@@ -1,5 +1,6 @@
 import Image from "next/image";
 import styles from "./styles/page.module.scss";
+import Auth from "@/components/Auth";
 
 export default function Home() {
   return (
@@ -8,11 +9,12 @@ export default function Home() {
         <Image
           className={styles.logo}
           src="/icon-192x192.png"
-          alt="Next.js logo"
+          alt="DH Portal logo"
           width={150}
           height={150}
           priority
         />
+        <Auth />
         </main>
     </div>
   );
