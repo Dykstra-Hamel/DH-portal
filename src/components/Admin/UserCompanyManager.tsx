@@ -323,7 +323,7 @@ export default function UserCompanyManager() {
                 <td>
                   {relationship.profiles ? 
                     `${relationship.profiles.first_name} ${relationship.profiles.last_name}` : 
-                    relationship.profiles?.email || 'Unknown user'
+                    (relationship.profiles as any)?.email || 'Unknown user'
                   }
                 </td>
                 <td>{relationship.companies?.name || 'Unknown company'}</td>
