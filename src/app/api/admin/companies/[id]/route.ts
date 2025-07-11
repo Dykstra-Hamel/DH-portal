@@ -3,11 +3,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const companyData = await request.json()
-    const companyId = params.id
+    const resolvedParams = await params
+    const companyId = resolvedParams.id
 
     const { error } = await supabaseAdmin
       .from('companies')
@@ -28,10 +29,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const companyId = params.id
+    const resolvedParams = await params
+    const companyId = resolvedParams.id
 
     const { error } = await supabaseAdmin
       .from('companies')

@@ -5,7 +5,7 @@ import { validateUserInput, sanitizeString, validateUUID } from '@/lib/validatio
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -14,7 +14,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userId = params.id
+    const resolvedParams = await params
+    const userId = resolvedParams.id
     if (!validateUUID(userId)) {
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 })
     }
@@ -54,7 +55,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -63,7 +64,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userId = params.id
+    const resolvedParams = await params
+    const userId = resolvedParams.id
     if (!validateUUID(userId)) {
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 })
     }
