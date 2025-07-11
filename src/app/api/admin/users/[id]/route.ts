@@ -10,7 +10,7 @@ export async function PUT(
   try {
     // Verify authentication
     const { user, error: authError } = await verifyAuth(request)
-    if (authError || !user || !isAuthorizedAdmin(user)) {
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -60,7 +60,7 @@ export async function DELETE(
   try {
     // Verify authentication
     const { user, error: authError } = await verifyAuth(request)
-    if (authError || !user || !isAuthorizedAdmin(user)) {
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

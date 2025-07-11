@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { supabase } from './supabase'
+import { supabaseAdmin } from './supabase-admin'
 
 export async function verifyAuth(request: NextRequest) {
   try {
@@ -9,7 +9,9 @@ export async function verifyAuth(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error } = await supabase.auth.getUser(token)
+    
+    // Try to verify with admin client first (more reliable for API routes)
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
 
     if (error || !user) {
       return { user: null, error: 'Invalid or expired token' }
@@ -21,10 +23,21 @@ export async function verifyAuth(request: NextRequest) {
   }
 }
 
-// For now, we'll allow any authenticated user to access admin routes
-// In production, you might want to check for specific roles/permissions
-export function isAuthorizedAdmin(user: any): boolean {
-  return !!user // For now, any authenticated user can be admin
-  // In production, you might check:
-  // return user?.user_metadata?.role === 'admin' || user?.email?.endsWith('@yourdomain.com')
+// Check if user has admin role
+export async function isAuthorizedAdmin(user: any): Promise<boolean> {
+  if (!user) return false
+  
+  // Check if user has admin role in their profile using admin client
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+    
+  return profile?.role === 'admin'
+}
+
+// Synchronous version for cases where we already have the profile
+export function isAuthorizedAdminSync(profile: any): boolean {
+  return profile?.role === 'admin'
 }
