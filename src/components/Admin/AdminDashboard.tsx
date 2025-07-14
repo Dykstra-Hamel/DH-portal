@@ -5,13 +5,14 @@ import { User } from '@supabase/supabase-js'
 import UsersManager from './UsersManager'
 import CompaniesManager from './CompaniesManager'
 import UserCompanyManager from './UserCompanyManager'
+import BrandManager from './BrandManager'
 import styles from './AdminDashboard.module.scss'
 
 interface AdminDashboardProps {
   user: User
 }
 
-type AdminSection = 'users' | 'companies' | 'relationships'
+type AdminSection = 'users' | 'companies' | 'relationships' | 'brands'
 
 export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [activeSection, setActiveSection] = useState<AdminSection>('users')
@@ -24,6 +25,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <CompaniesManager />
       case 'relationships':
         return <UserCompanyManager />
+      case 'brands':
+        return <BrandManager />
       default:
         return <UsersManager />
     }
@@ -54,6 +57,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           onClick={() => setActiveSection('relationships')}
         >
           User-Company Links
+        </button>
+        <button
+          className={`${styles.navButton} ${activeSection === 'brands' ? styles.active : ''}`}
+          onClick={() => setActiveSection('brands')}
+        >
+          Brand Management
         </button>
       </nav>
 
