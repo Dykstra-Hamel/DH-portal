@@ -33,12 +33,12 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const [marketingOpen, setMarketingOpen] = useState(false);
   const [helpfulToolsOpen, setHelpfulToolsOpen] = useState(false);
 
+  const pathname = usePathname();
+  const isLoginPage = pathname === '/login'
+
   if (collapsed) {
     return null;
   }
-
-  const pathname = usePathname();
-  const isLoginPage = pathname === '/login'
 
   if (!isLoginPage && pathname !== '/') {
     return (
