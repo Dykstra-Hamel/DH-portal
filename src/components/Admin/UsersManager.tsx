@@ -23,8 +23,14 @@ interface UserWithProfile extends AuthUser {
   profiles?: Profile
 }
 
+interface Company {
+  id: string
+  name: string
+}
+
 export default function UsersManager() {
   const [users, setUsers] = useState<UserWithProfile[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingUser, setEditingUser] = useState<Profile | null>(null)
@@ -33,12 +39,30 @@ export default function UsersManager() {
   const [formData, setFormData] = useState({
     email: '',
     first_name: '',
-    last_name: ''
+    last_name: '',
+    company_id: '',
+    role: 'member'
   })
 
   useEffect(() => {
-    loadUsers()
+    loadData()
   }, [])
+
+  const loadData = async () => {
+    try {
+      setError(null)
+      const [usersData, companiesData] = await Promise.all([
+        adminAPI.getUsers(),
+        adminAPI.getCompanies()
+      ])
+      setUsers(Array.isArray(usersData) ? usersData : [])
+      setCompanies(Array.isArray(companiesData) ? companiesData : [])
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const loadUsers = async () => {
     try {
@@ -47,8 +71,6 @@ export default function UsersManager() {
       setUsers(Array.isArray(usersData) ? usersData : [])
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load users')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -56,15 +78,20 @@ export default function UsersManager() {
     e.preventDefault()
     if (submitting) return
     
+    if (!formData.company_id) {
+      setError('Company selection is required')
+      return
+    }
+    
     try {
       setSubmitting(true)
       setError(null)
-      await adminAPI.createUser(formData)
-      setFormData({ email: '', first_name: '', last_name: '' })
+      await adminAPI.inviteUser(formData)
+      setFormData({ email: '', first_name: '', last_name: '', company_id: '', role: 'member' })
       setShowCreateForm(false)
       loadUsers()
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to create user')
+      setError(error instanceof Error ? error.message : 'Failed to send invitation')
     } finally {
       setSubmitting(false)
     }
@@ -116,7 +143,7 @@ export default function UsersManager() {
           onClick={() => setShowCreateForm(true)}
           disabled={submitting}
         >
-          Create User
+          Invite User
         </button>
       </div>
 
@@ -130,7 +157,7 @@ export default function UsersManager() {
       {showCreateForm && (
         <div className={styles.modal}>
           <div className={styles.modalContent}>
-            <h3>Create New User</h3>
+            <h3>Invite New User</h3>
             <form onSubmit={handleCreateUser}>
               <div className={styles.formGroup}>
                 <label>Email:</label>
@@ -159,9 +186,36 @@ export default function UsersManager() {
                   required
                 />
               </div>
+              <div className={styles.formGroup}>
+                <label>Company: *</label>
+                <select
+                  value={formData.company_id}
+                  onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
+                  required
+                >
+                  <option value="">Select a company</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Role:</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                >
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </div>
               <div className={styles.formActions}>
                 <button type="submit" className={styles.saveButton} disabled={submitting}>
-                  {submitting ? 'Creating...' : 'Create'}
+                  {submitting ? 'Sending Invite...' : 'Send Invitation'}
                 </button>
                 <button 
                   type="button" 

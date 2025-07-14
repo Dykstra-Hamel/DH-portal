@@ -41,6 +41,13 @@ export const adminAPI = {
     })
   },
 
+  async inviteUser(userData: { email: string; first_name: string; last_name: string; company_id: string; role: string }) {
+    return authenticatedFetch('/api/admin/users/invite', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    })
+  },
+
   async updateUser(userId: string, userData: { email: string; first_name: string; last_name: string }) {
     return authenticatedFetch(`/api/admin/users/${userId}`, {
       method: 'PUT',
