@@ -1,6 +1,19 @@
-// Global styles
-
-// Enable smooth scrolling for anchor links
-html {
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-outfit);
   scroll-behavior: smooth;
+}
+
+body {
+    background-color: #fff;
+    line-height: 1.5;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+a {
+  text-decoration: none;
 }

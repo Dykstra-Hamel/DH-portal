@@ -1,0 +1,136 @@
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 225px;
+    height: 100vh;
+    background-color: #353535;
+    color: #fff;
+
+    &LogoSection {
+        padding: 1.5rem;
+        border-bottom: 1px solid #4b5563;
+    }
+
+    &Navigation {
+        flex: 1;
+        padding: 1rem 0;
+    }
+
+    &Section {
+        margin-bottom: 1rem;
+
+        &Header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            text-align: left;
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        &Title {
+            color: #73d2de;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        &Icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            color: #73d2de;
+            transition: transform 0.3s ease-out;
+
+            &Expanded {
+                transform: rotate(90deg);
+            }
+        }
+
+        &Content {
+            overflow: hidden;
+            transition: all 0.3s ease-out;
+
+            &Collapsed {
+                max-height: 0;
+                opacity: 0;
+            }
+
+            &Expanded {
+                max-height: 500px;
+                opacity: 1;
+            }
+        }
+
+        &Nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+
+            &Item {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                width: 100%;
+                text-align: left;
+                padding: 0.5rem 1.5rem;
+                font-size: 14px;
+                color: white;
+                background: none;
+                border: none;
+                cursor: pointer;
+                transition: background-color 0.2s;
+                font-weight: normal;
+                position: relative;
+
+                &:hover {
+                    background-color: #4b5563;
+                }
+            }
+        }
+    }
+
+    &Nav {
+        &Item {
+            margin-bottom: 1rem;
+        }
+
+        &Link {
+            display: flex;
+            position: relative;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            text-align: left;
+            padding: 0.5rem 1.5rem;
+            font-size: 14px;
+            color: white;
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: normal;
+
+            &:hover {
+                background-color: #4b5563;
+            }
+
+            &Active {
+                background-color: #2b2b2b;
+                font-weight: 500;
+
+                &::before {
+                    content: '';
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    bottom: 0;
+                    width: 4px;
+                    background-color: #73d2de;
+                }
+            }
+        }
+    }
+}

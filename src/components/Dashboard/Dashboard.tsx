@@ -49,7 +49,7 @@ export default function Dashboard({
     if (error) {
       console.error('Error signing out:', error)
     } else {
-      router.push('/')
+      router.push('/login')
     }
   }
 

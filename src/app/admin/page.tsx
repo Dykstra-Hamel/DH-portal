@@ -16,7 +16,7 @@ export default function AdminPage() {
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session?.user) {
-        router.push('/')
+        router.push('/login')
         return
       }
 
@@ -29,7 +29,7 @@ export default function AdminPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!session?.user) {
-          router.push('/')
+          router.push('/login')
         }
       }
     )
