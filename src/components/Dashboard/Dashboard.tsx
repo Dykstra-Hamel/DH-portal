@@ -3,6 +3,7 @@
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import AccountLinking from '@/components/AccountLinking/AccountLinking'
 import styles from './Dashboard.module.scss'
 
 interface Profile {
@@ -118,6 +119,10 @@ export default function Dashboard({
             {selectedCompany && (
               <p>Currently viewing: <strong>{selectedCompany.name}</strong></p>
             )}
+          </div>
+
+          <div className={styles.card}>
+            <AccountLinking user={user} />
           </div>
         </div>
       </main>
