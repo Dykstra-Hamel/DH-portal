@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from "next/image";
+import { usePathname } from 'next/navigation';
 import { 
   Settings, 
   LogOut, 
@@ -36,55 +37,60 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
     return null;
   }
 
-  return (
-    <div className={styles.sidebar}>
-      {/* Logo Section */}
-      <div className={styles.sidebarLogoSection}>
-        <Image
-          src="pcocentral-logo.svg"
-          alt="pcocentral logo"
-          width={131}
-          height={23}
-          priority
-        />
-      </div>
+  const pathname = usePathname();
+  const isLoginPage = pathname === '/login'
 
-      {/* Navigation */}
-      <nav className={styles.sidebarNavigation}>
-        {/* Dashboard Item */}
-        <SidebarSingleNavItem itemText='Dashboard' icon={LayoutDashboard} path='/dashboard' />
+  if (!isLoginPage && pathname !== '/') {
+    return (
+      <div className={styles.sidebar}>
+        {/* Logo Section */}
+        <div className={styles.sidebarLogoSection}>
+          <Image
+            src="pcocentral-logo.svg"
+            alt="pcocentral logo"
+            width={131}
+            height={23}
+            priority
+          />
+        </div>
 
-        {/* Company Section */}
-        <SidebarSection sectionTitle='Company' sectionState={companyOpen} setSectionState={setCompanyOpen}>
-          <SidebarSectionNavItem itemText='Leads' icon={UserPlus} />
-          <SidebarSectionNavItem itemText='Customers' icon={Users} />
-          <SidebarSectionNavItem itemText='Routing' icon={Route} />
-          <SidebarSectionNavItem itemText='Tech Revenue' icon={DollarSign} />
-          <SidebarSectionNavItem itemText='Employees' icon={UserCheck} />
-        </SidebarSection>
+        {/* Navigation */}
+        <nav className={styles.sidebarNavigation}>
+          {/* Dashboard Item */}
+          <SidebarSingleNavItem itemText='Dashboard' icon={LayoutDashboard} path='/dashboard' />
 
-        {/* Marketing Section */}
-        <SidebarSection sectionTitle='Marketing' sectionState={marketingOpen} setSectionState={setMarketingOpen}>
-          <SidebarSectionNavItem itemText='Overview' icon={BarChart3} />
-          <SidebarSectionNavItem itemText='Your Brand' icon={Palette} />
-          <SidebarSectionNavItem itemText='Projects' icon={Briefcase} />
-          <SidebarSectionNavItem itemText='Email Campaigns' icon={Mail} />
-        </SidebarSection>
+          {/* Company Section */}
+          <SidebarSection sectionTitle='Company' sectionState={companyOpen} setSectionState={setCompanyOpen}>
+            <SidebarSectionNavItem itemText='Leads' icon={UserPlus} path='#' />
+            <SidebarSectionNavItem itemText='Customers' icon={Users} path='#' />
+            <SidebarSectionNavItem itemText='Routing' icon={Route} path='#' />
+            <SidebarSectionNavItem itemText='Tech Revenue' icon={DollarSign} path='#' />
+            <SidebarSectionNavItem itemText='Employees' icon={UserCheck} path='#' />
+          </SidebarSection>
 
-        {/* Helpful Tools Section */}
-        <SidebarSection sectionTitle='Helpful Tools' sectionState={helpfulToolsOpen} setSectionState={setHelpfulToolsOpen}>
-          <SidebarSectionNavItem itemText='Document Manager' icon={FileText} />
-          <SidebarSectionNavItem itemText='Inventory Control' icon={Package} />
-        </SidebarSection>
-      </nav>
+          {/* Marketing Section */}
+          <SidebarSection sectionTitle='Marketing' sectionState={marketingOpen} setSectionState={setMarketingOpen}>
+            <SidebarSectionNavItem itemText='Overview' icon={BarChart3} path='#' />
+            <SidebarSectionNavItem itemText='Your Brand' icon={Palette} path='/brand' />
+            <SidebarSectionNavItem itemText='Projects' icon={Briefcase} path='#' />
+            <SidebarSectionNavItem itemText='Email Campaigns' icon={Mail} path='#' />
+          </SidebarSection>
 
-      {/* Bottom Section */}
-      <div className="sidebar-bottom-section">
-        <div className="sidebar-bottom-nav">
-          <SidebarSingleNavItem itemText='Settings' icon={Settings} path='/dasbhoard-1' />
-          <SidebarSingleNavItem itemText='Log Out' icon={LogOut} path='#' />
+          {/* Helpful Tools Section */}
+          <SidebarSection sectionTitle='Helpful Tools' sectionState={helpfulToolsOpen} setSectionState={setHelpfulToolsOpen}>
+            <SidebarSectionNavItem itemText='Document Manager' icon={FileText} path='#' />
+            <SidebarSectionNavItem itemText='Inventory Control' icon={Package} path='#' />
+          </SidebarSection>
+        </nav>
+
+        {/* Bottom Section */}
+        <div className="sidebar-bottom-section">
+          <div className="sidebar-bottom-nav">
+            <SidebarSingleNavItem itemText='Settings' icon={Settings} path='/dasbhoard-1' />
+            <SidebarSingleNavItem itemText='Log Out' icon={LogOut} path='#' />
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 }

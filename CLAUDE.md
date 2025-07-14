@@ -36,9 +36,16 @@ This is a Next.js application with Supabase authentication supporting Google OAu
 - Auth providers configured: Google, Facebook
 - Email templates configured for magic links
 
+## Database Changes
+
+- Create migration: `npx supabase migration new <name>`
+- Test locally: `npx supabase db push --local`
+- Deploy to production: `npx supabase db push --linked`
+
 ## Notes for Developers
 
 - Always test auth flows after making changes
 - Check Supabase dashboard for auth logs and user management
 - Use `auth.sessions` table via SQL Editor to debug sessions
 - Redirect URL for OAuth: `${window.location.origin}/auth/callback`
+- CLAUDE should not run Git commands in order to avoid mistakes.

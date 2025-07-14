@@ -1,12 +1,118 @@
-import styles from "../styles/page.module.scss";
+'use client'
 
-export default async function DashboardPage() {
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { User } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
+import Dashboard from '@/components/Dashboard/Dashboard'
 
-    return (
-        <div className={styles.page}>
-            <main className={styles.main}>
-                <h1>This is a dashboard.</h1>
-            </main>
-        </div>
+interface Profile {
+  id: string
+  first_name: string
+  last_name: string
+  email: string
+}
+
+interface Company {
+  id: string
+  name: string
+}
+
+interface UserCompany {
+  id: string
+  user_id: string
+  company_id: string
+  role: string
+  is_primary: boolean
+  companies: Company
+}
+
+export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([])
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    const getSessionAndData = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.user) {
+        router.push('/login')
+        return
+      }
+
+      setUser(session.user)
+
+      // Get user profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single()
+
+      if (!profileError && profileData) {
+        setProfile(profileData)
+      }
+
+      // Get user companies
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('user_companies')
+        .select(`
+          *,
+          companies (
+            id,
+            name
+          )
+        `)
+        .eq('user_id', session.user.id)
+
+      if (!companiesError && companiesData) {
+        setUserCompanies(companiesData)
+        
+        // Set primary company as selected, or first company if no primary
+        const primaryCompany = companiesData.find(uc => uc.is_primary)
+        if (primaryCompany) {
+          setSelectedCompany(primaryCompany.companies)
+        } else if (companiesData.length > 0) {
+          setSelectedCompany(companiesData[0].companies)
+        }
+      }
+
+      setLoading(false)
+    }
+
+    getSessionAndData()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!session?.user) {
+          router.push('/login')
+        }
+      }
     )
+
+    return () => subscription.unsubscribe()
+  }, [router])
+
+  if (loading) {
+    return <div>Loading...</div>
+  }
+
+  if (!user || !profile) {
+    return <div>Redirecting...</div>
+  }
+
+  return (
+    <Dashboard
+      user={user}
+      profile={profile}
+      userCompanies={userCompanies}
+      selectedCompany={selectedCompany}
+      onCompanyChange={setSelectedCompany}
+    />
+  )
 }
