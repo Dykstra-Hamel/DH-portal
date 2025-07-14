@@ -80,41 +80,41 @@ export default function Auth() {
 
   if (!user) {
     return (
-      <div className="space-y-4">
-        <div className="space-y-2">
+      <div className="">
+        <div className="">
           <button 
             onClick={signInWithGoogle}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className=""
           >
             Sign in with Google
           </button>
           <button 
             onClick={signInWithFacebook}
-            className="w-full px-4 py-2 bg-blue-800 text-white rounded hover:bg-blue-900"
+            className=""
           >
             Sign in with Facebook
           </button>
         </div>
         
-        <div className="border-t pt-4">
-          <h3 className="text-sm font-medium mb-2">Or sign in with magic link:</h3>
+        <div className="">
+          <h3 className="">Or sign in with magic link:</h3>
           {magicLinkSent ? (
-            <div className="text-green-600 text-sm">
+            <div className="">
               Magic link sent! Check your email.
             </div>
           ) : (
-            <form onSubmit={signInWithMagicLink} className="space-y-2">
+            <form onSubmit={signInWithMagicLink} className="">
               <input
                 type="email"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className=""
                 required
               />
               <button 
                 type="submit"
-                className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                className=""
               >
                 Send Magic Link
               </button>
