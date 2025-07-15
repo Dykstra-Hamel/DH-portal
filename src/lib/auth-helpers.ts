@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { supabaseAdmin } from './supabase-admin'
+import { createAdminClient } from './supabase/server-admin'
 
 export async function verifyAuth(request: NextRequest) {
   try {
@@ -9,9 +9,10 @@ export async function verifyAuth(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
+    const supabase = createAdminClient()
     
     // Try to verify with admin client first (more reliable for API routes)
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+    const { data: { user }, error } = await supabase.auth.getUser(token)
 
     if (error || !user) {
       return { user: null, error: 'Invalid or expired token' }
@@ -27,8 +28,9 @@ export async function verifyAuth(request: NextRequest) {
 export async function isAuthorizedAdmin(user: any): Promise<boolean> {
   if (!user) return false
   
+  const supabase = createAdminClient()
   // Check if user has admin role in their profile using admin client
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)

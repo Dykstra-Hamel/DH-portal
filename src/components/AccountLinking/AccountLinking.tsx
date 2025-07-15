@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { User, UserIdentity } from '@supabase/supabase-js'
 import styles from './AccountLinking.module.scss'
 
@@ -24,10 +24,16 @@ export default function AccountLinking({ user }: AccountLinkingProps) {
   const linkProvider = async (provider: 'google' | 'facebook') => {
     setLinking(provider)
     try {
+      const supabase = createClient()
       const { error } = await supabase.auth.linkIdentity({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
+          // PKCE is used by default for linkIdentity
+          queryParams: {
+            // Add any additional query params if needed
+            flow_type: 'pkce'
+          }
         }
       })
       
@@ -35,6 +41,7 @@ export default function AccountLinking({ user }: AccountLinkingProps) {
         console.error('Error linking account:', error)
         alert(`Error linking ${provider}: ${error.message}`)
       }
+      // Note: The actual linking happens after redirect, so we don't update state here
     } catch (error) {
       console.error('Error linking account:', error)
       alert(`Error linking ${provider} account`)
@@ -43,6 +50,26 @@ export default function AccountLinking({ user }: AccountLinkingProps) {
     }
   }
 
+  const unlinkProvider = async (identity: UserIdentity) => {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.unlinkIdentity(identity)
+      
+      if (error) {
+        console.error('Error unlinking account:', error)
+        alert(`Error unlinking account: ${error.message}`)
+      } else {
+        // Refresh user data to update the UI
+        const { data: { user: updatedUser } } = await supabase.auth.getUser()
+        if (updatedUser?.identities) {
+          setIdentities(updatedUser.identities)
+        }
+      }
+    } catch (error) {
+      console.error('Error unlinking account:', error)
+      alert('Error unlinking account')
+    }
+  }
 
   const getProviderDisplayName = (provider: string) => {
     switch (provider) {
@@ -55,6 +82,11 @@ export default function AccountLinking({ user }: AccountLinkingProps) {
 
   const isProviderLinked = (provider: string) => {
     return identities.some(identity => identity.provider === provider)
+  }
+
+  const canUnlink = (identity: UserIdentity) => {
+    // Don't allow unlinking if it's the only identity
+    return identities.length > 1
   }
 
   if (loading) {
@@ -81,6 +113,14 @@ export default function AccountLinking({ user }: AccountLinkingProps) {
                     {identity.identity_data?.email || 'No email'}
                   </span>
                 </div>
+                {canUnlink(identity) && identity.provider !== 'email' && (
+                  <button
+                    onClick={() => unlinkProvider(identity)}
+                    className={styles.unlinkButton}
+                  >
+                    Unlink
+                  </button>
+                )}
               </div>
             ))}
           </div>

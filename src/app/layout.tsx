@@ -24,7 +24,7 @@ export default function RootLayout({
     <html lang="en" className={`${outfit.className}`}>
       <body>
         <Sidebar />
-        <section>
+        <section className="page">
           {children}
         </section>
       </body>
