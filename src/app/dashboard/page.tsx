@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import Dashboard from '@/components/Dashboard/Dashboard'
@@ -36,6 +36,8 @@ export default function DashboardPage() {
   const router = useRouter()
 
   useEffect(() => {
+    const supabase = createClient()
+    
     const getSessionAndData = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       
@@ -88,7 +90,7 @@ export default function DashboardPage() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_, session) => {
         if (!session?.user) {
           router.push('/login')
         }

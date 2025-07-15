@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
     }
 
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('brands')
       .select('*')
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
     }
 
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('brands')
       .upsert(brandData)
@@ -63,6 +65,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Brand ID is required' }, { status: 400 });
     }
 
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('brands')
       .update(brandData)
@@ -91,6 +94,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Brand ID is required' }, { status: 400 });
     }
 
+    const supabase = await createClient();
     const { error } = await supabase
       .from('brands')
       .delete()

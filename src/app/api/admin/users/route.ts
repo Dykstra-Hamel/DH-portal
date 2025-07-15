@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createAdminClient } from '@/lib/supabase/server-admin'
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers'
 
 export async function GET(request: NextRequest) {
@@ -10,15 +10,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const supabase = createAdminClient()
     // Get all users from auth.users
-    const { data: authUsers, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
+    const { data: authUsers, error: usersError } = await supabase.auth.admin.listUsers()
 
     if (usersError) {
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
     }
 
     // Get all profiles
-    const { data: profiles, error: profilesError } = await supabaseAdmin
+    const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
 
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const supabase = createAdminClient()
     const body = await request.json()
     const { validateUserInput, sanitizeString } = await import('@/lib/validation')
     
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user via Supabase auth admin
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    const { data, error } = await supabase.auth.admin.createUser({
       email: userData.email,
       password: 'tempPassword123', // Default password, user should reset
       user_metadata: {
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     // Create profile
     if (data.user) {
-      const { error: profileError } = await supabaseAdmin
+      const { error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: data.user.id,

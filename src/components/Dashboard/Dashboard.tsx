@@ -1,7 +1,7 @@
 'use client'
 
 import { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import AccountLinking from '@/components/AccountLinking/AccountLinking'
 import styles from './Dashboard.module.scss'
@@ -45,6 +45,7 @@ export default function Dashboard({
   const router = useRouter()
 
   const handleSignOut = async () => {
+    const supabase = createClient()
     const { error } = await supabase.auth.signOut()
     if (error) {
       console.error('Error signing out:', error)

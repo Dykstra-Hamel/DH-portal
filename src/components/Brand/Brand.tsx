@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import styles from './Brand.module.scss';
 
 interface ColorInfo {
@@ -297,7 +298,14 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       <div className={styles.heroSection}>
         <div className={styles.heroGradient} style={getGradientStyle()}>
           {brandData.logo_url && (
-            <img src={brandData.logo_url} alt={`${companyName} Logo`} className={styles.heroLogo} />
+            <Image 
+              src={brandData.logo_url} 
+              alt={`${companyName} Logo`} 
+              className={styles.heroLogo}
+              width={300}
+              height={120}
+              style={{ maxWidth: '300px', maxHeight: '120px', width: 'auto', height: 'auto' }}
+            />
           )}
         </div>
       </div>
@@ -410,7 +418,13 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
         {brandData.logo_url && (
           <div className={styles.logoShowcase}>
             <div className={styles.logoContainer}>
-              <img src={brandData.logo_url} alt={`${companyName} Logo`} />
+              <Image 
+                src={brandData.logo_url} 
+                alt={`${companyName} Logo`}
+                width={400}
+                height={200}
+                style={{ maxWidth: '100%', height: 'auto' }}
+              />
             </div>
           </div>
         )}
@@ -493,13 +507,15 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
         {brandData.photography_images && brandData.photography_images.length > 0 && (
           <div className={styles.photographyGrid}>
             {brandData.photography_images.map((image, index) => (
-              <img 
+              <Image
                 key={index} 
                 src={image} 
                 alt={`Photography example ${index + 1}`} 
                 className={styles.photographyImage}
-                onClick={() => openLightbox(image)}
+                width={600}
+                height={400}
                 style={{ cursor: 'pointer' }}
+                onClick={() => openLightbox(image)}
               />
             ))}
           </div>
@@ -513,7 +529,14 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
             <button className={styles.lightboxClose} onClick={closeLightbox}>
               ×
             </button>
-            <img src={lightboxImage} alt="Photography enlarged" className={styles.lightboxImage} />
+            <Image 
+              src={lightboxImage} 
+              alt="Photography enlarged" 
+              className={styles.lightboxImage}
+              width={1200}
+              height={800}
+              style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }}
+            />
           </div>
         </div>
       )}

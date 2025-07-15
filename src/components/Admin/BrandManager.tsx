@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 import styles from './AdminManager.module.scss';
 
 interface Company {
@@ -51,6 +52,7 @@ export default function BrandManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const supabase = createClient();
 
 
   useEffect(() => {
@@ -401,7 +403,13 @@ export default function BrandManager() {
                   />
                   {brandData.logo_url && (
                     <div className={styles.logoPreview}>
-                      <img src={brandData.logo_url} alt="Logo preview" />
+                      <Image 
+                        src={brandData.logo_url} 
+                        alt="Logo preview" 
+                        width={200}
+                        height={100}
+                        style={{ maxWidth: '100%', height: 'auto' }}
+                      />
                     </div>
                   )}
                   <textarea
@@ -651,7 +659,14 @@ export default function BrandManager() {
                     <div className={styles.photographyGrid}>
                       {brandData.photography_images.map((image, index) => (
                         <div key={index} className={styles.photographyImageItem}>
-                          <img src={image} alt={`Photography ${index + 1}`} className={styles.photographyPreview} />
+                          <Image 
+                            src={image} 
+                            alt={`Photography ${index + 1}`} 
+                            className={styles.photographyPreview}
+                            width={300}
+                            height={200}
+                            style={{ maxWidth: '100%', height: 'auto' }}
+                          />
                           <button
                             type="button"
                             onClick={() => removePhotographyImage(index)}

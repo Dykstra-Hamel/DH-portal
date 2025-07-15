@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createAdminClient } from '@/lib/supabase/server-admin'
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers'
 import { validateUserInput, sanitizeString, validateUUID } from '@/lib/validation'
 
@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const supabase = createAdminClient()
     const body = await request.json()
     
     // Validate and sanitize input
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify company exists
-    const { data: company, error: companyError } = await supabaseAdmin
+    const { data: company, error: companyError } = await supabase
       .from('companies')
       .select('id, name')
       .eq('id', userData.company_id)
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send invitation using Supabase auth admin
-    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+    const { data, error } = await supabase.auth.admin.inviteUserByEmail(
       userData.email,
       {
         redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     // If user was successfully invited, create a profile and company relationship
     if (data.user) {
       // Create profile
-      await supabaseAdmin
+      await supabase
         .from('profiles')
         .insert({
           id: data.user.id,
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
         })
 
       // Create user-company relationship
-      await supabaseAdmin
+      await supabase
         .from('user_companies')
         .insert({
           user_id: data.user.id,

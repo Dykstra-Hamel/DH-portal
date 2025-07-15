@@ -1,7 +1,8 @@
-import { supabase } from './supabase'
+import { createClient } from './supabase/client'
 
 // Helper for making authenticated API calls to admin endpoints
 export async function authenticatedFetch(url: string, options: RequestInit = {}) {
+  const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   
   if (!session?.access_token) {

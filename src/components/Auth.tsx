@@ -1,16 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 
 export default function Auth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
+    const supabase = createClient()
+    
     // Get initial session
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -22,30 +26,47 @@ export default function Auth() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_, session) => {
         setUser(session?.user ?? null)
         setLoading(false)
+        
+        // Redirect to dashboard if user is authenticated
+        if (session?.user) {
+          router.push('/dashboard')
+        }
       }
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [router])
 
   const signInWithGoogle = async () => {
+    const supabase = createClient()
+    // Use localhost in development, otherwise use current origin
+    const redirectOrigin = process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:3000' 
+      : window.location.origin
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+        redirectTo: `${redirectOrigin}/auth/callback?next=/dashboard`,
       }
     })
     if (error) console.error('Error signing in:', error)
   }
 
   const signInWithFacebook = async () => {
+    const supabase = createClient()
+    // Use localhost in development, otherwise use current origin
+    const redirectOrigin = process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:3000' 
+      : window.location.origin
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+        redirectTo: `${redirectOrigin}/auth/callback?next=/dashboard`,
       }
     })
     if (error) console.error('Error signing in:', error)
@@ -55,10 +76,16 @@ export default function Auth() {
     e.preventDefault()
     if (!email) return
 
+    const supabase = createClient()
+    // Use localhost in development, otherwise use current origin
+    const redirectOrigin = process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:3000' 
+      : window.location.origin
+    
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`
+        emailRedirectTo: `${redirectOrigin}/auth/callback?next=/dashboard`
       }
     })
     
@@ -70,6 +97,7 @@ export default function Auth() {
   }
 
   const signOut = async () => {
+    const supabase = createClient()
     const { error } = await supabase.auth.signOut()
     if (error) console.error('Error signing out:', error)
   }

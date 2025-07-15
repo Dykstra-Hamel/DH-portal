@@ -1,19 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
+export async function GET(request: Request) {
+  const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  // if "next" is in param, use it as the redirect URL
+  const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
+    const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (error) {
-      console.error('Error exchanging code for session:', error)
-      return NextResponse.redirect(new URL('/?error=auth_error', request.url))
+    if (!error) {
+      // URL to redirect to after sign up process completes
+      return NextResponse.redirect(`${origin}${next}`)
     }
   }
 
-  // Redirect to dashboard after successful authentication
-  return NextResponse.redirect(new URL('/dashboard', request.url))
+  // return the user to an error page with instructions
+  return NextResponse.redirect(`${origin}/login?error=auth-code-error`)
 }

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createAdminClient } from '@/lib/supabase/server-admin'
 
 export async function GET() {
   try {
+    const supabase = createAdminClient()
     // Load relationships (without joins since foreign key isn't set up)
-    const { data: relationshipsData, error: relError } = await supabaseAdmin
+    const { data: relationshipsData, error: relError } = await supabase
       .from('user_companies')
       .select('*')
       .order('joined_at', { ascending: false })
@@ -15,7 +16,7 @@ export async function GET() {
     }
 
     // Load users from auth.users using admin API
-    const { data: authUsers, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
+    const { data: authUsers, error: usersError } = await supabase.auth.admin.listUsers()
 
     if (usersError) {
       console.error('Error loading users:', usersError)
@@ -23,7 +24,7 @@ export async function GET() {
     }
 
     // Get profiles for users
-    const { data: profilesData, error: profilesError } = await supabaseAdmin
+    const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
 
@@ -38,7 +39,7 @@ export async function GET() {
     })) || []
 
     // Load companies
-    const { data: companiesData, error: companiesError } = await supabaseAdmin
+    const { data: companiesData, error: companiesError } = await supabase
       .from('companies')
       .select('id, name')
       .order('name')
@@ -68,9 +69,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createAdminClient()
     const relationshipData = await request.json()
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('user_companies')
       .insert([relationshipData])
       .select()

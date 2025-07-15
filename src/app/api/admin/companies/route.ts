@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createAdminClient } from '@/lib/supabase/server-admin'
 
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
       .from('companies')
       .select('*')
       .order('created_at', { ascending: false })
@@ -22,9 +23,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createAdminClient()
     const companyData = await request.json()
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('companies')
       .insert([companyData])
       .select()

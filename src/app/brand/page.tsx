@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import Brand from '@/components/Brand/Brand';
 
 interface BrandData {
@@ -64,6 +64,7 @@ export default function BrandPage() {
     const fetchUserCompaniesAndBrand = async () => {
       try {
         // Check if user is authenticated
+        const supabase = createClient()
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) {
           router.push('/');
@@ -164,6 +165,7 @@ export default function BrandPage() {
 
   const fetchBrandData = async (companyId: string) => {
     try {
+      const supabase = createClient()
       const { data: brandResult, error: brandError } = await supabase
         .from('brands')
         .select('*')

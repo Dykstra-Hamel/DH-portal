@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createAdminClient } from '@/lib/supabase/server-admin'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createAdminClient()
     const companyData = await request.json()
     const resolvedParams = await params
     const companyId = resolvedParams.id
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('companies')
       .update(companyData)
       .eq('id', companyId)
@@ -28,14 +29,15 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = createAdminClient()
     const resolvedParams = await params
     const companyId = resolvedParams.id
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('companies')
       .delete()
       .eq('id', companyId)
