@@ -39,18 +39,15 @@ export async function sendProjectCreatedNotification(
 
     console.log('About to call slack.chat.postMessage...');
     
-    // Add timeout to prevent hanging
+    // Add timeout to prevent hanging (shorter timeout for serverless)
     const messageTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Message send timed out after 10 seconds')), 10000);
+      setTimeout(() => reject(new Error('Message send timed out after 5 seconds')), 5000);
     });
     
+    // Try simple text message first to debug
     const messagePromise = slackClient.chat.postMessage({
       channel: channel,
-      text: message.text,
-      blocks: message.blocks,
-      username: config?.username || 'Project Bot',
-      icon_emoji: config?.iconEmoji || ':rocket:',
-      thread_ts: config?.threadTs,
+      text: `🚀 New Project Request: ${projectData.projectName}\n\nCompany: ${projectData.companyName}\nPriority: ${projectData.priority}\nDue Date: ${projectData.dueDate}\nRequested by: ${projectData.requesterName}\n\nDescription: ${projectData.description || 'No description provided'}`
     });
     
     const result = await Promise.race([messagePromise, messageTimeout]) as any;
