@@ -225,15 +225,24 @@ export async function POST(request: NextRequest) {
           .catch(error => console.error('Failed to send email notification:', error));
 
         // Send Slack notification
+        console.log('Attempting to send Slack notification with data:', {
+          projectId: slackData.projectId,
+          projectName: slackData.projectName,
+          companyName: slackData.companyName,
+          hasSlackToken: !!process.env.SLACK_BOT_TOKEN,
+          hasSlackChannel: !!process.env.SLACK_CHANNEL_PROJECT_REQUESTS,
+          slackChannel: process.env.SLACK_CHANNEL_PROJECT_REQUESTS
+        });
+        
         const slackPromise = sendSlackNotification(slackData)
           .then(result => {
             if (result.success) {
-              console.log('Slack notification sent successfully');
+              console.log('Slack notification sent successfully:', result);
             } else {
               console.error('Failed to send Slack notification:', result.error);
             }
           })
-          .catch(error => console.error('Failed to send Slack notification:', error));
+          .catch(error => console.error('Failed to send Slack notification - caught error:', error));
 
         // Wait for both notifications (but don't fail the main request)
         await Promise.allSettled([emailPromise, slackPromise]);
