@@ -39,18 +39,23 @@ export async function sendProjectCreatedNotification(
 
     console.log('About to call slack.chat.postMessage...');
     
-    // Add timeout to prevent hanging (shorter timeout for serverless)
-    const messageTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Message send timed out after 5 seconds')), 5000);
+    // Try direct HTTP request instead of SDK
+    const messageText = `🚀 New Project Request: ${projectData.projectName}\n\nCompany: ${projectData.companyName}\nPriority: ${projectData.priority}\nDue Date: ${projectData.dueDate}\nRequested by: ${projectData.requesterName}\n\nDescription: ${projectData.description || 'No description provided'}`;
+    
+    const response = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: channel,
+        text: messageText,
+      }),
     });
     
-    // Try simple text message first to debug
-    const messagePromise = slackClient.chat.postMessage({
-      channel: channel,
-      text: `🚀 New Project Request: ${projectData.projectName}\n\nCompany: ${projectData.companyName}\nPriority: ${projectData.priority}\nDue Date: ${projectData.dueDate}\nRequested by: ${projectData.requesterName}\n\nDescription: ${projectData.description || 'No description provided'}`
-    });
-    
-    const result = await Promise.race([messagePromise, messageTimeout]) as any;
+    console.log('HTTP response status:', response.status);
+    const result = await response.json();
     console.log('Slack API call completed, result:', result);
 
     if (result.ok) {
