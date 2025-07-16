@@ -45,6 +45,18 @@ export async function sendProjectCreatedNotification(
     console.log('About to make fetch request...');
     
     try {
+      // First test basic connectivity
+      console.log('Testing basic connectivity...');
+      const testResponse = await fetch('https://httpbin.org/get', {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'DH-Portal-Test'
+        }
+      });
+      console.log('Basic connectivity test status:', testResponse.status);
+      
+      // Now try Slack
+      console.log('Making Slack API request...');
       const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: {
@@ -57,7 +69,7 @@ export async function sendProjectCreatedNotification(
         }),
       });
       
-      console.log('Fetch request completed, status:', response.status);
+      console.log('Slack fetch request completed, status:', response.status);
       console.log('Response ok:', response.ok);
       
       const result = await response.json();
