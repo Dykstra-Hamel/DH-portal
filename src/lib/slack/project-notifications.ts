@@ -14,6 +14,13 @@ export async function sendProjectCreatedNotification(
   projectData: ProjectNotificationData,
   config?: Partial<SlackNotificationConfig>
 ) {
+  console.log('sendProjectCreatedNotification called with:', {
+    projectId: projectData.projectId,
+    projectName: projectData.projectName,
+    hasSlackClient: !!slackClient,
+    slackBotToken: process.env.SLACK_BOT_TOKEN ? 'Present' : 'Missing'
+  });
+
   if (!slackClient) {
     console.warn('Slack client not initialized - SLACK_BOT_TOKEN not provided');
     return { success: false, error: 'Slack client not configured' };
@@ -21,7 +28,10 @@ export async function sendProjectCreatedNotification(
 
   try {
     const channel = config?.channel || getChannelForNotificationType('PROJECT_REQUESTS');
+    console.log('Using channel:', channel);
+    
     const message = buildProjectCreatedMessage(projectData);
+    console.log('Built message:', { text: message.text, blockCount: message.blocks.length });
 
     const result = await slackClient.chat.postMessage({
       channel: channel,
@@ -33,7 +43,7 @@ export async function sendProjectCreatedNotification(
     });
 
     if (result.ok) {
-      console.log('Slack notification sent successfully:', result.ts);
+      console.log('Slack notification sent successfully:', result.ts, 'to channel:', result.channel);
       return { success: true, timestamp: result.ts, channel: result.channel };
     } else {
       console.error('Failed to send Slack notification:', result.error);
