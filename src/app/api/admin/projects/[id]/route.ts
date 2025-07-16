@@ -3,10 +3,11 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createAdminClient();
+    const { id } = await params;
     
     const { data: project, error } = await supabase
       .from('projects')
@@ -17,7 +18,7 @@ export async function GET(
           name
         )
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
     
     if (error) {
@@ -58,10 +59,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createAdminClient();
+    const { id } = await params;
     const body = await request.json();
     
     const {
@@ -109,7 +111,7 @@ export async function PUT(
         primary_file_path: primary_file_path || null,
         updated_at: new Date().toISOString()
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .select(`
         *,
         company:companies(
@@ -157,15 +159,16 @@ export async function PUT(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createAdminClient();
+    const { id } = await params;
     
     const { error } = await supabase
       .from('projects')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
     
     if (error) {
       console.error('Error deleting project:', error);
