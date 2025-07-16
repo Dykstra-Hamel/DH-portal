@@ -45,6 +45,10 @@ export async function sendProjectCreatedNotification(
     console.log('Making direct Slack API request...');
     
     try {
+      // Try with a timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
       const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: {
@@ -55,8 +59,10 @@ export async function sendProjectCreatedNotification(
           channel: channel,
           text: messageText,
         }),
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
       console.log('Slack fetch request completed, status:', response.status);
       console.log('Response ok:', response.ok);
       
@@ -72,6 +78,10 @@ export async function sendProjectCreatedNotification(
       }
     } catch (fetchError) {
       console.error('Fetch request failed:', fetchError);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.error('Request was aborted due to timeout');
+        return { success: false, error: 'Request timeout' };
+      }
       return { success: false, error: 'Network request failed' };
     }
   } catch (error) {
