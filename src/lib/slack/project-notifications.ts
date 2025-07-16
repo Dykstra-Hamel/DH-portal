@@ -46,12 +46,7 @@ export async function sendProjectCreatedNotification(
 
     console.log('About to call slack.chat.postMessage...');
     
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Slack API call timed out after 30 seconds')), 30000);
-    });
-
-    const slackPromise = slackClient.chat.postMessage({
+    const result = await slackClient.chat.postMessage({
       channel: channel,
       text: message.text,
       blocks: message.blocks,
@@ -60,7 +55,6 @@ export async function sendProjectCreatedNotification(
       thread_ts: config?.threadTs,
     });
 
-    const result = await Promise.race([slackPromise, timeoutPromise]);
     console.log('Slack API call completed, result:', result);
 
     if (result.ok) {
@@ -73,11 +67,11 @@ export async function sendProjectCreatedNotification(
   } catch (error) {
     console.error('Error sending Slack notification:', error);
     console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      data: error.data
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      code: (error as any)?.code,
+      data: (error as any)?.data
     });
     return { 
       success: false, 
