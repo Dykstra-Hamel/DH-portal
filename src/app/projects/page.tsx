@@ -151,7 +151,7 @@ export default function ProjectsPage() {
               <div className={styles.projectsSection}>
                 <div className={styles.sectionHeader}>
                   <h2>Your Projects for {selectedCompany.name}</h2>
-                  <p>Projects you've requested or been assigned to</p>
+                  <p>Projects you&apos;ve requested or been assigned to</p>
                 </div>
 
                 {projectsLoading ? (
