@@ -26,6 +26,29 @@ This is a Next.js application with Supabase authentication supporting Google OAu
 - Prefer functional components with hooks
 - Use absolute imports with `@/` prefix
 
+- **JSX Entity Escaping**: Always escape special characters in JSX text:
+  - Apostrophes: `don&apos;t` instead of `don't`
+  - Quotes: `&quot;` instead of `"`
+  - Less than: `&lt;` instead of `<`
+  - Greater than: `&gt;` instead of `>`
+  - This prevents Vercel build errors with `react/no-unescaped-entities`
+
+## Next.js API Route Rules
+
+- **IMPORTANT**: All API routes with dynamic segments must use `Promise<{ param: string }>` type for params
+- Always await params before using them: `const { id } = await params;`
+- **Example**: 
+  ```typescript
+  export async function GET(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+  ) {
+    const { id } = await params;
+    // Use id here
+  }
+  ```
+- This prevents Vercel build errors with Next.js 15+
+
 ## Styling Convetions
 
 - Do not use tailwind for styling. We will only use Scss Modules.

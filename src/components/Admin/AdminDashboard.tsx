@@ -6,13 +6,14 @@ import UsersManager from './UsersManager'
 import CompaniesManager from './CompaniesManager'
 import UserCompanyManager from './UserCompanyManager'
 import BrandManager from './BrandManager'
+import ProjectsManager from './ProjectsManager'
 import styles from './AdminDashboard.module.scss'
 
 interface AdminDashboardProps {
   user: User
 }
 
-type AdminSection = 'users' | 'companies' | 'relationships' | 'brands'
+type AdminSection = 'users' | 'companies' | 'relationships' | 'brands' | 'projects'
 
 export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [activeSection, setActiveSection] = useState<AdminSection>('users')
@@ -27,6 +28,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <UserCompanyManager />
       case 'brands':
         return <BrandManager />
+      case 'projects':
+        return <ProjectsManager user={user} />
       default:
         return <UsersManager />
     }
@@ -63,6 +66,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           onClick={() => setActiveSection('brands')}
         >
           Brand Management
+        </button>
+        <button
+          className={`${styles.navButton} ${activeSection === 'projects' ? styles.active : ''}`}
+          onClick={() => setActiveSection('projects')}
+        >
+          Projects
         </button>
       </nav>
 
