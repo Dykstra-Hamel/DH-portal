@@ -42,28 +42,37 @@ export async function sendProjectCreatedNotification(
     // Try direct HTTP request instead of SDK
     const messageText = `🚀 New Project Request: ${projectData.projectName}\n\nCompany: ${projectData.companyName}\nPriority: ${projectData.priority}\nDue Date: ${projectData.dueDate}\nRequested by: ${projectData.requesterName}\n\nDescription: ${projectData.description || 'No description provided'}`;
     
-    const response = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        channel: channel,
-        text: messageText,
-      }),
-    });
+    console.log('About to make fetch request...');
     
-    console.log('HTTP response status:', response.status);
-    const result = await response.json();
-    console.log('Slack API call completed, result:', result);
-
-    if (result.ok) {
-      console.log('Slack notification sent successfully:', result.ts, 'to channel:', result.channel);
-      return { success: true, timestamp: result.ts, channel: result.channel };
-    } else {
-      console.error('Failed to send Slack notification:', result.error);
-      return { success: false, error: result.error };
+    try {
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          channel: channel,
+          text: messageText,
+        }),
+      });
+      
+      console.log('Fetch request completed, status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      const result = await response.json();
+      console.log('JSON parsing completed, result:', result);
+      
+      if (result.ok) {
+        console.log('Slack notification sent successfully:', result.ts, 'to channel:', result.channel);
+        return { success: true, timestamp: result.ts, channel: result.channel };
+      } else {
+        console.error('Slack API returned error:', result.error);
+        return { success: false, error: result.error };
+      }
+    } catch (fetchError) {
+      console.error('Fetch request failed:', fetchError);
+      return { success: false, error: 'Network request failed' };
     }
   } catch (error) {
     console.error('Error sending Slack notification:', error);

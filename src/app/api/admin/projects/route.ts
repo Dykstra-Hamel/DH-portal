@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
           .then(() => console.log('Email notification sent successfully'))
           .catch(error => console.error('Failed to send email notification:', error));
 
-        // Send Slack notification
+        // Send Slack notification (fire and forget to avoid blocking)
         console.log('Attempting to send Slack notification with data:', {
           projectId: slackData.projectId,
           projectName: slackData.projectName,
@@ -234,7 +234,8 @@ export async function POST(request: NextRequest) {
           slackChannel: process.env.SLACK_CHANNEL_PROJECT_REQUESTS
         });
         
-        const slackPromise = sendSlackNotification(slackData)
+        // Don't await Slack notification - let it run in background
+        sendSlackNotification(slackData)
           .then(result => {
             if (result.success) {
               console.log('Slack notification sent successfully:', result);
@@ -244,8 +245,8 @@ export async function POST(request: NextRequest) {
           })
           .catch(error => console.error('Failed to send Slack notification - caught error:', error));
 
-        // Wait for both notifications (but don't fail the main request)
-        await Promise.allSettled([emailPromise, slackPromise]);
+        // Only wait for email notification
+        await emailPromise;
       } catch (error) {
         console.error('Failed to send notifications:', error);
       }
