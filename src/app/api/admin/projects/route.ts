@@ -224,28 +224,25 @@ export async function POST(request: NextRequest) {
           .then(() => console.log('Email notification sent successfully'))
           .catch(error => console.error('Failed to send email notification:', error));
 
-        // Send Slack notification via separate endpoint (fire and forget)
-        console.log('Triggering Slack notification via separate endpoint...');
+        // Send Slack notification using direct function call (avoid network timeout)
+        console.log('Calling Slack notification function directly...');
         
-        // Call the notification endpoint asynchronously
-        const notificationUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications/slack`;
+        // Import the function dynamically to avoid circular imports
+        const { sendProjectCreatedNotification } = await import('@/lib/slack/project-notifications');
         
-        fetch(notificationUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(slackData),
-        })
-        .then(response => {
-          if (response.ok) {
-            console.log('Slack notification endpoint called successfully');
-          } else {
-            console.error('Slack notification endpoint failed:', response.status);
+        // Call the function directly without HTTP request
+        setImmediate(async () => {
+          try {
+            console.log('Starting async Slack notification...');
+            const result = await sendProjectCreatedNotification(slackData);
+            if (result.success) {
+              console.log('Slack notification sent successfully:', result);
+            } else {
+              console.error('Failed to send Slack notification:', result.error);
+            }
+          } catch (error) {
+            console.error('Error in async Slack notification:', error);
           }
-        })
-        .catch(error => {
-          console.error('Failed to call Slack notification endpoint:', error);
         });
 
         // Only wait for email notification
