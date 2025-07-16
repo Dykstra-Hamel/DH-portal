@@ -34,13 +34,13 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const [helpfulToolsOpen, setHelpfulToolsOpen] = useState(false);
 
   const pathname = usePathname();
-  const isLoginPage = pathname === '/login'
+  const isPublicPage = pathname === '/login' || pathname === '/sign-up'
 
   if (collapsed) {
     return null;
   }
 
-  if (!isLoginPage && pathname !== '/') {
+  if (!isPublicPage && pathname !== '/') {
     return (
       <div className={styles.sidebar}>
         {/* Logo Section */}
