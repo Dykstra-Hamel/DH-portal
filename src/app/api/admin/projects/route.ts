@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendProjectCreatedNotification as sendEmail } from '@/lib/email/project-notifications';
 import { EmailRecipient, ProjectNotificationData as EmailProjectData } from '@/lib/email/types';
-import { sendProjectCreatedNotification as sendSlackNotification } from '@/lib/slack/project-notifications';
+// Removed Slack notification import - now using separate endpoint
 import { ProjectNotificationData as SlackProjectData } from '@/lib/slack/types';
 
 export async function GET(request: NextRequest) {
@@ -224,26 +224,29 @@ export async function POST(request: NextRequest) {
           .then(() => console.log('Email notification sent successfully'))
           .catch(error => console.error('Failed to send email notification:', error));
 
-        // Send Slack notification (fire and forget to avoid blocking)
-        console.log('Attempting to send Slack notification with data:', {
-          projectId: slackData.projectId,
-          projectName: slackData.projectName,
-          companyName: slackData.companyName,
-          hasSlackToken: !!process.env.SLACK_BOT_TOKEN,
-          hasSlackChannel: !!process.env.SLACK_CHANNEL_PROJECT_REQUESTS,
-          slackChannel: process.env.SLACK_CHANNEL_PROJECT_REQUESTS
-        });
+        // Send Slack notification via separate endpoint (fire and forget)
+        console.log('Triggering Slack notification via separate endpoint...');
         
-        // Don't await Slack notification - let it run in background
-        sendSlackNotification(slackData)
-          .then(result => {
-            if (result.success) {
-              console.log('Slack notification sent successfully:', result);
-            } else {
-              console.error('Failed to send Slack notification:', result.error);
-            }
-          })
-          .catch(error => console.error('Failed to send Slack notification - caught error:', error));
+        // Call the notification endpoint asynchronously
+        const notificationUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications/slack`;
+        
+        fetch(notificationUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(slackData),
+        })
+        .then(response => {
+          if (response.ok) {
+            console.log('Slack notification endpoint called successfully');
+          } else {
+            console.error('Slack notification endpoint failed:', response.status);
+          }
+        })
+        .catch(error => {
+          console.error('Failed to call Slack notification endpoint:', error);
+        });
 
         // Only wait for email notification
         await emailPromise;

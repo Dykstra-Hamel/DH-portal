@@ -42,21 +42,9 @@ export async function sendProjectCreatedNotification(
     // Try direct HTTP request instead of SDK
     const messageText = `🚀 New Project Request: ${projectData.projectName}\n\nCompany: ${projectData.companyName}\nPriority: ${projectData.priority}\nDue Date: ${projectData.dueDate}\nRequested by: ${projectData.requesterName}\n\nDescription: ${projectData.description || 'No description provided'}`;
     
-    console.log('About to make fetch request...');
+    console.log('Making direct Slack API request...');
     
     try {
-      // First test basic connectivity
-      console.log('Testing basic connectivity...');
-      const testResponse = await fetch('https://httpbin.org/get', {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'DH-Portal-Test'
-        }
-      });
-      console.log('Basic connectivity test status:', testResponse.status);
-      
-      // Now try Slack
-      console.log('Making Slack API request...');
       const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: {
