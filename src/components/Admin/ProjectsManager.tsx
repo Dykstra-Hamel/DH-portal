@@ -160,6 +160,7 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
         currentUserProfile={currentUserProfile}
         isAdmin={true}
         mode="full"
+        userActiveCompany={companies.length > 0 ? companies[0] : null}
       />
     </div>
   );
