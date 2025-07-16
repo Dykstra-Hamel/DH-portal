@@ -72,7 +72,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           <SidebarSection sectionTitle='Marketing' sectionState={marketingOpen} setSectionState={setMarketingOpen}>
             <SidebarSectionNavItem itemText='Overview' icon={BarChart3} path='#' />
             <SidebarSectionNavItem itemText='Your Brand' icon={Palette} path='/brand' />
-            <SidebarSectionNavItem itemText='Projects' icon={Briefcase} path='#' />
+            <SidebarSectionNavItem itemText='Projects' icon={Briefcase} path='/projects' />
             <SidebarSectionNavItem itemText='Email Campaigns' icon={Mail} path='#' />
           </SidebarSection>
 

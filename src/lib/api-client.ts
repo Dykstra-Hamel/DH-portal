@@ -22,6 +22,13 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+    console.error('API Error:', { 
+      url, 
+      status: response.status, 
+      statusText: response.statusText, 
+      error: errorData,
+      headers: Object.fromEntries(response.headers.entries())
+    });
     throw new Error(errorData.error || `HTTP ${response.status}`)
   }
 
@@ -92,6 +99,10 @@ export const adminAPI = {
     return authenticatedFetch('/api/admin/user-companies')
   },
 
+  async getCurrentUserCompanies() {
+    return authenticatedFetch('/api/admin/user-companies/current')
+  },
+
   async createUserCompany(relationshipData: any) {
     return authenticatedFetch('/api/admin/user-companies', {
       method: 'POST',
@@ -110,5 +121,41 @@ export const adminAPI = {
     return authenticatedFetch(`/api/admin/user-companies/${relationshipId}`, {
       method: 'DELETE',
     })
+  },
+
+  // Projects
+  async getProjects(filters: { companyId?: string; status?: string; priority?: string } = {}) {
+    const queryParams = new URLSearchParams()
+    if (filters.companyId) queryParams.append('companyId', filters.companyId)
+    if (filters.status) queryParams.append('status', filters.status)
+    if (filters.priority) queryParams.append('priority', filters.priority)
+    
+    const url = `/api/admin/projects${queryParams.toString() ? `?${queryParams}` : ''}`
+    return authenticatedFetch(url)
+  },
+
+  async createProject(projectData: any) {
+    return authenticatedFetch('/api/admin/projects', {
+      method: 'POST',
+      body: JSON.stringify(projectData),
+    })
+  },
+
+  async updateProject(projectId: string, projectData: any) {
+    return authenticatedFetch(`/api/admin/projects/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(projectData),
+    })
+  },
+
+  async deleteProject(projectId: string) {
+    return authenticatedFetch(`/api/admin/projects/${projectId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  // Non-admin project endpoints
+  async getUserProjects(companyId: string) {
+    return authenticatedFetch(`/api/projects?companyId=${companyId}`)
   },
 }
