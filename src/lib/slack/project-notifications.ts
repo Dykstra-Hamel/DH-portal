@@ -27,15 +27,8 @@ export async function sendProjectCreatedNotification(
     return { success: false, error: 'Slack client not configured' };
   }
 
-  // Test the client first
-  try {
-    console.log('Testing Slack client auth...');
-    const authTest = await slackClient.auth.test();
-    console.log('Auth test result:', authTest);
-  } catch (authError) {
-    console.error('Auth test failed:', authError);
-    return { success: false, error: 'Slack authentication failed' };
-  }
+  // Skip auth test in production to avoid hanging - just try to send message directly
+  console.log('Skipping auth test, proceeding directly to message send...');
 
   try {
     const channel = config?.channel || getChannelForNotificationType('PROJECT_REQUESTS');
@@ -46,7 +39,12 @@ export async function sendProjectCreatedNotification(
 
     console.log('About to call slack.chat.postMessage...');
     
-    const result = await slackClient.chat.postMessage({
+    // Add timeout to prevent hanging
+    const messageTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Message send timed out after 10 seconds')), 10000);
+    });
+    
+    const messagePromise = slackClient.chat.postMessage({
       channel: channel,
       text: message.text,
       blocks: message.blocks,
@@ -54,7 +52,8 @@ export async function sendProjectCreatedNotification(
       icon_emoji: config?.iconEmoji || ':rocket:',
       thread_ts: config?.threadTs,
     });
-
+    
+    const result = await Promise.race([messagePromise, messageTimeout]) as any;
     console.log('Slack API call completed, result:', result);
 
     if (result.ok) {
