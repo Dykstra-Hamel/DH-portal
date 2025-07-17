@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching projects:', error);
       return NextResponse.json({ error: 'Failed to fetch projects', details: error.message }, { status: 500 });
     }
+    
+    console.log('Fetched projects:', projects?.length || 0);
 
     if (!projects || projects.length === 0) {
       return NextResponse.json([]);
@@ -52,11 +54,15 @@ export async function GET(request: NextRequest) {
     // Get all unique user IDs from projects
     const userIds = new Set<string>();
     projects.forEach(project => {
-      userIds.add(project.requested_by);
+      if (project.requested_by) {
+        userIds.add(project.requested_by);
+      }
       if (project.assigned_to) {
         userIds.add(project.assigned_to);
       }
     });
+
+    console.log('User IDs to fetch:', Array.from(userIds));
 
     // Get profiles for these users
     const { data: profiles, error: profilesError } = await supabase
@@ -68,6 +74,8 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching profiles:', profilesError);
       return NextResponse.json({ error: 'Failed to fetch user profiles', details: profilesError.message }, { status: 500 });
     }
+
+    console.log('Fetched profiles:', profiles?.length || 0);
 
     // Create a map of user profiles for quick lookup
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);

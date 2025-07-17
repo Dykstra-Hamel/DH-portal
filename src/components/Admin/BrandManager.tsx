@@ -401,7 +401,7 @@ export default function BrandManager() {
                     onChange={handleLogoUpload}
                     className={styles.fileInput}
                   />
-                  {brandData.logo_url && (
+                  {brandData.logo_url && brandData.logo_url.trim() && (
                     <div className={styles.logoPreview}>
                       <Image 
                         src={brandData.logo_url} 
@@ -657,7 +657,7 @@ export default function BrandManager() {
                   
                   {brandData.photography_images && brandData.photography_images.length > 0 && (
                     <div className={styles.photographyGrid}>
-                      {brandData.photography_images.map((image, index) => (
+                      {brandData.photography_images.filter(image => image && image.trim()).map((image, index) => (
                         <div key={index} className={styles.photographyImageItem}>
                           <Image 
                             src={image} 

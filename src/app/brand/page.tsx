@@ -35,7 +35,7 @@ interface BrandData {
   font_tertiary_example?: string;
   font_tertiary_url?: string;
   photography_description?: string;
-  photography_images?: string[];
+  photography_images?: Array<{url: string; description: string}>;
 }
 
 interface Company {
