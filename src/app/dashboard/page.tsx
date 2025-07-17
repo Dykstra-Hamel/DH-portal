@@ -59,27 +59,54 @@ export default function DashboardPage() {
         setProfile(profileData)
       }
 
-      // Get user companies
-      const { data: companiesData, error: companiesError } = await supabase
-        .from('user_companies')
-        .select(`
-          *,
-          companies (
-            id,
-            name
-          )
-        `)
-        .eq('user_id', session.user.id)
+      // Check if user is admin
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
 
-      if (!companiesError && companiesData) {
-        setUserCompanies(companiesData)
-        
-        // Set primary company as selected, or first company if no primary
-        const primaryCompany = companiesData.find(uc => uc.is_primary)
-        if (primaryCompany) {
-          setSelectedCompany(primaryCompany.companies)
-        } else if (companiesData.length > 0) {
-          setSelectedCompany(companiesData[0].companies)
+      const isAdmin = profile?.role === 'admin'
+
+      if (isAdmin) {
+        // Admin users can see all companies
+        const response = await fetch('/api/admin/companies')
+        if (response.ok) {
+          const allCompanies = await response.json()
+          const companiesData = allCompanies.map((company: any) => ({
+            companies: company,
+            is_primary: false
+          }))
+          setUserCompanies(companiesData)
+          
+          // Set first company as selected for admin
+          if (companiesData.length > 0) {
+            setSelectedCompany(companiesData[0].companies)
+          }
+        }
+      } else {
+        // Regular users only see their associated companies
+        const { data: companiesData, error: companiesError } = await supabase
+          .from('user_companies')
+          .select(`
+            *,
+            companies (
+              id,
+              name
+            )
+          `)
+          .eq('user_id', session.user.id)
+
+        if (!companiesError && companiesData) {
+          setUserCompanies(companiesData)
+          
+          // Set primary company as selected, or first company if no primary
+          const primaryCompany = companiesData.find(uc => uc.is_primary)
+          if (primaryCompany) {
+            setSelectedCompany(primaryCompany.companies)
+          } else if (companiesData.length > 0) {
+            setSelectedCompany(companiesData[0].companies)
+          }
         }
       }
 

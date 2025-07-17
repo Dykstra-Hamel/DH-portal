@@ -36,7 +36,7 @@ interface BrandData {
   font_tertiary_example?: string;
   font_tertiary_url?: string;
   photography_description?: string;
-  photography_images?: string[];
+  photography_images?: Array<{url: string; description: string}>;
 }
 
 interface BrandProps {
@@ -297,7 +297,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       {/* Hero Section */}
       <div className={styles.heroSection}>
         <div className={styles.heroGradient} style={getGradientStyle()}>
-          {brandData.logo_url && (
+          {brandData.logo_url && brandData.logo_url.trim() && (
             <Image 
               src={brandData.logo_url} 
               alt={`${companyName} Logo`} 
@@ -415,7 +415,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
             <p>{brandData.logo_description}</p>
           </div>
         )}
-        {brandData.logo_url && (
+        {brandData.logo_url && brandData.logo_url.trim() && (
           <div className={styles.logoShowcase}>
             <div className={styles.logoContainer}>
               <Image 
@@ -506,16 +506,16 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
         )}
         {brandData.photography_images && brandData.photography_images.length > 0 && (
           <div className={styles.photographyGrid}>
-            {brandData.photography_images.map((image, index) => (
+            {brandData.photography_images.filter(image => image && image.url && image.url.trim()).map((image, index) => (
               <Image
                 key={index} 
-                src={image} 
-                alt={`Photography example ${index + 1}`} 
+                src={image.url} 
+                alt={image.description || `Photography example ${index + 1}`} 
                 className={styles.photographyImage}
                 width={600}
                 height={400}
                 style={{ cursor: 'pointer' }}
-                onClick={() => openLightbox(image)}
+                onClick={() => openLightbox(image.url)}
               />
             ))}
           </div>
