@@ -1,8 +1,8 @@
-import { ProjectNotificationData, SlackMessageBlock } from '../types';
+import { ProjectNotificationData } from '../types';
 
 export function buildProjectCreatedMessage(projectData: ProjectNotificationData): {
   text: string;
-  blocks: SlackMessageBlock[];
+  blocks: any[];
 } {
   const priorityEmoji = {
     low: '🟢',
@@ -11,57 +11,56 @@ export function buildProjectCreatedMessage(projectData: ProjectNotificationData)
     urgent: '🔴'
   };
 
-  const priorityColor = {
-    low: '#10b981',
-    medium: '#f59e0b',
-    high: '#f97316', 
-    urgent: '#ef4444'
-  };
-
   const fallbackText = `New project request: ${projectData.projectName} (${projectData.priority} priority)`;
 
-  const blocks: SlackMessageBlock[] = [
+  // Truncate description to avoid text limits
+  const description = projectData.description 
+    ? (projectData.description.length > 200 
+        ? `${projectData.description.substring(0, 200)}...` 
+        : projectData.description)
+    : '_No description provided_';
+
+  const blocks: any[] = [
     {
-      type: 'header',
-      text: {
-        type: 'plain_text',
-        text: '🚀 New Project Request',
-        emoji: true
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "🚀 New Project Request"
       }
     },
     {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*${projectData.projectName}*\n${projectData.description || '_No description provided_'}`
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": `*${projectData.projectName}*\n${description}`
       }
     },
     {
-      type: 'section',
-      fields: [
+      "type": "section",
+      "fields": [
         {
-          type: 'mrkdwn',
-          text: `*Project Type:*\n${projectData.projectType}`
+          "type": "mrkdwn",
+          "text": `*Project Type:*\n${projectData.projectType}`
         },
         {
-          type: 'mrkdwn',
-          text: `*Company:*\n${projectData.companyName}`
+          "type": "mrkdwn",
+          "text": `*Company:*\n${projectData.companyName}`
         },
         {
-          type: 'mrkdwn',
-          text: `*Priority:*\n${priorityEmoji[projectData.priority]} ${projectData.priority.charAt(0).toUpperCase() + projectData.priority.slice(1)}`
+          "type": "mrkdwn",
+          "text": `*Priority:*\n${priorityEmoji[projectData.priority]} ${projectData.priority.charAt(0).toUpperCase() + projectData.priority.slice(1)}`
         },
         {
-          type: 'mrkdwn',
-          text: `*Due Date:*\n${new Date(projectData.dueDate).toLocaleDateString()}`
+          "type": "mrkdwn",
+          "text": `*Due Date:*\n${new Date(projectData.dueDate).toLocaleDateString()}`
         },
         {
-          type: 'mrkdwn',
-          text: `*Requested by:*\n${projectData.requesterName}\n${projectData.requesterEmail}`
+          "type": "mrkdwn",
+          "text": `*Requested by:*\n${projectData.requesterName}`
         },
         {
-          type: 'mrkdwn',
-          text: `*Status:*\n${projectData.status}`
+          "type": "mrkdwn",
+          "text": `*Status:*\n${projectData.status}`
         }
       ]
     }
@@ -70,30 +69,16 @@ export function buildProjectCreatedMessage(projectData: ProjectNotificationData)
   // Add action buttons if URL provided
   if (projectData.actionUrl) {
     blocks.push({
-      type: 'actions',
-      block_id: 'project_actions',
-      elements: [
+      "type": "actions",
+      "elements": [
         {
-          type: 'button',
-          action_id: 'view_project_in_admin',
-          text: {
-            type: 'plain_text',
-            text: '📋 View in Admin Panel',
-            emoji: true
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "📋 View in Admin Panel"
           },
-          url: projectData.actionUrl,
-          style: 'primary'
-        },
-        {
-          type: 'button',
-          action_id: 'assign_project',
-          text: {
-            type: 'plain_text',
-            text: '👤 Assign Project',
-            emoji: true
-          },
-          value: projectData.projectId,
-          style: 'default'
+          "url": projectData.actionUrl,
+          "style": "primary"
         }
       ]
     });
@@ -101,16 +86,16 @@ export function buildProjectCreatedMessage(projectData: ProjectNotificationData)
 
   // Add divider
   blocks.push({
-    type: 'divider'
+    "type": "divider"
   });
 
   // Add context
   blocks.push({
-    type: 'context',
-    elements: [
+    "type": "context",
+    "elements": [
       {
-        type: 'mrkdwn',
-        text: `Project ID: ${projectData.projectId} | Created: ${new Date(projectData.timestamp).toLocaleString()}`
+        "type": "mrkdwn",
+        "text": `Project ID: ${projectData.projectId} | Created: ${new Date(projectData.timestamp).toLocaleString()}`
       }
     ]
   });
