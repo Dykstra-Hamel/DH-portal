@@ -104,7 +104,10 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
               <td>
                 <div className={styles.userInfo}>
                   <User size={14} />
-                  {project.requested_by_profile.first_name} {project.requested_by_profile.last_name}
+                  {project.requested_by_profile 
+                    ? `${project.requested_by_profile.first_name} ${project.requested_by_profile.last_name}`
+                    : 'Unknown User'
+                  }
                 </div>
               </td>
               <td>
