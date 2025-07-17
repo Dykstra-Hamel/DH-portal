@@ -258,7 +258,7 @@ async function handleProjectAssignmentSubmission(payload: SlackInteractivePayloa
       });
     }
     
-    // Find the user in our database by email
+    // Try to find the user in our database by email
     console.log('Looking for user with email:', assigneeEmail);
     const { data: userProfile, error: userError } = await supabase
       .from('profiles')
@@ -268,53 +268,66 @@ async function handleProjectAssignmentSubmission(payload: SlackInteractivePayloa
     
     console.log('User profile query result:', { userProfile, userError });
     
-    if (userError || !userProfile) {
-      console.error('User not found in database:', userError);
-      return NextResponse.json({
-        response_action: 'errors',
-        errors: {
-          assignee_selection: 'Selected user not found in project database'
-        }
-      });
+    let updatedProject: any = null;
+    let dbAssignmentSuccess = false;
+    let assigneeName = slackUserData.user?.real_name || slackUserData.user?.name || 'Unknown User';
+    
+    if (userProfile && !userError) {
+      // User found in database - try to assign
+      console.log('Updating project:', projectId, 'with user:', userProfile.id);
+      const { data: projectUpdate, error: updateError } = await supabase
+        .from('projects')
+        .update({ 
+          assigned_to: userProfile.id,
+          status: 'in_progress'
+        })
+        .eq('id', projectId)
+        .select(`
+          *,
+          company:companies(name)
+        `)
+        .single();
+      
+      console.log('Project update result:', { projectUpdate, updateError });
+      
+      if (projectUpdate && !updateError) {
+        updatedProject = projectUpdate;
+        assigneeName = `${userProfile.first_name} ${userProfile.last_name}`.trim() || assigneeName;
+        dbAssignmentSuccess = true;
+        console.log('Project assigned successfully in database');
+      } else {
+        console.error('Error updating project in database:', updateError);
+      }
+    } else {
+      console.log('User not found in database, will send notifications only');
     }
     
-    // Update the project assignment
-    console.log('Updating project:', projectId, 'with user:', userProfile.id);
-    const { data: updatedProject, error: updateError } = await supabase
-      .from('projects')
-      .update({ 
-        assigned_to: userProfile.id,
-        status: 'in_progress' // Optionally update status when assigned
-      })
-      .eq('id', projectId)
-      .select(`
-        *,
-        company:companies(name)
-      `)
-      .single();
-    
-    console.log('Project update result:', { updatedProject, updateError });
-    
-    if (updateError) {
-      console.error('Error updating project:', updateError);
-      return NextResponse.json({
-        response_action: 'errors',
-        errors: {
-          assignee_selection: `Failed to assign project in database: ${updateError.message}`
-        }
-      });
+    // Get basic project info for notifications (fallback if DB assignment failed)
+    if (!updatedProject) {
+      const { data: basicProject } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          company:companies(name)
+        `)
+        .eq('id', projectId)
+        .single();
+      updatedProject = basicProject;
     }
     
     // Send response to acknowledge the assignment in the channel
-    const assigneeName = `${userProfile.first_name} ${userProfile.last_name}`.trim();
+    const statusEmoji = dbAssignmentSuccess ? '🎯' : '⚠️';
+    const statusText = dbAssignmentSuccess ? 'Project Assignment Completed' : 'Project Assignment (Notification Only)';
+    const statusNote = dbAssignmentSuccess ? '' : '\n_Note: User not found in project database - assignment sent as notification only_';
+    
     const channelMessage = {
-      text: `🎯 Project "${updatedProject.name}" has been assigned to ${assigneeName}`,
+      text: `${statusEmoji} Project "${updatedProject.name}" has been assigned to ${assigneeName}`,
       blocks: [
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `🎯 *Project Assignment Completed*\n\n*Project:* ${updatedProject.name}\n*Assigned to:* <@${selectedUser}> (${assigneeName})\n*Assigned by:* <@${payload.user.id}>\n*Status:* ${updatedProject.status}`
+            text: `${statusEmoji} *${statusText}*\n\n*Project:* ${updatedProject.name}\n*Assigned to:* <@${selectedUser}> (${assigneeName})\n*Assigned by:* <@${payload.user.id}>\n*Status:* ${updatedProject.status}${statusNote}`
           }
         }
       ]
@@ -351,7 +364,7 @@ async function handleProjectAssignmentSubmission(payload: SlackInteractivePayloa
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `📋 *New Project Assignment*\n\nYou've been assigned to work on: *${updatedProject.name}*`
+            text: `📋 *New Project Assignment*\n\nYou've been assigned to work on: *${updatedProject.name}*${dbAssignmentSuccess ? '' : '\n\n_Note: This is a notification-only assignment. Please contact an admin to update the project database._'}`
           }
         },
         {
@@ -433,7 +446,7 @@ async function handleProjectAssignmentSubmission(payload: SlackInteractivePayloa
     console.log('Channel message result:', channelResult);
     console.log('Assignee DM result:', assigneeResult);
     
-    // Return success response to close the modal
+    // Always return success to close the modal - notifications were sent
     return NextResponse.json({
       response_action: 'clear'
     });
