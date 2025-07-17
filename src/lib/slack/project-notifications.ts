@@ -23,6 +23,9 @@ export async function sendProjectCreatedNotification(
     const channel = config?.channel || getChannelForNotificationType('PROJECT_REQUESTS');
     const message = buildProjectCreatedMessage(projectData);
 
+    // Debug: Log the message blocks
+    console.log('Slack message blocks:', JSON.stringify(message.blocks, null, 2));
+
     const response = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: {
