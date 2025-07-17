@@ -709,6 +709,215 @@ async function createProjectsForCompanies(users) {
   }
 }
 
+// Create customers for companies
+async function createCustomersForCompanies() {
+  try {
+    log('Creating customers for companies...');
+    
+    // First, clear existing customers
+    const { error: clearError } = await localClient
+      .from('customers')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Keep a dummy record if needed
+    
+    if (clearError) {
+      error(`Failed to clear existing customers: ${clearError.message}`);
+      return false;
+    }
+    
+    // Get all companies
+    const { data: companies, error: companyError } = await localClient
+      .from('companies')
+      .select('id, name');
+    
+    if (companyError) {
+      error(`Failed to fetch companies: ${companyError.message}`);
+      return false;
+    }
+    
+    if (companies.length === 0) {
+      log('No companies found to create customers for');
+      return true;
+    }
+    
+    // Sample customer data
+    const firstNames = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emily', 'Chris', 'Amanda', 'Robert', 'Lisa'];
+    const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
+    const cities = ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'San Jose'];
+    const states = ['NY', 'CA', 'IL', 'TX', 'AZ', 'PA', 'TX', 'CA', 'TX', 'CA'];
+    const statuses = ['active', 'inactive'];
+    
+    // Create 3-5 customers for each company
+    const customers = [];
+    let customerIndex = 1;
+    
+    for (const company of companies) {
+      const numCustomers = Math.floor(Math.random() * 3) + 3; // 3-5 customers
+      
+      for (let i = 0; i < numCustomers; i++) {
+        const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+        const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+        const cityIndex = Math.floor(Math.random() * cities.length);
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+        
+        customers.push({
+          id: `${customerIndex.toString().padStart(8, '0')}-1111-1111-1111-111111111111`,
+          company_id: company.id,
+          first_name: firstName,
+          last_name: lastName,
+          phone: `(${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
+          email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
+          address: `${Math.floor(Math.random() * 9999) + 1} ${lastName} St`,
+          city: cities[cityIndex],
+          state: states[cityIndex],
+          zip_code: `${Math.floor(Math.random() * 90000) + 10000}`,
+          customer_status: status,
+          notes: `Customer of ${company.name}. ${status === 'active' ? 'Regular customer with ongoing business.' : 'Inactive customer, potential for reactivation.'}`
+        });
+        
+        customerIndex++;
+      }
+    }
+    
+    // Insert customers
+    const { error: customerError } = await localClient
+      .from('customers')
+      .insert(customers);
+    
+    if (customerError) {
+      error(`Failed to create customers: ${customerError.message}`);
+      return false;
+    }
+    
+    log(`Successfully created ${customers.length} customers for ${companies.length} companies`);
+    return true;
+    
+  } catch (err) {
+    error(`Error creating customers: ${err.message}`);
+    return false;
+  }
+}
+
+// Create leads for companies
+async function createLeadsForCompanies(users) {
+  try {
+    log('Creating leads for companies...');
+    
+    // First, clear existing leads
+    const { error: clearError } = await localClient
+      .from('leads')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Keep a dummy record if needed
+    
+    if (clearError) {
+      error(`Failed to clear existing leads: ${clearError.message}`);
+      return false;
+    }
+    
+    // Get all companies and customers
+    const { data: companies, error: companyError } = await localClient
+      .from('companies')
+      .select('id, name');
+    
+    if (companyError) {
+      error(`Failed to fetch companies: ${companyError.message}`);
+      return false;
+    }
+    
+    const { data: customers, error: customerError } = await localClient
+      .from('customers')
+      .select('id, company_id');
+    
+    if (customerError) {
+      error(`Failed to fetch customers: ${customerError.message}`);
+      return false;
+    }
+    
+    // Get local user profiles
+    const { data: localUsers, error: localUserError } = await localClient
+      .from('profiles')
+      .select('id, email');
+    
+    if (localUserError) {
+      error(`Failed to fetch local users: ${localUserError.message}`);
+      return false;
+    }
+    
+    if (companies.length === 0 || localUsers.length === 0) {
+      log('No companies or users found to create leads for');
+      return true;
+    }
+    
+    // Lead configuration arrays
+    const leadSources = ['organic', 'referral', 'google_cpc', 'facebook_ads', 'linkedin', 'email_campaign', 'cold_call', 'trade_show', 'webinar', 'content_marketing'];
+    const leadTypes = ['phone_call', 'web_form', 'email', 'chat', 'social_media', 'in_person'];
+    const serviceTypes = ['Website Design', 'Branding', 'Marketing Campaign', 'App Development', 'Consultation', 'SEO Services', 'Social Media Management'];
+    const leadStatuses = ['new', 'contacted', 'quoted', 'won', 'lost'];
+    const priorities = ['low', 'medium', 'high', 'urgent'];
+    
+    // Create 2-4 leads for each company
+    const leads = [];
+    let leadIndex = 1;
+    
+    for (const company of companies) {
+      const numLeads = Math.floor(Math.random() * 3) + 2; // 2-4 leads
+      const companyCustomers = customers.filter(c => c.company_id === company.id);
+      
+      for (let i = 0; i < numLeads; i++) {
+        const randomUser = localUsers[Math.floor(Math.random() * localUsers.length)];
+        const leadSource = leadSources[Math.floor(Math.random() * leadSources.length)];
+        const leadType = leadTypes[Math.floor(Math.random() * leadTypes.length)];
+        const serviceType = serviceTypes[Math.floor(Math.random() * serviceTypes.length)];
+        const leadStatus = leadStatuses[Math.floor(Math.random() * leadStatuses.length)];
+        const priority = priorities[Math.floor(Math.random() * priorities.length)];
+        
+        // 50% chance to link to an existing customer
+        const linkedCustomer = Math.random() > 0.5 && companyCustomers.length > 0 
+          ? companyCustomers[Math.floor(Math.random() * companyCustomers.length)] 
+          : null;
+        
+        leads.push({
+          id: `${leadIndex.toString().padStart(8, '0')}-2222-2222-2222-222222222222`,
+          company_id: company.id,
+          customer_id: linkedCustomer?.id || null,
+          lead_source: leadSource,
+          lead_type: leadType,
+          service_type: serviceType,
+          lead_status: leadStatus,
+          comments: `${serviceType} inquiry from ${leadSource}. ${leadStatus === 'won' ? 'Successfully converted to project.' : leadStatus === 'lost' ? 'Lost to competitor.' : 'In progress.'}`,
+          assigned_to: randomUser.id,
+          last_contacted_at: leadStatus !== 'new' ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
+          next_follow_up_at: ['new', 'contacted', 'quoted'].includes(leadStatus) ? new Date(Date.now() + Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString() : null,
+          estimated_value: Math.floor(Math.random() * 50000) + 5000, // $5k - $55k
+          priority: priority,
+          utm_source: leadSource === 'google_cpc' ? 'google' : leadSource === 'facebook_ads' ? 'facebook' : null,
+          utm_medium: leadSource.includes('ads') || leadSource === 'google_cpc' ? 'cpc' : leadSource === 'organic' ? 'organic' : null,
+          utm_campaign: leadSource.includes('ads') ? `${company.name.toLowerCase()}-campaign` : null
+        });
+        
+        leadIndex++;
+      }
+    }
+    
+    // Insert leads
+    const { error: leadError } = await localClient
+      .from('leads')
+      .insert(leads);
+    
+    if (leadError) {
+      error(`Failed to create leads: ${leadError.message}`);
+      return false;
+    }
+    
+    log(`Successfully created ${leads.length} leads for ${companies.length} companies`);
+    return true;
+    
+  } catch (err) {
+    error(`Error creating leads: ${err.message}`);
+    return false;
+  }
+}
+
 // Assign users to projects
 async function assignUsersToProjects(users) {
   try {
@@ -1004,12 +1213,26 @@ async function main() {
       process.exit(1);
     }
     
+    // Step 5: Create customers for companies
+    const customerSuccess = await createCustomersForCompanies();
+    if (!customerSuccess) {
+      process.exit(1);
+    }
+    
+    // Step 6: Create leads for companies
+    const leadSuccess = await createLeadsForCompanies(users);
+    if (!leadSuccess) {
+      process.exit(1);
+    }
+    
     log('Database seeding completed successfully!');
     log('Summary:');
     log(`- ${users.length} total users pulled from production`);
     log('- Companies created with random user assignments');
     log('- Brands created for all companies');
     log('- Projects created for all companies');
+    log('- Customers created for all companies');
+    log('- Leads created for all companies');
     log('- All seed data ready for development');
     
   } catch (err) {
