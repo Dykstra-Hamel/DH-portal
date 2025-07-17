@@ -289,8 +289,7 @@ async function handleProjectAssignmentSubmission(payload: SlackInteractivePayloa
       .eq('id', projectId)
       .select(`
         *,
-        company:companies(name),
-        assigned_to_profile:profiles!assigned_to(first_name, last_name, email)
+        company:companies(name)
       `)
       .single();
     
