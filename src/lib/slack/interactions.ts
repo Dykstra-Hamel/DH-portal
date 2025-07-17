@@ -67,78 +67,88 @@ export async function openProjectAssignmentModal(
   context: SlackInteractionContext,
   projectId: string
 ) {
-  if (!slackClient || !context.triggerId) {
-    return { success: false, error: 'Cannot open modal - missing client or trigger ID' };
+  if (!context.triggerId) {
+    return { success: false, error: 'Cannot open modal - missing trigger ID' };
   }
 
   try {
-    const result = await slackClient.views.open({
-      trigger_id: context.triggerId,
-      view: {
-        type: 'modal',
-        callback_id: 'project_assignment_modal',
-        title: {
-          type: 'plain_text',
-          text: 'Assign Project'
-        },
-        submit: {
-          type: 'plain_text',
-          text: 'Assign'
-        },
-        close: {
-          type: 'plain_text',
-          text: 'Cancel'
-        },
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `*Assign Project ${projectId}*\n\nSelect a team member to assign this project to:`
-            }
+    const response = await fetch('https://slack.com/api/views.open', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        trigger_id: context.triggerId,
+        view: {
+          type: 'modal',
+          callback_id: 'project_assignment_modal',
+          title: {
+            type: 'plain_text',
+            text: 'Assign Project'
           },
-          {
-            type: 'input',
-            block_id: 'assignee_selection',
-            element: {
-              type: 'users_select',
-              action_id: 'selected_assignee',
-              placeholder: {
-                type: 'plain_text',
-                text: 'Select a user'
+          submit: {
+            type: 'plain_text',
+            text: 'Assign'
+          },
+          close: {
+            type: 'plain_text',
+            text: 'Cancel'
+          },
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*Assign Project ${projectId}*\n\nSelect a team member to assign this project to:`
               }
             },
-            label: {
-              type: 'plain_text',
-              text: 'Assignee'
-            }
-          },
-          {
-            type: 'input',
-            block_id: 'assignment_note',
-            element: {
-              type: 'plain_text_input',
-              action_id: 'note_input',
-              multiline: true,
-              placeholder: {
+            {
+              type: 'input',
+              block_id: 'assignee_selection',
+              element: {
+                type: 'users_select',
+                action_id: 'selected_assignee',
+                placeholder: {
+                  type: 'plain_text',
+                  text: 'Select a user'
+                }
+              },
+              label: {
                 type: 'plain_text',
-                text: 'Add a note for the assignee (optional)'
+                text: 'Assignee'
               }
             },
-            label: {
-              type: 'plain_text',
-              text: 'Note'
-            },
-            optional: true
-          }
-        ],
-        private_metadata: JSON.stringify({ projectId, originalUser: context.userId })
-      }
+            {
+              type: 'input',
+              block_id: 'assignment_note',
+              element: {
+                type: 'plain_text_input',
+                action_id: 'note_input',
+                multiline: true,
+                placeholder: {
+                  type: 'plain_text',
+                  text: 'Add a note for the assignee (optional)'
+                }
+              },
+              label: {
+                type: 'plain_text',
+                text: 'Note'
+              },
+              optional: true
+            }
+          ],
+          private_metadata: JSON.stringify({ projectId, originalUser: context.userId })
+        }
+      })
     });
+
+    const result = await response.json();
 
     if (result.ok) {
       return { success: true };
     } else {
+      console.error('Error opening modal:', result.error);
       return { success: false, error: result.error };
     }
   } catch (error) {
