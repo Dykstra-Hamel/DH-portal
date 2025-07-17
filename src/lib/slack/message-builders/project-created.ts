@@ -70,15 +70,27 @@ export function buildProjectCreatedMessage(projectData: ProjectNotificationData)
   if (projectData.actionUrl) {
     blocks.push({
       "type": "actions",
+      "block_id": "project_actions",
       "elements": [
         {
           "type": "button",
+          "action_id": "view_project_in_admin",
           "text": {
             "type": "plain_text",
             "text": "📋 View in Admin Panel"
           },
           "url": projectData.actionUrl,
           "style": "primary"
+        },
+        {
+          "type": "button",
+          "action_id": "assign_project",
+          "text": {
+            "type": "plain_text",
+            "text": "👤 Assign Project"
+          },
+          "value": projectData.projectId,
+          "style": "default"
         }
       ]
     });
