@@ -195,7 +195,251 @@ async function handleShortcut(payload: SlackInteractivePayload) {
 
 async function handleViewSubmission(payload: SlackInteractivePayload) {
   // Handle modal form submissions
+  console.log('View submission payload:', JSON.stringify(payload, null, 2));
+  
+  // Extract callback_id to determine which modal was submitted
+  const callbackId = (payload as any).view?.callback_id;
+  
+  if (callbackId === 'project_assignment_modal') {
+    return await handleProjectAssignmentSubmission(payload);
+  }
+  
   return NextResponse.json({
     text: 'Form submission received'
   });
+}
+
+async function handleProjectAssignmentSubmission(payload: SlackInteractivePayload) {
+  try {
+    const view = (payload as any).view;
+    const values = view.state.values;
+    const privateMetadata = JSON.parse(view.private_metadata || '{}');
+    
+    // Extract form data
+    const selectedUser = values.assignee_selection?.selected_assignee?.selected_user;
+    const note = values.assignment_note?.note_input?.value || '';
+    const projectId = privateMetadata.projectId;
+    
+    console.log('Assignment submission:', {
+      projectId,
+      selectedUser,
+      note,
+      submittedBy: payload.user.name
+    });
+    
+    if (!selectedUser || !projectId) {
+      return NextResponse.json({
+        response_action: 'errors',
+        errors: {
+          assignee_selection: 'Please select a user to assign the project to'
+        }
+      });
+    }
+    
+    // Update the project in the database
+    const { createAdminClient } = await import('@/lib/supabase/server-admin');
+    const supabase = createAdminClient();
+    
+    // First, get the Slack user's profile to find their corresponding database user
+    const slackUserResponse = await fetch(`https://slack.com/api/users.info?user=${selectedUser}`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+      }
+    });
+    const slackUserData = await slackUserResponse.json();
+    const assigneeEmail = slackUserData.user?.profile?.email;
+    
+    if (!assigneeEmail) {
+      return NextResponse.json({
+        response_action: 'errors',
+        errors: {
+          assignee_selection: 'Could not find email for selected user'
+        }
+      });
+    }
+    
+    // Find the user in our database by email
+    const { data: userProfile, error: userError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .eq('email', assigneeEmail)
+      .single();
+    
+    if (userError || !userProfile) {
+      console.error('User not found in database:', userError);
+      return NextResponse.json({
+        response_action: 'errors',
+        errors: {
+          assignee_selection: 'Selected user not found in project database'
+        }
+      });
+    }
+    
+    // Update the project assignment
+    const { data: updatedProject, error: updateError } = await supabase
+      .from('projects')
+      .update({ 
+        assigned_to: userProfile.id,
+        status: 'in_progress' // Optionally update status when assigned
+      })
+      .eq('id', projectId)
+      .select(`
+        *,
+        company:companies(name),
+        assigned_to_profile:profiles!assigned_to(first_name, last_name, email)
+      `)
+      .single();
+    
+    if (updateError) {
+      console.error('Error updating project:', updateError);
+      return NextResponse.json({
+        response_action: 'errors',
+        errors: {
+          assignee_selection: 'Failed to assign project in database'
+        }
+      });
+    }
+    
+    // Send response to acknowledge the assignment in the channel
+    const assigneeName = `${userProfile.first_name} ${userProfile.last_name}`.trim();
+    const channelMessage = {
+      text: `🎯 Project "${updatedProject.name}" has been assigned to ${assigneeName}`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `🎯 *Project Assignment Completed*\n\n*Project:* ${updatedProject.name}\n*Assigned to:* <@${selectedUser}> (${assigneeName})\n*Assigned by:* <@${payload.user.id}>\n*Status:* ${updatedProject.status}`
+          }
+        }
+      ]
+    };
+    
+    if (note) {
+      channelMessage.blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `📝 *Note:* ${note}`
+        }
+      });
+    }
+    
+    // Send message to the original channel
+    const channelResponse = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: process.env.SLACK_CHANNEL_PROJECT_REQUESTS || '#project-requests',
+        ...channelMessage
+      })
+    });
+    
+    // Send direct message to the assignee
+    const assigneeMessage: any = {
+      text: `📋 You've been assigned a new project: "${updatedProject.name}"`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `📋 *New Project Assignment*\n\nYou've been assigned to work on: *${updatedProject.name}*`
+          }
+        },
+        {
+          type: 'section',
+          fields: [
+            {
+              type: 'mrkdwn',
+              text: `*Company:* ${updatedProject.company.name}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Priority:* ${updatedProject.priority}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Due Date:* ${new Date(updatedProject.due_date).toLocaleDateString()}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Assigned by:* <@${payload.user.id}>`
+            }
+          ]
+        }
+      ]
+    };
+    
+    if (updatedProject.description) {
+      assigneeMessage.blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Description:*\n${updatedProject.description}`
+        }
+      });
+    }
+    
+    if (note) {
+      assigneeMessage.blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `📝 *Assignment Note:* ${note}`
+        }
+      });
+    }
+    
+    // Add action button to view project
+    assigneeMessage.blocks.push({
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: {
+            type: 'plain_text',
+            text: '📋 View Project Details'
+          },
+          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin`,
+          style: 'primary'
+        }
+      ]
+    });
+    
+    // Send DM to assignee
+    const assigneeResponse = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: selectedUser, // Send as DM to the assignee
+        ...assigneeMessage
+      })
+    });
+    
+    const channelResult = await channelResponse.json();
+    const assigneeResult = await assigneeResponse.json();
+    
+    console.log('Channel message result:', channelResult);
+    console.log('Assignee DM result:', assigneeResult);
+    
+    // Return success response to close the modal
+    return NextResponse.json({
+      response_action: 'clear'
+    });
+    
+  } catch (error) {
+    console.error('Error handling project assignment submission:', error);
+    return NextResponse.json({
+      response_action: 'errors',
+      errors: {
+        assignee_selection: 'Failed to assign project. Please try again.'
+      }
+    });
+  }
 }
