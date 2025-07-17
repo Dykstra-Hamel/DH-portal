@@ -259,11 +259,14 @@ async function handleProjectAssignmentSubmission(payload: SlackInteractivePayloa
     }
     
     // Find the user in our database by email
+    console.log('Looking for user with email:', assigneeEmail);
     const { data: userProfile, error: userError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name')
+      .select('id, first_name, last_name, email')
       .eq('email', assigneeEmail)
       .single();
+    
+    console.log('User profile query result:', { userProfile, userError });
     
     if (userError || !userProfile) {
       console.error('User not found in database:', userError);
@@ -276,6 +279,7 @@ async function handleProjectAssignmentSubmission(payload: SlackInteractivePayloa
     }
     
     // Update the project assignment
+    console.log('Updating project:', projectId, 'with user:', userProfile.id);
     const { data: updatedProject, error: updateError } = await supabase
       .from('projects')
       .update({ 
@@ -290,12 +294,14 @@ async function handleProjectAssignmentSubmission(payload: SlackInteractivePayloa
       `)
       .single();
     
+    console.log('Project update result:', { updatedProject, updateError });
+    
     if (updateError) {
       console.error('Error updating project:', updateError);
       return NextResponse.json({
         response_action: 'errors',
         errors: {
-          assignee_selection: 'Failed to assign project in database'
+          assignee_selection: `Failed to assign project in database: ${updateError.message}`
         }
       });
     }
