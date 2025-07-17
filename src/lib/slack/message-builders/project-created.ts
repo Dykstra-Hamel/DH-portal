@@ -22,45 +22,45 @@ export function buildProjectCreatedMessage(projectData: ProjectNotificationData)
 
   const blocks: any[] = [
     {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "🚀 New Project Request"
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "🚀 New Project Request"
       }
     },
     {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": `*${projectData.projectName}*\n${description}`
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*${projectData.projectName}*\n${description}`
       }
     },
     {
-      "type": "section",
-      "fields": [
+      type: "section",
+      fields: [
         {
-          "type": "mrkdwn",
-          "text": `*Project Type:*\n${projectData.projectType}`
+          type: "mrkdwn",
+          text: `*Project Type:*\n${projectData.projectType}`
         },
         {
-          "type": "mrkdwn",
-          "text": `*Company:*\n${projectData.companyName}`
+          type: "mrkdwn",
+          text: `*Company:*\n${projectData.companyName}`
         },
         {
-          "type": "mrkdwn",
-          "text": `*Priority:*\n${priorityEmoji[projectData.priority]} ${projectData.priority.charAt(0).toUpperCase() + projectData.priority.slice(1)}`
+          type: "mrkdwn",
+          text: `*Priority:*\n${priorityEmoji[projectData.priority]} ${projectData.priority.charAt(0).toUpperCase() + projectData.priority.slice(1)}`
         },
         {
-          "type": "mrkdwn",
-          "text": `*Due Date:*\n${new Date(projectData.dueDate).toLocaleDateString()}`
+          type: "mrkdwn",
+          text: `*Due Date:*\n${new Date(projectData.dueDate).toLocaleDateString()}`
         },
         {
-          "type": "mrkdwn",
-          "text": `*Requested by:*\n${projectData.requesterName}`
+          type: "mrkdwn",
+          text: `*Requested by:*\n${projectData.requesterName}`
         },
         {
-          "type": "mrkdwn",
-          "text": `*Status:*\n${projectData.status}`
+          type: "mrkdwn",
+          text: `*Status:*\n${projectData.status}`
         }
       ]
     }
@@ -68,36 +68,35 @@ export function buildProjectCreatedMessage(projectData: ProjectNotificationData)
 
   // Add action buttons if URL provided
   if (projectData.actionUrl) {
-    // URL button (no action_id when using url)
+    // URL button only
     blocks.push({
-      "type": "actions",
-      "elements": [
+      type: "actions",
+      elements: [
         {
-          "type": "button",
-          "text": {
-            "type": "plain_text",
-            "text": "📋 View in Admin Panel"
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "📋 View in Admin Panel"
           },
-          "url": projectData.actionUrl,
-          "style": "primary"
+          url: projectData.actionUrl,
+          style: "primary"
         }
       ]
     });
 
     // Interactive button (separate actions block)
     blocks.push({
-      "type": "actions",
-      "block_id": "project_actions",
-      "elements": [
+      type: "actions",
+      block_id: "project_actions",
+      elements: [
         {
-          "type": "button",
-          "action_id": "assign_project",
-          "text": {
-            "type": "plain_text",
-            "text": "👤 Assign Project"
+          type: "button",
+          action_id: "assign_project",
+          text: {
+            type: "plain_text",
+            text: "👤 Assign Project"
           },
-          "value": projectData.projectId,
-          "style": "default"
+          value: projectData.projectId
         }
       ]
     });
@@ -105,16 +104,16 @@ export function buildProjectCreatedMessage(projectData: ProjectNotificationData)
 
   // Add divider
   blocks.push({
-    "type": "divider"
+    type: "divider"
   });
 
   // Add context
   blocks.push({
-    "type": "context",
-    "elements": [
+    type: "context",
+    elements: [
       {
-        "type": "mrkdwn",
-        "text": `Project ID: ${projectData.projectId} | Created: ${new Date(projectData.timestamp).toLocaleString()}`
+        type: "mrkdwn",
+        text: `Project ID: ${projectData.projectId} | Created: ${new Date(projectData.timestamp).toLocaleString()}`
       }
     ]
   });
