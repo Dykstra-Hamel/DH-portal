@@ -68,20 +68,27 @@ export function buildProjectCreatedMessage(projectData: ProjectNotificationData)
 
   // Add action buttons if URL provided
   if (projectData.actionUrl) {
+    // URL button (no action_id when using url)
     blocks.push({
       "type": "actions",
-      "block_id": "project_actions",
       "elements": [
         {
           "type": "button",
-          "action_id": "view_project_in_admin",
           "text": {
             "type": "plain_text",
             "text": "📋 View in Admin Panel"
           },
           "url": projectData.actionUrl,
           "style": "primary"
-        },
+        }
+      ]
+    });
+
+    // Interactive button (separate actions block)
+    blocks.push({
+      "type": "actions",
+      "block_id": "project_actions",
+      "elements": [
         {
           "type": "button",
           "action_id": "assign_project",
