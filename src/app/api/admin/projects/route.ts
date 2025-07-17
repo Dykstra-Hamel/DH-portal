@@ -91,7 +91,6 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
     const body = await request.json();
     
-    console.log('Received project data:', body);
     
     const {
       name,
@@ -184,7 +183,7 @@ export async function POST(request: NextRequest) {
         const requesterName = `${requesterProfile?.first_name || ''} ${requesterProfile?.last_name || ''}`.trim() || 'Unknown';
         const requesterEmail = requesterProfile?.email || 'unknown@example.com';
 
-        // Prepare email data
+        // Prepare notification data
         const emailData: EmailProjectData = {
           projectId: project.id,
           projectName: project.name,
@@ -197,7 +196,6 @@ export async function POST(request: NextRequest) {
           companyName: project.company.name,
         };
 
-        // Prepare Slack data
         const slackData: SlackProjectData = {
           id: project.id,
           projectId: project.id,
@@ -214,38 +212,28 @@ export async function POST(request: NextRequest) {
           actionUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin`
         };
 
-        // Send email notification
+        // Send notifications
         const testRecipient: EmailRecipient = {
           email: 'austin@dykstrahamel.com',
           name: 'Austin',
         };
 
         const emailPromise = sendEmail(testRecipient, emailData)
-          .then(() => console.log('Email notification sent successfully'))
           .catch(error => console.error('Failed to send email notification:', error));
 
-        // Send Slack notification using direct function call (avoid network timeout)
-        console.log('Calling Slack notification function directly...');
-        
-        // Import the function dynamically to avoid circular imports
         const { sendProjectCreatedNotification } = await import('@/lib/slack/project-notifications');
         
-        // Call the function directly without HTTP request
         setImmediate(async () => {
           try {
-            console.log('Starting async Slack notification...');
             const result = await sendProjectCreatedNotification(slackData);
-            if (result.success) {
-              console.log('Slack notification sent successfully:', result);
-            } else {
+            if (!result.success) {
               console.error('Failed to send Slack notification:', result.error);
             }
           } catch (error) {
-            console.error('Error in async Slack notification:', error);
+            console.error('Error in Slack notification:', error);
           }
         });
 
-        // Only wait for email notification
         await emailPromise;
       } catch (error) {
         console.error('Failed to send notifications:', error);

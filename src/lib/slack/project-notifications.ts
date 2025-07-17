@@ -14,85 +14,42 @@ export async function sendProjectCreatedNotification(
   projectData: ProjectNotificationData,
   config?: Partial<SlackNotificationConfig>
 ) {
-  console.log('sendProjectCreatedNotification called with:', {
-    projectId: projectData.projectId,
-    projectName: projectData.projectName,
-    hasSlackClient: !!slackClient,
-    slackBotToken: process.env.SLACK_BOT_TOKEN ? 'Present' : 'Missing',
-    tokenLength: process.env.SLACK_BOT_TOKEN ? process.env.SLACK_BOT_TOKEN.length : 0
-  });
-
   if (!slackClient) {
     console.warn('Slack client not initialized - SLACK_BOT_TOKEN not provided');
     return { success: false, error: 'Slack client not configured' };
   }
 
-  // Skip auth test in production to avoid hanging - just try to send message directly
-  console.log('Skipping auth test, proceeding directly to message send...');
-
   try {
     const channel = config?.channel || getChannelForNotificationType('PROJECT_REQUESTS');
-    console.log('Using channel:', channel);
-    
     const message = buildProjectCreatedMessage(projectData);
-    console.log('Built message:', { text: message.text, blockCount: message.blocks.length });
 
-    console.log('About to call slack.chat.postMessage...');
+    const response = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: channel,
+        text: message.text,
+        blocks: message.blocks,
+        username: config?.username || 'Project Bot',
+        icon_emoji: config?.iconEmoji || ':rocket:',
+        thread_ts: config?.threadTs,
+      }),
+    });
     
-    // Try direct HTTP request instead of SDK
-    const messageText = `🚀 New Project Request: ${projectData.projectName}\n\nCompany: ${projectData.companyName}\nPriority: ${projectData.priority}\nDue Date: ${projectData.dueDate}\nRequested by: ${projectData.requesterName}\n\nDescription: ${projectData.description || 'No description provided'}`;
+    const result = await response.json();
     
-    console.log('Making direct Slack API request...');
-    
-    try {
-      // Try with a timeout to prevent hanging
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch('https://slack.com/api/chat.postMessage', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          channel: channel,
-          text: messageText,
-        }),
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      console.log('Slack fetch request completed, status:', response.status);
-      console.log('Response ok:', response.ok);
-      
-      const result = await response.json();
-      console.log('JSON parsing completed, result:', result);
-      
-      if (result.ok) {
-        console.log('Slack notification sent successfully:', result.ts, 'to channel:', result.channel);
-        return { success: true, timestamp: result.ts, channel: result.channel };
-      } else {
-        console.error('Slack API returned error:', result.error);
-        return { success: false, error: result.error };
-      }
-    } catch (fetchError) {
-      console.error('Fetch request failed:', fetchError);
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        console.error('Request was aborted due to timeout');
-        return { success: false, error: 'Request timeout' };
-      }
-      return { success: false, error: 'Network request failed' };
+    if (result.ok) {
+      console.log('Slack notification sent successfully');
+      return { success: true, timestamp: result.ts, channel: result.channel };
+    } else {
+      console.error('Failed to send Slack notification:', result.error);
+      return { success: false, error: result.error };
     }
   } catch (error) {
     console.error('Error sending Slack notification:', error);
-    console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      code: (error as any)?.code,
-      data: (error as any)?.data
-    });
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
