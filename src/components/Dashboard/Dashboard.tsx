@@ -11,6 +11,7 @@ interface Profile {
   first_name: string
   last_name: string
   email: string
+  role?: string
 }
 
 interface Company {
@@ -66,9 +67,19 @@ export default function Dashboard({
       <header className={styles.header}>
         <div className={styles.headerContent}>
           <h1 className={styles.title}>Dashboard</h1>
-          <button onClick={handleSignOut} className={styles.signOutButton}>
-            Sign Out
-          </button>
+          <div className={styles.headerActions}>
+            {profile.role === 'admin' && (
+              <button 
+                onClick={() => router.push('/admin')} 
+                className={styles.adminButton}
+              >
+                Admin Dashboard
+              </button>
+            )}
+            <button onClick={handleSignOut} className={styles.signOutButton}>
+              Sign Out
+            </button>
+          </div>
         </div>
       </header>
 
