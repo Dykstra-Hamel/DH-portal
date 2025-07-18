@@ -798,6 +798,105 @@ async function createCustomersForCompanies() {
   }
 }
 
+// Helper function to generate realistic comments based on lead status
+function getLeadComments(serviceType, leadSource, leadStatus) {
+  const comments = {
+    'new': [
+      `Initial ${serviceType} inquiry from ${leadSource}. Awaiting initial contact.`,
+      `${serviceType} request submitted. Need to schedule discovery call.`,
+      `Interested in ${serviceType} services. Requires follow-up within 24 hours.`,
+      `New lead for ${serviceType}. High priority based on project scope.`,
+      `${serviceType} inquiry via ${leadSource}. Client mentioned tight deadline.`
+    ],
+    'contacted': [
+      `Had initial conversation about ${serviceType} project. Sent proposal draft.`,
+      `Discovery call completed. Client interested in ${serviceType} services.`,
+      `First contact made. Scheduled follow-up meeting for next week.`,
+      `Discussed ${serviceType} requirements. Awaiting additional project details.`,
+      `Initial consultation completed. Client reviewing our ${serviceType} portfolio.`
+    ],
+    'quoted': [
+      `Formal quote sent for ${serviceType} project. Awaiting client decision.`,
+      `Proposal delivered. Client comparing our ${serviceType} quote with competitors.`,
+      `Quote approved by client. Working on contract details.`,
+      `${serviceType} proposal under review. Client requested minor revisions.`,
+      `Submitted comprehensive quote for ${serviceType} services. Follow-up scheduled.`
+    ],
+    'won': [
+      `Successfully converted! ${serviceType} project signed and initiated.`,
+      `Won the ${serviceType} project. Contract signed, project kickoff scheduled.`,
+      `Client chose us for ${serviceType} services. Project starting next month.`,
+      `${serviceType} project secured. Initial payment received, work beginning.`,
+      `Successful close on ${serviceType} project. Team assigned and project launched.`
+    ],
+    'lost': [
+      `Lost ${serviceType} project to competitor. Price was the deciding factor.`,
+      `Client decided to go with another agency for ${serviceType} services.`,
+      `${serviceType} project awarded to competitor. Client cited better timeline.`,
+      `Lost to competitor. Client felt their ${serviceType} approach was better fit.`,
+      `Project lost due to budget constraints. Client postponing ${serviceType} work.`
+    ],
+    'unqualified': [
+      `Lead disqualified. Budget too small for ${serviceType} project scope.`,
+      `Not qualified lead. Client timeline doesn't match our ${serviceType} availability.`,
+      `Unqualified inquiry. Client needs DIY solution, not professional ${serviceType}.`,
+      `Lead disqualified after discovery. Project scope too small for our ${serviceType} services.`,
+      `Not a good fit. Client expectations don't align with our ${serviceType} approach.`
+    ]
+  };
+  
+  const statusComments = comments[leadStatus] || comments['new'];
+  return statusComments[Math.floor(Math.random() * statusComments.length)];
+}
+
+// Helper function to generate realistic estimated values based on service type and status
+function getEstimatedValue(leadStatus, serviceType) {
+  const serviceValues = {
+    'General Pest Control': { min: 150, max: 500 },
+    'Ant Control': { min: 200, max: 400 },
+    'Roach Control': { min: 250, max: 600 },
+    'Spider Control': { min: 180, max: 450 },
+    'Rodent Control': { min: 300, max: 800 },
+    'Termite Inspection': { min: 100, max: 300 },
+    'Termite Treatment': { min: 1500, max: 5000 },
+    'Bed Bug Treatment': { min: 500, max: 2000 },
+    'Wasp & Hornet Removal': { min: 200, max: 600 },
+    'Flea Control': { min: 250, max: 500 },
+    'Tick Control': { min: 300, max: 700 },
+    'Mosquito Control': { min: 400, max: 1200 },
+    'Wildlife Removal': { min: 500, max: 1500 },
+    'Attic Insulation': { min: 2000, max: 8000 },
+    'Crawl Space Treatment': { min: 1000, max: 4000 },
+    'Commercial Pest Control': { min: 500, max: 3000 }
+  };
+  
+  const defaultRange = { min: 200, max: 800 };
+  const range = serviceValues[serviceType] || defaultRange;
+  
+  // Base value calculation
+  let baseValue = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+  
+  // Adjust based on lead status
+  switch(leadStatus) {
+    case 'quoted':
+    case 'won':
+      // More accurate estimates for quoted/won leads
+      baseValue = Math.floor(baseValue * (0.9 + Math.random() * 0.2)); // 90-110% of base
+      break;
+    case 'lost':
+    case 'unqualified':
+      // Lower estimates for lost/unqualified leads
+      baseValue = Math.floor(baseValue * (0.7 + Math.random() * 0.4)); // 70-110% of base
+      break;
+    default:
+      // New/contacted leads have wider range
+      baseValue = Math.floor(baseValue * (0.8 + Math.random() * 0.5)); // 80-130% of base
+  }
+  
+  // Round to nearest 25 for pest control pricing
+  return Math.round(baseValue / 25) * 25;
+}
+
 // Create leads for companies
 async function createLeadsForCompanies(users) {
   try {
@@ -851,44 +950,78 @@ async function createLeadsForCompanies(users) {
     // Lead configuration arrays
     const leadSources = ['organic', 'referral', 'google_cpc', 'facebook_ads', 'linkedin', 'email_campaign', 'cold_call', 'trade_show', 'webinar', 'content_marketing'];
     const leadTypes = ['phone_call', 'web_form', 'email', 'chat', 'social_media', 'in_person'];
-    const serviceTypes = ['Website Design', 'Branding', 'Marketing Campaign', 'App Development', 'Consultation', 'SEO Services', 'Social Media Management'];
-    const leadStatuses = ['new', 'contacted', 'quoted', 'won', 'lost'];
+    const serviceTypes = ['General Pest Control', 'Ant Control', 'Roach Control', 'Spider Control', 'Rodent Control', 'Termite Inspection', 'Termite Treatment', 'Bed Bug Treatment', 'Wasp & Hornet Removal', 'Flea Control', 'Tick Control', 'Mosquito Control', 'Wildlife Removal', 'Attic Insulation', 'Crawl Space Treatment', 'Commercial Pest Control'];
+    const leadStatuses = ['new', 'contacted', 'quoted', 'won', 'lost', 'unqualified'];
     const priorities = ['low', 'medium', 'high', 'urgent'];
     
-    // Create 2-4 leads for each company
+    // Sample customer data for creating customers on-demand
+    const firstNames = ['John', 'Jane', 'Michael', 'Sarah', 'David', 'Emily', 'Chris', 'Amanda', 'Robert', 'Lisa'];
+    const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
+    
+    // Create 5-8 leads for each company to ensure good coverage of all statuses
     const leads = [];
     let leadIndex = 1;
     
     for (const company of companies) {
-      const numLeads = Math.floor(Math.random() * 3) + 2; // 2-4 leads
+      const numLeads = Math.floor(Math.random() * 4) + 5; // 5-8 leads
       const companyCustomers = customers.filter(c => c.company_id === company.id);
+      
+      // Track customers to ensure some get multiple leads
+      const customersWithLeads = new Set();
       
       for (let i = 0; i < numLeads; i++) {
         const randomUser = localUsers[Math.floor(Math.random() * localUsers.length)];
         const leadSource = leadSources[Math.floor(Math.random() * leadSources.length)];
         const leadType = leadTypes[Math.floor(Math.random() * leadTypes.length)];
         const serviceType = serviceTypes[Math.floor(Math.random() * serviceTypes.length)];
-        const leadStatus = leadStatuses[Math.floor(Math.random() * leadStatuses.length)];
+        
+        // Ensure we have at least one lead of each status for the first 6 leads
+        const leadStatus = i < leadStatuses.length ? leadStatuses[i] : leadStatuses[Math.floor(Math.random() * leadStatuses.length)];
         const priority = priorities[Math.floor(Math.random() * priorities.length)];
         
-        // 50% chance to link to an existing customer
-        const linkedCustomer = Math.random() > 0.5 && companyCustomers.length > 0 
-          ? companyCustomers[Math.floor(Math.random() * companyCustomers.length)] 
-          : null;
+        // Always link to an existing customer - create additional customer if needed
+        let linkedCustomer = null;
+        if (companyCustomers.length > 0) {
+          // For the first few leads, prefer customers who already have leads (multi-lead scenario)
+          if (i < 3 && customersWithLeads.size > 0 && Math.random() > 0.3) {
+            const customersWithLeadsArray = Array.from(customersWithLeads);
+            const customerId = customersWithLeadsArray[Math.floor(Math.random() * customersWithLeadsArray.length)];
+            linkedCustomer = companyCustomers.find(c => c.id === customerId);
+          } else {
+            linkedCustomer = companyCustomers[Math.floor(Math.random() * companyCustomers.length)];
+          }
+        } else {
+          // If no customers exist for this company, create one
+          const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+          const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+          linkedCustomer = {
+            id: `${leadIndex.toString().padStart(8, '0')}-CUST-TEMP-${company.id.substring(0, 8)}`,
+            company_id: company.id,
+            first_name: firstName,
+            last_name: lastName,
+            phone: `(${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
+            email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
+            customer_status: 'active'
+          };
+          companyCustomers.push(linkedCustomer);
+        }
+        
+        // Track this customer as having leads
+        customersWithLeads.add(linkedCustomer.id);
         
         leads.push({
           id: `${leadIndex.toString().padStart(8, '0')}-2222-2222-2222-222222222222`,
           company_id: company.id,
-          customer_id: linkedCustomer?.id || null,
+          customer_id: linkedCustomer.id,
           lead_source: leadSource,
           lead_type: leadType,
           service_type: serviceType,
           lead_status: leadStatus,
-          comments: `${serviceType} inquiry from ${leadSource}. ${leadStatus === 'won' ? 'Successfully converted to project.' : leadStatus === 'lost' ? 'Lost to competitor.' : 'In progress.'}`,
+          comments: getLeadComments(serviceType, leadSource, leadStatus),
           assigned_to: randomUser.id,
           last_contacted_at: leadStatus !== 'new' ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
           next_follow_up_at: ['new', 'contacted', 'quoted'].includes(leadStatus) ? new Date(Date.now() + Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString() : null,
-          estimated_value: Math.floor(Math.random() * 50000) + 5000, // $5k - $55k
+          estimated_value: getEstimatedValue(leadStatus, serviceType),
           priority: priority,
           utm_source: leadSource === 'google_cpc' ? 'google' : leadSource === 'facebook_ads' ? 'facebook' : null,
           utm_medium: leadSource.includes('ads') || leadSource === 'google_cpc' ? 'cpc' : leadSource === 'organic' ? 'organic' : null,
