@@ -243,6 +243,10 @@ export const adminAPI = {
     })
   },
 
+  async getLeadCalls(leadId: string) {
+    return authenticatedFetch(`/api/admin/leads/${leadId}/calls`)
+  },
+
   // Non-admin project endpoints
   async getUserProjects(companyId: string) {
     return authenticatedFetch(`/api/projects?companyId=${companyId}`)
