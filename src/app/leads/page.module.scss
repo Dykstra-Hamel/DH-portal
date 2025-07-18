@@ -1,0 +1,85 @@
+.container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.adminControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .adminControls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.leadsSection {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.sectionHeader {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 8px 8px 0 0;
+}
+
+.sectionHeader h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+}
+
+.sectionHeader p {
+  color: #6b7280;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.loading {
+  padding: 40px 24px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.emptyState {
+  padding: 40px 24px;
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: 1rem;
+}

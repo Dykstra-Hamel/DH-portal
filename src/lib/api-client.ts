@@ -154,8 +154,102 @@ export const adminAPI = {
     })
   },
 
+  // Customers
+  async getCustomers(filters: { companyId?: string; status?: string; search?: string; sortBy?: string; sortOrder?: string } = {}) {
+    const queryParams = new URLSearchParams()
+    if (filters.companyId) queryParams.append('companyId', filters.companyId)
+    if (filters.status) queryParams.append('status', filters.status)
+    if (filters.search) queryParams.append('search', filters.search)
+    if (filters.sortBy) queryParams.append('sortBy', filters.sortBy)
+    if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder)
+    
+    const url = `/api/admin/customers${queryParams.toString() ? `?${queryParams}` : ''}`
+    return authenticatedFetch(url)
+  },
+
+  async getCustomer(customerId: string) {
+    return authenticatedFetch(`/api/admin/customers/${customerId}`)
+  },
+
+  async createCustomer(customerData: any) {
+    return authenticatedFetch('/api/admin/customers', {
+      method: 'POST',
+      body: JSON.stringify(customerData),
+    })
+  },
+
+  async updateCustomer(customerId: string, customerData: any) {
+    return authenticatedFetch(`/api/admin/customers/${customerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(customerData),
+    })
+  },
+
+  async deleteCustomer(customerId: string) {
+    return authenticatedFetch(`/api/admin/customers/${customerId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  async getCustomerLeads(customerId: string, filters: { status?: string; sortBy?: string; sortOrder?: string } = {}) {
+    const queryParams = new URLSearchParams()
+    if (filters.status) queryParams.append('status', filters.status)
+    if (filters.sortBy) queryParams.append('sortBy', filters.sortBy)
+    if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder)
+    
+    const url = `/api/admin/customers/${customerId}/leads${queryParams.toString() ? `?${queryParams}` : ''}`
+    return authenticatedFetch(url)
+  },
+
+  async createCustomerLead(customerId: string, leadData: any) {
+    return authenticatedFetch(`/api/admin/customers/${customerId}/leads`, {
+      method: 'POST',
+      body: JSON.stringify(leadData),
+    })
+  },
+
+  // Leads
+  async getLeads(filters: { companyId?: string; status?: string; priority?: string } = {}) {
+    const queryParams = new URLSearchParams()
+    if (filters.companyId) queryParams.append('companyId', filters.companyId)
+    if (filters.status) queryParams.append('status', filters.status)
+    if (filters.priority) queryParams.append('priority', filters.priority)
+    
+    const url = `/api/admin/leads${queryParams.toString() ? `?${queryParams}` : ''}`
+    return authenticatedFetch(url)
+  },
+
+  async getLead(leadId: string) {
+    return authenticatedFetch(`/api/admin/leads/${leadId}`)
+  },
+
+  async createLead(leadData: any) {
+    return authenticatedFetch('/api/admin/leads', {
+      method: 'POST',
+      body: JSON.stringify(leadData),
+    })
+  },
+
+  async updateLead(leadId: string, leadData: any) {
+    return authenticatedFetch(`/api/admin/leads/${leadId}`, {
+      method: 'PUT',
+      body: JSON.stringify(leadData),
+    })
+  },
+
+  async deleteLead(leadId: string) {
+    return authenticatedFetch(`/api/admin/leads/${leadId}`, {
+      method: 'DELETE',
+    })
+  },
+
   // Non-admin project endpoints
   async getUserProjects(companyId: string) {
     return authenticatedFetch(`/api/projects?companyId=${companyId}`)
+  },
+
+  // Non-admin leads endpoints
+  async getUserLeads(companyId: string) {
+    return authenticatedFetch(`/api/leads?companyId=${companyId}`)
   },
 }

@@ -46,7 +46,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         {/* Logo Section */}
         <div className={styles.sidebarLogoSection}>
           <Image
-            src="pcocentral-logo.svg"
+            src="/pcocentral-logo.svg"
             alt="pcocentral logo"
             width={131}
             height={23}
@@ -61,8 +61,8 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
 
           {/* Company Section */}
           <SidebarSection sectionTitle='Company' sectionState={companyOpen} setSectionState={setCompanyOpen}>
-            <SidebarSectionNavItem itemText='Leads' icon={UserPlus} path='#' />
-            <SidebarSectionNavItem itemText='Customers' icon={Users} path='#' />
+            <SidebarSectionNavItem itemText='Leads' icon={UserPlus} path='/leads' />
+            <SidebarSectionNavItem itemText='Customers' icon={Users} path='/customers' />
             <SidebarSectionNavItem itemText='Routing' icon={Route} path='#' />
             <SidebarSectionNavItem itemText='Tech Revenue' icon={DollarSign} path='#' />
             <SidebarSectionNavItem itemText='Employees' icon={UserCheck} path='#' />

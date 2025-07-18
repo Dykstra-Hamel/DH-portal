@@ -1,0 +1,431 @@
+.container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  
+  &:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+  }
+}
+
+.header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  flex: 1;
+}
+
+.headerButtons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.callButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #10b981;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  
+  &:hover:not(:disabled) {
+    background: #059669;
+  }
+  
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.editButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #3b82f6;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  
+  &:hover {
+    background: #2563eb;
+  }
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.saveButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #10b981;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  
+  &:hover:not(:disabled) {
+    background: #059669;
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.cancelButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #6b7280;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  
+  &:hover {
+    background: #4b5563;
+  }
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.leadInfo,
+.additionalInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.infoCard {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.infoCard h3 {
+  background: #f9fafb;
+  padding: 16px 20px;
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.leadDetails,
+.customerDetails,
+.assignmentDetails,
+.utmDetails {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  span {
+    font-size: 14px;
+    color: #374151;
+    font-weight: 500;
+  }
+}
+
+.sourceBadge,
+.typeBadge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: #e5e7eb;
+  color: #374151;
+  width: fit-content;
+}
+
+.statusBadge,
+.priorityBadge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  white-space: nowrap;
+  width: fit-content;
+}
+
+.valueAmount {
+  font-weight: 600;
+  color: #059669;
+  font-size: 16px;
+}
+
+.customerName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  
+  svg {
+    color: #6b7280;
+  }
+}
+
+.customerLink {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s;
+  
+  &:hover {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+}
+
+.contactItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #374151;
+  
+  svg {
+    color: #6b7280;
+    flex-shrink: 0;
+  }
+  
+  a {
+    color: #3b82f6;
+    text-decoration: none;
+    transition: color 0.2s;
+    
+    &:hover {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+  }
+}
+
+.noCustomer {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  padding: 20px;
+  
+  p {
+    margin: 0;
+  }
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #374151;
+  
+  svg {
+    color: #6b7280;
+  }
+}
+
+.unassigned {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.comments {
+  padding: 20px;
+  
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: #374151;
+    line-height: 1.5;
+  }
+}
+
+.editForm {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+.input,
+.select,
+.textarea {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #374151;
+  background: white;
+  transition: all 0.2s;
+  
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+  
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.loading {
+  padding: 40px 24px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.error {
+  padding: 40px 24px;
+  text-align: center;
+  color: #ef4444;
+  
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 16px;
+  }
+}
+
+// Mobile responsive
+@media (max-width: 1024px) {
+  .content {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .container {
+    padding: 16px;
+  }
+  
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .header h1 {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .customerName {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .contactItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
