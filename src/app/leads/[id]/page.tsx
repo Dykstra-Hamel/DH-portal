@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Edit, Phone, Mail, User as UserIcon, Save, X, PhoneCall } from 'lucide-react'
 import { adminAPI } from '@/lib/api-client'
 import { Lead, leadSourceOptions, leadTypeOptions, leadStatusOptions, leadPriorityOptions } from '@/types/lead'
+import { CallHistory } from '@/components/Calls/CallHistory/CallHistory'
 import styles from './page.module.scss'
 
 interface Profile {
@@ -444,6 +445,11 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
                             </div>
                         </div>
                     )}
+
+                    {/* Call History */}
+                    <div className={styles.infoCard}>
+                        <CallHistory leadId={leadId!} />
+                    </div>
                 </div>
 
                 <div className={styles.rightColumn}>
