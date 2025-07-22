@@ -130,84 +130,10 @@ export async function shouldAutoCall(companyId: string): Promise<boolean> {
   }
 }
 
-// Check if calling is allowed based on day-specific business hours and other rules
-export async function isCallingAllowed(companyId: string): Promise<boolean> {
-  try {
-    const supabase = await createClient()
-    
-    const now = new Date()
-    const currentTime = now.toTimeString().slice(0, 5) // HH:MM format
-    const currentDay = now.getDay() // 0 = Sunday, 6 = Saturday
-    
-    // Map day numbers to day names
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const currentDayName = dayNames[currentDay]
-    
-    // Get day-specific business hours
-    const { data: dayHoursSetting, error: dayError } = await supabase
-      .from('company_settings')
-      .select('setting_value')
-      .eq('company_id', companyId)
-      .eq('setting_key', `business_hours_${currentDayName}`)
-      .maybeSingle() // Use maybeSingle() to handle 0 rows gracefully
-    
-    if (!dayError && dayHoursSetting) {
-      const dayHours = JSON.parse(dayHoursSetting.setting_value)
-      
-      // If the day is disabled, don't allow calls
-      if (!dayHours.enabled) {
-        return false
-      }
-      
-      // Check if current time is within business hours for this day
-      const startTime = dayHours.start || '09:00'
-      const endTime = dayHours.end || '17:00'
-      
-      if (currentTime < startTime || currentTime > endTime) {
-        return false
-      }
-    } else {
-      // Fallback to old weekend calling logic if day-specific hours not found
-      const { data: weekendSetting } = await supabase
-        .from('company_settings')
-        .select('setting_value')
-        .eq('company_id', companyId)
-        .eq('setting_key', 'weekend_calling_enabled')
-        .maybeSingle()
-      
-      const weekendCallingEnabled = weekendSetting?.setting_value === 'true'
-      if (!weekendCallingEnabled && (currentDay === 0 || currentDay === 6)) {
-        return false
-      }
-      
-      // Fallback to old business hours if day-specific hours not found
-      const { data: startSetting } = await supabase
-        .from('company_settings')
-        .select('setting_value')
-        .eq('company_id', companyId)
-        .eq('setting_key', 'business_hours_start')
-        .maybeSingle()
-      
-      const { data: endSetting } = await supabase
-        .from('company_settings')
-        .select('setting_value')
-        .eq('company_id', companyId)
-        .eq('setting_key', 'business_hours_end')
-        .maybeSingle()
-      
-      const businessHoursStart = startSetting?.setting_value || '09:00'
-      const businessHoursEnd = endSetting?.setting_value || '17:00'
-      
-      if (currentTime < businessHoursStart || currentTime > businessHoursEnd) {
-        return false
-      }
-    }
-    
-    return true
-  } catch (error) {
-    console.error('Error checking calling hours:', error)
-    return true // Default to allowing calls on error
-  }
+// Simple check - always allow calls (no business hours restrictions)
+export async function isCallingAllowed(_companyId: string): Promise<boolean> {
+  // Always allow calls - only check if auto-calling is enabled in shouldAutoCall()
+  return true
 }
 
 // Main function to handle automated lead calling
