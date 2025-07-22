@@ -43,3 +43,92 @@ export async function isAuthorizedAdmin(user: any): Promise<boolean> {
 export function isAuthorizedAdminSync(profile: any): boolean {
   return profile?.role === 'admin'
 }
+
+// Interface for UserCompany data
+interface UserCompany {
+  id: string
+  user_id: string
+  company_id: string
+  role: string
+  is_primary: boolean
+}
+
+// Check if user has admin role for a specific company
+export async function isCompanyAdmin(userId: string, companyId: string): Promise<boolean> {
+  if (!userId || !companyId) return false
+  
+  const supabase = createAdminClient()
+  const { data: userCompany } = await supabase
+    .from('user_companies')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('company_id', companyId)
+    .maybeSingle()
+    
+  return userCompany ? ['admin', 'manager', 'owner'].includes(userCompany.role) : false
+}
+
+// Check if user has admin role for any company
+export async function isCompanyAdminAny(userId: string): Promise<boolean> {
+  if (!userId) return false
+  
+  const supabase = createAdminClient()
+  const { data: userCompanies } = await supabase
+    .from('user_companies')
+    .select('role')
+    .eq('user_id', userId)
+    .in('role', ['admin', 'manager', 'owner'])
+    
+  return userCompanies ? userCompanies.length > 0 : false
+}
+
+// Get user's role for a specific company
+export async function getUserCompanyRole(userId: string, companyId: string): Promise<string | null> {
+  if (!userId || !companyId) return null
+  
+  const supabase = createAdminClient()
+  const { data: userCompany } = await supabase
+    .from('user_companies')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('company_id', companyId)
+    .single()
+    
+  return userCompany?.role || null
+}
+
+// Get all companies where user has admin privileges
+export async function getUserAdminCompanies(userId: string): Promise<UserCompany[]> {
+  if (!userId) return []
+  
+  const supabase = createAdminClient()
+  const { data: userCompanies, error } = await supabase
+    .from('user_companies')
+    .select(`
+      *,
+      companies (
+        id,
+        name
+      )
+    `)
+    .eq('user_id', userId)
+    .in('role', ['admin', 'manager', 'owner'])
+    
+  if (error) {
+    console.error('Error fetching admin companies:', error)
+    return []
+  }
+  
+  return userCompanies || []
+}
+
+// Synchronous helper to check if a role can manage settings
+export function canManageSettings(role: string): boolean {
+  return ['admin', 'manager', 'owner'].includes(role)
+}
+
+// Synchronous helper to check if user is company admin from UserCompany array
+export function isCompanyAdminSync(userCompanies: UserCompany[], companyId: string): boolean {
+  const userCompany = userCompanies.find(uc => uc.company_id === companyId)
+  return userCompany ? canManageSettings(userCompany.role) : false
+}

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server-admin'
+import { handleAutoLeadCall } from '@/lib/services/lead-calling'
 import { normalizePhoneNumber } from '@/lib/utils'
+
 
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
@@ -212,6 +214,41 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create lead' },
         { status: 500 }
       ))
+    }
+
+    // Attempt auto-call if enabled (don't fail lead creation if this fails)
+    try {
+      // Get company info for the call
+      const { data: company } = await supabase
+        .from('companies')
+        .select('name, website')
+        .eq('id', submission.companyId)
+        .single()
+
+      const callResult = await handleAutoLeadCall(
+        lead.id,
+        submission.companyId,
+        {
+          first_name: submission.contactInfo.name.split(' ')[0] || '',
+          last_name: submission.contactInfo.name.split(' ').slice(1).join(' ') || '',
+          email: submission.contactInfo.email,
+          phone: submission.contactInfo.phone
+        },
+        company ? { name: company.name, website: company.website } : undefined,
+        status,
+        notes
+      )
+
+      if (callResult.success && !callResult.skipped) {
+        console.log(`Auto-call initiated for lead ${lead.id}, call ID: ${callResult.callId}`)
+      } else if (callResult.skipped) {
+        console.log(`Auto-call skipped for lead ${lead.id}: ${callResult.reason}`)
+      } else {
+        console.error(`Auto-call failed for lead ${lead.id}: ${callResult.error}`)
+      }
+    } catch (error) {
+      console.error('Error in auto-call process:', error)
+      // Don't fail the lead creation due to call issues
     }
 
     // Return success response
