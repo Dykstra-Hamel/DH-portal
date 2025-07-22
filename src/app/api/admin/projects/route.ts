@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendProjectCreatedNotification as sendEmail } from '@/lib/email/project-notifications';
 import { EmailRecipient, ProjectNotificationData as EmailProjectData } from '@/lib/email/types';
@@ -7,6 +8,12 @@ import { ProjectNotificationData as SlackProjectData } from '@/lib/slack/types';
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify authentication and admin authorization
+    const { user, error: authError } = await verifyAuth(request);
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const supabase = createAdminClient();
     
     // Get query parameters for filtering
@@ -96,6 +103,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication and admin authorization
+    const { user, error: authError } = await verifyAuth(request);
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const supabase = createAdminClient();
     const body = await request.json();
     

@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Edit, Phone, Mail, User as UserIcon, Save, X, PhoneCall } from 'lucide-react'
 import { adminAPI } from '@/lib/api-client'
 import { Lead, leadSourceOptions, leadTypeOptions, leadStatusOptions, leadPriorityOptions } from '@/types/lead'
+import { CallHistory } from '@/components/Calls/CallHistory/CallHistory'
+import { isAuthorizedAdminSync } from '@/lib/auth-helpers'
 import styles from './page.module.scss'
 
 interface Profile {
@@ -31,6 +33,8 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [editFormData, setEditFormData] = useState<any>(null)
     const [saving, setSaving] = useState(false)
+    const [callHistoryRefresh, setCallHistoryRefresh] = useState(0)
+    const [isAdmin, setIsAdmin] = useState(false)
     const router = useRouter()
 
     useEffect(() => {
@@ -63,6 +67,7 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     
           if (!profileError && profileData) {
             setProfile(profileData)
+            setIsAdmin(isAuthorizedAdminSync(profileData))
           }
     
           setLoading(false)
@@ -87,15 +92,19 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
         if (leadId && !loading) {
           fetchLead()
         }
-      }, [leadId, loading])
+      }, [leadId, loading, isAdmin])
 
       const fetchLead = async () => {
         if (!leadId) return
         
         try {
           setLeadLoading(true)
-          // We'll need to create a getLead function in the adminAPI
-          const leadData = await adminAPI.getLead(leadId)
+          let leadData
+          if (isAdmin) {
+            leadData = await adminAPI.getLead(leadId)
+          } else {
+            leadData = await adminAPI.getUserLead(leadId)
+          }
           setLead(leadData)
         } catch (error) {
           console.error('Error fetching lead:', error)
@@ -154,16 +163,22 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
           
           const normalizedPhone = normalizePhoneNumber(lead.customer.phone)
           
+          const isFollowUp = lead.lead_status !== 'new'
+
           const payload = {
             from_number: process.env.NEXT_PUBLIC_RETELL_FROM_NUMBER || "+12074197718",
             to_number: normalizedPhone,
             agent_id: process.env.NEXT_PUBLIC_RETELL_AGENT_ID || "agent_4d2bb226685183e59b205d6fd3",
             retell_llm_dynamic_variables: {
+              customer_first_name: lead.customer.first_name || 'Customer',
               customer_name: `${lead.customer.first_name} ${lead.customer.last_name}`,
               customer_email: lead.customer.email || '',
               customer_comments: lead.comments || '',
               company_name: lead.company?.name || "Dykstra-Hamel",
-              company_url: lead.company?.website || "https://www.dykstrahamel.com/"
+              company_url: lead.company?.website || "https://www.dykstrahamel.com/",
+              knowledge_base_url: "https://www.dykstrahamel.com/services",
+              is_follow_up: isFollowUp ? "true" : "false",
+              lead_id: leadId
             }
           }
 
@@ -251,10 +266,17 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
             estimated_value: parseFloat(editFormData.estimated_value) || 0
           }
           
-          const updatedLead = await adminAPI.updateLead(leadId, cleanFormData)
+          let updatedLead
+          if (isAdmin) {
+            updatedLead = await adminAPI.updateLead(leadId, cleanFormData)
+          } else {
+            updatedLead = await adminAPI.updateUserLead(leadId, cleanFormData)
+          }
           setLead(updatedLead)
           setIsEditing(false)
           setEditFormData(null)
+          // Trigger call history refresh in case customer phone number changed
+          setCallHistoryRefresh(prev => prev + 1)
         } catch (error) {
           console.error('Error updating lead:', error)
           alert('Failed to update lead. Please try again.')
@@ -291,6 +313,7 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
         const statusColors: { [key: string]: string } = {
           'new': '#3b82f6',
           'contacted': '#f59e0b',
+          'qualified': '#06b6d4',
           'quoted': '#8b5cf6',
           'won': '#10b981',
           'lost': '#ef4444',
@@ -307,6 +330,55 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
           'urgent': '#dc2626'
         }
         return priorityColors[priority] || '#6b7280'
+      }
+
+      const formatComments = (comments: string) => {
+        if (!comments) return []
+        
+        // Split comments by double newlines to separate different entries
+        const entries = comments.split('\n\n').filter(entry => entry.trim())
+        
+        return entries.map((entry, index) => {
+          const trimmedEntry = entry.trim()
+          
+          // Check if this entry starts with a call record pattern
+          if (trimmedEntry.startsWith('📞 Call on') || trimmedEntry.startsWith('📊 Call Analysis:')) {
+            return (
+              <div key={index} className={styles.commentEntry}>
+                <div className={styles.callEntry}>
+                  {trimmedEntry}
+                </div>
+              </div>
+            )
+          }
+          
+          // Check if this is an old-style call entry (contains "Call call_" pattern)
+          const oldCallPattern = /Call call_[a-zA-Z0-9]+ (completed|ended|failed)/
+          if (oldCallPattern.test(trimmedEntry)) {
+            // Try to extract some basic info and format it better
+            const statusMatch = trimmedEntry.match(/(completed|ended|failed)/)
+            const status = statusMatch ? statusMatch[1] : 'unknown'
+            return (
+              <div key={index} className={styles.commentEntry}>
+                <div className={styles.callEntry}>
+                  📞 Call - Status: {status}
+                </div>
+              </div>
+            )
+          }
+          
+          // Regular comment - split by newlines and preserve formatting
+          const lines = trimmedEntry.split('\n')
+          return (
+            <div key={index} className={styles.commentEntry}>
+              <div className={styles.regularComment}>
+                {lines.map((line, lineIndex) => (
+                  <div key={lineIndex}>{line}</div>
+                ))}
+              </div>
+            </div>
+          )
+        })
       }
     
       if (loading || leadLoading) {
@@ -344,7 +416,7 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
                         className={styles.callButton}
                     >
                         <PhoneCall size={16} />
-                        {isCallLoading ? 'Calling...' : 'Call Customer'}
+                        {isCallLoading ? 'Calling...' : (lead.lead_status === 'new' ? 'Call Customer' : 'Follow Up')}
                     </button>
                     {isEditing ? (
                         <div className={styles.editActions}>
@@ -436,10 +508,15 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
                         <div className={styles.infoCard}>
                             <h3>Comments</h3>
                             <div className={styles.comments}>
-                                <p>{lead.comments}</p>
+                                {formatComments(lead.comments)}
                             </div>
                         </div>
                     )}
+
+                    {/* Call History */}
+                    <div className={styles.infoCard}>
+                        <CallHistory leadId={leadId!} refreshTrigger={callHistoryRefresh} isAdmin={isAdmin} />
+                    </div>
                 </div>
 
                 <div className={styles.rightColumn}>

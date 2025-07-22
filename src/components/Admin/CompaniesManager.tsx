@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { adminAPI } from '@/lib/api-client'
 import styles from './AdminManager.module.scss'
 
 interface Company {
@@ -46,11 +47,7 @@ export default function CompaniesManager() {
 
   const loadCompanies = async () => {
     try {
-      const response = await fetch('/api/admin/companies')
-      if (!response.ok) {
-        throw new Error('Failed to fetch companies')
-      }
-      const companiesData = await response.json()
+      const companiesData = await adminAPI.getCompanies()
       setCompanies(companiesData)
     } catch (error) {
       console.error('Error loading companies:', error)
@@ -63,17 +60,7 @@ export default function CompaniesManager() {
     e.preventDefault()
     
     try {
-      const response = await fetch('/api/admin/companies', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create company')
-      }
+      await adminAPI.createCompany(formData)
 
       setFormData({
         name: '',
@@ -101,30 +88,20 @@ export default function CompaniesManager() {
     if (!editingCompany) return
 
     try {
-      const response = await fetch(`/api/admin/companies/${editingCompany.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: editingCompany.name,
-          description: editingCompany.description,
-          website: editingCompany.website,
-          email: editingCompany.email,
-          phone: editingCompany.phone,
-          address: editingCompany.address,
-          city: editingCompany.city,
-          state: editingCompany.state,
-          zip_code: editingCompany.zip_code,
-          country: editingCompany.country,
-          industry: editingCompany.industry,
-          size: editingCompany.size
-        }),
+      await adminAPI.updateCompany(editingCompany.id, {
+        name: editingCompany.name,
+        description: editingCompany.description,
+        website: editingCompany.website,
+        email: editingCompany.email,
+        phone: editingCompany.phone,
+        address: editingCompany.address,
+        city: editingCompany.city,
+        state: editingCompany.state,
+        zip_code: editingCompany.zip_code,
+        country: editingCompany.country,
+        industry: editingCompany.industry,
+        size: editingCompany.size
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to update company')
-      }
 
       setEditingCompany(null)
       loadCompanies()
@@ -137,13 +114,7 @@ export default function CompaniesManager() {
     if (!confirm('Are you sure you want to delete this company? This will also remove all user associations.')) return
 
     try {
-      const response = await fetch(`/api/admin/companies/${companyId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete company')
-      }
+      await adminAPI.deleteCompany(companyId)
 
       loadCompanies()
     } catch (error) {

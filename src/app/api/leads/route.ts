@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('company_id', companyId)
-      .in('lead_status', ['new', 'contacted', 'quoted'])
+      .in('lead_status', ['new', 'contacted', 'qualified', 'quoted'])
       .order('created_at', { ascending: false });
     
     if (error) {

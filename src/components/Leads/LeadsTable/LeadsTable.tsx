@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Edit, Trash2, Calendar, User, Phone, Mail, DollarSign } from 'lucide-react';
+import { Edit, Trash2, Calendar, User, Phone, Mail } from 'lucide-react';
 import { Lead, leadSourceOptions, leadTypeOptions, leadStatusOptions, leadPriorityOptions } from '@/types/lead';
 import { useRouter } from 'next/navigation';
 import styles from './LeadsTable.module.scss';
@@ -34,6 +34,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
     const statusColorMap: { [key: string]: string } = {
       'new': '#3b82f6',
       'contacted': '#f59e0b',
+      'qualified': '#06b6d4',
       'quoted': '#8b5cf6',
       'won': '#10b981',
       'lost': '#ef4444',
@@ -173,8 +174,11 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
               </td>
               <td>
                 <div className={styles.valueInfo}>
-                  <DollarSign size={14} />
-                  {formatCurrency(lead.estimated_value)}
+                  {lead.estimated_value ? (
+                    formatCurrency(lead.estimated_value)
+                  ) : (
+                    <span className={styles.noValue}>—</span>
+                  )}
                 </div>
               </td>
               <td>

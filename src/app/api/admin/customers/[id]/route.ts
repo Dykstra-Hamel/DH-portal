@@ -77,7 +77,7 @@ export async function GET(
     })) || [];
 
     // Calculate customer statistics
-    const activeLeads = leadsWithUsers?.filter(l => ['new', 'contacted', 'quoted'].includes(l.lead_status)) || [];
+    const activeLeads = leadsWithUsers?.filter(l => ['new', 'contacted', 'qualified', 'quoted'].includes(l.lead_status)) || [];
     const completedLeads = leadsWithUsers?.filter(l => ['won', 'lost', 'unqualified'].includes(l.lead_status)) || [];
     const totalValue = leadsWithUsers?.reduce((sum, l) => sum + (l.estimated_value || 0), 0) || 0;
     const wonValue = leadsWithUsers?.filter(l => l.lead_status === 'won').reduce((sum, l) => sum + (l.estimated_value || 0), 0) || 0;

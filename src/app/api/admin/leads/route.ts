@@ -4,7 +4,6 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('Admin Leads API: Starting request');
     
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
@@ -38,7 +37,7 @@ export async function GET(request: NextRequest) {
           name
         )
       `)
-      .in('lead_status', ['new', 'contacted', 'quoted'])
+      .in('lead_status', ['new', 'contacted', 'qualified', 'quoted'])
       .order('created_at', { ascending: false });
 
     // Apply filters
@@ -96,7 +95,6 @@ export async function GET(request: NextRequest) {
       assigned_user: lead.assigned_to ? profileMap.get(lead.assigned_to) || null : null
     }));
     
-    console.log('Admin Leads API: Successfully fetched leads', { count: enhancedLeads.length });
     return NextResponse.json(enhancedLeads);
   } catch (error) {
     console.error('Admin Leads API: Internal error:', error);
@@ -106,12 +104,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Admin Leads API: Starting POST request');
     
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Leads API: Unauthorized POST access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -131,7 +127,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 });
     }
 
-    console.log('Admin Leads API: Successfully created lead', { leadId: lead.id });
     return NextResponse.json(lead, { status: 201 });
   } catch (error) {
     console.error('Admin Leads API: Internal error:', error);

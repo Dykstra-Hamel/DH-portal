@@ -23,6 +23,7 @@ export type LeadType =
 export type LeadStatus = 
   | 'new'
   | 'contacted'
+  | 'qualified'
   | 'quoted'
   | 'won'
   | 'lost'
@@ -122,6 +123,7 @@ export const leadTypeOptions = [
 export const leadStatusOptions = [
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
+  { value: 'qualified', label: 'Qualified' },
   { value: 'quoted', label: 'Quoted' },
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },
