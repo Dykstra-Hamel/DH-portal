@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { normalizePhoneNumber } from '@/lib/utils';
 
 export async function GET(
   request: NextRequest,
@@ -141,10 +142,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Access denied to this customer' }, { status: 403 });
     }
     
+    // Normalize phone number if provided in update
+    const updateData = {
+      ...body,
+      phone: body.phone ? (normalizePhoneNumber(body.phone) || body.phone) : body.phone
+    };
+    
     // Update the customer
     const { data: customer, error } = await supabase
       .from('customers')
-      .update(body)
+      .update(updateData)
       .eq('id', customerId)
       .select(`
         *,

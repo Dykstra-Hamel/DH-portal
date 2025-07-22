@@ -26,6 +26,10 @@ This is a Next.js application with Supabase authentication supporting Google OAu
 - Prefer functional components with hooks
 - Use absolute imports with `@/` prefix
 
+## Local Testing
+
+- Always checking for an existing dev server running on port 3000 before attempting to open a new one.
+
 - **JSX Entity Escaping**: Always escape special characters in JSX text:
   - Apostrophes: `don&apos;t` instead of `don't`
   - Quotes: `&quot;` instead of `"`

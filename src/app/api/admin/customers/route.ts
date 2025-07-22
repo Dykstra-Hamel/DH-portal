@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { normalizePhoneNumber } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -119,12 +120,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: first_name, last_name, company_id' }, { status: 400 });
     }
 
+    // Normalize phone number if provided
+    const customerData = {
+      ...body,
+      phone: body.phone ? (normalizePhoneNumber(body.phone) || body.phone) : body.phone
+    };
+
     // Use admin client to create customer
     const supabase = createAdminClient();
     
     const { data: customer, error } = await supabase
       .from('customers')
-      .insert([body])
+      .insert([customerData])
       .select(`
         *,
         company:companies(

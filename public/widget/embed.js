@@ -159,7 +159,11 @@
     currentStep: 'welcome',
     formData: {
       pestIssue: '',
-      address: '',
+      address: '', // Keep as string for backward compatibility
+      addressStreet: '',
+      addressCity: '',
+      addressState: '',
+      addressZip: '',
       homeSize: '',
       urgency: '',
       contactInfo: {
@@ -169,6 +173,103 @@
       }
     },
     priceEstimate: null
+  };
+
+  // US States data for dropdown
+  const US_STATES = [
+    { code: 'AL', name: 'Alabama' },
+    { code: 'AK', name: 'Alaska' },
+    { code: 'AZ', name: 'Arizona' },
+    { code: 'AR', name: 'Arkansas' },
+    { code: 'CA', name: 'California' },
+    { code: 'CO', name: 'Colorado' },
+    { code: 'CT', name: 'Connecticut' },
+    { code: 'DE', name: 'Delaware' },
+    { code: 'FL', name: 'Florida' },
+    { code: 'GA', name: 'Georgia' },
+    { code: 'HI', name: 'Hawaii' },
+    { code: 'ID', name: 'Idaho' },
+    { code: 'IL', name: 'Illinois' },
+    { code: 'IN', name: 'Indiana' },
+    { code: 'IA', name: 'Iowa' },
+    { code: 'KS', name: 'Kansas' },
+    { code: 'KY', name: 'Kentucky' },
+    { code: 'LA', name: 'Louisiana' },
+    { code: 'ME', name: 'Maine' },
+    { code: 'MD', name: 'Maryland' },
+    { code: 'MA', name: 'Massachusetts' },
+    { code: 'MI', name: 'Michigan' },
+    { code: 'MN', name: 'Minnesota' },
+    { code: 'MS', name: 'Mississippi' },
+    { code: 'MO', name: 'Missouri' },
+    { code: 'MT', name: 'Montana' },
+    { code: 'NE', name: 'Nebraska' },
+    { code: 'NV', name: 'Nevada' },
+    { code: 'NH', name: 'New Hampshire' },
+    { code: 'NJ', name: 'New Jersey' },
+    { code: 'NM', name: 'New Mexico' },
+    { code: 'NY', name: 'New York' },
+    { code: 'NC', name: 'North Carolina' },
+    { code: 'ND', name: 'North Dakota' },
+    { code: 'OH', name: 'Ohio' },
+    { code: 'OK', name: 'Oklahoma' },
+    { code: 'OR', name: 'Oregon' },
+    { code: 'PA', name: 'Pennsylvania' },
+    { code: 'RI', name: 'Rhode Island' },
+    { code: 'SC', name: 'South Carolina' },
+    { code: 'SD', name: 'South Dakota' },
+    { code: 'TN', name: 'Tennessee' },
+    { code: 'TX', name: 'Texas' },
+    { code: 'UT', name: 'Utah' },
+    { code: 'VT', name: 'Vermont' },
+    { code: 'VA', name: 'Virginia' },
+    { code: 'WA', name: 'Washington' },
+    { code: 'WV', name: 'West Virginia' },
+    { code: 'WI', name: 'Wisconsin' },
+    { code: 'WY', name: 'Wyoming' }
+  ];
+
+  // Generate state options HTML
+  const generateStateOptions = () => {
+    return '<option value="">Select State</option>' + 
+           US_STATES.map(state => `<option value="${state.code}">${state.name}</option>`).join('');
+  };
+
+  // Map state names (from API) to state codes (for dropdown)
+  const getStateCodeFromName = (stateName) => {
+    if (!stateName) return '';
+    
+    // If it's already a 2-letter state code, return as-is
+    if (typeof stateName === 'string' && stateName.length === 2 && /^[A-Z]{2}$/.test(stateName.toUpperCase())) {
+      return stateName.toUpperCase();
+    }
+    
+    // Convert to lowercase for case-insensitive matching
+    const searchName = stateName.toLowerCase().trim();
+    
+    // Find matching state by full name
+    const matchedState = US_STATES.find(state => 
+      state.name.toLowerCase() === searchName
+    );
+    
+    if (matchedState) {
+      return matchedState.code;
+    }
+    
+    // Handle special cases and common variations
+    const stateNameMappings = {
+      'district of columbia': 'DC',
+      'd.c.': 'DC',
+      'washington d.c.': 'DC',
+      'washington dc': 'DC'
+    };
+    
+    if (stateNameMappings[searchName]) {
+      return stateNameMappings[searchName];
+    }
+    
+    // If no match found, return empty string
+    return '';
   };
 
   // Global elements reference
@@ -216,7 +317,7 @@
         background: white; 
         border-radius: 12px; 
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1); 
-        overflow: hidden; 
+        overflow: visible; 
         font-family: system-ui, sans-serif; 
         border: 1px solid #e5e7eb; 
       } 
@@ -225,6 +326,8 @@
         background: linear-gradient(135deg, ${primaryColor} 0%, ${darkShade} 100%); 
         color: white; 
         text-align: center; 
+        border-radius: 12px 12px 0 0; 
+        overflow: hidden; 
       } 
       .dh-form-header h2 { 
         margin: 0 0 8px 0; 
@@ -238,6 +341,8 @@
       } 
       .dh-form-content { 
         padding: 24px; 
+        border-radius: 0 0 12px 12px; 
+        overflow: visible; 
       } 
       .dh-form-step { 
         display: none; 
@@ -564,12 +669,28 @@
     addressStep.id = 'dh-step-address';
     addressStep.innerHTML = `
       <h3>What's your service address?</h3>
-      <p>Start typing your address and we'll help you find the exact location for accurate service pricing.</p>
+      <p>Please provide your complete service address below. Start typing the street address for autocomplete suggestions.</p>
       <div class="dh-form-group">
-        <label class="dh-form-label">Service Address</label>
+        <label class="dh-form-label">Street Address</label>
         <div class="dh-address-autocomplete">
-          <input type="text" class="dh-form-input" id="address-input" placeholder="Start typing your address..." autocomplete="off">
+          <input type="text" class="dh-form-input" id="street-input" placeholder="123 Main Street" autocomplete="off">
           <div class="dh-address-suggestions" id="address-suggestions"></div>
+        </div>
+      </div>
+      <div class="dh-form-group">
+        <label class="dh-form-label">City</label>
+        <input type="text" class="dh-form-input" id="city-input" placeholder="City" required>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <div class="dh-form-group" style="flex: 1;">
+          <label class="dh-form-label">State</label>
+          <select class="dh-form-select" id="state-input" required>
+            ${generateStateOptions()}
+          </select>
+        </div>
+        <div class="dh-form-group" style="flex: 0 0 120px;">
+          <label class="dh-form-label">ZIP Code</label>
+          <input type="text" class="dh-form-input" id="zip-input" placeholder="12345" maxlength="5" pattern="[0-9]{5}" required>
         </div>
       </div>
       <div class="dh-form-button-group">
@@ -746,7 +867,13 @@
     const formData = {
       companyId: config.companyId,
       pestIssue: widgetState.formData.pestIssue,
-      address: widgetState.formData.address,
+      address: widgetState.formData.address, // Formatted address for backward compatibility
+      addressDetails: {
+        street: widgetState.formData.addressStreet,
+        city: widgetState.formData.addressCity,
+        state: widgetState.formData.addressState,
+        zip: widgetState.formData.addressZip
+      },
       homeSize: parseInt(widgetState.formData.homeSize),
       urgency: widgetState.formData.urgency,
       contactInfo: widgetState.formData.contactInfo
@@ -794,26 +921,54 @@
         break;
         
       case 'address':
-        const addressInput = document.getElementById('address-input');
+        const streetInput = document.getElementById('street-input');
+        const cityInput = document.getElementById('city-input');
+        const stateInput = document.getElementById('state-input');
+        const zipInput = document.getElementById('zip-input');
         const addressNext = document.getElementById('address-next');
         const addressSuggestions = document.getElementById('address-suggestions');
         
-        if (addressInput && addressNext) {
+        if (streetInput && cityInput && stateInput && zipInput && addressNext) {
           let searchTimeout = null;
           
-          // Address autocomplete functionality
-          addressInput.addEventListener('input', (e) => {
+          // Validation function to check all address fields
+          const validateAddressFields = () => {
+            const street = streetInput.value.trim();
+            const city = cityInput.value.trim();
+            const state = stateInput.value.trim();
+            const zip = zipInput.value.trim();
+            
+            // Update form data
+            widgetState.formData.addressStreet = street;
+            widgetState.formData.addressCity = city;
+            widgetState.formData.addressState = state;
+            widgetState.formData.addressZip = zip;
+            
+            // Create formatted address for backward compatibility
+            if (street && city && state && zip) {
+              widgetState.formData.address = `${street}, ${city}, ${state} ${zip}`;
+            }
+            
+            // Enable next button only if all fields are filled
+            const isValid = street.length >= 3 && city.length >= 2 && state && zip.length === 5 && /^\d{5}$/.test(zip);
+            addressNext.disabled = !isValid;
+            
+            return isValid;
+          };
+          
+          // Street address autocomplete functionality
+          streetInput.addEventListener('input', (e) => {
             const value = e.target.value.trim();
-            widgetState.formData.address = value;
             
             // Clear previous timeout
             if (searchTimeout) {
               clearTimeout(searchTimeout);
             }
             
+            validateAddressFields();
+            
             if (value.length < 3) {
               hideSuggestions();
-              addressNext.disabled = true;
               return;
             }
             
@@ -821,14 +976,20 @@
             searchTimeout = setTimeout(() => {
               searchAddresses(value);
             }, 300);
-            
-            // Enable next button for manual addresses (fallback)
-            addressNext.disabled = value.length < 5;
+          });
+          
+          // Add validation to other address fields
+          cityInput.addEventListener('input', validateAddressFields);
+          stateInput.addEventListener('change', validateAddressFields);
+          zipInput.addEventListener('input', (e) => {
+            // Only allow digits for ZIP code
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5);
+            validateAddressFields();
           });
           
           // Handle clicking outside to close suggestions
           document.addEventListener('click', (e) => {
-            if (!addressInput.contains(e.target) && !addressSuggestions.contains(e.target)) {
+            if (!streetInput.contains(e.target) && !addressSuggestions.contains(e.target)) {
               hideSuggestions();
             }
           });
@@ -845,7 +1006,7 @@
                 return;
               }
               
-              // Use configured API endpoint (to be implemented in backend)
+              // Use configured API endpoint
               const response = await fetch(`${config.baseUrl}/api/widget/address-autocomplete`, {
                 method: 'POST',
                 headers: {
@@ -861,11 +1022,9 @@
                 const data = await response.json();
                 displaySuggestions(data.suggestions || []);
               } else {
-                // Fallback: hide suggestions if API fails
                 hideSuggestions();
               }
             } catch (error) {
-              // Graceful fallback: allow manual entry
               hideSuggestions();
             }
           };
@@ -899,23 +1058,25 @@
             }
           };
           
-          // Select an address
+          // Select an address and populate all fields
           const selectAddress = (address) => {
-            widgetState.formData.address = address.formatted;
-            widgetState.formData.addressDetails = {
-              formatted: address.formatted,
-              street: address.street,
-              city: address.city,
-              state: address.state,
-              postcode: address.postcode,
-              country: address.country,
-              lat: address.lat,
-              lon: address.lon
-            };
+            // Populate individual fields
+            streetInput.value = address.street || '';
+            cityInput.value = address.city || '';
+            // Use state mapping to convert API state name to state code
+            const stateCode = getStateCodeFromName(address.state);
+            stateInput.value = stateCode;
+            zipInput.value = address.postcode || '';
             
-            addressInput.value = address.formatted;
+            // Update form data
+            widgetState.formData.addressStreet = address.street || '';
+            widgetState.formData.addressCity = address.city || '';
+            widgetState.formData.addressState = stateCode;
+            widgetState.formData.addressZip = address.postcode || '';
+            widgetState.formData.address = address.formatted;
+            
             hideSuggestions();
-            addressNext.disabled = false;
+            validateAddressFields();
             
             // Trigger property lookup if available
             if (typeof lookupPropertyData === 'function') {
@@ -924,7 +1085,7 @@
           };
           
           // Keyboard navigation for suggestions
-          addressInput.addEventListener('keydown', (e) => {
+          streetInput.addEventListener('keydown', (e) => {
             const suggestions = addressSuggestions.querySelectorAll('.dh-address-suggestion');
             const selected = addressSuggestions.querySelector('.dh-address-suggestion.selected');
             let selectedIndex = selected ? Array.from(suggestions).indexOf(selected) : -1;
