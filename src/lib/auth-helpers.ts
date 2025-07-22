@@ -63,9 +63,9 @@ export async function isCompanyAdmin(userId: string, companyId: string): Promise
     .select('role')
     .eq('user_id', userId)
     .eq('company_id', companyId)
-    .single()
+    .maybeSingle()
     
-  return userCompany && ['admin', 'manager', 'owner'].includes(userCompany.role)
+  return userCompany ? ['admin', 'manager', 'owner'].includes(userCompany.role) : false
 }
 
 // Check if user has admin role for any company
@@ -79,7 +79,7 @@ export async function isCompanyAdminAny(userId: string): Promise<boolean> {
     .eq('user_id', userId)
     .in('role', ['admin', 'manager', 'owner'])
     
-  return userCompanies && userCompanies.length > 0
+  return userCompanies ? userCompanies.length > 0 : false
 }
 
 // Get user's role for a specific company
