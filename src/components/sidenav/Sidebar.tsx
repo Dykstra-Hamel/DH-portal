@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from "next/image";
 import { usePathname } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { useIsCompanyAdminAny } from '@/hooks/useCompanyRole';
+import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import { 
   Settings, 
   LogOut, 
@@ -32,9 +35,33 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const [companyOpen, setCompanyOpen] = useState(true);
   const [marketingOpen, setMarketingOpen] = useState(false);
   const [helpfulToolsOpen, setHelpfulToolsOpen] = useState(false);
+  const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
 
   const pathname = usePathname();
   const isPublicPage = pathname === '/login' || pathname === '/sign-up'
+  const { isAdminForAnyCompany } = useIsCompanyAdminAny()
+
+  // Check if user is global admin
+  useEffect(() => {
+    const checkGlobalAdmin = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        setIsGlobalAdmin(isAuthorizedAdminSync(profile))
+      }
+    }
+    
+    if (!isPublicPage) {
+      checkGlobalAdmin()
+    }
+  }, [isPublicPage])
 
   if (collapsed) {
     return null;
@@ -86,7 +113,9 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         {/* Bottom Section */}
         <div className="sidebar-bottom-section">
           <div className="sidebar-bottom-nav">
-            <SidebarSingleNavItem itemText='Settings' icon={Settings} path='/dasbhoard-1' />
+            {(isAdminForAnyCompany || isGlobalAdmin) && (
+              <SidebarSingleNavItem itemText='Settings' icon={Settings} path='/settings' />
+            )}
             <SidebarSingleNavItem itemText='Log Out' icon={LogOut} path='#' />
           </div>
         </div>
