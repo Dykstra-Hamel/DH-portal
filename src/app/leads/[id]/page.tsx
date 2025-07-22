@@ -153,8 +153,6 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
           setIsCallLoading(true)
           
           const normalizedPhone = normalizePhoneNumber(lead.customer.phone)
-          console.log('Original phone:', lead.customer.phone)
-          console.log('Normalized phone:', normalizedPhone)
           
           const payload = {
             from_number: process.env.NEXT_PUBLIC_RETELL_FROM_NUMBER || "+12074197718",
@@ -169,7 +167,6 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
             }
           }
 
-          console.log('Making phone call request with payload:', payload)
           
           const response = await fetch('https://api.retellai.com/v2/create-phone-call', {
             method: 'POST',
@@ -191,7 +188,6 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
           }
 
           const result = await response.json()
-          console.log('Phone call created:', result)
           
           // Show success message
           alert(`Phone call initiated successfully! Call ID: ${result.call_id || 'N/A'}`)

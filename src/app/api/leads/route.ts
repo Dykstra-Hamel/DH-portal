@@ -5,23 +5,17 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     
-    console.log('Leads API: Starting request');
     
     // Get the current user from the session
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
-      console.log('Leads API: Auth error or no user', { authError, user: !!user });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    console.log('Leads API: User authenticated', { userId: user.id });
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
-    
-    console.log('Leads API: Company ID', { companyId });
     
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });

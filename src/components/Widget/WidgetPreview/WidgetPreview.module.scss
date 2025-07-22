@@ -1,0 +1,166 @@
+// Direct Script Integration Preview Styles
+.previewContainer {
+  width: 100%;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  padding: 20px 20px 40px 20px;
+  min-height: 600px;
+  height: auto;
+}
+
+.previewBadge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: #fbbf24;
+  color: #92400e;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.widgetContainer {
+  width: 100%;
+  padding-top: 40px; /* Space for preview badge */
+  
+  // Override widget positioning for preview mode
+  :global(.dh-form-widget) {
+    position: static !important;
+    transform: none !important;
+    margin: 0 auto !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+    max-width: 500px !important;
+  }
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  
+  p {
+    margin: 16px 0 0 0;
+    color: #6b7280;
+    font-size: 14px;
+    font-family: system-ui, sans-serif;
+  }
+}
+
+.loadingHint {
+  font-size: 12px !important;
+  color: #9ca3af !important;
+  margin-top: 8px !important;
+}
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  background: #fef2f2;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  padding: 20px;
+  text-align: center;
+  
+  h3 {
+    color: #dc2626;
+    margin: 16px 0 8px 0;
+    font-size: 18px;
+    font-family: system-ui, sans-serif;
+  }
+  
+  p {
+    color: #7f1d1d;
+    font-size: 14px;
+    margin: 0 0 20px 0;
+    font-family: system-ui, sans-serif;
+  }
+}
+
+.errorIcon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.retryButton {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background: #b91c1c;
+  }
+}
+
+.loadingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e7eb;
+  border-top: 3px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+// Widget Container Styles for Script Integration
+.widgetContainer {
+  width: 100%;
+  padding-top: 40px; /* Space for preview badge */
+  
+  // Ensure widget displays properly in preview mode
+  :global(.dh-form-widget) {
+    position: static !important;
+    transform: none !important;
+    margin: 0 auto !important;
+    max-width: 500px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  }
+}
+
+// Responsive design
+@media (max-width: 640px) {
+  .previewContainer {
+    padding: 15px 15px 30px 15px;
+    min-height: 500px;
+    height: auto;
+  }
+  
+  .previewBadge {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+  
+  .widgetContainer {
+    padding-top: 35px;
+    
+    :global(.dh-form-widget) {
+      max-width: 100% !important;
+    }
+  }
+  
+  .loadingContainer, .errorContainer {
+    height: 300px;
+  }
+}
