@@ -168,6 +168,31 @@ After running the script:
 3. **Check user assignments** in companies and projects
 4. **Start development** with realistic data
 
+## Phone Number Normalization
+
+The `normalize-phone-numbers.js` script normalizes existing customer phone numbers to the `(xxx) xxx-xxxx` format.
+
+### Usage
+
+```bash
+# Run the phone normalization script
+node scripts/normalize-phone-numbers.js
+```
+
+### Prerequisites
+
+- `NEXT_PUBLIC_SUPABASE_URL` environment variable
+- `SUPABASE_SERVICE_ROLE_KEY` environment variable
+
+### What it does
+
+1. Fetches all customers with phone numbers
+2. Normalizes each phone number to `(xxx) xxx-xxxx` format
+3. Updates the database with normalized phone numbers
+4. Provides detailed progress and summary report
+
+**Note:** This script is only needed if you have existing customer data with inconsistent phone number formatting. For new installations, all customer creation endpoints automatically normalize phone numbers.
+
 ## Contributing
 
 To improve this script:

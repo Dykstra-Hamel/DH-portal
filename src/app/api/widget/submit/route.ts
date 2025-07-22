@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server-admin'
 import { handleAutoLeadCall } from '@/lib/services/lead-calling'
+import { normalizePhoneNumber } from '@/lib/utils'
+
 
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
@@ -25,7 +27,13 @@ const addCorsHeaders = (response: NextResponse) => {
 interface WidgetSubmission {
   companyId: string
   pestIssue: string
-  address: string
+  address: string // Formatted address for backward compatibility
+  addressDetails?: { // New structured address data
+    street: string
+    city: string
+    state: string
+    zip: string
+  }
   homeSize: number
   urgency: string
   contactInfo: {
@@ -55,14 +63,36 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    // Check if customer already exists
+    // Normalize phone number for consistent lookup and storage
+    const normalizedPhone = normalizePhoneNumber(submission.contactInfo.phone)
+
+    // Check if customer already exists by email OR phone number
     let customerId: string
-    const { data: existingCustomer } = await supabase
+    let existingCustomer = null
+
+    // First, try to find by email
+    const { data: emailCustomer } = await supabase
       .from('customers')
       .select('id')
       .eq('email', submission.contactInfo.email)
       .eq('company_id', submission.companyId)
       .single()
+
+    if (emailCustomer) {
+      existingCustomer = emailCustomer
+    } else if (normalizedPhone) {
+      // If no email match and we have a valid phone, try phone lookup
+      const { data: phoneCustomer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('phone', normalizedPhone)
+        .eq('company_id', submission.companyId)
+        .single()
+
+      if (phoneCustomer) {
+        existingCustomer = phoneCustomer
+      }
+    }
 
     if (existingCustomer) {
       customerId = existingCustomer.id
@@ -72,9 +102,18 @@ export async function POST(request: NextRequest) {
       const firstName = nameParts[0] || ''
       const lastName = nameParts.slice(1).join(' ') || ''
 
-      // Parse address components if available
+      // Parse address components - use structured data if available, fallback to parsing
       let addressData = {}
-      if (submission.address) {
+      if (submission.addressDetails) {
+        // Use structured address data
+        addressData = {
+          address: submission.addressDetails.street,
+          city: submission.addressDetails.city,
+          state: submission.addressDetails.state,
+          zip_code: submission.addressDetails.zip
+        }
+      } else if (submission.address) {
+        // Fallback: parse from formatted address string
         const zipMatch = submission.address.match(/\b\d{5}\b/)
         addressData = {
           address: submission.address,
@@ -89,7 +128,7 @@ export async function POST(request: NextRequest) {
           first_name: firstName,
           last_name: lastName,
           email: submission.contactInfo.email,
-          phone: submission.contactInfo.phone,
+          phone: normalizedPhone || submission.contactInfo.phone, // Use normalized phone if available, fallback to original
           customer_status: 'active',
           ...addressData
         }])
