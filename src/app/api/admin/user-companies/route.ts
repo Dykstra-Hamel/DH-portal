@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers'
 import { createAdminClient } from '@/lib/supabase/server-admin'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Verify authentication and admin authorization
+    const { user, error: authError } = await verifyAuth(request)
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = createAdminClient()
     // Load relationships (without joins since foreign key isn't set up)
     const { data: relationshipsData, error: relError } = await supabase
@@ -69,6 +76,12 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication and admin authorization
+    const { user, error: authError } = await verifyAuth(request)
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = createAdminClient()
     const relationshipData = await request.json()
 

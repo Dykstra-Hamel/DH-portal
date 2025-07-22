@@ -1,29 +1,32 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Phone, Clock, Download, Play, Pause, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Phone, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { adminAPI } from '@/lib/api-client'
 import { CallRecord } from '@/types/call-record'
+import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer'
 import styles from './CallHistory.module.scss'
 
 interface CallHistoryProps {
   leadId: string
+  refreshTrigger?: number // Optional prop to trigger refresh
+  isAdmin?: boolean // Whether user is admin
 }
 
-export function CallHistory({ leadId }: CallHistoryProps) {
+export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHistoryProps) {
   const [calls, setCalls] = useState<CallRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [playingCall, setPlayingCall] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchCalls()
-  }, [leadId])
-
-  const fetchCalls = async () => {
+  const fetchCalls = useCallback(async () => {
     try {
       setLoading(true)
-      const callData = await adminAPI.getLeadCalls(leadId)
+      let callData
+      if (isAdmin) {
+        callData = await adminAPI.getLeadCalls(leadId)
+      } else {
+        callData = await adminAPI.getUserLeadCalls(leadId)
+      }
       setCalls(callData)
     } catch (error) {
       console.error('Error fetching calls:', error)
@@ -31,7 +34,11 @@ export function CallHistory({ leadId }: CallHistoryProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [leadId, isAdmin])
+
+  useEffect(() => {
+    fetchCalls()
+  }, [leadId, refreshTrigger, fetchCalls])
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60)
@@ -68,17 +75,6 @@ export function CallHistory({ leadId }: CallHistoryProps) {
     }
   }
 
-  const handlePlayRecording = (callId: string, recordingUrl?: string) => {
-    if (!recordingUrl) return
-    
-    if (playingCall === callId) {
-      setPlayingCall(null)
-      // In a real implementation, you'd pause the audio here
-    } else {
-      setPlayingCall(callId)
-      // In a real implementation, you'd start playing the audio here
-    }
-  }
 
   if (loading) {
     return <div className={styles.loading}>Loading call history...</div>
@@ -194,30 +190,17 @@ export function CallHistory({ leadId }: CallHistoryProps) {
                 </div>
               )}
 
-              {/* Call Actions */}
-              <div className={styles.callActions}>
-                {call.recording_url && (
-                  <button 
-                    className={styles.playButton}
-                    onClick={() => handlePlayRecording(call.id, call.recording_url)}
-                  >
-                    {playingCall === call.id ? <Pause size={16} /> : <Play size={16} />}
-                    {playingCall === call.id ? 'Pause' : 'Play Recording'}
-                  </button>
-                )}
-                
-                {call.recording_url && (
-                  <a 
-                    href={call.recording_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.downloadButton}
-                  >
-                    <Download size={16} />
-                    Download
-                  </a>
-                )}
-              </div>
+              {/* Call Recording */}
+              {call.recording_url && (
+                <div className={styles.recordingSection}>
+                  <h4>Call Recording</h4>
+                  <AudioPlayer 
+                    src={call.recording_url} 
+                    title={`Call Recording - ${formatDate(call.start_timestamp || '')}`}
+                    className={styles.callRecording}
+                  />
+                </div>
+              )}
 
               {/* Transcript */}
               {call.transcript && (

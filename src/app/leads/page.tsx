@@ -41,7 +41,7 @@ export default function LeadsPage() {
     const [leads, setLeads] = useState<Lead[]>([])
     const [leadsLoading, setLeadsLoading] = useState(false)
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<'new' | 'contacted' | 'quoted' | 'all'>('all')
+    const [activeTab, setActiveTab] = useState<'new' | 'contacted' | 'qualified' | 'quoted' | 'all'>('all')
     const [isAdmin, setIsAdmin] = useState(false)
     const [adminSelectedCompany, setAdminSelectedCompany] = useState<string | undefined>(undefined)
     const router = useRouter()
@@ -71,29 +71,32 @@ export default function LeadsPage() {
             setIsAdmin(isAuthorizedAdminSync(profileData))
           }
 
-          // Get user companies
-          const { data: companiesData, error: companiesError } = await supabase
-            .from('user_companies')
-            .select(`
-              *,
-              companies (
-                id,
-                name
-              )
-            `)
-            .eq('user_id', session.user.id)
+          // Get user companies (skip for admin users)
+          if (!isAuthorizedAdminSync(profileData)) {
+            const { data: companiesData, error: companiesError } = await supabase
+              .from('user_companies')
+              .select(`
+                *,
+                companies (
+                  id,
+                  name
+                )
+              `)
+              .eq('user_id', session.user.id)
 
-          if (!companiesError && companiesData) {
-            setUserCompanies(companiesData)
-            
-            // Set primary company as selected, or first company if no primary
-            const primaryCompany = companiesData.find(uc => uc.is_primary)
-            if (primaryCompany) {
-              setSelectedCompany(primaryCompany.companies)
-            } else if (companiesData.length > 0) {
-              setSelectedCompany(companiesData[0].companies)
+            if (!companiesError && companiesData) {
+              setUserCompanies(companiesData)
+              
+              // Set primary company as selected, or first company if no primary
+              const primaryCompany = companiesData.find(uc => uc.is_primary)
+              if (primaryCompany) {
+                setSelectedCompany(primaryCompany.companies)
+              } else if (companiesData.length > 0) {
+                setSelectedCompany(companiesData[0].companies)
+              }
             }
           }
+          // Admin users don't need a selected company - they use the dropdown to filter
     
           setLoading(false)
         }
@@ -168,6 +171,7 @@ export default function LeadsPage() {
         all: leads.length,
         new: leads.filter(lead => lead.lead_status === 'new').length,
         contacted: leads.filter(lead => lead.lead_status === 'contacted').length,
+        qualified: leads.filter(lead => lead.lead_status === 'qualified').length,
         quoted: leads.filter(lead => lead.lead_status === 'quoted').length,
       }
 

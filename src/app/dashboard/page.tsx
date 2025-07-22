@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+import { adminAPI } from '@/lib/api-client'
 import Dashboard from '@/components/Dashboard/Dashboard'
 
 interface Profile {
@@ -71,9 +72,8 @@ export default function DashboardPage() {
 
       if (isAdmin) {
         // Admin users can see all companies
-        const response = await fetch('/api/admin/companies')
-        if (response.ok) {
-          const allCompanies = await response.json()
+        try {
+          const allCompanies = await adminAPI.getCompanies()
           const companiesData = allCompanies.map((company: any) => ({
             companies: company,
             is_primary: false
@@ -84,6 +84,8 @@ export default function DashboardPage() {
           if (companiesData.length > 0) {
             setSelectedCompany(companiesData[0].companies)
           }
+        } catch (error) {
+          console.error('Error fetching companies for admin:', error)
         }
       } else {
         // Regular users only see their associated companies

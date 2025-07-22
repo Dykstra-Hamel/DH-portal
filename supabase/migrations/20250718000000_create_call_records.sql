@@ -22,6 +22,11 @@ CREATE TABLE call_records (
   timeline VARCHAR(50), -- e.g., "spring 2024", "asap"
   pain_points TEXT[], -- array of pain points mentioned
   decision_maker VARCHAR(100), -- who makes decisions
+  pest_issue TEXT,
+  street_address VARCHAR(255),
+  preferred_service_time VARCHAR(10) CHECK (preferred_service_time IN ('AM', 'PM', 'anytime')),
+  contacted_other_companies BOOLEAN DEFAULT FALSE,
+  opt_out_sensitive_data_storage BOOLEAN DEFAULT FALSE,
   
   disconnect_reason VARCHAR(100),
   retell_variables JSONB, -- variables passed to/from Retell
@@ -36,6 +41,11 @@ CREATE INDEX idx_call_records_customer_id ON call_records(customer_id);
 CREATE INDEX idx_call_records_phone_number ON call_records(phone_number);
 CREATE INDEX idx_call_records_call_id ON call_records(call_id);
 CREATE INDEX idx_call_records_created_at ON call_records(created_at DESC);
+CREATE INDEX idx_call_records_pest_issue ON call_records(pest_issue);
+CREATE INDEX idx_call_records_street_address ON call_records(street_address);
+CREATE INDEX idx_call_records_service_time ON call_records(preferred_service_time);
+CREATE INDEX idx_call_records_contacted_others ON call_records(contacted_other_companies);
+CREATE INDEX idx_call_records_opt_out ON call_records(opt_out_sensitive_data_storage);
 
 -- Add updated_at trigger
 CREATE OR REPLACE FUNCTION update_call_records_updated_at()

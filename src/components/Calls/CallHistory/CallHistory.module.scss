@@ -164,42 +164,17 @@
   }
 }
 
-.callActions {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.playButton, .downloadButton {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition: all 0.2s;
-  cursor: pointer;
-  border: none;
-}
-
-.playButton {
-  background: #3b82f6;
-  color: white;
-  
-  &:hover {
-    background: #2563eb;
+.recordingSection {
+  h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
   }
 }
 
-.downloadButton {
-  background: #f3f4f6;
-  color: #374151;
-  
-  &:hover {
-    background: #e5e7eb;
-  }
+.callRecording {
+  margin-top: 0.5rem;
 }
 
 .transcript {

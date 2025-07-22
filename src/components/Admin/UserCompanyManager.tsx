@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { adminAPI } from '@/lib/api-client'
 import styles from './AdminManager.module.scss'
 
 interface UserCompany {
@@ -54,12 +55,7 @@ export default function UserCompanyManager() {
 
   const loadData = async () => {
     try {
-      const response = await fetch('/api/admin/user-companies')
-      if (!response.ok) {
-        throw new Error('Failed to fetch data')
-      }
-      
-      const data = await response.json()
+      const data = await adminAPI.getUserCompanies()
       setRelationships(data.relationships || [])
       setUsers(data.users || [])
       setCompanies(data.companies || [])
@@ -74,17 +70,7 @@ export default function UserCompanyManager() {
     e.preventDefault()
     
     try {
-      const response = await fetch('/api/admin/user-companies', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create relationship')
-      }
+      await adminAPI.createUserCompany(formData)
 
       setFormData({
         user_id: '',
@@ -104,20 +90,10 @@ export default function UserCompanyManager() {
     if (!editingRelationship) return
 
     try {
-      const response = await fetch(`/api/admin/user-companies/${editingRelationship.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          role: editingRelationship.role,
-          is_primary: editingRelationship.is_primary
-        }),
+      await adminAPI.updateUserCompany(editingRelationship.id, {
+        role: editingRelationship.role,
+        is_primary: editingRelationship.is_primary
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to update relationship')
-      }
 
       setEditingRelationship(null)
       loadData()
@@ -130,13 +106,7 @@ export default function UserCompanyManager() {
     if (!confirm('Are you sure you want to remove this user from the company?')) return
 
     try {
-      const response = await fetch(`/api/admin/user-companies/${relationshipId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete relationship')
-      }
+      await adminAPI.deleteUserCompany(relationshipId)
 
       loadData()
     } catch (error) {

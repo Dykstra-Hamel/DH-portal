@@ -247,6 +247,11 @@ export const adminAPI = {
     return authenticatedFetch(`/api/admin/leads/${leadId}/calls`)
   },
 
+  // All Calls (admin)
+  async getAllCalls() {
+    return authenticatedFetch('/api/admin/calls')
+  },
+
   // Non-admin project endpoints
   async getUserProjects(companyId: string) {
     return authenticatedFetch(`/api/projects?companyId=${companyId}`)
@@ -255,5 +260,46 @@ export const adminAPI = {
   // Non-admin leads endpoints
   async getUserLeads(companyId: string) {
     return authenticatedFetch(`/api/leads?companyId=${companyId}`)
+  },
+
+  // Non-admin customers endpoints
+  async getUserCustomers(filters: { companyId: string; status?: string; search?: string; sortBy?: string; sortOrder?: string }) {
+    const queryParams = new URLSearchParams()
+    queryParams.append('companyId', filters.companyId)
+    if (filters.status) queryParams.append('status', filters.status)
+    if (filters.search) queryParams.append('search', filters.search)
+    if (filters.sortBy) queryParams.append('sortBy', filters.sortBy)
+    if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder)
+    
+    const url = `/api/customers?${queryParams.toString()}`
+    return authenticatedFetch(url)
+  },
+
+  // Non-admin individual lead endpoints
+  async getUserLead(leadId: string) {
+    return authenticatedFetch(`/api/leads/${leadId}`)
+  },
+
+  async updateUserLead(leadId: string, leadData: any) {
+    return authenticatedFetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      body: JSON.stringify(leadData),
+    })
+  },
+
+  async getUserLeadCalls(leadId: string) {
+    return authenticatedFetch(`/api/leads/${leadId}/calls`)
+  },
+
+  // Non-admin individual customer endpoints
+  async getUserCustomer(customerId: string) {
+    return authenticatedFetch(`/api/customers/${customerId}`)
+  },
+
+  async updateUserCustomer(customerId: string, customerData: any) {
+    return authenticatedFetch(`/api/customers/${customerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(customerData),
+    })
   },
 }
