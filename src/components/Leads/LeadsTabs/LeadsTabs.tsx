@@ -4,7 +4,7 @@ import React from 'react';
 import { LeadStatus } from '@/types/lead';
 import styles from './LeadsTabs.module.scss';
 
-type ActiveLeadStatus = 'new' | 'contacted' | 'quoted';
+type ActiveLeadStatus = 'new' | 'contacted' | 'qualified' | 'quoted';
 
 interface LeadsTabsProps {
   activeTab: ActiveLeadStatus | 'all';
@@ -21,6 +21,7 @@ const LeadsTabs: React.FC<LeadsTabsProps> = ({
   const activeLeadStatusOptions = [
     { value: 'new', label: 'New' },
     { value: 'contacted', label: 'Contacted' },
+    { value: 'qualified', label: 'Qualified' },
     { value: 'quoted', label: 'Quoted' }
   ];
 

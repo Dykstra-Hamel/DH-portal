@@ -76,29 +76,32 @@ export default function CustomersPage() {
             setIsAdmin(isAuthorizedAdminSync(profileData))
           }
 
-          // Get user companies
-          const { data: companiesData, error: companiesError } = await supabase
-            .from('user_companies')
-            .select(`
-              *,
-              companies (
-                id,
-                name
-              )
-            `)
-            .eq('user_id', session.user.id)
+          // Get user companies (skip for admin users)
+          if (!isAuthorizedAdminSync(profileData)) {
+            const { data: companiesData, error: companiesError } = await supabase
+              .from('user_companies')
+              .select(`
+                *,
+                companies (
+                  id,
+                  name
+                )
+              `)
+              .eq('user_id', session.user.id)
 
-          if (!companiesError && companiesData) {
-            setUserCompanies(companiesData)
-            
-            // Set primary company as selected, or first company if no primary
-            const primaryCompany = companiesData.find(uc => uc.is_primary)
-            if (primaryCompany) {
-              setSelectedCompany(primaryCompany.companies)
-            } else if (companiesData.length > 0) {
-              setSelectedCompany(companiesData[0].companies)
+            if (!companiesError && companiesData) {
+              setUserCompanies(companiesData)
+              
+              // Set primary company as selected, or first company if no primary
+              const primaryCompany = companiesData.find(uc => uc.is_primary)
+              if (primaryCompany) {
+                setSelectedCompany(primaryCompany.companies)
+              } else if (companiesData.length > 0) {
+                setSelectedCompany(companiesData[0].companies)
+              }
             }
           }
+          // Admin users don't need a selected company - they use the dropdown to filter
     
           setLoading(false)
         }
@@ -131,7 +134,7 @@ export default function CustomersPage() {
         
         try {
           setCustomersLoading(true)
-          const customersData = await adminAPI.getCustomers({
+          const customersData = await adminAPI.getUserCustomers({
             companyId: selectedCompany.id,
             search: searchQuery,
             sortBy: sortKey,

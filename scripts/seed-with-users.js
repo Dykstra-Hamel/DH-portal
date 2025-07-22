@@ -191,97 +191,97 @@ async function createCompaniesWithUsers(users) {
       return false;
     }
     
-    // Define companies to create
+    // Define companies to create (pest control businesses)
     const companies = [
       {
         id: '11111111-1111-1111-1111-111111111111',
-        name: 'Dykstra Hamel',
-        description: 'Full-service creative agency specializing in brand development, web design, and digital marketing solutions.',
-        website: 'https://dykstrahamel.com',
-        email: 'hello@dykstrahamel.com',
+        name: 'Elite Pest Solutions',
+        description: 'Professional pest control services specializing in residential and commercial extermination, prevention, and integrated pest management.',
+        website: 'https://elitepestsolutions.com',
+        email: 'info@elitepestsolutions.com',
         phone: '(555) 123-4567',
-        address: '123 Creative St',
+        address: '123 Exterminator Blvd',
         city: 'Grand Rapids',
         state: 'Michigan',
         zip_code: '49503',
         country: 'United States',
-        industry: 'Creative Services',
+        industry: 'Pest Control',
         size: '10-50'
       },
       {
         id: '22222222-2222-2222-2222-222222222222',
-        name: 'TechStart Inc',
-        description: 'Innovative technology startup focused on AI solutions for small businesses.',
-        website: 'https://techstart.com',
-        email: 'info@techstart.com',
+        name: 'Guardian Pest Control',
+        description: 'Advanced pest control technology and eco-friendly solutions for homes and businesses across Texas.',
+        website: 'https://guardianpest.com',
+        email: 'hello@guardianpest.com',
         phone: '(555) 987-6543',
-        address: '456 Innovation Ave',
+        address: '456 Pest Control Ave',
         city: 'Austin',
         state: 'Texas',
         zip_code: '78701',
         country: 'United States',
-        industry: 'Technology',
-        size: '1-10'
+        industry: 'Pest Control',
+        size: '50-100'
       },
       {
         id: '33333333-3333-3333-3333-333333333333',
-        name: 'GreenLeaf Organics',
-        description: 'Sustainable organic food producer committed to environmental responsibility.',
-        website: 'https://greenleaforganics.com',
-        email: 'contact@greenleaforganics.com',
+        name: 'Green Shield Exterminators',
+        description: 'Sustainable and organic pest control solutions with a focus on environmental safety and family protection.',
+        website: 'https://greenshieldpest.com',
+        email: 'contact@greenshieldpest.com',
         phone: '(555) 456-7890',
-        address: '789 Organic Way',
+        address: '789 Green Way',
         city: 'Portland',
         state: 'Oregon',
         zip_code: '97201',
         country: 'United States',
-        industry: 'Food & Beverage',
-        size: '50-100'
+        industry: 'Pest Control',
+        size: '25-50'
       },
       {
         id: '44444444-4444-4444-4444-444444444444',
-        name: 'Metro Financial Services',
-        description: 'Full-service financial planning and investment management firm.',
-        website: 'https://metrofinancial.com',
-        email: 'support@metrofinancial.com',
+        name: 'Metro Bug Busters',
+        description: 'Full-service urban pest control specialists handling everything from bed bugs to rodent infestations in the metro area.',
+        website: 'https://metrobugbusters.com',
+        email: 'support@metrobugbusters.com',
         phone: '(555) 321-0987',
-        address: '321 Wall Street',
+        address: '321 Pest Control Plaza',
         city: 'New York',
         state: 'New York',
         zip_code: '10005',
         country: 'United States',
-        industry: 'Financial Services',
-        size: '100-500'
+        industry: 'Pest Control',
+        size: '100-200'
       },
       {
         id: '55555555-5555-5555-5555-555555555555',
-        name: 'Artisan Coffee Co',
-        description: 'Small-batch coffee roaster with a passion for quality and community.',
-        website: 'https://artisancoffee.co',
-        email: 'hello@artisancoffee.co',
+        name: 'Pacific Pest Professionals',
+        description: 'Premium pest control services for the Pacific Northwest, specializing in carpenter ants, termites, and moisture control.',
+        website: 'https://pacificpestpro.com',
+        email: 'service@pacificpestpro.com',
         phone: '(555) 654-3210',
-        address: '987 Coffee Lane',
+        address: '987 Pacific Lane',
         city: 'Seattle',
         state: 'Washington',
         zip_code: '98101',
         country: 'United States',
-        industry: 'Food & Beverage',
-        size: '10-50'
+        industry: 'Pest Control',
+        size: '75-100'
       },
       {
         id: '66666666-6666-6666-6666-666666666666',
-        name: 'Edge Case Company',
-        description: 'Company with special characters: Café & Résumé',
-        website: 'https://edge-case.com',
-        email: 'info@edge-case.com',
-        phone: '(555) 000-0000',
-        address: '123 Special St',
-        city: 'Test City',
-        state: 'Test State',
-        zip_code: '00000',
+        name: 'Apex Termite & Pest',
+        description: 'Comprehensive termite inspection and pest control services with advanced treatment technologies.',
+        website: 'https://apextermite.com',
+        email: 'info@apextermite.com',
+        phone: '(555) 888-9999',
+        address: '123 Termite Blvd',
+        city: 'Phoenix',
+        state: 'Arizona',
+        zip_code: '85001',
         country: 'United States',
-        industry: 'Testing',
-        size: '1-10'
+        industry: 'Pest Control',
+        size: '15-25'
       }
     ];
     
@@ -750,6 +750,8 @@ async function createCustomersForCompanies() {
     // Create 3-5 customers for each company
     const customers = [];
     let customerIndex = 1;
+    const usedEmails = new Set();
+    const usedPhones = new Set();
     
     for (const company of companies) {
       const numCustomers = Math.floor(Math.random() * 3) + 3; // 3-5 customers
@@ -760,13 +762,35 @@ async function createCustomersForCompanies() {
         const cityIndex = Math.floor(Math.random() * cities.length);
         const status = statuses[Math.floor(Math.random() * statuses.length)];
         
+        // Generate unique email
+        let email;
+        let emailAttempts = 0;
+        do {
+          const suffix = emailAttempts > 0 ? emailAttempts : '';
+          email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${suffix}@example.com`;
+          emailAttempts++;
+        } while (usedEmails.has(email) && emailAttempts < 100);
+        usedEmails.add(email);
+        
+        // Generate unique phone number
+        let phone;
+        let phoneAttempts = 0;
+        do {
+          const area = Math.floor(Math.random() * 900) + 100;
+          const exchange = Math.floor(Math.random() * 900) + 100;
+          const number = Math.floor(Math.random() * 9000) + 1000 + phoneAttempts;
+          phone = `(${area}) ${exchange}-${number.toString().padStart(4, '0')}`;
+          phoneAttempts++;
+        } while (usedPhones.has(phone) && phoneAttempts < 1000);
+        usedPhones.add(phone);
+        
         customers.push({
           id: `${customerIndex.toString().padStart(8, '0')}-1111-1111-1111-111111111111`,
           company_id: company.id,
           first_name: firstName,
           last_name: lastName,
-          phone: `(${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-          email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
+          phone: phone,
+          email: email,
           address: `${Math.floor(Math.random() * 9999) + 1} ${lastName} St`,
           city: cities[cityIndex],
           state: states[cityIndex],

@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     // Enhance customers with lead statistics
     const enhancedCustomers = customers.map(customer => {
       const customerLeads = leadCounts?.filter(l => l.customer_id === customer.id) || [];
-      const activeLeads = customerLeads.filter(l => ['new', 'contacted', 'quoted'].includes(l.lead_status));
+      const activeLeads = customerLeads.filter(l => ['new', 'contacted', 'qualified', 'quoted'].includes(l.lead_status));
       const totalValue = customerLeads.reduce((sum, l) => sum + (l.estimated_value || 0), 0);
       
       return {

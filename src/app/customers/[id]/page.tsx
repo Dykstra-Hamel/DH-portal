@@ -91,14 +91,19 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
         if (customerId && !loading) {
           fetchCustomer()
         }
-      }, [customerId, loading])
+      }, [customerId, loading, isAdmin])
 
       const fetchCustomer = async () => {
         if (!customerId) return
         
         try {
           setCustomerLoading(true)
-          const customerData = await adminAPI.getCustomer(customerId)
+          let customerData
+          if (isAdmin) {
+            customerData = await adminAPI.getCustomer(customerId)
+          } else {
+            customerData = await adminAPI.getUserCustomer(customerId)
+          }
           setCustomer(customerData)
         } catch (error) {
           console.error('Error fetching customer:', error)
@@ -141,7 +146,12 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
         
         try {
           setSaving(true)
-          const updatedCustomer = await adminAPI.updateCustomer(customerId, editFormData)
+          let updatedCustomer
+          if (isAdmin) {
+            updatedCustomer = await adminAPI.updateCustomer(customerId, editFormData)
+          } else {
+            updatedCustomer = await adminAPI.updateUserCustomer(customerId, editFormData)
+          }
           setCustomer(updatedCustomer)
           setIsEditing(false)
           setEditFormData(null)
@@ -184,6 +194,7 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
         const statusColors: { [key: string]: string } = {
           'new': '#3b82f6',
           'contacted': '#f59e0b',
+          'qualified': '#06b6d4',
           'quoted': '#8b5cf6',
           'won': '#10b981',
           'lost': '#ef4444',
@@ -223,7 +234,7 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
       }
 
       // Separate active and completed leads
-      const activeLeads = customer.leads?.filter(lead => ['new', 'contacted', 'quoted'].includes(lead.lead_status)) || []
+      const activeLeads = customer.leads?.filter(lead => ['new', 'contacted', 'qualified', 'quoted'].includes(lead.lead_status)) || []
       const completedLeads = customer.leads?.filter(lead => ['won', 'lost', 'unqualified'].includes(lead.lead_status)) || []
       const displayLeads = activeLeadsTab === 'active' ? activeLeads : completedLeads
 
@@ -499,8 +510,11 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
                                                 <span>Created: {formatDate(lead.created_at)}</span>
                                             </div>
                                             <div className={styles.metaItem}>
-                                                <DollarSign size={14} />
-                                                <span>{formatCurrency(lead.estimated_value || 0)}</span>
+                                                {lead.estimated_value ? (
+                                                    <span>{formatCurrency(lead.estimated_value)}</span>
+                                                ) : (
+                                                    <span>No value set</span>
+                                                )}
                                             </div>
                                             {lead.assigned_user && (
                                                 <div className={styles.metaItem}>

@@ -4,11 +4,14 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+import { isAuthorizedAdminSync } from '@/lib/auth-helpers'
 import AdminDashboard from '@/components/Admin/AdminDashboard'
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -22,6 +25,30 @@ export default function AdminPage() {
       }
 
       setUser(session.user)
+
+      // Get user profile to check admin status
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single()
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError)
+        router.push('/login')
+        return
+      }
+
+      setProfile(profileData)
+      const adminStatus = isAuthorizedAdminSync(profileData)
+      setIsAdmin(adminStatus)
+
+      // Redirect non-admin users away from admin page
+      if (!adminStatus) {
+        router.push('/')
+        return
+      }
+
       setLoading(false)
     }
 
@@ -42,7 +69,7 @@ export default function AdminPage() {
     return <div>Loading...</div>
   }
 
-  if (!user) {
+  if (!user || !profile || !isAdmin) {
     return <div>Redirecting...</div>
   }
 

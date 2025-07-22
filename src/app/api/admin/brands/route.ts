@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify authentication and admin authorization
+    const { user, error: authError } = await verifyAuth(request);
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('company_id');
 
@@ -10,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('brands')
       .select('*')
@@ -31,6 +38,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication and admin authorization
+    const { user, error: authError } = await verifyAuth(request);
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const brandData = await request.json();
 
     // Basic validation
@@ -38,7 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('brands')
       .upsert(brandData)
@@ -59,13 +72,19 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    // Verify authentication and admin authorization
+    const { user, error: authError } = await verifyAuth(request);
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const brandData = await request.json();
 
     if (!brandData.id) {
       return NextResponse.json({ error: 'Brand ID is required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('brands')
       .update(brandData)
@@ -87,6 +106,12 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    // Verify authentication and admin authorization
+    const { user, error: authError } = await verifyAuth(request);
+    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const brandId = searchParams.get('id');
 
@@ -94,7 +119,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Brand ID is required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase
       .from('brands')
       .delete()
