@@ -1,0 +1,160 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+interface QuoteRequest {
+  companyId: string
+  customerEmail: string
+  customerName: string
+  pestIssue: string
+  homeSize?: number
+  address?: string
+  estimatedPrice: {
+    min: number
+    max: number
+    service_type: string
+    factors: string[]
+  }
+  urgency: string
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const quoteData: QuoteRequest = await request.json()
+
+    // Validate required fields
+    if (!quoteData.companyId || !quoteData.customerEmail || !quoteData.customerName) {
+      return NextResponse.json(
+        { error: 'Company ID, customer email, and name are required' },
+        { status: 400 }
+      )
+    }
+
+    // Get company information
+    const supabase = await createClient()
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('name, email, phone, widget_config')
+      .eq('id', quoteData.companyId)
+      .single()
+
+    if (companyError || !company) {
+      console.error('Error fetching company:', companyError)
+      return NextResponse.json(
+        { error: 'Company not found' },
+        { status: 404 }
+      )
+    }
+
+    // Generate quote email content
+    const quoteId = `QUOTE-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
+    
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Your Pest Control Quote</title>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: ${company.widget_config?.branding?.primaryColor || '#007bff'}; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f9f9f9; }
+            .quote-details { background: white; padding: 20px; margin: 20px 0; border-left: 4px solid ${company.widget_config?.branding?.primaryColor || '#007bff'}; }
+            .price-range { font-size: 24px; font-weight: bold; color: ${company.widget_config?.branding?.primaryColor || '#007bff'}; }
+            .factors { margin: 15px 0; }
+            .factors li { margin: 5px 0; }
+            .next-steps { background: #e8f4f8; padding: 15px; margin: 20px 0; }
+            .footer { text-align: center; padding: 20px; font-size: 14px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${company.name}</h1>
+            <h2>Your Pest Control Quote</h2>
+          </div>
+          
+          <div class="content">
+            <p>Hi ${quoteData.customerName},</p>
+            
+            <p>Thank you for contacting us about your ${quoteData.pestIssue.toLowerCase()} issue. Based on the information you provided, here&apos;s your personalized quote:</p>
+            
+            <div class="quote-details">
+              <h3>Quote Details</h3>
+              <div class="price-range">$${quoteData.estimatedPrice.min} - $${quoteData.estimatedPrice.max}</div>
+              <p><strong>Service:</strong> ${quoteData.estimatedPrice.service_type}</p>
+              ${quoteData.homeSize ? `<p><strong>Property Size:</strong> ${quoteData.homeSize} sq ft</p>` : ''}
+              ${quoteData.address ? `<p><strong>Service Address:</strong> ${quoteData.address}</p>` : ''}
+              <p><strong>Timeline:</strong> ${quoteData.urgency}</p>
+              
+              <div class="factors">
+                <p><strong>Pricing factors considered:</strong></p>
+                <ul>
+                  ${quoteData.estimatedPrice.factors.map(factor => `<li>${factor}</li>`).join('')}
+                </ul>
+              </div>
+              
+              <p><strong>Quote ID:</strong> ${quoteId}</p>
+            </div>
+            
+            <div class="next-steps">
+              <h3>Next Steps</h3>
+              <p>We&apos;d love to schedule a consultation to provide you with a more detailed assessment and final pricing. Our team will contact you within 24 hours to:</p>
+              <ul>
+                <li>Confirm the details of your pest issue</li>
+                <li>Schedule an on-site inspection</li>
+                <li>Provide a detailed treatment plan</li>
+                <li>Answer any questions you may have</li>
+              </ul>
+            </div>
+            
+            <p>If you have any immediate questions or would like to schedule sooner, please don&apos;t hesitate to contact us:</p>
+            <p><strong>Phone:</strong> ${company.phone || 'Contact via email'}<br>
+            <strong>Email:</strong> ${company.email || 'info@company.com'}</p>
+            
+            <p>We look forward to helping you resolve your pest control needs!</p>
+            
+            <p>Best regards,<br>
+            The ${company.name} Team</p>
+          </div>
+          
+          <div class="footer">
+            <p>This quote is valid for 30 days. Prices may vary based on final inspection.</p>
+            <p>${company.name} | Professional Pest Control Services</p>
+          </div>
+        </body>
+      </html>
+    `
+
+    // Send email using Resend
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'quotes@company.com',
+      to: [quoteData.customerEmail],
+      subject: `Your Pest Control Quote - ${company.name}`,
+      html: emailHtml,
+    })
+
+    if (emailError) {
+      console.error('Error sending quote email:', emailError)
+      return NextResponse.json(
+        { error: 'Failed to send quote email' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      quoteId,
+      emailId: emailData?.id,
+      message: 'Quote sent successfully to ' + quoteData.customerEmail
+    })
+  } catch (error) {
+    console.error('Error in send quote:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

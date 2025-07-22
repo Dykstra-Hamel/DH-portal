@@ -11,13 +11,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
-    
 
     // Use admin client to fetch leads
     const supabase = createAdminClient();

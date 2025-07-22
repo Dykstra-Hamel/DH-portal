@@ -13,11 +13,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
-    
     
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });

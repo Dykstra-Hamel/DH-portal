@@ -9,11 +9,9 @@ export async function GET(request: NextRequest) {
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Customers API: Unauthorized access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('Admin Customers API: User authenticated and authorized', { userId: user.id });
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);

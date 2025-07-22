@@ -10,7 +10,8 @@
     "lint": "next lint",
     "migratedb": "supabase db push --linked",
     "seed": "node scripts/seed-with-users.js",
-    "restartdb": "supabase db reset --local"
+    "restartdb": "supabase db reset --local",
+    "stopstart": "supabase stop && supabase start"
   },
   "dependencies": {
     "@slack/web-api": "^7.9.3",

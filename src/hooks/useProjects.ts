@@ -36,7 +36,6 @@ export const useProjects = () => {
         completion_date: projectData.completion_date || null
       };
 
-      console.log('Sending project data to API:', processedData);
       const savedProject = await adminAPI.createProject(processedData);
       setProjects(prevProjects => [savedProject, ...prevProjects]);
       return savedProject;
