@@ -19,7 +19,7 @@ const EmbedPreview: React.FC<WidgetPreviewProps> = ({ companyId }) => {
 
     script.src = `/widget.js?v=${Date.now()}`;
     script.async = true;
-    script.setAttribute('data-base-url', 'http://localhost:3000');
+    script.setAttribute('data-base-url', window.location.origin);
     script.setAttribute('data-company-id', companyId);
     script.setAttribute('data-script-id', 'widget-preview');
     script.setAttribute('data-preview', 'true');
