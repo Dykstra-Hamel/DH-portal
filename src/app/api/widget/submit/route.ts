@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server-admin'
-import { handleAutoLeadCall } from '@/lib/services/lead-calling'
+import { handleAutoLeadCall, shouldAutoCall } from '@/lib/services/lead-calling'
 import { normalizePhoneNumber } from '@/lib/utils'
+import { sendLeadCreatedNotifications, validateEmails, LeadNotificationData } from '@/lib/email'
 
 
 // Handle CORS preflight requests
@@ -216,15 +217,18 @@ export async function POST(request: NextRequest) {
       ))
     }
 
-    // Attempt auto-call if enabled (don't fail lead creation if this fails)
-    try {
-      // Get company info for the call
-      const { data: company } = await supabase
-        .from('companies')
-        .select('name, website')
-        .eq('id', submission.companyId)
-        .single()
+    // Get company info for both calling and email notifications
+    const { data: company } = await supabase
+      .from('companies')
+      .select('name, website, widget_config')
+      .eq('id', submission.companyId)
+      .single()
 
+    // Attempt auto-call if enabled (don't fail lead creation if this fails)
+    let autoCallEnabled = false;
+    try {
+      autoCallEnabled = await shouldAutoCall(submission.companyId);
+      
       const callResult = await handleAutoLeadCall(
         lead.id,
         submission.companyId,
@@ -249,6 +253,51 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Error in auto-call process:', error)
       // Don't fail the lead creation due to call issues
+    }
+
+    // Send email notifications (don't fail lead creation if this fails)
+    try {
+      const widgetConfig = company?.widget_config || {};
+      const notificationEmails = widgetConfig.notifications?.emails || [];
+      
+      if (notificationEmails.length > 0) {
+        // Validate email addresses
+        const { valid: validEmails, invalid: invalidEmails } = validateEmails(notificationEmails);
+        
+        if (invalidEmails.length > 0) {
+          console.warn(`Invalid notification emails found for company ${submission.companyId}:`, invalidEmails);
+        }
+        
+        if (validEmails.length > 0) {
+          const leadNotificationData: LeadNotificationData = {
+            leadId: lead.id,
+            companyName: company?.name || 'Unknown Company',
+            customerName: submission.contactInfo.name,
+            customerEmail: submission.contactInfo.email,
+            customerPhone: submission.contactInfo.phone,
+            pestIssue: submission.pestIssue,
+            address: submission.address,
+            homeSize: submission.homeSize,
+            urgency: submission.urgency,
+            estimatedPrice: submission.estimatedPrice,
+            priority,
+            leadScore,
+            autoCallEnabled,
+            submittedAt: new Date().toISOString()
+          };
+
+          const emailResult = await sendLeadCreatedNotifications(validEmails, leadNotificationData);
+          
+          if (emailResult.success) {
+            console.log(`Lead notification emails sent successfully for lead ${lead.id}. Sent: ${emailResult.successCount}, Failed: ${emailResult.failureCount}`);
+          } else {
+            console.error(`All lead notification emails failed for lead ${lead.id}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error sending lead notification emails:', error)
+      // Don't fail the lead creation due to email issues
     }
 
     // Return success response

@@ -28,7 +28,7 @@ This is a Next.js application with Supabase authentication supporting Google OAu
 
 ## Local Testing
 
-- Always checking for an existing dev server running on port 3000 before attempting to open a new one.
+- If you need to check something on a local dev server, check for an existing server running on port 3000 before attempting to open a new one.
 
 - **JSX Entity Escaping**: Always escape special characters in JSX text:
   - Apostrophes: `don&apos;t` instead of `don't`

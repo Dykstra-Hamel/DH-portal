@@ -155,6 +155,7 @@
   let widgetState = {
     isMinimized: false,
     isLoading: false,
+    isSubmitting: false,
     widgetConfig: null,
     currentStep: 'welcome',
     formData: {
@@ -457,6 +458,28 @@
       .dh-form-btn:disabled { 
         opacity: 0.6; 
         cursor: not-allowed; 
+      }
+      .dh-form-btn.submitting {
+        position: relative;
+        pointer-events: none;
+      }
+      .dh-form-btn.submitting::after {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        margin: auto;
+        border: 2px solid transparent;
+        border-top-color: rgba(255, 255, 255, 0.8);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        top: 0;
+        right: 12px;
+        bottom: 0;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       } 
       .dh-form-progress { 
         height: 4px; 
@@ -857,11 +880,20 @@
 
   window.submitForm = async () => {
     
+    // Prevent double submissions
+    if (widgetState.isSubmitting) {
+      return;
+    }
+    
     // In preview mode, just show completion without submitting
     if (config.isPreview) {
       showStep('complete');
       return;
     }
+    
+    // Set submitting state and update UI
+    widgetState.isSubmitting = true;
+    updateSubmitButtonState(true);
     
     // Collect all form data
     const formData = {
@@ -878,7 +910,6 @@
       urgency: widgetState.formData.urgency,
       contactInfo: widgetState.formData.contactInfo
     };
-
 
     try {
       // Submit to API
@@ -897,10 +928,44 @@
       } else {
         console.error('Form submission failed:', data.error);
         alert('There was an error submitting your information. Please try again.');
+        // Reset submission state on error to allow retry
+        widgetState.isSubmitting = false;
+        updateSubmitButtonState(false);
       }
     } catch (error) {
       console.error('Error submitting form:', error);
       alert('There was an error submitting your information. Please try again.');
+      // Reset submission state on error to allow retry
+      widgetState.isSubmitting = false;
+      updateSubmitButtonState(false);
+    }
+  };
+
+  // Update submit button state for loading/submitting
+  const updateSubmitButtonState = (isSubmitting) => {
+    const submitBtn = document.getElementById('contact-submit');
+    if (submitBtn) {
+      if (isSubmitting) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        submitBtn.classList.add('submitting');
+      } else {
+        // Only re-enable if form is valid
+        const nameInput = document.getElementById('name-input');
+        const phoneInput = document.getElementById('phone-input');
+        const emailInput = document.getElementById('email-input');
+        
+        if (nameInput && phoneInput && emailInput) {
+          const name = nameInput.value.trim();
+          const phone = phoneInput.value.trim();
+          const email = emailInput.value.trim();
+          const isValid = name && phone && email && email.includes('@');
+          
+          submitBtn.disabled = !isValid;
+          submitBtn.textContent = 'Get My Free Estimate';
+          submitBtn.classList.remove('submitting');
+        }
+      }
     }
   };
 
