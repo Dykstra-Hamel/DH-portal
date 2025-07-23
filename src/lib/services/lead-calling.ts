@@ -8,6 +8,10 @@ interface CallData {
     last_name?: string
     email?: string
     phone: string
+    address?: string
+    city?: string
+    state?: string
+    zip_code?: string
   }
   company?: {
     name?: string
@@ -55,8 +59,13 @@ export async function initiateLeadCall(callData: CallData): Promise<{ success: b
       agent_id: process.env.NEXT_PUBLIC_RETELL_AGENT_ID || "agent_4d2bb226685183e59b205d6fd3",
       retell_llm_dynamic_variables: {
         customer_first_name: callData.customer.first_name || 'Customer',
+        customer_last_name: callData.customer.last_name || '',
         customer_name: `${callData.customer.first_name || ''} ${callData.customer.last_name || ''}`.trim() || 'Customer',
         customer_email: callData.customer.email || '',
+        customer_street_address: callData.customer.address || '',
+        customer_city: callData.customer.city || '',
+        customer_state: callData.customer.state || '',
+        customer_zip_code: callData.customer.zip_code || '',
         customer_comments: callData.comments || '',
         company_name: callData.company?.name || "Dykstra-Hamel",
         company_url: callData.company?.website || "https://www.dykstrahamel.com/",

@@ -560,7 +560,7 @@ function extractCallData(dynamicVariables: any, callAnalysis: any, transcript: s
     extractedData.yard_size = dynamicVariables.yard_size || null;
     extractedData.decision_maker = dynamicVariables.decision_maker || null;
     extractedData.pest_issue = dynamicVariables.pest_issue || null;
-    extractedData.street_address = dynamicVariables.street_address || null;
+    extractedData.street_address = dynamicVariables.street_address || dynamicVariables.customer_street_address || null;
     extractedData.preferred_service_time = dynamicVariables.preferred_service_time || null;
     extractedData.contacted_other_companies = dynamicVariables.contacted_other_companies === true;
     
