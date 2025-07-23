@@ -6,6 +6,10 @@ interface RetellCallRequest {
   email: string
   phone: string
   message: string
+  streetAddress?: string
+  city?: string
+  state?: string
+  zipCode?: string
 }
 
 interface RetellCallPayload {
@@ -17,13 +21,17 @@ interface RetellCallPayload {
     customer_last_name: string
     customer_email: string
     customer_message: string
+    customer_street_address?: string
+    customer_city?: string
+    customer_state?: string
+    customer_zip_code?: string
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: RetellCallRequest = await request.json()
-    const { firstName, lastName, email, phone, message } = body
+    const { firstName, lastName, email, phone, message, streetAddress, city, state, zipCode } = body
 
     // Validate required fields
     if (!firstName || !lastName || !email || !phone || !message) {
@@ -79,7 +87,11 @@ export async function POST(request: NextRequest) {
         customer_first_name: firstName,
         customer_last_name: lastName,
         customer_email: email,
-        customer_message: message
+        customer_message: message,
+        customer_street_address: streetAddress || '',
+        customer_city: city || '',
+        customer_state: state || '',
+        customer_zip_code: zipCode || ''
       }
     }
 
