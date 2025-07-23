@@ -1,31 +1,31 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { adminAPI } from '@/lib/api-client'
-import styles from './AdminManager.module.scss'
+import { useState, useEffect } from 'react';
+import { adminAPI } from '@/lib/api-client';
+import styles from './AdminManager.module.scss';
 
 interface Company {
-  id: string
-  name: string
-  description: string | null
-  website: string | null
-  email: string | null
-  phone: string | null
-  address: string | null
-  city: string | null
-  state: string | null
-  zip_code: string | null
-  country: string
-  industry: string | null
-  size: string | null
-  created_at: string
+  id: string;
+  name: string;
+  description: string | null;
+  website: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  country: string;
+  industry: string | null;
+  size: string | null;
+  created_at: string;
 }
 
 export default function CompaniesManager() {
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [loading, setLoading] = useState(true)
-  const [editingCompany, setEditingCompany] = useState<Company | null>(null)
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -38,29 +38,29 @@ export default function CompaniesManager() {
     zip_code: '',
     country: 'United States',
     industry: '',
-    size: ''
-  })
+    size: '',
+  });
 
   useEffect(() => {
-    loadCompanies()
-  }, [])
+    loadCompanies();
+  }, []);
 
   const loadCompanies = async () => {
     try {
-      const companiesData = await adminAPI.getCompanies()
-      setCompanies(companiesData)
+      const companiesData = await adminAPI.getCompanies();
+      setCompanies(companiesData);
     } catch (error) {
-      console.error('Error loading companies:', error)
+      console.error('Error loading companies:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleCreateCompany = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+    e.preventDefault();
+
     try {
-      await adminAPI.createCompany(formData)
+      await adminAPI.createCompany(formData);
 
       setFormData({
         name: '',
@@ -74,18 +74,18 @@ export default function CompaniesManager() {
         zip_code: '',
         country: 'United States',
         industry: '',
-        size: ''
-      })
-      setShowCreateForm(false)
-      loadCompanies()
+        size: '',
+      });
+      setShowCreateForm(false);
+      loadCompanies();
     } catch (error) {
-      console.error('Error creating company:', error)
+      console.error('Error creating company:', error);
     }
-  }
+  };
 
   const handleUpdateCompany = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingCompany) return
+    e.preventDefault();
+    if (!editingCompany) return;
 
     try {
       await adminAPI.updateCompany(editingCompany.id, {
@@ -100,133 +100,141 @@ export default function CompaniesManager() {
         zip_code: editingCompany.zip_code,
         country: editingCompany.country,
         industry: editingCompany.industry,
-        size: editingCompany.size
-      })
+        size: editingCompany.size,
+      });
 
-      setEditingCompany(null)
-      loadCompanies()
+      setEditingCompany(null);
+      loadCompanies();
     } catch (error) {
-      console.error('Error updating company:', error)
+      console.error('Error updating company:', error);
     }
-  }
+  };
 
   const handleDeleteCompany = async (companyId: string) => {
-    if (!confirm('Are you sure you want to delete this company? This will also remove all user associations.')) return
+    if (
+      !confirm(
+        'Are you sure you want to delete this company? This will also remove all user associations.'
+      )
+    )
+      return;
 
     try {
-      await adminAPI.deleteCompany(companyId)
+      await adminAPI.deleteCompany(companyId);
 
-      loadCompanies()
+      loadCompanies();
     } catch (error) {
-      console.error('Error deleting company:', error)
+      console.error('Error deleting company:', error);
     }
-  }
+  };
 
   if (loading) {
-    return <div>Loading companies...</div>
+    return <div>Loading companies...</div>;
   }
 
-  const renderForm = (company: Company | null, onSubmit: (e: React.FormEvent) => void) => (
+  const renderForm = (
+    company: Company | null,
+    onSubmit: (e: React.FormEvent) => void
+  ) => (
     <form onSubmit={onSubmit}>
       <div className={styles.formGroup}>
         <label>Name *:</label>
         <input
           type="text"
           value={company ? company.name : formData.name}
-          onChange={(e) => {
+          onChange={e => {
             if (company) {
-              setEditingCompany({ ...company, name: e.target.value })
+              setEditingCompany({ ...company, name: e.target.value });
             } else {
-              setFormData({ ...formData, name: e.target.value })
+              setFormData({ ...formData, name: e.target.value });
             }
           }}
           required
         />
       </div>
-      
+
       <div className={styles.formGroup}>
         <label>Description:</label>
         <textarea
           value={company ? company.description || '' : formData.description}
-          onChange={(e) => {
+          onChange={e => {
             if (company) {
-              setEditingCompany({ ...company, description: e.target.value })
+              setEditingCompany({ ...company, description: e.target.value });
             } else {
-              setFormData({ ...formData, description: e.target.value })
+              setFormData({ ...formData, description: e.target.value });
             }
           }}
         />
       </div>
-      
+
       <div className={styles.formGroup}>
         <label>Website:</label>
         <input
           type="url"
           value={company ? company.website || '' : formData.website}
-          onChange={(e) => {
+          onChange={e => {
             if (company) {
-              setEditingCompany({ ...company, website: e.target.value })
+              setEditingCompany({ ...company, website: e.target.value });
             } else {
-              setFormData({ ...formData, website: e.target.value })
+              setFormData({ ...formData, website: e.target.value });
             }
           }}
         />
       </div>
-      
+
       <div className={styles.formGroup}>
         <label>Email:</label>
         <input
           type="email"
           value={company ? company.email || '' : formData.email}
-          onChange={(e) => {
+          onChange={e => {
             if (company) {
-              setEditingCompany({ ...company, email: e.target.value })
+              setEditingCompany({ ...company, email: e.target.value });
             } else {
-              setFormData({ ...formData, email: e.target.value })
+              setFormData({ ...formData, email: e.target.value });
             }
           }}
         />
       </div>
-      
+
       <div className={styles.formGroup}>
         <label>Phone:</label>
         <input
           type="tel"
           value={company ? company.phone || '' : formData.phone}
-          onChange={(e) => {
+          onChange={e => {
             if (company) {
-              setEditingCompany({ ...company, phone: e.target.value })
+              setEditingCompany({ ...company, phone: e.target.value });
             } else {
-              setFormData({ ...formData, phone: e.target.value })
+              setFormData({ ...formData, phone: e.target.value });
             }
           }}
         />
       </div>
-      
+
       <div className={styles.formGroup}>
         <label>Industry:</label>
         <input
           type="text"
           value={company ? company.industry || '' : formData.industry}
-          onChange={(e) => {
+          onChange={e => {
             if (company) {
-              setEditingCompany({ ...company, industry: e.target.value })
+              setEditingCompany({ ...company, industry: e.target.value });
             } else {
-              setFormData({ ...formData, industry: e.target.value })
+              setFormData({ ...formData, industry: e.target.value });
             }
           }}
         />
       </div>
-      
+
       <div className={styles.formGroup}>
         <label>Size:</label>
         <select
           value={company ? company.size || '' : formData.size}
-          onChange={(e) => {
+          onChange={e => {
             if (company) {
-              setEditingCompany({ ...company, size: e.target.value })
+              setEditingCompany({ ...company, size: e.target.value });
             } else {
-              setFormData({ ...formData, size: e.target.value })
+              setFormData({ ...formData, size: e.target.value });
             }
           }}
         >
@@ -239,19 +247,19 @@ export default function CompaniesManager() {
           <option value="1000+">1000+ employees</option>
         </select>
       </div>
-      
+
       <div className={styles.formActions}>
         <button type="submit" className={styles.saveButton}>
           {company ? 'Save' : 'Create'}
         </button>
-        <button 
-          type="button" 
+        <button
+          type="button"
           className={styles.cancelButton}
           onClick={() => {
             if (company) {
-              setEditingCompany(null)
+              setEditingCompany(null);
             } else {
-              setShowCreateForm(false)
+              setShowCreateForm(false);
             }
           }}
         >
@@ -259,13 +267,13 @@ export default function CompaniesManager() {
         </button>
       </div>
     </form>
-  )
+  );
 
   return (
     <div className={styles.manager}>
       <div className={styles.header}>
         <h2>Companies Management</h2>
-        <button 
+        <button
           className={styles.createButton}
           onClick={() => setShowCreateForm(true)}
         >
@@ -304,7 +312,7 @@ export default function CompaniesManager() {
             </tr>
           </thead>
           <tbody>
-            {companies.map((company) => (
+            {companies.map(company => (
               <tr key={company.id}>
                 <td>{company.name}</td>
                 <td>{company.industry || '-'}</td>
@@ -313,13 +321,13 @@ export default function CompaniesManager() {
                 <td>{new Date(company.created_at).toLocaleDateString()}</td>
                 <td>
                   <div className={styles.actions}>
-                    <button 
+                    <button
                       className={styles.editButton}
                       onClick={() => setEditingCompany(company)}
                     >
                       Edit
                     </button>
-                    <button 
+                    <button
                       className={styles.deleteButton}
                       onClick={() => handleDeleteCompany(company.id)}
                     >
@@ -333,5 +341,5 @@ export default function CompaniesManager() {
         </table>
       </div>
     </div>
-  )
+  );
 }

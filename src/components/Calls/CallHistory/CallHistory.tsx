@@ -1,50 +1,54 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useCallback } from 'react'
-import { Phone, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
-import { adminAPI } from '@/lib/api-client'
-import { CallRecord } from '@/types/call-record'
-import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer'
-import styles from './CallHistory.module.scss'
+import { useState, useEffect, useCallback } from 'react';
+import { Phone, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { adminAPI } from '@/lib/api-client';
+import { CallRecord } from '@/types/call-record';
+import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
+import styles from './CallHistory.module.scss';
 
 interface CallHistoryProps {
-  leadId: string
-  refreshTrigger?: number // Optional prop to trigger refresh
-  isAdmin?: boolean // Whether user is admin
+  leadId: string;
+  refreshTrigger?: number; // Optional prop to trigger refresh
+  isAdmin?: boolean; // Whether user is admin
 }
 
-export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHistoryProps) {
-  const [calls, setCalls] = useState<CallRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export function CallHistory({
+  leadId,
+  refreshTrigger,
+  isAdmin = false,
+}: CallHistoryProps) {
+  const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchCalls = useCallback(async () => {
     try {
-      setLoading(true)
-      let callData
+      setLoading(true);
+      let callData;
       if (isAdmin) {
-        callData = await adminAPI.getLeadCalls(leadId)
+        callData = await adminAPI.getLeadCalls(leadId);
       } else {
-        callData = await adminAPI.getUserLeadCalls(leadId)
+        callData = await adminAPI.getUserLeadCalls(leadId);
       }
-      setCalls(callData)
+      setCalls(callData);
     } catch (error) {
-      console.error('Error fetching calls:', error)
-      setError('Failed to load call history')
+      console.error('Error fetching calls:', error);
+      setError('Failed to load call history');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [leadId, isAdmin])
+  }, [leadId, isAdmin]);
 
   useEffect(() => {
-    fetchCalls()
-  }, [leadId, refreshTrigger, fetchCalls])
+    fetchCalls();
+  }, [leadId, refreshTrigger, fetchCalls]);
 
   const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
-  }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -52,36 +56,44 @@ export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHis
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+      minute: '2-digit',
+    });
+  };
 
   const getSentimentColor = (sentiment?: string) => {
     switch (sentiment) {
-      case 'positive': return '#10b981'
-      case 'negative': return '#ef4444'
-      case 'neutral': return '#6b7280'
-      default: return '#6b7280'
+      case 'positive':
+        return '#10b981';
+      case 'negative':
+        return '#ef4444';
+      case 'neutral':
+        return '#6b7280';
+      default:
+        return '#6b7280';
     }
-  }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircle size={16} color="#10b981" />
-      case 'failed': return <XCircle size={16} color="#ef4444" />
-      case 'busy': return <AlertCircle size={16} color="#f59e0b" />
-      case 'no_answer': return <AlertCircle size={16} color="#f59e0b" />
-      default: return <AlertCircle size={16} color="#6b7280" />
+      case 'completed':
+        return <CheckCircle size={16} color="#10b981" />;
+      case 'failed':
+        return <XCircle size={16} color="#ef4444" />;
+      case 'busy':
+        return <AlertCircle size={16} color="#f59e0b" />;
+      case 'no_answer':
+        return <AlertCircle size={16} color="#f59e0b" />;
+      default:
+        return <AlertCircle size={16} color="#6b7280" />;
     }
-  }
-
+  };
 
   if (loading) {
-    return <div className={styles.loading}>Loading call history...</div>
+    return <div className={styles.loading}>Loading call history...</div>;
   }
 
   if (error) {
-    return <div className={styles.error}>{error}</div>
+    return <div className={styles.error}>{error}</div>;
   }
 
   if (calls.length === 0) {
@@ -90,24 +102,25 @@ export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHis
         <Phone size={24} />
         <p>No calls recorded yet</p>
       </div>
-    )
+    );
   }
 
   return (
     <div className={styles.container}>
       <h3>Call History ({calls.length})</h3>
-      
+
       <div className={styles.callsList}>
-        {calls.map((call) => (
+        {calls.map(call => (
           <div key={call.id} className={styles.callCard}>
             <div className={styles.callHeader}>
               <div className={styles.callStatus}>
                 {getStatusIcon(call.call_status)}
                 <span className={styles.statusText}>
-                  {call.call_status.charAt(0).toUpperCase() + call.call_status.slice(1)}
+                  {call.call_status.charAt(0).toUpperCase() +
+                    call.call_status.slice(1)}
                 </span>
               </div>
-              
+
               <div className={styles.callDate}>
                 {call.start_timestamp && formatDate(call.start_timestamp)}
               </div>
@@ -119,7 +132,7 @@ export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHis
                   <Phone size={14} />
                   <span>{call.phone_number}</span>
                 </div>
-                
+
                 {call.duration_seconds && (
                   <div className={styles.infoItem}>
                     <Clock size={14} />
@@ -129,9 +142,11 @@ export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHis
 
                 {call.sentiment && (
                   <div className={styles.infoItem}>
-                    <div 
+                    <div
                       className={styles.sentimentBadge}
-                      style={{ backgroundColor: getSentimentColor(call.sentiment) }}
+                      style={{
+                        backgroundColor: getSentimentColor(call.sentiment),
+                      }}
                     >
                       {call.sentiment}
                     </div>
@@ -140,7 +155,10 @@ export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHis
               </div>
 
               {/* Extracted Information */}
-              {(call.home_size || call.yard_size || call.budget_range || call.timeline) && (
+              {(call.home_size ||
+                call.yard_size ||
+                call.budget_range ||
+                call.timeline) && (
                 <div className={styles.extractedInfo}>
                   <h4>Call Insights</h4>
                   <div className={styles.insights}>
@@ -194,8 +212,8 @@ export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHis
               {call.recording_url && (
                 <div className={styles.recordingSection}>
                   <h4>Call Recording</h4>
-                  <AudioPlayer 
-                    src={call.recording_url} 
+                  <AudioPlayer
+                    src={call.recording_url}
                     title={`Call Recording - ${formatDate(call.start_timestamp || '')}`}
                     className={styles.callRecording}
                   />
@@ -216,5 +234,5 @@ export function CallHistory({ leadId, refreshTrigger, isAdmin = false }: CallHis
         ))}
       </div>
     </div>
-  )
+  );
 }

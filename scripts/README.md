@@ -27,6 +27,7 @@ NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 ### 2. Required Permissions
 
 Your production service key needs these permissions:
+
 - `auth.users.read` - to pull user data
 - `auth.admin` - to list users via admin API
 
@@ -56,26 +57,31 @@ npm run seed-local
 ## What the Script Does
 
 ### 1. **Pulls Production Users**
+
 - Fetches up to 50 users from production (configurable)
 - Includes user metadata (name, email, avatar)
 - Preserves user IDs for consistency
 
 ### 2. **Creates User Profiles**
+
 - Inserts users into local `profiles` table
 - Sets default role as 'user'
 - Preserves original timestamps
 
 ### 3. **Runs Base Seed**
+
 - Executes your existing `seed.sql` file
 - Creates companies, brands, and projects
 - Maintains all existing seed data
 
 ### 4. **Assigns Users to Companies**
+
 - Randomly assigns each user to 1-3 companies
 - Assigns random roles: admin, member, viewer
 - Creates entries in `user_companies` table
 
 ### 5. **Assigns Users to Projects**
+
 - Assigns users to projects based on company access
 - Ensures users can only access projects for their companies
 - Creates 1-4 users per project with roles: manager, contributor, viewer
@@ -86,8 +92,8 @@ Edit the `CONFIG` object in `seed-with-users.js`:
 
 ```javascript
 const CONFIG = {
-  MAX_USERS: 50,                    // Limit production users to pull
-  ASSIGN_RANDOM_USERS: true,        // Enable random user assignments
+  MAX_USERS: 50, // Limit production users to pull
+  ASSIGN_RANDOM_USERS: true, // Enable random user assignments
   // ... other options
 };
 ```
@@ -98,7 +104,7 @@ The script expects these tables to exist:
 
 - `profiles` - User profile information
 - `companies` - Company data (from seed.sql)
-- `brands` - Brand data (from seed.sql)  
+- `brands` - Brand data (from seed.sql)
 - `projects` - Project data (from seed.sql)
 - `user_companies` - User-company junction table
 - `user_projects` - User-project junction table (optional)

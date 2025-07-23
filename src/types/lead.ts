@@ -1,4 +1,4 @@
-export type LeadSource = 
+export type LeadSource =
   | 'organic'
   | 'referral'
   | 'google_cpc'
@@ -11,7 +11,7 @@ export type LeadSource =
   | 'content_marketing'
   | 'other';
 
-export type LeadType = 
+export type LeadType =
   | 'phone_call'
   | 'web_form'
   | 'email'
@@ -20,7 +20,7 @@ export type LeadType =
   | 'in_person'
   | 'other';
 
-export type LeadStatus = 
+export type LeadStatus =
   | 'new'
   | 'contacted'
   | 'qualified'
@@ -55,7 +55,7 @@ export interface Lead {
   user_agent?: string;
   created_at: string;
   updated_at: string;
-  
+
   // Joined data from related tables
   customer?: {
     id: string;
@@ -107,7 +107,7 @@ export const leadSourceOptions = [
   { value: 'trade_show', label: 'Trade Show' },
   { value: 'webinar', label: 'Webinar' },
   { value: 'content_marketing', label: 'Content Marketing' },
-  { value: 'other', label: 'Other' }
+  { value: 'other', label: 'Other' },
 ] as const;
 
 export const leadTypeOptions = [
@@ -117,7 +117,7 @@ export const leadTypeOptions = [
   { value: 'chat', label: 'Chat' },
   { value: 'social_media', label: 'Social Media' },
   { value: 'in_person', label: 'In Person' },
-  { value: 'other', label: 'Other' }
+  { value: 'other', label: 'Other' },
 ] as const;
 
 export const leadStatusOptions = [
@@ -127,12 +127,12 @@ export const leadStatusOptions = [
   { value: 'quoted', label: 'Quoted' },
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },
-  { value: 'unqualified', label: 'Unqualified' }
+  { value: 'unqualified', label: 'Unqualified' },
 ] as const;
 
 export const leadPriorityOptions = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' },
-  { value: 'urgent', label: 'Urgent' }
+  { value: 'urgent', label: 'Urgent' },
 ] as const;

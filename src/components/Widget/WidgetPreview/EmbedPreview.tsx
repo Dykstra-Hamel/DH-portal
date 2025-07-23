@@ -12,9 +12,7 @@ interface WindowWithWidget extends Window {
 }
 
 const EmbedPreview: React.FC<WidgetPreviewProps> = ({ companyId }) => {
-
   useEffect(() => {
-
     const script = document.createElement('script');
 
     script.src = `/widget.js?v=${Date.now()}`;
@@ -30,28 +28,25 @@ const EmbedPreview: React.FC<WidgetPreviewProps> = ({ companyId }) => {
 
     return () => {
       // Find the script by a stable attribute, not the src which is now dynamic
-      const scriptToRemove = document.querySelector("script[data-script-id='widget-preview']");
+      const scriptToRemove = document.querySelector(
+        "script[data-script-id='widget-preview']"
+      );
       if (scriptToRemove) {
         document.body.removeChild(scriptToRemove);
       }
       if ((window as WindowWithWidget).DHWidgetLoaded) {
         (window as WindowWithWidget).DHWidgetLoaded = false;
       }
-    }
+    };
   }, [companyId]);
 
   return (
     <div className={styles.previewContainer}>
-      <div className={styles.previewBadge}>
-        🎭 Preview Mode
-      </div>
-      
+      <div className={styles.previewBadge}>🎭 Preview Mode</div>
+
       {/* Widget container - React hands-off approach */}
-      <div 
-        id='widget-preview-container'
-        className={styles.widgetContainer}
-      >
-       {/* Widget will be injected here */}
+      <div id="widget-preview-container" className={styles.widgetContainer}>
+        {/* Widget will be injected here */}
       </div>
     </div>
   );

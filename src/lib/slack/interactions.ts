@@ -47,8 +47,8 @@ export async function handleProjectAssignment(
       },
       body: JSON.stringify({
         text: `Project ${projectData.projectId} has been assigned to ${projectData.assigneeName}`,
-        response_type: 'ephemeral' // Only visible to the user who clicked
-      })
+        response_type: 'ephemeral', // Only visible to the user who clicked
+      }),
     });
 
     if (response.ok) {
@@ -58,7 +58,10 @@ export async function handleProjectAssignment(
     }
   } catch (error) {
     console.error('Error handling project assignment:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }
 
@@ -75,7 +78,7 @@ export async function openProjectAssignmentModal(
     const response = await fetch('https://slack.com/api/views.open', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -85,23 +88,23 @@ export async function openProjectAssignmentModal(
           callback_id: 'project_assignment_modal',
           title: {
             type: 'plain_text',
-            text: 'Assign Project'
+            text: 'Assign Project',
           },
           submit: {
             type: 'plain_text',
-            text: 'Assign'
+            text: 'Assign',
           },
           close: {
             type: 'plain_text',
-            text: 'Cancel'
+            text: 'Cancel',
           },
           blocks: [
             {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: `*Assign Project ${projectId}*\n\nSelect a team member to assign this project to:`
-              }
+                text: `*Assign Project ${projectId}*\n\nSelect a team member to assign this project to:`,
+              },
             },
             {
               type: 'input',
@@ -111,13 +114,13 @@ export async function openProjectAssignmentModal(
                 action_id: 'selected_assignee',
                 placeholder: {
                   type: 'plain_text',
-                  text: 'Select a user'
-                }
+                  text: 'Select a user',
+                },
               },
               label: {
                 type: 'plain_text',
-                text: 'Assignee'
-              }
+                text: 'Assignee',
+              },
             },
             {
               type: 'input',
@@ -128,19 +131,22 @@ export async function openProjectAssignmentModal(
                 multiline: true,
                 placeholder: {
                   type: 'plain_text',
-                  text: 'Add a note for the assignee (optional)'
-                }
+                  text: 'Add a note for the assignee (optional)',
+                },
               },
               label: {
                 type: 'plain_text',
-                text: 'Note'
+                text: 'Note',
               },
-              optional: true
-            }
+              optional: true,
+            },
           ],
-          private_metadata: JSON.stringify({ projectId, originalUser: context.userId })
-        }
-      })
+          private_metadata: JSON.stringify({
+            projectId,
+            originalUser: context.userId,
+          }),
+        },
+      }),
     });
 
     const result = await response.json();
@@ -153,7 +159,10 @@ export async function openProjectAssignmentModal(
     }
   } catch (error) {
     console.error('Error opening assignment modal:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }
 
@@ -163,14 +172,17 @@ export async function sendFollowUpMessage(
   message: string
 ) {
   if (!slackClient || !context.channelId) {
-    return { success: false, error: 'Cannot send follow-up - missing client or channel' };
+    return {
+      success: false,
+      error: 'Cannot send follow-up - missing client or channel',
+    };
   }
 
   try {
     const result = await slackClient.chat.postMessage({
       channel: context.channelId,
       text: message,
-      thread_ts: context.messageTs // Reply in thread if available
+      thread_ts: context.messageTs, // Reply in thread if available
     });
 
     if (result.ok) {
@@ -180,6 +192,9 @@ export async function sendFollowUpMessage(
     }
   } catch (error) {
     console.error('Error sending follow-up message:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }

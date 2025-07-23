@@ -1,86 +1,102 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>You've been invited to DH Portal</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background: #007bff;
-            color: white;
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px 8px 0 0;
-        }
-        .content {
-            background: #f8f9fa;
-            padding: 30px;
-            border-radius: 0 0 8px 8px;
-        }
-        .button {
-            display: inline-block;
-            padding: 12px 24px;
-            background: #007bff;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            margin: 20px 0;
-        }
-        .details {
-            background: white;
-            padding: 20px;
-            border-radius: 6px;
-            margin: 20px 0;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 30px;
-            font-size: 14px;
-            color: #666;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .header {
+        background: #007bff;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        border-radius: 8px 8px 0 0;
+      }
+      .content {
+        background: #f8f9fa;
+        padding: 30px;
+        border-radius: 0 0 8px 8px;
+      }
+      .button {
+        display: inline-block;
+        padding: 12px 24px;
+        background: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        margin: 20px 0;
+      }
+      .details {
+        background: white;
+        padding: 20px;
+        border-radius: 6px;
+        margin: 20px 0;
+      }
+      .footer {
+        text-align: center;
+        margin-top: 30px;
+        font-size: 14px;
+        color: #666;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="header">
-        <h1>You've been invited to join DH Portal</h1>
+      <h1>You've been invited to join DH Portal</h1>
     </div>
-    
+
     <div class="content">
-        <p>Hello!</p>
-        
-        <p>You've been invited to join <strong>DH Portal</strong>. Click the button below to accept your invitation and set up your account.</p>
-        
-        <div class="details">
-            <h3>Invitation Details:</h3>
-            <p><strong>Company:</strong> {{ .Data.company_name }}</p>
-            <p><strong>Role:</strong> {{ .Data.role }}</p>
-            <p><strong>Your Name:</strong> {{ .Data.first_name }} {{ .Data.last_name }}</p>
-        </div>
-        
-        <div style="text-align: center;">
-            <a href="{{ .ConfirmationURL }}" class="button">Accept Invitation</a>
-        </div>
-        
-        <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-        <p style="word-break: break-all; background: #e9ecef; padding: 10px; border-radius: 4px;">
-            {{ .ConfirmationURL }}
+      <p>Hello!</p>
+
+      <p>
+        You've been invited to join <strong>DH Portal</strong>. Click the button
+        below to accept your invitation and set up your account.
+      </p>
+
+      <div class="details">
+        <h3>Invitation Details:</h3>
+        <p><strong>Company:</strong> {{ .Data.company_name }}</p>
+        <p><strong>Role:</strong> {{ .Data.role }}</p>
+        <p>
+          <strong>Your Name:</strong> {{ .Data.first_name }} {{ .Data.last_name
+          }}
         </p>
-        
-        <p>This invitation will expire in 24 hours.</p>
-        
-        <p>If you have any questions, please contact your administrator.</p>
+      </div>
+
+      <div style="text-align: center">
+        <a href="{{ .ConfirmationURL }}" class="button">Accept Invitation</a>
+      </div>
+
+      <p>
+        If the button doesn't work, you can copy and paste this link into your
+        browser:
+      </p>
+      <p
+        style="
+          word-break: break-all;
+          background: #e9ecef;
+          padding: 10px;
+          border-radius: 4px;
+        "
+      >
+        {{ .ConfirmationURL }}
+      </p>
+
+      <p>This invitation will expire in 24 hours.</p>
+
+      <p>If you have any questions, please contact your administrator.</p>
     </div>
-    
+
     <div class="footer">
-        <p>DH Portal - Company Management System</p>
+      <p>DH Portal - Company Management System</p>
     </div>
-</body>
+  </body>
 </html>

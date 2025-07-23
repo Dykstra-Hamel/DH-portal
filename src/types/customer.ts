@@ -15,7 +15,7 @@ export interface Customer {
   notes?: string;
   created_at: string;
   updated_at: string;
-  
+
   // Joined data from related tables
   company?: {
     id: string;
@@ -39,7 +39,7 @@ export interface Customer {
       email: string;
     };
   }[];
-  
+
   // Computed fields
   full_name?: string;
   total_leads?: number;
@@ -73,7 +73,7 @@ export interface CustomerSearchFilters {
 export const customerStatusOptions = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
-  { value: 'archived', label: 'Archived' }
+  { value: 'archived', label: 'Archived' },
 ] as const;
 
 export const customerSortOptions = [
@@ -84,7 +84,7 @@ export const customerSortOptions = [
   { value: 'city', label: 'City' },
   { value: 'customer_status', label: 'Status' },
   { value: 'created_at', label: 'Created Date' },
-  { value: 'updated_at', label: 'Updated Date' }
+  { value: 'updated_at', label: 'Updated Date' },
 ] as const;
 
 // Helper functions
@@ -94,9 +94,9 @@ export const getCustomerFullName = (customer: Customer): string => {
 
 export const getCustomerStatusColor = (status: CustomerStatus): string => {
   const statusColorMap: { [key in CustomerStatus]: string } = {
-    'active': '#10b981',
-    'inactive': '#f59e0b',
-    'archived': '#6b7280'
+    active: '#10b981',
+    inactive: '#f59e0b',
+    archived: '#6b7280',
   };
   return statusColorMap[status] || '#6b7280';
 };
@@ -106,8 +106,8 @@ export const formatCustomerAddress = (customer: Customer): string => {
     customer.address,
     customer.city,
     customer.state,
-    customer.zip_code
+    customer.zip_code,
   ].filter(Boolean);
-  
+
   return parts.join(', ');
 };

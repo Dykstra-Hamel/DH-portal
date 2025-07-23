@@ -8,28 +8,28 @@ const { createClient } = require('@supabase/supabase-js');
 // Phone number normalization function (copied from utils.ts for Node.js compatibility)
 function normalizePhoneNumber(phoneNumber) {
   if (!phoneNumber) return null;
-  
+
   // Remove all non-digit characters
   const digits = phoneNumber.replace(/\D/g, '');
-  
+
   // Handle common US phone number formats
   let cleanDigits = digits;
-  
+
   // Remove country code if present (1 at the beginning for US numbers)
   if (cleanDigits.startsWith('1') && cleanDigits.length === 11) {
     cleanDigits = cleanDigits.substring(1);
   }
-  
+
   // Must be exactly 10 digits for a valid US phone number
   if (cleanDigits.length !== 10) {
     return null;
   }
-  
+
   // Format as (xxx) xxx-xxxx
   const areaCode = cleanDigits.substring(0, 3);
   const exchange = cleanDigits.substring(3, 6);
   const number = cleanDigits.substring(6, 10);
-  
+
   return `(${areaCode}) ${exchange}-${number}`;
 }
 
@@ -37,7 +37,7 @@ async function normalizePhoneNumbers() {
   // Initialize Supabase client with service role key for admin access
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
+
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error('Missing required environment variables:');
     console.error('- NEXT_PUBLIC_SUPABASE_URL');
@@ -49,7 +49,7 @@ async function normalizePhoneNumbers() {
 
   try {
     console.log('🔄 Starting phone number normalization...');
-    
+
     // Fetch all customers with phone numbers
     const { data: customers, error: fetchError } = await supabase
       .from('customers')
@@ -79,13 +79,17 @@ async function normalizePhoneNumbers() {
 
       // Skip if phone couldn't be normalized or is already in correct format
       if (!normalizedPhone) {
-        console.log(`⚠️  Skipped invalid phone for ${customer.first_name} ${customer.last_name}: "${originalPhone}"`);
+        console.log(
+          `⚠️  Skipped invalid phone for ${customer.first_name} ${customer.last_name}: "${originalPhone}"`
+        );
         skippedCount++;
         continue;
       }
 
       if (normalizedPhone === originalPhone) {
-        console.log(`✅ Already normalized: ${customer.first_name} ${customer.last_name} - ${originalPhone}`);
+        console.log(
+          `✅ Already normalized: ${customer.first_name} ${customer.last_name} - ${originalPhone}`
+        );
         skippedCount++;
         continue;
       }
@@ -97,7 +101,10 @@ async function normalizePhoneNumbers() {
         .eq('id', customer.id);
 
       if (updateError) {
-        console.error(`❌ Error updating ${customer.first_name} ${customer.last_name}:`, updateError);
+        console.error(
+          `❌ Error updating ${customer.first_name} ${customer.last_name}:`,
+          updateError
+        );
         errorCount++;
         continue;
       }
@@ -109,17 +116,20 @@ async function normalizePhoneNumbers() {
 
     console.log('\\n📊 Migration Summary:');
     console.log(`✅ Successfully updated: ${updatedCount} customers`);
-    console.log(`⚠️  Skipped (already normalized/invalid): ${skippedCount} customers`);
+    console.log(
+      `⚠️  Skipped (already normalized/invalid): ${skippedCount} customers`
+    );
     console.log(`❌ Errors: ${errorCount} customers`);
     console.log(`📋 Total processed: ${customers.length} customers`);
 
     if (errorCount > 0) {
-      console.log('\\n⚠️  Some updates failed. Check the error messages above.');
+      console.log(
+        '\\n⚠️  Some updates failed. Check the error messages above.'
+      );
       process.exit(1);
     } else {
       console.log('\\n🎉 Phone number normalization completed successfully!');
     }
-
   } catch (error) {
     console.error('❌ Unexpected error:', error);
     process.exit(1);

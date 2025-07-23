@@ -7,10 +7,13 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient();
-    
+
     // Get the current user from the session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -23,13 +26,16 @@ export async function GET(
       .select('company_id')
       .eq('id', leadId)
       .single();
-    
+
     if (leadError) {
       console.error('Error fetching lead for calls:', leadError);
       if (leadError.code === 'PGRST116') {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       }
-      return NextResponse.json({ error: 'Failed to fetch lead' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch lead' },
+        { status: 500 }
+      );
     }
 
     // Verify user has access to this lead's company
@@ -41,7 +47,10 @@ export async function GET(
       .single();
 
     if (userCompanyError || !userCompany) {
-      return NextResponse.json({ error: 'Access denied to this lead' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Access denied to this lead' },
+        { status: 403 }
+      );
     }
 
     // Get call records for this lead
@@ -50,15 +59,21 @@ export async function GET(
       .select('*')
       .eq('lead_id', leadId)
       .order('start_timestamp', { ascending: false });
-    
+
     if (callsError) {
       console.error('Error fetching call records:', callsError);
-      return NextResponse.json({ error: 'Failed to fetch call records' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch call records' },
+        { status: 500 }
+      );
     }
-    
+
     return NextResponse.json(calls || []);
   } catch (error) {
     console.error('Error in lead calls API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

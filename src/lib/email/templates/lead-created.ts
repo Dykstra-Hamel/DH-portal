@@ -15,14 +15,14 @@ export function generateLeadCreatedEmailTemplate(
     estimatedPrice,
     priority,
     autoCallEnabled,
-    submittedAt
+    submittedAt,
   } = leadData;
 
   const priorityColors = {
     urgent: '#dc2626',
-    high: '#ea580c', 
+    high: '#ea580c',
     medium: '#d97706',
-    low: '#65a30d'
+    low: '#65a30d',
   };
 
   const priorityColor = priorityColors[priority];
@@ -60,9 +60,10 @@ export function generateLeadCreatedEmailTemplate(
               ${autoCallEnabled ? '🤖 AI Agent is Calling Now' : '📞 Manual Follow-up Required'}
             </h2>
             <p style="margin: 0; font-size: 14px; color: #64748b;">
-              ${autoCallEnabled 
-                ? 'Our automated AI agent is currently calling the customer. The lead will be updated automatically with call notes.' 
-                : 'This is a new lead that requires manual follow-up. Please contact the customer as soon as possible.'
+              ${
+                autoCallEnabled
+                  ? 'Our automated AI agent is currently calling the customer. The lead will be updated automatically with call notes.'
+                  : 'This is a new lead that requires manual follow-up. Please contact the customer as soon as possible.'
               }
             </p>
           </div>
@@ -108,19 +109,27 @@ export function generateLeadCreatedEmailTemplate(
                 <span style="color: #1e293b;">${pestIssue}</span>
               </div>
               
-              ${homeSize ? `
+              ${
+                homeSize
+                  ? `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
                   <span style="font-weight: 500; color: #64748b;">Home Size:</span>
                   <span style="color: #1e293b;">${homeSize.toLocaleString()} sq ft</span>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
               
-              ${estimatedPrice ? `
+              ${
+                estimatedPrice
+                  ? `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
                   <span style="font-weight: 500; color: #64748b;">Estimated Price:</span>
                   <span style="color: #1e293b;">$${estimatedPrice.min} - $${estimatedPrice.max} (${estimatedPrice.service_type})</span>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
             </div>
           </div>
 
@@ -132,13 +141,17 @@ export function generateLeadCreatedEmailTemplate(
             </p>
           </div>
 
-          ${!autoCallEnabled ? `
+          ${
+            !autoCallEnabled
+              ? `
             <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 16px; text-align: center;">
               <p style="margin: 0; font-size: 14px; color: #92400e;">
                 ⚡ <strong>Action Required:</strong> This lead needs immediate follow-up. Please contact the customer promptly to maximize conversion potential.
               </p>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
 
         <!-- Footer -->

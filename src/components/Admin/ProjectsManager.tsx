@@ -4,7 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { adminAPI } from '@/lib/api-client';
-import { Project, ProjectFormData, User, Company, ProjectFilters as FilterValues } from '@/types/project';
+import {
+  Project,
+  ProjectFormData,
+  User,
+  Company,
+  ProjectFilters as FilterValues,
+} from '@/types/project';
 import { useProjects } from '@/hooks/useProjects';
 import ProjectForm from '@/components/Projects/ProjectForm/ProjectForm';
 import ProjectsTable from '@/components/Projects/ProjectsTable/ProjectsTable';
@@ -18,13 +24,15 @@ interface ProjectsManagerProps {
 const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [currentUserProfile, setCurrentUserProfile] = useState<User | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<User | null>(
+    null
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [filters, setFilters] = useState<FilterValues>({
     status: '',
     priority: '',
-    companyId: ''
+    companyId: '',
   });
 
   const {
@@ -35,7 +43,7 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
     createProject,
     updateProject,
     deleteProject,
-    clearError
+    clearError,
   } = useProjects();
 
   useEffect(() => {
@@ -46,12 +54,12 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
     try {
       const [usersData, companiesData] = await Promise.all([
         adminAPI.getUsers(),
-        adminAPI.getCompanies()
+        adminAPI.getCompanies(),
       ]);
 
       setUsers(usersData || []);
       setCompanies(companiesData || []);
-      
+
       // Find current user's profile
       const currentProfile = usersData?.find((u: User) => u.id === user.id);
       setCurrentUserProfile(currentProfile || null);
@@ -109,7 +117,7 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
     <div className={styles.manager}>
       <div className={styles.header}>
         <h2>Project Management</h2>
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className={styles.createButton}
         >
@@ -125,7 +133,7 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
         </div>
       )}
 
-      <ProjectFilters 
+      <ProjectFilters
         filters={filters}
         onFiltersChange={handleFiltersChange}
         companies={companies}
@@ -134,10 +142,9 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
       {projects.length === 0 && !error && !isLoading ? (
         <div className={styles.emptyState}>
           <p>
-            {(filters.status || filters.priority || filters.companyId) 
+            {filters.status || filters.priority || filters.companyId
               ? 'No projects match your current filters. Try adjusting your filters or create a new project.'
-              : 'No projects found. Create your first project to get started.'
-            }
+              : 'No projects found. Create your first project to get started.'}
           </p>
         </div>
       ) : (

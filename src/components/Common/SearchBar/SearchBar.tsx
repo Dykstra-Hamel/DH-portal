@@ -17,7 +17,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onChange,
   placeholder = 'Search...',
   debounceMs = 300,
-  className = ''
+  className = '',
 }) => {
   const [localValue, setLocalValue] = useState(value);
 
@@ -46,7 +46,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         <input
           type="text"
           value={localValue}
-          onChange={(e) => setLocalValue(e.target.value)}
+          onChange={e => setLocalValue(e.target.value)}
           placeholder={placeholder}
           className={styles.input}
         />

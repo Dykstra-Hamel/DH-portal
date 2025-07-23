@@ -21,8 +21,13 @@ export const createCompanySlug = (name: string): string => {
  * @param slug - The slug to match
  * @returns The matching company or null
  */
-export const findCompanyBySlug = (companies: Array<{id: string, name: string}>, slug: string) => {
-  return companies.find(company => createCompanySlug(company.name) === slug) || null;
+export const findCompanyBySlug = (
+  companies: Array<{ id: string; name: string }>,
+  slug: string
+) => {
+  return (
+    companies.find(company => createCompanySlug(company.name) === slug) || null
+  );
 };
 
 /**
@@ -30,30 +35,32 @@ export const findCompanyBySlug = (companies: Array<{id: string, name: string}>, 
  * @param phoneNumber - The phone number to normalize
  * @returns A formatted phone number or null if invalid
  */
-export const normalizePhoneNumber = (phoneNumber: string | null | undefined): string | null => {
+export const normalizePhoneNumber = (
+  phoneNumber: string | null | undefined
+): string | null => {
   if (!phoneNumber) return null;
-  
+
   // Remove all non-digit characters
   const digits = phoneNumber.replace(/\D/g, '');
-  
+
   // Handle common US phone number formats
   let cleanDigits = digits;
-  
+
   // Remove country code if present (1 at the beginning for US numbers)
   if (cleanDigits.startsWith('1') && cleanDigits.length === 11) {
     cleanDigits = cleanDigits.substring(1);
   }
-  
+
   // Must be exactly 10 digits for a valid US phone number
   if (cleanDigits.length !== 10) {
     return null;
   }
-  
+
   // Format as (xxx) xxx-xxxx
   const areaCode = cleanDigits.substring(0, 3);
   const exchange = cleanDigits.substring(3, 6);
   const number = cleanDigits.substring(6, 10);
-  
+
   return `(${areaCode}) ${exchange}-${number}`;
 };
 
@@ -62,6 +69,8 @@ export const normalizePhoneNumber = (phoneNumber: string | null | undefined): st
  * @param phoneNumber - The phone number to validate
  * @returns True if the phone number is valid
  */
-export const isValidPhoneNumber = (phoneNumber: string | null | undefined): boolean => {
+export const isValidPhoneNumber = (
+  phoneNumber: string | null | undefined
+): boolean => {
   return normalizePhoneNumber(phoneNumber) !== null;
 };

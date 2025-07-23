@@ -4,11 +4,13 @@ import { createClient } from '@/lib/supabase/server';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    
-    
+
     // Get the current user from the session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -16,9 +18,12 @@ export async function GET(request: NextRequest) {
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
-    
+
     if (!companyId) {
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Company ID is required' },
+        { status: 400 }
+      );
     }
 
     // First verify user has access to this company
@@ -30,13 +35,17 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (userCompanyError || !userCompany) {
-      return NextResponse.json({ error: 'Access denied to this company' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Access denied to this company' },
+        { status: 403 }
+      );
     }
 
     // Get active leads for this company only
     const { data: leads, error } = await supabase
       .from('leads')
-      .select(`
+      .select(
+        `
         *,
         customer:customers(
           id,
@@ -45,14 +54,18 @@ export async function GET(request: NextRequest) {
           email,
           phone
         )
-      `)
+      `
+      )
       .eq('company_id', companyId)
       .in('lead_status', ['new', 'contacted', 'qualified', 'quoted'])
       .order('created_at', { ascending: false });
-    
+
     if (error) {
       console.error('Error fetching leads:', error);
-      return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch leads' },
+        { status: 500 }
+      );
     }
 
     if (!leads || leads.length === 0) {
@@ -77,7 +90,10 @@ export async function GET(request: NextRequest) {
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
-        return NextResponse.json({ error: 'Failed to fetch user profiles' }, { status: 500 });
+        return NextResponse.json(
+          { error: 'Failed to fetch user profiles' },
+          { status: 500 }
+        );
       }
 
       profiles = profilesData || [];
@@ -89,12 +105,17 @@ export async function GET(request: NextRequest) {
     // Enhance leads with profile data
     const enhancedLeads = leads.map(lead => ({
       ...lead,
-      assigned_user: lead.assigned_to ? profileMap.get(lead.assigned_to) || null : null
+      assigned_user: lead.assigned_to
+        ? profileMap.get(lead.assigned_to) || null
+        : null,
     }));
-    
+
     return NextResponse.json(enhancedLeads);
   } catch (error) {
     console.error('Error in leads API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

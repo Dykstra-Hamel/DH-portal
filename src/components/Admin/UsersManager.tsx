@@ -1,144 +1,156 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { adminAPI } from '@/lib/api-client'
-import styles from './AdminManager.module.scss'
+import { useState, useEffect } from 'react';
+import { adminAPI } from '@/lib/api-client';
+import styles from './AdminManager.module.scss';
 
 interface Profile {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  created_at: string
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  created_at: string;
 }
 
 interface AuthUser {
-  id: string
-  email: string
-  created_at: string
-  email_confirmed_at: string | null
+  id: string;
+  email: string;
+  created_at: string;
+  email_confirmed_at: string | null;
 }
 
 interface UserWithProfile extends AuthUser {
-  profiles?: Profile
+  profiles?: Profile;
 }
 
 interface Company {
-  id: string
-  name: string
+  id: string;
+  name: string;
 }
 
 export default function UsersManager() {
-  const [users, setUsers] = useState<UserWithProfile[]>([])
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [editingUser, setEditingUser] = useState<Profile | null>(null)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [users, setUsers] = useState<UserWithProfile[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     first_name: '',
     last_name: '',
     company_id: '',
-    role: 'member'
-  })
+    role: 'member',
+  });
 
   useEffect(() => {
-    loadData()
-  }, [])
+    loadData();
+  }, []);
 
   const loadData = async () => {
     try {
-      setError(null)
+      setError(null);
       const [usersData, companiesData] = await Promise.all([
         adminAPI.getUsers(),
-        adminAPI.getCompanies()
-      ])
-      setUsers(Array.isArray(usersData) ? usersData : [])
-      setCompanies(Array.isArray(companiesData) ? companiesData : [])
+        adminAPI.getCompanies(),
+      ]);
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      setCompanies(Array.isArray(companiesData) ? companiesData : []);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to load data')
+      setError(error instanceof Error ? error.message : 'Failed to load data');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const loadUsers = async () => {
     try {
-      setError(null)
-      const usersData = await adminAPI.getUsers()
-      setUsers(Array.isArray(usersData) ? usersData : [])
+      setError(null);
+      const usersData = await adminAPI.getUsers();
+      setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to load users')
+      setError(error instanceof Error ? error.message : 'Failed to load users');
     }
-  }
+  };
 
   const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (submitting) return
-    
+    e.preventDefault();
+    if (submitting) return;
+
     if (!formData.company_id) {
-      setError('Company selection is required')
-      return
+      setError('Company selection is required');
+      return;
     }
-    
+
     try {
-      setSubmitting(true)
-      setError(null)
-      await adminAPI.inviteUser(formData)
-      setFormData({ email: '', first_name: '', last_name: '', company_id: '', role: 'member' })
-      setShowCreateForm(false)
-      loadUsers()
+      setSubmitting(true);
+      setError(null);
+      await adminAPI.inviteUser(formData);
+      setFormData({
+        email: '',
+        first_name: '',
+        last_name: '',
+        company_id: '',
+        role: 'member',
+      });
+      setShowCreateForm(false);
+      loadUsers();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to send invitation')
+      setError(
+        error instanceof Error ? error.message : 'Failed to send invitation'
+      );
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingUser || submitting) return
+    e.preventDefault();
+    if (!editingUser || submitting) return;
 
     try {
-      setSubmitting(true)
-      setError(null)
+      setSubmitting(true);
+      setError(null);
       await adminAPI.updateUser(editingUser.id, {
         first_name: editingUser.first_name,
         last_name: editingUser.last_name,
-        email: editingUser.email
-      })
-      setEditingUser(null)
-      loadUsers()
+        email: editingUser.email,
+      });
+      setEditingUser(null);
+      loadUsers();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to update user')
+      setError(
+        error instanceof Error ? error.message : 'Failed to update user'
+      );
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return
+    if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      setError(null)
-      await adminAPI.deleteUser(userId)
-      loadUsers()
+      setError(null);
+      await adminAPI.deleteUser(userId);
+      loadUsers();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to delete user')
+      setError(
+        error instanceof Error ? error.message : 'Failed to delete user'
+      );
     }
-  }
+  };
 
   if (loading) {
-    return <div>Loading users...</div>
+    return <div>Loading users...</div>;
   }
 
   return (
     <div className={styles.manager}>
       <div className={styles.header}>
         <h2>Users Management</h2>
-        <button 
+        <button
           className={styles.createButton}
           onClick={() => setShowCreateForm(true)}
           disabled={submitting}
@@ -150,7 +162,12 @@ export default function UsersManager() {
       {error && (
         <div className={styles.error}>
           {error}
-          <button onClick={() => setError(null)} className={styles.dismissError}>×</button>
+          <button
+            onClick={() => setError(null)}
+            className={styles.dismissError}
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -164,7 +181,9 @@ export default function UsersManager() {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -173,7 +192,9 @@ export default function UsersManager() {
                 <input
                   type="text"
                   value={formData.first_name}
-                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, first_name: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -182,7 +203,9 @@ export default function UsersManager() {
                 <input
                   type="text"
                   value={formData.last_name}
-                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, last_name: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -190,11 +213,13 @@ export default function UsersManager() {
                 <label>Company: *</label>
                 <select
                   value={formData.company_id}
-                  onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, company_id: e.target.value })
+                  }
                   required
                 >
                   <option value="">Select a company</option>
-                  {companies.map((company) => (
+                  {companies.map(company => (
                     <option key={company.id} value={company.id}>
                       {company.name}
                     </option>
@@ -205,7 +230,9 @@ export default function UsersManager() {
                 <label>Role:</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, role: e.target.value })
+                  }
                 >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
@@ -214,11 +241,15 @@ export default function UsersManager() {
                 </select>
               </div>
               <div className={styles.formActions}>
-                <button type="submit" className={styles.saveButton} disabled={submitting}>
+                <button
+                  type="submit"
+                  className={styles.saveButton}
+                  disabled={submitting}
+                >
                   {submitting ? 'Sending Invite...' : 'Send Invitation'}
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className={styles.cancelButton}
                   onClick={() => setShowCreateForm(false)}
                   disabled={submitting}
@@ -241,7 +272,9 @@ export default function UsersManager() {
                 <input
                   type="email"
                   value={editingUser.email}
-                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  onChange={e =>
+                    setEditingUser({ ...editingUser, email: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -250,7 +283,12 @@ export default function UsersManager() {
                 <input
                   type="text"
                   value={editingUser.first_name}
-                  onChange={(e) => setEditingUser({ ...editingUser, first_name: e.target.value })}
+                  onChange={e =>
+                    setEditingUser({
+                      ...editingUser,
+                      first_name: e.target.value,
+                    })
+                  }
                   required
                 />
               </div>
@@ -259,16 +297,25 @@ export default function UsersManager() {
                 <input
                   type="text"
                   value={editingUser.last_name}
-                  onChange={(e) => setEditingUser({ ...editingUser, last_name: e.target.value })}
+                  onChange={e =>
+                    setEditingUser({
+                      ...editingUser,
+                      last_name: e.target.value,
+                    })
+                  }
                   required
                 />
               </div>
               <div className={styles.formActions}>
-                <button type="submit" className={styles.saveButton} disabled={submitting}>
+                <button
+                  type="submit"
+                  className={styles.saveButton}
+                  disabled={submitting}
+                >
                   {submitting ? 'Saving...' : 'Save'}
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className={styles.cancelButton}
                   onClick={() => setEditingUser(null)}
                   disabled={submitting}
@@ -293,28 +340,27 @@ export default function UsersManager() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {users.map(user => (
               <tr key={user.id}>
                 <td>{user.email}</td>
                 <td>
-                  {user.profiles ? 
-                    `${user.profiles.first_name} ${user.profiles.last_name}` : 
-                    'No profile'
-                  }
+                  {user.profiles
+                    ? `${user.profiles.first_name} ${user.profiles.last_name}`
+                    : 'No profile'}
                 </td>
                 <td>{new Date(user.created_at).toLocaleDateString()}</td>
                 <td>{user.email_confirmed_at ? 'Yes' : 'No'}</td>
                 <td>
                   <div className={styles.actions}>
                     {user.profiles && (
-                      <button 
+                      <button
                         className={styles.editButton}
                         onClick={() => setEditingUser(user.profiles!)}
                       >
                         Edit
                       </button>
                     )}
-                    <button 
+                    <button
                       className={styles.deleteButton}
                       onClick={() => handleDeleteUser(user.id)}
                     >
@@ -328,5 +374,5 @@ export default function UsersManager() {
         </table>
       </div>
     </div>
-  )
+  );
 }

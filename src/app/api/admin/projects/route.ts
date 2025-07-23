@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendProjectCreatedNotification as sendEmail } from '@/lib/email/project-notifications';
-import { EmailRecipient, ProjectNotificationData as EmailProjectData } from '@/lib/email/types';
+import {
+  EmailRecipient,
+  ProjectNotificationData as EmailProjectData,
+} from '@/lib/email/types';
 // Removed Slack notification import - now using separate endpoint
 import { ProjectNotificationData as SlackProjectData } from '@/lib/slack/types';
 
@@ -15,25 +18,27 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    
+
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
-    
+
     // First get projects with company info
     let query = supabase
       .from('projects')
-      .select(`
+      .select(
+        `
         *,
         company:companies(
           id,
           name
         )
-      `)
+      `
+      )
       .order('created_at', { ascending: false });
-    
+
     // Apply filters if provided
     if (companyId) {
       query = query.eq('company_id', companyId);
@@ -44,14 +49,17 @@ export async function GET(request: NextRequest) {
     if (priority) {
       query = query.eq('priority', priority);
     }
-    
+
     const { data: projects, error } = await query;
-    
+
     if (error) {
       console.error('Error fetching projects:', error);
-      return NextResponse.json({ error: 'Failed to fetch projects', details: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch projects', details: error.message },
+        { status: 500 }
+      );
     }
-    
+
     console.log('Fetched projects:', projects?.length || 0);
 
     if (!projects || projects.length === 0) {
@@ -79,7 +87,13 @@ export async function GET(request: NextRequest) {
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
-      return NextResponse.json({ error: 'Failed to fetch user profiles', details: profilesError.message }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: 'Failed to fetch user profiles',
+          details: profilesError.message,
+        },
+        { status: 500 }
+      );
     }
 
     console.log('Fetched profiles:', profiles?.length || 0);
@@ -91,13 +105,21 @@ export async function GET(request: NextRequest) {
     const enhancedProjects = projects.map(project => ({
       ...project,
       requested_by_profile: profileMap.get(project.requested_by) || null,
-      assigned_to_profile: project.assigned_to ? profileMap.get(project.assigned_to) || null : null
+      assigned_to_profile: project.assigned_to
+        ? profileMap.get(project.assigned_to) || null
+        : null,
     }));
-    
+
     return NextResponse.json(enhancedProjects);
   } catch (error) {
     console.error('Error in projects API:', error);
-    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -111,8 +133,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
     const body = await request.json();
-    
-    
+
     const {
       name,
       description,
@@ -128,18 +149,34 @@ export async function POST(request: NextRequest) {
       budget_amount,
       tags,
       notes,
-      primary_file_path
+      primary_file_path,
     } = body;
-    
+
     // Validate required fields
     if (!name || !project_type || !requested_by || !company_id || !due_date) {
-      console.log('Missing required fields:', { name, project_type, requested_by, company_id, due_date });
-      return NextResponse.json({ 
-        error: 'Missing required fields: name, project_type, requested_by, company_id, due_date',
-        details: { name: !!name, project_type: !!project_type, requested_by: !!requested_by, company_id: !!company_id, due_date: !!due_date }
-      }, { status: 400 });
+      console.log('Missing required fields:', {
+        name,
+        project_type,
+        requested_by,
+        company_id,
+        due_date,
+      });
+      return NextResponse.json(
+        {
+          error:
+            'Missing required fields: name, project_type, requested_by, company_id, due_date',
+          details: {
+            name: !!name,
+            project_type: !!project_type,
+            requested_by: !!requested_by,
+            company_id: !!company_id,
+            due_date: !!due_date,
+          },
+        },
+        { status: 400 }
+      );
     }
-    
+
     const { data: project, error } = await supabase
       .from('projects')
       .insert({
@@ -157,20 +194,25 @@ export async function POST(request: NextRequest) {
         budget_amount,
         tags,
         notes,
-        primary_file_path: primary_file_path || null
+        primary_file_path: primary_file_path || null,
       })
-      .select(`
+      .select(
+        `
         *,
         company:companies(
           id,
           name
         )
-      `)
+      `
+      )
       .single();
-    
+
     if (error) {
       console.error('Error creating project:', error);
-      return NextResponse.json({ error: 'Failed to create project', details: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to create project', details: error.message },
+        { status: 500 }
+      );
     }
 
     // Get profiles for the users involved in this project
@@ -186,7 +228,10 @@ export async function POST(request: NextRequest) {
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
-      return NextResponse.json({ error: 'Failed to fetch user profiles' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch user profiles' },
+        { status: 500 }
+      );
     }
 
     // Create profile map and enhance project
@@ -194,14 +239,18 @@ export async function POST(request: NextRequest) {
     const enhancedProject = {
       ...project,
       requested_by_profile: profileMap.get(project.requested_by) || null,
-      assigned_to_profile: project.assigned_to ? profileMap.get(project.assigned_to) || null : null
+      assigned_to_profile: project.assigned_to
+        ? profileMap.get(project.assigned_to) || null
+        : null,
     };
-    
+
     // Trigger notifications (fire-and-forget)
     const triggerNotifications = async () => {
       try {
         const requesterProfile = profileMap.get(project.requested_by);
-        const requesterName = `${requesterProfile?.first_name || ''} ${requesterProfile?.last_name || ''}`.trim() || 'Unknown';
+        const requesterName =
+          `${requesterProfile?.first_name || ''} ${requesterProfile?.last_name || ''}`.trim() ||
+          'Unknown';
         const requesterEmail = requesterProfile?.email || 'unknown@example.com';
 
         // Prepare notification data
@@ -230,7 +279,7 @@ export async function POST(request: NextRequest) {
           requesterEmail,
           companyName: project.company.name,
           timestamp: new Date().toISOString(),
-          actionUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin`
+          actionUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin`,
         };
 
         // Send notifications
@@ -239,11 +288,14 @@ export async function POST(request: NextRequest) {
           name: 'Austin',
         };
 
-        const emailPromise = sendEmail(testRecipient, emailData)
-          .catch(error => console.error('Failed to send email notification:', error));
+        const emailPromise = sendEmail(testRecipient, emailData).catch(error =>
+          console.error('Failed to send email notification:', error)
+        );
 
-        const { sendProjectCreatedNotification } = await import('@/lib/slack/project-notifications');
-        
+        const { sendProjectCreatedNotification } = await import(
+          '@/lib/slack/project-notifications'
+        );
+
         setImmediate(async () => {
           try {
             const result = await sendProjectCreatedNotification(slackData);
@@ -263,10 +315,13 @@ export async function POST(request: NextRequest) {
 
     // Call notifications asynchronously (don't await)
     triggerNotifications();
-    
+
     return NextResponse.json(enhancedProject, { status: 201 });
   } catch (error) {
     console.error('Error in projects POST:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

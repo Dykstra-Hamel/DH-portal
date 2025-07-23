@@ -4,11 +4,13 @@ import { createClient } from '@/lib/supabase/server';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    
-    
+
     // Get the current user from the session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -16,9 +18,12 @@ export async function GET(request: NextRequest) {
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
-    
+
     if (!companyId) {
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Company ID is required' },
+        { status: 400 }
+      );
     }
 
     // First verify user has access to this company
@@ -30,26 +35,34 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (userCompanyError || !userCompany) {
-      return NextResponse.json({ error: 'Access denied to this company' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Access denied to this company' },
+        { status: 403 }
+      );
     }
 
     // Get projects for this company where user is either requester or assigned
     const { data: projects, error } = await supabase
       .from('projects')
-      .select(`
+      .select(
+        `
         *,
         company:companies(
           id,
           name
         )
-      `)
+      `
+      )
       .eq('company_id', companyId)
       .or(`requested_by.eq.${user.id},assigned_to.eq.${user.id}`)
       .order('created_at', { ascending: false });
-    
+
     if (error) {
       console.error('Error fetching projects:', error);
-      return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch projects' },
+        { status: 500 }
+      );
     }
 
     if (!projects || projects.length === 0) {
@@ -73,7 +86,10 @@ export async function GET(request: NextRequest) {
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
-      return NextResponse.json({ error: 'Failed to fetch user profiles' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch user profiles' },
+        { status: 500 }
+      );
     }
 
     // Create a map of user profiles for quick lookup
@@ -83,12 +99,17 @@ export async function GET(request: NextRequest) {
     const enhancedProjects = projects.map(project => ({
       ...project,
       requested_by_profile: profileMap.get(project.requested_by) || null,
-      assigned_to_profile: project.assigned_to ? profileMap.get(project.assigned_to) || null : null
+      assigned_to_profile: project.assigned_to
+        ? profileMap.get(project.assigned_to) || null
+        : null,
     }));
-    
+
     return NextResponse.json(enhancedProjects);
   } catch (error) {
     console.error('Error in projects API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

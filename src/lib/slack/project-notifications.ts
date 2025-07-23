@@ -20,13 +20,14 @@ export async function sendProjectCreatedNotification(
   }
 
   try {
-    const channel = config?.channel || getChannelForNotificationType('PROJECT_REQUESTS');
+    const channel =
+      config?.channel || getChannelForNotificationType('PROJECT_REQUESTS');
     const message = buildProjectCreatedMessage(projectData);
 
     const response = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -38,9 +39,9 @@ export async function sendProjectCreatedNotification(
         thread_ts: config?.threadTs,
       }),
     });
-    
+
     const result = await response.json();
-    
+
     if (result.ok) {
       console.log('Slack notification sent successfully');
       return { success: true, timestamp: result.ts, channel: result.channel };
@@ -50,9 +51,9 @@ export async function sendProjectCreatedNotification(
     }
   } catch (error) {
     console.error('Error sending Slack notification:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }

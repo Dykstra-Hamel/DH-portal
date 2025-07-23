@@ -26,7 +26,7 @@
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover {
     background: #f3f4f6;
     border-color: #9ca3af;
@@ -54,7 +54,7 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover {
     background: #2563eb;
   }
@@ -79,11 +79,11 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover:not(:disabled) {
     background: #059669;
   }
-  
+
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -103,7 +103,7 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover {
     background: #4b5563;
   }
@@ -153,17 +153,17 @@
   gap: 12px;
   font-size: 14px;
   color: #374151;
-  
+
   svg {
     color: #6b7280;
     flex-shrink: 0;
   }
-  
+
   a {
     color: #3b82f6;
     text-decoration: none;
     transition: color 0.2s;
-    
+
     &:hover {
       color: #2563eb;
       text-decoration: underline;
@@ -182,7 +182,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  
+
   label {
     font-size: 12px;
     font-weight: 600;
@@ -190,7 +190,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
-  
+
   span {
     font-size: 14px;
     color: #374151;
@@ -206,15 +206,15 @@
   font-weight: 500;
   color: white;
   white-space: nowrap;
-  
+
   &.active {
     background-color: #10b981;
   }
-  
+
   &.inactive {
     background-color: #f59e0b;
   }
-  
+
   &.archived {
     background-color: #6b7280;
   }
@@ -229,7 +229,7 @@
 .notes {
   padding: 20px;
   border-top: 1px solid #e5e7eb;
-  
+
   label {
     font-size: 12px;
     font-weight: 600;
@@ -239,7 +239,7 @@
     display: block;
     margin-bottom: 8px;
   }
-  
+
   p {
     font-size: 14px;
     color: #374151;
@@ -259,7 +259,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  
+
   &.three-col {
     grid-template-columns: 1fr 1fr 1fr;
   }
@@ -269,7 +269,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  
+
   label {
     font-size: 12px;
     font-weight: 600;
@@ -289,13 +289,13 @@
   color: #374151;
   background: white;
   transition: all 0.2s;
-  
+
   &:focus {
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
   }
-  
+
   &::placeholder {
     color: #9ca3af;
   }
@@ -348,13 +348,13 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  
+
   &.active {
     background: #3b82f6;
     color: white;
     border-color: #3b82f6;
   }
-  
+
   &:hover:not(.active) {
     background: #f3f4f6;
     border-color: #9ca3af;
@@ -366,7 +366,7 @@
   text-align: center;
   color: #6b7280;
   font-style: italic;
-  
+
   p {
     margin: 0;
     font-size: 16px;
@@ -385,15 +385,15 @@
   border-radius: 8px;
   padding: 16px;
   transition: all 0.2s;
-  
+
   &:hover {
     border-color: #d1d5db;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
-  
+
   &.clickable {
     cursor: pointer;
-    
+
     &:hover {
       border-color: #3b82f6;
       box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
@@ -412,7 +412,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  
+
   h4 {
     font-size: 16px;
     font-weight: 600;
@@ -466,7 +466,7 @@
   gap: 6px;
   font-size: 13px;
   color: #6b7280;
-  
+
   svg {
     opacity: 0.8;
   }
@@ -477,7 +477,7 @@
   background: #f9fafb;
   border-radius: 6px;
   border: 1px solid #e5e7eb;
-  
+
   p {
     margin: 0;
     font-size: 14px;
@@ -498,7 +498,7 @@
   padding: 40px 24px;
   text-align: center;
   color: #ef4444;
-  
+
   h2 {
     font-size: 1.5rem;
     margin-bottom: 16px;
@@ -511,17 +511,17 @@
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  
+
   .container {
     padding: 16px;
   }
-  
+
   .header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-  
+
   .header h1 {
     font-size: 1.5rem;
   }
@@ -532,28 +532,28 @@
     flex-direction: column;
     gap: 12px;
   }
-  
+
   .leadBadges {
     justify-content: flex-start;
   }
-  
+
   .leadMeta {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
   }
-  
+
   .leadsHeader {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-  
+
   .leadsTabs {
     width: 100%;
     justify-content: center;
   }
-  
+
   .tab {
     flex: 1;
     text-align: center;

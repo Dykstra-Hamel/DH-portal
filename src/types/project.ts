@@ -80,12 +80,12 @@ export const statusOptions = [
   { value: 'in_progress', label: 'In Progress', color: '#3b82f6' },
   { value: 'on_hold', label: 'On Hold', color: '#6b7280' },
   { value: 'completed', label: 'Completed', color: '#10b981' },
-  { value: 'cancelled', label: 'Cancelled', color: '#ef4444' }
+  { value: 'cancelled', label: 'Cancelled', color: '#ef4444' },
 ];
 
 export const priorityOptions = [
   { value: 'low', label: 'Low', color: '#10b981' },
   { value: 'medium', label: 'Medium', color: '#f59e0b' },
   { value: 'high', label: 'High', color: '#f97316' },
-  { value: 'urgent', label: 'Urgent', color: '#ef4444' }
+  { value: 'urgent', label: 'Urgent', color: '#ef4444' },
 ];

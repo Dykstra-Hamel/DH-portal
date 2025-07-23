@@ -21,7 +21,7 @@ const CompanyDropdown: React.FC<CompanyDropdownProps> = ({
   selectedCompanyId,
   onCompanyChange,
   includeAllOption = true,
-  placeholder = 'Select a company'
+  placeholder = 'Select a company',
 }) => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,8 +52,11 @@ const CompanyDropdown: React.FC<CompanyDropdownProps> = ({
   };
 
   const selectedCompany = companies.find(c => c.id === selectedCompanyId);
-  const displayText = selectedCompany ? selectedCompany.name : 
-                     (!selectedCompanyId && includeAllOption ? 'All Companies' : placeholder);
+  const displayText = selectedCompany
+    ? selectedCompany.name
+    : !selectedCompanyId && includeAllOption
+      ? 'All Companies'
+      : placeholder;
 
   if (loading) {
     return (
@@ -83,8 +86,8 @@ const CompanyDropdown: React.FC<CompanyDropdownProps> = ({
         type="button"
       >
         <span>{displayText}</span>
-        <ChevronDown 
-          size={16} 
+        <ChevronDown
+          size={16}
           className={`${styles.chevron} ${isOpen ? styles.open : ''}`}
         />
       </button>
@@ -99,7 +102,7 @@ const CompanyDropdown: React.FC<CompanyDropdownProps> = ({
               All Companies
             </button>
           )}
-          {companies.map((company) => (
+          {companies.map(company => (
             <button
               key={company.id}
               className={`${styles.option} ${selectedCompanyId === company.id ? styles.selected : ''}`}

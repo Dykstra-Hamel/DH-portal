@@ -20,7 +20,7 @@ const SortableTableHeader: React.FC<SortableTableHeaderProps> = ({
   currentSortKey,
   currentSortDirection,
   onSort,
-  className = ''
+  className = '',
 }) => {
   const isActive = currentSortKey === sortKey;
   const isAscending = currentSortDirection === 'asc';

@@ -8,6 +8,8 @@
     "start": "next start",
     "serve": "next build && next start",
     "lint": "next lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "migratedb": "supabase db push --linked",
     "seed": "node scripts/seed-with-users.js",
     "restartdb": "supabase db reset --local",
@@ -32,6 +34,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.3.5",
+    "prettier": "3.6.2",
     "supabase": "^2.31.4",
     "typescript": "^5"
   }
