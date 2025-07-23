@@ -35,7 +35,7 @@ interface BrandData {
   font_tertiary_example?: string;
   font_tertiary_url?: string;
   photography_description?: string;
-  photography_images?: Array<{url: string; description: string}>;
+  photography_images?: Array<{ url: string; description: string }>;
 }
 
 interface Company {
@@ -64,8 +64,10 @@ export default function BrandPage() {
     const fetchUserCompaniesAndBrand = async () => {
       try {
         // Check if user is authenticated
-        const supabase = createClient()
-        const { data: { session } } = await supabase.auth.getSession();
+        const supabase = createClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session?.user) {
           router.push('/');
           return;
@@ -91,10 +93,8 @@ export default function BrandPage() {
 
         if (isAdmin) {
           // Admin users can see all companies
-          const { data: allCompaniesData, error: allCompaniesError } = await supabase
-            .from('companies')
-            .select('id, name')
-            .order('name');
+          const { data: allCompaniesData, error: allCompaniesError } =
+            await supabase.from('companies').select('id, name').order('name');
 
           if (allCompaniesError) {
             console.error('Error fetching all companies:', allCompaniesError);
@@ -104,27 +104,30 @@ export default function BrandPage() {
           }
 
           // Convert to UserCompany format for consistency
-          companiesData = allCompaniesData?.map(company => ({
-            id: `admin-${company.id}`,
-            user_id: session.user.id,
-            company_id: company.id,
-            role: 'admin',
-            is_primary: false,
-            companies: company
-          })) || [];
-
+          companiesData =
+            allCompaniesData?.map(company => ({
+              id: `admin-${company.id}`,
+              user_id: session.user.id,
+              company_id: company.id,
+              role: 'admin',
+              is_primary: false,
+              companies: company,
+            })) || [];
         } else {
           // Regular users see only their associated companies
-          const { data: userCompaniesData, error: companiesError } = await supabase
-            .from('user_companies')
-            .select(`
+          const { data: userCompaniesData, error: companiesError } =
+            await supabase
+              .from('user_companies')
+              .select(
+                `
               *,
               companies (
                 id,
                 name
               )
-            `)
-            .eq('user_id', session.user.id);
+            `
+              )
+              .eq('user_id', session.user.id);
 
           if (companiesError) {
             console.error('Error fetching user companies:', companiesError);
@@ -146,12 +149,13 @@ export default function BrandPage() {
 
         // Set default company (primary first for regular users, first alphabetically for admins)
         const primaryCompany = companiesData.find(uc => uc.is_primary);
-        const defaultCompany = primaryCompany ? primaryCompany.companies : companiesData[0].companies;
+        const defaultCompany = primaryCompany
+          ? primaryCompany.companies
+          : companiesData[0].companies;
         setSelectedCompany(defaultCompany);
 
         // Fetch brand data for default company
         await fetchBrandData(defaultCompany.id);
-
       } catch (err) {
         console.error('Unexpected error:', err);
         setError('An unexpected error occurred');
@@ -165,7 +169,7 @@ export default function BrandPage() {
 
   const fetchBrandData = async (companyId: string) => {
     try {
-      const supabase = createClient()
+      const supabase = createClient();
       const { data: brandResult, error: brandError } = await supabase
         .from('brands')
         .select('*')
@@ -184,10 +188,14 @@ export default function BrandPage() {
     }
   };
 
-  const handleCompanyChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleCompanyChange = async (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
     const companyId = event.target.value;
-    const company = userCompanies.find(uc => uc.companies.id === companyId)?.companies;
-    
+    const company = userCompanies.find(
+      uc => uc.companies.id === companyId
+    )?.companies;
+
     if (company) {
       setSelectedCompany(company);
       setError(null);
@@ -196,7 +204,9 @@ export default function BrandPage() {
   };
 
   if (loading) {
-    return <div style={{ padding: '60px', textAlign: 'center' }}>Loading...</div>;
+    return (
+      <div style={{ padding: '60px', textAlign: 'center' }}>Loading...</div>
+    );
   }
 
   if (error) {
@@ -221,23 +231,30 @@ export default function BrandPage() {
     <div>
       {/* Company Selector */}
       {userCompanies.length > 1 && (
-        <div style={{
-          padding: '20px',
-          borderBottom: '1px solid #e5e7eb',
-          backgroundColor: '#f9fafb'
-        }}>
-          <div style={{
-            maxWidth: '1200px',
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '15px'
-          }}>
-            <label htmlFor="company-select" style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#374151'
-            }}>
+        <div
+          style={{
+            padding: '20px',
+            borderBottom: '1px solid #e5e7eb',
+            backgroundColor: '#f9fafb',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: '1200px',
+              margin: '0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '15px',
+            }}
+          >
+            <label
+              htmlFor="company-select"
+              style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#374151',
+              }}
+            >
               Select Company:
             </label>
             <select
@@ -251,7 +268,7 @@ export default function BrandPage() {
                 fontSize: '16px',
                 backgroundColor: 'white',
                 color: '#374151',
-                minWidth: '200px'
+                minWidth: '200px',
               }}
             >
               {userCompanies.map(uc => (
@@ -268,7 +285,10 @@ export default function BrandPage() {
       {!brandData ? (
         <div style={{ padding: '60px', textAlign: 'center' }}>
           <h1>Brand Guidelines</h1>
-          <p>No brand guidelines have been created for {selectedCompany.name} yet.</p>
+          <p>
+            No brand guidelines have been created for {selectedCompany.name}{' '}
+            yet.
+          </p>
           <p>Contact an administrator to set up brand guidelines.</p>
         </div>
       ) : (

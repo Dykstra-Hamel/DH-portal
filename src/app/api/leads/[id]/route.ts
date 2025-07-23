@@ -7,10 +7,13 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient();
-    
+
     // Get the current user from the session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -20,7 +23,8 @@ export async function GET(
     // Get lead with customer and company info
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select(`
+      .select(
+        `
         *,
         customer:customers(
           id,
@@ -34,16 +38,20 @@ export async function GET(
           name,
           website
         )
-      `)
+      `
+      )
       .eq('id', id)
       .single();
-    
+
     if (leadError) {
       console.error('Error fetching lead:', leadError);
       if (leadError.code === 'PGRST116') {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       }
-      return NextResponse.json({ error: 'Failed to fetch lead' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch lead' },
+        { status: 500 }
+      );
     }
 
     // Verify user has access to this lead's company
@@ -55,7 +63,10 @@ export async function GET(
       .single();
 
     if (userCompanyError || !userCompany) {
-      return NextResponse.json({ error: 'Access denied to this lead' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Access denied to this lead' },
+        { status: 403 }
+      );
     }
 
     // Get assigned user profile if lead has one
@@ -66,7 +77,7 @@ export async function GET(
         .select('id, first_name, last_name, email')
         .eq('id', lead.assigned_to)
         .single();
-      
+
       if (!profileError && profileData) {
         assignedUser = profileData;
       }
@@ -75,13 +86,16 @@ export async function GET(
     // Enhanced lead object
     const enhancedLead = {
       ...lead,
-      assigned_user: assignedUser
+      assigned_user: assignedUser,
     };
-    
+
     return NextResponse.json(enhancedLead);
   } catch (error) {
     console.error('Error in lead detail API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
@@ -91,10 +105,13 @@ export async function PUT(
 ) {
   try {
     const supabase = await createClient();
-    
+
     // Get the current user from the session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -108,13 +125,16 @@ export async function PUT(
       .select('company_id')
       .eq('id', id)
       .single();
-    
+
     if (existingLeadError) {
       console.error('Error fetching existing lead:', existingLeadError);
       if (existingLeadError.code === 'PGRST116') {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       }
-      return NextResponse.json({ error: 'Failed to fetch lead' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch lead' },
+        { status: 500 }
+      );
     }
 
     // Verify user has access to this lead's company
@@ -126,15 +146,19 @@ export async function PUT(
       .single();
 
     if (userCompanyError || !userCompany) {
-      return NextResponse.json({ error: 'Access denied to this lead' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Access denied to this lead' },
+        { status: 403 }
+      );
     }
-    
+
     // Update the lead
     const { data: lead, error } = await supabase
       .from('leads')
       .update(body)
       .eq('id', id)
-      .select(`
+      .select(
+        `
         *,
         customer:customers(
           id,
@@ -148,15 +172,19 @@ export async function PUT(
           name,
           website
         )
-      `)
+      `
+      )
       .single();
-    
+
     if (error) {
       console.error('Error updating lead:', error);
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       }
-      return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to update lead' },
+        { status: 500 }
+      );
     }
 
     // Get assigned user profile if lead has one
@@ -167,7 +195,7 @@ export async function PUT(
         .select('id, first_name, last_name, email')
         .eq('id', lead.assigned_to)
         .single();
-      
+
       if (!profileError && profileData) {
         assignedUser = profileData;
       }
@@ -176,12 +204,15 @@ export async function PUT(
     // Enhanced lead object
     const enhancedLead = {
       ...lead,
-      assigned_user: assignedUser
+      assigned_user: assignedUser,
     };
 
     return NextResponse.json(enhancedLead);
   } catch (error) {
     console.error('Error in lead detail API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

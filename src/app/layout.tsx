@@ -1,17 +1,17 @@
-import type { Metadata } from "next";
-import { Outfit } from "next/font/google";
-import "./styles/globals.scss";
-import { Sidebar } from "@/components/sidenav/Sidebar";
+import type { Metadata } from 'next';
+import { Outfit } from 'next/font/google';
+import './styles/globals.scss';
+import { Sidebar } from '@/components/sidenav/Sidebar';
 
 const outfit = Outfit({
-  subsets: ["latin"],
+  subsets: ['latin'],
   variable: '--font-outfit',
   display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: "DH | Portal",
-  description: "Home of the Dykstra Hamel Portal",
+  title: 'DH | Portal',
+  description: 'Home of the Dykstra Hamel Portal',
 };
 
 export default function RootLayout({
@@ -19,14 +19,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-
   return (
     <html lang="en" className={`${outfit.className}`}>
       <body>
         <Sidebar />
-        <section className="page">
-          {children}
-        </section>
+        <section className="page">{children}</section>
       </body>
     </html>
   );

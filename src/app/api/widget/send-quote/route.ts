@@ -1,56 +1,57 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { Resend } from 'resend'
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 interface QuoteRequest {
-  companyId: string
-  customerEmail: string
-  customerName: string
-  pestIssue: string
-  homeSize?: number
-  address?: string
+  companyId: string;
+  customerEmail: string;
+  customerName: string;
+  pestIssue: string;
+  homeSize?: number;
+  address?: string;
   estimatedPrice: {
-    min: number
-    max: number
-    service_type: string
-    factors: string[]
-  }
-  urgency: string
+    min: number;
+    max: number;
+    service_type: string;
+    factors: string[];
+  };
+  urgency: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const quoteData: QuoteRequest = await request.json()
+    const quoteData: QuoteRequest = await request.json();
 
     // Validate required fields
-    if (!quoteData.companyId || !quoteData.customerEmail || !quoteData.customerName) {
+    if (
+      !quoteData.companyId ||
+      !quoteData.customerEmail ||
+      !quoteData.customerName
+    ) {
       return NextResponse.json(
         { error: 'Company ID, customer email, and name are required' },
         { status: 400 }
-      )
+      );
     }
 
     // Get company information
-    const supabase = await createClient()
+    const supabase = await createClient();
     const { data: company, error: companyError } = await supabase
       .from('companies')
       .select('name, email, phone, widget_config')
       .eq('id', quoteData.companyId)
-      .single()
+      .single();
 
     if (companyError || !company) {
-      console.error('Error fetching company:', companyError)
-      return NextResponse.json(
-        { error: 'Company not found' },
-        { status: 404 }
-      )
+      console.error('Error fetching company:', companyError);
+      return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
     // Generate quote email content
-    const quoteId = `QUOTE-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
-    
+    const quoteId = `QUOTE-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
     const emailHtml = `
       <!DOCTYPE html>
       <html>
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
           </div>
         </body>
       </html>
-    `
+    `;
 
     // Send email using Resend
     const { data: emailData, error: emailError } = await resend.emails.send({
@@ -134,27 +135,27 @@ export async function POST(request: NextRequest) {
       to: [quoteData.customerEmail],
       subject: `Your Pest Control Quote - ${company.name}`,
       html: emailHtml,
-    })
+    });
 
     if (emailError) {
-      console.error('Error sending quote email:', emailError)
+      console.error('Error sending quote email:', emailError);
       return NextResponse.json(
         { error: 'Failed to send quote email' },
         { status: 500 }
-      )
+      );
     }
 
     return NextResponse.json({
       success: true,
       quoteId,
       emailId: emailData?.id,
-      message: 'Quote sent successfully to ' + quoteData.customerEmail
-    })
+      message: 'Quote sent successfully to ' + quoteData.customerEmail,
+    });
   } catch (error) {
-    console.error('Error in send quote:', error)
+    console.error('Error in send quote:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
-    )
+    );
   }
 }

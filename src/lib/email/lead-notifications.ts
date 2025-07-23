@@ -9,15 +9,19 @@ export async function sendLeadCreatedNotifications(
   leadData: LeadNotificationData
 ) {
   try {
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'notifications@yourdomain.com';
+    const fromEmail =
+      process.env.RESEND_FROM_EMAIL || 'notifications@yourdomain.com';
     const results = [];
 
     // Send email to each recipient
     for (const email of recipients) {
       try {
         // Extract name from email or use generic greeting
-        const recipientName = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        
+        const recipientName = email
+          .split('@')[0]
+          .replace(/[._]/g, ' ')
+          .replace(/\b\w/g, l => l.toUpperCase());
+
         const { data, error } = await resend.emails.send({
           from: fromEmail,
           to: [email],
@@ -34,10 +38,11 @@ export async function sendLeadCreatedNotifications(
         }
       } catch (emailError) {
         console.error(`Error sending email to ${email}:`, emailError);
-        results.push({ 
-          email, 
-          success: false, 
-          error: emailError instanceof Error ? emailError.message : 'Unknown error' 
+        results.push({
+          email,
+          success: false,
+          error:
+            emailError instanceof Error ? emailError.message : 'Unknown error',
         });
       }
     }
@@ -45,13 +50,15 @@ export async function sendLeadCreatedNotifications(
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
 
-    console.log(`Lead notification results: ${successCount} sent, ${failureCount} failed`);
+    console.log(
+      `Lead notification results: ${successCount} sent, ${failureCount} failed`
+    );
 
     return {
       success: successCount > 0,
       results,
       successCount,
-      failureCount
+      failureCount,
     };
   } catch (error) {
     console.error('Error in sendLeadCreatedNotifications:', error);
@@ -60,7 +67,10 @@ export async function sendLeadCreatedNotifications(
 }
 
 // Helper function to validate email addresses
-export function validateEmails(emails: string[]): { valid: string[]; invalid: string[] } {
+export function validateEmails(emails: string[]): {
+  valid: string[];
+  invalid: string[];
+} {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const valid: string[] = [];
   const invalid: string[] = [];

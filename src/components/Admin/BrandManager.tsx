@@ -51,9 +51,11 @@ export default function BrandManager() {
   const [brandData, setBrandData] = useState<BrandData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
   const supabase = createClient();
-
 
   useEffect(() => {
     fetchCompanies();
@@ -89,14 +91,19 @@ export default function BrandManager() {
         throw error;
       }
 
-      setBrandData(data || {
-        company_id: companyId,
-        alternative_colors: [],
-        photography_images: []
-      });
+      setBrandData(
+        data || {
+          company_id: companyId,
+          alternative_colors: [],
+          photography_images: [],
+        }
+      );
     } catch (error) {
       console.error('Error fetching brand data:', error);
-      setMessage({ type: 'error', text: `Failed to load brand data: ${error instanceof Error ? error.message : 'Unknown error'}` });
+      setMessage({
+        type: 'error',
+        text: `Failed to load brand data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
     }
   };
 
@@ -107,12 +114,16 @@ export default function BrandManager() {
   };
 
   const handleInputChange = (field: keyof BrandData, value: string) => {
-    setBrandData(prev => prev ? { ...prev, [field]: value } : null);
+    setBrandData(prev => (prev ? { ...prev, [field]: value } : null));
   };
 
-  const handleColorChange = (colorType: 'primary' | 'secondary', colorField: 'hex' | 'cmyk' | 'pantone', value: string) => {
+  const handleColorChange = (
+    colorType: 'primary' | 'secondary',
+    colorField: 'hex' | 'cmyk' | 'pantone',
+    value: string
+  ) => {
     const field = `${colorType}_color_${colorField}` as keyof BrandData;
-    setBrandData(prev => prev ? { ...prev, [field]: value } : null);
+    setBrandData(prev => (prev ? { ...prev, [field]: value } : null));
   };
 
   const addAlternativeColor = () => {
@@ -121,12 +132,16 @@ export default function BrandManager() {
       const newColor: ColorInfo = { hex: '', cmyk: '', pantone: '', name: '' };
       return {
         ...prev,
-        alternative_colors: [...(prev.alternative_colors || []), newColor]
+        alternative_colors: [...(prev.alternative_colors || []), newColor],
       };
     });
   };
 
-  const updateAlternativeColor = (index: number, field: keyof ColorInfo, value: string) => {
+  const updateAlternativeColor = (
+    index: number,
+    field: keyof ColorInfo,
+    value: string
+  ) => {
     setBrandData(prev => {
       if (!prev || !prev.alternative_colors) return prev;
       const updated = [...prev.alternative_colors];
@@ -143,7 +158,11 @@ export default function BrandManager() {
     });
   };
 
-  const createAssetPath = (companyName: string, category: string, fileName: string): string => {
+  const createAssetPath = (
+    companyName: string,
+    category: string,
+    fileName: string
+  ): string => {
     // Create clean company name for folder structure
     const cleanCompanyName = companyName
       .toLowerCase()
@@ -159,18 +178,26 @@ export default function BrandManager() {
       .replace(/[^a-zA-Z0-9\s-]/g, '') // Remove special chars
       .replace(/\s+/g, '-') // Replace spaces with hyphens
       .toLowerCase();
-    
+
     const timestamp = Date.now();
     const finalFileName = `${cleanFileName}_${timestamp}.${fileExt}`;
 
     return `${cleanCompanyName}/${category}/${finalFileName}`;
   };
 
-  const uploadFile = async (file: File, bucket: string, category: string): Promise<string | null> => {
+  const uploadFile = async (
+    file: File,
+    bucket: string,
+    category: string
+  ): Promise<string | null> => {
     if (!selectedCompany) return null;
 
     try {
-      const filePath = createAssetPath(selectedCompany.name, category, file.name);
+      const filePath = createAssetPath(
+        selectedCompany.name,
+        category,
+        file.name
+      );
 
       const { error: uploadError } = await supabase.storage
         .from(bucket)
@@ -178,9 +205,9 @@ export default function BrandManager() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(filePath);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(filePath);
 
       return publicUrl;
     } catch (error) {
@@ -189,7 +216,9 @@ export default function BrandManager() {
     }
   };
 
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -206,11 +235,15 @@ export default function BrandManager() {
     }
   };
 
-  const handlePhotographyUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotographyUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const uploadPromises = Array.from(files).map(file => uploadFile(file, 'brand-assets', 'photography'));
+    const uploadPromises = Array.from(files).map(file =>
+      uploadFile(file, 'brand-assets', 'photography')
+    );
     const urls = await Promise.all(uploadPromises);
     const validUrls = urls.filter(url => url !== null) as string[];
 
@@ -220,7 +253,7 @@ export default function BrandManager() {
         const currentImages = prev.photography_images || [];
         return {
           ...prev,
-          photography_images: [...currentImages, ...validUrls]
+          photography_images: [...currentImages, ...validUrls],
         };
       });
       // Clear the input so the same files can be selected again if needed
@@ -237,9 +270,9 @@ export default function BrandManager() {
         console.error('Invalid file URL format:', fileUrl);
         return false;
       }
-      
+
       const filePath = urlParts[1];
-      
+
       const { error } = await supabase.storage
         .from('brand-assets')
         .remove([filePath]);
@@ -258,29 +291,38 @@ export default function BrandManager() {
 
   const removePhotographyImage = async (indexToRemove: number) => {
     if (!brandData?.photography_images) return;
-    
+
     // Confirm deletion
-    if (!confirm('Are you sure you want to delete this image? This action cannot be undone.')) {
+    if (
+      !confirm(
+        'Are you sure you want to delete this image? This action cannot be undone.'
+      )
+    ) {
       return;
     }
-    
+
     const imageToDelete = brandData.photography_images[indexToRemove];
-    
+
     // Delete from storage first
     const deleted = await deleteFileFromStorage(imageToDelete);
-    
+
     if (deleted) {
       // Remove from brand data only if storage deletion was successful
       setBrandData(prev => {
         if (!prev || !prev.photography_images) return prev;
         return {
           ...prev,
-          photography_images: prev.photography_images.filter((_, index) => index !== indexToRemove)
+          photography_images: prev.photography_images.filter(
+            (_, index) => index !== indexToRemove
+          ),
         };
       });
       setMessage({ type: 'success', text: 'Image deleted successfully' });
     } else {
-      setMessage({ type: 'error', text: 'Failed to delete image file from storage' });
+      setMessage({
+        type: 'error',
+        text: 'Failed to delete image file from storage',
+      });
     }
   };
 
@@ -291,14 +333,12 @@ export default function BrandManager() {
     setMessage(null);
 
     try {
-      const { error } = await supabase
-        .from('brands')
-        .upsert(brandData);
+      const { error } = await supabase.from('brands').upsert(brandData);
 
       if (error) throw error;
 
       setMessage({ type: 'success', text: 'Brand data saved successfully!' });
-      
+
       // Refresh data
       await fetchBrandData(selectedCompany.id);
     } catch (error) {
@@ -360,7 +400,9 @@ export default function BrandManager() {
                 <h4>Brand Guidelines</h4>
                 <textarea
                   value={brandData.brand_guidelines || ''}
-                  onChange={(e) => handleInputChange('brand_guidelines', e.target.value)}
+                  onChange={e =>
+                    handleInputChange('brand_guidelines', e.target.value)
+                  }
                   placeholder="Brand guidelines overview..."
                   className={styles.textarea}
                   rows={4}
@@ -371,7 +413,9 @@ export default function BrandManager() {
                 <h4>Brand Strategy</h4>
                 <textarea
                   value={brandData.brand_strategy || ''}
-                  onChange={(e) => handleInputChange('brand_strategy', e.target.value)}
+                  onChange={e =>
+                    handleInputChange('brand_strategy', e.target.value)
+                  }
                   placeholder="Brand strategy description..."
                   className={styles.textarea}
                   rows={6}
@@ -382,7 +426,9 @@ export default function BrandManager() {
                 <h4>Personality</h4>
                 <textarea
                   value={brandData.personality || ''}
-                  onChange={(e) => handleInputChange('personality', e.target.value)}
+                  onChange={e =>
+                    handleInputChange('personality', e.target.value)
+                  }
                   placeholder="Brand personality traits..."
                   className={styles.textarea}
                   rows={4}
@@ -393,7 +439,16 @@ export default function BrandManager() {
                 <h4>Logo</h4>
                 <div className={styles.logoSection}>
                   <div className={styles.uploadInfo}>
-                    <small>Files will be organized: <code>{selectedCompany?.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/logos/</code></small>
+                    <small>
+                      Files will be organized:{' '}
+                      <code>
+                        {selectedCompany?.name
+                          .toLowerCase()
+                          .replace(/[^a-z0-9\s-]/g, '')
+                          .replace(/\s+/g, '-')}
+                        /logos/
+                      </code>
+                    </small>
                   </div>
                   <input
                     type="file"
@@ -403,9 +458,9 @@ export default function BrandManager() {
                   />
                   {brandData.logo_url && brandData.logo_url.trim() && (
                     <div className={styles.logoPreview}>
-                      <Image 
-                        src={brandData.logo_url} 
-                        alt="Logo preview" 
+                      <Image
+                        src={brandData.logo_url}
+                        alt="Logo preview"
                         width={200}
                         height={100}
                         style={{ maxWidth: '100%', height: 'auto' }}
@@ -414,7 +469,9 @@ export default function BrandManager() {
                   )}
                   <textarea
                     value={brandData.logo_description || ''}
-                    onChange={(e) => handleInputChange('logo_description', e.target.value)}
+                    onChange={e =>
+                      handleInputChange('logo_description', e.target.value)
+                    }
                     placeholder="Logo description..."
                     className={styles.textarea}
                     rows={3}
@@ -424,34 +481,42 @@ export default function BrandManager() {
 
               <div className={styles.formSection}>
                 <h4>Colors</h4>
-                
+
                 <div className={styles.colorSection}>
                   <h5>Primary Color</h5>
                   <div className={styles.colorInputs}>
                     <input
                       type="color"
                       value={brandData.primary_color_hex || '#000000'}
-                      onChange={(e) => handleColorChange('primary', 'hex', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('primary', 'hex', e.target.value)
+                      }
                       className={styles.colorPicker}
                     />
                     <input
                       type="text"
                       value={brandData.primary_color_hex || ''}
-                      onChange={(e) => handleColorChange('primary', 'hex', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('primary', 'hex', e.target.value)
+                      }
                       placeholder="Hex"
                       className={styles.input}
                     />
                     <input
                       type="text"
                       value={brandData.primary_color_cmyk || ''}
-                      onChange={(e) => handleColorChange('primary', 'cmyk', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('primary', 'cmyk', e.target.value)
+                      }
                       placeholder="CMYK"
                       className={styles.input}
                     />
                     <input
                       type="text"
                       value={brandData.primary_color_pantone || ''}
-                      onChange={(e) => handleColorChange('primary', 'pantone', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('primary', 'pantone', e.target.value)
+                      }
                       placeholder="Pantone"
                       className={styles.input}
                     />
@@ -464,27 +529,39 @@ export default function BrandManager() {
                     <input
                       type="color"
                       value={brandData.secondary_color_hex || '#000000'}
-                      onChange={(e) => handleColorChange('secondary', 'hex', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('secondary', 'hex', e.target.value)
+                      }
                       className={styles.colorPicker}
                     />
                     <input
                       type="text"
                       value={brandData.secondary_color_hex || ''}
-                      onChange={(e) => handleColorChange('secondary', 'hex', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('secondary', 'hex', e.target.value)
+                      }
                       placeholder="Hex"
                       className={styles.input}
                     />
                     <input
                       type="text"
                       value={brandData.secondary_color_cmyk || ''}
-                      onChange={(e) => handleColorChange('secondary', 'cmyk', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('secondary', 'cmyk', e.target.value)
+                      }
                       placeholder="CMYK"
                       className={styles.input}
                     />
                     <input
                       type="text"
                       value={brandData.secondary_color_pantone || ''}
-                      onChange={(e) => handleColorChange('secondary', 'pantone', e.target.value)}
+                      onChange={e =>
+                        handleColorChange(
+                          'secondary',
+                          'pantone',
+                          e.target.value
+                        )
+                      }
                       placeholder="Pantone"
                       className={styles.input}
                     />
@@ -494,7 +571,10 @@ export default function BrandManager() {
                 <div className={styles.colorSection}>
                   <div className={styles.sectionHeader}>
                     <h5>Alternative Colors</h5>
-                    <button onClick={addAlternativeColor} className={styles.addButton}>
+                    <button
+                      onClick={addAlternativeColor}
+                      className={styles.addButton}
+                    >
                       Add Color
                     </button>
                   </div>
@@ -504,34 +584,56 @@ export default function BrandManager() {
                         <input
                           type="color"
                           value={color.hex || '#000000'}
-                          onChange={(e) => updateAlternativeColor(index, 'hex', e.target.value)}
+                          onChange={e =>
+                            updateAlternativeColor(index, 'hex', e.target.value)
+                          }
                           className={styles.colorPicker}
                         />
                         <input
                           type="text"
                           value={color.name || ''}
-                          onChange={(e) => updateAlternativeColor(index, 'name', e.target.value)}
+                          onChange={e =>
+                            updateAlternativeColor(
+                              index,
+                              'name',
+                              e.target.value
+                            )
+                          }
                           placeholder="Color name"
                           className={styles.input}
                         />
                         <input
                           type="text"
                           value={color.hex || ''}
-                          onChange={(e) => updateAlternativeColor(index, 'hex', e.target.value)}
+                          onChange={e =>
+                            updateAlternativeColor(index, 'hex', e.target.value)
+                          }
                           placeholder="Hex"
                           className={styles.input}
                         />
                         <input
                           type="text"
                           value={color.cmyk || ''}
-                          onChange={(e) => updateAlternativeColor(index, 'cmyk', e.target.value)}
+                          onChange={e =>
+                            updateAlternativeColor(
+                              index,
+                              'cmyk',
+                              e.target.value
+                            )
+                          }
                           placeholder="CMYK"
                           className={styles.input}
                         />
                         <input
                           type="text"
                           value={color.pantone || ''}
-                          onChange={(e) => updateAlternativeColor(index, 'pantone', e.target.value)}
+                          onChange={e =>
+                            updateAlternativeColor(
+                              index,
+                              'pantone',
+                              e.target.value
+                            )
+                          }
                           placeholder="Pantone"
                           className={styles.input}
                         />
@@ -549,27 +651,36 @@ export default function BrandManager() {
 
               <div className={styles.formSection}>
                 <h4>Typography</h4>
-                
+
                 <div className={styles.fontSection}>
                   <h5>Primary Font</h5>
                   <div className={styles.fontInputs}>
                     <input
                       type="text"
                       value={brandData.font_primary_name || ''}
-                      onChange={(e) => handleInputChange('font_primary_name', e.target.value)}
+                      onChange={e =>
+                        handleInputChange('font_primary_name', e.target.value)
+                      }
                       placeholder="Font name"
                       className={styles.input}
                     />
                     <input
                       type="url"
                       value={brandData.font_primary_url || ''}
-                      onChange={(e) => handleInputChange('font_primary_url', e.target.value)}
+                      onChange={e =>
+                        handleInputChange('font_primary_url', e.target.value)
+                      }
                       placeholder="Font URL"
                       className={styles.input}
                     />
                     <textarea
                       value={brandData.font_primary_example || ''}
-                      onChange={(e) => handleInputChange('font_primary_example', e.target.value)}
+                      onChange={e =>
+                        handleInputChange(
+                          'font_primary_example',
+                          e.target.value
+                        )
+                      }
                       placeholder="Example text"
                       className={styles.textarea}
                       rows={2}
@@ -583,20 +694,29 @@ export default function BrandManager() {
                     <input
                       type="text"
                       value={brandData.font_secondary_name || ''}
-                      onChange={(e) => handleInputChange('font_secondary_name', e.target.value)}
+                      onChange={e =>
+                        handleInputChange('font_secondary_name', e.target.value)
+                      }
                       placeholder="Font name"
                       className={styles.input}
                     />
                     <input
                       type="url"
                       value={brandData.font_secondary_url || ''}
-                      onChange={(e) => handleInputChange('font_secondary_url', e.target.value)}
+                      onChange={e =>
+                        handleInputChange('font_secondary_url', e.target.value)
+                      }
                       placeholder="Font URL"
                       className={styles.input}
                     />
                     <textarea
                       value={brandData.font_secondary_example || ''}
-                      onChange={(e) => handleInputChange('font_secondary_example', e.target.value)}
+                      onChange={e =>
+                        handleInputChange(
+                          'font_secondary_example',
+                          e.target.value
+                        )
+                      }
                       placeholder="Example text"
                       className={styles.textarea}
                       rows={2}
@@ -610,20 +730,29 @@ export default function BrandManager() {
                     <input
                       type="text"
                       value={brandData.font_tertiary_name || ''}
-                      onChange={(e) => handleInputChange('font_tertiary_name', e.target.value)}
+                      onChange={e =>
+                        handleInputChange('font_tertiary_name', e.target.value)
+                      }
                       placeholder="Font name"
                       className={styles.input}
                     />
                     <input
                       type="url"
                       value={brandData.font_tertiary_url || ''}
-                      onChange={(e) => handleInputChange('font_tertiary_url', e.target.value)}
+                      onChange={e =>
+                        handleInputChange('font_tertiary_url', e.target.value)
+                      }
                       placeholder="Font URL"
                       className={styles.input}
                     />
                     <textarea
                       value={brandData.font_tertiary_example || ''}
-                      onChange={(e) => handleInputChange('font_tertiary_example', e.target.value)}
+                      onChange={e =>
+                        handleInputChange(
+                          'font_tertiary_example',
+                          e.target.value
+                        )
+                      }
                       placeholder="Example text"
                       className={styles.textarea}
                       rows={2}
@@ -636,16 +765,27 @@ export default function BrandManager() {
                 <h4>Photography</h4>
                 <textarea
                   value={brandData.photography_description || ''}
-                  onChange={(e) => handleInputChange('photography_description', e.target.value)}
+                  onChange={e =>
+                    handleInputChange('photography_description', e.target.value)
+                  }
                   placeholder="Photography style description..."
                   className={styles.textarea}
                   rows={4}
                 />
-                
+
                 <div className={styles.photographyUpload}>
                   <h5>Photography Images</h5>
                   <div className={styles.uploadInfo}>
-                    <small>Files will be organized: <code>{selectedCompany?.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/photography/</code></small>
+                    <small>
+                      Files will be organized:{' '}
+                      <code>
+                        {selectedCompany?.name
+                          .toLowerCase()
+                          .replace(/[^a-z0-9\s-]/g, '')
+                          .replace(/\s+/g, '-')}
+                        /photography/
+                      </code>
+                    </small>
                   </div>
                   <input
                     type="file"
@@ -654,30 +794,36 @@ export default function BrandManager() {
                     onChange={handlePhotographyUpload}
                     className={styles.fileInput}
                   />
-                  
-                  {brandData.photography_images && brandData.photography_images.length > 0 && (
-                    <div className={styles.photographyGrid}>
-                      {brandData.photography_images.filter(image => image && image.trim()).map((image, index) => (
-                        <div key={index} className={styles.photographyImageItem}>
-                          <Image 
-                            src={image} 
-                            alt={`Photography ${index + 1}`} 
-                            className={styles.photographyPreview}
-                            width={300}
-                            height={200}
-                            style={{ maxWidth: '100%', height: 'auto' }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removePhotographyImage(index)}
-                            className={styles.removeImageButton}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+
+                  {brandData.photography_images &&
+                    brandData.photography_images.length > 0 && (
+                      <div className={styles.photographyGrid}>
+                        {brandData.photography_images
+                          .filter(image => image && image.trim())
+                          .map((image, index) => (
+                            <div
+                              key={index}
+                              className={styles.photographyImageItem}
+                            >
+                              <Image
+                                src={image}
+                                alt={`Photography ${index + 1}`}
+                                className={styles.photographyPreview}
+                                width={300}
+                                height={200}
+                                style={{ maxWidth: '100%', height: 'auto' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePhotographyImage(index)}
+                                className={styles.removeImageButton}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -702,7 +848,10 @@ export default function BrandManager() {
           ) : (
             <div className={styles.placeholder}>
               <h3>Select a company to manage its brand</h3>
-              <p>Choose a company from the list to create or edit its brand guidelines.</p>
+              <p>
+                Choose a company from the list to create or edit its brand
+                guidelines.
+              </p>
             </div>
           )}
         </div>

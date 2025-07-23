@@ -113,14 +113,18 @@ export function generateProjectCreatedEmailTemplate(
             <span class="detail-value">${new Date(projectData.dueDate).toLocaleDateString()}</span>
           </div>
           
-          ${projectData.description ? `
+          ${
+            projectData.description
+              ? `
           <div style="margin-top: 15px;">
             <span class="detail-label">Description:</span>
             <div style="margin-top: 5px; padding: 10px; background-color: #f1f5f9; border-radius: 4px;">
               ${projectData.description}
             </div>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
         
         <p>Please review and assign this project when you have a chance.</p>

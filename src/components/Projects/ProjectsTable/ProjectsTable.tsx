@@ -12,11 +12,11 @@ interface ProjectsTableProps {
   showActions?: boolean;
 }
 
-const ProjectsTable: React.FC<ProjectsTableProps> = ({ 
-  projects, 
-  onEdit, 
-  onDelete, 
-  showActions = true 
+const ProjectsTable: React.FC<ProjectsTableProps> = ({
+  projects,
+  onEdit,
+  onDelete,
+  showActions = true,
 }) => {
   const getStatusColor = (status: string) => {
     return statusOptions.find(s => s.value === status)?.color || '#6b7280';
@@ -60,7 +60,7 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {projects.map((project) => (
+          {projects.map(project => (
             <tr key={project.id}>
               <td>
                 <div className={styles.projectInfo}>
@@ -86,7 +86,7 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
               <td>{project.company.name}</td>
               <td>{project.project_type}</td>
               <td>
-                <span 
+                <span
                   className={styles.statusBadge}
                   style={{ backgroundColor: getStatusColor(project.status) }}
                 >
@@ -94,27 +94,32 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
                 </span>
               </td>
               <td>
-                <span 
+                <span
                   className={styles.priorityBadge}
-                  style={{ backgroundColor: getPriorityColor(project.priority) }}
+                  style={{
+                    backgroundColor: getPriorityColor(project.priority),
+                  }}
                 >
-                  {priorityOptions.find(p => p.value === project.priority)?.label}
+                  {
+                    priorityOptions.find(p => p.value === project.priority)
+                      ?.label
+                  }
                 </span>
               </td>
               <td>
                 <div className={styles.userInfo}>
                   <User size={14} />
-                  {project.requested_by_profile 
+                  {project.requested_by_profile
                     ? `${project.requested_by_profile.first_name} ${project.requested_by_profile.last_name}`
-                    : 'Unknown User'
-                  }
+                    : 'Unknown User'}
                 </div>
               </td>
               <td>
                 {project.assigned_to_profile ? (
                   <div className={styles.userInfo}>
                     <User size={14} />
-                    {project.assigned_to_profile.first_name} {project.assigned_to_profile.last_name}
+                    {project.assigned_to_profile.first_name}{' '}
+                    {project.assigned_to_profile.last_name}
                   </div>
                 ) : (
                   <span className={styles.unassigned}>Unassigned</span>
@@ -130,14 +135,14 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
               {showActions && (
                 <td>
                   <div className={styles.actions}>
-                    <button 
+                    <button
                       onClick={() => onEdit?.(project)}
                       className={styles.editButton}
                       title="Edit project"
                     >
                       <Edit size={16} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => onDelete?.(project.id)}
                       className={styles.deleteButton}
                       title="Delete project"

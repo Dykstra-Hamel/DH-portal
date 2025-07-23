@@ -12,7 +12,7 @@
   border-radius: 8px;
   padding: 8px 12px;
   transition: all 0.2s;
-  
+
   &:focus-within {
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
@@ -32,7 +32,7 @@
   background: transparent;
   font-size: 14px;
   color: #374151;
-  
+
   &::placeholder {
     color: #9ca3af;
   }
@@ -50,12 +50,12 @@
   justify-content: center;
   margin-left: 8px;
   transition: all 0.2s;
-  
+
   &:hover {
     color: #374151;
     background: #f3f4f6;
   }
-  
+
   &:focus {
     outline: none;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
@@ -67,11 +67,11 @@
   .searchBar {
     max-width: 100%;
   }
-  
+
   .searchInput {
     padding: 6px 10px;
   }
-  
+
   .input {
     font-size: 13px;
   }

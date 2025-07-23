@@ -41,7 +41,7 @@ This is a Next.js application with Supabase authentication supporting Google OAu
 
 - **IMPORTANT**: All API routes with dynamic segments must use `Promise<{ param: string }>` type for params
 - Always await params before using them: `const { id } = await params;`
-- **Example**: 
+- **Example**:
   ```typescript
   export async function GET(
     request: NextRequest,
@@ -62,6 +62,12 @@ This is a Next.js application with Supabase authentication supporting Google OAu
 - Environment variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - Auth providers configured: Google, Facebook
 - Email templates configured for magic links
+
+## Widget Configuration
+
+- **Address Autocomplete**: Uses Google Places API for address suggestions
+- Environment variable required: `GOOGLE_PLACES_API_KEY`
+- Configure in widget settings to enable/disable address autocomplete
 
 ## Database Changes
 

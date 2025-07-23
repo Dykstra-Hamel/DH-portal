@@ -98,13 +98,15 @@
     margin-bottom: 0.25rem;
   }
 
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     width: 100%;
     padding: 0.5rem 0.75rem;
     border: 1px solid #d1d5db;
     border-radius: 0.375rem;
     font-size: 0.875rem;
-    
+
     &:focus {
       outline: none;
       border-color: #3b82f6;
@@ -173,25 +175,26 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    
-    th, td {
+
+    th,
+    td {
       text-align: left;
       padding: 0.75rem;
       border-bottom: 1px solid #e5e7eb;
     }
-    
+
     th {
       background-color: #f9fafb;
       font-weight: 600;
       color: #374151;
       font-size: 0.875rem;
     }
-    
+
     td {
       font-size: 0.875rem;
       color: #6b7280;
     }
-    
+
     tr:hover {
       background-color: #f9fafb;
     }
@@ -245,8 +248,8 @@
     align-items: center;
     padding: 0.25rem;
     margin-bottom: 0;
-    
-    input[type="checkbox"] {
+
+    input[type='checkbox'] {
       width: auto;
       margin-right: 0.5rem;
     }
@@ -259,22 +262,22 @@
   font-size: 0.75rem;
   font-weight: 500;
   text-transform: capitalize;
-  
+
   &.member {
     background-color: #e5e7eb;
     color: #374151;
   }
-  
+
   &.admin {
     background-color: #fef3c7;
     color: #d97706;
   }
-  
+
   &.owner {
     background-color: #ddd6fe;
     color: #7c3aed;
   }
-  
+
   &.manager {
     background-color: #d1fae5;
     color: #059669;
@@ -288,12 +291,12 @@
   background-color: #f0f9ff;
   border: 1px solid #bae6fd;
   border-radius: 4px;
-  
+
   small {
     color: #0369a1;
     font-size: 12px;
   }
-  
+
   code {
     background-color: #e0f2fe;
     padding: 2px 4px;
@@ -306,7 +309,7 @@
 // Photography upload styles
 .photographyUpload {
   margin-top: 20px;
-  
+
   h5 {
     font-size: 16px;
     font-weight: 600;
@@ -326,7 +329,7 @@
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .photographyPreview {
@@ -349,7 +352,7 @@
   font-size: 12px;
   cursor: pointer;
   transition: background-color 0.2s;
-  
+
   &:hover {
     background-color: rgba(220, 38, 38, 1);
   }
@@ -406,7 +409,7 @@
   color: #6b7280;
   cursor: pointer;
   padding: 0;
-  
+
   &:hover {
     color: #374151;
   }
@@ -420,18 +423,18 @@
 .detailGrid {
   display: grid;
   gap: 1rem;
-  
+
   .detailItem {
     strong {
       color: #374151;
       font-weight: 600;
       margin-right: 0.5rem;
     }
-    
+
     ul {
       margin: 0.5rem 0 0 1rem;
       padding: 0;
-      
+
       li {
         color: #6b7280;
         margin-bottom: 0.25rem;
@@ -456,7 +459,7 @@
     color: #1e293b;
     margin: 0 0 0.5rem 0;
   }
-  
+
   p {
     color: #6b7280;
     font-size: 0.875rem;
@@ -465,11 +468,12 @@
 }
 
 // Call Recording and Transcript Styles
-.recordingSection, .transcriptSection {
+.recordingSection,
+.transcriptSection {
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid #e5e7eb;
-  
+
   h4 {
     margin: 0 0 0.75rem 0;
     font-size: 1rem;
@@ -493,7 +497,10 @@
   white-space: pre-wrap;
   max-height: 300px;
   overflow-y: auto;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 // Responsive design updates
@@ -502,7 +509,7 @@
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
   }
-  
+
   .photographyPreview {
     height: 120px;
   }

@@ -3,7 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { X } from 'lucide-react';
-import { Project, ProjectFormData, User, Company, statusOptions, priorityOptions } from '@/types/project';
+import {
+  Project,
+  ProjectFormData,
+  User,
+  Company,
+  statusOptions,
+  priorityOptions,
+} from '@/types/project';
 import styles from './ProjectForm.module.scss';
 
 interface ProjectFormProps {
@@ -31,7 +38,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   currentUserProfile,
   isAdmin = false,
   mode = 'full',
-  userActiveCompany = null
+  userActiveCompany = null,
 }) => {
   const [formData, setFormData] = useState<ProjectFormData>({
     name: editingProject?.name || '',
@@ -49,7 +56,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     actual_hours: editingProject?.actual_hours?.toString() || '',
     budget_amount: editingProject?.budget_amount?.toString() || '',
     tags: editingProject?.tags?.join(', ') || '',
-    notes: editingProject?.notes || ''
+    notes: editingProject?.notes || '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,7 +80,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         actual_hours: editingProject.actual_hours?.toString() || '',
         budget_amount: editingProject.budget_amount?.toString() || '',
         tags: editingProject.tags?.join(', ') || '',
-        notes: editingProject.notes || ''
+        notes: editingProject.notes || '',
       });
     } else {
       // Reset form for new project
@@ -93,14 +100,14 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         actual_hours: '',
         budget_amount: '',
         tags: '',
-        notes: ''
+        notes: '',
       });
     }
   }, [editingProject, currentUser.id, userActiveCompany?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setIsSubmitting(true);
       await onSubmit(formData);
@@ -129,7 +136,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       actual_hours: '',
       budget_amount: '',
       tags: '',
-      notes: ''
+      notes: '',
     });
     onClose();
   };
@@ -141,16 +148,17 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       <div className={styles.modalContent}>
         <div className={styles.modalHeader}>
           <h3>
-            {mode === 'request' 
-              ? 'Request New Project' 
-              : (editingProject ? 'Edit Project' : 'Create New Project')
-            }
+            {mode === 'request'
+              ? 'Request New Project'
+              : editingProject
+                ? 'Edit Project'
+                : 'Create New Project'}
           </h3>
           <button onClick={handleClose} className={styles.closeButton}>
             <X size={24} />
           </button>
         </div>
-        
+
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
@@ -158,7 +166,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={e =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 required
               />
             </div>
@@ -168,7 +178,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               <input
                 type="text"
                 value={formData.project_type}
-                onChange={(e) => setFormData({...formData, project_type: e.target.value})}
+                onChange={e =>
+                  setFormData({ ...formData, project_type: e.target.value })
+                }
                 placeholder="e.g., Web Design, Logo Design, Marketing Campaign"
                 required
               />
@@ -186,12 +198,16 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               ) : (
                 <select
                   value={formData.company_id}
-                  onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+                  onChange={e =>
+                    setFormData({ ...formData, company_id: e.target.value })
+                  }
                   required
                 >
                   <option value="">Select Company</option>
                   {companies.map(company => (
-                    <option key={company.id} value={company.id}>{company.name}</option>
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
                   ))}
                 </select>
               )}
@@ -203,13 +219,17 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 <label>Requested By *</label>
                 <select
                   value={formData.requested_by}
-                  onChange={(e) => setFormData({...formData, requested_by: e.target.value})}
+                  onChange={e =>
+                    setFormData({ ...formData, requested_by: e.target.value })
+                  }
                   required
                 >
                   <option value="">Select User</option>
                   {users.map(user => (
                     <option key={user.id} value={user.id}>
-                      {user.profiles?.first_name || ''} {user.profiles?.last_name || ''} ({user.profiles?.email || user.email})
+                      {user.profiles?.first_name || ''}{' '}
+                      {user.profiles?.last_name || ''} (
+                      {user.profiles?.email || user.email})
                     </option>
                   ))}
                 </select>
@@ -219,9 +239,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 <label>Requested By *</label>
                 <input
                   type="text"
-                  value={currentUserProfile && currentUserProfile.profiles
-                    ? `${currentUserProfile.profiles.first_name || ''} ${currentUserProfile.profiles.last_name || ''}`.trim() + ` (${currentUserProfile.profiles.email || currentUser.email})`
-                    : `Current User (${currentUser.email})`
+                  value={
+                    currentUserProfile && currentUserProfile.profiles
+                      ? `${currentUserProfile.profiles.first_name || ''} ${currentUserProfile.profiles.last_name || ''}`.trim() +
+                        ` (${currentUserProfile.profiles.email || currentUser.email})`
+                      : `Current User (${currentUser.email})`
                   }
                   readOnly
                   style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
@@ -235,12 +257,16 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                   <label>Assigned To</label>
                   <select
                     value={formData.assigned_to}
-                    onChange={(e) => setFormData({...formData, assigned_to: e.target.value})}
+                    onChange={e =>
+                      setFormData({ ...formData, assigned_to: e.target.value })
+                    }
                   >
                     <option value="">Unassigned</option>
                     {users.map(user => (
                       <option key={user.id} value={user.id}>
-                        {user.profiles?.first_name || ''} {user.profiles?.last_name || ''} ({user.profiles?.email || user.email})
+                        {user.profiles?.first_name || ''}{' '}
+                        {user.profiles?.last_name || ''} (
+                        {user.profiles?.email || user.email})
                       </option>
                     ))}
                   </select>
@@ -250,7 +276,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                   <label>Status</label>
                   <select
                     value={formData.status}
-                    onChange={(e) => setFormData({...formData, status: e.target.value})}
+                    onChange={e =>
+                      setFormData({ ...formData, status: e.target.value })
+                    }
                   >
                     {statusOptions.map(status => (
                       <option key={status.value} value={status.value}>
@@ -264,7 +292,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                   <label>Priority</label>
                   <select
                     value={formData.priority}
-                    onChange={(e) => setFormData({...formData, priority: e.target.value})}
+                    onChange={e =>
+                      setFormData({ ...formData, priority: e.target.value })
+                    }
                   >
                     {priorityOptions.map(priority => (
                       <option key={priority.value} value={priority.value}>
@@ -281,7 +311,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               <input
                 type="date"
                 value={formData.due_date}
-                onChange={(e) => setFormData({...formData, due_date: e.target.value})}
+                onChange={e =>
+                  setFormData({ ...formData, due_date: e.target.value })
+                }
                 required
               />
             </div>
@@ -293,7 +325,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                   <input
                     type="date"
                     value={formData.start_date}
-                    onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                    onChange={e =>
+                      setFormData({ ...formData, start_date: e.target.value })
+                    }
                   />
                 </div>
 
@@ -302,7 +336,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                   <input
                     type="date"
                     value={formData.completion_date}
-                    onChange={(e) => setFormData({...formData, completion_date: e.target.value})}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        completion_date: e.target.value,
+                      })
+                    }
                   />
                 </div>
 
@@ -312,7 +351,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                     type="number"
                     step="0.5"
                     value={formData.estimated_hours}
-                    onChange={(e) => setFormData({...formData, estimated_hours: e.target.value})}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        estimated_hours: e.target.value,
+                      })
+                    }
                   />
                 </div>
 
@@ -322,7 +366,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                     type="number"
                     step="0.5"
                     value={formData.actual_hours}
-                    onChange={(e) => setFormData({...formData, actual_hours: e.target.value})}
+                    onChange={e =>
+                      setFormData({ ...formData, actual_hours: e.target.value })
+                    }
                   />
                 </div>
 
@@ -332,7 +378,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                     type="number"
                     step="0.01"
                     value={formData.budget_amount}
-                    onChange={(e) => setFormData({...formData, budget_amount: e.target.value})}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        budget_amount: e.target.value,
+                      })
+                    }
                   />
                 </div>
               </>
@@ -343,7 +394,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
             <label>Description</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              onChange={e =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               rows={3}
             />
           </div>
@@ -353,7 +406,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
             <input
               type="text"
               value={formData.tags}
-              onChange={(e) => setFormData({...formData, tags: e.target.value})}
+              onChange={e => setFormData({ ...formData, tags: e.target.value })}
               placeholder="business cards, website images, postcard design"
             />
           </div>
@@ -363,23 +416,34 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               <label>Notes</label>
               <textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={e =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
                 rows={2}
               />
             </div>
           )}
 
           <div className={styles.modalActions}>
-            <button type="button" onClick={handleClose} className={styles.cancelButton}>
+            <button
+              type="button"
+              onClick={handleClose}
+              className={styles.cancelButton}
+            >
               Cancel
             </button>
-            <button type="submit" className={styles.saveButton} disabled={isSubmitting}>
-              {isSubmitting 
-                ? 'Submitting...' 
-                : mode === 'request' 
-                  ? 'Submit Request' 
-                  : (editingProject ? 'Update Project' : 'Create Project')
-              }
+            <button
+              type="submit"
+              className={styles.saveButton}
+              disabled={isSubmitting}
+            >
+              {isSubmitting
+                ? 'Submitting...'
+                : mode === 'request'
+                  ? 'Submit Request'
+                  : editingProject
+                    ? 'Update Project'
+                    : 'Create Project'}
             </button>
           </div>
         </form>

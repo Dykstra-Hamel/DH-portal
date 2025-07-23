@@ -1,45 +1,52 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { User } from '@supabase/supabase-js'
-import UsersManager from './UsersManager'
-import CompaniesManager from './CompaniesManager'
-import UserCompanyManager from './UserCompanyManager'
-import BrandManager from './BrandManager'
-import ProjectsManager from './ProjectsManager'
-import WidgetManager from './WidgetManager'
-import CallsManager from './CallsManager'
-import styles from './AdminDashboard.module.scss'
+import { useState } from 'react';
+import { User } from '@supabase/supabase-js';
+import UsersManager from './UsersManager';
+import CompaniesManager from './CompaniesManager';
+import UserCompanyManager from './UserCompanyManager';
+import BrandManager from './BrandManager';
+import ProjectsManager from './ProjectsManager';
+import WidgetManager from './WidgetManager';
+import CallsManager from './CallsManager';
+import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
-  user: User
+  user: User;
 }
 
-type AdminSection = 'users' | 'companies' | 'relationships' | 'brands' | 'projects' | 'widgets' | 'calls'
+type AdminSection =
+  | 'users'
+  | 'companies'
+  | 'relationships'
+  | 'brands'
+  | 'projects'
+  | 'widgets'
+  | 'calls';
 
 export default function AdminDashboard({ user }: AdminDashboardProps) {
-  const [activeSection, setActiveSection] = useState<AdminSection>('users')
+  const [activeSection, setActiveSection] = useState<AdminSection>('users');
 
   const renderSection = () => {
     switch (activeSection) {
       case 'users':
-        return <UsersManager />
+        return <UsersManager />;
       case 'companies':
-        return <CompaniesManager />
+        return <CompaniesManager />;
       case 'relationships':
-        return <UserCompanyManager />
+        return <UserCompanyManager />;
       case 'brands':
-        return <BrandManager />
+        return <BrandManager />;
       case 'projects':
-        return <ProjectsManager user={user} />
+        return <ProjectsManager user={user} />;
       case 'widgets':
-        return <WidgetManager />
+        return <WidgetManager />;
       case 'calls':
-        return <CallsManager />
+        return <CallsManager />;
       default:
-        return <UsersManager />
+        return <UsersManager />;
     }
-  }
+  };
 
   return (
     <div className={styles.adminDashboard}>
@@ -93,9 +100,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         </button>
       </nav>
 
-      <main className={styles.content}>
-        {renderSection()}
-      </main>
+      <main className={styles.content}>{renderSection()}</main>
     </div>
-  )
+  );
 }

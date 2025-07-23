@@ -8,19 +8,21 @@ export async function GET(
   try {
     const supabase = createAdminClient();
     const { id } = await params;
-    
+
     const { data: project, error } = await supabase
       .from('projects')
-      .select(`
+      .select(
+        `
         *,
         company:companies(
           id,
           name
         )
-      `)
+      `
+      )
       .eq('id', id)
       .single();
-    
+
     if (error) {
       console.error('Error fetching project:', error);
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
@@ -39,7 +41,10 @@ export async function GET(
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
-      return NextResponse.json({ error: 'Failed to fetch user profiles' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch user profiles' },
+        { status: 500 }
+      );
     }
 
     // Create profile map and enhance project
@@ -47,13 +52,21 @@ export async function GET(
     const enhancedProject = {
       ...project,
       requested_by_profile: profileMap.get(project.requested_by) || null,
-      assigned_to_profile: project.assigned_to ? profileMap.get(project.assigned_to) || null : null
+      assigned_to_profile: project.assigned_to
+        ? profileMap.get(project.assigned_to) || null
+        : null,
     };
-    
+
     return NextResponse.json(enhancedProject);
   } catch (error) {
     console.error('Error in project GET:', error);
-    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -65,7 +78,7 @@ export async function PUT(
     const supabase = createAdminClient();
     const { id } = await params;
     const body = await request.json();
-    
+
     const {
       name,
       description,
@@ -81,16 +94,19 @@ export async function PUT(
       budget_amount,
       tags,
       notes,
-      primary_file_path
+      primary_file_path,
     } = body;
-    
+
     // Validate required fields
     if (!name || !project_type || !due_date) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: name, project_type, due_date' 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: 'Missing required fields: name, project_type, due_date',
+        },
+        { status: 400 }
+      );
     }
-    
+
     const { data: project, error } = await supabase
       .from('projects')
       .update({
@@ -109,21 +125,26 @@ export async function PUT(
         tags,
         notes,
         primary_file_path: primary_file_path || null,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .select(`
+      .select(
+        `
         *,
         company:companies(
           id,
           name
         )
-      `)
+      `
+      )
       .single();
-    
+
     if (error) {
       console.error('Error updating project:', error);
-      return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to update project' },
+        { status: 500 }
+      );
     }
 
     // Get profiles for the users involved in this project
@@ -139,7 +160,10 @@ export async function PUT(
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
-      return NextResponse.json({ error: 'Failed to fetch user profiles' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch user profiles' },
+        { status: 500 }
+      );
     }
 
     // Create profile map and enhance project
@@ -147,13 +171,21 @@ export async function PUT(
     const enhancedProject = {
       ...project,
       requested_by_profile: profileMap.get(project.requested_by) || null,
-      assigned_to_profile: project.assigned_to ? profileMap.get(project.assigned_to) || null : null
+      assigned_to_profile: project.assigned_to
+        ? profileMap.get(project.assigned_to) || null
+        : null,
     };
-    
+
     return NextResponse.json(enhancedProject);
   } catch (error) {
     console.error('Error in project PUT:', error);
-    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -164,20 +196,26 @@ export async function DELETE(
   try {
     const supabase = createAdminClient();
     const { id } = await params;
-    
-    const { error } = await supabase
-      .from('projects')
-      .delete()
-      .eq('id', id);
-    
+
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+
     if (error) {
       console.error('Error deleting project:', error);
-      return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to delete project' },
+        { status: 500 }
+      );
     }
-    
+
     return NextResponse.json({ message: 'Project deleted successfully' });
   } catch (error) {
     console.error('Error in project DELETE:', error);
-    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
 }

@@ -2,7 +2,11 @@
 
 import React from 'react';
 import { Edit, Trash2, Phone, Mail, MapPin, Building } from 'lucide-react';
-import { Customer, customerStatusOptions, getCustomerStatusColor } from '@/types/customer';
+import {
+  Customer,
+  customerStatusOptions,
+  getCustomerStatusColor,
+} from '@/types/customer';
 import { SortDirection } from '@/types/common';
 import SortableTableHeader from '@/components/Common/SortableTableHeader/SortableTableHeader';
 import styles from './CustomersTable.module.scss';
@@ -19,16 +23,16 @@ interface CustomersTableProps {
   onSort?: (key: string) => void;
 }
 
-const CustomersTable: React.FC<CustomersTableProps> = ({ 
-  customers, 
-  onEdit, 
-  onDelete, 
+const CustomersTable: React.FC<CustomersTableProps> = ({
+  customers,
+  onEdit,
+  onDelete,
   onCustomerClick,
   showActions = true,
   showCompanyColumn = false,
   currentSortKey,
   currentSortDirection,
-  onSort
+  onSort,
 }) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -74,8 +78,8 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
             ) : (
               <th>Name</th>
             )}
-            {showCompanyColumn && (
-              onSort ? (
+            {showCompanyColumn &&
+              (onSort ? (
                 <SortableTableHeader
                   label="Company"
                   sortKey="company"
@@ -85,8 +89,7 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
                 />
               ) : (
                 <th>Company</th>
-              )
-            )}
+              ))}
             <th>Contact</th>
             <th>Location</th>
             {onSort ? (
@@ -117,7 +120,7 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {customers.map((customer) => (
+          {customers.map(customer => (
             <tr key={customer.id} className={styles.row}>
               <td>
                 <div className={styles.customerInfo}>
@@ -125,7 +128,9 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
                     onClick={() => handleCustomerClick(customer)}
                     className={styles.customerName}
                   >
-                    <strong>{customer.first_name} {customer.last_name}</strong>
+                    <strong>
+                      {customer.first_name} {customer.last_name}
+                    </strong>
                   </button>
                   {customer.notes && (
                     <div className={styles.notes}>
@@ -148,7 +153,10 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
                   {customer.email && (
                     <div className={styles.contactItem}>
                       <Mail size={12} />
-                      <a href={`mailto:${customer.email}`} className={styles.contactLink}>
+                      <a
+                        href={`mailto:${customer.email}`}
+                        className={styles.contactLink}
+                      >
                         {customer.email}
                       </a>
                     </div>
@@ -156,7 +164,10 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
                   {customer.phone && (
                     <div className={styles.contactItem}>
                       <Phone size={12} />
-                      <a href={`tel:${customer.phone}`} className={styles.contactLink}>
+                      <a
+                        href={`tel:${customer.phone}`}
+                        className={styles.contactLink}
+                      >
                         {customer.phone}
                       </a>
                     </div>
@@ -169,23 +180,31 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
                     <div className={styles.locationItem}>
                       <MapPin size={12} />
                       <span>
-                        {[customer.city, customer.state].filter(Boolean).join(', ')}
+                        {[customer.city, customer.state]
+                          .filter(Boolean)
+                          .join(', ')}
                       </span>
                     </div>
                   )}
                   {customer.address && (
-                    <div className={styles.address}>
-                      {customer.address}
-                    </div>
+                    <div className={styles.address}>{customer.address}</div>
                   )}
                 </div>
               </td>
               <td>
-                <span 
+                <span
                   className={styles.statusBadge}
-                  style={{ backgroundColor: getCustomerStatusColor(customer.customer_status) }}
+                  style={{
+                    backgroundColor: getCustomerStatusColor(
+                      customer.customer_status
+                    ),
+                  }}
                 >
-                  {customerStatusOptions.find(s => s.value === customer.customer_status)?.label}
+                  {
+                    customerStatusOptions.find(
+                      s => s.value === customer.customer_status
+                    )?.label
+                  }
                 </span>
               </td>
               <td>
@@ -211,14 +230,14 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
               {showActions && (
                 <td>
                   <div className={styles.actions}>
-                    <button 
+                    <button
                       onClick={() => onEdit?.(customer)}
                       className={styles.editButton}
                       title="Edit customer"
                     >
                       <Edit size={16} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => onDelete?.(customer.id)}
                       className={styles.deleteButton}
                       title="Delete customer"

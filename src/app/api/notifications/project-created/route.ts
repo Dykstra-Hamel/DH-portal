@@ -9,7 +9,10 @@ export async function POST(request: NextRequest) {
     const { projectId } = body;
 
     if (!projectId) {
-      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Project ID is required' },
+        { status: 400 }
+      );
     }
 
     const supabase = createAdminClient();
@@ -17,13 +20,15 @@ export async function POST(request: NextRequest) {
     // Get the project with related data
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select(`
+      .select(
+        `
         *,
         company:companies(
           id,
           name
         )
-      `)
+      `
+      )
       .eq('id', projectId)
       .single();
 
@@ -41,7 +46,10 @@ export async function POST(request: NextRequest) {
 
     if (requesterError || !requesterProfile) {
       console.error('Error fetching requester profile:', requesterError);
-      return NextResponse.json({ error: 'Requester profile not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Requester profile not found' },
+        { status: 404 }
+      );
     }
 
     // For testing: hardcode notification to austin@dykstrahamel.com
@@ -55,7 +63,8 @@ export async function POST(request: NextRequest) {
       description: project.description,
       dueDate: project.due_date,
       priority: project.priority,
-      requesterName: `${requesterProfile.first_name} ${requesterProfile.last_name}`.trim(),
+      requesterName:
+        `${requesterProfile.first_name} ${requesterProfile.last_name}`.trim(),
       requesterEmail: requesterProfile.email,
       companyName: project.company.name,
     };
@@ -67,29 +76,41 @@ export async function POST(request: NextRequest) {
     };
 
     const emailPromises: Promise<any>[] = [
-      sendProjectCreatedNotification(testRecipient, projectData)
-        .catch(error => {
-          console.error(`Failed to send email to ${testRecipient.email}:`, error);
+      sendProjectCreatedNotification(testRecipient, projectData).catch(
+        error => {
+          console.error(
+            `Failed to send email to ${testRecipient.email}:`,
+            error
+          );
           return { error: error.message, recipient: testRecipient.email };
-        })
+        }
+      ),
     ];
 
     const results = await Promise.allSettled(emailPromises);
-    
-    const successful = results.filter(result => result.status === 'fulfilled').length;
-    const failed = results.filter(result => result.status === 'rejected').length;
 
-    console.log(`Email notifications sent: ${successful} successful, ${failed} failed`);
+    const successful = results.filter(
+      result => result.status === 'fulfilled'
+    ).length;
+    const failed = results.filter(
+      result => result.status === 'rejected'
+    ).length;
+
+    console.log(
+      `Email notifications sent: ${successful} successful, ${failed} failed`
+    );
 
     return NextResponse.json({
       success: true,
       sent: successful,
       failed: failed,
-      projectId: projectId
+      projectId: projectId,
     });
-
   } catch (error) {
     console.error('Error in project notification API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

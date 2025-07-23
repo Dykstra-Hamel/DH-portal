@@ -1,4 +1,9 @@
-export type CallStatus = 'completed' | 'failed' | 'busy' | 'no_answer' | 'cancelled';
+export type CallStatus =
+  | 'completed'
+  | 'failed'
+  | 'busy'
+  | 'no_answer'
+  | 'cancelled';
 export type CallSentiment = 'positive' | 'negative' | 'neutral';
 
 export interface CallRecord {
@@ -15,7 +20,7 @@ export interface CallRecord {
   recording_url?: string;
   transcript?: string;
   call_analysis?: any; // Raw Retell analysis object
-  
+
   // Extracted structured data
   sentiment?: CallSentiment;
   home_size?: string;
@@ -24,10 +29,10 @@ export interface CallRecord {
   timeline?: string;
   pain_points?: string[];
   decision_maker?: string;
-  
+
   disconnect_reason?: string;
   retell_variables?: any;
-  
+
   created_at: string;
   updated_at: string;
 }

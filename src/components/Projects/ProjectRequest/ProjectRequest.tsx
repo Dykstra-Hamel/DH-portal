@@ -22,14 +22,15 @@ interface ProjectRequestProps {
   onProjectCreated?: () => void;
 }
 
-const ProjectRequest: React.FC<ProjectRequestProps> = ({ user, profile, selectedCompany, onProjectCreated }) => {
+const ProjectRequest: React.FC<ProjectRequestProps> = ({
+  user,
+  profile,
+  selectedCompany,
+  onProjectCreated,
+}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const {
-    createProject,
-    error,
-    clearError
-  } = useProjects();
+  const { createProject, error, clearError } = useProjects();
 
   // Convert profile to User format expected by ProjectForm
   const currentUserProfile: User = {
@@ -39,8 +40,8 @@ const ProjectRequest: React.FC<ProjectRequestProps> = ({ user, profile, selected
       id: profile.id,
       first_name: profile.first_name,
       last_name: profile.last_name,
-      email: profile.email
-    }
+      email: profile.email,
+    },
   };
 
   const handleSubmit = async (formData: ProjectFormData) => {
@@ -64,9 +65,12 @@ const ProjectRequest: React.FC<ProjectRequestProps> = ({ user, profile, selected
       <div className={styles.header}>
         <div>
           <h2>Request New Project</h2>
-          <p>Submit a project request{selectedCompany ? ` for ${selectedCompany.name}` : ''}.</p>
+          <p>
+            Submit a project request
+            {selectedCompany ? ` for ${selectedCompany.name}` : ''}.
+          </p>
         </div>
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className={styles.requestButton}
           disabled={!selectedCompany}

@@ -1,39 +1,39 @@
-'use client'
+'use client';
 
-import { User } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import AccountLinking from '@/components/AccountLinking/AccountLinking'
-import styles from './Dashboard.module.scss'
+import { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
+import AccountLinking from '@/components/AccountLinking/AccountLinking';
+import styles from './Dashboard.module.scss';
 
 interface Profile {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  role?: string
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role?: string;
 }
 
 interface Company {
-  id: string
-  name: string
+  id: string;
+  name: string;
 }
 
 interface UserCompany {
-  id: string
-  user_id: string
-  company_id: string
-  role: string
-  is_primary: boolean
-  companies: Company
+  id: string;
+  user_id: string;
+  company_id: string;
+  role: string;
+  is_primary: boolean;
+  companies: Company;
 }
 
 interface DashboardProps {
-  user: User
-  profile: Profile
-  userCompanies: UserCompany[]
-  selectedCompany: Company | null
-  onCompanyChange: (company: Company) => void
+  user: User;
+  profile: Profile;
+  userCompanies: UserCompany[];
+  selectedCompany: Company | null;
+  onCompanyChange: (company: Company) => void;
 }
 
 export default function Dashboard({
@@ -41,26 +41,28 @@ export default function Dashboard({
   profile,
   userCompanies,
   selectedCompany,
-  onCompanyChange
+  onCompanyChange,
 }: DashboardProps) {
-  const router = useRouter()
+  const router = useRouter();
 
   const handleSignOut = async () => {
-    const supabase = createClient()
-    const { error } = await supabase.auth.signOut()
+    const supabase = createClient();
+    const { error } = await supabase.auth.signOut();
     if (error) {
-      console.error('Error signing out:', error)
+      console.error('Error signing out:', error);
     } else {
-      router.push('/login')
+      router.push('/login');
     }
-  }
+  };
 
   const handleCompanyChange = (companyId: string) => {
-    const company = userCompanies.find(uc => uc.companies.id === companyId)?.companies
+    const company = userCompanies.find(
+      uc => uc.companies.id === companyId
+    )?.companies;
     if (company) {
-      onCompanyChange(company)
+      onCompanyChange(company);
     }
-  }
+  };
 
   return (
     <div className={styles.dashboard}>
@@ -69,8 +71,8 @@ export default function Dashboard({
           <h1 className={styles.title}>Dashboard</h1>
           <div className={styles.headerActions}>
             {profile.role === 'admin' && (
-              <button 
-                onClick={() => router.push('/admin')} 
+              <button
+                onClick={() => router.push('/admin')}
                 className={styles.adminButton}
               >
                 Admin Dashboard
@@ -86,24 +88,31 @@ export default function Dashboard({
       <main className={styles.main}>
         <div className={styles.welcomeSection}>
           <h2 className={styles.welcome}>
-            Welcome, {profile.first_name || user.user_metadata?.first_name || 'User'}!
+            Welcome,{' '}
+            {profile.first_name || user.user_metadata?.first_name || 'User'}!
           </h2>
-          
+
           {selectedCompany && (
             <div className={styles.companySection}>
               {userCompanies.length > 1 ? (
                 <div className={styles.companySelector}>
-                  <label htmlFor="company-select" className={styles.companyLabel}>
+                  <label
+                    htmlFor="company-select"
+                    className={styles.companyLabel}
+                  >
                     Company:
                   </label>
                   <select
                     id="company-select"
                     value={selectedCompany.id}
-                    onChange={(e) => handleCompanyChange(e.target.value)}
+                    onChange={e => handleCompanyChange(e.target.value)}
                     className={styles.companySelect}
                   >
-                    {userCompanies.map((userCompany) => (
-                      <option key={userCompany.companies.id} value={userCompany.companies.id}>
+                    {userCompanies.map(userCompany => (
+                      <option
+                        key={userCompany.companies.id}
+                        value={userCompany.companies.id}
+                      >
                         {userCompany.companies.name}
                       </option>
                     ))}
@@ -111,7 +120,9 @@ export default function Dashboard({
                 </div>
               ) : (
                 <div className={styles.singleCompany}>
-                  <span className={styles.companyName}>{selectedCompany.name}</span>
+                  <span className={styles.companyName}>
+                    {selectedCompany.name}
+                  </span>
                 </div>
               )}
             </div>
@@ -129,7 +140,9 @@ export default function Dashboard({
             <h3>Dashboard Content</h3>
             <p>This is where your dashboard content will go.</p>
             {selectedCompany && (
-              <p>Currently viewing: <strong>{selectedCompany.name}</strong></p>
+              <p>
+                Currently viewing: <strong>{selectedCompany.name}</strong>
+              </p>
             )}
           </div>
 
@@ -139,5 +152,5 @@ export default function Dashboard({
         </div>
       </main>
     </div>
-  )
+  );
 }

@@ -12,17 +12,17 @@ interface LeadsTabsProps {
   leadCounts: Record<ActiveLeadStatus | 'all', number>;
 }
 
-const LeadsTabs: React.FC<LeadsTabsProps> = ({ 
-  activeTab, 
-  onTabChange, 
-  leadCounts 
+const LeadsTabs: React.FC<LeadsTabsProps> = ({
+  activeTab,
+  onTabChange,
+  leadCounts,
 }) => {
   // Only show active lead statuses
   const activeLeadStatusOptions = [
     { value: 'new', label: 'New' },
     { value: 'contacted', label: 'Contacted' },
     { value: 'qualified', label: 'Qualified' },
-    { value: 'quoted', label: 'Quoted' }
+    { value: 'quoted', label: 'Quoted' },
   ];
 
   const tabs = [
@@ -30,14 +30,14 @@ const LeadsTabs: React.FC<LeadsTabsProps> = ({
     ...activeLeadStatusOptions.map(status => ({
       key: status.value as ActiveLeadStatus,
       label: status.label,
-      count: leadCounts[status.value as ActiveLeadStatus]
-    }))
+      count: leadCounts[status.value as ActiveLeadStatus],
+    })),
   ];
 
   return (
     <div className={styles.tabsContainer}>
       <div className={styles.tabsList}>
-        {tabs.map((tab) => (
+        {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => onTabChange(tab.key)}

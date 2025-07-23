@@ -41,7 +41,7 @@
 
 .clickableRow {
   cursor: pointer;
-  
+
   &:hover {
     background-color: #f0f9ff !important;
   }
@@ -56,7 +56,7 @@
 
 .customerInfo {
   max-width: 200px;
-  
+
   strong {
     display: block;
     margin-bottom: 4px;
@@ -71,7 +71,7 @@
   font-size: 12px;
   color: #6b7280;
   margin-bottom: 2px;
-  
+
   svg {
     opacity: 0.7;
   }
@@ -84,7 +84,7 @@
 
 .companyInfo {
   max-width: 150px;
-  
+
   strong {
     color: #1f2937;
     font-weight: 600;
@@ -115,7 +115,7 @@
 
 .serviceInfo {
   max-width: 150px;
-  
+
   .comments {
     font-size: 12px;
     color: #6b7280;
@@ -130,7 +130,7 @@
   gap: 6px;
   color: #374151;
   font-size: 13px;
-  
+
   svg {
     opacity: 0.7;
   }
@@ -147,7 +147,7 @@
   gap: 4px;
   font-weight: 500;
   color: #059669;
-  
+
   svg {
     opacity: 0.7;
   }
@@ -159,7 +159,7 @@
   gap: 4px;
   color: #6b7280;
   font-size: 13px;
-  
+
   svg {
     opacity: 0.7;
   }
@@ -186,7 +186,7 @@
 .editButton {
   background-color: #3b82f6;
   color: white;
-  
+
   &:hover {
     background-color: #2563eb;
   }
@@ -195,7 +195,7 @@
 .deleteButton {
   background-color: #ef4444;
   color: white;
-  
+
   &:hover {
     background-color: #dc2626;
   }
@@ -206,7 +206,7 @@
   text-align: center;
   color: #6b7280;
   font-style: italic;
-  
+
   p {
     margin: 0;
     font-size: 16px;

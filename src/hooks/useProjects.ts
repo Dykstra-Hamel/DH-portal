@@ -9,31 +9,47 @@ export const useProjects = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProjects = useCallback(async (filters: ProjectFilters = { status: '', priority: '', companyId: '' }) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const data = await adminAPI.getProjects(filters);
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      setError('Failed to load projects. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const fetchProjects = useCallback(
+    async (
+      filters: ProjectFilters = { status: '', priority: '', companyId: '' }
+    ) => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const data = await adminAPI.getProjects(filters);
+        setProjects(data || []);
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        setError('Failed to load projects. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
 
   const createProject = useCallback(async (projectData: ProjectFormData) => {
     try {
       const processedData = {
         ...projectData,
-        estimated_hours: projectData.estimated_hours ? parseFloat(projectData.estimated_hours) : null,
-        actual_hours: projectData.actual_hours ? parseFloat(projectData.actual_hours) : null,
-        budget_amount: projectData.budget_amount ? parseFloat(projectData.budget_amount) : null,
-        tags: projectData.tags ? projectData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : null,
+        estimated_hours: projectData.estimated_hours
+          ? parseFloat(projectData.estimated_hours)
+          : null,
+        actual_hours: projectData.actual_hours
+          ? parseFloat(projectData.actual_hours)
+          : null,
+        budget_amount: projectData.budget_amount
+          ? parseFloat(projectData.budget_amount)
+          : null,
+        tags: projectData.tags
+          ? projectData.tags
+              .split(',')
+              .map(tag => tag.trim())
+              .filter(Boolean)
+          : null,
         start_date: projectData.start_date || null,
-        completion_date: projectData.completion_date || null
+        completion_date: projectData.completion_date || null,
       };
 
       const savedProject = await adminAPI.createProject(processedData);
@@ -45,28 +61,45 @@ export const useProjects = () => {
     }
   }, []);
 
-  const updateProject = useCallback(async (projectId: string, projectData: ProjectFormData) => {
-    try {
-      const processedData = {
-        ...projectData,
-        estimated_hours: projectData.estimated_hours ? parseFloat(projectData.estimated_hours) : null,
-        actual_hours: projectData.actual_hours ? parseFloat(projectData.actual_hours) : null,
-        budget_amount: projectData.budget_amount ? parseFloat(projectData.budget_amount) : null,
-        tags: projectData.tags ? projectData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : null,
-        start_date: projectData.start_date || null,
-        completion_date: projectData.completion_date || null
-      };
+  const updateProject = useCallback(
+    async (projectId: string, projectData: ProjectFormData) => {
+      try {
+        const processedData = {
+          ...projectData,
+          estimated_hours: projectData.estimated_hours
+            ? parseFloat(projectData.estimated_hours)
+            : null,
+          actual_hours: projectData.actual_hours
+            ? parseFloat(projectData.actual_hours)
+            : null,
+          budget_amount: projectData.budget_amount
+            ? parseFloat(projectData.budget_amount)
+            : null,
+          tags: projectData.tags
+            ? projectData.tags
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(Boolean)
+            : null,
+          start_date: projectData.start_date || null,
+          completion_date: projectData.completion_date || null,
+        };
 
-      const updatedProject = await adminAPI.updateProject(projectId, processedData);
-      setProjects(prevProjects => 
-        prevProjects.map(p => p.id === projectId ? updatedProject : p)
-      );
-      return updatedProject;
-    } catch (error) {
-      console.error('Error updating project:', error);
-      throw new Error('Failed to update project');
-    }
-  }, []);
+        const updatedProject = await adminAPI.updateProject(
+          projectId,
+          processedData
+        );
+        setProjects(prevProjects =>
+          prevProjects.map(p => (p.id === projectId ? updatedProject : p))
+        );
+        return updatedProject;
+      } catch (error) {
+        console.error('Error updating project:', error);
+        throw new Error('Failed to update project');
+      }
+    },
+    []
+  );
 
   const deleteProject = useCallback(async (projectId: string) => {
     try {
@@ -90,6 +123,6 @@ export const useProjects = () => {
     createProject,
     updateProject,
     deleteProject,
-    clearError
+    clearError,
   };
 };

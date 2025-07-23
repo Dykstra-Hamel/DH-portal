@@ -4,7 +4,6 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function GET(request: NextRequest) {
   try {
-    
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
@@ -19,11 +18,12 @@ export async function GET(request: NextRequest) {
 
     // Use admin client to fetch leads
     const supabase = createAdminClient();
-    
+
     // Build query - filter to active leads only by default
     let query = supabase
       .from('leads')
-      .select(`
+      .select(
+        `
         *,
         customer:customers(
           id,
@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
           id,
           name
         )
-      `)
+      `
+      )
       .in('lead_status', ['new', 'contacted', 'qualified', 'quoted'])
       .order('created_at', { ascending: false });
 
@@ -52,10 +53,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: leads, error } = await query;
-    
+
     if (error) {
       console.error('Admin Leads API: Error fetching leads:', error);
-      return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to fetch leads' },
+        { status: 500 }
+      );
     }
 
     if (!leads || leads.length === 0) {
@@ -79,8 +83,14 @@ export async function GET(request: NextRequest) {
         .in('id', Array.from(userIds));
 
       if (profilesError) {
-        console.error('Admin Leads API: Error fetching profiles:', profilesError);
-        return NextResponse.json({ error: 'Failed to fetch user profiles' }, { status: 500 });
+        console.error(
+          'Admin Leads API: Error fetching profiles:',
+          profilesError
+        );
+        return NextResponse.json(
+          { error: 'Failed to fetch user profiles' },
+          { status: 500 }
+        );
       }
 
       profiles = profilesData || [];
@@ -92,19 +102,23 @@ export async function GET(request: NextRequest) {
     // Enhance leads with profile data
     const enhancedLeads = leads.map(lead => ({
       ...lead,
-      assigned_user: lead.assigned_to ? profileMap.get(lead.assigned_to) || null : null
+      assigned_user: lead.assigned_to
+        ? profileMap.get(lead.assigned_to) || null
+        : null,
     }));
-    
+
     return NextResponse.json(enhancedLeads);
   } catch (error) {
     console.error('Admin Leads API: Internal error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
@@ -115,21 +129,27 @@ export async function POST(request: NextRequest) {
 
     // Use admin client to create lead
     const supabase = createAdminClient();
-    
+
     const { data: lead, error } = await supabase
       .from('leads')
       .insert([body])
       .select()
       .single();
-    
+
     if (error) {
       console.error('Admin Leads API: Error creating lead:', error);
-      return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to create lead' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(lead, { status: 201 });
   } catch (error) {
     console.error('Admin Leads API: Internal error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

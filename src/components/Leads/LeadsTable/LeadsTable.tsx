@@ -2,7 +2,13 @@
 
 import React from 'react';
 import { Edit, Trash2, Calendar, User, Phone, Mail } from 'lucide-react';
-import { Lead, leadSourceOptions, leadTypeOptions, leadStatusOptions, leadPriorityOptions } from '@/types/lead';
+import {
+  Lead,
+  leadSourceOptions,
+  leadTypeOptions,
+  leadStatusOptions,
+  leadPriorityOptions,
+} from '@/types/lead';
 import { useRouter } from 'next/navigation';
 import styles from './LeadsTable.module.scss';
 
@@ -14,15 +20,15 @@ interface LeadsTableProps {
   showCompanyColumn?: boolean;
 }
 
-const LeadsTable: React.FC<LeadsTableProps> = ({ 
-  leads, 
-  onEdit, 
-  onDelete, 
+const LeadsTable: React.FC<LeadsTableProps> = ({
+  leads,
+  onEdit,
+  onDelete,
   showActions = true,
-  showCompanyColumn = false 
+  showCompanyColumn = false,
 }) => {
   const router = useRouter();
-  
+
   const handleRowClick = (leadId: string, event: React.MouseEvent) => {
     // Don't navigate if clicking on action buttons
     if ((event.target as HTMLElement).closest(`.${styles.actions}`)) {
@@ -32,23 +38,23 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
   };
   const getStatusColor = (status: string) => {
     const statusColorMap: { [key: string]: string } = {
-      'new': '#3b82f6',
-      'contacted': '#f59e0b',
-      'qualified': '#06b6d4',
-      'quoted': '#8b5cf6',
-      'won': '#10b981',
-      'lost': '#ef4444',
-      'unqualified': '#6b7280'
+      new: '#3b82f6',
+      contacted: '#f59e0b',
+      qualified: '#06b6d4',
+      quoted: '#8b5cf6',
+      won: '#10b981',
+      lost: '#ef4444',
+      unqualified: '#6b7280',
     };
     return statusColorMap[status] || '#6b7280';
   };
 
   const getPriorityColor = (priority: string) => {
     const priorityColorMap: { [key: string]: string } = {
-      'low': '#10b981',
-      'medium': '#f59e0b',
-      'high': '#ef4444',
-      'urgent': '#dc2626'
+      low: '#10b981',
+      medium: '#f59e0b',
+      high: '#ef4444',
+      urgent: '#dc2626',
     };
     return priorityColorMap[priority] || '#6b7280';
   };
@@ -89,17 +95,19 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {leads.map((lead) => (
-            <tr 
-              key={lead.id} 
+          {leads.map(lead => (
+            <tr
+              key={lead.id}
               className={styles.clickableRow}
-              onClick={(e) => handleRowClick(lead.id, e)}
+              onClick={e => handleRowClick(lead.id, e)}
             >
               <td>
                 <div className={styles.customerInfo}>
                   {lead.customer ? (
                     <div>
-                      <strong>{lead.customer.first_name} {lead.customer.last_name}</strong>
+                      <strong>
+                        {lead.customer.first_name} {lead.customer.last_name}
+                      </strong>
                       {lead.customer.email && (
                         <div className={styles.contactInfo}>
                           <Mail size={12} />
@@ -114,20 +122,27 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                       )}
                     </div>
                   ) : (
-                    <span className={styles.noCustomer}>No customer linked</span>
+                    <span className={styles.noCustomer}>
+                      No customer linked
+                    </span>
                   )}
                 </div>
               </td>
               {showCompanyColumn && (
                 <td>
                   <div className={styles.companyInfo}>
-                    <strong>{(lead as any).company?.name || 'Unknown Company'}</strong>
+                    <strong>
+                      {(lead as any).company?.name || 'Unknown Company'}
+                    </strong>
                   </div>
                 </td>
               )}
               <td>
                 <span className={styles.sourceBadge}>
-                  {leadSourceOptions.find(s => s.value === lead.lead_source)?.label}
+                  {
+                    leadSourceOptions.find(s => s.value === lead.lead_source)
+                      ?.label
+                  }
                 </span>
               </td>
               <td>
@@ -136,19 +151,25 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                 </span>
               </td>
               <td>
-                <span 
+                <span
                   className={styles.statusBadge}
                   style={{ backgroundColor: getStatusColor(lead.lead_status) }}
                 >
-                  {leadStatusOptions.find(s => s.value === lead.lead_status)?.label}
+                  {
+                    leadStatusOptions.find(s => s.value === lead.lead_status)
+                      ?.label
+                  }
                 </span>
               </td>
               <td>
-                <span 
+                <span
                   className={styles.priorityBadge}
                   style={{ backgroundColor: getPriorityColor(lead.priority) }}
                 >
-                  {leadPriorityOptions.find(p => p.value === lead.priority)?.label}
+                  {
+                    leadPriorityOptions.find(p => p.value === lead.priority)
+                      ?.label
+                  }
                 </span>
               </td>
               <td>
@@ -166,7 +187,8 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                 {lead.assigned_user ? (
                   <div className={styles.userInfo}>
                     <User size={14} />
-                    {lead.assigned_user.first_name} {lead.assigned_user.last_name}
+                    {lead.assigned_user.first_name}{' '}
+                    {lead.assigned_user.last_name}
                   </div>
                 ) : (
                   <span className={styles.unassigned}>Unassigned</span>
@@ -196,14 +218,14 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
               {showActions && (
                 <td>
                   <div className={styles.actions}>
-                    <button 
+                    <button
                       onClick={() => onEdit?.(lead)}
                       className={styles.editButton}
                       title="Edit lead"
                     >
                       <Edit size={16} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => onDelete?.(lead.id)}
                       className={styles.deleteButton}
                       title="Delete lead"

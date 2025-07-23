@@ -80,8 +80,12 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .statusMessage {
@@ -142,7 +146,7 @@
 
   &.withPreview {
     grid-template-columns: 1fr auto;
-    
+
     @media (max-width: 1024px) {
       grid-template-columns: 1fr;
     }
@@ -198,7 +202,9 @@
     font-size: 14px;
   }
 
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #d1d5db;
@@ -212,7 +218,7 @@
       box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
     }
 
-    &[type="checkbox"] {
+    &[type='checkbox'] {
       width: auto;
       margin-right: 10px;
     }
@@ -233,12 +239,26 @@
   line-height: 1.4;
 }
 
+.readOnlyField {
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #374151;
+  
+  strong {
+    font-weight: 600;
+    color: #1f2937;
+  }
+}
+
 .colorInput {
   display: flex;
   gap: 12px;
   align-items: center;
 
-  input[type="color"] {
+  input[type='color'] {
     width: 50px;
     height: 40px;
     padding: 4px;
@@ -247,9 +267,96 @@
     cursor: pointer;
   }
 
-  input[type="text"] {
+  input[type='text'] {
     flex: 1;
     font-family: monospace;
+  }
+}
+
+.colorSource {
+  font-size: 12px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 8px;
+  font-style: italic;
+}
+
+.colorGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.brandColorsSection {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.resetBrandButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: #4f46e5;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.brandColorsNote {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.colorInputWithReset {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.individualResetButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #e5e7eb;
+    color: #374151;
+    border-color: #9ca3af;
+  }
+
+  &:active {
+    background: #d1d5db;
   }
 }
 
@@ -367,7 +474,9 @@
 }
 
 .knowledgeTextarea {
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+    monospace;
   font-size: 13px;
   line-height: 1.6;
   min-height: 400px;
@@ -382,7 +491,9 @@
 
   code {
     display: block;
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-family:
+      'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas,
+      'Courier New', monospace;
     font-size: 13px;
     line-height: 1.6;
     color: #1e293b;
@@ -410,6 +521,33 @@
   &:hover {
     background: #0056b3;
   }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.embedCodeGroup {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  h4 {
+    margin: 0 0 8px 0;
+    color: #1f2937;
+    font-size: 16px;
+    font-weight: 600;
+  }
+}
+
+.embedDescription {
+  margin: 0 0 12px 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .previewSection {

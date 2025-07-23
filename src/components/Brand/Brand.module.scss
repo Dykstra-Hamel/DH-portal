@@ -3,7 +3,8 @@
   margin: 0 auto;
   padding: 0;
   background: white;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .heroSection {
@@ -15,7 +16,7 @@
 
 .heroGradient {
   // Fallback gradient - will be overridden by inline styles with brand colors
-  background: linear-gradient(135deg, #A8B5C8 0%, #F5A623 100%);
+  background: linear-gradient(135deg, #a8b5c8 0%, #f5a623 100%);
   height: 100%;
   display: flex;
   align-items: center;
@@ -26,24 +27,26 @@
 .heroLogo {
   max-height: 120px;
   max-width: 300px;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
 }
 
 .contentSection {
   padding: 60px 80px;
   border-bottom: 1px solid #f0f0f0;
-  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-  
+  transition:
+    opacity 0.8s ease-out,
+    transform 0.8s ease-out;
+
   &:last-child {
     border-bottom: none;
   }
-  
+
   // Animation states
   &.hidden {
     opacity: 0;
     transform: translateY(30px);
   }
-  
+
   &.visible {
     opacity: 1;
     transform: translateY(0);
@@ -52,7 +55,7 @@
 
 .sectionHeader {
   margin-bottom: 40px;
-  
+
   h1 {
     font-size: 48px;
     font-weight: 700;
@@ -72,7 +75,7 @@
 
 .guidelinesContent {
   margin-bottom: 60px;
-  
+
   p {
     font-size: 16px;
     color: #555;
@@ -94,10 +97,10 @@
   list-style: none;
   padding: 0;
   margin: 0;
-  
+
   li {
     border-bottom: 1px solid #f0f0f0;
-    
+
     &:last-child {
       border-bottom: none;
     }
@@ -111,8 +114,10 @@
   font-size: 20px;
   color: #555;
   text-decoration: none;
-  transition: color 0.2s ease, background-color 0.2s ease;
-  
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
+
   &:hover {
     color: #333;
     background-color: #f8f9fa;
@@ -124,7 +129,7 @@
 }
 
 .number {
-  color: #F5A623;
+  color: #f5a623;
   font-weight: 600;
   font-size: 18px;
   margin-right: 20px;
@@ -132,7 +137,7 @@
 }
 
 .sectionNumber {
-  color: #F5A623;
+  color: #f5a623;
   font-size: 72px;
   font-weight: 700;
   line-height: 1;
@@ -168,7 +173,7 @@
   padding: 60px;
   border-radius: 8px;
   text-align: center;
-  
+
   img {
     max-height: 200px;
     max-width: 100%;
@@ -177,7 +182,7 @@
 
 .colorSection {
   margin-bottom: 40px;
-  
+
   h3 {
     font-size: 24px;
     font-weight: 600;
@@ -208,7 +213,7 @@
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border: 3px solid #fff;
 }
 
@@ -219,7 +224,7 @@
     color: #2c3e50;
     margin: 0 0 10px 0;
   }
-  
+
   p {
     font-size: 14px;
     color: #666;
@@ -231,7 +236,7 @@
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid #f0f0f0;
-  
+
   p {
     font-size: 12px;
     color: #888;
@@ -277,10 +282,10 @@
 }
 
 .fontLink {
-  color: #F5A623;
+  color: #f5a623;
   text-decoration: none;
   font-weight: 500;
-  
+
   &:hover {
     text-decoration: underline;
   }
@@ -304,13 +309,15 @@
   height: 250px;
   object-fit: contain;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   background-color: #f8f9fa;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+
   &:hover {
     transform: scale(1.02);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
   }
 }
 
@@ -319,34 +326,34 @@
   .contentSection {
     padding: 40px 20px;
   }
-  
+
   .sectionHeader h1 {
     font-size: 36px;
   }
-  
+
   .sectionNumber {
     font-size: 48px;
   }
-  
+
   .contentSection h2 {
     font-size: 28px;
   }
-  
+
   .colorGrid {
     grid-template-columns: 1fr;
     gap: 20px;
   }
-  
+
   .colorCircle {
     width: 80px;
     height: 80px;
   }
-  
+
   .typographyGrid {
     grid-template-columns: 1fr;
     gap: 30px;
   }
-  
+
   .photographyGrid {
     grid-template-columns: 1fr;
   }
@@ -400,9 +407,11 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
   z-index: 1001;
-  
+
   &:hover {
     background: rgba(255, 255, 255, 1);
     transform: scale(1.1);
@@ -427,7 +436,7 @@
     height: 35px;
     font-size: 20px;
   }
-  
+
   .lightboxContent {
     max-width: 95vw;
     max-height: 95vh;

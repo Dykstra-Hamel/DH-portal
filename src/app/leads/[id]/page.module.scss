@@ -26,7 +26,7 @@
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover {
     background: #f3f4f6;
     border-color: #9ca3af;
@@ -60,11 +60,11 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover:not(:disabled) {
     background: #059669;
   }
-  
+
   &:disabled {
     background: #9ca3af;
     cursor: not-allowed;
@@ -85,7 +85,7 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover {
     background: #2563eb;
   }
@@ -110,11 +110,11 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover:not(:disabled) {
     background: #059669;
   }
-  
+
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -134,7 +134,7 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
-  
+
   &:hover {
     background: #4b5563;
   }
@@ -185,7 +185,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  
+
   label {
     font-size: 12px;
     font-weight: 600;
@@ -193,7 +193,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
-  
+
   span {
     font-size: 14px;
     color: #374151;
@@ -236,7 +236,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-  
+
   svg {
     color: #6b7280;
   }
@@ -251,7 +251,7 @@
   font-weight: 500;
   text-decoration: none;
   transition: color 0.2s;
-  
+
   &:hover {
     color: #2563eb;
     text-decoration: underline;
@@ -264,17 +264,17 @@
   gap: 8px;
   font-size: 14px;
   color: #374151;
-  
+
   svg {
     color: #6b7280;
     flex-shrink: 0;
   }
-  
+
   a {
     color: #3b82f6;
     text-decoration: none;
     transition: color 0.2s;
-    
+
     &:hover {
       color: #2563eb;
       text-decoration: underline;
@@ -287,7 +287,7 @@
   color: #6b7280;
   font-style: italic;
   padding: 20px;
-  
+
   p {
     margin: 0;
   }
@@ -298,7 +298,7 @@
   align-items: center;
   gap: 8px;
   color: #374151;
-  
+
   svg {
     color: #6b7280;
   }
@@ -314,7 +314,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  
+
   p {
     margin: 0;
     font-size: 14px;
@@ -325,7 +325,7 @@
 
 .commentEntry {
   margin-bottom: 12px;
-  
+
   &:last-child {
     margin-bottom: 0;
   }
@@ -351,10 +351,10 @@
   font-size: 14px;
   color: #374151;
   line-height: 1.5;
-  
+
   div {
     margin-bottom: 4px;
-    
+
     &:last-child {
       margin-bottom: 0;
     }
@@ -378,7 +378,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  
+
   label {
     font-size: 12px;
     font-weight: 600;
@@ -398,13 +398,13 @@
   color: #374151;
   background: white;
   transition: all 0.2s;
-  
+
   &:focus {
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
   }
-  
+
   &::placeholder {
     color: #9ca3af;
   }
@@ -428,7 +428,7 @@
   padding: 40px 24px;
   text-align: center;
   color: #ef4444;
-  
+
   h2 {
     font-size: 1.5rem;
     margin-bottom: 16px;
@@ -441,17 +441,17 @@
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  
+
   .container {
     padding: 16px;
   }
-  
+
   .header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-  
+
   .header h1 {
     font-size: 1.5rem;
   }
@@ -463,7 +463,7 @@
     align-items: flex-start;
     gap: 4px;
   }
-  
+
   .contactItem {
     flex-direction: column;
     align-items: flex-start;
