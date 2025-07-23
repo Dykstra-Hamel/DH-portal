@@ -25,14 +25,12 @@ export interface LeadNotificationData {
   pestIssue: string;
   address: string;
   homeSize?: number;
-  urgency: string;
   estimatedPrice?: {
     min: number;
     max: number;
     service_type: string;
   };
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  leadScore: number;
   autoCallEnabled: boolean;
   submittedAt: string;
 }

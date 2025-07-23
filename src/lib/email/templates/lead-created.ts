@@ -12,10 +12,8 @@ export function generateLeadCreatedEmailTemplate(
     pestIssue,
     address,
     homeSize,
-    urgency,
     estimatedPrice,
     priority,
-    leadScore,
     autoCallEnabled,
     submittedAt
   } = leadData;
@@ -77,22 +75,22 @@ export function generateLeadCreatedEmailTemplate(
             
             <div style="display: grid; gap: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
-                <span style="font-weight: 500; color: #64748b;">Name:</span>
+                <span style="font-weight: 500; color: #64748b;">Name: </span>
                 <span style="color: #1e293b;">${customerName}</span>
               </div>
               
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
-                <span style="font-weight: 500; color: #64748b;">Email:</span>
+                <span style="font-weight: 500; color: #64748b;">Email: </span>
                 <a href="mailto:${customerEmail}" style="color: #007bff; text-decoration: none;">${customerEmail}</a>
               </div>
               
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
-                <span style="font-weight: 500; color: #64748b;">Phone:</span>
+                <span style="font-weight: 500; color: #64748b;">Phone: </span>
                 <a href="tel:${customerPhone}" style="color: #007bff; text-decoration: none;">${customerPhone}</a>
               </div>
               
               <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0;">
-                <span style="font-weight: 500; color: #64748b;">Address:</span>
+                <span style="font-weight: 500; color: #64748b;">Address: </span>
                 <span style="color: #1e293b; text-align: right; max-width: 300px;">${address}</span>
               </div>
             </div>
@@ -106,7 +104,7 @@ export function generateLeadCreatedEmailTemplate(
             
             <div style="display: grid; gap: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
-                <span style="font-weight: 500; color: #64748b;">Pest Issue:</span>
+                <span style="font-weight: 500; color: #64748b;">Pest Issue: </span>
                 <span style="color: #1e293b;">${pestIssue}</span>
               </div>
               
@@ -116,11 +114,6 @@ export function generateLeadCreatedEmailTemplate(
                   <span style="color: #1e293b;">${homeSize.toLocaleString()} sq ft</span>
                 </div>
               ` : ''}
-              
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
-                <span style="font-weight: 500; color: #64748b;">Urgency:</span>
-                <span style="color: #1e293b;">${urgency}</span>
-              </div>
               
               ${estimatedPrice ? `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
@@ -132,25 +125,6 @@ export function generateLeadCreatedEmailTemplate(
           </div>
 
           <!-- Lead Metrics -->
-          <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-            <div style="flex: 1; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; text-align: center;">
-              <div style="font-size: 24px; font-weight: 700; color: ${priorityColor}; margin-bottom: 4px;">
-                ${priority.toUpperCase()}
-              </div>
-              <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
-                Priority
-              </div>
-            </div>
-            
-            <div style="flex: 1; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; text-align: center;">
-              <div style="font-size: 24px; font-weight: 700; color: #007bff; margin-bottom: 4px;">
-                ${leadScore}/100
-              </div>
-              <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
-                Lead Score
-              </div>
-            </div>
-          </div>
 
           <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
             <p style="margin: 0; font-size: 14px; color: #64748b; text-align: center;">
