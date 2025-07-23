@@ -36,7 +36,6 @@ interface WidgetSubmission {
     zip: string
   }
   homeSize: number
-  urgency: string
   contactInfo: {
     name: string
     phone: string
@@ -147,50 +146,20 @@ export async function POST(request: NextRequest) {
       customerId = newCustomer.id
     }
 
-    // Simple lead scoring based on form completion and urgency
-    let leadScore = 0
-    
-    // Base score for completion
-    if (submission.pestIssue) leadScore += 25
-    if (submission.address) leadScore += 20
-    if (submission.contactInfo?.name) leadScore += 20
-    if (submission.contactInfo?.phone) leadScore += 20
-    if (submission.contactInfo?.email) leadScore += 15
-    
-    // Urgency scoring
-    if (submission.urgency) {
-      const urgencyLower = submission.urgency.toLowerCase()
-      if (urgencyLower.includes('asap') || urgencyLower.includes('urgent') || urgencyLower.includes('immediately')) {
-        leadScore += 20
-      } else if (urgencyLower.includes('soon') || urgencyLower.includes('week')) {
-        leadScore += 15
-      } else if (urgencyLower.includes('month')) {
-        leadScore += 10
-      } else {
-        leadScore += 5
-      }
-    }
+    // Set priority to medium for all leads
+    const priority = 'medium'
 
-    // Determine lead priority based on score
-    let priority: 'low' | 'medium' | 'high' | 'urgent'
-    if (leadScore >= 85) priority = 'urgent'
-    else if (leadScore >= 70) priority = 'high'
-    else if (leadScore >= 55) priority = 'medium'
-    else priority = 'low'
-
-    // Determine lead status based on urgency
+    // Set lead status to new lead
     const status: 'new' | 'contacted' | 'quoted' | 'won' | 'lost' | 'unqualified' = 'new'
 
     // Create lead notes
     let notes = `Widget Submission:\n`
     notes += `Pest Issue: ${submission.pestIssue}\n`
     if (submission.homeSize) notes += `Home Size: ${submission.homeSize} sq ft\n`
-    notes += `Urgency: ${submission.urgency}\n`
     if (submission.address) notes += `Address: ${submission.address}\n`
     if (submission.estimatedPrice) {
       notes += `Estimated Price: $${submission.estimatedPrice.min} - $${submission.estimatedPrice.max} (${submission.estimatedPrice.service_type})\n`
     }
-    notes += `Lead Score: ${leadScore}/100`
 
     // Create lead
     const { data: lead, error: leadError } = await supabase
@@ -278,10 +247,8 @@ export async function POST(request: NextRequest) {
             pestIssue: submission.pestIssue,
             address: submission.address,
             homeSize: submission.homeSize,
-            urgency: submission.urgency,
             estimatedPrice: submission.estimatedPrice,
             priority,
-            leadScore,
             autoCallEnabled,
             submittedAt: new Date().toISOString()
           };
@@ -305,7 +272,6 @@ export async function POST(request: NextRequest) {
       success: true,
       customerId,
       leadId: lead.id,
-      leadScore,
       priority,
       message: 'Thank you! Your information has been submitted successfully. We&apos;ll be in touch soon.'
     }))
