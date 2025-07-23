@@ -111,7 +111,7 @@ export default function AudioPlayer({ src, title = 'Call Recording', className =
         <div className={styles.errorMessage}>
           <span>❌ {error}</span>
           <button onClick={downloadRecording} className={styles.downloadBtn}>
-            📥 Download
+            ⬇️ Download
           </button>
         </div>
       </div>
@@ -162,7 +162,7 @@ export default function AudioPlayer({ src, title = 'Call Recording', className =
         </div>
 
         <button onClick={downloadRecording} className={styles.downloadBtn} aria-label="Download recording">
-          📥
+          ⬇️
         </button>
       </div>
     </div>
