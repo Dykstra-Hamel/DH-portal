@@ -15,3 +15,24 @@ export interface ProjectNotificationData {
   requesterEmail: string;
   companyName: string;
 }
+
+export interface LeadNotificationData {
+  leadId: string;
+  companyName: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  pestIssue: string;
+  address: string;
+  homeSize?: number;
+  urgency: string;
+  estimatedPrice?: {
+    min: number;
+    max: number;
+    service_type: string;
+  };
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  leadScore: number;
+  autoCallEnabled: boolean;
+  submittedAt: string;
+}

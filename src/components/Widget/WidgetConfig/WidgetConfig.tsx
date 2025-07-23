@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Copy, Eye, RefreshCw, AlertCircle, Check } from 'lucide-react';
+import { Save, Copy, Eye, RefreshCw, Check } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
-import WidgetPreview from '../WidgetPreview';
 import styles from './WidgetConfig.module.scss';
 import EmbedPreview from '../WidgetPreview';
 
@@ -32,6 +31,9 @@ interface WidgetConfigData {
   messaging: {
     welcome: string;
     fallback: string;
+  };
+  notifications: {
+    emails: string[];
   };
 }
 
@@ -65,9 +67,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     messaging: {
       welcome: 'Get Started',
       fallback: 'Get your free pest control estimate in just a few steps.'
+    },
+    notifications: {
+      emails: []
     }
   });
   const [serviceAreaInput, setServiceAreaInput] = useState('');
+  const [notificationEmailsInput, setNotificationEmailsInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -106,8 +112,15 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       messaging: {
         welcome: widgetConfig.messaging?.welcome || 'Get Started',
         fallback: widgetConfig.messaging?.fallback || 'Get your free pest control estimate in just a few steps.'
+      },
+      notifications: {
+        emails: widgetConfig.notifications?.emails || []
       }
     });
+
+    // Set the notification emails input field
+    const emails = widgetConfig.notifications?.emails || [];
+    setNotificationEmailsInput(emails.join('\n'));
   };
 
 
@@ -148,6 +161,37 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       ...prev,
       service_areas: prev.service_areas.filter(a => a !== area)
     }));
+  };
+
+  const parseNotificationEmails = (input: string): string[] => {
+    return input
+      .split(/[,\n]/)
+      .map(email => email.trim())
+      .filter(email => email.length > 0 && email.includes('@'))
+  };
+
+  const updateNotificationEmails = () => {
+    const emails = parseNotificationEmails(notificationEmailsInput);
+    setConfig(prev => ({
+      ...prev,
+      notifications: {
+        emails
+      }
+    }));
+  };
+
+  const removeNotificationEmail = (emailToRemove: string) => {
+    // Update the config
+    setConfig(prev => ({
+      ...prev,
+      notifications: {
+        emails: prev.notifications.emails.filter(email => email !== emailToRemove)
+      }
+    }));
+
+    // Update the text input field to sync with the removed email
+    const currentEmails = config.notifications.emails.filter(email => email !== emailToRemove);
+    setNotificationEmailsInput(currentEmails.join('\n'));
   };
 
   const saveConfig = async () => {
@@ -262,6 +306,18 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         </div>
       </div>
 
+      <div className={styles.companySelector}>
+        <label>Select Company:</label>
+        <select onChange={(e) => handleCompanySelect(e.target.value)} value={selectedCompany.id}>
+          <option value="">Choose a company...</option>
+          {companies.map(company => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {saveStatus !== 'idle' && (
         <div className={`${styles.statusMessage} ${styles[saveStatus]}`}>
           {saveStatus === 'success' && 'Configuration saved successfully!'}
@@ -269,7 +325,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         </div>
       )}
 
-      <div className={styles.content}>
+      <div className={`${styles.content} ${showPreview ? styles.withPreview : styles.withoutPreview}`}>
         <div className={styles.configSection}>
           {/* Branding Section */}
           <div className={styles.section}>
@@ -361,6 +417,40 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             </div>
           </div>
 
+          {/* Email Notifications Section */}
+          <div className={styles.section}>
+            <h3>Email Notifications</h3>
+            <p className={styles.sectionDescription}>
+              Enter email addresses that should receive notifications when customers submit the widget form. 
+              Separate multiple emails with commas or new lines.
+            </p>
+            
+            <div className={styles.formGroup}>
+              <label>Notification Email Addresses</label>
+              <textarea
+                value={notificationEmailsInput}
+                onChange={(e) => setNotificationEmailsInput(e.target.value)}
+                onBlur={updateNotificationEmails}
+                rows={3}
+                placeholder="user@company.com, manager@company.com, admin@company.com"
+              />
+            </div>
+
+            {config.notifications.emails.length > 0 && (
+              <div className={styles.emailList}>
+                <label>Current notification emails:</label>
+                <div className={styles.emailTags}>
+                  {config.notifications.emails.map(email => (
+                    <span key={email} className={styles.emailTag}>
+                      {email}
+                      <button onClick={() => removeNotificationEmail(email)} type="button">×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Service Areas Section */}
           <div className={styles.section}>
             <h3>Service Areas</h3>
@@ -374,7 +464,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 value={serviceAreaInput}
                 onChange={(e) => setServiceAreaInput(e.target.value)}
                 placeholder="Enter zip code (e.g., 12345)"
-                onKeyPress={(e) => e.key === 'Enter' && addServiceArea()}
+                onKeyDown={(e) => e.key === 'Enter' && addServiceArea()}
               />
               <button onClick={addServiceArea} type="button">Add</button>
             </div>
