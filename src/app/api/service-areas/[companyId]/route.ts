@@ -87,7 +87,7 @@ export async function GET(
           console.warn('Failed to parse polygon GeoJSON:', e);
           formatted.polygon = [];
         }
-      } else if (area.type === 'radius' && area.center_lat !== null && area.center_lng !== null) {
+      } else if (area.type === 'radius' && area.center_lat !== null && area.center_lng !== null && area.center_lat !== undefined && area.center_lng !== undefined) {
         // Use the parsed center coordinates from the database function
         formatted.center = {
           lat: parseFloat(area.center_lat),
