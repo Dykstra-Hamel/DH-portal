@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -104,14 +104,7 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // Fetch lead when leadId is available
-  useEffect(() => {
-    if (leadId && !loading) {
-      fetchLead();
-    }
-  }, [leadId, loading, isAdmin]);
-
-  const fetchLead = async () => {
+  const fetchLead = useCallback(async () => {
     if (!leadId) return;
 
     try {
@@ -129,7 +122,14 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     } finally {
       setLeadLoading(false);
     }
-  };
+  }, [leadId, isAdmin]);
+
+  // Fetch lead when leadId is available
+  useEffect(() => {
+    if (leadId && !loading) {
+      fetchLead();
+    }
+  }, [leadId, loading, fetchLead]);
 
   const handleBack = () => {
     router.push('/leads');
@@ -141,28 +141,6 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     }
   };
 
-  const normalizePhoneNumber = (phone: string): string => {
-    // Remove all non-digit characters
-    const digitsOnly = phone.replace(/\D/g, '');
-
-    // If it's a 10-digit number, assume it's US and add +1
-    if (digitsOnly.length === 10) {
-      return `+1${digitsOnly}`;
-    }
-
-    // If it's 11 digits and starts with 1, add +
-    if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
-      return `+${digitsOnly}`;
-    }
-
-    // If it already starts with +, return as is
-    if (phone.startsWith('+')) {
-      return phone;
-    }
-
-    // Otherwise, assume US and add +1
-    return `+1${digitsOnly}`;
-  };
 
   const handlePhoneCall = async () => {
     if (!lead || !lead.customer) {
@@ -175,66 +153,72 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
       return;
     }
 
+    if (!lead.company_id) {
+      alert('Company information is missing for this lead.');
+      return;
+    }
+
     try {
       setIsCallLoading(true);
 
-      const normalizedPhone = normalizePhoneNumber(lead.customer.phone);
-
       const isFollowUp = lead.lead_status !== 'new';
 
-      const payload = {
-        from_number:
-          process.env.NEXT_PUBLIC_RETELL_FROM_NUMBER || '+12074197718',
-        to_number: normalizedPhone,
-        agent_id:
-          process.env.NEXT_PUBLIC_RETELL_AGENT_ID ||
-          'agent_4d2bb226685183e59b205d6fd3',
-        retell_llm_dynamic_variables: {
-          customer_first_name: lead.customer.first_name || 'Customer',
-          customer_name: `${lead.customer.first_name} ${lead.customer.last_name}`,
-          customer_email: lead.customer.email || '',
-          customer_comments: lead.comments || '',
-          company_name: lead.company?.name || 'Dykstra-Hamel',
-          company_url: lead.company?.website || 'https://www.dykstrahamel.com/',
-          knowledge_base_url: 'https://www.dykstrahamel.com/services',
-          is_follow_up: isFollowUp ? 'true' : 'false',
-          lead_id: leadId,
-        },
+      // Prepare call request data to send to our retell-call API
+      const callRequest = {
+        firstName: lead.customer.first_name || 'Customer',
+        lastName: lead.customer.last_name || '',
+        email: lead.customer.email || '',
+        phone: lead.customer.phone,
+        message: `Lead Status: ${lead.lead_status}\n\nComments: ${lead.comments || ''}\n\nCall Type: ${isFollowUp ? 'Follow-up' : 'Initial Contact'}`,
+        streetAddress: lead.customer.address || '',
+        city: lead.customer.city || '',
+        state: lead.customer.state || '',
+        zipCode: lead.customer.zip_code || '',
+        companyId: lead.company_id,
       };
 
-      const response = await fetch(
-        'https://api.retellai.com/v2/create-phone-call',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_RETELL_API_KEY}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      // Use our retell-call API endpoint which handles company-specific configuration
+      const response = await fetch('/api/retell-call', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(callRequest),
+      });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Retell API Error:', {
+        const errorData = await response.json();
+        console.error('Call API Error:', {
           status: response.status,
-          statusText: response.statusText,
-          error: errorText,
+          error: errorData,
         });
-        throw new Error(
-          `HTTP error! status: ${response.status} - ${errorText}`
-        );
+        
+        // Show specific error message from API
+        let errorMessage = 'Failed to initiate phone call.';
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        
+        alert(errorMessage);
+        return;
       }
 
       const result = await response.json();
 
-      // Show success message
-      alert(
-        `Phone call initiated successfully! Call ID: ${result.call_id || 'N/A'}`
-      );
+      if (result.success) {
+        // Show success message
+        alert(
+          `Phone call initiated successfully! Call ID: ${result.callId || 'N/A'}`
+        );
+        
+        // Refresh call history to show the new call
+        setCallHistoryRefresh(prev => prev + 1);
+      } else {
+        alert(result.error || 'Failed to initiate phone call.');
+      }
     } catch (error) {
       console.error('Error creating phone call:', error);
-      alert('Failed to initiate phone call. Please try again.');
+      alert('Failed to initiate phone call. Please check your internet connection and try again.');
     } finally {
       setIsCallLoading(false);
     }

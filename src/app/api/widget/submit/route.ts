@@ -1,15 +1,120 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import {
-  handleAutoLeadCall,
-  shouldAutoCall,
-} from '@/lib/services/lead-calling';
+// Auto-calling functions - implemented inline below
 import { normalizePhoneNumber } from '@/lib/utils';
 import {
   sendLeadCreatedNotifications,
   validateEmails,
   LeadNotificationData,
 } from '@/lib/email';
+
+// Helper function to check if auto-calling is enabled for a company
+async function shouldAutoCall(companyId: string): Promise<boolean> {
+  try {
+    const supabase = createAdminClient();
+    
+    const { data: setting, error } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'auto_call_enabled')
+      .single();
+
+    if (error || !setting) {
+      console.error('Failed to fetch auto_call_enabled setting:', error);
+      return false; // Default to false if setting not found
+    }
+
+    return setting.setting_value === 'true';
+  } catch (error) {
+    console.error('Error checking shouldAutoCall:', error);
+    return false;
+  }
+}
+
+// Helper function to handle auto lead calling via Retell API
+async function handleAutoLeadCall(
+  leadId: string,
+  companyId: string,
+  customerData: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  },
+  leadStatus: string,
+  notes: string,
+  companyData?: {
+    name: string;
+    website?: string;
+  },
+  addressComponents?: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+  }
+): Promise<{
+  success: boolean;
+  skipped?: boolean;
+  reason?: string;
+  callId?: string;
+  error?: string;
+}> {
+  try {
+    // Prepare the call request data
+    const callRequest = {
+      firstName: customerData.first_name,
+      lastName: customerData.last_name,
+      email: customerData.email,
+      phone: customerData.phone,
+      message: notes, // Use the formatted customer comments
+      streetAddress: addressComponents?.street || '',
+      city: addressComponents?.city || '',
+      state: addressComponents?.state || '',
+      zipCode: addressComponents?.zip || '',
+      companyId: companyId,
+    };
+
+    // Make request to our retell-call endpoint
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/retell-call`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(callRequest),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Auto-call request failed:', response.status, errorData);
+      return {
+        success: false,
+        error: `Call request failed: ${response.status} - ${errorData}`,
+      };
+    }
+
+    const result = await response.json();
+    
+    if (result.success) {
+      return {
+        success: true,
+        callId: result.callId,
+      };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Unknown error from call service',
+      };
+    }
+  } catch (error) {
+    console.error('Error in handleAutoLeadCall:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
 
 // Handle CORS preflight requests
 export async function OPTIONS() {
@@ -225,33 +330,84 @@ export async function POST(request: NextRequest) {
     try {
       autoCallEnabled = await shouldAutoCall(submission.companyId);
 
-      const callResult = await handleAutoLeadCall(
-        lead.id,
-        submission.companyId,
-        {
-          first_name: submission.contactInfo.name.split(' ')[0] || '',
-          last_name:
-            submission.contactInfo.name.split(' ').slice(1).join(' ') || '',
-          email: submission.contactInfo.email,
-          phone: submission.contactInfo.phone,
-        },
-        company ? { name: company.name, website: company.website } : undefined,
-        status,
-        notes
-      );
+      if (autoCallEnabled) {
+        // Extract address components for the call
+        let addressComponents = {
+          street: '',
+          city: '',
+          state: '',
+          zip: ''
+        };
 
-      if (callResult.success && !callResult.skipped) {
-        console.log(
-          `Auto-call initiated for lead ${lead.id}, call ID: ${callResult.callId}`
+        if (submission.addressDetails) {
+          // Use structured address data
+          addressComponents = {
+            street: submission.addressDetails.street || '',
+            city: submission.addressDetails.city || '',
+            state: submission.addressDetails.state || '',
+            zip: submission.addressDetails.zip || ''
+          };
+        } else if (submission.address) {
+          // Parse formatted address string
+          const addressParts = submission.address.split(',').map(part => part.trim());
+          const zipMatch = submission.address.match(/\b\d{5}\b/);
+          
+          addressComponents.street = addressParts[0] || '';
+          if (addressParts.length >= 2) {
+            addressComponents.city = addressParts[1] || '';
+          }
+          if (addressParts.length >= 3) {
+            const stateZip = addressParts[2] || '';
+            const stateMatch = stateZip.match(/([A-Z]{2})/);
+            addressComponents.state = stateMatch ? stateMatch[1] : '';
+          }
+          addressComponents.zip = zipMatch ? zipMatch[0] : '';
+        }
+
+        // Format customer comments with widget-specific details
+        let customerComments = `Widget Submission Details:\n`;
+        customerComments += `Pest Issue: ${submission.pestIssue}\n`;
+        if (submission.homeSize) {
+          customerComments += `Home Size: ${submission.homeSize} sq ft\n`;
+        }
+        if (submission.estimatedPrice) {
+          customerComments += `Estimated Price: $${submission.estimatedPrice.min} - $${submission.estimatedPrice.max} (${submission.estimatedPrice.service_type})\n`;
+        }
+        if (submission.address) {
+          customerComments += `Address: ${submission.address}\n`;
+        }
+
+        const callResult = await handleAutoLeadCall(
+          lead.id,
+          submission.companyId,
+          {
+            first_name: submission.contactInfo.name.split(' ')[0] || '',
+            last_name:
+              submission.contactInfo.name.split(' ').slice(1).join(' ') || '',
+            email: submission.contactInfo.email,
+            phone: submission.contactInfo.phone,
+          },
+          status,
+          customerComments, // Use formatted comments instead of generic notes
+          company ? { name: company.name, website: company.website } : undefined,
+          addressComponents // Pass address components
         );
-      } else if (callResult.skipped) {
-        console.log(
-          `Auto-call skipped for lead ${lead.id}: ${callResult.reason}`
-        );
+
+        if (callResult.success && !callResult.skipped) {
+          console.log(
+            `Auto-call initiated for lead ${lead.id}, call ID: ${callResult.callId}`
+          );
+        } else if (callResult.skipped) {
+          console.log(
+            `Auto-call skipped for lead ${lead.id}: ${callResult.reason}`
+          );
+        } else {
+          console.error(
+            `Auto-call failed for lead ${lead.id}: ${callResult.error}`
+          );
+        }
       } else {
-        console.error(
-          `Auto-call failed for lead ${lead.id}: ${callResult.error}`
-        );
+        console.log(`Auto-call disabled for company ${submission.companyId}`);
       }
     } catch (error) {
       console.error('Error in auto-call process:', error);

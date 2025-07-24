@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  getCompanyRetellConfig,
+  logRetellConfigError,
+} from '@/lib/retell-config';
 
 interface RetellCallRequest {
   firstName: string;
@@ -10,21 +14,27 @@ interface RetellCallRequest {
   city?: string;
   state?: string;
   zipCode?: string;
+  companyId: string;
 }
 
 interface RetellCallPayload {
   from_number: string;
   to_number: string;
-  override_agent_id: string;
+  agent_id: string;
   retell_llm_dynamic_variables?: {
     customer_first_name: string;
     customer_last_name: string;
+    customer_name: string;
     customer_email: string;
-    customer_message: string;
+    customer_comments: string;
     customer_street_address?: string;
     customer_city?: string;
     customer_state?: string;
-    customer_zip_code?: string;
+    customer_zip?: string;
+    company_id: string;
+    company_name: string;
+    company_url?: string;
+    is_follow_up: string;
   };
 }
 
@@ -41,9 +51,12 @@ export async function POST(request: NextRequest) {
       city,
       state,
       zipCode,
+      companyId,
     } = body;
 
-    // Validate required fields
+    // Note: Knowledge base functionality has been simplified to direct Retell AI integration
+
+    // Validate and sanitize required fields
     if (!firstName || !lastName || !email || !phone || !message) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -51,34 +64,115 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for required environment variables
-    const retellApiKey = process.env.RETELL_API_KEY;
-    const retellAgentId = process.env.RETELL_AGENT_ID;
-    const retellFromNumber = process.env.RETELL_FROM_NUMBER;
-
-    if (!retellApiKey) {
-      console.error('RETELL_API_KEY environment variable is not set');
+    // Input validation
+    if (firstName.length > 100 || lastName.length > 100) {
       return NextResponse.json(
-        { error: 'Server configuration error' },
+        { error: 'Name fields cannot exceed 100 characters' },
+        { status: 400 }
+      );
+    }
+
+    if (message.length > 2000) {
+      return NextResponse.json(
+        { error: 'Message cannot exceed 2000 characters' },
+        { status: 400 }
+      );
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      );
+    }
+
+    // Phone number validation (more permissive for various formats)
+    const phoneRegex = /^[\+]?[\d\s\-\(\)\.]{7,20}$/;
+    if (!phoneRegex.test(phone.trim())) {
+      return NextResponse.json(
+        { error: 'Invalid phone number format' },
+        { status: 400 }
+      );
+    }
+
+    // Company ID is required - no fallback to environment variables
+    if (!companyId) {
+      logRetellConfigError('unknown', 'Company ID is required for all calls');
+      return NextResponse.json(
+        { error: 'Company ID is required for making calls' },
+        { status: 400 }
+      );
+    }
+
+    // Get company-specific Retell configuration and company info in a single operation
+    const { createAdminClient } = await import('@/lib/supabase/server-admin');
+    const supabase = createAdminClient();
+
+    // Fetch both company settings and company info in parallel
+    const [configResult, companyResult] = await Promise.all([
+      getCompanyRetellConfig(companyId),
+      supabase
+        .from('companies')
+        .select('name, website')
+        .eq('id', companyId)
+        .single(),
+    ]);
+
+    if (configResult.error || !configResult.config) {
+      logRetellConfigError(
+        companyId,
+        configResult.error || 'Unknown error',
+        configResult.missingSettings
+      );
+
+      // Provide specific error message for frontend
+      let errorMessage =
+        'Retell configuration is not complete for this company.';
+      if (
+        configResult.missingSettings &&
+        configResult.missingSettings.length > 0
+      ) {
+        errorMessage += ` Missing: ${configResult.missingSettings.join(', ')}.`;
+      }
+      errorMessage += ' Please configure Call Settings in the admin dashboard.';
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          missingSettings: configResult.missingSettings,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Company lookup is required - no fallbacks allowed
+    if (companyResult.error) {
+      console.error('Failed to fetch company information:', {
+        companyId,
+        error: companyResult.error,
+        errorCode: companyResult.error.code,
+        errorDetails: companyResult.error.details,
+      });
+      return NextResponse.json(
+        { error: 'Failed to load company information' },
         { status: 500 }
       );
     }
 
-    if (!retellAgentId) {
-      console.error('RETELL_AGENT_ID environment variable is not set');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
+    if (!companyResult.data) {
+      console.error('Company not found in database:', { companyId });
+      return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    if (!retellFromNumber) {
-      console.error('RETELL_FROM_NUMBER environment variable is not set');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
-    }
+    const company = companyResult.data;
+
+    const {
+      apiKey: retellApiKey,
+      agentId: retellAgentId,
+      phoneNumber: retellFromNumber,
+    } = configResult.config;
 
     // Clean phone number (remove formatting)
     const cleanPhoneNumber = phone.replace(/[\s\-\(\)\.]/g, '');
@@ -92,16 +186,21 @@ export async function POST(request: NextRequest) {
     const payload: RetellCallPayload = {
       from_number: retellFromNumber,
       to_number: formattedPhoneNumber,
-      override_agent_id: retellAgentId,
+      agent_id: retellAgentId,
       retell_llm_dynamic_variables: {
         customer_first_name: firstName,
         customer_last_name: lastName,
+        customer_name: `${firstName} ${lastName}`,
         customer_email: email,
-        customer_message: message,
+        customer_comments: message,
         customer_street_address: streetAddress || '',
         customer_city: city || '',
         customer_state: state || '',
-        customer_zip_code: zipCode || '',
+        customer_zip: zipCode || '',
+        company_id: companyId,
+        company_name: company.name,
+        company_url: company.website || '',
+        is_follow_up: 'false', // Default to false, can be overridden by caller
       },
     };
 
@@ -120,29 +219,32 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Retell API failed: ${response.status} - ${errorText}`);
-      console.error('Request payload:', JSON.stringify(payload, null, 2));
+      console.error(`Retell API failed: ${response.status}`, {
+        companyId,
+        phoneNumber: formattedPhoneNumber.slice(0, -4) + '****', // Log only partial phone number
+        errorMessage: errorText,
+      });
 
       // Handle specific error cases
       if (response.status === 401) {
         return NextResponse.json(
           {
-            error: 'Authentication failed with Retell API',
-            details: errorText,
+            error:
+              'Authentication failed with Retell service. Please check your configuration.',
           },
           { status: 500 }
         );
       } else if (response.status === 400) {
         return NextResponse.json(
-          { error: 'Invalid phone number or request data', details: errorText },
+          {
+            error:
+              'Invalid phone number or request data. Please verify the phone number format.',
+          },
           { status: 400 }
         );
       } else {
         return NextResponse.json(
-          {
-            error: 'Failed to initiate call. Please try again later.',
-            details: errorText,
-          },
+          { error: 'Failed to initiate call. Please try again later.' },
           { status: 500 }
         );
       }

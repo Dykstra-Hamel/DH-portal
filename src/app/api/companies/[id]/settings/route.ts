@@ -148,6 +148,42 @@ export async function PUT(
       );
     }
 
+    // Validate Retell configuration fields
+    const retellValidationErrors = []
+    
+    // Validate Retell API key format
+    if (settings.retell_api_key?.value) {
+      const apiKey = settings.retell_api_key.value
+      if (!apiKey.startsWith('key_') || apiKey.length < 10) {
+        retellValidationErrors.push('Retell API key must start with "key_" and be at least 10 characters long')
+      }
+    }
+
+    // Validate Retell agent ID format
+    if (settings.retell_agent_id?.value) {
+      const agentId = settings.retell_agent_id.value
+      if (!agentId.startsWith('agent_') || agentId.length < 10) {
+        retellValidationErrors.push('Retell agent ID must start with "agent_" and be at least 10 characters long')
+      }
+    }
+
+    // Validate phone number format
+    if (settings.retell_phone_number?.value) {
+      const phoneNumber = settings.retell_phone_number.value
+      const phoneRegex = /^\+[1-9]\d{1,14}$/
+      if (!phoneRegex.test(phoneNumber)) {
+        retellValidationErrors.push('Phone number must be in E.164 format (e.g., +12074197718)')
+      }
+    }
+
+    // Return validation errors if any
+    if (retellValidationErrors.length > 0) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: retellValidationErrors },
+        { status: 400 }
+      )
+    }
+
     // Update each setting
     const updatePromises = Object.entries(settings).map(
       async ([key, data]: [string, any]) => {

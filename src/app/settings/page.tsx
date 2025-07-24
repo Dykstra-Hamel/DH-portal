@@ -12,7 +12,11 @@ import {
   AlertCircle,
   CheckCircle,
   Settings as SettingsIcon,
+  Copy,
+  Check,
+  RefreshCw,
 } from 'lucide-react';
+import KnowledgeBase from '@/components/KnowledgeBase/KnowledgeBase';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -59,7 +63,7 @@ export default function SettingsPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'calling'>('calling');
+  const [activeTab, setActiveTab] = useState<'widget' | 'knowledge-base'>('widget');
   const router = useRouter();
 
   const {
@@ -322,10 +326,16 @@ export default function SettingsPage() {
             {/* Tab Navigation */}
             <div className={styles.tabNavigation}>
               <button
-                className={`${styles.tabButton} ${activeTab === 'calling' ? styles.active : ''}`}
-                onClick={() => setActiveTab('calling')}
+                className={`${styles.tabButton} ${activeTab === 'widget' ? styles.active : ''}`}
+                onClick={() => setActiveTab('widget')}
               >
-                Calling Settings
+                Widget Settings
+              </button>
+              <button
+                className={`${styles.tabButton} ${activeTab === 'knowledge-base' ? styles.active : ''}`}
+                onClick={() => setActiveTab('knowledge-base')}
+              >
+                Knowledge Base
               </button>
             </div>
 
@@ -333,242 +343,60 @@ export default function SettingsPage() {
               <div className={styles.settingsLoading}>Loading settings...</div>
             ) : (
               <div className={styles.settingsForm}>
-                {/* Calling Settings Tab */}
-                {activeTab === 'calling' && (
+                {/* Widget Settings Tab */}
+                {activeTab === 'widget' && (
                   <>
-                    {/* Auto-Call Settings */}
                     <div className={styles.settingGroup}>
-                      <h3 className={styles.groupTitle}>
-                        Phone Call Automation
-                      </h3>
-
+                      <h3 className={styles.groupTitle}>Widget Form Settings</h3>
+                      <p className={styles.groupDescription}>
+                        Configure the lead capture widget for your website.
+                      </p>
+                      
                       <div className={styles.setting}>
                         <div className={styles.settingInfo}>
-                          <label
-                            htmlFor="auto-call-enabled"
-                            className={styles.settingLabel}
-                          >
-                            Auto-Call New Leads
+                          <label htmlFor="widget-enabled" className={styles.settingLabel}>
+                            Enable Widget
                           </label>
                           <p className={styles.settingDescription}>
-                            {settings.auto_call_enabled?.description ||
-                              'Automatically initiate phone calls for new leads'}
+                            Enable or disable the lead capture widget.
                           </p>
                         </div>
                         <div className={styles.settingControl}>
                           <label className={styles.toggle}>
                             <input
-                              id="auto-call-enabled"
+                              id="widget-enabled"
                               type="checkbox"
-                              checked={
-                                settings.auto_call_enabled?.value === true
-                              }
-                              onChange={e =>
-                                handleSettingChange(
-                                  'auto_call_enabled',
-                                  e.target.checked
-                                )
-                              }
+                              checked={settings.widget_enabled?.value === true}
+                              onChange={e => handleSettingChange('widget_enabled', e.target.checked)}
                             />
                             <span className={styles.toggleSlider}></span>
                           </label>
-                        </div>
-                      </div>
-
-                      <div className={styles.setting}>
-                        <div className={styles.settingInfo}>
-                          <label
-                            htmlFor="weekend-calling"
-                            className={styles.settingLabel}
-                          >
-                            Weekend Calling
-                          </label>
-                          <p className={styles.settingDescription}>
-                            {settings.weekend_calling_enabled?.description ||
-                              'Allow calls on weekends'}
-                          </p>
-                        </div>
-                        <div className={styles.settingControl}>
-                          <label className={styles.toggle}>
-                            <input
-                              id="weekend-calling"
-                              type="checkbox"
-                              checked={
-                                settings.weekend_calling_enabled?.value === true
-                              }
-                              onChange={e =>
-                                handleSettingChange(
-                                  'weekend_calling_enabled',
-                                  e.target.checked
-                                )
-                              }
-                            />
-                            <span className={styles.toggleSlider}></span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Business Hours Settings */}
-                    <div className={styles.settingGroup}>
-                      <h3 className={styles.groupTitle}>Business Hours</h3>
-
-                      {[
-                        'monday',
-                        'tuesday',
-                        'wednesday',
-                        'thursday',
-                        'friday',
-                        'saturday',
-                        'sunday',
-                      ].map(day => (
-                        <div key={day} className={styles.dayHours}>
-                          <div className={styles.dayHeader}>
-                            <span className={styles.dayName}>
-                              {day.charAt(0).toUpperCase() + day.slice(1)}
-                            </span>
-                            <label className={styles.toggle}>
-                              <input
-                                type="checkbox"
-                                checked={
-                                  settings[`business_hours_${day}`]?.value
-                                    ?.enabled ?? true
-                                }
-                                onChange={e => {
-                                  const currentValue = settings[
-                                    `business_hours_${day}`
-                                  ]?.value || {
-                                    start: '09:00',
-                                    end: '17:00',
-                                    enabled: true,
-                                  };
-                                  handleSettingChange(`business_hours_${day}`, {
-                                    ...currentValue,
-                                    enabled: e.target.checked,
-                                  });
-                                }}
-                              />
-                              <span className={styles.toggleSlider}></span>
-                            </label>
-                          </div>
-
-                          {settings[`business_hours_${day}`]?.value
-                            ?.enabled && (
-                            <div className={styles.timeSettings}>
-                              <div className={styles.timeInputGroup}>
-                                <label className={styles.settingLabel}>
-                                  Start
-                                </label>
-                                <input
-                                  type="time"
-                                  value={
-                                    settings[`business_hours_${day}`]?.value
-                                      ?.start || '09:00'
-                                  }
-                                  onChange={e => {
-                                    const currentValue = settings[
-                                      `business_hours_${day}`
-                                    ]?.value || {
-                                      start: '09:00',
-                                      end: '17:00',
-                                      enabled: true,
-                                    };
-                                    handleSettingChange(
-                                      `business_hours_${day}`,
-                                      {
-                                        ...currentValue,
-                                        start: e.target.value,
-                                      }
-                                    );
-                                  }}
-                                  className={styles.timeField}
-                                />
-                              </div>
-
-                              <div className={styles.timeInputGroup}>
-                                <label className={styles.settingLabel}>
-                                  End
-                                </label>
-                                <input
-                                  type="time"
-                                  value={
-                                    settings[`business_hours_${day}`]?.value
-                                      ?.end || '17:00'
-                                  }
-                                  onChange={e => {
-                                    const currentValue = settings[
-                                      `business_hours_${day}`
-                                    ]?.value || {
-                                      start: '09:00',
-                                      end: '17:00',
-                                      enabled: true,
-                                    };
-                                    handleSettingChange(
-                                      `business_hours_${day}`,
-                                      {
-                                        ...currentValue,
-                                        end: e.target.value,
-                                      }
-                                    );
-                                  }}
-                                  className={styles.timeField}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Call Throttling */}
-                    <div className={styles.settingGroup}>
-                      <h3 className={styles.groupTitle}>Call Management</h3>
-
-                      <div className={styles.setting}>
-                        <div className={styles.settingInfo}>
-                          <label
-                            htmlFor="call-throttle"
-                            className={styles.settingLabel}
-                          >
-                            Call Throttle (minutes)
-                          </label>
-                          <p className={styles.settingDescription}>
-                            {settings.call_throttle_minutes?.description ||
-                              'Minimum minutes between calls to same customer'}
-                          </p>
-                        </div>
-                        <div className={styles.settingControl}>
-                          <input
-                            id="call-throttle"
-                            type="number"
-                            min="1"
-                            max="60"
-                            value={settings.call_throttle_minutes?.value || 5}
-                            onChange={e =>
-                              handleSettingChange(
-                                'call_throttle_minutes',
-                                parseInt(e.target.value)
-                              )
-                            }
-                            className={styles.numberInput}
-                          />
                         </div>
                       </div>
                     </div>
                   </>
                 )}
 
-                {/* Save Button */}
-                <div className={styles.actions}>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving || (!isCompanyAdmin && !isGlobalAdmin)}
-                    className={styles.saveButton}
-                  >
-                    <Save size={16} />
-                    {saving ? 'Saving...' : 'Save Settings'}
-                  </button>
-                </div>
+                {/* Knowledge Base Tab */}
+                {activeTab === 'knowledge-base' && (
+                  <div className={styles.knowledgeBaseSection}>
+                    <KnowledgeBase companyId={selectedCompanyId} />
+                  </div>
+                )}
+
+                {/* Save Button - only show for widget tab */}
+                {activeTab === 'widget' && (
+                  <div className={styles.actions}>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving || (!isCompanyAdmin && !isGlobalAdmin)}
+                      className={styles.saveButton}
+                    >
+                      <Save size={16} />
+                      {saving ? 'Saving...' : 'Save Settings'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
