@@ -26,7 +26,6 @@ interface RetellCallPayload {
     customer_last_name: string;
     customer_name: string;
     customer_email: string;
-    customer_message: string;
     customer_comments: string;
     customer_street_address?: string;
     customer_city?: string;
@@ -112,11 +111,6 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Fetch both company settings and company info in parallel
-    console.log('Querying database for company:', {
-      companyId,
-      timestamp: new Date().toISOString(),
-    });
-
     const [configResult, companyResult] = await Promise.all([
       getCompanyRetellConfig(companyId),
       supabase
@@ -125,14 +119,6 @@ export async function POST(request: NextRequest) {
         .eq('id', companyId)
         .single(),
     ]);
-
-    console.log('Database query results:', {
-      companyId,
-      configError: configResult.error,
-      companyError: companyResult.error,
-      companyData: companyResult.data,
-      timestamp: new Date().toISOString(),
-    });
 
     if (configResult.error || !configResult.config) {
       logRetellConfigError(
@@ -206,7 +192,6 @@ export async function POST(request: NextRequest) {
         customer_last_name: lastName,
         customer_name: `${firstName} ${lastName}`,
         customer_email: email,
-        customer_message: message,
         customer_comments: message,
         customer_street_address: streetAddress || '',
         customer_city: city || '',

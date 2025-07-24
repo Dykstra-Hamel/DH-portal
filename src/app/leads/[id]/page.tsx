@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -104,14 +104,7 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // Fetch lead when leadId is available
-  useEffect(() => {
-    if (leadId && !loading) {
-      fetchLead();
-    }
-  }, [leadId, loading, isAdmin]);
-
-  const fetchLead = async () => {
+  const fetchLead = useCallback(async () => {
     if (!leadId) return;
 
     try {
@@ -129,7 +122,14 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     } finally {
       setLeadLoading(false);
     }
-  };
+  }, [leadId, isAdmin]);
+
+  // Fetch lead when leadId is available
+  useEffect(() => {
+    if (leadId && !loading) {
+      fetchLead();
+    }
+  }, [leadId, loading, fetchLead]);
 
   const handleBack = () => {
     router.push('/leads');

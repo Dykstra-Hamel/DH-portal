@@ -63,6 +63,10 @@ export interface Lead {
     last_name: string;
     email?: string;
     phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
   };
   assigned_user?: {
     id: string;
