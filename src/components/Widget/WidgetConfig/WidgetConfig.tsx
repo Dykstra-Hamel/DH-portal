@@ -6,10 +6,20 @@ import { adminAPI } from '@/lib/api-client';
 import { createClient } from '@/lib/supabase/client';
 import styles from './WidgetConfig.module.scss';
 import EmbedPreview from '../WidgetPreview';
+import ServiceAreaMap from '../ServiceAreaMap';
+import {
+  getCompanyCoordinates,
+  createCachedGeocodeResult,
+} from '@/lib/geocoding';
 
 interface Company {
   id: string;
   name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string;
   widget_config?: any;
 }
 
@@ -104,6 +114,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>(
     'idle'
   );
+  const [serviceAreas, setServiceAreas] = useState<any[]>([]);
+  const [showServiceAreaMap, setShowServiceAreaMap] = useState(true);
   const [copyStatusFull, setCopyStatusFull] = useState<
     'idle' | 'copying' | 'copied'
   >('idle');
@@ -126,6 +138,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     background: { value: '#ffffff', source: 'default' },
     text: { value: '#374151', source: 'default' },
   });
+  const [googleApiKey, setGoogleApiKey] = useState<string>('');
+  const [mapCenter, setMapCenter] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   // Default color values
   const defaultColors = {
@@ -138,7 +155,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   // Color resolution function
   const resolveColors = (
     brandColors: { primary?: string; secondary?: string },
-    overrides?: { primary?: string; secondary?: string; background?: string; text?: string }
+    overrides?: {
+      primary?: string;
+      secondary?: string;
+      background?: string;
+      text?: string;
+    }
   ) => {
     const resolved: {
       primary: ColorState;
@@ -147,12 +169,24 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       text: ColorState;
     } = {
       primary: {
-        value: overrides?.primary || brandColors.primary || defaultColors.primary,
-        source: overrides?.primary ? 'override' : brandColors.primary ? 'brand' : 'default',
+        value:
+          overrides?.primary || brandColors.primary || defaultColors.primary,
+        source: overrides?.primary
+          ? 'override'
+          : brandColors.primary
+            ? 'brand'
+            : 'default',
       },
       secondary: {
-        value: overrides?.secondary || brandColors.secondary || defaultColors.secondary,
-        source: overrides?.secondary ? 'override' : brandColors.secondary ? 'brand' : 'default',
+        value:
+          overrides?.secondary ||
+          brandColors.secondary ||
+          defaultColors.secondary,
+        source: overrides?.secondary
+          ? 'override'
+          : brandColors.secondary
+            ? 'brand'
+            : 'default',
       },
       background: {
         value: overrides?.background || defaultColors.background,
@@ -168,15 +202,22 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   // Handle color changes with override tracking
-  const handleColorChange = (colorType: 'primary' | 'secondary' | 'background' | 'text', value: string) => {
+  const handleColorChange = (
+    colorType: 'primary' | 'secondary' | 'background' | 'text',
+    value: string
+  ) => {
     setConfig(prev => {
       const newOverrides = { ...prev.colorOverrides };
-      
+
       // Check if this color matches the brand color or default
-      const brandValue = colorType === 'primary' ? brandColors.primary : 
-                        colorType === 'secondary' ? brandColors.secondary : null;
+      const brandValue =
+        colorType === 'primary'
+          ? brandColors.primary
+          : colorType === 'secondary'
+            ? brandColors.secondary
+            : null;
       const defaultValue = defaultColors[colorType];
-      
+
       if (value === brandValue || (value === defaultValue && !brandValue)) {
         // Remove override if value matches brand or default
         delete newOverrides[colorType];
@@ -184,7 +225,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         // Set override if value is different
         newOverrides[colorType] = value;
       }
-      
+
       return {
         ...prev,
         colorOverrides: newOverrides,
@@ -193,12 +234,14 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   // Reset individual color to brand/default value
-  const resetIndividualColor = (colorType: 'primary' | 'secondary' | 'background' | 'text') => {
+  const resetIndividualColor = (
+    colorType: 'primary' | 'secondary' | 'background' | 'text'
+  ) => {
     setConfig(prev => {
       const newOverrides = { ...prev.colorOverrides };
       // Remove the override for this specific color
       delete newOverrides[colorType];
-      
+
       return {
         ...prev,
         colorOverrides: newOverrides,
@@ -210,7 +253,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   useEffect(() => {
     const resolved = resolveColors(brandColors, config.colorOverrides);
     setColorStates(resolved);
-    
+
     // Update the colors in config to reflect resolved values
     setConfig(prev => ({
       ...prev,
@@ -223,6 +266,23 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }));
   }, [brandColors, config.colorOverrides]);
 
+  // Fetch Google API key on component mount
+  useEffect(() => {
+    const fetchGoogleApiKey = async () => {
+      try {
+        const response = await fetch('/api/google-places-key');
+        if (response.ok) {
+          const data = await response.json();
+          setGoogleApiKey(data.apiKey || '');
+        }
+      } catch (error) {
+        console.error('Error fetching Google API key:', error);
+      }
+    };
+
+    fetchGoogleApiKey();
+  }, []);
+
   // Load company data when selected company changes
   useEffect(() => {
     if (selectedCompanyId) {
@@ -231,6 +291,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         setSelectedCompany(company);
         loadCompanyConfig(company);
         fetchBrandColors(selectedCompanyId);
+        loadServiceAreas(selectedCompanyId);
+        geocodeCompanyAddress(company);
       }
     }
   }, [selectedCompanyId, companies]);
@@ -279,6 +341,34 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     setNotificationEmailsInput(emails.join('\n'));
   };
 
+  const geocodeCompanyAddress = async (company: Company) => {
+    try {
+      const coordinates = await getCompanyCoordinates(company);
+      setMapCenter({ lat: coordinates.lat, lng: coordinates.lng });
+
+      // Cache the result in widget_config if it's not already cached
+      if (!company.widget_config?.geocodedAddress) {
+        const cachedResult = createCachedGeocodeResult(coordinates);
+
+        // Update the company config to include the cached geocode result
+        try {
+          await adminAPI.updateCompany(company.id, {
+            widget_config: {
+              ...company.widget_config,
+              geocodedAddress: cachedResult,
+            },
+          });
+        } catch (error) {
+          console.error('Failed to cache geocoded address:', error);
+          // Non-critical error, don't block the UI
+        }
+      }
+    } catch (error) {
+      console.error('Error geocoding company address:', error);
+      // setMapCenter will remain null, ServiceAreaMap will use fallback
+    }
+  };
+
   const fetchBrandColors = async (companyId: string) => {
     try {
       setBrandLoading(true);
@@ -305,6 +395,55 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
 
+  const loadServiceAreas = async (companyId: string) => {
+    try {
+      const response = await fetch(`/api/service-areas/${companyId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setServiceAreas(data.serviceAreas || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading service areas:', error);
+      setServiceAreas([]);
+    }
+  };
+
+  const saveServiceAreas = async (areas: any[]) => {
+    if (!selectedCompany) return;
+
+    try {
+      const response = await fetch(`/api/service-areas/${selectedCompany.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ serviceAreas: areas }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setServiceAreas(areas);
+          setSaveStatus('success');
+          setTimeout(() => setSaveStatus('idle'), 3000);
+        } else {
+          throw new Error(data.error || 'Failed to save service areas');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `Server responded with ${response.status}`
+        );
+      }
+    } catch (error) {
+      console.error('Error saving service areas:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
   const resetToBrandColors = () => {
     if (brandColors.primary || brandColors.secondary) {
       setConfig(prev => ({
@@ -312,8 +451,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         colorOverrides: {
           ...prev.colorOverrides,
           // Remove overrides for colors that have brand values
-          primary: brandColors.primary ? undefined : prev.colorOverrides?.primary,
-          secondary: brandColors.secondary ? undefined : prev.colorOverrides?.secondary,
+          primary: brandColors.primary
+            ? undefined
+            : prev.colorOverrides?.primary,
+          secondary: brandColors.secondary
+            ? undefined
+            : prev.colorOverrides?.secondary,
         },
       }));
     }
@@ -642,7 +785,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               />
             </div>
 
-
             <div className={styles.formGroup}>
               <label>Logo URL (optional)</label>
               <input
@@ -691,8 +833,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 <label>
                   Primary Color
                   <span className={styles.colorSource}>
-                    ({colorStates.primary.source === 'brand' ? 'from brand' : 
-                      colorStates.primary.source === 'override' ? 'custom' : 'default'})
+                    (
+                    {colorStates.primary.source === 'brand'
+                      ? 'from brand'
+                      : colorStates.primary.source === 'override'
+                        ? 'custom'
+                        : 'default'}
+                    )
                   </span>
                 </label>
                 <div className={styles.colorInputWithReset}>
@@ -700,12 +847,16 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     <input
                       type="color"
                       value={config.colors.primary}
-                      onChange={e => handleColorChange('primary', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('primary', e.target.value)
+                      }
                     />
                     <input
                       type="text"
                       value={config.colors.primary}
-                      onChange={e => handleColorChange('primary', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('primary', e.target.value)
+                      }
                       placeholder="#3b82f6"
                     />
                   </div>
@@ -726,8 +877,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 <label>
                   Secondary Color
                   <span className={styles.colorSource}>
-                    ({colorStates.secondary.source === 'brand' ? 'from brand' : 
-                      colorStates.secondary.source === 'override' ? 'custom' : 'default'})
+                    (
+                    {colorStates.secondary.source === 'brand'
+                      ? 'from brand'
+                      : colorStates.secondary.source === 'override'
+                        ? 'custom'
+                        : 'default'}
+                    )
                   </span>
                 </label>
                 <div className={styles.colorInputWithReset}>
@@ -735,12 +891,16 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     <input
                       type="color"
                       value={config.colors.secondary}
-                      onChange={e => handleColorChange('secondary', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('secondary', e.target.value)
+                      }
                     />
                     <input
                       type="text"
                       value={config.colors.secondary}
-                      onChange={e => handleColorChange('secondary', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('secondary', e.target.value)
+                      }
                       placeholder="#1e293b"
                     />
                   </div>
@@ -761,7 +921,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 <label>
                   Background Color
                   <span className={styles.colorSource}>
-                    ({colorStates.background.source === 'override' ? 'custom' : 'default'})
+                    (
+                    {colorStates.background.source === 'override'
+                      ? 'custom'
+                      : 'default'}
+                    )
                   </span>
                 </label>
                 <div className={styles.colorInputWithReset}>
@@ -769,12 +933,16 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     <input
                       type="color"
                       value={config.colors.background}
-                      onChange={e => handleColorChange('background', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('background', e.target.value)
+                      }
                     />
                     <input
                       type="text"
                       value={config.colors.background}
-                      onChange={e => handleColorChange('background', e.target.value)}
+                      onChange={e =>
+                        handleColorChange('background', e.target.value)
+                      }
                       placeholder="#ffffff"
                     />
                   </div>
@@ -795,7 +963,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 <label>
                   Text Color
                   <span className={styles.colorSource}>
-                    ({colorStates.text.source === 'override' ? 'custom' : 'default'})
+                    (
+                    {colorStates.text.source === 'override'
+                      ? 'custom'
+                      : 'default'}
+                    )
                   </span>
                 </label>
                 <div className={styles.colorInputWithReset}>
@@ -942,31 +1114,76 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           <div className={styles.section}>
             <h3>Service Areas</h3>
             <p className={styles.sectionDescription}>
-              Add zip codes where you provide service. Leave empty to serve all
-              areas.
+              Define where you provide service using geographic areas or zip
+              codes. Leave empty to serve all areas.
             </p>
 
-            <div className={styles.serviceAreaInput}>
-              <input
-                type="text"
-                value={serviceAreaInput}
-                onChange={e => setServiceAreaInput(e.target.value)}
-                placeholder="Enter zip code (e.g., 12345)"
-                onKeyDown={e => e.key === 'Enter' && addServiceArea()}
-              />
-              <button onClick={addServiceArea} type="button">
-                Add
+            <div className={styles.serviceAreaTabs}>
+              <button
+                type="button"
+                className={`${styles.tabButton} ${showServiceAreaMap ? styles.active : ''}`}
+                onClick={() => setShowServiceAreaMap(true)}
+              >
+                Geographic Areas
+              </button>
+              <button
+                type="button"
+                className={`${styles.tabButton} ${!showServiceAreaMap ? styles.active : ''}`}
+                onClick={() => setShowServiceAreaMap(false)}
+              >
+                Zip Codes
               </button>
             </div>
 
-            <div className={styles.serviceAreas}>
-              {config.service_areas.map(area => (
-                <span key={area} className={styles.serviceArea}>
-                  {area}
-                  <button onClick={() => removeServiceArea(area)}>×</button>
-                </span>
-              ))}
-            </div>
+            {!showServiceAreaMap ? (
+              <div className={styles.zipCodeSection}>
+                <div className={styles.serviceAreaInput}>
+                  <input
+                    type="text"
+                    value={serviceAreaInput}
+                    onChange={e => setServiceAreaInput(e.target.value)}
+                    placeholder="Enter zip code (e.g., 12345)"
+                    onKeyDown={e => e.key === 'Enter' && addServiceArea()}
+                  />
+                  <button onClick={addServiceArea} type="button">
+                    Add
+                  </button>
+                </div>
+
+                <div className={styles.serviceAreas}>
+                  {config.service_areas.map(area => (
+                    <span key={area} className={styles.serviceArea}>
+                      {area}
+                      <button onClick={() => removeServiceArea(area)}>×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className={styles.geographicSection}>
+                {googleApiKey ? (
+                  <ServiceAreaMap
+                    companyId={selectedCompany.id}
+                    existingAreas={serviceAreas}
+                    onAreasChange={setServiceAreas}
+                    onSave={saveServiceAreas}
+                    googleMapsApiKey={googleApiKey}
+                    defaultCenter={mapCenter || undefined}
+                  />
+                ) : (
+                  <div className={styles.missingApiKey}>
+                    <p>
+                      Google Maps API key is required for geographic service
+                      areas.
+                    </p>
+                    <p>
+                      Please add GOOGLE_PLACES_API_KEY to your environment
+                      variables.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Address API Section */}
@@ -974,7 +1191,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <h3>Address Autocomplete</h3>
             <p className={styles.sectionDescription}>
               Enable address autocomplete to help users enter accurate service
-              addresses. This feature uses Google Places API and may incur costs based on usage.
+              addresses. This feature uses Google Places API and may incur costs
+              based on usage.
             </p>
 
             <div className={styles.formGroup}>
@@ -1002,8 +1220,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     <strong>Google Places API</strong>
                   </div>
                   <small className={styles.fieldNote}>
-                    Uses Google Places API for accurate address suggestions. 
-                    GOOGLE_PLACES_API_KEY must be configured in environment variables.
+                    Uses Google Places API for accurate address suggestions.
+                    GOOGLE_PLACES_API_KEY must be configured in environment
+                    variables.
                   </small>
                 </div>
 

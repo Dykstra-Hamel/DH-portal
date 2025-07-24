@@ -360,6 +360,56 @@
   }
 }
 
+.serviceAreaTabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.tabButton {
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+
+  &:hover {
+    color: #374151;
+  }
+
+  &.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+  }
+}
+
+.zipCodeSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.geographicSection {
+  min-height: 200px;
+}
+
+.missingApiKey {
+  padding: 2rem;
+  text-align: center;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  color: #92400e;
+
+  p {
+    margin: 0.5rem 0;
+  }
+}
+
 .serviceAreaInput {
   display: flex;
   gap: 8px;
