@@ -12,7 +12,7 @@ import {
 async function shouldAutoCall(companyId: string): Promise<boolean> {
   try {
     const supabase = createAdminClient();
-    
+
     const { data: setting, error } = await supabase
       .from('company_settings')
       .select('setting_value')
@@ -77,13 +77,16 @@ async function handleAutoLeadCall(
     };
 
     // Make request to our retell-call endpoint
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/retell-call`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(callRequest),
-    });
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/retell-call`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(callRequest),
+      }
+    );
 
     if (!response.ok) {
       const errorData = await response.text();
@@ -95,7 +98,7 @@ async function handleAutoLeadCall(
     }
 
     const result = await response.json();
-    
+
     if (result.success) {
       return {
         success: true,
@@ -189,18 +192,21 @@ export async function POST(request: NextRequest) {
     let serviceAreaValidation = null;
     if (submission.coordinates || submission.addressDetails?.zip) {
       try {
-        const validationResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/service-areas/validate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            companyId: submission.companyId,
-            latitude: submission.coordinates?.latitude,
-            longitude: submission.coordinates?.longitude,
-            zipCode: submission.addressDetails?.zip,
-          }),
-        });
+        const validationResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_SITE_URL}/api/service-areas/validate`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              companyId: submission.companyId,
+              latitude: submission.coordinates?.latitude,
+              longitude: submission.coordinates?.longitude,
+              zipCode: submission.addressDetails?.zip,
+            }),
+          }
+        );
 
         if (validationResponse.ok) {
           serviceAreaValidation = await validationResponse.json();
@@ -215,7 +221,9 @@ export async function POST(request: NextRequest) {
     let isOutsideServiceArea = false;
     if (serviceAreaValidation && !serviceAreaValidation.served) {
       isOutsideServiceArea = true;
-      console.log(`Lead from outside service area - Company: ${submission.companyId}, Location: ${submission.address}`);
+      console.log(
+        `Lead from outside service area - Company: ${submission.companyId}, Location: ${submission.address}`
+      );
     }
 
     // Normalize phone number for consistent lookup and storage
@@ -331,7 +339,7 @@ export async function POST(request: NextRequest) {
     if (submission.estimatedPrice) {
       notes += `Estimated Price: $${submission.estimatedPrice.min} - $${submission.estimatedPrice.max} (${submission.estimatedPrice.service_type})\n`;
     }
-    
+
     // Add service area information to notes
     if (serviceAreaValidation) {
       if (serviceAreaValidation.served) {
@@ -388,7 +396,7 @@ export async function POST(request: NextRequest) {
           street: '',
           city: '',
           state: '',
-          zip: ''
+          zip: '',
         };
 
         if (submission.addressDetails) {
@@ -397,13 +405,15 @@ export async function POST(request: NextRequest) {
             street: submission.addressDetails.street || '',
             city: submission.addressDetails.city || '',
             state: submission.addressDetails.state || '',
-            zip: submission.addressDetails.zip || ''
+            zip: submission.addressDetails.zip || '',
           };
         } else if (submission.address) {
           // Parse formatted address string
-          const addressParts = submission.address.split(',').map(part => part.trim());
+          const addressParts = submission.address
+            .split(',')
+            .map(part => part.trim());
           const zipMatch = submission.address.match(/\b\d{5}\b/);
-          
+
           addressComponents.street = addressParts[0] || '';
           if (addressParts.length >= 2) {
             addressComponents.city = addressParts[1] || '';
@@ -441,7 +451,9 @@ export async function POST(request: NextRequest) {
           },
           status,
           customerComments, // Use formatted comments instead of generic notes
-          company ? { name: company.name, website: company.website } : undefined,
+          company
+            ? { name: company.name, website: company.website }
+            : undefined,
           addressComponents // Pass address components
         );
 
@@ -529,12 +541,14 @@ export async function POST(request: NextRequest) {
         priority,
         message:
           'Thank you! Your information has been submitted successfully. We&apos;ll be in touch soon.',
-        serviceArea: serviceAreaValidation ? {
-          served: serviceAreaValidation.served,
-          areas: serviceAreaValidation.areas,
-          primaryArea: serviceAreaValidation.primaryArea,
-          outsideServiceArea: !serviceAreaValidation.served,
-        } : null,
+        serviceArea: serviceAreaValidation
+          ? {
+              served: serviceAreaValidation.served,
+              areas: serviceAreaValidation.areas,
+              primaryArea: serviceAreaValidation.primaryArea,
+              outsideServiceArea: !serviceAreaValidation.served,
+            }
+          : null,
       })
     );
   } catch (error) {
