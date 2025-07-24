@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
         leads (
           id,
           customer_id,
+          company_id,
           customers (
             id,
             first_name,
