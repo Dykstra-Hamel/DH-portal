@@ -212,6 +212,66 @@ export default function CompaniesManager() {
       </div>
 
       <div className={styles.formGroup}>
+        <label>Address:</label>
+        <input
+          type="text"
+          value={company ? company.address || '' : formData.address}
+          onChange={e => {
+            if (company) {
+              setEditingCompany({ ...company, address: e.target.value });
+            } else {
+              setFormData({ ...formData, address: e.target.value });
+            }
+          }}
+        />
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>City:</label>
+        <input
+          type="text"
+          value={company ? company.city || '' : formData.city}
+          onChange={e => {
+            if (company) {
+              setEditingCompany({ ...company, city: e.target.value });
+            } else {
+              setFormData({ ...formData, city: e.target.value });
+            }
+          }}
+        />
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>State:</label>
+        <input
+          type="text"
+          value={company ? company.state || '' : formData.state}
+          onChange={e => {
+            if (company) {
+              setEditingCompany({ ...company, state: e.target.value });
+            } else {
+              setFormData({ ...formData, state: e.target.value });
+            }
+          }}
+        />
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>ZIP Code:</label>
+        <input
+          type="text"
+          value={company ? company.zip_code || '' : formData.zip_code}
+          onChange={e => {
+            if (company) {
+              setEditingCompany({ ...company, zip_code: e.target.value });
+            } else {
+              setFormData({ ...formData, zip_code: e.target.value });
+            }
+          }}
+        />
+      </div>
+
+      <div className={styles.formGroup}>
         <label>Industry:</label>
         <input
           type="text"
