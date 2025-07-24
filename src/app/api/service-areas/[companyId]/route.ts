@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 
+// TypeScript interfaces for service area data
+interface ServiceAreaFromDB {
+  id: string;
+  name: string;
+  type: 'polygon' | 'radius' | 'zip_code';
+  priority: number;
+  is_active: boolean;
+  polygon_geojson?: string;
+  center_lat?: string;
+  center_lng?: string;
+  radius_miles?: number;
+  zip_codes?: string[];
+}
+
+interface ServiceAreaInput {
+  name: string;
+  type: 'polygon' | 'radius' | 'zip_code';
+  polygon?: { lat: number; lng: number }[];
+  center?: { lat: number; lng: number };
+  radius?: number;
+  zipCodes?: string[];
+  priority?: number;
+  isActive?: boolean;
+}
+
 // Get all service areas for a company
 export async function GET(
   request: NextRequest,
@@ -37,7 +62,7 @@ export async function GET(
     }
 
     // Transform the data from the database function to the expected format
-    const formattedAreas = (serviceAreas || []).map(area => {
+    const formattedAreas = (serviceAreas || []).map((area: ServiceAreaFromDB) => {
       const formatted: any = {
         id: area.id,
         name: area.name,
@@ -232,7 +257,7 @@ export async function PUT(
 
     // Then insert all new service areas
     if (serviceAreas.length > 0) {
-      const insertData = serviceAreas.map((area: any) => {
+      const insertData = serviceAreas.map((area: ServiceAreaInput) => {
         const data: any = {
           company_id: companyId,
           name: area.name,
