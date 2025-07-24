@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useIsCompanyAdminAny } from '@/hooks/useCompanyRole';
@@ -40,6 +41,18 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname();
   const isPublicPage = pathname === '/login' || pathname === '/sign-up';
   const { isAdminForAnyCompany } = useIsCompanyAdminAny();
+
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Error signing out:', error);
+    } else {
+      router.push('/login');
+    }
+  };
 
   // Check if user is global admin
   useEffect(() => {
@@ -108,7 +121,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               icon={Users}
               path="/customers"
             />
-            <SidebarSectionNavItem itemText="Routing" icon={Route} path="#" />
+            {/* <SidebarSectionNavItem itemText="Routing" icon={Route} path="#" />
             <SidebarSectionNavItem
               itemText="Tech Revenue"
               icon={DollarSign}
@@ -118,7 +131,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               itemText="Employees"
               icon={UserCheck}
               path="#"
-            />
+            /> */}
           </SidebarSection>
 
           {/* Marketing Section */}
@@ -142,15 +155,15 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               icon={Briefcase}
               path="/projects"
             />
-            <SidebarSectionNavItem
+            {/* <SidebarSectionNavItem
               itemText="Email Campaigns"
               icon={Mail}
               path="#"
-            />
+            /> */}
           </SidebarSection>
 
           {/* Helpful Tools Section */}
-          <SidebarSection
+          {/* <SidebarSection
             sectionTitle="Helpful Tools"
             sectionState={helpfulToolsOpen}
             setSectionState={setHelpfulToolsOpen}
@@ -165,7 +178,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               icon={Package}
               path="#"
             />
-          </SidebarSection>
+          </SidebarSection> */}
         </nav>
 
         {/* Bottom Section */}

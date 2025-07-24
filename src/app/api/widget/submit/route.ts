@@ -159,6 +159,10 @@ interface WidgetSubmission {
     service_type: string;
   };
   conversationContext?: any;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -180,6 +184,39 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
+
+    // Check service area coverage if coordinates or zip code are provided
+    let serviceAreaValidation = null;
+    if (submission.coordinates || submission.addressDetails?.zip) {
+      try {
+        const validationResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/service-areas/validate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            companyId: submission.companyId,
+            latitude: submission.coordinates?.latitude,
+            longitude: submission.coordinates?.longitude,
+            zipCode: submission.addressDetails?.zip,
+          }),
+        });
+
+        if (validationResponse.ok) {
+          serviceAreaValidation = await validationResponse.json();
+        }
+      } catch (error) {
+        console.warn('Service area validation failed:', error);
+        // Continue processing - don't fail the submission if validation fails
+      }
+    }
+
+    // If service areas are configured but location is not served, add a flag but don't reject
+    let isOutsideServiceArea = false;
+    if (serviceAreaValidation && !serviceAreaValidation.served) {
+      isOutsideServiceArea = true;
+      console.log(`Lead from outside service area - Company: ${submission.companyId}, Location: ${submission.address}`);
+    }
 
     // Normalize phone number for consistent lookup and storage
     const normalizedPhone = normalizePhoneNumber(submission.contactInfo.phone);
@@ -229,6 +266,11 @@ export async function POST(request: NextRequest) {
           city: submission.addressDetails.city,
           state: submission.addressDetails.state,
           zip_code: submission.addressDetails.zip,
+          // Add coordinates if available
+          ...(submission.coordinates && {
+            latitude: submission.coordinates.latitude,
+            longitude: submission.coordinates.longitude,
+          }),
         };
       } else if (submission.address) {
         // Fallback: parse from formatted address string
@@ -288,6 +330,16 @@ export async function POST(request: NextRequest) {
     if (submission.address) notes += `Address: ${submission.address}\n`;
     if (submission.estimatedPrice) {
       notes += `Estimated Price: $${submission.estimatedPrice.min} - $${submission.estimatedPrice.max} (${submission.estimatedPrice.service_type})\n`;
+    }
+    
+    // Add service area information to notes
+    if (serviceAreaValidation) {
+      if (serviceAreaValidation.served) {
+        const primaryArea = serviceAreaValidation.primaryArea;
+        notes += `Service Area: ${primaryArea ? primaryArea.area_name : 'Covered'} (${serviceAreaValidation.areas.length} area(s))\n`;
+      } else {
+        notes += `Service Area: Outside coverage area\n`;
+      }
     }
 
     // Create lead
@@ -477,6 +529,12 @@ export async function POST(request: NextRequest) {
         priority,
         message:
           'Thank you! Your information has been submitted successfully. We&apos;ll be in touch soon.',
+        serviceArea: serviceAreaValidation ? {
+          served: serviceAreaValidation.served,
+          areas: serviceAreaValidation.areas,
+          primaryArea: serviceAreaValidation.primaryArea,
+          outsideServiceArea: !serviceAreaValidation.served,
+        } : null,
       })
     );
   } catch (error) {

@@ -1,0 +1,380 @@
+.serviceAreaMap {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mapControls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.drawingControls {
+  h4 {
+    margin: 0 0 1rem 0;
+    color: #1f2937;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+}
+
+.drawingButtons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.drawButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: #2563eb;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+.creationForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  label {
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.875rem;
+  }
+
+  input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.875rem;
+
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  }
+}
+
+.formActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.5rem;
+}
+
+.instruction {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.cancelButton {
+  padding: 0.5rem 1rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #dc2626;
+  }
+}
+
+.mapContainer {
+  width: 100%;
+  height: 500px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.areasList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.emptyState {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  padding: 2rem;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px dashed #d1d5db;
+  margin: 0;
+}
+
+.areasGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.areaCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1rem;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+  }
+
+  &.selected {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &.inactive {
+    opacity: 0.6;
+    background: #f9fafb;
+  }
+}
+
+.areaHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.areaInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  h5 {
+    margin: 0;
+    color: #1f2937;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+}
+
+.areaType {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #6b7280;
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.areaActions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.toggleButton {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &.active {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+
+    &:hover {
+      background: #059669;
+    }
+  }
+
+  &.inactive {
+    background: #6b7280;
+    color: white;
+    border-color: #6b7280;
+
+    &:hover {
+      background: #4b5563;
+    }
+  }
+}
+
+.deleteButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #dc2626;
+  }
+}
+
+.areaDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.areaDetail {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+
+  span:first-child {
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  span:last-child {
+    color: #1f2937;
+  }
+}
+
+@media (max-width: 768px) {
+  .serviceAreaMap {
+    padding: 1rem;
+  }
+
+  .drawingButtons {
+    flex-direction: column;
+  }
+
+  .areasGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .mapContainer {
+    height: 400px;
+  }
+}
+
+.areasHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+
+  h4 {
+    margin: 0;
+    color: #1f2937;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+}
+
+.saveSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.unsavedIndicator {
+  font-weight: 600;
+  color: #ef4444;
+  font-size: 14px;
+}
+
+.saveButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  }
+
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  &.success {
+    background: #10b981;
+    
+    &:hover:not(:disabled) {
+      background: #059669;
+      box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+    }
+  }
+
+  &.error {
+    background: #ef4444;
+    
+    &:hover:not(:disabled) {
+      background: #dc2626;
+      box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+    }
+  }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
