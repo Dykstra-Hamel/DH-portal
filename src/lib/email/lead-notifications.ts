@@ -6,11 +6,19 @@ const resend = new Resend(process.env.RESEND_API_KEY!);
 
 export async function sendLeadCreatedNotifications(
   recipients: string[],
-  leadData: LeadNotificationData
+  leadData: LeadNotificationData,
+  emailConfig?: {
+    subjectLine?: string;
+  }
 ) {
   try {
     const fromEmail =
       process.env.RESEND_FROM_EMAIL || 'notifications@yourdomain.com';
+    const fromName = process.env.RESEND_FROM_NAME || 'PCOcentral';
+
+    // Format from field with name
+    const fromField = `${fromName} <${fromEmail}>`;
+
     const results = [];
 
     // Send email to each recipient
@@ -22,10 +30,13 @@ export async function sendLeadCreatedNotifications(
           .replace(/[._]/g, ' ')
           .replace(/\b\w/g, l => l.toUpperCase());
 
+        // Generate subject line
+        const subject = generateSubjectLine(leadData, emailConfig?.subjectLine);
+
         const { data, error } = await resend.emails.send({
-          from: fromEmail,
+          from: fromField,
           to: [email],
-          subject: `🎯 New ${leadData.priority.toUpperCase()} Priority Lead - ${leadData.customerName}`,
+          subject: subject,
           html: generateLeadCreatedEmailTemplate(recipientName, leadData),
         });
 
@@ -85,4 +96,24 @@ export function validateEmails(emails: string[]): {
   }
 
   return { valid, invalid };
+}
+
+// Generate subject line with template variable support
+function generateSubjectLine(
+  leadData: LeadNotificationData,
+  customTemplate?: string
+): string {
+  // Default professional subject line
+  const defaultTemplate = 'New Service Request: {customerName} - {companyName}';
+
+  // Use custom template or default
+  const template = customTemplate || defaultTemplate;
+
+  // Replace template variables
+  return template
+    .replace(/\{customerName\}/g, leadData.customerName)
+    .replace(/\{companyName\}/g, leadData.companyName)
+    .replace(/\{pestIssue\}/g, leadData.pestType)
+    .replace(/\{priority\}/g, leadData.priority.toUpperCase())
+    .replace(/\{address\}/g, leadData.address);
 }

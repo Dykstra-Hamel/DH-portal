@@ -162,22 +162,79 @@
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   overflow: hidden;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
 }
 
 .section {
-  padding: 24px;
   border-bottom: 1px solid #e5e7eb;
 
   &:last-child {
     border-bottom: none;
   }
 
+  // Alternating backgrounds for better visual separation
+  &:nth-child(even) {
+    background-color: #f8fafc;
+  }
+
+  &:nth-child(odd) {
+    background-color: #ffffff;
+  }
+}
+
+.sectionHeader {
+  padding: 24px 28px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid transparent;
+  position: relative;
+
+  &:hover {
+    background-color: rgba(59, 130, 246, 0.04);
+    transform: translateY(-1px);
+  }
+
+  &:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+  }
+
+  // Enhanced styling for even sections (light gray background)
+  .section:nth-child(even) & {
+    &:hover {
+      background-color: rgba(59, 130, 246, 0.06);
+    }
+  }
+}
+
+.sectionHeaderContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+
   h3 {
-    margin: 0 0 16px 0;
+    margin: 0;
     color: #1f2937;
     font-size: 18px;
     font-weight: 600;
   }
+}
+
+.chevron {
+  color: #6b7280;
+  transition: transform 0.2s ease, color 0.2s ease;
+  flex-shrink: 0;
+
+  .sectionHeader:hover & {
+    color: #374151;
+  }
+}
+
+.sectionContent {
+  padding: 0 28px 28px 28px;
+  animation: slideDown 0.2s ease-out;
 }
 
 .sectionDescription {
@@ -632,5 +689,17 @@
     bottom: 20px !important;
     right: 20px !important;
     transform: none !important;
+  }
+}
+
+// Animation for collapsible sections
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

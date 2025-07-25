@@ -37,3 +37,8 @@ export interface LeadNotificationData {
   autoCallEnabled: boolean;
   submittedAt: string;
 }
+
+export interface EmailNotificationConfig {
+  subjectLine?: string;
+  enabled: boolean;
+}
