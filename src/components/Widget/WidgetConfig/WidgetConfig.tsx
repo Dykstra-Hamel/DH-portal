@@ -1,6 +1,14 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Save, Copy, Eye, RefreshCw, Check } from 'lucide-react';
+import {
+  Save,
+  Copy,
+  Eye,
+  RefreshCw,
+  Check,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
 import { createClient } from '@/lib/supabase/client';
 import styles from './WidgetConfig.module.scss';
@@ -59,12 +67,49 @@ interface WidgetConfigData {
   notifications: {
     emails: string[];
   };
+  emailNotifications: {
+    subjectLine: string;
+    enabled: boolean;
+  };
 }
 interface WidgetConfigProps {
   companies: Company[];
   selectedCompanyId?: string;
   onCompanyChange?: (companyId: string) => void;
 }
+
+// Collapsible Section Component - moved outside to prevent re-creation on renders
+const CollapsibleSection: React.FC<{
+  sectionKey: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+  isExpanded: boolean;
+  onToggle: () => void;
+  styles: any;
+}> = ({ sectionKey, title, description, children, isExpanded, onToggle, styles }) => {
+  return (
+    <div className={styles.section}>
+      <div
+        className={styles.sectionHeader}
+        onClick={onToggle}
+      >
+        <div className={styles.sectionHeaderContent}>
+          <h3>{title}</h3>
+          {isExpanded ? (
+            <ChevronDown size={20} className={styles.chevron} />
+          ) : (
+            <ChevronRight size={20} className={styles.chevron} />
+          )}
+        </div>
+        {description && (
+          <p className={styles.sectionDescription}>{description}</p>
+        )}
+      </div>
+      {isExpanded && <div className={styles.sectionContent}>{children}</div>}
+    </div>
+  );
+};
 const WidgetConfig: React.FC<WidgetConfigProps> = ({
   companies,
   selectedCompanyId,
@@ -89,7 +134,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     successMessage:
       'Thank you! Your information has been submitted successfully. We will contact you soon.',
     addressApi: {
-      enabled: false,
+      enabled: true,
       maxSuggestions: 5,
     },
     service_areas: [],
@@ -99,6 +144,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     },
     notifications: {
       emails: [],
+    },
+    emailNotifications: {
+      subjectLine: 'New Service Request: {customerName} - {companyName}',
+      enabled: true,
     },
   });
   const [serviceAreaInput, setServiceAreaInput] = useState('');
@@ -119,6 +168,18 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const [copyStatusButton, setCopyStatusButton] = useState<
     'idle' | 'copying' | 'copied'
   >('idle');
+
+  // Collapsible sections state
+  const [expandedSections, setExpandedSections] = useState({
+    branding: true, // Expanded by default
+    colors: false,
+    text: false,
+    welcome: false,
+    serviceAreas: false,
+    emailNotifications: false,
+    addressApi: false,
+    embedCode: true, // Expanded by default
+  });
   const [brandColors, setBrandColors] = useState<{
     primary?: string;
     secondary?: string;
@@ -146,6 +207,14 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     secondary: '#1e293b',
     background: '#ffffff',
     text: '#374151',
+  };
+
+  // Toggle section expansion
+  const toggleSection = (sectionKey: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }));
   };
   // Color resolution function
   const resolveColors = (
@@ -302,7 +371,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         widgetConfig.successMessage ||
         'Thank you! Your information has been submitted successfully. We will contact you soon.',
       addressApi: {
-        enabled: widgetConfig.addressApi?.enabled || false,
+        enabled: widgetConfig.addressApi?.hasOwnProperty('enabled') ? widgetConfig.addressApi.enabled : true,
         maxSuggestions: widgetConfig.addressApi?.maxSuggestions || 5,
       },
       service_areas: widgetConfig.service_areas || [],
@@ -314,6 +383,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       },
       notifications: {
         emails: widgetConfig.notifications?.emails || [],
+      },
+      emailNotifications: {
+        enabled: widgetConfig.emailNotifications?.enabled ?? true,
+        subjectLine:
+          widgetConfig.emailNotifications?.subjectLine ||
+          'New {pestIssue} Service Request From: {customerName}',
       },
     });
     // Set the notification emails input field
@@ -670,6 +745,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       </div>
     );
   }
+
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -677,6 +754,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         <p>Configure the AI-powered widget for {selectedCompany.name}</p>
         <div className={styles.headerActions}>
           <button
+            type="button"
             onClick={() => setShowPreview(!showPreview)}
             className={styles.previewButton}
           >
@@ -684,6 +762,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             {showPreview ? 'Hide Preview' : 'Show Preview'}
           </button>
           <button
+            type="button"
             onClick={saveConfig}
             disabled={isSaving}
             className={styles.saveButton}
@@ -723,8 +802,14 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       >
         <div className={styles.configSection}>
           {/* Branding Section */}
-          <div className={styles.section}>
-            <h3>Branding</h3>
+          <CollapsibleSection
+            sectionKey="branding"
+            title="Branding"
+            description="Configure your company name, headers, and logo for the widget"
+            isExpanded={expandedSections.branding}
+            onToggle={() => toggleSection('branding')}
+            styles={styles}
+          >
             <div className={styles.formGroup}>
               <label>Company Name</label>
               <input
@@ -769,13 +854,16 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="https://example.com/logo.png"
               />
             </div>
-          </div>
+          </CollapsibleSection>
           {/* Widget Colors Section */}
-          <div className={styles.section}>
-            <h3>Widget Colors</h3>
-            <p className={styles.sectionDescription}>
-              Customize the color scheme of your widget.
-            </p>
+          <CollapsibleSection
+            sectionKey="colors"
+            title="Widget Colors"
+            description="Customize the color scheme of your widget."
+            isExpanded={expandedSections.colors}
+            onToggle={() => toggleSection('colors')}
+            styles={styles}
+          >
             {(brandColors.primary || brandColors.secondary) && (
               <div className={styles.brandColorsSection}>
                 <button
@@ -964,13 +1052,38 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 </div>
               </div>
             </div>
-          </div>
+          </CollapsibleSection>
           {/* Widget Text Section */}
-          <div className={styles.section}>
-            <h3>Widget Text</h3>
-            <p className={styles.sectionDescription}>
-              Customize the text content of your widget.
-            </p>
+          <CollapsibleSection
+            sectionKey="text"
+            title="Widget Text"
+            description="Customize the text content of your widget."
+            isExpanded={expandedSections.text}
+            onToggle={() => toggleSection('text')}
+            styles={styles}
+          >
+            <div className={styles.formGroup}>
+              <label>Welcome Title</label>
+              <input
+                type="text"
+                value={config.messaging.welcome}
+                onChange={e =>
+                  handleConfigChange('messaging', 'welcome', e.target.value)
+                }
+                placeholder="Get Started"
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label>Welcome Description</label>
+              <textarea
+                value={config.messaging.fallback}
+                onChange={e =>
+                  handleConfigChange('messaging', 'fallback', e.target.value)
+                }
+                rows={2}
+                placeholder="Get your free pest control estimate in just a few steps."
+              />
+            </div>
             <div className={styles.formGroup}>
               <label>Submit Button Text</label>
               <input
@@ -999,81 +1112,16 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="Thank you! Your information has been submitted successfully. We will contact you soon."
               />
             </div>
-          </div>
-          {/* Welcome Step Section */}
-          <div className={styles.section}>
-            <h3>Welcome Step</h3>
-            <p className={styles.sectionDescription}>
-              Customize the title and description text shown on the first step
-              of your widget.
-            </p>
-            <div className={styles.formGroup}>
-              <label>Welcome Title</label>
-              <input
-                type="text"
-                value={config.messaging.welcome}
-                onChange={e =>
-                  handleConfigChange('messaging', 'welcome', e.target.value)
-                }
-                placeholder="Get Started"
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label>Welcome Description</label>
-              <textarea
-                value={config.messaging.fallback}
-                onChange={e =>
-                  handleConfigChange('messaging', 'fallback', e.target.value)
-                }
-                rows={2}
-                placeholder="Get your free pest control estimate in just a few steps."
-              />
-            </div>
-          </div>
-          {/* Email Notifications Section */}
-          <div className={styles.section}>
-            <h3>Email Notifications</h3>
-            <p className={styles.sectionDescription}>
-              Enter email addresses that should receive notifications when
-              customers submit the widget form. Separate multiple emails with
-              commas or new lines.
-            </p>
-            <div className={styles.formGroup}>
-              <label>Notification Email Addresses</label>
-              <textarea
-                value={notificationEmailsInput}
-                onChange={e => setNotificationEmailsInput(e.target.value)}
-                onBlur={updateNotificationEmails}
-                rows={3}
-                placeholder="user@company.com, manager@company.com, admin@company.com"
-              />
-            </div>
-            {config.notifications.emails.length > 0 && (
-              <div className={styles.emailList}>
-                <label>Current notification emails:</label>
-                <div className={styles.emailTags}>
-                  {config.notifications.emails.map(email => (
-                    <span key={email} className={styles.emailTag}>
-                      {email}
-                      <button
-                        onClick={() => removeNotificationEmail(email)}
-                        type="button"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          </CollapsibleSection>
           {/* Service Areas Section */}
-          <div className={styles.section}>
-            <h3>Service Areas</h3>
-            <p className={styles.sectionDescription}>
-              Define where you provide service using geographic areas or zip
-              codes. Leave empty to serve all areas.
-            </p>
+          <CollapsibleSection
+            sectionKey="serviceAreas"
+            title="Service Areas"
+            description="Define where you provide service using geographic areas or zip codes. Leave empty to serve all areas."
+            isExpanded={expandedSections.serviceAreas}
+            onToggle={() => toggleSection('serviceAreas')}
+            styles={styles}
+          >
             <div className={styles.serviceAreaTabs}>
               <button
                 type="button"
@@ -1108,7 +1156,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                   {config.service_areas.map(area => (
                     <span key={area} className={styles.serviceArea}>
                       {area}
-                      <button onClick={() => removeServiceArea(area)}>×</button>
+                      <button type="button" onClick={() => removeServiceArea(area)}>×</button>
                     </span>
                   ))}
                 </div>
@@ -1138,15 +1186,118 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 )}
               </div>
             )}
-          </div>
+          </CollapsibleSection>
+
+          {/* Email Notifications Section */}
+          <CollapsibleSection
+            sectionKey="emailNotifications"
+            title="Email Notifications"
+            description="Configure email notifications that are sent when customers submit the widget form."
+            isExpanded={expandedSections.emailNotifications}
+            onToggle={() => toggleSection('emailNotifications')}
+            styles={styles}
+          >
+            <div className={styles.formGroup}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.emailNotifications.enabled}
+                  onChange={e =>
+                    handleConfigChange(
+                      'emailNotifications',
+                      'enabled',
+                      e.target.checked
+                    )
+                  }
+                />
+                Enable Email Notifications
+              </label>
+            </div>
+
+            {config.emailNotifications.enabled && (
+              <>
+                <div className={styles.formGroup}>
+                  <label>Notification Email Addresses</label>
+                  <textarea
+                    value={notificationEmailsInput}
+                    onChange={e => setNotificationEmailsInput(e.target.value)}
+                    onBlur={updateNotificationEmails}
+                    rows={3}
+                    placeholder="user@company.com, manager@company.com, admin@company.com"
+                  />
+                  <small className={styles.fieldNote}>
+                    Enter email addresses that should receive notifications.
+                    Separate multiple emails with commas or new lines.
+                  </small>
+                </div>
+
+                {config.notifications.emails.length > 0 && (
+                  <div className={styles.emailList}>
+                    <label>Current notification emails:</label>
+                    <div className={styles.emailTags}>
+                      {config.notifications.emails.map(email => (
+                        <span key={email} className={styles.emailTag}>
+                          {email}
+                          <button
+                            onClick={() => removeNotificationEmail(email)}
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className={styles.formGroup}>
+                  <label>Subject Line Template</label>
+                  <input
+                    type="text"
+                    value={config.emailNotifications.subjectLine}
+                    onChange={e =>
+                      handleConfigChange(
+                        'emailNotifications',
+                        'subjectLine',
+                        e.target.value
+                      )
+                    }
+                    placeholder="New {pestIssue} Service Request From: {customerName}"
+                  />
+                  <small className={styles.fieldNote}>
+                    Available variables: {'{customerName}'}, {'{companyName}'},{' '}
+                    {'{pestIssue}'}, {'{priority}'}, {'{address}'}
+                  </small>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label>Subject Line Preview</label>
+                  <div className={styles.previewBox}>
+                    <strong>Subject:</strong>{' '}
+                    {config.emailNotifications.subjectLine
+                      .replace(/\{customerName\}/g, 'John Smith')
+                      .replace(
+                        /\{companyName\}/g,
+                        config.branding.companyName || 'Your Company'
+                      )
+                      .replace(/\{pestIssue\}/g, 'Ant Treatment')
+                      .replace(/\{priority\}/g, 'HIGH')
+                      .replace(/\{address\}/g, '123 Main St, City, State')}
+                  </div>
+                </div>
+              </>
+            )}
+          </CollapsibleSection>
+
           {/* Address API Section */}
-          <div className={styles.section}>
-            <h3>Address Autocomplete</h3>
-            <p className={styles.sectionDescription}>
-              Enable address autocomplete to help users enter accurate service
-              addresses. This feature uses Google Places API and may incur costs
-              based on usage.
-            </p>
+          <CollapsibleSection
+            sectionKey="addressApi"
+            title="Address Autocomplete"
+            description="Enable address autocomplete to help users enter accurate service addresses. This feature uses Google Places API and may incur costs based on usage."
+            isExpanded={expandedSections.addressApi}
+            onToggle={() => toggleSection('addressApi')}
+            styles={styles}
+          >
             <div className={styles.formGroup}>
               <label>
                 <input
@@ -1197,24 +1348,27 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 </div>
               </>
             )}
-          </div>
+          </CollapsibleSection>
           {/* Embed Code Section */}
-          <div className={styles.section}>
-            <h3>Embed Code</h3>
-            <p className={styles.sectionDescription}>
-              Copy this code and paste it on your website where you want the
-              widget to appear.
-            </p>
-
+          <CollapsibleSection
+            sectionKey="embedCode"
+            title="Embed Code"
+            description="Copy this code and paste it on your website where you want the widget to appear."
+            isExpanded={expandedSections.embedCode}
+            onToggle={() => toggleSection('embedCode')}
+            styles={styles}
+          >
             {/* Minimal Embed Code */}
             <div className={styles.embedCodeGroup}>
               <h4>Minimal Configuration (Recommended)</h4>
               <p className={styles.embedDescription}>
-                Clean, simple embed code. Customizations will be loaded from your saved configuration.
+                Clean, simple embed code. Customizations will be loaded from
+                your saved configuration.
               </p>
               <div className={styles.embedCode}>
                 <code>{generateMinimalEmbedCode()}</code>
                 <button
+                  type="button"
                   onClick={copyMinimalEmbedCode}
                   className={styles.copyButton}
                   disabled={copyStatusMinimal === 'copying'}
@@ -1235,12 +1389,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.embedCodeGroup}>
               <h4>Button + Modal</h4>
               <p className={styles.embedDescription}>
-                Displays as a button that opens the widget in a lightbox modal. 
+                Displays as a button that opens the widget in a lightbox modal.
                 Perfect for pages where you want a smaller footprint.
               </p>
               <div className={styles.embedCode}>
                 <code>{generateButtonEmbedCode()}</code>
                 <button
+                  type="button"
                   onClick={copyButtonEmbedCode}
                   className={styles.copyButton}
                   disabled={copyStatusButton === 'copying'}
@@ -1261,11 +1416,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.embedCodeGroup}>
               <h4>Full Configuration</h4>
               <p className={styles.embedDescription}>
-                Includes all your customizations as data attributes for maximum portability.
+                Includes all your customizations as data attributes for maximum
+                portability.
               </p>
               <div className={styles.embedCode}>
                 <code>{generateFullEmbedCode()}</code>
                 <button
+                  type="button"
                   onClick={copyFullEmbedCode}
                   className={styles.copyButton}
                   disabled={copyStatusFull === 'copying'}
@@ -1281,7 +1438,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 </button>
               </div>
             </div>
-          </div>
+          </CollapsibleSection>
         </div>
         {/* Preview Section */}
         {showPreview && (

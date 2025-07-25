@@ -677,9 +677,18 @@ export async function POST(request: NextRequest) {
             submittedAt: new Date().toISOString(),
           };
 
+          // Get email notification configuration from company widget config
+          const emailConfig = company?.widget_config?.emailNotifications || {
+            enabled: true,
+            subjectLine: 'New Service Request: {customerName} - {companyName}'
+          };
+
           const emailResult = await sendLeadCreatedNotifications(
             validEmails,
-            leadNotificationData
+            leadNotificationData,
+            emailConfig.enabled ? {
+              subjectLine: emailConfig.subjectLine
+            } : undefined
           );
 
           if (emailResult.success) {

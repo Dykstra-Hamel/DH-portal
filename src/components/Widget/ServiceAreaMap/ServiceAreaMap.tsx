@@ -113,8 +113,12 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
       // Update the ref with the new value
       prevExistingAreasRef.current = existingAreas;
       
-      // Only reset unsaved changes on initial load (when prev was empty)
-      if (prevIds.length === 0) {
+      // Only reset unsaved changes if this is truly external data (not our own changes)
+      // This happens when new areas have permanent IDs (not temp-*) or when both prev and new are empty
+      const hasOnlyTempIds = newIds.every(id => id.startsWith('temp-'));
+      const isInitialLoad = prevIds.length === 0 && newIds.length === 0;
+      
+      if (isInitialLoad || !hasOnlyTempIds) {
         setHasUnsavedChanges(false);
       }
     }
