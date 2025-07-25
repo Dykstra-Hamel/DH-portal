@@ -349,24 +349,34 @@ export async function POST(request: NextRequest) {
     let customerId: string;
     let existingCustomer = null;
 
+    console.log('Looking for existing customer:', {
+      email: submission.contactInfo.email,
+      phone: normalizedPhone,
+      companyId: submission.companyId
+    });
+
     // First, try to find by email
-    const { data: emailCustomer } = await supabase
+    const { data: emailCustomer, error: emailError } = await supabase
       .from('customers')
       .select('id')
       .eq('email', submission.contactInfo.email)
       .eq('company_id', submission.companyId)
       .single();
 
+    console.log('Email customer lookup result:', { emailCustomer, emailError });
+
     if (emailCustomer) {
       existingCustomer = emailCustomer;
     } else if (normalizedPhone) {
       // If no email match and we have a valid phone, try phone lookup
-      const { data: phoneCustomer } = await supabase
+      const { data: phoneCustomer, error: phoneError } = await supabase
         .from('customers')
         .select('id')
         .eq('phone', normalizedPhone)
         .eq('company_id', submission.companyId)
         .single();
+
+      console.log('Phone customer lookup result:', { phoneCustomer, phoneError });
 
       if (phoneCustomer) {
         existingCustomer = phoneCustomer;
@@ -422,10 +432,23 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (customerError || !newCustomer) {
-        console.error('Error creating customer:', customerError);
+        console.error('Error creating customer:', {
+          error: customerError,
+          errorCode: customerError?.code,
+          errorMessage: customerError?.message,
+          customerData: {
+            company_id: submission.companyId,
+            first_name: firstName,
+            last_name: lastName,
+            email: submission.contactInfo.email,
+            phone: normalizedPhone || submission.contactInfo.phone,
+            customer_status: 'active',
+            ...addressData,
+          }
+        });
         return addCorsHeaders(
           NextResponse.json(
-            { error: 'Failed to create customer' },
+            { error: 'Failed to create customer', details: customerError?.message },
             { status: 500 }
           )
         );
