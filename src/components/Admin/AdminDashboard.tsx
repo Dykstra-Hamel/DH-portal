@@ -9,6 +9,9 @@ import BrandManager from './BrandManager';
 import ProjectsManager from './ProjectsManager';
 import WidgetManager from './WidgetManager';
 import CallsManager from './CallsManager';
+import PartialLeadsManager from './PartialLeadsManager';
+import AttributionAnalytics from './AttributionAnalytics';
+import FormAnalytics from './FormAnalytics';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -22,7 +25,10 @@ type AdminSection =
   | 'brands'
   | 'projects'
   | 'widgets'
-  | 'calls';
+  | 'calls'
+  | 'partial-leads'
+  | 'attribution-analytics'
+  | 'form-analytics';
 
 export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [activeSection, setActiveSection] = useState<AdminSection>('users');
@@ -43,6 +49,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <WidgetManager />;
       case 'calls':
         return <CallsManager />;
+      case 'partial-leads':
+        return <PartialLeadsManager />;
+      case 'attribution-analytics':
+        return <AttributionAnalytics />;
+      case 'form-analytics':
+        return <FormAnalytics />;
       default:
         return <UsersManager />;
     }
@@ -97,6 +109,24 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           onClick={() => setActiveSection('calls')}
         >
           Calls
+        </button>
+        <button
+          className={`${styles.navButton} ${activeSection === 'partial-leads' ? styles.active : ''}`}
+          onClick={() => setActiveSection('partial-leads')}
+        >
+          Partial Leads
+        </button>
+        <button
+          className={`${styles.navButton} ${activeSection === 'attribution-analytics' ? styles.active : ''}`}
+          onClick={() => setActiveSection('attribution-analytics')}
+        >
+          Attribution Analytics
+        </button>
+        <button
+          className={`${styles.navButton} ${activeSection === 'form-analytics' ? styles.active : ''}`}
+          onClick={() => setActiveSection('form-analytics')}
+        >
+          Form Analytics
         </button>
       </nav>
 

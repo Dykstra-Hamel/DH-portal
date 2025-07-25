@@ -119,6 +119,61 @@ async function handleAutoLeadCall(
   }
 }
 
+// Helper function to determine lead source from attribution data
+function determineLeadSourceFromAttribution(attributionData: any): string {
+  if (!attributionData) return 'other';
+
+  const { utm_source, utm_medium, gclid, traffic_source, referrer_domain } =
+    attributionData;
+
+  // Google Ads (highest priority)
+  if (gclid || (utm_source === 'google' && utm_medium === 'cpc')) {
+    return 'google_cpc';
+  }
+
+  // Facebook Ads
+  if (
+    utm_source === 'facebook' &&
+    ['paid', 'cpc', 'ads'].includes(utm_medium)
+  ) {
+    return 'facebook_ads';
+  }
+
+  // LinkedIn
+  if (utm_source === 'linkedin') {
+    return 'linkedin';
+  }
+
+  // Bing Ads
+  if (utm_source === 'bing' && utm_medium === 'cpc') {
+    return 'bing_cpc';
+  }
+
+  // Organic search
+  if (traffic_source === 'organic') {
+    return 'organic';
+  }
+
+  // Social media
+  if (
+    traffic_source === 'social' ||
+    (referrer_domain &&
+      ['facebook.com', 'instagram.com', 'twitter.com', 'linkedin.com'].includes(
+        referrer_domain
+      ))
+  ) {
+    return 'social_media';
+  }
+
+  // Referral
+  if (traffic_source === 'referral') {
+    return 'referral';
+  }
+
+  // Default
+  return 'other';
+}
+
 // Handle CORS preflight requests
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -166,6 +221,26 @@ interface WidgetSubmission {
     latitude: number;
     longitude: number;
   };
+  // Enhanced attribution and session data
+  sessionId?: string;
+  attributionData?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_term?: string;
+    utm_content?: string;
+    gclid?: string;
+    referrer_url?: string;
+    referrer_domain?: string;
+    traffic_source?: string;
+    page_url?: string;
+    user_agent?: string;
+    timestamp?: string;
+    collected_at?: string;
+    cross_domain_data?: any;
+    domain?: string;
+    subdomain?: string;
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -187,6 +262,47 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
+
+    // Check for existing partial lead to link conversion
+    let partialLead = null;
+    let partialLeadAttribution = null;
+    if (submission.sessionId) {
+      try {
+        const { data: existingPartialLead, error: partialLeadError } =
+          await supabase
+            .from('partial_leads')
+            .select(
+              `
+            id,
+            form_data,
+            attribution_data,
+            service_area_data,
+            created_at
+          `
+            )
+            .eq('session_id', submission.sessionId)
+            .eq('company_id', submission.companyId)
+            .is('converted_to_lead_id', null)
+            .single();
+
+        if (existingPartialLead && !partialLeadError) {
+          partialLead = existingPartialLead;
+          partialLeadAttribution = existingPartialLead.attribution_data;
+          console.log('Found partial lead to convert:', partialLead.id);
+        }
+      } catch (error) {
+        console.warn('Error checking for partial lead:', error);
+        // Continue processing - don't fail submission if partial lead lookup fails
+      }
+    }
+
+    // Merge attribution data: prioritize submission data, fallback to partial lead
+    const finalAttributionData = {
+      ...partialLeadAttribution,
+      ...submission.attributionData,
+      conversion_timestamp: new Date().toISOString(),
+      converted_from_partial: !!partialLead,
+    };
 
     // Check service area coverage if coordinates or zip code are provided
     let serviceAreaValidation = null;
@@ -350,14 +466,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create lead
+    // Determine lead source from attribution data
+    const leadSource = determineLeadSourceFromAttribution(finalAttributionData);
+
+    // Create lead with enhanced attribution data
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .insert([
         {
           company_id: submission.companyId,
           customer_id: customerId,
-          lead_source: 'other',
+          partial_lead_id: partialLead?.id || null,
+          lead_source: leadSource,
           lead_type: 'web_form',
           lead_status: status,
           priority,
@@ -366,6 +486,14 @@ export async function POST(request: NextRequest) {
             ? (submission.estimatedPrice.min + submission.estimatedPrice.max) /
               2
             : null,
+          // Attribution fields
+          utm_source: finalAttributionData.utm_source || null,
+          utm_medium: finalAttributionData.utm_medium || null,
+          utm_campaign: finalAttributionData.utm_campaign || null,
+          utm_term: finalAttributionData.utm_term || null,
+          utm_content: finalAttributionData.utm_content || null,
+          gclid: finalAttributionData.gclid || null,
+          attribution_data: finalAttributionData,
         },
       ])
       .select('id')
@@ -376,6 +504,26 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(
         NextResponse.json({ error: 'Failed to create lead' }, { status: 500 })
       );
+    }
+
+    // Update partial lead to mark it as converted (if it exists)
+    if (partialLead) {
+      try {
+        await supabase
+          .from('partial_leads')
+          .update({
+            converted_to_lead_id: lead.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', partialLead.id);
+
+        console.log(
+          `Partial lead ${partialLead.id} marked as converted to lead ${lead.id}`
+        );
+      } catch (error) {
+        console.warn('Error updating partial lead conversion status:', error);
+        // Don't fail the lead creation if this update fails
+      }
     }
 
     // Get company info for both calling and email notifications
@@ -549,6 +697,19 @@ export async function POST(request: NextRequest) {
               outsideServiceArea: !serviceAreaValidation.served,
             }
           : null,
+        attribution: {
+          leadSource: leadSource,
+          hasAttribution: !!(
+            finalAttributionData.utm_source || finalAttributionData.gclid
+          ),
+          convertedFromPartial: !!partialLead,
+          partialLeadId: partialLead?.id || null,
+          utmSource: finalAttributionData.utm_source || null,
+          utmMedium: finalAttributionData.utm_medium || null,
+          utmCampaign: finalAttributionData.utm_campaign || null,
+          gclid: finalAttributionData.gclid || null,
+          trafficSource: finalAttributionData.traffic_source || null,
+        },
       })
     );
   } catch (error) {

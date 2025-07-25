@@ -75,22 +75,22 @@ export function generateLeadCreatedEmailTemplate(
             </h3>
             
             <div style="display: grid; gap: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
                 <span style="font-weight: 500; color: #64748b;">Name: </span>
                 <span style="color: #1e293b;">${customerName}</span>
               </div>
               
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
                 <span style="font-weight: 500; color: #64748b;">Email: </span>
                 <a href="mailto:${customerEmail}" style="color: #007bff; text-decoration: none;">${customerEmail}</a>
               </div>
               
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
                 <span style="font-weight: 500; color: #64748b;">Phone: </span>
                 <a href="tel:${customerPhone}" style="color: #007bff; text-decoration: none;">${customerPhone}</a>
               </div>
               
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; gap: 5px;">
                 <span style="font-weight: 500; color: #64748b;">Address: </span>
                 <span style="color: #1e293b; text-align: right; max-width: 300px;">${address}</span>
               </div>
@@ -104,7 +104,7 @@ export function generateLeadCreatedEmailTemplate(
             </h3>
             
             <div style="display: grid; gap: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
                 <span style="font-weight: 500; color: #64748b;">Pest Issue: </span>
                 <span style="color: #1e293b;">${pestIssue}</span>
               </div>
@@ -112,7 +112,7 @@ export function generateLeadCreatedEmailTemplate(
               ${
                 homeSize
                   ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
                   <span style="font-weight: 500; color: #64748b;">Home Size:</span>
                   <span style="color: #1e293b;">${homeSize.toLocaleString()} sq ft</span>
                 </div>
@@ -123,7 +123,7 @@ export function generateLeadCreatedEmailTemplate(
               ${
                 estimatedPrice
                   ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
                   <span style="font-weight: 500; color: #64748b;">Estimated Price:</span>
                   <span style="color: #1e293b;">$${estimatedPrice.min} - $${estimatedPrice.max} (${estimatedPrice.service_type})</span>
                 </div>
