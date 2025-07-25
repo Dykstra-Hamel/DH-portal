@@ -400,11 +400,6 @@ export async function POST(request: NextRequest) {
           city: submission.addressDetails.city,
           state: submission.addressDetails.state,
           zip_code: submission.addressDetails.zip,
-          // Add coordinates if available
-          ...(submission.coordinates && {
-            latitude: submission.coordinates.latitude,
-            longitude: submission.coordinates.longitude,
-          }),
         };
       } else if (submission.address) {
         // Fallback: parse from formatted address string
