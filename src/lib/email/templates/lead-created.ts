@@ -9,7 +9,10 @@ export function generateLeadCreatedEmailTemplate(
     customerName,
     customerEmail,
     customerPhone,
-    pestIssue,
+    pestType,
+    urgency,
+    selectedPlan,
+    recommendedPlan,
     address,
     homeSize,
     estimatedPrice,
@@ -105,9 +108,36 @@ export function generateLeadCreatedEmailTemplate(
             
             <div style="display: grid; gap: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                <span style="font-weight: 500; color: #64748b;">Pest Issue: </span>
-                <span style="color: #1e293b;">${pestIssue}</span>
+                <span style="font-weight: 500; color: #64748b;">Pest Type: </span>
+                <span style="color: #1e293b;">${pestType}</span>
               </div>
+              
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
+                <span style="font-weight: 500; color: #64748b;">Urgency: </span>
+                <span style="color: #1e293b;">${urgency}</span>
+              </div>
+              
+              ${
+                selectedPlan
+                  ? `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
+                  <span style="font-weight: 500; color: #64748b;">Selected Plan:</span>
+                  <span style="color: #1e293b;">${selectedPlan}</span>
+                </div>
+              `
+                  : ''
+              }
+              
+              ${
+                recommendedPlan
+                  ? `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
+                  <span style="font-weight: 500; color: #64748b;">Recommended Plan:</span>
+                  <span style="color: #1e293b;">${recommendedPlan}</span>
+                </div>
+              `
+                  : ''
+              }
               
               ${
                 homeSize
