@@ -223,6 +223,7 @@ interface WidgetSubmission {
     name: string;
     phone: string;
     email: string;
+    comments?: string;
   };
   estimatedPrice?: {
     min: number;
@@ -467,6 +468,9 @@ export async function POST(request: NextRequest) {
     if (submission.estimatedPrice) {
       notes += `Estimated Price: $${submission.estimatedPrice.min} - $${submission.estimatedPrice.max} (${submission.estimatedPrice.service_type})\n`;
     }
+    if (submission.contactInfo.comments && submission.contactInfo.comments.trim()) {
+      notes += `Customer Comments: ${submission.contactInfo.comments.trim()}\n`;
+    }
 
     // Add service area information to notes
     if (serviceAreaValidation) {
@@ -601,6 +605,9 @@ export async function POST(request: NextRequest) {
         }
         if (submission.address) {
           customerComments += `Address: ${submission.address}\n`;
+        }
+        if (submission.contactInfo.comments && submission.contactInfo.comments.trim()) {
+          customerComments += `Customer Comments: ${submission.contactInfo.comments.trim()}\n`;
         }
 
         const callResult = await handleAutoLeadCall(
