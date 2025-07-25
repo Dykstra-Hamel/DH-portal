@@ -10,6 +10,10 @@ interface RetellCallRequest {
   email: string;
   phone: string;
   message: string;
+  pestType?: string;
+  urgency?: string;
+  selectedPlan?: string;
+  recommendedPlan?: string;
   streetAddress?: string;
   city?: string;
   state?: string;
@@ -27,6 +31,10 @@ interface RetellCallPayload {
     customer_name: string;
     customer_email: string;
     customer_comments: string;
+    customer_pest_problem?: string;
+    customer_urgency?: string;
+    customer_selected_plan?: string;
+    customer_recommended_plan?: string;
     customer_street_address?: string;
     customer_city?: string;
     customer_state?: string;
@@ -47,6 +55,10 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       message,
+      pestType,
+      urgency,
+      selectedPlan,
+      recommendedPlan,
       streetAddress,
       city,
       state,
@@ -193,6 +205,10 @@ export async function POST(request: NextRequest) {
         customer_name: `${firstName} ${lastName}`,
         customer_email: email,
         customer_comments: message,
+        customer_pest_problem: pestType || '',
+        customer_urgency: urgency || '',
+        customer_selected_plan: selectedPlan || '',
+        customer_recommended_plan: recommendedPlan || '',
         customer_street_address: streetAddress || '',
         customer_city: city || '',
         customer_state: state || '',

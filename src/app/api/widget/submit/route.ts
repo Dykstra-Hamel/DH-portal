@@ -53,6 +53,12 @@ async function handleAutoLeadCall(
     city: string;
     state: string;
     zip: string;
+  },
+  pestData?: {
+    pestType: string;
+    urgency: string;
+    selectedPlan?: string;
+    recommendedPlan?: string;
   }
 ): Promise<{
   success: boolean;
@@ -69,6 +75,10 @@ async function handleAutoLeadCall(
       email: customerData.email,
       phone: customerData.phone,
       message: notes, // Use the formatted customer comments
+      pestType: pestData?.pestType || '',
+      urgency: pestData?.urgency || '',
+      selectedPlan: pestData?.selectedPlan || '',
+      recommendedPlan: pestData?.recommendedPlan || '',
       streetAddress: addressComponents?.street || '',
       city: addressComponents?.city || '',
       state: addressComponents?.state || '',
@@ -196,7 +206,10 @@ const addCorsHeaders = (response: NextResponse) => {
 
 interface WidgetSubmission {
   companyId: string;
-  pestIssue: string;
+  pestType: string;
+  urgency: string;
+  selectedPlan?: string;
+  recommendedPlan?: string;
   address: string; // Formatted address for backward compatibility
   addressDetails?: {
     // New structured address data
@@ -448,7 +461,14 @@ export async function POST(request: NextRequest) {
 
     // Create lead notes
     let notes = `Widget Submission:\n`;
-    notes += `Pest Issue: ${submission.pestIssue}\n`;
+    notes += `Pest Type: ${submission.pestType}\n`;
+    notes += `Urgency: ${submission.urgency}\n`;
+    if (submission.selectedPlan) {
+      notes += `Selected Plan: ${submission.selectedPlan}\n`;
+    }
+    if (submission.recommendedPlan) {
+      notes += `Recommended Plan: ${submission.recommendedPlan}\n`;
+    }
     if (submission.homeSize)
       notes += `Home Size: ${submission.homeSize} sq ft\n`;
     if (submission.address) notes += `Address: ${submission.address}\n`;
@@ -576,7 +596,14 @@ export async function POST(request: NextRequest) {
 
         // Format customer comments with widget-specific details
         let customerComments = `Widget Submission Details:\n`;
-        customerComments += `Pest Issue: ${submission.pestIssue}\n`;
+        customerComments += `Pest Type: ${submission.pestType}\n`;
+        customerComments += `Urgency: ${submission.urgency}\n`;
+        if (submission.selectedPlan) {
+          customerComments += `Selected Plan: ${submission.selectedPlan}\n`;
+        }
+        if (submission.recommendedPlan) {
+          customerComments += `Recommended Plan: ${submission.recommendedPlan}\n`;
+        }
         if (submission.homeSize) {
           customerComments += `Home Size: ${submission.homeSize} sq ft\n`;
         }
@@ -602,7 +629,13 @@ export async function POST(request: NextRequest) {
           company
             ? { name: company.name, website: company.website }
             : undefined,
-          addressComponents // Pass address components
+          addressComponents, // Pass address components
+          {
+            pestType: submission.pestType,
+            urgency: submission.urgency,
+            selectedPlan: submission.selectedPlan,
+            recommendedPlan: submission.recommendedPlan,
+          }
         );
 
         if (callResult.success && !callResult.skipped) {
@@ -650,7 +683,10 @@ export async function POST(request: NextRequest) {
             customerName: submission.contactInfo.name,
             customerEmail: submission.contactInfo.email,
             customerPhone: submission.contactInfo.phone,
-            pestIssue: submission.pestIssue,
+            pestType: submission.pestType,
+            urgency: submission.urgency,
+            selectedPlan: submission.selectedPlan,
+            recommendedPlan: submission.recommendedPlan,
             address: submission.address,
             homeSize: submission.homeSize,
             estimatedPrice: submission.estimatedPrice,
