@@ -2792,17 +2792,21 @@
       };
 
       // Open modal function
+      // Track if modal widget has been created
+      let modalWidgetCreated = false;
+      
       const openModal = () => {
         const modal = document.getElementById('dh-modal-overlay');
         const modalBody = document.getElementById('dh-modal-body');
 
         if (modal && modalBody) {
-          // Clear any existing content
-          modalBody.innerHTML = '';
-
-          // Create the widget inside the modal
-          const widget = createInlineWidget();
-          modalBody.appendChild(widget.formWidget);
+          // Only create widget on first open, then reuse the existing one
+          if (!modalWidgetCreated) {
+            modalBody.innerHTML = '';
+            const widget = createInlineWidget();
+            modalBody.appendChild(widget.formWidget);
+            modalWidgetCreated = true;
+          }
 
           // Show modal
           modal.style.display = 'flex';
@@ -2824,6 +2828,16 @@
         if (modal) {
           modal.style.display = 'none';
           document.body.style.overflow = ''; // Restore scroll
+          // State is automatically preserved since we're not destroying the widget
+        }
+      };
+      
+      // Function to reset modal widget (for testing purposes)
+      window.resetModalWidget = () => {
+        modalWidgetCreated = false;
+        const modalBody = document.getElementById('dh-modal-body');
+        if (modalBody) {
+          modalBody.innerHTML = '';
         }
       };
 
