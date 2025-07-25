@@ -265,44 +265,37 @@
 
       const extractGclidFromCookies = () => {
         try {
-          console.log('Attempting advanced GCLID extraction from cookies');
           
           // Method 1: Google Ads Conversion Cookies (_gac_*)
           const gclid = extractFromGacCookies();
           if (gclid) {
-            console.log('GCLID found in GAC cookie:', gclid);
             return gclid;
           }
           
           // Method 2: Google Analytics Enhanced Ecommerce Cookies
           const gclidFromGa = extractFromGaCookies();
           if (gclidFromGa) {
-            console.log('GCLID found in GA cookie:', gclidFromGa);
             return gclidFromGa;
           }
           
           // Method 3: GTM Conversion Linker Cookies (_gcl_*)
           const gclidFromGcl = extractFromGclCookies();
           if (gclidFromGcl) {
-            console.log('GCLID found in GCL cookie:', gclidFromGcl);
             return gclidFromGcl;
           }
           
           // Method 4: First-party data layer (if available)
           const gclidFromDataLayer = extractFromDataLayer();
           if (gclidFromDataLayer) {
-            console.log('GCLID found in data layer:', gclidFromDataLayer);
             return gclidFromDataLayer;
           }
           
           // Method 5: Cross-domain GCLID from URL fragments or linker params
           const crossDomainGclid = extractCrossDomainGclid();
           if (crossDomainGclid) {
-            console.log('GCLID found via cross-domain tracking:', crossDomainGclid);
             return crossDomainGclid;
           }
           
-          console.log('No GCLID found in any cookie method');
           return null;
           
         } catch (error) {
@@ -622,7 +615,6 @@
           collected_at: 'widget_load'
         };
         
-        console.log('Attribution data collected:', attribution);
         return attribution;
       };
 
@@ -872,7 +864,6 @@
         try {
           // Check if GTM is loaded
           if (typeof gtag === 'undefined' && typeof dataLayer === 'undefined') {
-            console.log('GTM not detected, skipping conversion linker initialization');
             return;
           }
 
@@ -883,7 +874,6 @@
               allow_enhanced_conversions: true,
               conversion_linker: true
             });
-            console.log('GTM Conversion Linker initialized');
           }
 
           // Manually trigger linker functionality for cross-domain attribution
@@ -1020,7 +1010,6 @@
             persisted_by: 'widget'
           }));
 
-          console.log('GCLID persisted for GTM integration:', gclid);
 
         } catch (error) {
           console.warn('Error persisting GCLID for GTM:', error);
@@ -1057,7 +1046,6 @@
             persistGclidForGTM(consentSafeAttribution.gclid);
           }
 
-          console.log('GTM-enhanced consent-safe attribution data collected:', consentSafeAttribution);
           return consentSafeAttribution;
 
         } catch (error) {
@@ -1229,7 +1217,6 @@
               gtm_integration: null
             };
             
-            console.log('Cookie consent denied, using limited attribution:', limitedAttribution);
             return limitedAttribution;
           }
         },
@@ -1289,7 +1276,6 @@
             widgetState.attributionData = newAttributionData;
             persistAttributionData(newAttributionData);
             
-            console.log('Attribution updated due to consent change:', newAttributionData);
           } catch (error) {
             console.warn('Error updating attribution on consent change:', error);
           }
@@ -1351,7 +1337,6 @@
             }
           }, widgetState.formState.autoSaveInterval);
           
-          console.log('Auto-save initialized with', widgetState.formState.autoSaveInterval, 'ms interval');
         },
 
         shouldAutoSave: () => {
@@ -1378,7 +1363,6 @@
 
         performAutoSave: async () => {
           try {
-            console.log('Performing auto-save...');
             
             // Calculate completion status
             const completionStatus = progressiveFormManager.calculateStepCompletion();
@@ -1418,7 +1402,6 @@
 
               if (response.ok) {
                 widgetState.formState.lastSaved = new Date().toISOString();
-                console.log('Auto-save successful');
                 
                 // Show subtle save indicator
                 progressiveFormManager.showSaveIndicator();
@@ -1889,16 +1872,13 @@
         // Validate existing session ID format (UUID v4: 8-4-4-4-12 characters)
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (sessionId && !uuidRegex.test(sessionId)) {
-          console.log('Invalid session ID found, generating new one:', sessionId);
           sessionId = null; // Force regeneration
         }
         
         if (!sessionId) {
           sessionId = generateSessionId();
-          console.log('Generated new session ID:', sessionId);
           localStorage.setItem('dh_session_' + config.companyId, sessionId);
         } else {
-          console.log('Retrieved existing session ID:', sessionId);
         }
         widgetState.sessionId = sessionId;
         
@@ -1921,10 +1901,6 @@
         widgetState.attributionData = attributionData;
         persistAttributionData(attributionData);
         
-        console.log('Attribution tracking initialized:', {
-          sessionId: widgetState.sessionId,
-          attribution: widgetState.attributionData
-        });
       };
 
       // US States data for dropdown
@@ -2829,11 +2805,8 @@
           try {
             const validationResult = await validateServiceArea();
             
-            console.log('Service area validation result:', validationResult);
-            
             if (validationResult.served) {
               // User is in service area, save partial lead and proceed to contact step
-              console.log('Address is in service area, saving partial lead and proceeding to contact step');
               
               const partialSaveResult = await savePartialLead(validationResult, 'address_validated');
               if (!partialSaveResult.success) {
@@ -2844,13 +2817,11 @@
               setupStepValidation('contact');
             } else {
               // User is out of service area, do not save partial lead, show end-stop step
-              console.log('Address is not in service area, not saving partial lead, showing out-of-service step');
               showStep('out-of-service');
             }
           } catch (error) {
             console.error('Service area validation error:', error);
             // On error, allow user to proceed (graceful fallback)
-            console.log('Validation failed, proceeding with graceful fallback');
             showStep('contact');
             setupStepValidation('contact');
           } finally {
@@ -2936,12 +2907,6 @@
         const { latitude, longitude } = widgetState.formData;
         const zipCode = widgetState.formData.addressZip;
         
-        console.log('Service area validation - form data:', {
-          latitude,
-          longitude,
-          zipCode,
-          companyId: config.companyId
-        });
         
         if (!latitude || !longitude) {
           console.warn('No coordinates available for service area validation');
@@ -2956,7 +2921,6 @@
             zipCode: zipCode
           };
           
-          console.log('Service area validation - API request:', requestData);
           
           const response = await fetch(`${config.baseUrl}/api/service-areas/validate`, {
             method: 'POST',
@@ -2973,7 +2937,6 @@
           }
 
           const result = await response.json();
-          console.log('Service area validation - API response:', result);
           return result;
         } catch (error) {
           console.error('Service area validation error:', error);
@@ -3075,7 +3038,6 @@
           }
 
           const result = await response.json();
-          console.log('Recovery check result:', result);
           
           if (result.success && result.hasPartialLead && !result.expired) {
             return result;
@@ -3292,7 +3254,6 @@
             if (addressNext) addressNext.disabled = false;
           }
           
-          console.log('Address fields populated from recovery data');
         } catch (error) {
           console.error('Error populating address fields:', error);
         }
@@ -3310,7 +3271,6 @@
           if (phoneInput) phoneInput.value = contactInfo.phone || '';
           if (emailInput) emailInput.value = contactInfo.email || '';
           
-          console.log('Contact fields populated from recovery data');
         } catch (error) {
           console.error('Error populating contact fields:', error);
         }

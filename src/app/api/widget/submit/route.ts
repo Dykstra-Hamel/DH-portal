@@ -288,8 +288,7 @@ export async function POST(request: NextRequest) {
         if (existingPartialLead && !partialLeadError) {
           partialLead = existingPartialLead;
           partialLeadAttribution = existingPartialLead.attribution_data;
-          console.log('Found partial lead to convert:', partialLead.id);
-        }
+          }
       } catch (error) {
         console.warn('Error checking for partial lead:', error);
         // Continue processing - don't fail submission if partial lead lookup fails
@@ -333,10 +332,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If service areas are configured but location is not served, add a flag but don't reject
-    let isOutsideServiceArea = false;
+    // If service areas are configured but location is not served, log it but don't reject
     if (serviceAreaValidation && !serviceAreaValidation.served) {
-      isOutsideServiceArea = true;
       console.log(
         `Lead from outside service area - Company: ${submission.companyId}, Location: ${submission.address}`
       );
@@ -349,34 +346,24 @@ export async function POST(request: NextRequest) {
     let customerId: string;
     let existingCustomer = null;
 
-    console.log('Looking for existing customer:', {
-      email: submission.contactInfo.email,
-      phone: normalizedPhone,
-      companyId: submission.companyId
-    });
-
     // First, try to find by email
-    const { data: emailCustomer, error: emailError } = await supabase
+    const { data: emailCustomer } = await supabase
       .from('customers')
       .select('id')
       .eq('email', submission.contactInfo.email)
       .eq('company_id', submission.companyId)
       .single();
 
-    console.log('Email customer lookup result:', { emailCustomer, emailError });
-
     if (emailCustomer) {
       existingCustomer = emailCustomer;
     } else if (normalizedPhone) {
       // If no email match and we have a valid phone, try phone lookup
-      const { data: phoneCustomer, error: phoneError } = await supabase
+      const { data: phoneCustomer } = await supabase
         .from('customers')
         .select('id')
         .eq('phone', normalizedPhone)
         .eq('company_id', submission.companyId)
         .single();
-
-      console.log('Phone customer lookup result:', { phoneCustomer, phoneError });
 
       if (phoneCustomer) {
         existingCustomer = phoneCustomer;
@@ -427,23 +414,10 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (customerError || !newCustomer) {
-        console.error('Error creating customer:', {
-          error: customerError,
-          errorCode: customerError?.code,
-          errorMessage: customerError?.message,
-          customerData: {
-            company_id: submission.companyId,
-            first_name: firstName,
-            last_name: lastName,
-            email: submission.contactInfo.email,
-            phone: normalizedPhone || submission.contactInfo.phone,
-            customer_status: 'active',
-            ...addressData,
-          }
-        });
+        console.error('Error creating customer:', customerError);
         return addCorsHeaders(
           NextResponse.json(
-            { error: 'Failed to create customer', details: customerError?.message },
+            { error: 'Failed to create customer' },
             { status: 500 }
           )
         );
@@ -535,9 +509,6 @@ export async function POST(request: NextRequest) {
           })
           .eq('id', partialLead.id);
 
-        console.log(
-          `Partial lead ${partialLead.id} marked as converted to lead ${lead.id}`
-        );
       } catch (error) {
         console.warn('Error updating partial lead conversion status:', error);
         // Don't fail the lead creation if this update fails
@@ -624,20 +595,13 @@ export async function POST(request: NextRequest) {
         );
 
         if (callResult.success && !callResult.skipped) {
-          console.log(
-            `Auto-call initiated for lead ${lead.id}, call ID: ${callResult.callId}`
-          );
         } else if (callResult.skipped) {
-          console.log(
-            `Auto-call skipped for lead ${lead.id}: ${callResult.reason}`
-          );
         } else {
           console.error(
             `Auto-call failed for lead ${lead.id}: ${callResult.error}`
           );
         }
       } else {
-        console.log(`Auto-call disabled for company ${submission.companyId}`);
       }
     } catch (error) {
       console.error('Error in auto-call process:', error);
@@ -683,9 +647,6 @@ export async function POST(request: NextRequest) {
           );
 
           if (emailResult.success) {
-            console.log(
-              `Lead notification emails sent successfully for lead ${lead.id}. Sent: ${emailResult.successCount}, Failed: ${emailResult.failureCount}`
-            );
           } else {
             console.error(
               `All lead notification emails failed for lead ${lead.id}`

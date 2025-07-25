@@ -7,17 +7,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Admin Lead Detail API: Starting request');
-
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Lead Detail API: Unauthorized access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    console.log('Admin Lead Detail API: Fetching lead', { leadId: id });
 
     // Use admin client to fetch lead with all related data
     const supabase = createAdminClient();
@@ -76,10 +72,6 @@ export async function GET(
       assigned_user: assignedUser,
     };
 
-    console.log('Admin Lead Detail API: Successfully fetched lead', {
-      leadId: id,
-    });
-
     return NextResponse.json(enhancedLead);
   } catch (error) {
     console.error('Admin Lead Detail API: Internal error:', error);
@@ -95,18 +87,14 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Admin Lead Detail API: Starting PUT request');
-
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Lead Detail API: Unauthorized PUT access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await request.json();
-    console.log('Admin Lead Detail API: Updating lead', { leadId: id, body });
 
     // Use admin client to update lead
     const supabase = createAdminClient();
@@ -165,9 +153,6 @@ export async function PUT(
       assigned_user: assignedUser,
     };
 
-    console.log('Admin Lead Detail API: Successfully updated lead', {
-      leadId: id,
-    });
     return NextResponse.json(enhancedLead);
   } catch (error) {
     console.error('Admin Lead Detail API: Internal error:', error);
@@ -183,17 +168,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Admin Lead Detail API: Starting DELETE request');
-
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Lead Detail API: Unauthorized DELETE access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    console.log('Admin Lead Detail API: Deleting lead', { leadId: id });
 
     // Use admin client to delete lead
     const supabase = createAdminClient();
@@ -211,9 +192,6 @@ export async function DELETE(
       );
     }
 
-    console.log('Admin Lead Detail API: Successfully deleted lead', {
-      leadId: id,
-    });
     return NextResponse.json({ message: 'Lead deleted successfully' });
   } catch (error) {
     console.error('Admin Lead Detail API: Internal error:', error);

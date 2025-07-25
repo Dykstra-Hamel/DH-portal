@@ -60,7 +60,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Fetched projects:', projects?.length || 0);
 
     if (!projects || projects.length === 0) {
       return NextResponse.json([]);
@@ -77,7 +76,6 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    console.log('User IDs to fetch:', Array.from(userIds));
 
     // Get profiles for these users
     const { data: profiles, error: profilesError } = await supabase
@@ -96,7 +94,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Fetched profiles:', profiles?.length || 0);
 
     // Create a map of user profiles for quick lookup
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
@@ -154,13 +151,6 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!name || !project_type || !requested_by || !company_id || !due_date) {
-      console.log('Missing required fields:', {
-        name,
-        project_type,
-        requested_by,
-        company_id,
-        due_date,
-      });
       return NextResponse.json(
         {
           error:

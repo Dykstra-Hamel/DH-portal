@@ -7,19 +7,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Admin Customer Detail API: Starting request');
 
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Customer Detail API: Unauthorized access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    console.log('Admin Customer Detail API: Fetching customer', {
-      customerId: id,
-    });
 
     // Use admin client to fetch customer with all related data
     const supabase = createAdminClient();
@@ -130,10 +125,6 @@ export async function GET(
       last_activity: leadsWithUsers?.[0]?.created_at || customer.updated_at,
     };
 
-    console.log('Admin Customer Detail API: Successfully fetched customer', {
-      customerId: id,
-      leadsCount: leadsWithUsers?.length || 0,
-    });
 
     return NextResponse.json(enhancedCustomer);
   } catch (error) {
@@ -150,21 +141,15 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Admin Customer Detail API: Starting PUT request');
 
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Customer Detail API: Unauthorized PUT access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await request.json();
-    console.log('Admin Customer Detail API: Updating customer', {
-      customerId: id,
-      body,
-    });
 
     // Use admin client to update customer
     const supabase = createAdminClient();
@@ -201,9 +186,6 @@ export async function PUT(
       );
     }
 
-    console.log('Admin Customer Detail API: Successfully updated customer', {
-      customerId: id,
-    });
     return NextResponse.json({
       ...customer,
       full_name: `${customer.first_name} ${customer.last_name}`,
@@ -223,21 +205,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Admin Customer Detail API: Starting DELETE request');
 
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log(
-        'Admin Customer Detail API: Unauthorized DELETE access attempt'
-      );
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    console.log('Admin Customer Detail API: Deleting customer', {
-      customerId: id,
-    });
 
     // Use admin client to delete customer
     const supabase = createAdminClient();
@@ -288,9 +263,6 @@ export async function DELETE(
       );
     }
 
-    console.log('Admin Customer Detail API: Successfully deleted customer', {
-      customerId: id,
-    });
     return NextResponse.json({ message: 'Customer deleted successfully' });
   } catch (error) {
     console.error('Admin Customer Detail API: Internal error:', error);

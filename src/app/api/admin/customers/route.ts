@@ -5,7 +5,6 @@ import { normalizePhoneNumber } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('Admin Customers API: Starting request');
 
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
@@ -21,13 +20,6 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
-    console.log('Admin Customers API: Query parameters', {
-      companyId,
-      status,
-      search,
-      sortBy,
-      sortOrder,
-    });
 
     // Use admin client to fetch customers
     const supabase = createAdminClient();
@@ -110,9 +102,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log('Admin Customers API: Successfully fetched customers', {
-      count: enhancedCustomers.length,
-    });
     return NextResponse.json(enhancedCustomers);
   } catch (error) {
     console.error('Admin Customers API: Internal error:', error);
@@ -125,17 +114,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Admin Customers API: Starting POST request');
 
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Customers API: Unauthorized POST access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
-    console.log('Admin Customers API: Creating customer', { body });
 
     // Validate required fields
     if (!body.first_name || !body.last_name || !body.company_id) {
@@ -178,9 +164,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Admin Customers API: Successfully created customer', {
-      customerId: customer.id,
-    });
     return NextResponse.json(
       {
         ...customer,
