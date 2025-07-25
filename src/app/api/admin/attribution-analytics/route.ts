@@ -97,25 +97,25 @@ export async function GET(request: NextRequest) {
 
     switch (metric) {
       case 'overview':
-        analyticsData = generateOverviewAnalytics(leads, partialLeads);
+        analyticsData = generateOverviewAnalytics(leads || [], partialLeads || []);
         break;
       case 'sources':
-        analyticsData = generateSourceAnalytics(leads, partialLeads);
+        analyticsData = generateSourceAnalytics(leads || [], partialLeads || []);
         break;
       case 'campaigns':
-        analyticsData = generateCampaignAnalytics(leads, partialLeads);
+        analyticsData = generateCampaignAnalytics(leads || [], partialLeads || []);
         break;
       case 'funnel':
-        analyticsData = generateFunnelAnalytics(leads, partialLeads);
+        analyticsData = generateFunnelAnalytics(leads || [], partialLeads || []);
         break;
       case 'performance':
-        analyticsData = generatePerformanceAnalytics(leads, partialLeads);
+        analyticsData = generatePerformanceAnalytics(leads || [], partialLeads || []);
         break;
       case 'trends':
-        analyticsData = generateTrendAnalytics(leads, partialLeads, startDate, endDate);
+        analyticsData = generateTrendAnalytics(leads || [], partialLeads || [], startDate, endDate);
         break;
       default:
-        analyticsData = generateOverviewAnalytics(leads, partialLeads);
+        analyticsData = generateOverviewAnalytics(leads || [], partialLeads || []);
     }
 
     return NextResponse.json({
@@ -435,7 +435,7 @@ function determineLeadSource(leadOrAttributionData: any): string {
   
   // Use lead_source if available
   if (leadOrAttributionData.lead_source && leadOrAttributionData.lead_source !== 'other') {
-    return leadOrAttributionData.lead_source.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return leadOrAttributionData.lead_source.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
   }
   
   if (gclid || (utm_source === 'google' && utm_medium === 'cpc')) {

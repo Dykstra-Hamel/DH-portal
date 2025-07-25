@@ -75,11 +75,11 @@ export async function GET(request: NextRequest) {
       .from('leads')
       .select(`
         id,
+        company_id,
         partial_lead_id,
         lead_status,
         estimated_value,
-        created_at,
-        companies!inner(id, name)
+        created_at
       `)
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString());
@@ -95,25 +95,25 @@ export async function GET(request: NextRequest) {
 
     switch (metric) {
       case 'overview':
-        analyticsData = generateFormOverviewAnalytics(partialLeads, leads);
+        analyticsData = generateFormOverviewAnalytics(partialLeads || [], leads || []);
         break;
       case 'steps':
-        analyticsData = generateStepAnalytics(partialLeads, leads);
+        analyticsData = generateStepAnalytics(partialLeads || [], leads || []);
         break;
       case 'abandonment':
-        analyticsData = generateAbandonmentAnalytics(partialLeads, leads);
+        analyticsData = generateAbandonmentAnalytics(partialLeads || [], leads || []);
         break;
       case 'completion-times':
-        analyticsData = generateCompletionTimeAnalytics(partialLeads, leads);
+        analyticsData = generateCompletionTimeAnalytics(partialLeads || [], leads || []);
         break;
       case 'field-analysis':
-        analyticsData = generateFieldAnalytics(partialLeads, leads);
+        analyticsData = generateFieldAnalytics(partialLeads || [], leads || []);
         break;
       case 'progressive-forms':
-        analyticsData = generateProgressiveFormAnalytics(partialLeads, leads);
+        analyticsData = generateProgressiveFormAnalytics(partialLeads || [], leads || []);
         break;
       default:
-        analyticsData = generateFormOverviewAnalytics(partialLeads, leads);
+        analyticsData = generateFormOverviewAnalytics(partialLeads || [], leads || []);
     }
 
     return NextResponse.json({

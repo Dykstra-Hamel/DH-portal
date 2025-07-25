@@ -129,7 +129,7 @@ export default function FormAnalytics() {
             {Object.entries(stepCompletion).map(([step, data]: [string, any]) => (
               <div key={step} className={styles.stepCard}>
                 <div className={styles.stepName}>
-                  {step.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {step.replace('-', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </div>
                 <div className={styles.stepStats}>
                   <div className={styles.stepCount}>{data.completed} users</div>
@@ -277,7 +277,7 @@ export default function FormAnalytics() {
                   <div 
                     className={styles.reasonBarFill}
                     style={{ 
-                      width: `${(reason.count / analyticsData.totalAbandoned) * 100}%` 
+                      width: `${analyticsData.totalAbandoned ? (reason.count / analyticsData.totalAbandoned) * 100 : 0}%` 
                     }}
                   ></div>
                 </div>
@@ -293,7 +293,7 @@ export default function FormAnalytics() {
             {Object.entries(analyticsData.abandonmentByStep || {}).map(([step, count]: [string, any]) => (
               <div key={step} className={styles.stepAbandonmentCard}>
                 <div className={styles.stepAbandonmentStep}>
-                  {step.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {step.replace('-', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </div>
                 <div className={styles.stepAbandonmentCount}>{count}</div>
               </div>
@@ -327,11 +327,11 @@ export default function FormAnalytics() {
         <div className={styles.timeStatsGrid}>
           <div className={styles.timeStat}>
             <h4>Average Time</h4>
-            <div className={styles.timeValue}>{formatTime(analyticsData.avgCompletionTime)}</div>
+            <div className={styles.timeValue}>{formatTime(analyticsData.avgCompletionTime || 0)}</div>
           </div>
           <div className={styles.timeStat}>
             <h4>Median Time</h4>
-            <div className={styles.timeValue}>{formatTime(analyticsData.medianCompletionTime)}</div>
+            <div className={styles.timeValue}>{formatTime(analyticsData.medianCompletionTime || 0)}</div>
           </div>
           <div className={styles.timeStat}>
             <h4>Completed Forms</h4>
@@ -357,7 +357,7 @@ export default function FormAnalytics() {
               <tbody>
                 {analyticsData.stepTimeAnalytics?.map((step: any) => (
                   <tr key={step.step}>
-                    <td><strong>{step.step.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong></td>
+                    <td><strong>{step.step.replace('-', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</strong></td>
                     <td>{formatTime(step.avgTime)}</td>
                     <td>{formatTime(step.medianTime)}</td>
                     <td>{formatTime(step.minTime)}</td>
@@ -387,7 +387,7 @@ export default function FormAnalytics() {
             {analyticsData.fieldCompletionRates?.map((field: any) => (
               <div key={field.field} className={styles.fieldCompletionCard}>
                 <div className={styles.fieldName}>
-                  {field.field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                  {field.field.replace(/([A-Z])/g, ' $1').replace(/^./, (str: string) => str.toUpperCase())}
                 </div>
                 <div className={styles.fieldCompletionRate}>
                   {field.completionRate.toFixed(1)}%
@@ -481,13 +481,13 @@ export default function FormAnalytics() {
         <div className={styles.progressiveImpact}>
           <div className={styles.impactMetric}>
             <span>Improvement:</span>
-            <strong className={analyticsData.improvement > 0 ? styles.positive : styles.negative}>
-              {analyticsData.improvement > 0 ? '+' : ''}{analyticsData.improvement.toFixed(1)}%
+            <strong className={(analyticsData.improvement || 0) > 0 ? styles.positive : styles.negative}>
+              {(analyticsData.improvement || 0) > 0 ? '+' : ''}{(analyticsData.improvement || 0).toFixed(1)}%
             </strong>
           </div>
           <div className={styles.impactMetric}>
             <span>Progressive Adoption:</span>
-            <strong>{analyticsData.progressiveAdoption.toFixed(1)}%</strong>
+            <strong>{(analyticsData.progressiveAdoption || 0).toFixed(1)}%</strong>
           </div>
         </div>
       </div>

@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch company data separately
     const companyIds = [...new Set(partialLeads?.map(lead => lead.company_id) || [])];
-    let companiesMap = new Map();
+    const companiesMap = new Map();
     
     if (companyIds.length > 0) {
       const { data: companies } = await supabase
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch lead data for converted partial leads
     const convertedLeadIds = partialLeads?.filter(lead => lead.converted_to_lead_id).map(lead => lead.converted_to_lead_id) || [];
-    let leadsMap = new Map();
+    const leadsMap = new Map();
     
     if (convertedLeadIds.length > 0) {
       const { data: leads } = await supabase
