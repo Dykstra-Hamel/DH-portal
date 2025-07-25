@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DH Portal Widget Test Page</title>
+    <title>DH Widget Test - Paste & Test</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        max-width: 1200px;
+        max-width: 1000px;
         margin: 0 auto;
         padding: 20px;
         background: #f8fafc;
@@ -17,37 +17,22 @@
       
       .header {
         text-align: center;
-        margin-bottom: 40px;
-        padding: 30px;
+        margin-bottom: 30px;
+        padding: 20px;
         background: linear-gradient(135deg, #3b82f6, #1e40af);
         color: white;
         border-radius: 12px;
-        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
       }
       
       .header h1 {
         margin: 0 0 10px 0;
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 700;
       }
       
       .header p {
         margin: 0;
-        font-size: 1.1rem;
         opacity: 0.9;
-      }
-      
-      .test-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
-        margin-bottom: 40px;
-      }
-      
-      @media (max-width: 768px) {
-        .test-grid {
-          grid-template-columns: 1fr;
-        }
       }
       
       .test-section {
@@ -55,307 +40,260 @@
         padding: 30px;
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        border: 1px solid #e2e8f0;
+        margin-bottom: 30px;
       }
       
       .test-section h2 {
-        margin: 0 0 15px 0;
+        margin: 0 0 20px 0;
         color: #1e293b;
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 10px;
       }
       
-      .test-section h3 {
-        margin: 25px 0 10px 0;
-        color: #475569;
-        font-size: 1.1rem;
-        font-weight: 500;
-      }
-      
-      .status-indicator {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #10b981;
-        animation: pulse 2s infinite;
-      }
-      
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
-      
-      .company-info {
-        background: #f1f5f9;
+      .code-input {
+        width: 100%;
+        min-height: 120px;
         padding: 15px;
+        border: 2px solid #e2e8f0;
         border-radius: 8px;
-        margin: 15px 0;
         font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 0.9rem;
+        font-size: 14px;
+        background: #f8fafc;
+        resize: vertical;
+        margin-bottom: 15px;
       }
       
-      .instructions {
-        background: #fef3c7;
-        border: 1px solid #f59e0b;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
+      .code-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        background: white;
       }
       
-      .instructions h4 {
-        margin: 0 0 10px 0;
-        color: #92400e;
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      
+      .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
         font-weight: 600;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
       }
       
-      .instructions ol {
-        margin: 10px 0 0 0;
-        padding-left: 20px;
+      .btn-primary {
+        background: #3b82f6;
+        color: white;
       }
       
-      .instructions li {
-        margin: 5px 0;
-        color: #78350f;
+      .btn-primary:hover {
+        background: #2563eb;
       }
       
-      .debug-section {
-        background: #1e293b;
-        color: #e2e8f0;
+      .btn-secondary {
+        background: #64748b;
+        color: white;
+      }
+      
+      .btn-secondary:hover {
+        background: #475569;
+      }
+      
+      .btn-danger {
+        background: #dc2626;
+        color: white;
+      }
+      
+      .btn-danger:hover {
+        background: #b91c1c;
+      }
+      
+      .example-codes {
+        background: #f1f5f9;
         padding: 20px;
         border-radius: 8px;
-        margin: 20px 0;
-        font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 0.85rem;
-        max-height: 200px;
-        overflow-y: auto;
+        margin-bottom: 20px;
       }
       
-      .debug-section h4 {
+      .example-codes h3 {
         margin: 0 0 15px 0;
-        color: #60a5fa;
-        font-family: sans-serif;
+        color: #374151;
+        font-size: 1.1rem;
+      }
+      
+      .example-code {
+        background: white;
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        border-left: 4px solid #3b82f6;
+      }
+      
+      .example-code h4 {
+        margin: 0 0 8px 0;
+        font-size: 0.9rem;
+        color: #374151;
+      }
+      
+      .example-code code {
+        font-family: 'Monaco', 'Menlo', monospace;
+        font-size: 12px;
+        color: #1e293b;
+        display: block;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      
+      .example-code button {
+        margin-top: 8px;
+        padding: 4px 8px;
+        font-size: 12px;
+        background: #e2e8f0;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      
+      .example-code button:hover {
+        background: #cbd5e1;
       }
       
       .widget-container {
         background: white;
         padding: 30px;
         border-radius: 12px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
         border: 2px dashed #cbd5e1;
         margin: 20px 0;
-        min-height: 200px;
+        min-height: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
       }
       
-      .api-status {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+      .debug-console {
+        background: #1e293b;
+        color: #e2e8f0;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+        font-family: 'Monaco', 'Menlo', monospace;
+        font-size: 12px;
+        max-height: 200px;
+        overflow-y: auto;
       }
       
-      .api-status.ready {
+      .status-message {
+        padding: 10px 15px;
+        border-radius: 6px;
+        margin: 10px 0;
+        font-weight: 500;
+      }
+      
+      .status-success {
         background: #d1fae5;
         color: #065f46;
+        border: 1px solid #10b981;
       }
       
-      .api-status.loading {
-        background: #fef3c7;
-        color: #92400e;
-      }
-      
-      .api-status.error {
+      .status-error {
         background: #fee2e2;
         color: #991b1b;
-      }
-      
-      .feature-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 15px;
-        margin: 20px 0;
-      }
-      
-      .feature-item {
-        background: #f8fafc;
-        padding: 15px;
-        border-radius: 8px;
-        border-left: 4px solid #3b82f6;
-      }
-      
-      .feature-item strong {
-        color: #1e293b;
-        display: block;
-        margin-bottom: 5px;
-      }
-      
-      .company-selector {
-        margin: 20px 0;
-      }
-      
-      .company-selector select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        font-size: 1rem;
-        background: white;
-      }
-      
-      .load-widget-btn {
-        background: #3b82f6;
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 6px;
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.2s;
-        margin: 10px 0;
-      }
-      
-      .load-widget-btn:hover {
-        background: #2563eb;
-      }
-      
-      .load-widget-btn:disabled {
-        background: #9ca3af;
-        cursor: not-allowed;
+        border: 1px solid #ef4444;
       }
     </style>
   </head>
   <body>
     <div class="header">
-      <h1>🚀 DH Portal Widget Test</h1>
-      <p>Test the embedded widget with Google Places API integration</p>
+      <h1>🧪 DH Widget Test</h1>
+      <p>Paste any widget embed code and test it instantly</p>
     </div>
 
-    <div class="test-grid">
-      <!-- Widget Test Section -->
-      <div class="test-section">
-        <h2>
-          <span class="status-indicator"></span>
-          Live Widget Test
-        </h2>
-        
-        <div class="company-info">
-          <strong>Test Company:</strong> Guardian Pest Control<br>
-          <strong>Company ID:</strong> 22222222-2222-2222-2222-222222222222<br>
-          <strong>API Status:</strong> <span class="api-status ready">Google Places Ready</span>
-        </div>
-
-        <div class="instructions">
-          <h4>🧪 Test Instructions</h4>
-          <ol>
-            <li>Fill out the form below completely</li>
-            <li>Test address autocomplete by typing a street address</li>
-            <li>Try different addresses to test Google Places API</li>
-            <li>Submit the form and check the debug console</li>
-            <li>Monitor network requests in DevTools</li>
-          </ol>
-        </div>
-
-        <div class="widget-container" id="widget-container-1">
-          <p style="text-align: center; color: #64748b; margin: 0;">
-            Widget will load here automatically...
-          </p>
-        </div>
-      </div>
-
-      <!-- Alternative Company Test -->
-      <div class="test-section">
-        <h2>
-          <span class="status-indicator"></span>
-          Multi-Company Test
-        </h2>
-        
-        <p>Test with different companies to verify configuration loading:</p>
-        
-        <div class="company-selector">
-          <select id="company-selector">
-            <option value="22222222-2222-2222-2222-222222222222">Guardian Pest Control</option>
-            <option value="11111111-1111-1111-1111-111111111111">Elite Pest Solutions</option>
-            <option value="33333333-3333-3333-3333-333333333333">Green Shield Exterminators</option>
-            <option value="44444444-4444-4444-4444-444444444444">Metro Bug Busters</option>
-            <option value="55555555-5555-5555-5555-555555555555">Pacific Pest Professionals</option>
-            <option value="66666666-6666-6666-6666-666666666666">Apex Termite & Pest</option>
-          </select>
-          <button class="load-widget-btn" onclick="loadSelectedCompanyWidget()">
-            Load Widget for Selected Company
-          </button>
-        </div>
-
-        <div class="widget-container" id="widget-container-2">
-          <p style="text-align: center; color: #64748b; margin: 0;">
-            Select a company and click "Load Widget" to test...
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Features Overview -->
     <div class="test-section">
-      <h2>✨ Features Being Tested</h2>
-      <div class="feature-list">
-        <div class="feature-item">
-          <strong>Google Places API</strong>
-          Address autocomplete with real-time suggestions
+      <h2>📝 Paste & Test Widget Code</h2>
+      
+      <div class="example-codes">
+        <h3>Quick Examples (click to use):</h3>
+        
+        <div class="example-code">
+          <h4>📄 Inline Widget (Default)</h4>
+          <code id="example-inline">&lt;script 
+  src="/widget.js"
+  data-company-id="22222222-2222-2222-2222-222222222222"
+  data-base-url="http://localhost:3000"
+&gt;&lt;/script&gt;</code>
+          <button onclick="useExample('example-inline')">Use This</button>
         </div>
-        <div class="feature-item">
-          <strong>Form Validation</strong>
-          Multi-step form with field validation
+        
+        <div class="example-code">
+          <h4>🔘 Button + Modal Widget</h4>
+          <code id="example-button">&lt;script 
+  src="/widget.js"
+  data-company-id="22222222-2222-2222-2222-222222222222"
+  data-base-url="http://localhost:3000"
+  data-display-mode="button"
+  data-button-text="Get Free Quote"
+&gt;&lt;/script&gt;</code>
+          <button onclick="useExample('example-button')">Use This</button>
         </div>
-        <div class="feature-item">
-          <strong>Company Configuration</strong>
-          Dynamic loading of company-specific settings
+        
+        <div class="example-code">
+          <h4>🎨 Custom Styled Widget</h4>
+          <code id="example-custom">&lt;script 
+  src="/widget.js"
+  data-company-id="22222222-2222-2222-2222-222222222222"
+  data-base-url="http://localhost:3000"
+  data-header-text="Get Your Custom Quote"
+  data-primary-color="#ff6b35"
+  data-background-color="#f9fafb"
+&gt;&lt;/script&gt;</code>
+          <button onclick="useExample('example-custom')">Use This</button>
         </div>
-        <div class="feature-item">
-          <strong>Address Parsing</strong>
-          Automatic separation of street, city, state, zip
-        </div>
-        <div class="feature-item">
-          <strong>Error Handling</strong>
-          Graceful degradation when APIs are unavailable
-        </div>
-        <div class="feature-item">
-          <strong>Responsive Design</strong>
-          Works on desktop and mobile devices
-        </div>
+      </div>
+      
+      <textarea 
+        id="widget-code" 
+        class="code-input" 
+        placeholder="Paste your widget embed code here...
+
+Example:
+<script 
+  src=&quot;/widget.js&quot;
+  data-company-id=&quot;your-company-id&quot;
+  data-base-url=&quot;http://localhost:3000&quot;
+></script>"
+      ></textarea>
+      
+      <div class="button-group">
+        <button class="btn btn-primary" onclick="testWidget()">🚀 Test Widget</button>
+        <button class="btn btn-secondary" onclick="clearWidget()">🧹 Clear</button>
+        <button class="btn btn-danger" onclick="resetPage()">🔄 Reset Page</button>
+      </div>
+      
+      <div id="status-message"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>📱 Widget Output</h2>
+      <div class="widget-container" id="widget-container">
+        <p>Paste widget code above and click "Test Widget" to see it here</p>
       </div>
     </div>
 
-    <!-- Debug Console -->
     <div class="test-section">
       <h2>🔍 Debug Console</h2>
-      <div class="debug-section" id="debug-console">
-        <h4>Console Output</h4>
-        <div id="debug-output">
-          Ready for testing... Open browser DevTools for detailed logging.
-        </div>
+      <div class="debug-console" id="debug-console">
+        <div id="debug-output">Ready for testing...</div>
       </div>
     </div>
 
-    <!-- Widget Scripts -->
     <script>
-      // Environment detection and base URL configuration
-      function getBaseUrl() {
-        // Detect environment and return appropriate base URL
-        const { protocol, hostname, port } = window.location;
-        
-        // For local development, always use the current origin
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          return `${protocol}//${hostname}:${port || '3000'}`;
-        }
-        
-        // For production or other environments, use current origin
-        return window.location.origin;
-      }
+      let widgetCounter = 0;
 
       // Debug logging function
       function debugLog(message, type = 'info') {
@@ -365,109 +303,143 @@
         
         console.log(logLine);
         if (debugOutput) {
-          debugOutput.innerHTML += logLine + '<br>';
+          debugOutput.innerHTML += logLine + '\n';
           debugOutput.scrollTop = debugOutput.scrollHeight;
         }
       }
 
-      // Load widget for selected company
-      function loadSelectedCompanyWidget() {
-        const selector = document.getElementById('company-selector');
-        const companyId = selector.value;
-        const companyName = selector.options[selector.selectedIndex].text;
-        const container = document.getElementById('widget-container-2');
+      // Show status message
+      function showStatus(message, type = 'success') {
+        const statusDiv = document.getElementById('status-message');
+        statusDiv.className = `status-message status-${type}`;
+        statusDiv.textContent = message;
         
-        if (!companyId) {
-          debugLog('No company selected', 'error');
+        setTimeout(() => {
+          statusDiv.textContent = '';
+          statusDiv.className = '';
+        }, 5000);
+      }
+
+      // Use example code
+      function useExample(exampleId) {
+        const exampleCode = document.getElementById(exampleId).textContent;
+        document.getElementById('widget-code').value = exampleCode;
+        debugLog(`Loaded example: ${exampleId}`);
+      }
+
+      // Test widget function
+      function testWidget() {
+        const code = document.getElementById('widget-code').value.trim();
+        const container = document.getElementById('widget-container');
+        
+        if (!code) {
+          showStatus('Please paste widget code first', 'error');
           return;
         }
         
-        debugLog(`Loading widget for ${companyName} (${companyId})`);
+        debugLog('Testing new widget code...');
         
-        // Clear existing content and show loading
-        container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">Loading widget...</p>';
+        // Clear existing widget state
+        if (window.DHWidgetLoaded) {
+          delete window.DHWidgetLoaded;
+          debugLog('Cleared previous widget state');
+        }
         
-        // Clear any existing DH widget state to prevent conflicts
+        // Clear container
+        container.innerHTML = '<p style="color: #64748b;">Loading widget...</p>';
+        
+        // Remove any existing modals
+        const existingModals = document.querySelectorAll('.dh-modal-overlay');
+        existingModals.forEach(modal => modal.remove());
+        
+        try {
+          // Create a temporary div to parse the HTML
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = code;
+          
+          const scriptTag = tempDiv.querySelector('script');
+          if (!scriptTag) {
+            throw new Error('No script tag found in the provided code');
+          }
+          
+          // Create new script element
+          const newScript = document.createElement('script');
+          newScript.src = scriptTag.src || '/widget.js';
+          
+          // Copy all data attributes
+          Array.from(scriptTag.attributes).forEach(attr => {
+            if (attr.name.startsWith('data-')) {
+              newScript.setAttribute(attr.name, attr.value);
+            }
+          });
+          
+          // Add container ID for proper placement
+          newScript.setAttribute('data-container-id', 'widget-container');
+          
+          // Add unique identifier
+          widgetCounter++;
+          newScript.setAttribute('data-test-id', `test-${widgetCounter}`);
+          
+          // Error handling
+          newScript.onerror = function() {
+            debugLog('Failed to load widget script', 'error');
+            container.innerHTML = '<p style="color: #dc2626;">❌ Failed to load widget</p>';
+            showStatus('Widget failed to load', 'error');
+          };
+          
+          newScript.onload = function() {
+            debugLog('Widget script loaded successfully');
+          };
+          
+          // Clear container and add script
+          container.innerHTML = '';
+          document.body.appendChild(newScript);
+          
+          debugLog(`Widget initialized with test ID: test-${widgetCounter}`);
+          showStatus('Widget loaded successfully!', 'success');
+          
+        } catch (error) {
+          debugLog(`Error parsing widget code: ${error.message}`, 'error');
+          container.innerHTML = `<p style="color: #dc2626;">❌ Error: ${error.message}</p>`;
+          showStatus(`Error: ${error.message}`, 'error');
+        }
+      }
+
+      // Clear widget
+      function clearWidget() {
+        const container = document.getElementById('widget-container');
+        container.innerHTML = '<p style="color: #64748b;">Paste widget code above and click "Test Widget" to see it here</p>';
+        
+        // Remove any existing modals
+        const existingModals = document.querySelectorAll('.dh-modal-overlay');
+        existingModals.forEach(modal => modal.remove());
+        
+        // Clear widget state
         if (window.DHWidgetLoaded) {
           delete window.DHWidgetLoaded;
         }
         
-        // Create widget script with proper base URL
-        const baseUrl = getBaseUrl();
-        const script = document.createElement('script');
-        script.src = '/widget.js';
-        script.setAttribute('data-company-id', companyId);
-        script.setAttribute('data-base-url', baseUrl);
-        script.setAttribute('data-header-text', `Get Your Free ${companyName} Quote`);
-        script.setAttribute('data-sub-header-text', 'Test form with Google Places address autocomplete');
-        script.setAttribute('data-container-id', 'widget-container-2');
-        
-        // Add error handling for script loading
-        script.onerror = function() {
-          debugLog(`Failed to load widget script for ${companyName}`, 'error');
-          container.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 40px;">❌ Failed to load widget</p>';
-        };
-        
-        script.onload = function() {
-          debugLog(`Widget script successfully loaded for ${companyName}`);
-        };
-        
-        // Clear container and append script
-        container.innerHTML = '';
-        container.appendChild(script);
-        
-        debugLog(`Widget script initialized for ${companyName} with base URL: ${baseUrl}`);
+        debugLog('Widget cleared');
+        showStatus('Widget cleared', 'success');
       }
 
-      // Monitor widget events
-      window.addEventListener('DOMContentLoaded', function() {
-        debugLog('Page loaded, initializing widget tests...');
-        
-        // Monitor for widget errors
-        window.addEventListener('error', function(e) {
-          debugLog(`JavaScript Error: ${e.message}`, 'error');
-        });
-        
-        // Monitor network requests (if available)
-        if (typeof PerformanceObserver !== 'undefined') {
-          const observer = new PerformanceObserver((list) => {
-            for (const entry of list.getEntries()) {
-              if (entry.name.includes('address-autocomplete') || entry.name.includes('widget')) {
-                debugLog(`API Request: ${entry.name} (${Math.round(entry.duration)}ms)`, 'network');
-              }
-            }
-          });
-          observer.observe({ entryTypes: ['resource'] });
-        }
-        
-        debugLog('Debug monitoring initialized');
+      // Reset page
+      function resetPage() {
+        window.location.reload();
+      }
+
+      // Monitor for errors
+      window.addEventListener('error', function(e) {
+        debugLog(`JavaScript Error: ${e.message}`, 'error');
       });
 
-      // Enhanced error handling for widget failures
       window.addEventListener('unhandledrejection', function(e) {
         debugLog(`Promise Rejection: ${e.reason}`, 'error');
       });
-    </script>
 
-    <script>
-      // Initialize primary widget after page load to ensure proper base URL
+      // Initialize
       document.addEventListener('DOMContentLoaded', function() {
-        debugLog('Initializing primary widget...');
-        
-        // Create primary widget script dynamically with correct base URL
-        const baseUrl = getBaseUrl();
-        const primaryScript = document.createElement('script');
-        primaryScript.src = '/widget.js';
-        primaryScript.setAttribute('data-company-id', '22222222-2222-2222-2222-222222222222');
-        primaryScript.setAttribute('data-base-url', baseUrl);
-        primaryScript.setAttribute('data-header-text', 'Get Your Free Pest Control Quote');
-        primaryScript.setAttribute('data-sub-header-text', 'Complete this form to receive a customized quote with Google Places address suggestions');
-        primaryScript.setAttribute('data-container-id', 'widget-container-1');
-        
-        // Add script to page
-        document.body.appendChild(primaryScript);
-        
-        debugLog(`Primary widget initialized with base URL: ${baseUrl}`);
+        debugLog('Widget test page loaded and ready');
       });
     </script>
   </body>

@@ -147,6 +147,11 @@
       headerText: scriptTag.getAttribute('data-header-text') || '',
       subHeaderText: scriptTag.getAttribute('data-sub-header-text') || '',
       isPreview: scriptTag.getAttribute('data-preview') === 'true',
+      displayMode: scriptTag.getAttribute('data-display-mode') || 'inline',
+      buttonText:
+        scriptTag.getAttribute('data-button-text') || 'Get Free Quote',
+      modalCloseOnBackdrop:
+        scriptTag.getAttribute('data-modal-close-on-backdrop') !== 'false',
     };
 
     // Validate required configuration
@@ -217,46 +222,55 @@
             stepTimes: {},
             totalTimeSpent: 0,
             abandonmentPoints: [],
-            returningUser: false
+            returningUser: false,
           },
           formVersion: '2.1',
           progressiveFeatures: {
             smartSuggestions: true,
             realTimeValidation: true,
             autoSave: true,
-            stepAnalytics: true
-          }
-        }
+            stepAnalytics: true,
+          },
+        },
       };
 
       // Attribution tracking functions
       const generateSessionId = () => {
         // Generate a proper UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-          const r = Math.random() * 16 | 0;
-          const v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        });
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+          /[xy]/g,
+          function (c) {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          }
+        );
       };
 
       const parseUrlParameters = (url = window.location.href) => {
         const urlObj = new URL(url);
         const params = {};
-        
+
         // Extract UTM parameters
-        ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].forEach(param => {
+        [
+          'utm_source',
+          'utm_medium',
+          'utm_campaign',
+          'utm_term',
+          'utm_content',
+        ].forEach(param => {
           const value = urlObj.searchParams.get(param);
           if (value) params[param] = value;
         });
-        
+
         // Extract GCLID
         const gclid = urlObj.searchParams.get('gclid');
         if (gclid) params.gclid = gclid;
-        
+
         return params;
       };
 
-      const getCookieValue = (name) => {
+      const getCookieValue = name => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
         if (parts.length === 2) return parts.pop().split(';').shift();
@@ -265,39 +279,37 @@
 
       const extractGclidFromCookies = () => {
         try {
-          
           // Method 1: Google Ads Conversion Cookies (_gac_*)
           const gclid = extractFromGacCookies();
           if (gclid) {
             return gclid;
           }
-          
+
           // Method 2: Google Analytics Enhanced Ecommerce Cookies
           const gclidFromGa = extractFromGaCookies();
           if (gclidFromGa) {
             return gclidFromGa;
           }
-          
+
           // Method 3: GTM Conversion Linker Cookies (_gcl_*)
           const gclidFromGcl = extractFromGclCookies();
           if (gclidFromGcl) {
             return gclidFromGcl;
           }
-          
+
           // Method 4: First-party data layer (if available)
           const gclidFromDataLayer = extractFromDataLayer();
           if (gclidFromDataLayer) {
             return gclidFromDataLayer;
           }
-          
+
           // Method 5: Cross-domain GCLID from URL fragments or linker params
           const crossDomainGclid = extractCrossDomainGclid();
           if (crossDomainGclid) {
             return crossDomainGclid;
           }
-          
+
           return null;
-          
         } catch (error) {
           console.warn('Error extracting GCLID from cookies:', error);
           return null;
@@ -312,7 +324,9 @@
             const [name, value] = cookie.trim().split('=');
             if (name && name.startsWith('_gac_')) {
               // _gac_ cookie format: 1.timestamp.gclid
-              const gacParts = value ? decodeURIComponent(value).split('.') : [];
+              const gacParts = value
+                ? decodeURIComponent(value).split('.')
+                : [];
               if (gacParts.length >= 3) {
                 const potentialGclid = gacParts[2];
                 // Validate GCLID format (should start with specific prefixes)
@@ -344,7 +358,7 @@
               }
             }
           }
-          
+
           // Check Universal Analytics cookies for enhanced data
           const gaCookie = getCookieValue('_ga');
           if (gaCookie) {
@@ -368,8 +382,14 @@
       const extractFromGclCookies = () => {
         try {
           // GTM Conversion Linker creates various _gcl_* cookies
-          const gclPatterns = ['_gcl_au', '_gcl_aw', '_gcl_dc', '_gcl_gf', '_gcl_ha'];
-          
+          const gclPatterns = [
+            '_gcl_au',
+            '_gcl_aw',
+            '_gcl_dc',
+            '_gcl_gf',
+            '_gcl_ha',
+          ];
+
           for (let pattern of gclPatterns) {
             const gclCookie = getCookieValue(pattern);
             if (gclCookie) {
@@ -380,7 +400,7 @@
                   return part;
                 }
               }
-              
+
               // Some GCL cookies store GCLID in encoded format
               try {
                 const decoded = decodeURIComponent(gclCookie);
@@ -404,7 +424,10 @@
       const extractFromDataLayer = () => {
         try {
           // Check if Google Tag Manager data layer exists
-          if (typeof window.dataLayer !== 'undefined' && Array.isArray(window.dataLayer)) {
+          if (
+            typeof window.dataLayer !== 'undefined' &&
+            Array.isArray(window.dataLayer)
+          ) {
             for (let i = window.dataLayer.length - 1; i >= 0; i--) {
               const layer = window.dataLayer[i];
               if (layer && typeof layer === 'object') {
@@ -429,22 +452,22 @@
         return null;
       };
 
-      const isValidGclid = (value) => {
+      const isValidGclid = value => {
         if (!value || typeof value !== 'string') return false;
-        
+
         // GCLID typically starts with specific prefixes and has minimum length
         const gclidPrefixes = ['CjwK', 'Cj0K', 'EAIa', 'EAA', 'CjgK'];
         const minLength = 20; // Minimum GCLID length
-        
+
         if (value.length < minLength) return false;
-        
+
         // Check if it starts with known GCLID prefixes
         for (let prefix of gclidPrefixes) {
           if (value.startsWith(prefix)) {
             return true;
           }
         }
-        
+
         // Additional validation: check if it contains only valid GCLID characters
         const gclidPattern = /^[A-Za-z0-9_-]+$/;
         return gclidPattern.test(value) && value.length >= minLength;
@@ -454,7 +477,7 @@
       const extractCrossDomainGclid = () => {
         try {
           const url = new URL(window.location.href);
-          
+
           // Method 1: Check for Google Ads linker parameter format (_gl)
           const glParam = url.searchParams.get('_gl');
           if (glParam) {
@@ -463,17 +486,19 @@
               return gclidFromGl;
             }
           }
-          
+
           // Method 2: Check URL fragment for cross-domain data
           const fragment = url.hash;
           if (fragment && fragment.includes('gclid=')) {
-            const fragmentParams = new URLSearchParams(fragment.replace('#', ''));
+            const fragmentParams = new URLSearchParams(
+              fragment.replace('#', '')
+            );
             const fragmentGclid = fragmentParams.get('gclid');
             if (fragmentGclid && isValidGclid(fragmentGclid)) {
               return fragmentGclid;
             }
           }
-          
+
           // Method 3: Check for GTM Cross-Domain Linker in URL
           const gtmLinker = url.searchParams.get('_ga');
           if (gtmLinker) {
@@ -482,20 +507,21 @@
               return gclidFromGtm;
             }
           }
-          
+
           // Method 4: Check for custom cross-domain attribution parameters
-          const customGclid = url.searchParams.get('xd_gclid') || url.searchParams.get('cross_gclid');
+          const customGclid =
+            url.searchParams.get('xd_gclid') ||
+            url.searchParams.get('cross_gclid');
           if (customGclid && isValidGclid(customGclid)) {
             return customGclid;
           }
-          
         } catch (error) {
           console.warn('Error extracting cross-domain GCLID:', error);
         }
         return null;
       };
 
-      const extractGclidFromGlParam = (glParam) => {
+      const extractGclidFromGlParam = glParam => {
         try {
           // Google Ads linker parameter format: _gl=1*hash*gclid*timestamp
           const parts = glParam.split('*');
@@ -506,7 +532,7 @@
               }
             }
           }
-          
+
           // Alternative format: base64 encoded data
           try {
             const decoded = atob(glParam);
@@ -518,14 +544,13 @@
           } catch (e) {
             // Not base64 encoded, continue
           }
-          
         } catch (error) {
           console.warn('Error extracting GCLID from _gl parameter:', error);
         }
         return null;
       };
 
-      const extractGclidFromGtmLinker = (gtmLinker) => {
+      const extractGclidFromGtmLinker = gtmLinker => {
         try {
           // GTM linker format: GA1.2.clientId.timestamp.gclid
           const parts = gtmLinker.split('.');
@@ -550,11 +575,14 @@
             // If gtag is loaded, might be able to extract measurement ID
             return 'UNKNOWN'; // Placeholder - would need specific implementation
           }
-          
+
           // Look for GA4 measurement ID in common script patterns
           const scripts = document.getElementsByTagName('script');
           for (let script of scripts) {
-            if (script.src && script.src.includes('googletagmanager.com/gtag/js')) {
+            if (
+              script.src &&
+              script.src.includes('googletagmanager.com/gtag/js')
+            ) {
               const match = script.src.match(/id=([^&]+)/);
               if (match && match[1].startsWith('G-')) {
                 return match[1].replace('G-', '');
@@ -570,25 +598,29 @@
       const determineTrafficSource = (referrer, utmSource, gclid) => {
         if (gclid || utmSource === 'google') return 'paid';
         if (!referrer) return 'direct';
-        
+
         try {
           const referrerDomain = new URL(referrer).hostname.toLowerCase();
-          
-          if (referrerDomain.includes('google') || 
-              referrerDomain.includes('bing') || 
-              referrerDomain.includes('yahoo') ||
-              referrerDomain.includes('duckduckgo')) {
+
+          if (
+            referrerDomain.includes('google') ||
+            referrerDomain.includes('bing') ||
+            referrerDomain.includes('yahoo') ||
+            referrerDomain.includes('duckduckgo')
+          ) {
             return 'organic';
           }
-          
-          if (referrerDomain.includes('facebook') || 
-              referrerDomain.includes('instagram') ||
-              referrerDomain.includes('twitter') || 
-              referrerDomain.includes('linkedin') ||
-              referrerDomain.includes('tiktok')) {
+
+          if (
+            referrerDomain.includes('facebook') ||
+            referrerDomain.includes('instagram') ||
+            referrerDomain.includes('twitter') ||
+            referrerDomain.includes('linkedin') ||
+            referrerDomain.includes('tiktok')
+          ) {
             return 'social';
           }
-          
+
           return 'referral';
         } catch (error) {
           return 'referral';
@@ -599,67 +631,81 @@
         const urlParams = parseUrlParameters();
         const referrer = document.referrer;
         const cookieGclid = extractGclidFromCookies();
-        
+
         // Use GCLID from URL if available, otherwise from cookies
         const gclid = urlParams.gclid || cookieGclid;
-        
+
         const attribution = {
           ...urlParams,
           gclid: gclid,
           referrer_url: referrer,
           referrer_domain: referrer ? new URL(referrer).hostname : null,
-          traffic_source: determineTrafficSource(referrer, urlParams.utm_source, gclid),
+          traffic_source: determineTrafficSource(
+            referrer,
+            urlParams.utm_source,
+            gclid
+          ),
           page_url: window.location.href,
           user_agent: navigator.userAgent,
           timestamp: new Date().toISOString(),
-          collected_at: 'widget_load'
+          collected_at: 'widget_load',
         };
-        
+
         return attribution;
       };
 
-      const persistAttributionData = (attribution) => {
+      const persistAttributionData = attribution => {
         try {
           const enrichedAttribution = {
             ...attribution,
             cross_domain_data: extractCrossDomainData(),
             domain: window.location.hostname,
             subdomain: extractSubdomain(),
-            persisted_at: new Date().toISOString()
+            persisted_at: new Date().toISOString(),
           };
-          
-          localStorage.setItem('dh_attribution_' + config.companyId, JSON.stringify(enrichedAttribution));
-          
+
+          localStorage.setItem(
+            'dh_attribution_' + config.companyId,
+            JSON.stringify(enrichedAttribution)
+          );
+
           // Also persist cross-domain safe data for subdomain sharing
           persistCrossDomainAttributionData(enrichedAttribution);
-          
         } catch (error) {
-          console.warn('Could not persist attribution data to localStorage:', error);
+          console.warn(
+            'Could not persist attribution data to localStorage:',
+            error
+          );
         }
       };
 
       const getPersistedAttributionData = () => {
         try {
-          const stored = localStorage.getItem('dh_attribution_' + config.companyId);
+          const stored = localStorage.getItem(
+            'dh_attribution_' + config.companyId
+          );
           if (stored) {
             return JSON.parse(stored);
           }
-          
+
           // Fallback: check for cross-domain attribution data
           const crossDomainData = getCrossDomainAttributionData();
           if (crossDomainData) {
             console.log('Using cross-domain attribution data as fallback');
             return crossDomainData;
           }
-          
+
           return null;
         } catch (error) {
-          console.warn('Could not retrieve attribution data from localStorage:', error);
+          console.warn(
+            'Could not retrieve attribution data from localStorage:',
+            error
+          );
           return null;
         }
       };
 
-      const persistCrossDomainAttributionData = (attribution) => {
+      const persistCrossDomainAttributionData = attribution => {
         try {
           // Create a simplified version for cross-domain sharing
           const crossDomainSafeData = {
@@ -672,18 +718,27 @@
             traffic_source: attribution.traffic_source,
             collected_at: attribution.collected_at,
             cross_domain_timestamp: new Date().toISOString(),
-            original_domain: window.location.hostname
+            original_domain: window.location.hostname,
           };
-          
+
           // Store with a cross-domain safe key
           const crossDomainKey = 'dh_xd_attr_' + config.companyId;
-          localStorage.setItem(crossDomainKey, JSON.stringify(crossDomainSafeData));
-          
+          localStorage.setItem(
+            crossDomainKey,
+            JSON.stringify(crossDomainSafeData)
+          );
+
           // Also try to set a cookie for broader cross-domain support
-          setCrossDomainCookie('dh_attr_' + config.companyId, JSON.stringify(crossDomainSafeData), 30);
-          
+          setCrossDomainCookie(
+            'dh_attr_' + config.companyId,
+            JSON.stringify(crossDomainSafeData),
+            30
+          );
         } catch (error) {
-          console.warn('Could not persist cross-domain attribution data:', error);
+          console.warn(
+            'Could not persist cross-domain attribution data:',
+            error
+          );
         }
       };
 
@@ -696,20 +751,24 @@
             const data = JSON.parse(stored);
             // Check if data is not too old (30 days max)
             const timestamp = new Date(data.cross_domain_timestamp);
-            const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+            const thirtyDaysAgo = new Date(
+              Date.now() - 30 * 24 * 60 * 60 * 1000
+            );
             if (timestamp > thirtyDaysAgo) {
               return data;
             }
           }
-          
+
           // Fallback: try cookie
           const cookieData = getCookieValue('dh_attr_' + config.companyId);
           if (cookieData) {
             return JSON.parse(decodeURIComponent(cookieData));
           }
-          
         } catch (error) {
-          console.warn('Could not retrieve cross-domain attribution data:', error);
+          console.warn(
+            'Could not retrieve cross-domain attribution data:',
+            error
+          );
         }
         return null;
       };
@@ -721,7 +780,7 @@
             session_id: getGoogleAnalyticsSessionId(),
             user_id: getGoogleAnalyticsUserId(),
             gtm_container_id: getGTMContainerId(),
-            ga_measurement_id: getGA4MeasurementId()
+            ga_measurement_id: getGA4MeasurementId(),
           };
         } catch (error) {
           console.warn('Error extracting cross-domain data:', error);
@@ -745,21 +804,20 @@
       const setCrossDomainCookie = (name, value, days) => {
         try {
           const expires = new Date();
-          expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-          
+          expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+
           // Try to set cookie with different domain strategies
           const hostname = window.location.hostname;
           const domainParts = hostname.split('.');
-          
+
           // Strategy 1: Current domain
           document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires.toUTCString()}; path=/; domain=${hostname}; SameSite=None; Secure`;
-          
+
           // Strategy 2: Parent domain (if subdomain)
           if (domainParts.length > 2) {
             const parentDomain = '.' + domainParts.slice(-2).join('.');
             document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires.toUTCString()}; path=/; domain=${parentDomain}; SameSite=None; Secure`;
           }
-          
         } catch (error) {
           console.warn('Could not set cross-domain cookie:', error);
         }
@@ -770,12 +828,12 @@
           // Method 1: GA4 gtag
           if (typeof gtag !== 'undefined') {
             let clientId = null;
-            gtag('get', 'GA_MEASUREMENT_ID', 'client_id', (id) => {
+            gtag('get', 'GA_MEASUREMENT_ID', 'client_id', id => {
               clientId = id;
             });
             if (clientId) return clientId;
           }
-          
+
           // Method 2: Universal Analytics _ga cookie
           const gaCookie = getCookieValue('_ga');
           if (gaCookie) {
@@ -784,19 +842,20 @@
               return parts[2] + '.' + parts[3];
             }
           }
-          
+
           // Method 3: GA4 cookie
           const cookies = document.cookie.split(';');
           for (let cookie of cookies) {
             const [name, value] = cookie.trim().split('=');
             if (name && name.startsWith('_ga_')) {
-              const cookieParts = value ? decodeURIComponent(value).split('.') : [];
+              const cookieParts = value
+                ? decodeURIComponent(value).split('.')
+                : [];
               if (cookieParts.length >= 4) {
                 return cookieParts[2] + '.' + cookieParts[3];
               }
             }
           }
-          
         } catch (error) {
           console.warn('Error getting Google Analytics client ID:', error);
         }
@@ -810,7 +869,9 @@
           for (let cookie of cookies) {
             const [name, value] = cookie.trim().split('=');
             if (name && name.startsWith('_ga_')) {
-              const cookieParts = value ? decodeURIComponent(value).split('.') : [];
+              const cookieParts = value
+                ? decodeURIComponent(value).split('.')
+                : [];
               if (cookieParts.length >= 6) {
                 return cookieParts[4] + '.' + cookieParts[5];
               }
@@ -826,7 +887,7 @@
         try {
           if (typeof gtag !== 'undefined') {
             let userId = null;
-            gtag('get', 'GA_MEASUREMENT_ID', 'user_id', (id) => {
+            gtag('get', 'GA_MEASUREMENT_ID', 'user_id', id => {
               userId = id;
             });
             return userId;
@@ -842,11 +903,14 @@
           if (typeof google_tag_manager !== 'undefined') {
             return Object.keys(google_tag_manager)[0];
           }
-          
+
           // Alternative: check for GTM script tags
           const scripts = document.getElementsByTagName('script');
           for (let script of scripts) {
-            if (script.src && script.src.includes('googletagmanager.com/gtm.js')) {
+            if (
+              script.src &&
+              script.src.includes('googletagmanager.com/gtm.js')
+            ) {
               const match = script.src.match(/id=([^&]+)/);
               if (match) {
                 return match[1];
@@ -872,13 +936,12 @@
             // Enable conversion linker to improve cross-domain tracking
             gtag('config', 'AW-CONVERSION_ID', {
               allow_enhanced_conversions: true,
-              conversion_linker: true
+              conversion_linker: true,
             });
           }
 
           // Manually trigger linker functionality for cross-domain attribution
           setupCrossDomainLinker();
-
         } catch (error) {
           console.warn('Error initializing GTM Conversion Linker:', error);
         }
@@ -891,14 +954,14 @@
             const clientId = getGoogleAnalyticsClientId();
             const sessionId = getGoogleAnalyticsSessionId();
             const gclid = extractGclidFromCookies();
-            
+
             if (clientId || gclid) {
               const linkerData = {
                 client_id: clientId,
                 session_id: sessionId,
                 gclid: gclid,
                 timestamp: Date.now(),
-                domain: window.location.hostname
+                domain: window.location.hostname,
               };
 
               // Create _gcl_au cookie for Google Ads
@@ -908,23 +971,30 @@
               }
 
               // Create custom linker cookie
-              setCrossDomainCookie('_dh_linker', JSON.stringify(linkerData), 30);
-              
+              setCrossDomainCookie(
+                '_dh_linker',
+                JSON.stringify(linkerData),
+                30
+              );
+
               console.log('Cross-domain linker cookies created');
             }
           };
 
           // Setup click handlers for outbound links
           const setupLinkDecoration = () => {
-            document.addEventListener('click', (event) => {
+            document.addEventListener('click', event => {
               const link = event.target.closest('a');
               if (link && link.href) {
                 try {
                   const url = new URL(link.href);
                   const currentDomain = window.location.hostname;
-                  
+
                   // Check if it's a cross-domain link
-                  if (url.hostname !== currentDomain && !url.hostname.includes(currentDomain)) {
+                  if (
+                    url.hostname !== currentDomain &&
+                    !url.hostname.includes(currentDomain)
+                  ) {
                     decorateLink(link);
                   }
                 } catch (error) {
@@ -934,7 +1004,7 @@
             });
           };
 
-          const decorateLink = (link) => {
+          const decorateLink = link => {
             try {
               const url = new URL(link.href);
               const gclid = extractGclidFromCookies();
@@ -952,18 +1022,22 @@
 
               // Add custom cross-domain attribution
               if ((gclid || clientId) && !url.searchParams.has('xd_attr')) {
-                const crossDomainData = btoa(JSON.stringify({
-                  gclid: gclid,
-                  client_id: clientId,
-                  source_domain: window.location.hostname,
-                  timestamp: Date.now()
-                }));
+                const crossDomainData = btoa(
+                  JSON.stringify({
+                    gclid: gclid,
+                    client_id: clientId,
+                    source_domain: window.location.hostname,
+                    timestamp: Date.now(),
+                  })
+                );
                 url.searchParams.set('xd_attr', crossDomainData);
               }
 
               link.href = url.toString();
-              console.log('Link decorated for cross-domain tracking:', link.href);
-
+              console.log(
+                'Link decorated for cross-domain tracking:',
+                link.href
+              );
             } catch (error) {
               console.warn('Error decorating link:', error);
             }
@@ -972,19 +1046,18 @@
           // Initialize linker functionality
           createLinkerCookies();
           setupLinkDecoration();
-
         } catch (error) {
           console.warn('Error setting up cross-domain linker:', error);
         }
       };
 
       // Enhanced GCLID persistence for GTM integration
-      const persistGclidForGTM = (gclid) => {
+      const persistGclidForGTM = gclid => {
         if (!gclid || !isValidGclid(gclid)) return;
 
         try {
           // Store GCLID in various formats for GTM compatibility
-          
+
           // 1. Standard _gcl_aw format (Google Ads)
           const gclAwValue = `GCL.${Date.now()}.${gclid}`;
           setCrossDomainCookie('_gcl_aw', gclAwValue, 90);
@@ -996,21 +1069,22 @@
           // 3. Push to dataLayer if available
           if (typeof dataLayer !== 'undefined') {
             dataLayer.push({
-              'event': 'gclid_available',
-              'gclid': gclid,
-              'gclid_timestamp': Date.now(),
-              'widget_attribution': true
+              event: 'gclid_available',
+              gclid: gclid,
+              gclid_timestamp: Date.now(),
+              widget_attribution: true,
             });
           }
 
           // 4. Store in localStorage for widget-specific tracking
-          localStorage.setItem('dh_gtm_gclid_' + config.companyId, JSON.stringify({
-            gclid: gclid,
-            timestamp: Date.now(),
-            persisted_by: 'widget'
-          }));
-
-
+          localStorage.setItem(
+            'dh_gtm_gclid_' + config.companyId,
+            JSON.stringify({
+              gclid: gclid,
+              timestamp: Date.now(),
+              persisted_by: 'widget',
+            })
+          );
         } catch (error) {
           console.warn('Error persisting GCLID for GTM:', error);
         }
@@ -1019,39 +1093,52 @@
       // Enhanced attribution data collection for GTM with consent handling
       const collectGTMAttributionData = () => {
         const baseAttribution = collectAttributionData();
-        
+
         try {
           // Add GTM-specific data
           const gtmData = {
             gtm_container_id: getGTMContainerId(),
-            gtm_debug_mode: !!(window.google_tag_manager && window.google_tag_manager.dataLayer && window.google_tag_manager.dataLayer.gtm && window.google_tag_manager.dataLayer.gtm.uniqueEventId),
+            gtm_debug_mode: !!(
+              window.google_tag_manager &&
+              window.google_tag_manager.dataLayer &&
+              window.google_tag_manager.dataLayer.gtm &&
+              window.google_tag_manager.dataLayer.gtm.uniqueEventId
+            ),
             has_gtag: typeof gtag !== 'undefined',
             has_data_layer: typeof dataLayer !== 'undefined',
             enhanced_conversions_enabled: checkEnhancedConversionsStatus(),
-            conversion_linker_enabled: checkConversionLinkerStatus()
+            conversion_linker_enabled: checkConversionLinkerStatus(),
           };
 
           // Merge with base attribution data
           const fullAttribution = {
             ...baseAttribution,
             gtm_integration: gtmData,
-            collection_method: 'gtm_enhanced'
+            collection_method: 'gtm_enhanced',
           };
 
           // Apply consent-safe attribution filtering
-          const consentSafeAttribution = cookieConsentManager.getConsentSafeAttribution(fullAttribution);
+          const consentSafeAttribution =
+            cookieConsentManager.getConsentSafeAttribution(fullAttribution);
 
           // Persist GCLID for GTM if found and consent is granted
-          if (consentSafeAttribution.gclid && consentSafeAttribution.consent_status === 'granted') {
+          if (
+            consentSafeAttribution.gclid &&
+            consentSafeAttribution.consent_status === 'granted'
+          ) {
             persistGclidForGTM(consentSafeAttribution.gclid);
           }
 
           return consentSafeAttribution;
-
         } catch (error) {
-          console.warn('Error collecting GTM attribution data, falling back to base attribution:', error);
+          console.warn(
+            'Error collecting GTM attribution data, falling back to base attribution:',
+            error
+          );
           // Apply consent filtering to fallback as well
-          return cookieConsentManager.getConsentSafeAttribution(baseAttribution);
+          return cookieConsentManager.getConsentSafeAttribution(
+            baseAttribution
+          );
         }
       };
 
@@ -1088,15 +1175,15 @@
               // Check if analytics storage is granted
               let analyticsConsent = false;
               let adStorageConsent = false;
-              
-              gtag('get', 'analytics_storage', (value) => {
+
+              gtag('get', 'analytics_storage', value => {
                 analyticsConsent = value === 'granted';
               });
-              
-              gtag('get', 'ad_storage', (value) => {
+
+              gtag('get', 'ad_storage', value => {
                 adStorageConsent = value === 'granted';
               });
-              
+
               if (analyticsConsent && adStorageConsent) {
                 return { granted: true, method: 'google_consent_mode' };
               }
@@ -1105,9 +1192,11 @@
             // Method 2: Check for OneTrust
             if (typeof OnetrustActiveGroups !== 'undefined') {
               const groups = OnetrustActiveGroups.split(',');
-              const hasAnalytics = groups.includes('C0002') || groups.includes('2'); // Analytics
-              const hasAdvertising = groups.includes('C0004') || groups.includes('4'); // Advertising
-              
+              const hasAnalytics =
+                groups.includes('C0002') || groups.includes('2'); // Analytics
+              const hasAdvertising =
+                groups.includes('C0004') || groups.includes('4'); // Advertising
+
               if (hasAnalytics && hasAdvertising) {
                 return { granted: true, method: 'onetrust' };
               }
@@ -1115,7 +1204,11 @@
 
             // Method 3: Check for Cookiebot
             if (typeof Cookiebot !== 'undefined') {
-              if (Cookiebot.consent && Cookiebot.consent.statistics && Cookiebot.consent.marketing) {
+              if (
+                Cookiebot.consent &&
+                Cookiebot.consent.statistics &&
+                Cookiebot.consent.marketing
+              ) {
                 return { granted: true, method: 'cookiebot' };
               }
             }
@@ -1123,17 +1216,26 @@
             // Method 4: Check for CookieYes
             if (typeof ckyStore !== 'undefined') {
               const consent = ckyStore.getItem('cky-consent');
-              if (consent && consent.includes('analytics') && consent.includes('advertisement')) {
+              if (
+                consent &&
+                consent.includes('analytics') &&
+                consent.includes('advertisement')
+              ) {
                 return { granted: true, method: 'cookieyes' };
               }
             }
 
             // Method 5: Check for generic consent in localStorage/cookies
-            const genericConsent = localStorage.getItem('cookie_consent') || 
-                                  getCookieValue('cookie_consent') ||
-                                  getCookieValue('consent_analytics');
-            
-            if (genericConsent === 'true' || genericConsent === '1' || genericConsent === 'accepted') {
+            const genericConsent =
+              localStorage.getItem('cookie_consent') ||
+              getCookieValue('cookie_consent') ||
+              getCookieValue('consent_analytics');
+
+            if (
+              genericConsent === 'true' ||
+              genericConsent === '1' ||
+              genericConsent === 'accepted'
+            ) {
               return { granted: true, method: 'generic_consent' };
             }
 
@@ -1145,7 +1247,6 @@
 
             // Default: assume consent granted if no framework detected (non-EU traffic)
             return { granted: true, method: 'default_granted' };
-
           } catch (error) {
             console.warn('Error checking cookie consent status:', error);
             return { granted: true, method: 'error_fallback' };
@@ -1157,31 +1258,50 @@
             // Simple heuristic to detect EU traffic
             const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const euTimezones = [
-              'Europe/London', 'Europe/Berlin', 'Europe/Paris', 'Europe/Rome',
-              'Europe/Madrid', 'Europe/Amsterdam', 'Europe/Brussels', 'Europe/Vienna',
-              'Europe/Stockholm', 'Europe/Helsinki', 'Europe/Copenhagen', 'Europe/Prague',
-              'Europe/Warsaw', 'Europe/Budapest', 'Europe/Bucharest', 'Europe/Sofia',
-              'Europe/Athens', 'Europe/Zagreb', 'Europe/Ljubljana', 'Europe/Bratislava',
-              'Europe/Vilnius', 'Europe/Riga', 'Europe/Tallinn', 'Europe/Dublin',
-              'Europe/Luxembourg', 'Europe/Malta'
+              'Europe/London',
+              'Europe/Berlin',
+              'Europe/Paris',
+              'Europe/Rome',
+              'Europe/Madrid',
+              'Europe/Amsterdam',
+              'Europe/Brussels',
+              'Europe/Vienna',
+              'Europe/Stockholm',
+              'Europe/Helsinki',
+              'Europe/Copenhagen',
+              'Europe/Prague',
+              'Europe/Warsaw',
+              'Europe/Budapest',
+              'Europe/Bucharest',
+              'Europe/Sofia',
+              'Europe/Athens',
+              'Europe/Zagreb',
+              'Europe/Ljubljana',
+              'Europe/Bratislava',
+              'Europe/Vilnius',
+              'Europe/Riga',
+              'Europe/Tallinn',
+              'Europe/Dublin',
+              'Europe/Luxembourg',
+              'Europe/Malta',
             ];
-            
+
             return euTimezones.includes(timezone);
           } catch (error) {
             return false; // Assume non-EU if detection fails
           }
         },
 
-        getConsentSafeAttribution: (fullAttribution) => {
+        getConsentSafeAttribution: fullAttribution => {
           const consentStatus = cookieConsentManager.checkConsentStatus();
-          
+
           if (consentStatus.granted) {
             // Full attribution allowed
             return {
               ...fullAttribution,
               consent_status: 'granted',
               consent_method: consentStatus.method,
-              privacy_compliant: true
+              privacy_compliant: true,
             };
           } else {
             // Limited attribution - only session-based and URL parameters
@@ -1192,31 +1312,34 @@
               utm_campaign: fullAttribution.utm_campaign,
               utm_term: fullAttribution.utm_term,
               utm_content: fullAttribution.utm_content,
-              
+
               // Keep GCLID from URL (not from cookies)
-              gclid: fullAttribution.gclid && cookieConsentManager.gclidFromURL() ? fullAttribution.gclid : null,
-              
+              gclid:
+                fullAttribution.gclid && cookieConsentManager.gclidFromURL()
+                  ? fullAttribution.gclid
+                  : null,
+
               // Keep referrer (first-party data)
               referrer_url: fullAttribution.referrer_url,
               referrer_domain: fullAttribution.referrer_domain,
-              
+
               // Keep basic page data
               page_url: fullAttribution.page_url,
               traffic_source: fullAttribution.traffic_source,
               timestamp: fullAttribution.timestamp,
               collected_at: fullAttribution.collected_at,
-              
+
               // Privacy metadata
               consent_status: 'denied',
               consent_method: consentStatus.method,
               privacy_compliant: true,
               limited_attribution: true,
-              
+
               // Remove cookie-based data
               cross_domain_data: null,
-              gtm_integration: null
+              gtm_integration: null,
             };
-            
+
             return limitedAttribution;
           }
         },
@@ -1233,12 +1356,12 @@
         setupConsentListener: () => {
           try {
             // Listen for consent changes and update attribution accordingly
-            
+
             // Google Consent Mode listener
             if (typeof gtag !== 'undefined') {
               // Listen for consent updates
               gtag('event', 'consent_update_listener', {
-                custom_parameter: 'dh_widget_attribution'
+                custom_parameter: 'dh_widget_attribution',
               });
             }
 
@@ -1263,7 +1386,6 @@
               console.log('Generic consent changed, updating attribution');
               cookieConsentManager.updateAttributionOnConsentChange();
             });
-
           } catch (error) {
             console.warn('Error setting up consent listeners:', error);
           }
@@ -1275,49 +1397,60 @@
             const newAttributionData = collectGTMAttributionData();
             widgetState.attributionData = newAttributionData;
             persistAttributionData(newAttributionData);
-            
           } catch (error) {
-            console.warn('Error updating attribution on consent change:', error);
+            console.warn(
+              'Error updating attribution on consent change:',
+              error
+            );
           }
-        }
+        },
       };
 
       // Progressive Form State Management System
       const progressiveFormManager = {
         // Auto-save functionality
         autoSaveTimer: null,
-        
+
         initializeProgressiveFeatures: () => {
           try {
             // Initialize user engagement tracking
-            widgetState.formState.userEngagement.startTime = new Date().toISOString();
-            widgetState.formState.userEngagement.returningUser = progressiveFormManager.isReturningUser();
-            
+            widgetState.formState.userEngagement.startTime =
+              new Date().toISOString();
+            widgetState.formState.userEngagement.returningUser =
+              progressiveFormManager.isReturningUser();
+
             // Setup auto-save if enabled
-            if (widgetState.formState.progressiveFeatures.autoSave && widgetState.formState.autoSaveEnabled) {
+            if (
+              widgetState.formState.progressiveFeatures.autoSave &&
+              widgetState.formState.autoSaveEnabled
+            ) {
               progressiveFormManager.setupAutoSave();
             }
-            
+
             // Setup real-time validation
             if (widgetState.formState.progressiveFeatures.realTimeValidation) {
               progressiveFormManager.setupRealTimeValidation();
             }
-            
+
             // Initialize step analytics
             if (widgetState.formState.progressiveFeatures.stepAnalytics) {
               progressiveFormManager.initializeStepAnalytics();
             }
-            
+
             console.log('Progressive form features initialized');
-            
           } catch (error) {
-            console.warn('Error initializing progressive form features:', error);
+            console.warn(
+              'Error initializing progressive form features:',
+              error
+            );
           }
         },
 
         isReturningUser: () => {
           try {
-            const lastVisit = localStorage.getItem('dh_last_visit_' + config.companyId);
+            const lastVisit = localStorage.getItem(
+              'dh_last_visit_' + config.companyId
+            );
             return !!lastVisit;
           } catch (error) {
             return false;
@@ -1329,44 +1462,46 @@
           if (progressiveFormManager.autoSaveTimer) {
             clearInterval(progressiveFormManager.autoSaveTimer);
           }
-          
+
           // Setup new auto-save timer
           progressiveFormManager.autoSaveTimer = setInterval(() => {
             if (progressiveFormManager.shouldAutoSave()) {
               progressiveFormManager.performAutoSave();
             }
           }, widgetState.formState.autoSaveInterval);
-          
         },
 
         shouldAutoSave: () => {
           // Only auto-save if user has made progress and form has data
           const hasFormData = progressiveFormManager.hasSignificantFormData();
-          const isInProgress = widgetState.currentStep !== 'welcome' && widgetState.currentStep !== 'complete';
-          const timeSinceLastSave = widgetState.formState.lastSaved ? 
-            Date.now() - new Date(widgetState.formState.lastSaved).getTime() : Infinity;
-          
+          const isInProgress =
+            widgetState.currentStep !== 'welcome' &&
+            widgetState.currentStep !== 'complete';
+          const timeSinceLastSave = widgetState.formState.lastSaved
+            ? Date.now() - new Date(widgetState.formState.lastSaved).getTime()
+            : Infinity;
+
           return hasFormData && isInProgress && timeSinceLastSave > 5000; // Min 5 seconds between saves
         },
 
         hasSignificantFormData: () => {
           const data = widgetState.formData;
           return !!(
-            data.pestIssue || 
-            data.address || 
-            data.homeSize || 
-            data.contactInfo.name || 
-            data.contactInfo.email || 
+            data.pestIssue ||
+            data.address ||
+            data.homeSize ||
+            data.contactInfo.name ||
+            data.contactInfo.email ||
             data.contactInfo.phone
           );
         },
 
         performAutoSave: async () => {
           try {
-            
             // Calculate completion status
-            const completionStatus = progressiveFormManager.calculateStepCompletion();
-            
+            const completionStatus =
+              progressiveFormManager.calculateStepCompletion();
+
             // Prepare progressive save data
             const saveData = {
               companyId: config.companyId,
@@ -1375,34 +1510,44 @@
               formData: {
                 ...widgetState.formData,
                 latitude: widgetState.formData.latitude || null,
-                longitude: widgetState.formData.longitude || null
+                longitude: widgetState.formData.longitude || null,
               },
-              serviceAreaData: widgetState.serviceAreaData || { served: null, areas: [] },
+              serviceAreaData: widgetState.serviceAreaData || {
+                served: null,
+                areas: [],
+              },
               attributionData: widgetState.attributionData,
               progressiveState: {
                 currentStep: widgetState.currentStep,
                 completionPercentage: completionStatus.overall,
                 stepCompletions: completionStatus.steps,
-                userEngagement: progressiveFormManager.calculateEngagementMetrics(),
+                userEngagement:
+                  progressiveFormManager.calculateEngagementMetrics(),
                 validationErrors: widgetState.formState.validationErrors,
                 autoSaveTimestamp: new Date().toISOString(),
-                formVersion: widgetState.formState.formVersion
-              }
+                formVersion: widgetState.formState.formVersion,
+              },
             };
 
             // Only save if address is validated (same logic as original partial save)
-            if (widgetState.serviceAreaData && widgetState.serviceAreaData.served) {
-              const response = await fetch(config.baseUrl + '/api/widget/partial-save', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(saveData),
-              });
+            if (
+              widgetState.serviceAreaData &&
+              widgetState.serviceAreaData.served
+            ) {
+              const response = await fetch(
+                config.baseUrl + '/api/widget/partial-save',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(saveData),
+                }
+              );
 
               if (response.ok) {
                 widgetState.formState.lastSaved = new Date().toISOString();
-                
+
                 // Show subtle save indicator
                 progressiveFormManager.showSaveIndicator();
               }
@@ -1410,7 +1555,6 @@
               // Save locally for incomplete forms
               progressiveFormManager.saveLocalFormState(saveData);
             }
-            
           } catch (error) {
             console.warn('Auto-save failed:', error);
           }
@@ -1418,9 +1562,15 @@
 
         getProgressiveStepStatus: () => {
           // Determine the most advanced step completed
-          if (widgetState.formData.contactInfo.name && widgetState.formData.contactInfo.email) {
+          if (
+            widgetState.formData.contactInfo.name &&
+            widgetState.formData.contactInfo.email
+          ) {
             return 'contact_started';
-          } else if (widgetState.formData.address && widgetState.formData.latitude) {
+          } else if (
+            widgetState.formData.address &&
+            widgetState.formData.latitude
+          ) {
             return 'address_validated';
           } else {
             return 'form_started';
@@ -1430,39 +1580,44 @@
         calculateStepCompletion: () => {
           const steps = {
             pest_issue: widgetState.formData.pestIssue ? 100 : 0,
-            address: (widgetState.formData.address ? 50 : 0) + (widgetState.formData.latitude ? 50 : 0),
+            address:
+              (widgetState.formData.address ? 50 : 0) +
+              (widgetState.formData.latitude ? 50 : 0),
             home_size: widgetState.formData.homeSize ? 100 : 0,
-            contact: (
+            contact:
               (widgetState.formData.contactInfo.name ? 34 : 0) +
               (widgetState.formData.contactInfo.email ? 33 : 0) +
-              (widgetState.formData.contactInfo.phone ? 33 : 0)
-            )
+              (widgetState.formData.contactInfo.phone ? 33 : 0),
           };
-          
-          const overall = Object.values(steps).reduce((sum, val) => sum + val, 0) / Object.keys(steps).length;
-          
+
+          const overall =
+            Object.values(steps).reduce((sum, val) => sum + val, 0) /
+            Object.keys(steps).length;
+
           widgetState.formState.stepCompletionPercentage = steps;
-          
+
           return {
             steps: steps,
-            overall: Math.round(overall)
+            overall: Math.round(overall),
           };
         },
 
         calculateEngagementMetrics: () => {
           const now = new Date().toISOString();
-          const startTime = new Date(widgetState.formState.userEngagement.startTime);
+          const startTime = new Date(
+            widgetState.formState.userEngagement.startTime
+          );
           const totalTime = Date.now() - startTime.getTime();
-          
+
           return {
             ...widgetState.formState.userEngagement,
             totalTimeSpent: Math.round(totalTime / 1000), // seconds
             currentSessionDuration: Math.round(totalTime / 1000),
-            lastActivity: now
+            lastActivity: now,
           };
         },
 
-        saveLocalFormState: (data) => {
+        saveLocalFormState: data => {
           try {
             const localStateKey = 'dh_local_form_state_' + config.companyId;
             localStorage.setItem(localStateKey, JSON.stringify(data));
@@ -1480,9 +1635,13 @@
             if (stored) {
               const data = JSON.parse(stored);
               // Check if data is not too old (7 days)
-              const saveTime = new Date(data.progressiveState?.autoSaveTimestamp);
-              const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
-              
+              const saveTime = new Date(
+                data.progressiveState?.autoSaveTimestamp
+              );
+              const sevenDaysAgo = new Date(
+                Date.now() - 7 * 24 * 60 * 60 * 1000
+              );
+
               if (saveTime > sevenDaysAgo) {
                 return data;
               } else {
@@ -1513,14 +1672,14 @@
             opacity: 0;
             transition: opacity 0.3s ease;
           `;
-          
+
           document.body.appendChild(indicator);
-          
+
           // Animate in
           setTimeout(() => {
             indicator.style.opacity = '1';
           }, 100);
-          
+
           // Remove after 2 seconds
           setTimeout(() => {
             indicator.style.opacity = '0';
@@ -1534,31 +1693,31 @@
 
         setupRealTimeValidation: () => {
           // Setup event listeners for real-time validation
-          document.addEventListener('input', (event) => {
+          document.addEventListener('input', event => {
             if (event.target.closest('.dh-widget')) {
               progressiveFormManager.validateField(event.target);
             }
           });
-          
-          document.addEventListener('blur', (event) => {
+
+          document.addEventListener('blur', event => {
             if (event.target.closest('.dh-widget')) {
               progressiveFormManager.validateField(event.target);
             }
           });
         },
 
-        validateField: (field) => {
+        validateField: field => {
           try {
             const fieldName = field.id || field.name;
             const value = field.value;
             let isValid = true;
             let errorMessage = '';
             let warningMessage = '';
-            
+
             // Clear previous error
             delete widgetState.formState.validationErrors[fieldName];
             progressiveFormManager.clearFieldError(field);
-            
+
             // Field-specific validation with enhanced rules
             switch (fieldName) {
               case 'email-input':
@@ -1569,34 +1728,41 @@
                     errorMessage = 'Please enter a valid email address';
                   } else {
                     // Advanced email validation
-                    const commonDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com'];
+                    const commonDomains = [
+                      'gmail.com',
+                      'yahoo.com',
+                      'hotmail.com',
+                      'outlook.com',
+                      'aol.com',
+                    ];
                     const domain = value.split('@')[1]?.toLowerCase();
-                    
+
                     // Check for common typos
                     const possibleTypos = {
                       'gmai.com': 'gmail.com',
                       'gmial.com': 'gmail.com',
                       'yahooo.com': 'yahoo.com',
-                      'hotmial.com': 'hotmail.com'
+                      'hotmial.com': 'hotmail.com',
                     };
-                    
+
                     if (possibleTypos[domain]) {
                       warningMessage = `Did you mean ${value.replace(domain, possibleTypos[domain])}?`;
                     }
-                    
+
                     // Check for missing TLD
                     if (domain && !domain.includes('.')) {
                       isValid = false;
-                      errorMessage = 'Please include the domain extension (e.g., .com)';
+                      errorMessage =
+                        'Please include the domain extension (e.g., .com)';
                     }
                   }
                 }
                 break;
-                
+
               case 'phone-input':
                 if (value) {
                   const cleanPhone = value.replace(/[\s\-\(\)]/g, '');
-                  
+
                   if (!/^[\d\+]+$/.test(cleanPhone)) {
                     isValid = false;
                     errorMessage = 'Please enter a valid phone number';
@@ -1609,13 +1775,16 @@
                   } else {
                     // Format suggestion
                     if (cleanPhone.length === 10 && !value.includes('(')) {
-                      const formatted = `(${cleanPhone.slice(0,3)}) ${cleanPhone.slice(3,6)}-${cleanPhone.slice(6)}`;
-                      progressiveFormManager.suggestFieldFormat(field, formatted);
+                      const formatted = `(${cleanPhone.slice(0, 3)}) ${cleanPhone.slice(3, 6)}-${cleanPhone.slice(6)}`;
+                      progressiveFormManager.suggestFieldFormat(
+                        field,
+                        formatted
+                      );
                     }
                   }
                 }
                 break;
-                
+
               case 'name-input':
                 if (value) {
                   if (value.trim().length < 2) {
@@ -1629,7 +1798,7 @@
                   }
                 }
                 break;
-                
+
               case 'address-input':
                 if (value) {
                   if (value.trim().length < 5) {
@@ -1639,7 +1808,7 @@
                   }
                 }
                 break;
-                
+
               case 'home-size-input':
                 if (value) {
                   const size = parseInt(value);
@@ -1654,7 +1823,7 @@
                 }
                 break;
             }
-            
+
             if (!isValid) {
               widgetState.formState.validationErrors[fieldName] = errorMessage;
               progressiveFormManager.showFieldError(field, errorMessage);
@@ -1663,31 +1832,39 @@
             } else {
               progressiveFormManager.showFieldSuccess(field);
             }
-            
+
             // Update field completion status
             widgetState.formState.fieldCompletionStatus[fieldName] = {
               isValid: isValid,
               hasWarning: !!warningMessage,
               completedAt: new Date().toISOString(),
-              value: value ? '***' : '' // Don't store actual values for privacy
+              value: value ? '***' : '', // Don't store actual values for privacy
             };
-            
+
             // Trigger auto-save if field is valid and significant
-            if (isValid && value && progressiveFormManager.isSignificantField(fieldName)) {
+            if (
+              isValid &&
+              value &&
+              progressiveFormManager.isSignificantField(fieldName)
+            ) {
               setTimeout(() => {
                 if (progressiveFormManager.shouldAutoSave()) {
                   progressiveFormManager.performAutoSave();
                 }
               }, 2000); // Delay to avoid excessive saves
             }
-            
           } catch (error) {
             console.warn('Error in field validation:', error);
           }
         },
 
-        isSignificantField: (fieldName) => {
-          return ['email-input', 'name-input', 'phone-input', 'address-input'].includes(fieldName);
+        isSignificantField: fieldName => {
+          return [
+            'email-input',
+            'name-input',
+            'phone-input',
+            'address-input',
+          ].includes(fieldName);
         },
 
         suggestFieldFormat: (field, suggestion) => {
@@ -1711,10 +1888,10 @@
             align-items: center;
             gap: 8px;
           `;
-          
+
           field.parentNode.style.position = 'relative';
           field.parentNode.appendChild(tooltip);
-          
+
           // Auto-remove after 5 seconds
           setTimeout(() => {
             if (tooltip.parentNode) {
@@ -1726,7 +1903,7 @@
         showFieldWarning: (field, message) => {
           // Remove existing indicators
           progressiveFormManager.clearFieldIndicators(field);
-          
+
           // Create warning indicator
           const warningEl = document.createElement('div');
           warningEl.className = 'dh-field-warning';
@@ -1740,25 +1917,25 @@
             gap: 4px;
           `;
           warningEl.innerHTML = `<span>⚠️</span> ${message}`;
-          
+
           // Add warning styling to field
           field.style.borderColor = '#f59e0b';
           field.style.boxShadow = '0 0 0 1px #f59e0b';
-          
+
           // Insert warning message
           if (field.parentNode) {
             field.parentNode.appendChild(warningEl);
           }
         },
 
-        showFieldSuccess: (field) => {
+        showFieldSuccess: field => {
           // Remove existing indicators
           progressiveFormManager.clearFieldIndicators(field);
-          
+
           // Add success styling to field
           field.style.borderColor = '#10b981';
           field.style.boxShadow = '0 0 0 1px #10b981';
-          
+
           // Add checkmark indicator
           const successEl = document.createElement('div');
           successEl.className = 'dh-field-success';
@@ -1772,25 +1949,27 @@
             font-weight: bold;
             pointer-events: none;
           `;
-          
+
           field.parentNode.style.position = 'relative';
           field.parentNode.appendChild(successEl);
         },
 
-        clearFieldIndicators: (field) => {
+        clearFieldIndicators: field => {
           // Remove error styling
           field.style.borderColor = '';
           field.style.boxShadow = '';
-          
+
           // Remove all indicator elements
-          const indicators = field.parentNode?.querySelectorAll('.dh-field-error, .dh-field-warning, .dh-field-success, .dh-format-suggestion');
+          const indicators = field.parentNode?.querySelectorAll(
+            '.dh-field-error, .dh-field-warning, .dh-field-success, .dh-format-suggestion'
+          );
           indicators?.forEach(el => el.remove());
         },
 
         showFieldError: (field, message) => {
           // Remove existing error
           progressiveFormManager.clearFieldError(field);
-          
+
           // Create error element
           const errorEl = document.createElement('div');
           errorEl.className = 'dh-field-error';
@@ -1801,18 +1980,18 @@
             margin-top: 4px;
             animation: fadeIn 0.3s ease;
           `;
-          
+
           // Add error styling to field
           field.style.borderColor = '#ef4444';
           field.style.boxShadow = '0 0 0 1px #ef4444';
-          
+
           // Insert error message
           if (field.parentNode) {
             field.parentNode.appendChild(errorEl);
           }
         },
 
-        clearFieldError: (field) => {
+        clearFieldError: field => {
           // Use the comprehensive clearFieldIndicators method
           progressiveFormManager.clearFieldIndicators(field);
         },
@@ -1820,16 +1999,23 @@
         initializeStepAnalytics: () => {
           // Track step entry times
           const originalShowStep = window.showStep;
-          window.showStep = function(stepName) {
+          window.showStep = function (stepName) {
             // Record step timing
             if (widgetState.currentStep) {
-              const stepTime = Date.now() - (widgetState.formState.userEngagement.stepTimes[widgetState.currentStep] || Date.now());
-              widgetState.formState.userEngagement.stepTimes[widgetState.currentStep] = stepTime;
+              const stepTime =
+                Date.now() -
+                (widgetState.formState.userEngagement.stepTimes[
+                  widgetState.currentStep
+                ] || Date.now());
+              widgetState.formState.userEngagement.stepTimes[
+                widgetState.currentStep
+              ] = stepTime;
             }
-            
+
             // Record new step start
-            widgetState.formState.userEngagement.stepTimes[stepName] = Date.now();
-            
+            widgetState.formState.userEngagement.stepTimes[stepName] =
+              Date.now();
+
             // Call original function
             return originalShowStep.call(this, stepName);
           };
@@ -1840,7 +2026,8 @@
             step: step,
             reason: reason,
             timestamp: new Date().toISOString(),
-            completionPercentage: progressiveFormManager.calculateStepCompletion().overall
+            completionPercentage:
+              progressiveFormManager.calculateStepCompletion().overall,
           });
         },
 
@@ -1849,7 +2036,7 @@
           if (progressiveFormManager.autoSaveTimer) {
             clearInterval(progressiveFormManager.autoSaveTimer);
           }
-          
+
           // Save final state before cleanup
           if (progressiveFormManager.hasSignificantFormData()) {
             progressiveFormManager.saveLocalFormState({
@@ -1857,50 +2044,55 @@
               sessionId: widgetState.sessionId,
               formData: widgetState.formData,
               currentStep: widgetState.currentStep,
-              completionPercentage: progressiveFormManager.calculateStepCompletion().overall,
-              cleanupReason: 'widget_closed'
+              completionPercentage:
+                progressiveFormManager.calculateStepCompletion().overall,
+              cleanupReason: 'widget_closed',
             });
           }
-        }
+        },
       };
 
       // Initialize attribution tracking
       const initializeAttributionTracking = () => {
         // Generate or retrieve session ID
         let sessionId = localStorage.getItem('dh_session_' + config.companyId);
-        
+
         // Validate existing session ID format (UUID v4: 8-4-4-4-12 characters)
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const uuidRegex =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (sessionId && !uuidRegex.test(sessionId)) {
           sessionId = null; // Force regeneration
         }
-        
+
         if (!sessionId) {
           sessionId = generateSessionId();
           localStorage.setItem('dh_session_' + config.companyId, sessionId);
         } else {
         }
         widgetState.sessionId = sessionId;
-        
+
         // Initialize cookie consent listeners
         cookieConsentManager.setupConsentListener();
-        
+
         // Initialize GTM Conversion Linker
         initializeGTMLinker();
-        
+
         // Collect attribution data with GTM enhancements and consent handling (prioritize fresh data over stored)
         let attributionData = collectGTMAttributionData();
-        
+
         // If we have stored attribution and no new UTM/GCLID data, use stored data
         const storedAttribution = getPersistedAttributionData();
-        if (storedAttribution && !attributionData.utm_source && !attributionData.gclid) {
+        if (
+          storedAttribution &&
+          !attributionData.utm_source &&
+          !attributionData.gclid
+        ) {
           attributionData = { ...storedAttribution, ...attributionData };
           attributionData.collected_at = 'widget_load_with_stored';
         }
-        
+
         widgetState.attributionData = attributionData;
         persistAttributionData(attributionData);
-        
       };
 
       // US States data for dropdown
@@ -2012,12 +2204,14 @@
       let elements;
 
       // Create CSS styles with full color palette
-      const createStyles = (colors = {
-        primary: '#3b82f6',
-        secondary: '#1e293b', 
-        background: '#ffffff',
-        text: '#374151'
-      }) => {
+      const createStyles = (
+        colors = {
+          primary: '#3b82f6',
+          secondary: '#1e293b',
+          background: '#ffffff',
+          text: '#374151',
+        }
+      ) => {
         // Convert hex to RGB for rgba usage
         const hexToRgb = hex => {
           const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -2388,6 +2582,139 @@
         margin-bottom: 4px;
         color: ${textColor};
         font-size: 14px;
+      }
+      
+      /* Button widget styles */
+      .dh-widget-button {
+        background: ${primaryColor};
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: inherit;
+        display: inline-block;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      
+      .dh-widget-button:hover {
+        background: ${primaryDark};
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+      
+      .dh-widget-button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      
+      /* Modal styles */
+      .dh-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      
+      .dh-modal-content {
+        border-radius: 12px;
+        max-width: 100%;
+        width: auto;
+        max-height: 90vh;
+        overflow: visible;
+        position: relative;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      }
+      
+      .dh-modal-body {
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 0;
+      }
+      
+      .dh-modal-close {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background: #fff;
+        border: none;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        color: #374151;
+        transition: all 0.2s ease;
+        z-index: 10;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        border: 2px solid #e5e7eb;
+      }
+      
+      .dh-modal-close:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+      
+      
+      .dh-modal-body .dh-form-widget {
+        margin: 0;
+        box-shadow: none;
+        border-radius: 12px;
+        padding: 0;
+      }
+      
+      .dh-modal-body .dh-form-header {
+        padding: 24px 24px 16px 24px;
+        margin: 0;
+      }
+      
+      .dh-modal-body .dh-form-content {
+        padding: 0 24px 24px 24px;
+        margin: 0;
+      }
+      
+      .dh-modal-body .dh-form-progress {
+        margin: 0 24px;
+      }
+      
+      /* Mobile modal adjustments */
+      @media (max-width: 768px) {
+        .dh-modal-overlay {
+          padding: 10px;
+        }
+        
+        .dh-modal-content {
+          max-height: 95vh;
+        }
+        
+        .dh-modal-close {
+          top: 8px;
+          right: 8px;
+          width: 36px;
+          height: 36px;
+          font-size: 20px;
+        }
+        
+        .dh-widget-button {
+          padding: 14px 28px;
+          font-size: 16px;
+          width: 100%;
+          max-width: 300px;
+        }
       }`;
         document.head.appendChild(styleElement);
       };
@@ -2404,8 +2731,116 @@
         createStyles(colors);
       };
 
-      // Create inline form widget
+      // Create button for modal trigger
+      const createButton = () => {
+        const button = document.createElement('button');
+        button.className = 'dh-widget-button';
+        button.id = 'dh-widget-button';
+        button.textContent = config.buttonText;
+        button.type = 'button';
+
+        // Add click handler to open modal
+        button.addEventListener('click', openModal);
+
+        return button;
+      };
+
+      // Create modal overlay
+      const createModal = () => {
+        const modal = document.createElement('div');
+        modal.className = 'dh-modal-overlay';
+        modal.id = 'dh-modal-overlay';
+        modal.style.display = 'none';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'dh-modal-content';
+        modalContent.id = 'dh-modal-content';
+
+        const modalBody = document.createElement('div');
+        modalBody.className = 'dh-modal-body';
+        modalBody.id = 'dh-modal-body';
+        modalContent.appendChild(modalBody);
+
+        // Create close button and attach to modal content (positioned outside)
+        const closeButton = document.createElement('button');
+        closeButton.className = 'dh-modal-close';
+        closeButton.innerHTML = '&times;';
+        closeButton.type = 'button';
+        closeButton.addEventListener('click', closeModal);
+
+        modalContent.appendChild(closeButton);
+        modal.appendChild(modalContent);
+
+        // Add backdrop click handler if enabled
+        if (config.modalCloseOnBackdrop) {
+          modal.addEventListener('click', e => {
+            if (e.target === modal) {
+              closeModal();
+            }
+          });
+        }
+
+        // Add ESC key handler
+        document.addEventListener('keydown', e => {
+          if (e.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+          }
+        });
+
+        document.body.appendChild(modal);
+        return { modal, modalBody };
+      };
+
+      // Open modal function
+      const openModal = () => {
+        const modal = document.getElementById('dh-modal-overlay');
+        const modalBody = document.getElementById('dh-modal-body');
+
+        if (modal && modalBody) {
+          // Clear any existing content
+          modalBody.innerHTML = '';
+
+          // Create the widget inside the modal
+          const widget = createInlineWidget();
+          modalBody.appendChild(widget.formWidget);
+
+          // Show modal
+          modal.style.display = 'flex';
+          document.body.style.overflow = 'hidden'; // Prevent background scroll
+
+          // Focus management
+          const firstFocusable = modal.querySelector(
+            'input, button, select, textarea'
+          );
+          if (firstFocusable) {
+            firstFocusable.focus();
+          }
+        }
+      };
+
+      // Close modal function
+      const closeModal = () => {
+        const modal = document.getElementById('dh-modal-overlay');
+        if (modal) {
+          modal.style.display = 'none';
+          document.body.style.overflow = ''; // Restore scroll
+        }
+      };
+
+      // Main widget creation router
       const createWidget = () => {
+        if (config.displayMode === 'button') {
+          // Create button and modal for button mode
+          createModal();
+          return createButton();
+        } else {
+          // Default inline mode
+          return createInlineWidget();
+        }
+      };
+
+      // Create inline form widget (renamed for clarity)
+      const createInlineWidget = () => {
         // Create main form container
         const formWidget = document.createElement('div');
         formWidget.className = 'dh-form-widget';
@@ -2460,37 +2895,6 @@
 
         // Insert widget into DOM - check for container ID first (for React integration)
         const containerId = scriptTag.getAttribute('data-container-id');
-
-        if (containerId) {
-          const container = document.getElementById(containerId);
-          if (container) {
-            container.appendChild(formWidget);
-          } else {
-            // Fallback to original logic
-            if (scriptTag.parentNode) {
-              scriptTag.parentNode.insertBefore(
-                formWidget,
-                scriptTag.nextSibling
-              );
-            } else {
-              console.error(
-                'DH Widget: No script parent node available for insertion'
-              );
-            }
-          }
-        } else {
-          // Original logic for normal embedding
-          if (scriptTag.parentNode) {
-            scriptTag.parentNode.insertBefore(
-              formWidget,
-              scriptTag.nextSibling
-            );
-          } else {
-            console.error(
-              'DH Widget: No script parent node available for insertion'
-            );
-          }
-        }
 
         return {
           formWidget: formWidget,
@@ -2795,7 +3199,7 @@
         // Special handling for address step - validate service area
         if (widgetState.currentStep === 'address') {
           const addressNext = document.getElementById('address-next');
-          
+
           // Show loading state
           if (addressNext) {
             addressNext.disabled = true;
@@ -2804,15 +3208,21 @@
 
           try {
             const validationResult = await validateServiceArea();
-            
+
             if (validationResult.served) {
               // User is in service area, save partial lead and proceed to contact step
-              
-              const partialSaveResult = await savePartialLead(validationResult, 'address_validated');
+
+              const partialSaveResult = await savePartialLead(
+                validationResult,
+                'address_validated'
+              );
               if (!partialSaveResult.success) {
-                console.warn('Failed to save partial lead, but continuing with form flow:', partialSaveResult.error);
+                console.warn(
+                  'Failed to save partial lead, but continuing with form flow:',
+                  partialSaveResult.error
+                );
               }
-              
+
               showStep('contact');
               setupStepValidation('contact');
             } else {
@@ -2866,27 +3276,27 @@
       window.changeAddress = () => {
         // Show search mode, hide display mode
         const searchMode = document.getElementById('address-search-mode');
-        const displayMode = document.getElementById('address-display-mode'); 
+        const displayMode = document.getElementById('address-display-mode');
         const searchInput = document.getElementById('address-search-input');
         const addressNext = document.getElementById('address-next');
-        
+
         if (searchMode && displayMode && searchInput && addressNext) {
           searchMode.style.display = 'block';
           displayMode.style.display = 'none';
-          
+
           // Clear the search input and focus it
           searchInput.value = '';
           searchInput.focus();
-          
+
           // Clear editable form fields
           document.getElementById('street-input').value = '';
           document.getElementById('city-input').value = '';
           document.getElementById('state-input').value = '';
           document.getElementById('zip-input').value = '';
-          
+
           // Disable next button until new address is selected
           addressNext.disabled = true;
-          
+
           // Clear form data
           widgetState.formData.addressStreet = '';
           widgetState.formData.addressCity = '';
@@ -2895,7 +3305,7 @@
           widgetState.formData.address = '';
           widgetState.formData.latitude = '';
           widgetState.formData.longitude = '';
-          
+
           // Navigate back to address step
           showStep('address');
           setupStepValidation('address');
@@ -2906,8 +3316,7 @@
       window.validateServiceArea = async () => {
         const { latitude, longitude } = widgetState.formData;
         const zipCode = widgetState.formData.addressZip;
-        
-        
+
         if (!latitude || !longitude) {
           console.warn('No coordinates available for service area validation');
           return { served: false, error: 'No coordinates available' };
@@ -2918,22 +3327,30 @@
             companyId: config.companyId,
             latitude: parseFloat(latitude),
             longitude: parseFloat(longitude),
-            zipCode: zipCode
+            zipCode: zipCode,
           };
-          
-          
-          const response = await fetch(`${config.baseUrl}/api/service-areas/validate`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestData),
-          });
+
+          const response = await fetch(
+            `${config.baseUrl}/api/service-areas/validate`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestData),
+            }
+          );
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('Service area validation - API error:', response.status, errorText);
-            throw new Error(`Service area validation failed: ${response.status}`);
+            console.error(
+              'Service area validation - API error:',
+              response.status,
+              errorText
+            );
+            throw new Error(
+              `Service area validation failed: ${response.status}`
+            );
           }
 
           const result = await response.json();
@@ -2945,9 +3362,14 @@
       };
 
       // Partial lead save function
-      window.savePartialLead = async (validationResult, stepCompleted = 'address_validated') => {
+      window.savePartialLead = async (
+        validationResult,
+        stepCompleted = 'address_validated'
+      ) => {
         if (!widgetState.sessionId || !widgetState.attributionData) {
-          console.warn('Cannot save partial lead: missing session ID or attribution data');
+          console.warn(
+            'Cannot save partial lead: missing session ID or attribution data'
+          );
           return { success: false, error: 'Missing session data' };
         }
 
@@ -2969,44 +3391,53 @@
                 street: widgetState.formData.addressStreet,
                 city: widgetState.formData.addressCity,
                 state: widgetState.formData.addressState,
-                zip: widgetState.formData.addressZip
+                zip: widgetState.formData.addressZip,
               },
               latitude: parseFloat(latitude),
               longitude: parseFloat(longitude),
-              contactInfo: stepCompleted === 'contact_started' ? {
-                name: widgetState.formData.contactInfo.name || null,
-                phone: widgetState.formData.contactInfo.phone || null,
-                email: widgetState.formData.contactInfo.email || null
-              } : null
+              contactInfo:
+                stepCompleted === 'contact_started'
+                  ? {
+                      name: widgetState.formData.contactInfo.name || null,
+                      phone: widgetState.formData.contactInfo.phone || null,
+                      email: widgetState.formData.contactInfo.email || null,
+                    }
+                  : null,
             },
             serviceAreaData: validationResult || {
               served: false,
               areas: [],
-              primaryArea: null
+              primaryArea: null,
             },
-            attributionData: widgetState.attributionData
+            attributionData: widgetState.attributionData,
           };
 
           console.log('Saving partial lead:', partialSaveData);
 
-          const response = await fetch(config.baseUrl + '/api/widget/partial-save', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(partialSaveData)
-          });
+          const response = await fetch(
+            config.baseUrl + '/api/widget/partial-save',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(partialSaveData),
+            }
+          );
 
           if (!response.ok) {
             const errorData = await response.json();
-            console.error('Partial save API error:', response.status, errorData);
+            console.error(
+              'Partial save API error:',
+              response.status,
+              errorData
+            );
             return { success: false, error: errorData.error || 'API error' };
           }
 
           const result = await response.json();
           console.log('Partial lead saved successfully:', result);
           return result;
-
         } catch (error) {
           console.error('Error saving partial lead:', error);
           return { success: false, error: error.message };
@@ -3021,16 +3452,19 @@
         }
 
         try {
-          const response = await fetch(config.baseUrl + '/api/widget/recover-form', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              companyId: config.companyId,
-              sessionId: widgetState.sessionId
-            })
-          });
+          const response = await fetch(
+            config.baseUrl + '/api/widget/recover-form',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                companyId: config.companyId,
+                sessionId: widgetState.sessionId,
+              }),
+            }
+          );
 
           if (!response.ok) {
             console.error('Recovery check failed:', response.status);
@@ -3038,11 +3472,11 @@
           }
 
           const result = await response.json();
-          
+
           if (result.success && result.hasPartialLead && !result.expired) {
             return result;
           }
-          
+
           return null;
         } catch (error) {
           console.error('Error checking for partial lead:', error);
@@ -3050,7 +3484,7 @@
         }
       };
 
-      window.recoverFormData = (recoveryData) => {
+      window.recoverFormData = recoveryData => {
         if (!recoveryData || !recoveryData.formData) {
           console.warn('No recovery data provided');
           return false;
@@ -3058,33 +3492,36 @@
 
         try {
           const formData = recoveryData.formData;
-          
+
           // Restore form data to widget state
           if (formData.pestIssue) {
             widgetState.formData.pestIssue = formData.pestIssue;
           }
-          
+
           if (formData.address) {
             widgetState.formData.address = formData.address;
           }
-          
+
           if (formData.addressDetails) {
-            widgetState.formData.addressStreet = formData.addressDetails.street || '';
-            widgetState.formData.addressCity = formData.addressDetails.city || '';
-            widgetState.formData.addressState = formData.addressDetails.state || '';
+            widgetState.formData.addressStreet =
+              formData.addressDetails.street || '';
+            widgetState.formData.addressCity =
+              formData.addressDetails.city || '';
+            widgetState.formData.addressState =
+              formData.addressDetails.state || '';
             widgetState.formData.addressZip = formData.addressDetails.zip || '';
           }
-          
+
           if (formData.latitude && formData.longitude) {
             widgetState.formData.latitude = formData.latitude;
             widgetState.formData.longitude = formData.longitude;
           }
-          
+
           if (formData.contactInfo) {
             widgetState.formData.contactInfo = {
               name: formData.contactInfo.name || '',
               phone: formData.contactInfo.phone || '',
-              email: formData.contactInfo.email || ''
+              email: formData.contactInfo.email || '',
             };
           }
 
@@ -3094,14 +3531,17 @@
             stepCompleted: recoveryData.stepCompleted,
             serviceAreaData: recoveryData.serviceAreaData,
             originalAttribution: recoveryData.attributionData,
-            recovered: true
+            recovered: true,
           };
 
           console.log('Form data recovered successfully:', {
             stepCompleted: recoveryData.stepCompleted,
             hasAddress: !!formData.address,
             hasPestIssue: !!formData.pestIssue,
-            hasContact: !!(formData.contactInfo && (formData.contactInfo.name || formData.contactInfo.email))
+            hasContact: !!(
+              formData.contactInfo &&
+              (formData.contactInfo.name || formData.contactInfo.email)
+            ),
           });
 
           return true;
@@ -3112,33 +3552,36 @@
       };
 
       // Recovery UI functions
-      window.showRecoveryPrompt = (recoveryData) => {
+      window.showRecoveryPrompt = recoveryData => {
         try {
           // Populate recovery details
           const detailsList = document.getElementById('dh-recovery-details');
           if (detailsList && recoveryData.formData) {
             detailsList.innerHTML = '';
-            
+
             if (recoveryData.formData.pestIssue) {
               const li = document.createElement('li');
               li.textContent = `Pest issue: ${recoveryData.formData.pestIssue}`;
               detailsList.appendChild(li);
             }
-            
+
             if (recoveryData.formData.address) {
               const li = document.createElement('li');
               li.textContent = `Address: ${recoveryData.formData.address}`;
               detailsList.appendChild(li);
             }
-            
-            if (recoveryData.formData.contactInfo && 
-                (recoveryData.formData.contactInfo.name || recoveryData.formData.contactInfo.email)) {
+
+            if (
+              recoveryData.formData.contactInfo &&
+              (recoveryData.formData.contactInfo.name ||
+                recoveryData.formData.contactInfo.email)
+            ) {
               const li = document.createElement('li');
               li.textContent = 'Contact information';
               detailsList.appendChild(li);
             }
           }
-          
+
           // Show the recovery step
           showStep('recovery');
         } catch (error) {
@@ -3152,7 +3595,7 @@
         try {
           // Clear recovery data and start fresh
           widgetState.recoveryData = null;
-          
+
           // Reset form data
           widgetState.formData = {
             pestIssue: '',
@@ -3171,7 +3614,7 @@
               email: '',
             },
           };
-          
+
           console.log('Starting fresh form');
           showStep('welcome');
         } catch (error) {
@@ -3187,10 +3630,10 @@
             showStep('welcome');
             return;
           }
-          
+
           const stepCompleted = widgetState.recoveryData.stepCompleted;
           console.log('Continuing form from step:', stepCompleted);
-          
+
           // Navigate to the appropriate step based on what was completed
           if (stepCompleted === 'address_validated') {
             // Address was validated, go to contact step
@@ -3231,29 +3674,28 @@
       window.populateAddressFields = () => {
         try {
           const formData = widgetState.formData;
-          
+
           // Populate address display mode fields if they exist
           const streetInput = document.getElementById('street-input');
           const cityInput = document.getElementById('city-input');
           const stateInput = document.getElementById('state-input');
           const zipInput = document.getElementById('zip-input');
-          
+
           if (streetInput) streetInput.value = formData.addressStreet || '';
           if (cityInput) cityInput.value = formData.addressCity || '';
           if (stateInput) stateInput.value = formData.addressState || '';
           if (zipInput) zipInput.value = formData.addressZip || '';
-          
+
           // Also ensure the address step shows display mode if we have address data
           if (formData.address) {
             const searchMode = document.getElementById('address-search-mode');
             const displayMode = document.getElementById('address-display-mode');
             const addressNext = document.getElementById('address-next');
-            
+
             if (searchMode) searchMode.style.display = 'none';
             if (displayMode) displayMode.style.display = 'block';
             if (addressNext) addressNext.disabled = false;
           }
-          
         } catch (error) {
           console.error('Error populating address fields:', error);
         }
@@ -3262,15 +3704,14 @@
       window.populateContactFields = () => {
         try {
           const contactInfo = widgetState.formData.contactInfo;
-          
+
           const nameInput = document.getElementById('name-input');
           const phoneInput = document.getElementById('phone-input');
           const emailInput = document.getElementById('email-input');
-          
+
           if (nameInput) nameInput.value = contactInfo.name || '';
           if (phoneInput) phoneInput.value = contactInfo.phone || '';
           if (emailInput) emailInput.value = contactInfo.email || '';
-          
         } catch (error) {
           console.error('Error populating contact fields:', error);
         }
@@ -3280,13 +3721,18 @@
         try {
           if (widgetState.formData.pestIssue) {
             // Find the pest issue radio button and select it
-            const pestRadios = document.querySelectorAll('input[name="pest-issue"]');
+            const pestRadios = document.querySelectorAll(
+              'input[name="pest-issue"]'
+            );
             pestRadios.forEach(radio => {
               if (radio.value === widgetState.formData.pestIssue) {
                 radio.checked = true;
               }
             });
-            console.log('Pest issue field populated:', widgetState.formData.pestIssue);
+            console.log(
+              'Pest issue field populated:',
+              widgetState.formData.pestIssue
+            );
           }
         } catch (error) {
           console.error('Error populating pest issue field:', error);
@@ -3325,15 +3771,15 @@
           contactInfo: widgetState.formData.contactInfo,
           coordinates: {
             latitude: widgetState.formData.latitude,
-            longitude: widgetState.formData.longitude
+            longitude: widgetState.formData.longitude,
           },
           // Enhanced attribution and session data for conversion linking
           sessionId: widgetState.sessionId,
           attributionData: {
             ...widgetState.attributionData,
             form_submission_timestamp: new Date().toISOString(),
-            completed_at: 'widget_submit'
-          }
+            completed_at: 'widget_submit',
+          },
         };
 
         try {
@@ -3418,7 +3864,9 @@
           case 'address':
             const searchInput = document.getElementById('address-search-input');
             const addressNext = document.getElementById('address-next');
-            const addressSuggestions = document.getElementById('address-suggestions');
+            const addressSuggestions = document.getElementById(
+              'address-suggestions'
+            );
 
             if (searchInput && addressNext && addressSuggestions) {
               let searchTimeout = null;
@@ -3500,30 +3948,39 @@
               // Select an address and switch to display mode
               const selectAddress = address => {
                 // Hide search mode, show display mode
-                const searchMode = document.getElementById('address-search-mode');
-                const displayMode = document.getElementById('address-display-mode');
-                
+                const searchMode = document.getElementById(
+                  'address-search-mode'
+                );
+                const displayMode = document.getElementById(
+                  'address-display-mode'
+                );
+
                 // Update editable form fields
-                document.getElementById('street-input').value = address.street || '';
-                document.getElementById('city-input').value = address.city || '';
-                document.getElementById('state-input').value = getStateCodeFromName(address.state);
-                document.getElementById('zip-input').value = address.postcode || '';
+                document.getElementById('street-input').value =
+                  address.street || '';
+                document.getElementById('city-input').value =
+                  address.city || '';
+                document.getElementById('state-input').value =
+                  getStateCodeFromName(address.state);
+                document.getElementById('zip-input').value =
+                  address.postcode || '';
 
                 // Update form data
                 widgetState.formData.addressStreet = address.street || '';
                 widgetState.formData.addressCity = address.city || '';
-                widgetState.formData.addressState = getStateCodeFromName(address.state);
+                widgetState.formData.addressState = getStateCodeFromName(
+                  address.state
+                );
                 widgetState.formData.addressZip = address.postcode || '';
                 widgetState.formData.address = address.formatted;
                 widgetState.formData.latitude = address.lat;
                 widgetState.formData.longitude = address.lon;
-                
+
                 console.log('Address selected - coordinates stored:', {
                   lat: address.lat,
                   lon: address.lon,
-                  formatted: address.formatted
+                  formatted: address.formatted,
                 });
-
 
                 // Switch modes
                 if (searchMode && displayMode) {
@@ -3669,6 +4126,59 @@
           createStyles();
           elements = createWidget();
 
+          // Insert widget into DOM - check for container ID first (for React integration)
+          const containerId = scriptTag.getAttribute('data-container-id');
+          if (containerId) {
+            const container = document.getElementById(containerId);
+            if (container) {
+              if (config.displayMode === 'button') {
+                // For button mode, elements is the button element
+                container.appendChild(elements);
+              } else {
+                // For inline mode, elements is an object with formWidget
+                container.appendChild(elements.formWidget);
+              }
+            } else {
+              // Fallback to original logic
+              if (scriptTag.parentNode) {
+                if (config.displayMode === 'button') {
+                  scriptTag.parentNode.insertBefore(
+                    elements,
+                    scriptTag.nextSibling
+                  );
+                } else {
+                  scriptTag.parentNode.insertBefore(
+                    elements.formWidget,
+                    scriptTag.nextSibling
+                  );
+                }
+              } else {
+                console.error(
+                  'DH Widget: No script parent node available for insertion'
+                );
+              }
+            }
+          } else {
+            // Original logic for normal embedding
+            if (scriptTag.parentNode) {
+              if (config.displayMode === 'button') {
+                scriptTag.parentNode.insertBefore(
+                  elements,
+                  scriptTag.nextSibling
+                );
+              } else {
+                scriptTag.parentNode.insertBefore(
+                  elements.formWidget,
+                  scriptTag.nextSibling
+                );
+              }
+            } else {
+              console.error(
+                'DH Widget: No script parent node available for insertion'
+              );
+            }
+          }
+
           // Load configuration
           const configLoaded = await loadConfig();
           if (!configLoaded) {
@@ -3695,7 +4205,10 @@
           const minimizeBtn = document.querySelector('.dh-widget-minimize');
           if (minimizeBtn) {
             minimizeBtn.addEventListener('click', () => {
-              progressiveFormManager.recordAbandonmentPoint(widgetState.currentStep, 'widget_minimized');
+              progressiveFormManager.recordAbandonmentPoint(
+                widgetState.currentStep,
+                'widget_minimized'
+              );
             });
           }
 

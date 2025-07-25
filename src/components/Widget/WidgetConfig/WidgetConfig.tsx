@@ -122,6 +122,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const [copyStatusMinimal, setCopyStatusMinimal] = useState<
     'idle' | 'copying' | 'copied'
   >('idle');
+  const [copyStatusButton, setCopyStatusButton] = useState<
+    'idle' | 'copying' | 'copied'
+  >('idle');
   const [brandColors, setBrandColors] = useState<{
     primary?: string;
     secondary?: string;
@@ -627,6 +630,26 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 ></script>`;
   };
 
+  const generateButtonEmbedCode = () => {
+    if (!selectedCompany) return '';
+
+    let embedCode = `<script 
+  src="${window.location.origin}/widget.js"
+  data-company-id="${selectedCompany.id}"
+  data-base-url="${window.location.origin}"
+  data-display-mode="button"`;
+
+    // Add button text if customized
+    if (config.submitButtonText !== 'Get My Quote') {
+      embedCode += `\n  data-button-text="${config.submitButtonText}"`;
+    }
+
+    embedCode += `
+></script>`;
+
+    return embedCode;
+  };
+
   const copyFullEmbedCode = async () => {
     if (!selectedCompany) return;
 
@@ -662,6 +685,25 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     } catch (error) {
       console.error('Failed to copy minimal embed code:', error);
       setCopyStatusMinimal('idle');
+    }
+  };
+
+  const copyButtonEmbedCode = async () => {
+    if (!selectedCompany) return;
+
+    setCopyStatusButton('copying');
+
+    try {
+      await navigator.clipboard.writeText(generateButtonEmbedCode());
+      setCopyStatusButton('copied');
+
+      // Reset to idle after 2 seconds
+      setTimeout(() => {
+        setCopyStatusButton('idle');
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy button embed code:', error);
+      setCopyStatusButton('idle');
     }
   };
 
@@ -1257,37 +1299,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               widget to appear.
             </p>
 
-            {/* Full Embed Code */}
-            <div className={styles.embedCodeGroup}>
-              <h4>Full Configuration (Recommended)</h4>
-              <p className={styles.embedDescription}>
-                Includes all your customizations as data attributes.
-              </p>
-              <div className={styles.embedCode}>
-                <code>{generateFullEmbedCode()}</code>
-                <button
-                  onClick={copyFullEmbedCode}
-                  className={styles.copyButton}
-                  disabled={copyStatusFull === 'copying'}
-                >
-                  {copyStatusFull === 'copying' && (
-                    <RefreshCw size={16} className={styles.spinning} />
-                  )}
-                  {copyStatusFull === 'copied' && <Check size={16} />}
-                  {copyStatusFull === 'idle' && <Copy size={16} />}
-                  {copyStatusFull === 'copying' && 'Copying...'}
-                  {copyStatusFull === 'copied' && 'Copied!'}
-                  {copyStatusFull === 'idle' && 'Copy Full Code'}
-                </button>
-              </div>
-            </div>
-
             {/* Minimal Embed Code */}
             <div className={styles.embedCodeGroup}>
-              <h4>Minimal Configuration</h4>
+              <h4>Minimal Configuration (Recommended)</h4>
               <p className={styles.embedDescription}>
-                Basic embed code with default settings. Customizations will be
-                loaded from your saved configuration.
+                Clean, simple embed code. Customizations will be loaded from your saved configuration.
               </p>
               <div className={styles.embedCode}>
                 <code>{generateMinimalEmbedCode()}</code>
@@ -1304,6 +1320,57 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                   {copyStatusMinimal === 'copying' && 'Copying...'}
                   {copyStatusMinimal === 'copied' && 'Copied!'}
                   {copyStatusMinimal === 'idle' && 'Copy Minimal Code'}
+                </button>
+              </div>
+            </div>
+
+            {/* Button + Modal Embed Code */}
+            <div className={styles.embedCodeGroup}>
+              <h4>Button + Modal</h4>
+              <p className={styles.embedDescription}>
+                Displays as a button that opens the widget in a lightbox modal. 
+                Perfect for pages where you want a smaller footprint.
+              </p>
+              <div className={styles.embedCode}>
+                <code>{generateButtonEmbedCode()}</code>
+                <button
+                  onClick={copyButtonEmbedCode}
+                  className={styles.copyButton}
+                  disabled={copyStatusButton === 'copying'}
+                >
+                  {copyStatusButton === 'copying' && (
+                    <RefreshCw size={16} className={styles.spinning} />
+                  )}
+                  {copyStatusButton === 'copied' && <Check size={16} />}
+                  {copyStatusButton === 'idle' && <Copy size={16} />}
+                  {copyStatusButton === 'copying' && 'Copying...'}
+                  {copyStatusButton === 'copied' && 'Copied!'}
+                  {copyStatusButton === 'idle' && 'Copy Button Code'}
+                </button>
+              </div>
+            </div>
+
+            {/* Full Embed Code */}
+            <div className={styles.embedCodeGroup}>
+              <h4>Full Configuration</h4>
+              <p className={styles.embedDescription}>
+                Includes all your customizations as data attributes for maximum portability.
+              </p>
+              <div className={styles.embedCode}>
+                <code>{generateFullEmbedCode()}</code>
+                <button
+                  onClick={copyFullEmbedCode}
+                  className={styles.copyButton}
+                  disabled={copyStatusFull === 'copying'}
+                >
+                  {copyStatusFull === 'copying' && (
+                    <RefreshCw size={16} className={styles.spinning} />
+                  )}
+                  {copyStatusFull === 'copied' && <Check size={16} />}
+                  {copyStatusFull === 'idle' && <Copy size={16} />}
+                  {copyStatusFull === 'copying' && 'Copying...'}
+                  {copyStatusFull === 'copied' && 'Copied!'}
+                  {copyStatusFull === 'idle' && 'Copy Full Code'}
                 </button>
               </div>
             </div>
