@@ -209,6 +209,7 @@
             name: '',
             phone: '',
             email: '',
+            comments: '',
           },
         },
         priceEstimate: null,
@@ -1086,7 +1087,6 @@
               persisted_by: 'widget',
             })
           );
-          
         } catch (error) {
           console.warn('Error persisting GCLID for GTM:', error);
         }
@@ -2973,7 +2973,7 @@
       // Open modal function
       // Track if modal widget has been created
       let modalWidgetCreated = false;
-      
+
       const openModal = () => {
         const modal = document.getElementById('dh-modal-overlay');
         const modalBody = document.getElementById('dh-modal-body');
@@ -3010,7 +3010,7 @@
           // State is automatically preserved since we're not destroying the widget
         }
       };
-      
+
       // Function to reset modal widget (for testing purposes)
       window.resetModalWidget = () => {
         modalWidgetCreated = false;
@@ -3243,6 +3243,10 @@
         <label class="dh-form-label">Email Address</label>
         <input type="email" class="dh-form-input" id="email-input" placeholder="john@example.com">
       </div>
+      <div class="dh-form-group">
+        <label class="dh-form-label">Comments (Optional)</label>
+        <textarea class="dh-form-input" id="comments-input" placeholder="Any additional details or specific concerns?" rows="3"></textarea>
+      </div>
       <div class="dh-form-button-group">
         <button class="dh-form-btn dh-form-btn-secondary" onclick="previousStep()">Back</button>
         <button class="dh-form-btn dh-form-btn-primary" onclick="submitForm()" disabled id="contact-submit">Get My Inspection</button>
@@ -3255,15 +3259,15 @@
         planStep.className = 'dh-form-step';
         planStep.id = 'dh-step-plans';
         planStep.innerHTML = `
-      <div class="dh-success-message" style="background: #d1fae5; border: 1px solid #10b981; border-radius: 8px; padding: 20px; margin: 0 0 24px 0; text-align: center;">
-        <div style="color: #065f46; font-weight: 600; font-size: 18px; margin-bottom: 8px;">🎉 Inspection Requested Successfully!</div>
-        <div style="color: #047857; font-size: 14px;">We&apos;ll contact you soon to schedule your inspection and discuss these service options.</div>
-      </div>
       <h3>Here are our recommended service plans:</h3>
       <div class="dh-plans-container" id="plans-container">
         <!-- Plans will be dynamically ordered with recommended plan first -->
       </div>
       <div class="dh-plans-footer">**initial fees may apply</div>
+      <div class="dh-form-button-group">
+        <button class="dh-form-btn dh-form-btn-secondary" onclick="previousStep()">Back</button>
+        <button class="dh-form-btn dh-form-btn-primary" onclick="nextStep()">Schedule Service</button>
+      </div>
     `;
         steps.push(planStep);
 
@@ -3408,8 +3412,8 @@
           'pest-issue',
           'address',
           'urgency',
-          'contact',
           'plans',
+          'contact',
         ];
         const currentIndex = steps.indexOf(stepName);
         const progress = ((currentIndex + 1) / steps.length) * 100;
@@ -3427,8 +3431,8 @@
           'pest-issue',
           'address',
           'urgency',
-          'contact',
           'plans',
+          'contact',
           'out-of-service',
         ];
         const currentIndex = steps.indexOf(widgetState.currentStep);
@@ -3459,11 +3463,9 @@
                   partialSaveResult.error
                 );
               }
-              
+
               showStep('urgency');
               setupStepValidation('urgency');
-
-
             } else {
               // User is out of service area, do not save partial lead, show end-stop step
               showStep('out-of-service');
@@ -3500,8 +3502,8 @@
           'pest-issue',
           'address',
           'urgency',
-          'contact',
           'plans',
+          'contact',
           'out-of-service',
         ];
         const currentIndex = steps.indexOf(widgetState.currentStep);
@@ -3644,6 +3646,8 @@
                       name: widgetState.formData.contactInfo.name || null,
                       phone: widgetState.formData.contactInfo.phone || null,
                       email: widgetState.formData.contactInfo.email || null,
+                      comments:
+                        widgetState.formData.contactInfo.comments || null,
                     }
                   : null,
             },
@@ -3739,15 +3743,15 @@
           if (formData.pestType) {
             widgetState.formData.pestType = formData.pestType;
           }
-          
+
           if (formData.urgency) {
             widgetState.formData.urgency = formData.urgency;
           }
-          
+
           if (formData.selectedPlan) {
             widgetState.formData.selectedPlan = formData.selectedPlan;
           }
-          
+
           if (formData.recommendedPlan) {
             widgetState.formData.recommendedPlan = formData.recommendedPlan;
           }
@@ -3776,6 +3780,7 @@
               name: formData.contactInfo.name || '',
               phone: formData.contactInfo.phone || '',
               email: formData.contactInfo.email || '',
+              comments: formData.contactInfo.comments || '',
             };
           }
 
@@ -3869,6 +3874,7 @@
               name: '',
               phone: '',
               email: '',
+              comments: '',
             },
           };
 
@@ -3965,10 +3971,12 @@
           const nameInput = document.getElementById('name-input');
           const phoneInput = document.getElementById('phone-input');
           const emailInput = document.getElementById('email-input');
+          const commentsInput = document.getElementById('comments-input');
 
           if (nameInput) nameInput.value = contactInfo.name || '';
           if (phoneInput) phoneInput.value = contactInfo.phone || '';
           if (emailInput) emailInput.value = contactInfo.email || '';
+          if (commentsInput) commentsInput.value = contactInfo.comments || '';
         } catch (error) {
           console.error('Error populating contact fields:', error);
         }
@@ -3987,26 +3995,18 @@
                 if (pestNext) pestNext.disabled = false;
               }
             });
-            console.log('Pest issue field populated:', widgetState.formData.pestType);
+            console.log(
+              'Pest issue field populated:',
+              widgetState.formData.pestType
+            );
           }
         } catch (error) {
           console.error('Error populating pest issue field:', error);
         }
       };
 
-      window.selectPlan = (planType) => {
-        try {
-          // Store the selected plan
-          widgetState.formData.selectedPlan = planType;
-          console.log('Plan selected:', planType);
-          
-          // For now, just show an alert or could open a modal
-          // This is where you might show plan details or handle plan selection
-          alert(`You selected the ${planType.toUpperCase()} plan. Plan details coming soon!`);
-        } catch (error) {
-          console.error('Error selecting plan:', error);
-        }
-      };
+      // Note: Plan selection removed - plans are now informational only
+      // Users proceed to contact step via navigation buttons
 
       window.submitForm = async () => {
         // Prevent double submissions
@@ -4014,10 +4014,10 @@
           return;
         }
 
-        // In preview mode, just navigate to plans step without submitting
+        // In preview mode, just navigate to complete step without submitting
         if (config.isPreview) {
-          showStep('plans');
-          setupStepValidation('plans');
+          showStep('complete');
+          setupStepValidation('complete');
           return;
         }
 
@@ -4072,10 +4072,10 @@
           if (data.success) {
             // Reset submission state
             widgetState.isSubmitting = false;
-            
-            // Navigate to plans step to show success and recommended plans
-            showStep('plans');
-            setupStepValidation('plans');
+
+            // Navigate to complete step to show thank you message
+            showStep('complete');
+            setupStepValidation('complete');
           } else {
             console.error('Form submission failed:', data.error);
             alert(
@@ -4361,29 +4361,34 @@
             break;
 
           case 'urgency':
-            const urgencyOptions = document.querySelectorAll('.dh-urgency-option');
+            const urgencyOptions =
+              document.querySelectorAll('.dh-urgency-option');
             const urgencyNext = document.getElementById('urgency-next');
-            const urgencyPestType = document.getElementById('urgency-pest-type');
+            const urgencyPestType =
+              document.getElementById('urgency-pest-type');
 
             // Update the pest type in the title
             if (urgencyPestType && widgetState.formData.pestType) {
               const pestTypeMap = {
-                'ants': 'ants',
-                'spiders': 'spiders', 
-                'cockroaches': 'cockroaches',
-                'rodents': 'rodents like mice and rats',
-                'termites': 'termites',
-                'wasps': 'wasps',
-                'others': 'pests'
+                ants: 'ants',
+                spiders: 'spiders',
+                cockroaches: 'cockroaches',
+                rodents: 'rodents like mice and rats',
+                termites: 'termites',
+                wasps: 'wasps',
+                others: 'pests',
               };
-              urgencyPestType.textContent = pestTypeMap[widgetState.formData.pestType] || 'pests';
+              urgencyPestType.textContent =
+                pestTypeMap[widgetState.formData.pestType] || 'pests';
             }
 
             if (urgencyOptions && urgencyNext) {
               urgencyOptions.forEach(option => {
                 option.addEventListener('click', e => {
                   // Remove selected class from all options
-                  urgencyOptions.forEach(opt => opt.classList.remove('selected'));
+                  urgencyOptions.forEach(opt =>
+                    opt.classList.remove('selected')
+                  );
                   // Add selected class to clicked option
                   e.target.classList.add('selected');
                   // Store selection
@@ -4399,6 +4404,7 @@
             const nameInput = document.getElementById('name-input');
             const phoneInput = document.getElementById('phone-input');
             const emailInput = document.getElementById('email-input');
+            const commentsInput = document.getElementById('comments-input');
             const submitBtn = document.getElementById('contact-submit');
 
             if (nameInput && phoneInput && emailInput && submitBtn) {
@@ -4406,8 +4412,16 @@
                 const name = nameInput.value.trim();
                 const phone = phoneInput.value.trim();
                 const email = emailInput.value.trim();
+                const comments = commentsInput
+                  ? commentsInput.value.trim()
+                  : '';
 
-                widgetState.formData.contactInfo = { name, phone, email };
+                widgetState.formData.contactInfo = {
+                  name,
+                  phone,
+                  email,
+                  comments,
+                };
 
                 const isValid = name && phone && email && email.includes('@');
                 submitBtn.disabled = !isValid;
@@ -4416,6 +4430,9 @@
               nameInput.addEventListener('input', validateContactForm);
               phoneInput.addEventListener('input', validateContactForm);
               emailInput.addEventListener('input', validateContactForm);
+              if (commentsInput) {
+                commentsInput.addEventListener('input', validateContactForm);
+              }
             }
             break;
 
@@ -4423,44 +4440,50 @@
             // Determine recommended plan based on pest type
             const pestType = widgetState.formData.pestType;
             let recommendedPlan = 'defense'; // default
-            
+
             if (pestType === 'rodents') {
               recommendedPlan = 'smartdefense';
             } else if (pestType === 'termites') {
               recommendedPlan = 'smartdefense-complete';
             }
-            
+
             // Store the recommended plan
             widgetState.formData.recommendedPlan = recommendedPlan;
-            
+
             // Generate plans with recommended plan first
             const generatePlanHTML = (planType, isRecommended) => {
               const planData = {
-                'defense': {
+                defense: {
                   title: 'DEFENSE PLAN',
                   header: '#10b981',
                   features: [
                     'Year-Round Pest Protection',
-                    '4 Seasonal Services', 
+                    '4 Seasonal Services',
                     'General Pest Control',
                     'Free Re-Treat Service',
-                    { text: 'SMART Monitoring System For Rodents', enabled: false },
+                    {
+                      text: 'SMART Monitoring System For Rodents',
+                      enabled: false,
+                    },
                     { text: 'Termite Monitoring', enabled: false },
-                    { text: 'Termite Baiting System', enabled: false }
-                  ]
+                    { text: 'Termite Baiting System', enabled: false },
+                  ],
                 },
-                'smartdefense': {
+                smartdefense: {
                   title: 'SMARTDEFENSE',
                   header: '#06b6d4',
                   features: [
                     'Year-Round Pest Protection',
                     '4 Seasonal Services',
-                    'General Pest Control', 
+                    'General Pest Control',
                     'Free Re-Treat Service',
-                    { text: 'SMART Monitoring System For Rodents', enabled: true },
+                    {
+                      text: 'SMART Monitoring System For Rodents',
+                      enabled: true,
+                    },
                     { text: 'Termite Monitoring', enabled: false },
-                    { text: 'Termite Baiting System', enabled: false }
-                  ]
+                    { text: 'Termite Baiting System', enabled: false },
+                  ],
                 },
                 'smartdefense-complete': {
                   title: 'SMARTDEFENSE COMPLETE',
@@ -4470,44 +4493,66 @@
                     '4 Seasonal Services',
                     'General Pest Control',
                     'Free Re-Treat Service',
-                    { text: 'SMART Monitoring System For Rodents', enabled: true },
+                    {
+                      text: 'SMART Monitoring System For Rodents',
+                      enabled: true,
+                    },
                     { text: 'Termite Monitoring', enabled: true },
-                    { text: 'Termite Baiting System', enabled: true }
-                  ]
-                }
+                    { text: 'Termite Baiting System', enabled: true },
+                  ],
+                },
               };
-              
+
               const plan = planData[planType];
-              const featuresHTML = plan.features.map(feature => {
-                if (typeof feature === 'string') {
-                  return `<div class="dh-plan-feature">${feature}</div>`;
-                } else {
-                  const className = feature.enabled ? 'dh-plan-feature dh-plan-feature-enabled' : 'dh-plan-feature dh-plan-feature-disabled';
-                  return `<div class="${className}">${feature.text}</div>`;
-                }
-              }).join('');
-              
+              const featuresHTML = plan.features
+                .map(feature => {
+                  if (typeof feature === 'string') {
+                    return `<div class="dh-plan-feature">${feature}</div>`;
+                  } else {
+                    const className = feature.enabled
+                      ? 'dh-plan-feature dh-plan-feature-enabled'
+                      : 'dh-plan-feature dh-plan-feature-disabled';
+                    return `<div class="${className}">${feature.text}</div>`;
+                  }
+                })
+                .join('');
+
+              // Add pricing text for Defense Plan when recommended
+              const pricingText =
+                planType === 'defense' && isRecommended
+                  ? '<div class="dh-plan-pricing" style="color: #10b981; font-weight: bold; margin-bottom: 12px; text-align: center;">Starting at $49/month</div>'
+                  : '';
+
               return `
                 <div class="dh-plan-card ${isRecommended ? 'recommended' : ''}" data-plan="${planType}" id="${planType}-plan">
                   <div class="dh-plan-header">${plan.title}</div>
                   <div class="dh-plan-content">
+                    ${pricingText}
                     <div class="dh-plan-included">What&apos;s included:</div>
                     ${featuresHTML}
                   </div>
-                  <button class="dh-plan-button" onclick="selectPlan('${planType}')">PLAN DETAILS</button>
                 </div>
               `;
             };
-            
+
             // Order plans with recommended plan first
-            const allPlans = ['defense', 'smartdefense', 'smartdefense-complete'];
-            const orderedPlans = [recommendedPlan, ...allPlans.filter(p => p !== recommendedPlan)];
-            
+            const allPlans = [
+              'defense',
+              'smartdefense',
+              'smartdefense-complete',
+            ];
+            const orderedPlans = [
+              recommendedPlan,
+              ...allPlans.filter(p => p !== recommendedPlan),
+            ];
+
             // Generate HTML with recommended plan first
-            const plansHTML = orderedPlans.map(planType => 
-              generatePlanHTML(planType, planType === recommendedPlan)
-            ).join('');
-            
+            const plansHTML = orderedPlans
+              .map(planType =>
+                generatePlanHTML(planType, planType === recommendedPlan)
+              )
+              .join('');
+
             // Insert the dynamically ordered plans
             const plansContainer = document.getElementById('plans-container');
             if (plansContainer) {
