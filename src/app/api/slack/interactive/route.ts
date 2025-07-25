@@ -104,14 +104,6 @@ export async function POST(request: NextRequest) {
 
     const payload: SlackInteractivePayload = JSON.parse(payloadString);
 
-    console.log('Slack interactive payload received:', {
-      type: payload.type,
-      user: payload.user.name,
-      actions: payload.actions?.map(a => ({
-        action_id: a.action_id,
-        value: a.value,
-      })),
-    });
 
     // Handle different types of interactions
     switch (payload.type) {

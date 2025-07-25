@@ -301,8 +301,7 @@ export async function POST(request: NextRequest) {
         if (existingPartialLead && !partialLeadError) {
           partialLead = existingPartialLead;
           partialLeadAttribution = existingPartialLead.attribution_data;
-          console.log('Found partial lead to convert:', partialLead.id);
-        }
+          }
       } catch (error) {
         console.warn('Error checking for partial lead:', error);
         // Continue processing - don't fail submission if partial lead lookup fails
@@ -346,10 +345,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If service areas are configured but location is not served, add a flag but don't reject
-    let isOutsideServiceArea = false;
+    // If service areas are configured but location is not served, log it but don't reject
     if (serviceAreaValidation && !serviceAreaValidation.served) {
-      isOutsideServiceArea = true;
       console.log(
         `Lead from outside service area - Company: ${submission.companyId}, Location: ${submission.address}`
       );
@@ -403,11 +400,6 @@ export async function POST(request: NextRequest) {
           city: submission.addressDetails.city,
           state: submission.addressDetails.state,
           zip_code: submission.addressDetails.zip,
-          // Add coordinates if available
-          ...(submission.coordinates && {
-            latitude: submission.coordinates.latitude,
-            longitude: submission.coordinates.longitude,
-          }),
         };
       } else if (submission.address) {
         // Fallback: parse from formatted address string
@@ -537,9 +529,6 @@ export async function POST(request: NextRequest) {
           })
           .eq('id', partialLead.id);
 
-        console.log(
-          `Partial lead ${partialLead.id} marked as converted to lead ${lead.id}`
-        );
       } catch (error) {
         console.warn('Error updating partial lead conversion status:', error);
         // Don't fail the lead creation if this update fails
@@ -639,20 +628,13 @@ export async function POST(request: NextRequest) {
         );
 
         if (callResult.success && !callResult.skipped) {
-          console.log(
-            `Auto-call initiated for lead ${lead.id}, call ID: ${callResult.callId}`
-          );
         } else if (callResult.skipped) {
-          console.log(
-            `Auto-call skipped for lead ${lead.id}: ${callResult.reason}`
-          );
         } else {
           console.error(
             `Auto-call failed for lead ${lead.id}: ${callResult.error}`
           );
         }
       } else {
-        console.log(`Auto-call disabled for company ${submission.companyId}`);
       }
     } catch (error) {
       console.error('Error in auto-call process:', error);
@@ -701,9 +683,6 @@ export async function POST(request: NextRequest) {
           );
 
           if (emailResult.success) {
-            console.log(
-              `Lead notification emails sent successfully for lead ${lead.id}. Sent: ${emailResult.successCount}, Failed: ${emailResult.failureCount}`
-            );
           } else {
             console.error(
               `All lead notification emails failed for lead ${lead.id}`

@@ -189,13 +189,6 @@ export async function POST(request: NextRequest) {
         .eq('session_id', sessionId);
     }
 
-    console.log('Form recovery successful:', {
-      partialLeadId: partialLead.id,
-      sessionId: sessionId,
-      stepCompleted: partialLead.step_completed,
-      hasServiceAreaData: !!partialLead.service_area_data,
-      hasAttributionData: !!partialLead.attribution_data
-    });
 
     return NextResponse.json(
       recoveryData,

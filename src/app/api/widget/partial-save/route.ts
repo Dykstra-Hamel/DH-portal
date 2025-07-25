@@ -201,15 +201,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log successful save for debugging
-    console.log('Partial lead saved successfully:', {
-      partialLeadId: partialLead.id,
-      sessionId: sessionId,
-      companyId: companyId,
-      stepCompleted: stepCompleted,
-      serviceAreaServed: serviceAreaData.served,
-      hasAttribution: !!attributionData.utm_source || !!attributionData.gclid
-    });
 
     return NextResponse.json(
       {
