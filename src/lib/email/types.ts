@@ -22,7 +22,10 @@ export interface LeadNotificationData {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
-  pestIssue: string;
+  pestType: string;
+  urgency: string;
+  selectedPlan?: string;
+  recommendedPlan?: string;
   address: string;
   homeSize?: number;
   estimatedPrice?: {

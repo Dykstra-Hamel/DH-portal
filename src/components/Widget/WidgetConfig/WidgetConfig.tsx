@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useState, useEffect } from 'react';
 import { Save, Copy, Eye, RefreshCw, Check } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
@@ -11,7 +10,6 @@ import {
   getCompanyCoordinates,
   createCachedGeocodeResult,
 } from '@/lib/geocoding';
-
 interface Company {
   id: string;
   name: string;
@@ -22,12 +20,10 @@ interface Company {
   country?: string;
   widget_config?: any;
 }
-
 interface ColorState {
   value: string;
   source: 'brand' | 'override' | 'default';
 }
-
 interface WidgetConfigData {
   branding: {
     logo?: string;
@@ -64,13 +60,11 @@ interface WidgetConfigData {
     emails: string[];
   };
 }
-
 interface WidgetConfigProps {
   companies: Company[];
   selectedCompanyId?: string;
   onCompanyChange?: (companyId: string) => void;
 }
-
 const WidgetConfig: React.FC<WidgetConfigProps> = ({
   companies,
   selectedCompanyId,
@@ -146,7 +140,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     lat: number;
     lng: number;
   } | null>(null);
-
   // Default color values
   const defaultColors = {
     primary: '#3b82f6',
@@ -154,7 +147,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     background: '#ffffff',
     text: '#374151',
   };
-
   // Color resolution function
   const resolveColors = (
     brandColors: { primary?: string; secondary?: string },
@@ -200,10 +192,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         source: overrides?.text ? 'override' : 'default',
       },
     };
-
     return resolved;
   };
-
   // Handle color changes with override tracking
   const handleColorChange = (
     colorType: 'primary' | 'secondary' | 'background' | 'text',
@@ -211,7 +201,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   ) => {
     setConfig(prev => {
       const newOverrides = { ...prev.colorOverrides };
-
       // Check if this color matches the brand color or default
       const brandValue =
         colorType === 'primary'
@@ -220,7 +209,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             ? brandColors.secondary
             : null;
       const defaultValue = defaultColors[colorType];
-
       if (value === brandValue || (value === defaultValue && !brandValue)) {
         // Remove override if value matches brand or default
         delete newOverrides[colorType];
@@ -228,14 +216,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         // Set override if value is different
         newOverrides[colorType] = value;
       }
-
       return {
         ...prev,
         colorOverrides: newOverrides,
       };
     });
   };
-
   // Reset individual color to brand/default value
   const resetIndividualColor = (
     colorType: 'primary' | 'secondary' | 'background' | 'text'
@@ -244,19 +230,16 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       const newOverrides = { ...prev.colorOverrides };
       // Remove the override for this specific color
       delete newOverrides[colorType];
-
       return {
         ...prev,
         colorOverrides: newOverrides,
       };
     });
   };
-
   // Update color states when brand colors or config changes
   useEffect(() => {
     const resolved = resolveColors(brandColors, config.colorOverrides);
     setColorStates(resolved);
-
     // Update the colors in config to reflect resolved values
     setConfig(prev => ({
       ...prev,
@@ -268,7 +251,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       },
     }));
   }, [brandColors, config.colorOverrides]);
-
   // Fetch Google API key on component mount
   useEffect(() => {
     const fetchGoogleApiKey = async () => {
@@ -282,10 +264,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         console.error('Error fetching Google API key:', error);
       }
     };
-
     fetchGoogleApiKey();
   }, []);
-
   // Load company data when selected company changes
   useEffect(() => {
     if (selectedCompanyId) {
@@ -299,10 +279,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       }
     }
   }, [selectedCompanyId, companies]);
-
   const loadCompanyConfig = (company: Company) => {
     const widgetConfig = company.widget_config || {};
-
     setConfig({
       branding: {
         logo: widgetConfig.branding?.logo || '',
@@ -338,21 +316,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         emails: widgetConfig.notifications?.emails || [],
       },
     });
-
     // Set the notification emails input field
     const emails = widgetConfig.notifications?.emails || [];
     setNotificationEmailsInput(emails.join('\n'));
   };
-
   const geocodeCompanyAddress = async (company: Company) => {
     try {
       const coordinates = await getCompanyCoordinates(company);
       setMapCenter({ lat: coordinates.lat, lng: coordinates.lng });
-
       // Cache the result in widget_config if it's not already cached
       if (!company.widget_config?.geocodedAddress) {
         const cachedResult = createCachedGeocodeResult(coordinates);
-
         // Update the company config to include the cached geocode result
         try {
           await adminAPI.updateCompany(company.id, {
@@ -371,7 +345,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       // setMapCenter will remain null, ServiceAreaMap will use fallback
     }
   };
-
   const fetchBrandColors = async (companyId: string) => {
     try {
       setBrandLoading(true);
@@ -381,7 +354,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         .select('primary_color_hex, secondary_color_hex')
         .eq('company_id', companyId)
         .single();
-
       if (!error && brandData) {
         setBrandColors({
           primary: brandData.primary_color_hex,
@@ -397,7 +369,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setBrandLoading(false);
     }
   };
-
   const loadServiceAreas = async (companyId: string) => {
     try {
       const response = await fetch(`/api/service-areas/${companyId}`);
@@ -412,10 +383,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setServiceAreas([]);
     }
   };
-
   const saveServiceAreas = async (areas: any[]) => {
     if (!selectedCompany) return;
-
     try {
       const response = await fetch(`/api/service-areas/${selectedCompany.id}`, {
         method: 'PUT',
@@ -424,7 +393,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         },
         body: JSON.stringify({ serviceAreas: areas }),
       });
-
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -446,7 +414,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setTimeout(() => setSaveStatus('idle'), 5000);
     }
   };
-
   const resetToBrandColors = () => {
     if (brandColors.primary || brandColors.secondary) {
       setConfig(prev => ({
@@ -464,7 +431,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       }));
     }
   };
-
   const handleCompanySelect = (companyId: string) => {
     if (onCompanyChange) {
       onCompanyChange(companyId);
@@ -476,7 +442,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       }
     }
   };
-
   const handleConfigChange = (
     section: keyof WidgetConfigData,
     field: string,
@@ -490,7 +455,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       },
     }));
   };
-
   const addServiceArea = () => {
     if (
       serviceAreaInput.trim() &&
@@ -503,21 +467,18 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setServiceAreaInput('');
     }
   };
-
   const removeServiceArea = (area: string) => {
     setConfig(prev => ({
       ...prev,
       service_areas: prev.service_areas.filter(a => a !== area),
     }));
   };
-
   const parseNotificationEmails = (input: string): string[] => {
     return input
       .split(/[,\n]/)
       .map(email => email.trim())
       .filter(email => email.length > 0 && email.includes('@'));
   };
-
   const updateNotificationEmails = () => {
     const emails = parseNotificationEmails(notificationEmailsInput);
     setConfig(prev => ({
@@ -527,7 +488,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       },
     }));
   };
-
   const removeNotificationEmail = (emailToRemove: string) => {
     // Update the config
     setConfig(prev => ({
@@ -538,25 +498,20 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         ),
       },
     }));
-
     // Update the text input field to sync with the removed email
     const currentEmails = config.notifications.emails.filter(
       email => email !== emailToRemove
     );
     setNotificationEmailsInput(currentEmails.join('\n'));
   };
-
   const saveConfig = async () => {
     if (!selectedCompany) return;
-
     setIsSaving(true);
     setSaveStatus('idle');
-
     try {
       await adminAPI.updateCompany(selectedCompany.id, {
         widget_config: config,
       });
-
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
@@ -567,15 +522,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setIsSaving(false);
     }
   };
-
   const generateFullEmbedCode = () => {
     if (!selectedCompany) return '';
-
     let embedCode = `<script 
   src="${window.location.origin}/widget.js"
   data-company-id="${selectedCompany.id}"
   data-base-url="${window.location.origin}"`;
-
     // Add all configuration as data attributes
     if (config.headers.headerText) {
       embedCode += `\n  data-header-text="${config.headers.headerText}"`;
@@ -613,16 +565,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     ) {
       embedCode += `\n  data-welcome-description="${config.messaging.fallback}"`;
     }
-
     embedCode += `
 ></script>`;
-
     return embedCode;
   };
-
   const generateMinimalEmbedCode = () => {
     if (!selectedCompany) return '';
-
     return `<script 
   src="${window.location.origin}/widget.js"
   data-company-id="${selectedCompany.id}"
@@ -654,11 +602,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     if (!selectedCompany) return;
 
     setCopyStatusFull('copying');
-
     try {
       await navigator.clipboard.writeText(generateFullEmbedCode());
       setCopyStatusFull('copied');
-
       // Reset to idle after 2 seconds
       setTimeout(() => {
         setCopyStatusFull('idle');
@@ -668,16 +614,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setCopyStatusFull('idle');
     }
   };
-
   const copyMinimalEmbedCode = async () => {
     if (!selectedCompany) return;
-
     setCopyStatusMinimal('copying');
-
     try {
       await navigator.clipboard.writeText(generateMinimalEmbedCode());
       setCopyStatusMinimal('copied');
-
       // Reset to idle after 2 seconds
       setTimeout(() => {
         setCopyStatusMinimal('idle');
@@ -714,7 +656,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           <h2>Widget Configuration</h2>
           <p>Select a company to configure their AI-powered widget.</p>
         </div>
-
         <div className={styles.companySelector}>
           <label>Select Company:</label>
           <select onChange={e => handleCompanySelect(e.target.value)} value="">
@@ -729,13 +670,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       </div>
     );
   }
-
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <h2>Widget Configuration</h2>
         <p>Configure the AI-powered widget for {selectedCompany.name}</p>
-
         <div className={styles.headerActions}>
           <button
             onClick={() => setShowPreview(!showPreview)}
@@ -744,7 +683,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <Eye size={16} />
             {showPreview ? 'Hide Preview' : 'Show Preview'}
           </button>
-
           <button
             onClick={saveConfig}
             disabled={isSaving}
@@ -759,7 +697,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           </button>
         </div>
       </div>
-
       <div className={styles.companySelector}>
         <label>Select Company:</label>
         <select
@@ -774,7 +711,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           ))}
         </select>
       </div>
-
       {saveStatus !== 'idle' && (
         <div className={`${styles.statusMessage} ${styles[saveStatus]}`}>
           {saveStatus === 'success' && 'Configuration saved successfully!'}
@@ -782,7 +718,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             'Failed to save configuration. Please try again.'}
         </div>
       )}
-
       <div
         className={`${styles.content} ${showPreview ? styles.withPreview : styles.withoutPreview}`}
       >
@@ -790,7 +725,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           {/* Branding Section */}
           <div className={styles.section}>
             <h3>Branding</h3>
-
             <div className={styles.formGroup}>
               <label>Company Name</label>
               <input
@@ -802,7 +736,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="Your Company Name"
               />
             </div>
-
             <div className={styles.formGroup}>
               <label>Header Text</label>
               <input
@@ -814,7 +747,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="Get Free Estimate (default if left blank)"
               />
             </div>
-
             <div className={styles.formGroup}>
               <label>Sub-Header Text (optional)</label>
               <input
@@ -826,7 +758,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="Subtitle text - leave blank for no subtitle"
               />
             </div>
-
             <div className={styles.formGroup}>
               <label>Logo URL (optional)</label>
               <input
@@ -839,14 +770,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               />
             </div>
           </div>
-
           {/* Widget Colors Section */}
           <div className={styles.section}>
             <h3>Widget Colors</h3>
             <p className={styles.sectionDescription}>
               Customize the color scheme of your widget.
             </p>
-
             {(brandColors.primary || brandColors.secondary) && (
               <div className={styles.brandColorsSection}>
                 <button
@@ -869,7 +798,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 </p>
               </div>
             )}
-
             <div className={styles.colorGrid}>
               <div className={styles.formGroup}>
                 <label>
@@ -914,7 +842,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                   )}
                 </div>
               </div>
-
               <div className={styles.formGroup}>
                 <label>
                   Secondary Color
@@ -958,7 +885,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                   )}
                 </div>
               </div>
-
               <div className={styles.formGroup}>
                 <label>
                   Background Color
@@ -1000,7 +926,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                   )}
                 </div>
               </div>
-
               <div className={styles.formGroup}>
                 <label>
                   Text Color
@@ -1040,14 +965,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               </div>
             </div>
           </div>
-
           {/* Widget Text Section */}
           <div className={styles.section}>
             <h3>Widget Text</h3>
             <p className={styles.sectionDescription}>
               Customize the text content of your widget.
             </p>
-
             <div className={styles.formGroup}>
               <label>Submit Button Text</label>
               <input
@@ -1062,7 +985,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="Get My Quote"
               />
             </div>
-
             <div className={styles.formGroup}>
               <label>Success Message</label>
               <textarea
@@ -1078,7 +1000,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               />
             </div>
           </div>
-
           {/* Welcome Step Section */}
           <div className={styles.section}>
             <h3>Welcome Step</h3>
@@ -1086,7 +1007,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               Customize the title and description text shown on the first step
               of your widget.
             </p>
-
             <div className={styles.formGroup}>
               <label>Welcome Title</label>
               <input
@@ -1098,7 +1018,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="Get Started"
               />
             </div>
-
             <div className={styles.formGroup}>
               <label>Welcome Description</label>
               <textarea
@@ -1111,7 +1030,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               />
             </div>
           </div>
-
           {/* Email Notifications Section */}
           <div className={styles.section}>
             <h3>Email Notifications</h3>
@@ -1120,7 +1038,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               customers submit the widget form. Separate multiple emails with
               commas or new lines.
             </p>
-
             <div className={styles.formGroup}>
               <label>Notification Email Addresses</label>
               <textarea
@@ -1131,7 +1048,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="user@company.com, manager@company.com, admin@company.com"
               />
             </div>
-
             {config.notifications.emails.length > 0 && (
               <div className={styles.emailList}>
                 <label>Current notification emails:</label>
@@ -1151,7 +1067,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               </div>
             )}
           </div>
-
           {/* Service Areas Section */}
           <div className={styles.section}>
             <h3>Service Areas</h3>
@@ -1159,7 +1074,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               Define where you provide service using geographic areas or zip
               codes. Leave empty to serve all areas.
             </p>
-
             <div className={styles.serviceAreaTabs}>
               <button
                 type="button"
@@ -1176,7 +1090,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 Zip Codes
               </button>
             </div>
-
             {!showServiceAreaMap ? (
               <div className={styles.zipCodeSection}>
                 <div className={styles.serviceAreaInput}>
@@ -1191,7 +1104,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     Add
                   </button>
                 </div>
-
                 <div className={styles.serviceAreas}>
                   {config.service_areas.map(area => (
                     <span key={area} className={styles.serviceArea}>
@@ -1227,7 +1139,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               </div>
             )}
           </div>
-
           {/* Address API Section */}
           <div className={styles.section}>
             <h3>Address Autocomplete</h3>
@@ -1236,7 +1147,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               addresses. This feature uses Google Places API and may incur costs
               based on usage.
             </p>
-
             <div className={styles.formGroup}>
               <label>
                 <input
@@ -1253,7 +1163,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 Enable Address Autocomplete
               </label>
             </div>
-
             {config.addressApi.enabled && (
               <>
                 <div className={styles.formGroup}>
@@ -1267,7 +1176,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     variables.
                   </small>
                 </div>
-
                 <div className={styles.formGroup}>
                   <label>Max Suggestions</label>
                   <input
@@ -1290,7 +1198,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               </>
             )}
           </div>
-
           {/* Embed Code Section */}
           <div className={styles.section}>
             <h3>Embed Code</h3>
@@ -1376,7 +1283,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             </div>
           </div>
         </div>
-
         {/* Preview Section */}
         {showPreview && (
           <div className={styles.previewSection}>
@@ -1390,5 +1296,4 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     </div>
   );
 };
-
 export default WidgetConfig;
