@@ -2958,7 +2958,7 @@
           
           console.log('Service area validation - API request:', requestData);
           
-          const response = await fetch(`/api/service-areas/validate`, {
+          const response = await fetch(`${config.baseUrl}/api/service-areas/validate`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
