@@ -44,6 +44,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate UUID format for companyId (more flexible pattern)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(companyId)) {
+      return NextResponse.json(
+        { 
+          error: 'Company ID must be a valid UUID format',
+          served: false,
+          areas: []
+        },
+        {
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          },
+        }
+      );
+    }
+
     // Validate coordinate ranges
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
       return NextResponse.json(

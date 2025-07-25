@@ -27,6 +27,50 @@ export async function verifyAuth(request: NextRequest) {
   }
 }
 
+// Alternative auth verification that accepts session token from request body or headers
+export async function verifyAuthFlexible(request: NextRequest) {
+  try {
+    // First try the standard Bearer token approach
+    const authHeader = request.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      const supabase = createAdminClient();
+
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser(token);
+
+      if (!error && user) {
+        return { user, error: null };
+      }
+    }
+
+    // Try to get session token from request body for admin components
+    try {
+      const body = await request.clone().json();
+      if (body.sessionToken) {
+        const supabase = createAdminClient();
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser(body.sessionToken);
+
+        if (!error && user) {
+          return { user, error: null };
+        }
+      }
+    } catch {
+      // JSON parsing failed, continue with other methods
+    }
+
+    // If no valid authentication found
+    return { user: null, error: 'No valid authentication found' };
+  } catch (error) {
+    return { user: null, error: 'Authentication failed' };
+  }
+}
+
 // Check if user has admin role
 export async function isAuthorizedAdmin(user: any): Promise<boolean> {
   if (!user) return false;

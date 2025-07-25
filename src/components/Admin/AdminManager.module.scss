@@ -908,3 +908,1090 @@
     padding: 0.5rem;
   }
 }
+
+// Analytics-specific styles
+.adminSection {
+  padding: 1rem;
+}
+
+.sectionHeader {
+  margin-bottom: 2rem;
+  
+  h2 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 0.5rem 0;
+  }
+  
+  p {
+    color: #6b7280;
+    font-size: 1rem;
+    margin: 0;
+  }
+}
+
+.filtersContainer {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  
+  label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+  }
+  
+  select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    background: white;
+    min-width: 150px;
+    
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  }
+}
+
+.refreshButton {
+  background-color: #6b7280;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: #374151;
+  }
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.statCard {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  
+  h3 {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    margin: 0 0 0.5rem 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.tableContainer {
+  background: white;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  
+  th {
+    background: #f9fafb;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  td {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: #111827;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  
+  tr:hover {
+    background: #f9fafb;
+  }
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  
+  &.success {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  &.warning {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  &.danger {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+}
+
+.actionButtons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.viewButton, .deleteButton {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.viewButton {
+  background: #e0e7ff;
+  color: #3730a3;
+  
+  &:hover {
+    background: #c7d2fe;
+  }
+}
+
+.deleteButton {
+  background: #fee2e2;
+  color: #991b1b;
+  
+  &:hover {
+    background: #fecaca;
+  }
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1rem;
+  
+  button {
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    
+    &:hover:not(:disabled) {
+      background: #f3f4f6;
+    }
+    
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+  
+  span {
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modalContent {
+  background: white;
+  border-radius: 0.5rem;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+  }
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  
+  &:hover {
+    color: #374151;
+  }
+}
+
+.modalBody {
+  padding: 1.5rem;
+}
+
+.detailsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.detailSection {
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+  }
+  
+  p {
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+    
+    strong {
+      font-weight: 600;
+      color: #374151;
+    }
+  }
+  
+  ul {
+    margin: 0.5rem 0;
+    padding-left: 1rem;
+    
+    li {
+      font-size: 0.875rem;
+      margin: 0.25rem 0;
+    }
+  }
+}
+
+.noData {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+// Analytics specific styles
+.analyticsOverview {
+  .chartSection {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 2rem;
+    
+    h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #111827;
+      margin: 0 0 1rem 0;
+    }
+  }
+  
+  .sourceGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+  
+  .sourceCard {
+    text-align: center;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 0.375rem;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .sourceName {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+  }
+  
+  .sourceCount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+  }
+  
+  .sourcePercentage {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+}
+
+.qualitySection {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  
+  h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 1rem 0;
+  }
+}
+
+.qualityGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.qualityMetric {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.qualityLabel {
+  min-width: 150px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.qualityBar {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.qualityFill {
+  height: 100%;
+  background: #3b82f6;
+  transition: width 0.3s ease;
+}
+
+.qualityValue {
+  min-width: 50px;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.funnelContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.funnelStage {
+  flex: 1;
+  text-align: center;
+  padding: 1rem;
+  background: #f9fafb;
+  margin: 0 0.25rem;
+  border-radius: 0.375rem;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  
+  &:not(:last-child)::after {
+    content: '→';
+    position: absolute;
+    right: -15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.5rem;
+    color: #6b7280;
+    z-index: 1;
+  }
+}
+
+.stageName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.stageCount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.stagePercentage {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.dropoffRate {
+  font-size: 0.75rem;
+  color: #dc2626;
+  margin-top: 0.25rem;
+}
+
+.funnelMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.funnelMetric {
+  text-align: center;
+  
+  span {
+    display: block;
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+  }
+  
+  strong {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
+  }
+}
+
+.performanceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.performanceCard {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+  }
+}
+
+.performanceMetrics {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.performanceMetric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  
+  span {
+    color: #6b7280;
+  }
+  
+  strong {
+    color: #111827;
+    font-weight: 600;
+  }
+}
+
+.trendsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.trendMetric {
+  text-align: center;
+  
+  span {
+    display: block;
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+  }
+  
+  strong {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
+  }
+}
+
+.trendsTable {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 1rem 0;
+  }
+}
+
+// Form Analytics Styles
+.formOverview {
+  .stepCompletionSection {
+    margin: 2rem 0;
+    
+    .stepGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    
+    .stepCard {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      
+      .stepName {
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #111827;
+      }
+      
+      .stepStats {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+      
+      .stepCount {
+        font-size: 0.875rem;
+        color: #6b7280;
+      }
+      
+      .stepPercentage {
+        font-weight: 600;
+        color: #059669;
+      }
+      
+      .progressBar {
+        height: 8px;
+        background: #f3f4f6;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      
+      .progressFill {
+        height: 100%;
+        background: linear-gradient(90deg, #10b981, #059669);
+        transition: width 0.3s ease;
+      }
+    }
+  }
+  
+  .serviceAreaSection {
+    margin: 2rem 0;
+    
+    .serviceAreaGrid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    
+    .serviceAreaCard {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      text-align: center;
+      
+      .serviceAreaLabel {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-bottom: 0.5rem;
+      }
+      
+      .serviceAreaValue {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 0.25rem;
+      }
+      
+      .serviceAreaPercentage {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #059669;
+      }
+    }
+  }
+  
+  .timeDistributionSection {
+    margin: 2rem 0;
+    
+    .timeDistributionGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    
+    .timeDistributionItem {
+      background: white;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      
+      .timeRange {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 0.5rem;
+      }
+      
+      .timeCount {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-bottom: 0.5rem;
+      }
+      
+      .timeBar {
+        height: 4px;
+        background: #f3f4f6;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      
+      .timeBarFill {
+        height: 100%;
+        background: #3b82f6;
+        transition: width 0.3s ease;
+      }
+    }
+  }
+}
+
+.stepAnalysisSection {
+  .funnelContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 2rem 0;
+  }
+}
+
+.abandonmentSection {
+  .abandonmentOverview {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    
+    .abandonmentStat {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      
+      span {
+        color: #6b7280;
+      }
+      
+      strong {
+        color: #111827;
+      }
+    }
+  }
+  
+  .abandonmentReasonsContainer {
+    margin: 2rem 0;
+    
+    .reasonsList {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .reasonItem {
+      background: white;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      
+      .reasonName {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #111827;
+      }
+      
+      .reasonCount {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-bottom: 0.5rem;
+      }
+      
+      .reasonBar {
+        height: 6px;
+        background: #f3f4f6;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      
+      .reasonBarFill {
+        height: 100%;
+        background: #dc2626;
+        transition: width 0.3s ease;
+      }
+    }
+  }
+  
+  .abandonmentByStepContainer {
+    margin: 2rem 0;
+    
+    .stepAbandonmentGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    
+    .stepAbandonmentCard {
+      background: white;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      text-align: center;
+      
+      .stepAbandonmentStep {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 0.5rem;
+      }
+      
+      .stepAbandonmentCount {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #dc2626;
+      }
+    }
+  }
+  
+  .abandonmentByTimeContainer {
+    margin: 2rem 0;
+    
+    .timeAbandonmentGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    
+    .timeAbandonmentItem {
+      background: white;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      text-align: center;
+      
+      .timeAbandonmentRange {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 0.5rem;
+      }
+      
+      .timeAbandonmentCount {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #f59e0b;
+      }
+    }
+  }
+}
+
+.completionTimesSection {
+  .timeStatsGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .timeStat {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+    text-align: center;
+    
+    h4 {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-bottom: 0.5rem;
+    }
+    
+    .timeValue {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #111827;
+    }
+  }
+  
+  .stepTimeContainer {
+    margin: 2rem 0;
+  }
+}
+
+.fieldAnalysisSection {
+  .fieldCompletionContainer {
+    margin: 2rem 0;
+    
+    .fieldCompletionGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    
+    .fieldCompletionCard {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      text-align: center;
+      
+      .fieldName {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 1rem;
+      }
+      
+      .fieldCompletionRate {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #059669;
+        margin-bottom: 0.5rem;
+      }
+      
+      .fieldAvgLength {
+        font-size: 0.75rem;
+        color: #6b7280;
+      }
+    }
+  }
+  
+  .pestIssueContainer {
+    margin: 2rem 0;
+    
+    .pestIssueList {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    
+    .pestIssueItem {
+      background: white;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      
+      .pestIssueName {
+        font-weight: 600;
+        color: #111827;
+      }
+      
+      .pestIssueCount {
+        font-size: 0.875rem;
+        color: #6b7280;
+      }
+    }
+  }
+  
+  .homeSizeContainer {
+    margin: 2rem 0;
+    
+    .homeSizeGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    
+    .homeSizeItem {
+      background: white;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      text-align: center;
+      
+      .homeSizeRange {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 0.5rem;
+      }
+      
+      .homeSizeCount {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #3b82f6;
+      }
+    }
+  }
+}
+
+.progressiveFormsSection {
+  .progressiveComparison {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+  
+  .formTypeCard {
+    background: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+    
+    h4 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    
+    .formTypeStats {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .formTypeStat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      
+      span {
+        color: #6b7280;
+      }
+      
+      strong {
+        color: #111827;
+      }
+    }
+  }
+  
+  .progressiveImpact {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    
+    .impactMetric {
+      text-align: center;
+      
+      span {
+        display: block;
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-bottom: 0.5rem;
+      }
+      
+      strong {
+        font-size: 1.5rem;
+        font-weight: 700;
+        
+        &.positive {
+          color: #059669;
+        }
+        
+        &.negative {
+          color: #dc2626;
+        }
+      }
+    }
+  }
+}

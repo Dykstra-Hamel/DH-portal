@@ -1,0 +1,35 @@
+
+> dh-portal@0.1.0 dev
+> next dev --turbopack
+
+ ⚠ Port 3000 is in use, using available port 3001 instead.
+   ▲ Next.js 15.3.5 (Turbopack)
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.1.57:3001
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Compiled middleware in 192ms
+ ✓ Ready in 1059ms
+ ○ Compiling /api/service-areas/validate ...
+ ✓ Compiled /api/service-areas/validate in 622ms
+(node:37891) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Error checking service area coverage: {
+  code: '22P02',
+  details: null,
+  hint: null,
+  message: 'invalid input syntax for type uuid: "cm1yql7bz0000r2ckzve9dkgg"'
+}
+ POST /api/service-areas/validate 500 in 773ms
+ POST /api/service-areas/validate 400 in 78ms
+Error checking service area coverage: {
+  code: 'XX000',
+  details: null,
+  hint: null,
+  message: 'contains: Operation on mixed SRID geometries (Polygon, 4326) != (Point, 0)'
+}
+ POST /api/service-areas/validate 500 in 112ms
+ POST /api/service-areas/validate 200 in 62ms
+ POST /api/service-areas/validate 200 in 35ms
+[?25h
