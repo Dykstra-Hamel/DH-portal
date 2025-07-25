@@ -147,6 +147,11 @@
       headerText: scriptTag.getAttribute('data-header-text') || '',
       subHeaderText: scriptTag.getAttribute('data-sub-header-text') || '',
       isPreview: scriptTag.getAttribute('data-preview') === 'true',
+      displayMode: scriptTag.getAttribute('data-display-mode') || 'inline',
+      buttonText:
+        scriptTag.getAttribute('data-button-text') || 'Get Free Quote',
+      modalCloseOnBackdrop:
+        scriptTag.getAttribute('data-modal-close-on-backdrop') !== 'false',
     };
 
     // Validate required configuration
@@ -2550,6 +2555,130 @@
         margin-bottom: 4px;
         color: ${textColor};
         font-size: 14px;
+      }
+      
+      /* Modal styles */
+      .dh-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      
+      .dh-modal-content {
+        border-radius: 12px;
+        max-width: 100%;
+        width: auto;
+        max-height: 90vh;
+        overflow: visible;
+        position: relative;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      }
+      
+      .dh-modal-body {
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 0;
+      }
+      
+      .dh-modal-close {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background: #fff;
+        border: none;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        color: #6b7280;
+        transition: all 0.2s ease;
+        z-index: 10;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        border: 2px solid #e5e7eb;
+      }
+      
+      .dh-modal-close:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+      
+      .dh-modal-body .dh-form-widget {
+        margin: 0;
+        box-shadow: none;
+        border-radius: 12px;
+        padding: 0;
+      }
+      
+      .dh-modal-body .dh-form-header {
+        padding: 24px 24px 16px 24px;
+        margin: 0;
+      }
+      
+      .dh-modal-body .dh-form-content {
+        padding: 0 24px 24px 24px;
+        margin: 0;
+      }
+      
+      .dh-modal-body .dh-form-progress {
+        margin: 0 24px;
+      }
+      
+      /* Button widget styles */
+      .dh-widget-button {
+        background: ${primaryColor};
+        color: white;
+        border: none;
+        padding: 16px 32px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      
+      .dh-widget-button:hover {
+        background: ${primaryColor}dd;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+      
+      /* Mobile modal adjustments */
+      @media (max-width: 768px) {
+        .dh-modal-overlay {
+          padding: 10px;
+        }
+        
+        .dh-modal-content {
+          max-height: 95vh;
+        }
+        
+        .dh-modal-close {
+          top: 8px;
+          right: 8px;
+          width: 36px;
+          height: 36px;
+          font-size: 20px;
+        }
+        
+        .dh-widget-button {
+          padding: 14px 28px;
+          font-size: 16px;
+        }
       }`;
         document.head.appendChild(styleElement);
       };
@@ -2567,7 +2696,116 @@
       };
 
       // Create inline form widget
+      // Create button for modal trigger
+      const createButton = () => {
+        const button = document.createElement('button');
+        button.className = 'dh-widget-button';
+        button.id = 'dh-widget-button';
+        button.textContent = config.buttonText;
+        button.type = 'button';
+
+        // Add click handler to open modal
+        button.addEventListener('click', openModal);
+
+        return button;
+      };
+
+      // Create modal overlay
+      const createModal = () => {
+        const modal = document.createElement('div');
+        modal.className = 'dh-modal-overlay';
+        modal.id = 'dh-modal-overlay';
+        modal.style.display = 'none';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'dh-modal-content';
+        modalContent.id = 'dh-modal-content';
+
+        const modalBody = document.createElement('div');
+        modalBody.className = 'dh-modal-body';
+        modalBody.id = 'dh-modal-body';
+        modalContent.appendChild(modalBody);
+
+        // Create close button and attach to modal content (positioned outside)
+        const closeButton = document.createElement('button');
+        closeButton.className = 'dh-modal-close';
+        closeButton.innerHTML = '&times;';
+        closeButton.type = 'button';
+        closeButton.addEventListener('click', closeModal);
+
+        modalContent.appendChild(closeButton);
+        modal.appendChild(modalContent);
+
+        // Add backdrop click handler if enabled
+        if (config.modalCloseOnBackdrop) {
+          modal.addEventListener('click', e => {
+            if (e.target === modal) {
+              closeModal();
+            }
+          });
+        }
+
+        // Add ESC key handler
+        document.addEventListener('keydown', e => {
+          if (e.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+          }
+        });
+
+        document.body.appendChild(modal);
+        return { modal, modalBody };
+      };
+
+      // Open modal function
+      const openModal = () => {
+        const modal = document.getElementById('dh-modal-overlay');
+        const modalBody = document.getElementById('dh-modal-body');
+
+        if (modal && modalBody) {
+          // Clear any existing content
+          modalBody.innerHTML = '';
+
+          // Create the widget inside the modal
+          const widget = createInlineWidget();
+          modalBody.appendChild(widget.formWidget);
+
+          // Show modal
+          modal.style.display = 'flex';
+          document.body.style.overflow = 'hidden'; // Prevent background scroll
+
+          // Focus management
+          const firstFocusable = modal.querySelector(
+            'input, button, select, textarea'
+          );
+          if (firstFocusable) {
+            firstFocusable.focus();
+          }
+        }
+      };
+
+      // Close modal function
+      const closeModal = () => {
+        const modal = document.getElementById('dh-modal-overlay');
+        if (modal) {
+          modal.style.display = 'none';
+          document.body.style.overflow = ''; // Restore scroll
+        }
+      };
+
+      // Main widget creation router
       const createWidget = () => {
+        if (config.displayMode === 'button') {
+          // Create button and modal for button mode
+          createModal();
+          return createButton();
+        } else {
+          // Default inline mode
+          return createInlineWidget();
+        }
+      };
+
+      // Create inline form widget (renamed for clarity)
+      const createInlineWidget = () => {
         // Create main form container
         const formWidget = document.createElement('div');
         formWidget.className = 'dh-form-widget';
@@ -2620,39 +2858,7 @@
         formWidget.appendChild(header);
         formWidget.appendChild(content);
 
-        // Insert widget into DOM - check for container ID first (for React integration)
-        const containerId = scriptTag.getAttribute('data-container-id');
-
-        if (containerId) {
-          const container = document.getElementById(containerId);
-          if (container) {
-            container.appendChild(formWidget);
-          } else {
-            // Fallback to original logic
-            if (scriptTag.parentNode) {
-              scriptTag.parentNode.insertBefore(
-                formWidget,
-                scriptTag.nextSibling
-              );
-            } else {
-              console.error(
-                'DH Widget: No script parent node available for insertion'
-              );
-            }
-          }
-        } else {
-          // Original logic for normal embedding
-          if (scriptTag.parentNode) {
-            scriptTag.parentNode.insertBefore(
-              formWidget,
-              scriptTag.nextSibling
-            );
-          } else {
-            console.error(
-              'DH Widget: No script parent node available for insertion'
-            );
-          }
-        }
+        // Note: DOM insertion is now handled by the init function
 
         return {
           formWidget: formWidget,
@@ -4060,6 +4266,59 @@
         try {
           createStyles();
           elements = createWidget();
+
+          // Insert widget into DOM - check for container ID first (for React integration)
+          const containerId = scriptTag.getAttribute('data-container-id');
+          if (containerId) {
+            const container = document.getElementById(containerId);
+            if (container) {
+              if (config.displayMode === 'button') {
+                // For button mode, elements is the button element
+                container.appendChild(elements);
+              } else {
+                // For inline mode, elements is an object with formWidget
+                container.appendChild(elements.formWidget);
+              }
+            } else {
+              // Fallback to original logic
+              if (scriptTag.parentNode) {
+                if (config.displayMode === 'button') {
+                  scriptTag.parentNode.insertBefore(
+                    elements,
+                    scriptTag.nextSibling
+                  );
+                } else {
+                  scriptTag.parentNode.insertBefore(
+                    elements.formWidget,
+                    scriptTag.nextSibling
+                  );
+                }
+              } else {
+                console.error(
+                  'DH Widget: No script parent node available for insertion'
+                );
+              }
+            }
+          } else {
+            // Original logic for normal embedding
+            if (scriptTag.parentNode) {
+              if (config.displayMode === 'button') {
+                scriptTag.parentNode.insertBefore(
+                  elements,
+                  scriptTag.nextSibling
+                );
+              } else {
+                scriptTag.parentNode.insertBefore(
+                  elements.formWidget,
+                  scriptTag.nextSibling
+                );
+              }
+            } else {
+              console.error(
+                'DH Widget: No script parent node available for insertion'
+              );
+            }
+          }
 
           // Load configuration
           const configLoaded = await loadConfig();
