@@ -21,6 +21,21 @@ interface QuoteRequest {
   urgency?: string;
 }
 
+// CORS headers for cross-origin requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+// Handle preflight OPTIONS request
+export async function OPTIONS() {
+  return new Response(null, { 
+    status: 200, 
+    headers: corsHeaders 
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const quoteData: QuoteRequest = await request.json();
@@ -33,7 +48,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'Company ID, customer email, and name are required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -47,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     if (companyError || !company) {
       console.error('Error fetching company:', companyError);
-      return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
     }
 
     // Generate quote email content
@@ -218,7 +233,7 @@ export async function POST(request: NextRequest) {
       console.error('DEBUG: Email sending failed with error:', emailError);
       return NextResponse.json(
         { error: 'Failed to send quote email', details: emailError },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -228,12 +243,12 @@ export async function POST(request: NextRequest) {
       quoteId,
       emailId: emailData?.id,
       message: 'Quote sent successfully to ' + quoteData.customerEmail,
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error('Error in send quote:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
