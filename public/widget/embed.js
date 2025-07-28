@@ -4076,8 +4076,11 @@
                 companyId: config.companyId,
                 customerEmail: widgetState.formData.contactInfo.email,
                 customerName: widgetState.formData.contactInfo.name,
-                pestType: widgetState.formData.pestType
+                pestType: widgetState.formData.pestType,
+                address: widgetState.formData.address
               };
+
+              console.log('DEBUG: Widget sending quote data:', quoteData);
 
               await fetch(config.baseUrl + '/api/widget/send-quote', {
                 method: 'POST',
