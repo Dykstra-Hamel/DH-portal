@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 import { Resend } from 'resend';
+import { getDomain } from '@/lib/resend-domains';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -36,8 +37,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get company information
-    const supabase = await createClient();
+    // Get company information including domain settings
+    const supabase = createAdminClient();
     const { data: company, error: companyError } = await supabase
       .from('companies')
       .select('name, email, phone, widget_config')
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
       </html>
     `;
 
-    // Determine the from email address - use custom domain if configured
+    // Determine the from email address - use custom domain if verified in Resend
     let fromEmail = process.env.RESEND_FROM_EMAIL || 'quotes@company.com';
     
     try {
@@ -139,9 +140,7 @@ export async function POST(request: NextRequest) {
         .from('company_settings')
         .select('setting_key, setting_value')
         .eq('company_id', quoteData.companyId)
-        .in('setting_key', ['email_domain', 'email_domain_status', 'email_domain_prefix']);
-
-      console.log('Quote API - Domain settings for company', quoteData.companyId, ':', domainSettings);
+        .in('setting_key', ['email_domain', 'email_domain_prefix', 'resend_domain_id']);
 
       if (domainSettings && domainSettings.length > 0) {
         const settingsMap = domainSettings.reduce((acc, setting) => {
@@ -150,19 +149,21 @@ export async function POST(request: NextRequest) {
         }, {} as Record<string, string>);
 
         const emailDomain = settingsMap.email_domain;
-        const domainStatus = settingsMap.email_domain_status;
         const emailPrefix = settingsMap.email_domain_prefix || 'quotes';
+        const resendDomainId = settingsMap.resend_domain_id;
 
-        console.log('Quote API - Email domain:', emailDomain, 'Status:', domainStatus, 'Prefix:', emailPrefix);
-
-        if (emailDomain && domainStatus === 'verified') {
-          fromEmail = `${emailPrefix}@${emailDomain}`;
-          console.log('Quote API - Using custom domain email:', fromEmail);
-        } else {
-          console.log('Quote API - Domain not verified or missing, using default:', fromEmail);
+        // Check domain status directly from Resend if we have a domain ID
+        if (emailDomain && resendDomainId) {
+          try {
+            const domainInfo = await getDomain(resendDomainId);
+            
+            if (domainInfo.status === 'verified') {
+              fromEmail = `${emailPrefix}@${emailDomain}`;
+            }
+          } catch (resendError) {
+            // Silently fall back to default email if Resend check fails
+          }
         }
-      } else {
-        console.log('Quote API - No domain settings found for company, using default:', fromEmail);
       }
     } catch (error) {
       console.warn('Failed to load domain settings for quotes, using default:', error);
