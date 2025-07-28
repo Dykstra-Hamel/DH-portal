@@ -707,6 +707,16 @@ export async function POST(request: NextRequest) {
       // Don't fail the lead creation due to email issues
     }
 
+    // Schedule automatic quote email (5 minutes after submission)
+    setTimeout(async () => {
+      try {
+        await sendDelayedQuoteEmail(submission, company);
+      } catch (error) {
+        console.error('Error sending delayed quote email:', error);
+        // Don't affect the main submission flow
+      }
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+
     // Return success response
     return addCorsHeaders(
       NextResponse.json({
@@ -745,4 +755,66 @@ export async function POST(request: NextRequest) {
       NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     );
   }
+}
+
+// Function to send delayed quote email
+async function sendDelayedQuoteEmail(submission: WidgetSubmission, company: any) {
+  try {
+    // Generate pricing estimate based on pest type and submission data
+    const estimatedPrice = generatePricingEstimate(submission);
+    
+    // Prepare quote data for the existing quote API
+    const quoteData = {
+      companyId: submission.companyId,
+      customerEmail: submission.contactInfo.email,
+      customerName: submission.contactInfo.name,
+      pestType: submission.pestType,
+      homeSize: submission.homeSize || undefined,
+      address: submission.address || undefined,
+      estimatedPrice: estimatedPrice,
+      urgency: submission.urgency
+    };
+
+    // Make internal API call to send quote email
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/widget/send-quote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(quoteData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Quote API failed: ${errorData.error || 'Unknown error'}`);
+    }
+
+    const result = await response.json();
+    console.log('Delayed quote email sent successfully:', result);
+    
+  } catch (error) {
+    console.error('Failed to send delayed quote email:', error);
+    throw error;
+  }
+}
+
+// Function to generate pricing estimates based on submission data
+function generatePricingEstimate(submission: WidgetSubmission) {
+  // Standard pricing for all pest types and home sizes
+  const baseMin = 150;
+  const baseMax = 300;
+  const serviceType = 'Professional pest control service';
+  const factors = [
+    'Comprehensive inspection',
+    'Targeted treatment plan',
+    'Professional grade products',
+    'Follow-up service included'
+  ];
+
+  return {
+    min: baseMin,
+    max: baseMax,
+    service_type: serviceType,
+    factors: factors
+  };
 }
