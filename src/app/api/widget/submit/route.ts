@@ -707,7 +707,7 @@ export async function POST(request: NextRequest) {
       // Don't fail the lead creation due to email issues
     }
 
-    // Schedule automatic quote email (5 minutes after submission)
+    // Schedule automatic quote email (10 seconds after submission)
     setTimeout(async () => {
       try {
         await sendDelayedQuoteEmail(submission, company);
@@ -715,7 +715,7 @@ export async function POST(request: NextRequest) {
         console.error('Error sending delayed quote email:', error);
         // Don't affect the main submission flow
       }
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+    }, 10 * 1000); // 10 seconds in milliseconds
 
     // Return success response
     return addCorsHeaders(

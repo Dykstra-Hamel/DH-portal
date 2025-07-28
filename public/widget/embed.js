@@ -4070,30 +4070,6 @@
           const data = await response.json();
 
           if (data.success) {
-            // Send quote email
-            try {
-              const quoteData = {
-                companyId: config.companyId,
-                customerEmail: widgetState.formData.contactInfo.email,
-                customerName: widgetState.formData.contactInfo.name,
-                pestType: widgetState.formData.pestType,
-                address: widgetState.formData.address
-              };
-
-              console.log('DEBUG: Widget sending quote data:', quoteData);
-
-              await fetch(config.baseUrl + '/api/widget/send-quote', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(quoteData),
-              });
-            } catch (quoteError) {
-              console.error('Error sending quote email:', quoteError);
-              // Don't fail the form submission if quote email fails
-            }
-
             // Reset submission state
             widgetState.isSubmitting = false;
 
