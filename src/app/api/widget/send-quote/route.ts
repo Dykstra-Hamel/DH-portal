@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate quote email content
-    const quoteId = `QUOTE-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+    const quoteId = `QUOTE-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
 
     // Determine the from email address - use custom domain if verified in Resend
     let fromEmail = process.env.RESEND_FROM_EMAIL || 'quotes@company.com';
+    console.log('DEBUG: Initial fromEmail:', fromEmail);
     
     try {
       // Get domain settings from company_settings
@@ -141,6 +142,8 @@ export async function POST(request: NextRequest) {
         .select('setting_key, setting_value')
         .eq('company_id', quoteData.companyId)
         .in('setting_key', ['email_domain', 'email_domain_prefix', 'resend_domain_id']);
+
+      console.log('DEBUG: Domain settings found:', domainSettings?.length || 0, 'settings');
 
       if (domainSettings && domainSettings.length > 0) {
         const settingsMap = domainSettings.reduce((acc, setting) => {
@@ -152,24 +155,37 @@ export async function POST(request: NextRequest) {
         const emailPrefix = settingsMap.email_domain_prefix || 'quotes';
         const resendDomainId = settingsMap.resend_domain_id;
 
+        console.log('DEBUG: Email config - domain:', emailDomain, 'prefix:', emailPrefix, 'resendId:', resendDomainId);
+
         // Check domain status directly from Resend if we have a domain ID
         if (emailDomain && resendDomainId) {
           try {
             const domainInfo = await getDomain(resendDomainId);
+            console.log('DEBUG: Resend domain status:', domainInfo.status);
             
             if (domainInfo.status === 'verified') {
               fromEmail = `${emailPrefix}@${emailDomain}`;
+              console.log('DEBUG: Using custom domain email:', fromEmail);
+            } else {
+              console.log('DEBUG: Domain not verified, using default');
             }
           } catch (resendError) {
-            // Silently fall back to default email if Resend check fails
+            console.log('DEBUG: Resend domain check failed:', resendError);
           }
+        } else {
+          console.log('DEBUG: Missing domain or resendId, using default');
         }
+      } else {
+        console.log('DEBUG: No domain settings found, using default');
       }
     } catch (error) {
       console.warn('Failed to load domain settings for quotes, using default:', error);
     }
 
+    console.log('DEBUG: Final fromEmail to be used:', fromEmail);
+
     // Send email using Resend
+    console.log('DEBUG: Attempting to send email to:', quoteData.customerEmail);
     const { data: emailData, error: emailError } = await resend.emails.send({
       from: fromEmail,
       to: [quoteData.customerEmail],
@@ -178,13 +194,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (emailError) {
-      console.error('Error sending quote email:', emailError);
+      console.error('DEBUG: Email sending failed with error:', emailError);
       return NextResponse.json(
-        { error: 'Failed to send quote email' },
+        { error: 'Failed to send quote email', details: emailError },
         { status: 500 }
       );
     }
 
+    console.log('DEBUG: Email sent successfully, ID:', emailData?.id);
     return NextResponse.json({
       success: true,
       quoteId,
