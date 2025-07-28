@@ -21,7 +21,6 @@ export async function sendProjectCreatedNotification(
       throw new Error(`Failed to send email: ${error.message}`);
     }
 
-    console.log('Project created notification sent successfully:', data);
     return data;
   } catch (error) {
     console.error('Error sending project created notification:', error);

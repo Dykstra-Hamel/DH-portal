@@ -96,9 +96,6 @@ export async function POST(request: NextRequest) {
       result => result.status === 'rejected'
     ).length;
 
-    console.log(
-      `Email notifications sent: ${successful} successful, ${failed} failed`
-    );
 
     return NextResponse.json({
       success: true,

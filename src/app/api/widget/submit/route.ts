@@ -346,12 +346,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If service areas are configured but location is not served, log it but don't reject
-    if (serviceAreaValidation && !serviceAreaValidation.served) {
-      console.log(
-        `Lead from outside service area - Company: ${submission.companyId}, Location: ${submission.address}`
-      );
-    }
+    // If service areas are configured but location is not served, we still accept the lead
 
     // Normalize phone number for consistent lookup and storage
     const normalizedPhone = normalizePhoneNumber(submission.contactInfo.phone);
@@ -695,7 +690,8 @@ export async function POST(request: NextRequest) {
             leadNotificationData,
             emailConfig.enabled ? {
               subjectLine: emailConfig.subjectLine
-            } : undefined
+            } : undefined,
+            submission.companyId // Pass company ID for custom domain lookup
           );
 
           if (emailResult.success) {
