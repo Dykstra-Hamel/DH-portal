@@ -129,9 +129,38 @@ export async function POST(request: NextRequest) {
       </html>
     `;
 
+    // Determine the from email address - use custom domain if configured
+    let fromEmail = process.env.RESEND_FROM_EMAIL || 'quotes@company.com';
+    
+    try {
+      // Get domain settings from company_settings
+      const { data: domainSettings } = await supabase
+        .from('company_settings')
+        .select('setting_key, setting_value')
+        .eq('company_id', quoteData.companyId)
+        .in('setting_key', ['email_domain', 'email_domain_status', 'email_domain_prefix']);
+
+      if (domainSettings) {
+        const settingsMap = domainSettings.reduce((acc, setting) => {
+          acc[setting.setting_key] = setting.setting_value;
+          return acc;
+        }, {} as Record<string, string>);
+
+        const emailDomain = settingsMap.email_domain;
+        const domainStatus = settingsMap.email_domain_status;
+        const emailPrefix = settingsMap.email_domain_prefix || 'quotes';
+
+        if (emailDomain && domainStatus === 'verified') {
+          fromEmail = `${emailPrefix}@${emailDomain}`;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load domain settings for quotes, using default:', error);
+    }
+
     // Send email using Resend
     const { data: emailData, error: emailError } = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'quotes@company.com',
+      from: fromEmail,
       to: [quoteData.customerEmail],
       subject: `Your Pest Control Quote - ${company.name}`,
       html: emailHtml,

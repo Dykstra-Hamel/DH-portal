@@ -43,7 +43,6 @@ export async function sendProjectCreatedNotification(
     const result = await response.json();
 
     if (result.ok) {
-      console.log('Slack notification sent successfully');
       return { success: true, timestamp: result.ts, channel: result.channel };
     } else {
       console.error('Failed to send Slack notification:', result.error);
@@ -63,7 +62,6 @@ export async function sendProjectAssignedNotification(
   config?: Partial<SlackNotificationConfig>
 ) {
   // Future implementation
-  console.log('Project assigned notification not yet implemented');
   return { success: false, error: 'Not implemented' };
 }
 
@@ -72,7 +70,6 @@ export async function sendProjectCompletedNotification(
   config?: Partial<SlackNotificationConfig>
 ) {
   // Future implementation
-  console.log('Project completed notification not yet implemented');
   return { success: false, error: 'Not implemented' };
 }
 
@@ -81,6 +78,5 @@ export async function sendProjectOverdueNotification(
   config?: Partial<SlackNotificationConfig>
 ) {
   // Future implementation
-  console.log('Project overdue notification not yet implemented');
   return { success: false, error: 'Not implemented' };
 }
