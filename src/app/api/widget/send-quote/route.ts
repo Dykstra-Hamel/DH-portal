@@ -12,13 +12,13 @@ interface QuoteRequest {
   pestType: string;
   homeSize?: number;
   address?: string;
-  estimatedPrice: {
+  estimatedPrice?: {
     min: number;
     max: number;
     service_type: string;
     factors: string[];
   };
-  urgency: string;
+  urgency?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -85,8 +85,8 @@ export async function POST(request: NextRequest) {
             
             <div class="quote-details">
               <h3>Quote Details</h3>
-              <div class="price-range">$${quoteData.estimatedPrice.min} - $${quoteData.estimatedPrice.max}</div>
-              <p><strong>Service:</strong> ${quoteData.estimatedPrice.service_type}</p>
+              <div class="price-range">$${quoteData.estimatedPrice?.min} - $${quoteData.estimatedPrice?.max}</div>
+              <p><strong>Service:</strong> ${quoteData.estimatedPrice?.service_type}</p>
               <p><strong>Pest Type:</strong> ${quoteData.pestType}</p>
               ${quoteData.homeSize ? `<p><strong>Property Size:</strong> ${quoteData.homeSize} sq ft</p>` : ''}
               ${quoteData.address ? `<p><strong>Service Address:</strong> ${quoteData.address}</p>` : ''}
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
               <div class="factors">
                 <p><strong>Pricing factors considered:</strong></p>
                 <ul>
-                  ${quoteData.estimatedPrice.factors.map(factor => `<li>${factor}</li>`).join('')}
+                  ${quoteData.estimatedPrice?.factors.map(factor => `<li>${factor}</li>`).join('')}
                 </ul>
               </div>
               
@@ -134,35 +134,53 @@ export async function POST(request: NextRequest) {
     // Determine the from email address - use custom domain if verified in Resend
     let fromEmail = process.env.RESEND_FROM_EMAIL || 'quotes@company.com';
     console.log('DEBUG: Initial fromEmail:', fromEmail);
-    
+
     try {
       // Get domain settings from company_settings
       const { data: domainSettings } = await supabase
         .from('company_settings')
         .select('setting_key, setting_value')
         .eq('company_id', quoteData.companyId)
-        .in('setting_key', ['email_domain', 'email_domain_prefix', 'resend_domain_id']);
+        .in('setting_key', [
+          'email_domain',
+          'email_domain_prefix',
+          'resend_domain_id',
+        ]);
 
-      console.log('DEBUG: Domain settings found:', domainSettings?.length || 0, 'settings');
+      console.log(
+        'DEBUG: Domain settings found:',
+        domainSettings?.length || 0,
+        'settings'
+      );
 
       if (domainSettings && domainSettings.length > 0) {
-        const settingsMap = domainSettings.reduce((acc, setting) => {
-          acc[setting.setting_key] = setting.setting_value;
-          return acc;
-        }, {} as Record<string, string>);
+        const settingsMap = domainSettings.reduce(
+          (acc, setting) => {
+            acc[setting.setting_key] = setting.setting_value;
+            return acc;
+          },
+          {} as Record<string, string>
+        );
 
         const emailDomain = settingsMap.email_domain;
         const emailPrefix = settingsMap.email_domain_prefix || 'quotes';
         const resendDomainId = settingsMap.resend_domain_id;
 
-        console.log('DEBUG: Email config - domain:', emailDomain, 'prefix:', emailPrefix, 'resendId:', resendDomainId);
+        console.log(
+          'DEBUG: Email config - domain:',
+          emailDomain,
+          'prefix:',
+          emailPrefix,
+          'resendId:',
+          resendDomainId
+        );
 
         // Check domain status directly from Resend if we have a domain ID
         if (emailDomain && resendDomainId) {
           try {
             const domainInfo = await getDomain(resendDomainId);
             console.log('DEBUG: Resend domain status:', domainInfo.status);
-            
+
             if (domainInfo.status === 'verified') {
               fromEmail = `${emailPrefix}@${emailDomain}`;
               console.log('DEBUG: Using custom domain email:', fromEmail);
@@ -179,7 +197,10 @@ export async function POST(request: NextRequest) {
         console.log('DEBUG: No domain settings found, using default');
       }
     } catch (error) {
-      console.warn('Failed to load domain settings for quotes, using default:', error);
+      console.warn(
+        'Failed to load domain settings for quotes, using default:',
+        error
+      );
     }
 
     console.log('DEBUG: Final fromEmail to be used:', fromEmail);
