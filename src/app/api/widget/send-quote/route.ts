@@ -8,7 +8,7 @@ interface QuoteRequest {
   companyId: string;
   customerEmail: string;
   customerName: string;
-  pestIssue: string;
+  pestType: string;
   homeSize?: number;
   address?: string;
   estimatedPrice: {
@@ -80,12 +80,13 @@ export async function POST(request: NextRequest) {
           <div class="content">
             <p>Hi ${quoteData.customerName},</p>
             
-            <p>Thank you for contacting us about your ${quoteData.pestIssue.toLowerCase()} issue. Based on the information you provided, here&apos;s your personalized quote:</p>
+            <p>Thank you for contacting us about your ${quoteData.pestType.toLowerCase()} issue. Based on the information you provided, here&apos;s your personalized quote:</p>
             
             <div class="quote-details">
               <h3>Quote Details</h3>
               <div class="price-range">$${quoteData.estimatedPrice.min} - $${quoteData.estimatedPrice.max}</div>
               <p><strong>Service:</strong> ${quoteData.estimatedPrice.service_type}</p>
+              <p><strong>Pest Type:</strong> ${quoteData.pestType}</p>
               ${quoteData.homeSize ? `<p><strong>Property Size:</strong> ${quoteData.homeSize} sq ft</p>` : ''}
               ${quoteData.address ? `<p><strong>Service Address:</strong> ${quoteData.address}</p>` : ''}
               <p><strong>Timeline:</strong> ${quoteData.urgency}</p>
@@ -140,7 +141,9 @@ export async function POST(request: NextRequest) {
         .eq('company_id', quoteData.companyId)
         .in('setting_key', ['email_domain', 'email_domain_status', 'email_domain_prefix']);
 
-      if (domainSettings) {
+      console.log('Quote API - Domain settings for company', quoteData.companyId, ':', domainSettings);
+
+      if (domainSettings && domainSettings.length > 0) {
         const settingsMap = domainSettings.reduce((acc, setting) => {
           acc[setting.setting_key] = setting.setting_value;
           return acc;
@@ -150,9 +153,16 @@ export async function POST(request: NextRequest) {
         const domainStatus = settingsMap.email_domain_status;
         const emailPrefix = settingsMap.email_domain_prefix || 'quotes';
 
+        console.log('Quote API - Email domain:', emailDomain, 'Status:', domainStatus, 'Prefix:', emailPrefix);
+
         if (emailDomain && domainStatus === 'verified') {
           fromEmail = `${emailPrefix}@${emailDomain}`;
+          console.log('Quote API - Using custom domain email:', fromEmail);
+        } else {
+          console.log('Quote API - Domain not verified or missing, using default:', fromEmail);
         }
+      } else {
+        console.log('Quote API - No domain settings found for company, using default:', fromEmail);
       }
     } catch (error) {
       console.warn('Failed to load domain settings for quotes, using default:', error);
