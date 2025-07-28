@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { Resend } from 'resend';
-import { getDomain } from '@/lib/resend-domains';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -190,21 +189,10 @@ export async function POST(request: NextRequest) {
           resendDomainId
         );
 
-        // Check domain status directly from Resend if we have a domain ID
+        // Use custom domain if configured (skip real-time verification to avoid rate limits)
         if (emailDomain && resendDomainId) {
-          try {
-            const domainInfo = await getDomain(resendDomainId);
-            console.log('DEBUG: Resend domain status:', domainInfo.status);
-
-            if (domainInfo.status === 'verified') {
-              fromEmail = `${emailPrefix}@${emailDomain}`;
-              console.log('DEBUG: Using custom domain email:', fromEmail);
-            } else {
-              console.log('DEBUG: Domain not verified, using default');
-            }
-          } catch (resendError) {
-            console.log('DEBUG: Resend domain check failed:', resendError);
-          }
+          fromEmail = `${emailPrefix}@${emailDomain}`;
+          console.log('DEBUG: Using custom domain email:', fromEmail);
         } else {
           console.log('DEBUG: Missing domain or resendId, using default');
         }
