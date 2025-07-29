@@ -1,5 +1,35 @@
 import { QuoteEmailData } from '../types';
 
+// Function to convert plural pest types to singular forms
+function getSingularPestType(pestType: string): string {
+  switch (pestType.toLowerCase()) {
+    case 'ants': return 'ant';
+    case 'spiders': return 'spider';
+    case 'cockroaches': return 'cockroach';
+    case 'rodents': return 'rodent';
+    case 'termites': return 'termite';
+    case 'wasps': return 'wasp';
+    case 'others': return 'pest';
+    case 'other': return 'pest';
+    // Legacy mappings (in case they're still used)
+    case 'roaches': return 'roach';
+    case 'mice': return 'mouse';
+    case 'rats': return 'rat';
+    default: return 'pest';
+  }
+}
+
+// Function to format urgency for human-readable display
+function formatUrgencyDisplay(urgency: string): string {
+  switch (urgency) {
+    case 'yesterday': return 'Yesterday';
+    case '1-2-days': return '1 Or 2 Days';
+    case 'next-week': return 'Next Week';
+    case 'no-rush': return 'No Rush';
+    default: return urgency.charAt(0).toUpperCase() + urgency.slice(1);
+  }
+}
+
 // Function to generate urgency-specific messaging
 function getUrgencyMessage(urgency: string): string {
   switch (urgency) {
@@ -18,6 +48,8 @@ function getUrgencyMessage(urgency: string): string {
 
 export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
   const { firstName, pestType, address, urgency } = quoteData;
+  const singularPestType = getSingularPestType(pestType);
+  const formattedUrgency = formatUrgencyDisplay(urgency);
   const urgencyMessage = getUrgencyMessage(urgency);
 
   return `<!doctype html>
@@ -181,6 +213,15 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
 
         .row-8 .column-2 {
           padding: 10px 0 20px !important;
+        }
+
+        .button_block .alignment {
+          text-align: center !important;
+        }
+
+        .row-5 .column-1 .block-3.heading_block h1,
+        .row-6 .column-2 .block-2.heading_block h1 {
+          line-height: 1.1 !important;
         }
       }
     </style>
@@ -477,7 +518,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                     </p>
                                     <p style="margin: 0">
                                       Thank you for contacting us about your
-                                      ${pestType} issue. Based on the information you
+                                      ${singularPestType} issue. Based on the information you
                                       provided, your personalized quote is
                                       listed below. If everything looks great,
                                       click the book my service button to get
@@ -1036,7 +1077,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                     <span
                                       class="tinyMce-placeholder"
                                       style="word-break: break-word"
-                                      >${urgency}</span
+                                      >${formattedUrgency}</span
                                     >
                                   </h1>
                                 </td>
@@ -1675,7 +1716,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                     <span
                                       class="tinyMce-placeholder"
                                       style="word-break: break-word"
-                                      >We&apos;ll Get Your Scheduled</span
+                                      >We&apos;ll Get You Scheduled</span
                                     >
                                   </h1>
                                 </td>
