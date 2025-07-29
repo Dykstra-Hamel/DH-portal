@@ -79,6 +79,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   });
 
   const [activeTab, setActiveTab] = useState('basic');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     if (plan) {
@@ -251,16 +252,25 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // If there's an existing image, delete it from storage first
-    if (formData.plan_image_url) {
-      await deleteFileFromStorage(formData.plan_image_url);
-    }
+    setIsUploadingImage(true);
 
-    const url = await uploadFile(file, 'brand-assets', 'service-plans');
-    if (url) {
-      handleInputChange('plan_image_url', url);
-      // Clear the input so the same file can be selected again if needed
-      event.target.value = '';
+    try {
+      // If there's an existing image, delete it from storage first
+      if (formData.plan_image_url) {
+        await deleteFileFromStorage(formData.plan_image_url);
+      }
+
+      const url = await uploadFile(file, 'brand-assets', 'service-plans');
+      if (url) {
+        handleInputChange('plan_image_url', url);
+        // Clear the input so the same file can be selected again if needed
+        event.target.value = '';
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      // Could add error state handling here if needed
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -449,14 +459,23 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                       </code>
                     </small>
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className={styles.fileInput}
-                  />
+                  
+                  {isUploadingImage ? (
+                    <div className={styles.uploadingIndicator}>
+                      <div className={styles.spinner}></div>
+                      <span>Uploading image...</span>
+                    </div>
+                  ) : (
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className={styles.fileInput}
+                    />
+                  )}
+                  
                   {formData.plan_image_url && formData.plan_image_url.trim() && (
-                    <div className={styles.imagePreview}>
+                    <div className={`${styles.imagePreview} ${isUploadingImage ? styles.uploading : ''}`}>
                       <Image
                         src={formData.plan_image_url}
                         alt="Plan Image"
@@ -464,6 +483,11 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                         height={120}
                         style={{ objectFit: 'cover', borderRadius: '8px' }}
                       />
+                      {isUploadingImage && (
+                        <div className={styles.imageOverlay}>
+                          <div className={styles.overlaySpinner}></div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

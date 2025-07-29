@@ -3743,7 +3743,7 @@
         font-weight: 500;
         text-align: center;
         line-height: 1.2;
-        text-wrap: nowrap;
+        white-space: nowrap;
       }
       
       .dh-progress-step-label.completed {
@@ -7106,7 +7106,9 @@
                       <p class="dh-plan-price-detail">Service continues after the initial service at $${plan.recurring_price}/${plan.billing_frequency}.</p>
                     </div>
                   </div>
-                  ${plan.plan_image_url ? `
+                  ${
+                    plan.plan_image_url
+                      ? `
                   <div class="dh-plan-visual">
                     <div class="dh-plan-image-container">
                       <div class="dh-plan-image-actual">
@@ -7114,7 +7116,9 @@
                       </div>
                     </div>
                   </div>
-                  ` : ''}
+                  `
+                      : ''
+                  }
                   <div class="dh-plan-coverage-icons">
                       <div class="dh-coverage-icon">
                         <span class="dh-coverage-checkmark">✓</span>
@@ -7764,7 +7768,9 @@
       // Apply iOS-specific class for safe area handling
       const handleIOSStyles = () => {
         if (isIOS()) {
-          const widgetContainer = document.getElementById('dh-widget-' + config.companyId);
+          const widgetContainer = document.getElementById(
+            'dh-widget-' + config.companyId
+          );
           if (widgetContainer) {
             widgetContainer.classList.add('dh-ios-device');
           }
