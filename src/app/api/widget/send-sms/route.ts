@@ -90,7 +90,15 @@ Aiden`;
       body: JSON.stringify(mailersendPayload),
     });
 
-    const responseData = await response.json();
+    let responseData = {};
+    try {
+      const responseText = await response.text();
+      if (responseText.trim()) {
+        responseData = JSON.parse(responseText);
+      }
+    } catch (error) {
+      console.log('MailerSend response was not JSON, but SMS may have sent successfully');
+    }
 
     if (!response.ok) {
       console.error('MailerSend SMS API error:', responseData);
