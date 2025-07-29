@@ -2436,7 +2436,7 @@
         border: 1px solid #d1d5db; 
         border-radius: 8px; 
         outline: none; 
-        font-size: 14px; 
+        font-size: 16px; 
         font-family: inherit; 
         box-sizing: border-box; 
         background: ${backgroundColor};
@@ -2895,7 +2895,7 @@
         flex-direction: row;
         justify-content: center;
         align-items: center;
-        gap: 12px;
+        gap: 20px;
         margin: 24px 0;
       }
       .dh-offer-btn {
@@ -2909,6 +2909,7 @@
         text-align: center;
         font-weight: 600;
         font-size: 20px;
+        line-height: 100%;
         background: none;
         outline: none;
       }
@@ -4089,16 +4090,14 @@
           .dh-form-step-content {
             padding: 20px;
           }
-
-          .dh-offer-options {
-            flex-direction: column;
-            align-items: center;
-          }
           
           .dh-offer-options {
             flex-direction: column;
             align-items: center;
-            gap: 0;
+          }
+
+          .dh-offer-options p {
+            margin: 0;
           }
 
           .dh-plan-title {
