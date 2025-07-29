@@ -2898,6 +2898,9 @@
         gap: 20px;
         margin: 24px 0;
       }
+        .dh-offer-options p {
+            margin: 0;
+          }
       .dh-offer-btn {
         padding: 16px 24px;
         border: 2px solid;
@@ -4096,10 +4099,6 @@
             align-items: center;
           }
 
-          .dh-offer-options p {
-            margin: 0;
-          }
-
           .dh-plan-title {
             font-size: 26px;
             text-align: center;
@@ -4122,6 +4121,22 @@
 
           .dh-pest-icon, .dh-pest-option {
             width: 120px;
+          }
+
+          .dh-form-row {
+            gap: 0;
+          }
+
+          #comparison-plan-content {
+            padding: 0;
+          }
+
+          .dh-plan-details {
+            gap: 0;
+          }
+
+          .dh-form-step h3.dh-plan-title {
+            font-size: 30px;
           }
 
       }
@@ -6926,16 +6941,16 @@
                     data.suggestions.length > 0
                   ) {
                     const lowestPrice = Math.min(
-                      ...data.suggestions.map(plan => plan.recurring_price)
+                      ...data.suggestions.map(plan => plan.initial_price)
                     );
                     offerPrice.textContent = `$${lowestPrice}`;
                   } else {
-                    offerPrice.textContent = '$229'; // Fallback price
+                    offerPrice.textContent = '$'; // Fallback price
                   }
                 })
                 .catch(error => {
                   console.warn('Error fetching plan prices:', error);
-                  offerPrice.textContent = '$229'; // Fallback price
+                  offerPrice.textContent = '$'; // Fallback price
                 });
             }
 
@@ -7100,7 +7115,7 @@
                     
                     <div class="dh-plan-pricing">
                       <div class="dh-plan-price">
-                        <span class="dh-plan-price-label">Just $${plan.recurring_price} to get started.</span>
+                        <span class="dh-plan-price-label">Just $${plan.initial_price} to get started.</span>
                       </div>
                       <p class="dh-plan-price-detail">Service continues after the initial service at $${plan.recurring_price}/${plan.billing_frequency}.</p>
                     </div>
