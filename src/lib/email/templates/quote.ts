@@ -3,30 +3,47 @@ import { QuoteEmailData } from '../types';
 // Function to convert plural pest types to singular forms
 function getSingularPestType(pestType: string): string {
   switch (pestType.toLowerCase()) {
-    case 'ants': return 'ant';
-    case 'spiders': return 'spider';
-    case 'cockroaches': return 'cockroach';
-    case 'rodents': return 'rodent';
-    case 'termites': return 'termite';
-    case 'wasps': return 'wasp';
-    case 'others': return 'pest';
-    case 'other': return 'pest';
+    case 'ants':
+      return 'ant';
+    case 'spiders':
+      return 'spider';
+    case 'cockroaches':
+      return 'cockroach';
+    case 'rodents':
+      return 'rodent';
+    case 'termites':
+      return 'termite';
+    case 'wasps':
+      return 'wasp';
+    case 'others':
+      return 'pest';
+    case 'other':
+      return 'pest';
     // Legacy mappings (in case they're still used)
-    case 'roaches': return 'roach';
-    case 'mice': return 'mouse';
-    case 'rats': return 'rat';
-    default: return 'pest';
+    case 'roaches':
+      return 'roach';
+    case 'mice':
+      return 'mouse';
+    case 'rats':
+      return 'rat';
+    default:
+      return 'pest';
   }
 }
 
 // Function to format urgency for human-readable display
 function formatUrgencyDisplay(urgency: string): string {
   switch (urgency) {
-    case 'yesterday': return 'Yesterday';
-    case '1-2-days': return '1 Or 2 Days';
-    case 'next-week': return 'Next Week';
-    case 'no-rush': return 'No Rush';
-    default: return urgency.charAt(0).toUpperCase() + urgency.slice(1);
+    case 'yesterday':
+      return 'Yesterday';
+    case '1-2-days':
+      return '1 Or 2 Days';
+    case 'next-week':
+      return 'Next Week';
+    case 'no-rush':
+      return 'No Rush';
+    default:
+      return urgency.charAt(0).toUpperCase() + urgency.slice(1);
   }
 }
 
@@ -552,14 +569,14 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                 >
                                   <div class="alignment" align="left">
                                     <a
-                                      href="www.examplelink.com"
+                                      href="https://www.nwexterminating.com/"
                                       target="_blank"
                                       style="
                                         color: #ffffff;
                                         text-decoration: none;
                                       "
                                       ><!--[if mso]>
-<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"  href="www.examplelink.com"  style="height:38px;width:192px;v-text-anchor:middle;" arcsize="79%" fillcolor="#00ae42">
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"  href="https://www.nwexterminating.com/"  style="height:38px;width:192px;v-text-anchor:middle;" arcsize="79%" fillcolor="#00ae42">
 <v:stroke dashstyle="Solid" weight="0px" color="#00ae42"/>
 <w:anchorlock/>
 <v:textbox inset="0px,0px,0px,0px">
@@ -1920,14 +1937,14 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                 <td class="pad">
                                   <div class="alignment" align="center">
                                     <a
-                                      href="www.examplelink.com"
+                                      href="https://www.nwexterminating.com/"
                                       target="_blank"
                                       style="
                                         color: #ffffff;
                                         text-decoration: none;
                                       "
                                       ><!--[if mso]>
-<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"  href="www.examplelink.com"  style="height:38px;width:166px;v-text-anchor:middle;" arcsize="79%" fillcolor="#00ae42">
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"  href="https://www.nwexterminating.com/"  style="height:38px;width:166px;v-text-anchor:middle;" arcsize="79%" fillcolor="#00ae42">
 <v:stroke dashstyle="Solid" weight="0px" color="#00ae42"/>
 <w:anchorlock/>
 <v:textbox inset="0px,0px,0px,0px">
@@ -2002,7 +2019,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                       style="max-width: 600px"
                                     >
                                       <a
-                                        href="www.examplelink.com"
+                                        href="https://www.nwexterminating.com/
                                         target="_blank"
                                         ><img
                                           src="https://d15k2d11r6t6rl.cloudfront.net/pub/bfra/ikek4pu4/o8n/v1n/m9a/footer%20banner.png"
