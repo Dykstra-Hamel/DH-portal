@@ -2555,8 +2555,8 @@
         border: none; 
         border-radius: 8px; 
         cursor: pointer; 
-        font-size: 20px;
-        line-height: 20px;
+        font-size: 18px;
+        line-height: 18px;
         font-family: Outfit, sans-serif;
         font-weight: 500; 
         transition: all 0.2s ease; 
@@ -2588,9 +2588,9 @@
         background: #CBCBCB; 
         color: #4E4E4E;
         font-family: Outfit;
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 500;
-        line-height: 20px;
+        line-height: 18px;
       } 
       .dh-form-btn-back svg { 
         transition: transform 0.2s ease;
@@ -3816,14 +3816,25 @@
         color: #374151;
       }
       
-      .dh-welcome-benefits li::before {
-        content: '';
-        width: 20px;
-        height: 20px;
-        background: #d1d5db;
-        border-radius: 50%;
+      .dh-benefit-icon {
         margin-right: 12px;
         flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+      }
+      
+      .dh-benefit-icon svg {
+        width: 20px;
+        height: 20px;
+        max-width: 100%;
+        max-height: 100%;
+      }
+      
+      .dh-benefit-text {
+        flex: 1;
       }
       
       .dh-welcome-button {
@@ -3864,9 +3875,9 @@
       .dh-step-heading {
         color: #4E4E4E;
         text-align: center;
-        font-size: 50px;
-        font-weight: 600;
-        line-height: 103%;
+        font-size: 45px;
+        font-weight: 700;
+        line-height: 100%;
         margin: 0 0 20px 0;
       }
       
@@ -4239,6 +4250,11 @@
             const widget = createInlineWidget();
             modalBody.appendChild(widget.formWidget);
             modalWidgetCreated = true;
+
+            // Update welcome step with loaded config after modal content is created
+            if (widgetState.widgetConfig) {
+              updateWelcomeStep();
+            }
           }
 
           // Show modal
@@ -4298,37 +4314,51 @@
         // Welcome title
         const welcomeTitle = document.createElement('h1');
         welcomeTitle.className = 'dh-welcome-title';
-        welcomeTitle.textContent = config.welcomeTitle || 'Get help now!';
+        welcomeTitle.textContent =
+          widgetState.widgetConfig?.welcomeTitle || 'Get help now!';
 
         // Welcome description
         const welcomeDescription = document.createElement('h2');
         welcomeDescription.className = 'dh-welcome-description';
         welcomeDescription.textContent =
-          config.welcomeDescription ||
+          widgetState.widgetConfig?.welcomeDescription ||
           'For fast, affordable & professional pest solutions in your area.';
 
         // Benefits list
         const benefitsList = document.createElement('ul');
         benefitsList.className = 'dh-welcome-benefits';
 
-        const defaultBenefits = [
-          'Fully Licensed & Insured',
-          'Over 3,000+ Google Reviews',
-          'Local Service Since 1979',
-          'Fast Solutions For Any Pest Problems',
-        ];
+        // Render custom benefits if available
+        if (
+          widgetState.widgetConfig?.welcomeBenefits &&
+          widgetState.widgetConfig.welcomeBenefits.length > 0
+        ) {
+          widgetState.widgetConfig.welcomeBenefits.forEach(benefit => {
+            const li = document.createElement('li');
 
-        defaultBenefits.forEach(benefit => {
-          const li = document.createElement('li');
-          li.textContent = benefit;
-          benefitsList.appendChild(li);
-        });
+            // Create icon element
+            if (benefit.icon && benefit.icon.trim()) {
+              const iconElement = document.createElement('span');
+              iconElement.className = 'dh-benefit-icon';
+              iconElement.innerHTML = benefit.icon;
+              li.appendChild(iconElement);
+            }
+
+            // Create text element
+            const textElement = document.createElement('span');
+            textElement.className = 'dh-benefit-text';
+            textElement.textContent = benefit.text;
+            li.appendChild(textElement);
+
+            benefitsList.appendChild(li);
+          });
+        }
 
         // Welcome button
         const welcomeButton = document.createElement('button');
         welcomeButton.className = 'dh-welcome-button';
         welcomeButton.innerHTML = `
-          <span>${config.welcomeButtonText || 'Start My Free Estimate'}</span>
+          <span>${widgetState.widgetConfig?.welcomeButtonText || 'Start My Free Estimate'}</span>
           <span class="dh-button-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></span>
         `;
         welcomeButton.addEventListener('click', () => {
@@ -4353,8 +4383,8 @@
         welcomeHero.className = 'dh-welcome-hero';
 
         // Set hero image if available
-        if (config.heroImageUrl) {
-          welcomeHero.style.backgroundImage = `url(${config.heroImageUrl})`;
+        if (widgetState.widgetConfig?.branding?.hero_image_url) {
+          welcomeHero.style.backgroundImage = `url(${widgetState.widgetConfig.branding.hero_image_url})`;
         }
 
         // Set welcome screen background in bottom corner
@@ -5321,6 +5351,18 @@
 
           // Update modal overflow behavior
           updateModalOverflow(stepName);
+
+          // Scroll to top of modal content
+          setTimeout(() => {
+            const scrollContainer =
+              stepName === 'welcome'
+                ? document.querySelector('.dh-modal-content')
+                : document.querySelector('.dh-form-widget');
+
+            if (scrollContainer) {
+              scrollContainer.scrollTop = 0;
+            }
+          }, 50); // Small delay to ensure DOM updates are complete
 
           // Update progress bar
           updateProgressBar(stepName);
