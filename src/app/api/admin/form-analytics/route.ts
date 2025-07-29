@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
     const dateRange = searchParams.get('dateRange') || '30d';
@@ -47,11 +48,14 @@ export async function GET(request: NextRequest) {
         step_completed,
         service_area_data,
         attribution_data,
-        progressive_state,
         created_at,
         updated_at,
         expires_at,
-        converted_to_lead_id
+        converted_to_lead_id,
+        companies(
+          id,
+          name
+        )
       `)
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString());
@@ -149,8 +153,7 @@ function generateFormOverviewAnalytics(partialLeads: any[], leads: any[]) {
   const formSteps = ['pest-selection', 'address-input', 'home-details', 'contact-info'];
   const stepCompletion = formSteps.reduce((acc: any, step) => {
     const completedStep = partialLeads?.filter(p => 
-      p.step_completed === step || 
-      (p.progressive_state && getStepOrder(p.step_completed) >= getStepOrder(step))
+      p.step_completed === step || getStepOrder(p.step_completed) >= getStepOrder(step)
     )?.length || 0;
     
     acc[step] = {
@@ -311,7 +314,7 @@ function generateCompletionTimeAnalytics(partialLeads: any[], leads: any[]) {
       duration,
       minutes: Math.round(duration / 60),
       step: form.step_completed,
-      company: form.companies.name
+      company: form.companies?.name || 'Unknown'
     };
   });
 
@@ -403,8 +406,9 @@ function generateFieldAnalytics(partialLeads: any[], leads: any[]) {
 }
 
 function generateProgressiveFormAnalytics(partialLeads: any[], leads: any[]) {
-  const progressiveForms = partialLeads?.filter(p => p.progressive_state) || [];
-  const traditionalForms = partialLeads?.filter(p => !p.progressive_state) || [];
+  // Since progressive_state column doesn't exist, we'll return empty data for now
+  const progressiveForms: any[] = [];
+  const traditionalForms = partialLeads || [];
 
   const progressiveStats = {
     total: progressiveForms.length,

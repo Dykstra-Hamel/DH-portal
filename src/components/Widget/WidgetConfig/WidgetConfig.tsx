@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/client';
 import styles from './WidgetConfig.module.scss';
 import EmbedPreview from '../WidgetPreview';
 import ServiceAreaMap from '../ServiceAreaMap';
+import ServicePlanModal from './ServicePlanModal';
 import {
   getCompanyCoordinates,
   createCachedGeocodeResult,
@@ -50,16 +51,78 @@ interface DomainRecord {
 interface DomainConfiguration {
   name?: string;
   configured: boolean;
-  status: 'not_configured' | 'pending' | 'verified' | 'failed' | 'temporary_failure';
+  status:
+    | 'not_configured'
+    | 'pending'
+    | 'verified'
+    | 'failed'
+    | 'temporary_failure';
   records: DomainRecord[];
   verifiedAt?: string;
   resendDomainId?: string;
 }
 
+interface PestType {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  icon_svg: string;
+  is_active: boolean;
+  pest_categories?: {
+    name: string;
+    slug: string;
+  };
+}
+
+interface CompanyPestOption {
+  id: string;
+  pest_id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  icon_svg: string;
+  custom_label: string | null;
+  display_order: number;
+  is_active: boolean;
+}
+
+interface ServicePlan {
+  id: string;
+  company_id: string;
+  plan_name: string;
+  plan_description: string;
+  plan_category: string;
+  initial_price: number;
+  recurring_price: number;
+  billing_frequency: string;
+  treatment_frequency: string;
+  includes_inspection: boolean;
+  plan_features: string[];
+  plan_faqs: Array<{ question: string; answer: string }>;
+  display_order: number;
+  highlight_badge: string | null;
+  color_scheme: any;
+  requires_quote: boolean;
+  is_active: boolean;
+  pest_coverage?: Array<{
+    pest_id: string;
+    coverage_level: string;
+    pest_name: string;
+    pest_slug: string;
+    pest_icon: string;
+    pest_category: string;
+  }>;
+  created_at: string;
+  updated_at: string;
+}
+
 interface WidgetConfigData {
   branding: {
-    logo?: string;
     companyName: string;
+    hero_image_url?: string;
   };
   headers: {
     headerText: string;
@@ -78,6 +141,7 @@ interface WidgetConfigData {
     text?: string;
   };
   submitButtonText: string;
+  welcomeButtonText: string;
   successMessage: string;
   addressApi: {
     enabled: boolean;
@@ -111,13 +175,18 @@ const CollapsibleSection: React.FC<{
   isExpanded: boolean;
   onToggle: () => void;
   styles: any;
-}> = ({ sectionKey, title, description, children, isExpanded, onToggle, styles }) => {
+}> = ({
+  sectionKey,
+  title,
+  description,
+  children,
+  isExpanded,
+  onToggle,
+  styles,
+}) => {
   return (
     <div className={styles.section}>
-      <div
-        className={styles.sectionHeader}
-        onClick={onToggle}
-      >
+      <div className={styles.sectionHeader} onClick={onToggle}>
         <div className={styles.sectionHeaderContent}>
           <h3>{title}</h3>
           {isExpanded ? (
@@ -143,6 +212,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const [config, setConfig] = useState<WidgetConfigData>({
     branding: {
       companyName: '',
+      hero_image_url: '',
     },
     headers: {
       headerText: '',
@@ -155,6 +225,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       text: '#374151',
     },
     submitButtonText: 'Get My Quote',
+    welcomeButtonText: 'Start My Free Estimate',
     successMessage:
       'Thank you! Your information has been submitted successfully. We will contact you soon.',
     addressApi: {
@@ -193,11 +264,26 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     'idle' | 'copying' | 'copied'
   >('idle');
 
+  // Pest options state
+  const [companyPestOptions, setCompanyPestOptions] = useState<
+    CompanyPestOption[]
+  >([]);
+  const [availablePestTypes, setAvailablePestTypes] = useState<PestType[]>([]);
+  const [pestOptionsLoading, setPestOptionsLoading] = useState(false);
+
+  // Service plans state
+  const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
+  const [servicePlansLoading, setServicePlansLoading] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<ServicePlan | null>(null);
+  const [showPlanModal, setShowPlanModal] = useState(false);
+
   // Collapsible sections state
   const [expandedSections, setExpandedSections] = useState({
     branding: true, // Expanded by default
     colors: false,
     text: false,
+    pestOptions: false,
+    servicePlans: false,
     welcome: false,
     serviceAreas: false,
     emailNotifications: false,
@@ -209,6 +295,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     primary?: string;
     secondary?: string;
   }>({});
+  const [brandLogo, setBrandLogo] = useState<string | null>(null);
   const [brandLoading, setBrandLoading] = useState(false);
   const [colorStates, setColorStates] = useState<{
     primary: ColorState;
@@ -226,17 +313,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     lat: number;
     lng: number;
   } | null>(null);
-  
+
   // Domain configuration state
   const [domainConfig, setDomainConfig] = useState<DomainConfiguration>({
     configured: false,
     status: 'not_configured',
-    records: []
+    records: [],
   });
   const [domainForm, setDomainForm] = useState({
     domain: '',
     region: 'us-east-1',
-    customReturnPath: 'noreply'
+    customReturnPath: 'noreply',
   });
   const [domainLoading, setDomainLoading] = useState(false);
   const [domainError, setDomainError] = useState<string | null>(null);
@@ -383,6 +470,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         loadCompanyConfig(company);
         fetchBrandColors(selectedCompanyId);
         loadServiceAreas(selectedCompanyId);
+        loadPestOptions(selectedCompanyId);
+        loadServicePlans(selectedCompanyId);
         geocodeCompanyAddress(company);
         loadDomainConfiguration(selectedCompanyId);
       }
@@ -392,8 +481,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     const widgetConfig = company.widget_config || {};
     setConfig({
       branding: {
-        logo: widgetConfig.branding?.logo || '',
         companyName: widgetConfig.branding?.companyName || company.name,
+        hero_image_url: widgetConfig.branding?.hero_image_url || '',
       },
       headers: {
         headerText: widgetConfig.headers?.headerText || '',
@@ -407,11 +496,15 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       },
       colorOverrides: widgetConfig.colorOverrides || {},
       submitButtonText: widgetConfig.submitButtonText || 'Get My Quote',
+      welcomeButtonText:
+        widgetConfig.welcomeButtonText || 'Start My Free Estimate',
       successMessage:
         widgetConfig.successMessage ||
         'Thank you! Your information has been submitted successfully. We will contact you soon.',
       addressApi: {
-        enabled: widgetConfig.addressApi?.hasOwnProperty('enabled') ? widgetConfig.addressApi.enabled : true,
+        enabled: widgetConfig.addressApi?.hasOwnProperty('enabled')
+          ? widgetConfig.addressApi.enabled
+          : true,
         maxSuggestions: widgetConfig.addressApi?.maxSuggestions || 5,
       },
       service_areas: widgetConfig.service_areas || [],
@@ -466,7 +559,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       const supabase = createClient();
       const { data: brandData, error } = await supabase
         .from('brands')
-        .select('primary_color_hex, secondary_color_hex')
+        .select('primary_color_hex, secondary_color_hex, logo_url')
         .eq('company_id', companyId)
         .single();
       if (!error && brandData) {
@@ -474,12 +567,15 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           primary: brandData.primary_color_hex,
           secondary: brandData.secondary_color_hex,
         });
+        setBrandLogo(brandData.logo_url || null);
       } else {
         setBrandColors({});
+        setBrandLogo(null);
       }
     } catch (error) {
       console.error('Error fetching brand colors:', error);
       setBrandColors({});
+      setBrandLogo(null);
     } finally {
       setBrandLoading(false);
     }
@@ -493,26 +589,29 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         const data = await response.json();
         if (data.settings) {
           const settings = data.settings;
-          
+
           // Convert settings to domain config format
           const domainName = settings.email_domain?.value || '';
-          const configured = domainName !== '' && settings.email_domain_status?.value !== 'not_configured';
-          
+          const configured =
+            domainName !== '' &&
+            settings.email_domain_status?.value !== 'not_configured';
+
           setDomainConfig({
             name: domainName,
             configured,
             status: settings.email_domain_status?.value || 'not_configured',
             records: settings.email_domain_records?.value || [],
             verifiedAt: settings.email_domain_verified_at?.value || undefined,
-            resendDomainId: settings.resend_domain_id?.value || undefined
+            resendDomainId: settings.resend_domain_id?.value || undefined,
           });
-          
+
           if (domainName) {
             setDomainForm(prev => ({
               ...prev,
               domain: domainName,
               region: settings.email_domain_region?.value || 'us-east-1',
-              customReturnPath: settings.email_domain_prefix?.value || 'noreply'
+              customReturnPath:
+                settings.email_domain_prefix?.value || 'noreply',
             }));
           }
         }
@@ -525,33 +624,36 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   // Create or update domain
   const handleDomainSubmit = async () => {
     if (!selectedCompany || !domainForm.domain.trim()) return;
-    
+
     setDomainLoading(true);
     setDomainError(null);
-    
+
     try {
-      const response = await fetch(`/api/companies/${selectedCompany.id}/settings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'create_domain',
-          domain: domainForm.domain.trim(),
-          region: domainForm.region,
-          customReturnPath: domainForm.customReturnPath
-        })
-      });
-      
+      const response = await fetch(
+        `/api/companies/${selectedCompany.id}/settings`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'create_domain',
+            domain: domainForm.domain.trim(),
+            region: domainForm.region,
+            customReturnPath: domainForm.customReturnPath,
+          }),
+        }
+      );
+
       const data = await response.json();
-      
+
       if (data.success) {
         setDomainConfig({
           name: data.domain.name,
           configured: true,
           status: data.domain.status,
           records: data.domain.records,
-          resendDomainId: data.domain.resendDomainId
+          resendDomainId: data.domain.resendDomainId,
         });
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 3000);
@@ -569,28 +671,31 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   // Verify domain
   const handleDomainVerify = async () => {
     if (!selectedCompany || !domainConfig.resendDomainId) return;
-    
+
     setDomainLoading(true);
     setDomainError(null);
-    
+
     try {
-      const response = await fetch(`/api/companies/${selectedCompany.id}/settings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'verify_domain'
-        })
-      });
-      
+      const response = await fetch(
+        `/api/companies/${selectedCompany.id}/settings`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'verify_domain',
+          }),
+        }
+      );
+
       const data = await response.json();
-      
+
       if (data.success) {
         setDomainConfig(prev => ({
           ...prev,
           status: data.domain.status,
-          records: data.domain.records
+          records: data.domain.records,
         }));
       } else {
         setDomainError(data.error || 'Failed to verify domain');
@@ -606,36 +711,43 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   // Delete domain configuration
   const handleDomainDelete = async () => {
     if (!selectedCompany || !domainConfig.configured) return;
-    
-    if (!confirm('Are you sure you want to remove the domain configuration? This will revert to using the default email domain.')) {
+
+    if (
+      !confirm(
+        'Are you sure you want to remove the domain configuration? This will revert to using the default email domain.'
+      )
+    ) {
       return;
     }
-    
+
     setDomainLoading(true);
     setDomainError(null);
-    
+
     try {
-      const response = await fetch(`/api/companies/${selectedCompany.id}/settings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'delete_domain'
-        })
-      });
-      
+      const response = await fetch(
+        `/api/companies/${selectedCompany.id}/settings`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'delete_domain',
+          }),
+        }
+      );
+
       const data = await response.json();
-      
+
       if (data.success) {
         setDomainConfig({
           configured: false,
           status: 'not_configured',
-          records: []
+          records: [],
         });
         setDomainForm(prev => ({
           ...prev,
-          domain: ''
+          domain: '',
         }));
       } else {
         setDomainError(data.error || 'Failed to remove domain');
@@ -667,7 +779,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const getRecordStatusIcon = (status?: string) => {
     switch (status) {
       case 'verified':
-        return <CheckCircle size={14} className={styles.recordStatusVerified} />;
+        return (
+          <CheckCircle size={14} className={styles.recordStatusVerified} />
+        );
       case 'pending':
         return <Clock size={14} className={styles.recordStatusPending} />;
       case 'failed':
@@ -690,6 +804,218 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setServiceAreas([]);
     }
   };
+
+  const loadPestOptions = async (companyId: string) => {
+    try {
+      setPestOptionsLoading(true);
+      const response = await fetch(`/api/admin/pest-options/${companyId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCompanyPestOptions(data.data.companyPestOptions || []);
+          setAvailablePestTypes(data.data.availablePestTypes || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading pest options:', error);
+      setCompanyPestOptions([]);
+      setAvailablePestTypes([]);
+    } finally {
+      setPestOptionsLoading(false);
+    }
+  };
+
+  const savePestOptions = async (pestOptions: CompanyPestOption[]) => {
+    if (!selectedCompany) return;
+    try {
+      const updateData = {
+        pestOptions: pestOptions.map((option, index) => ({
+          pest_id: option.pest_id,
+          custom_label: option.custom_label,
+          display_order: index + 1,
+          is_active: true,
+        })),
+      };
+
+      const response = await fetch(
+        `/api/admin/pest-options/${selectedCompany.id}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setCompanyPestOptions(pestOptions);
+        setSaveStatus('success');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('Error saving pest options:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }
+  };
+
+  const addPestOption = (pestType: PestType) => {
+    const newOption: CompanyPestOption = {
+      id: `temp-${Date.now()}`,
+      pest_id: pestType.id,
+      name: pestType.name,
+      slug: pestType.slug,
+      description: pestType.description,
+      category: pestType.category,
+      icon_svg: pestType.icon_svg,
+      custom_label: null,
+      display_order: companyPestOptions.length + 1,
+      is_active: true,
+    };
+    const updatedOptions = [...companyPestOptions, newOption];
+    setCompanyPestOptions(updatedOptions);
+    savePestOptions(updatedOptions);
+  };
+
+  const removePestOption = (optionId: string) => {
+    const updatedOptions = companyPestOptions.filter(
+      option => option.id !== optionId
+    );
+    setCompanyPestOptions(updatedOptions);
+    savePestOptions(updatedOptions);
+  };
+
+  const updatePestOptionLabel = (optionId: string, customLabel: string) => {
+    const updatedOptions = companyPestOptions.map(option =>
+      option.id === optionId ? { ...option, custom_label: customLabel } : option
+    );
+    setCompanyPestOptions(updatedOptions);
+    savePestOptions(updatedOptions);
+  };
+
+  const reorderPestOptions = (fromIndex: number, toIndex: number) => {
+    const updatedOptions = [...companyPestOptions];
+    const [moved] = updatedOptions.splice(fromIndex, 1);
+    updatedOptions.splice(toIndex, 0, moved);
+    setCompanyPestOptions(updatedOptions);
+    savePestOptions(updatedOptions);
+  };
+
+  // Service Plans Management Functions
+  const loadServicePlans = async (companyId: string) => {
+    try {
+      setServicePlansLoading(true);
+      const response = await fetch(`/api/admin/service-plans/${companyId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setServicePlans(data.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading service plans:', error);
+      setServicePlans([]);
+    } finally {
+      setServicePlansLoading(false);
+    }
+  };
+
+  const createServicePlan = async (planData: Partial<ServicePlan>) => {
+    if (!selectedCompany) return;
+    try {
+      const response = await fetch(
+        `/api/admin/service-plans/${selectedCompany.id}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(planData),
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        await loadServicePlans(selectedCompany.id);
+        setShowPlanModal(false);
+        setEditingPlan(null);
+        setSaveStatus('success');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('Error creating service plan:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }
+  };
+
+  const updateServicePlan = async (planData: Partial<ServicePlan>) => {
+    if (!selectedCompany || !editingPlan) return;
+    try {
+      const response = await fetch(
+        `/api/admin/service-plans/${selectedCompany.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...planData,
+            id: editingPlan.id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        await loadServicePlans(selectedCompany.id);
+        setShowPlanModal(false);
+        setEditingPlan(null);
+        setSaveStatus('success');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('Error updating service plan:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }
+  };
+
+  const deleteServicePlan = async (planId: string) => {
+    if (
+      !selectedCompany ||
+      !confirm('Are you sure you want to delete this service plan?')
+    )
+      return;
+    try {
+      const response = await fetch(
+        `/api/admin/service-plans/${selectedCompany.id}?id=${planId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        await loadServicePlans(selectedCompany.id);
+        setSaveStatus('success');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('Error deleting service plan:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }
+  };
+
+  const openPlanModal = (plan?: ServicePlan) => {
+    setEditingPlan(plan || null);
+    setShowPlanModal(true);
+  };
+
   const saveServiceAreas = async (areas: any[]) => {
     if (!selectedCompany) return;
     try {
@@ -811,6 +1137,133 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     );
     setNotificationEmailsInput(currentEmails.join('\n'));
   };
+  // Hero image upload functionality
+  const createAssetPath = (
+    companyName: string,
+    category: string,
+    fileName: string
+  ): string => {
+    const cleanCompanyName = companyName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+
+    const fileExt = fileName.split('.').pop();
+    const cleanFileName = fileName
+      .replace(`.${fileExt}`, '')
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .toLowerCase();
+
+    const timestamp = Date.now();
+    const finalFileName = `${cleanFileName}_${timestamp}.${fileExt}`;
+
+    return `${cleanCompanyName}/${category}/${finalFileName}`;
+  };
+
+  const uploadFile = async (
+    file: File,
+    bucket: string,
+    category: string
+  ): Promise<string | null> => {
+    if (!selectedCompany) return null;
+
+    try {
+      const supabase = createClient();
+      const filePath = createAssetPath(
+        selectedCompany.name,
+        category,
+        file.name
+      );
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      return null;
+    }
+  };
+
+  const deleteFileFromStorage = async (fileUrl: string): Promise<boolean> => {
+    try {
+      const supabase = createClient();
+      const urlParts = fileUrl.split('/storage/v1/object/public/brand-assets/');
+      if (urlParts.length !== 2) {
+        console.error('Invalid file URL format:', fileUrl);
+        return false;
+      }
+
+      const filePath = urlParts[1];
+
+      const { error } = await supabase.storage
+        .from('brand-assets')
+        .remove([filePath]);
+
+      if (error) {
+        console.error('Error deleting file from storage:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Unexpected error deleting file:', error);
+      return false;
+    }
+  };
+
+  const handleHeroImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // If there's an existing hero image, delete it from storage first
+    if (config.branding.hero_image_url) {
+      await deleteFileFromStorage(config.branding.hero_image_url);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'hero-images');
+    if (url) {
+      handleConfigChange('branding', 'hero_image_url', url);
+      // Clear the input so the same file can be selected again if needed
+      event.target.value = '';
+    }
+  };
+
+  const removeHeroImage = async () => {
+    if (!config.branding.hero_image_url) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this hero image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const deleted = await deleteFileFromStorage(config.branding.hero_image_url);
+
+    if (deleted) {
+      handleConfigChange('branding', 'hero_image_url', '');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
   const saveConfig = async () => {
     if (!selectedCompany) return;
     setIsSaving(true);
@@ -872,17 +1325,59 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     ) {
       embedCode += `\n  data-welcome-description="${config.messaging.fallback}"`;
     }
+    if (config.welcomeButtonText !== 'Start My Free Estimate') {
+      embedCode += `\n  data-welcome-button-text="${config.welcomeButtonText}"`;
+    }
+    if (config.branding.hero_image_url) {
+      embedCode += `\n  data-hero-image-url="${config.branding.hero_image_url}"`;
+    }
     embedCode += `
 ></script>`;
     return embedCode;
   };
   const generateMinimalEmbedCode = () => {
     if (!selectedCompany) return '';
-    return `<script 
+
+    let embedCode = `<script 
   src="${window.location.origin}/widget.js"
   data-company-id="${selectedCompany.id}"
-  data-base-url="${window.location.origin}"
+  data-base-url="${window.location.origin}"`;
+
+    // Add essential color data attributes to prevent style flash
+    if (config.colors.primary !== '#3b82f6') {
+      embedCode += `\n  data-primary-color="${config.colors.primary}"`;
+    }
+    if (config.colors.secondary !== '#1e293b') {
+      embedCode += `\n  data-secondary-color="${config.colors.secondary}"`;
+    }
+    if (config.colors.background !== '#ffffff') {
+      embedCode += `\n  data-background-color="${config.colors.background}"`;
+    }
+    if (config.colors.text !== '#374151') {
+      embedCode += `\n  data-text-color="${config.colors.text}"`;
+    }
+
+    // Add essential messaging attributes if customized
+    if (config.messaging.welcome !== 'Get Started') {
+      embedCode += `\n  data-welcome-title="${config.messaging.welcome}"`;
+    }
+    if (
+      config.messaging.fallback !==
+      'Get your free pest control estimate in just a few steps.'
+    ) {
+      embedCode += `\n  data-welcome-description="${config.messaging.fallback}"`;
+    }
+    if (config.welcomeButtonText !== 'Start My Free Estimate') {
+      embedCode += `\n  data-welcome-button-text="${config.welcomeButtonText}"`;
+    }
+    if (config.branding.hero_image_url) {
+      embedCode += `\n  data-hero-image-url="${config.branding.hero_image_url}"`;
+    }
+
+    embedCode += `
 ></script>`;
+
+    return embedCode;
   };
 
   const generateButtonEmbedCode = () => {
@@ -897,6 +1392,37 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     // Add button text if customized
     if (config.submitButtonText !== 'Get My Quote') {
       embedCode += `\n  data-button-text="${config.submitButtonText}"`;
+    }
+
+    // Add essential color data attributes to prevent style flash
+    if (config.colors.primary !== '#3b82f6') {
+      embedCode += `\n  data-primary-color="${config.colors.primary}"`;
+    }
+    if (config.colors.secondary !== '#1e293b') {
+      embedCode += `\n  data-secondary-color="${config.colors.secondary}"`;
+    }
+    if (config.colors.background !== '#ffffff') {
+      embedCode += `\n  data-background-color="${config.colors.background}"`;
+    }
+    if (config.colors.text !== '#374151') {
+      embedCode += `\n  data-text-color="${config.colors.text}"`;
+    }
+
+    // Add essential messaging attributes if customized
+    if (config.messaging.welcome !== 'Get Started') {
+      embedCode += `\n  data-welcome-title="${config.messaging.welcome}"`;
+    }
+    if (
+      config.messaging.fallback !==
+      'Get your free pest control estimate in just a few steps.'
+    ) {
+      embedCode += `\n  data-welcome-description="${config.messaging.fallback}"`;
+    }
+    if (config.welcomeButtonText !== 'Start My Free Estimate') {
+      embedCode += `\n  data-welcome-button-text="${config.welcomeButtonText}"`;
+    }
+    if (config.branding.hero_image_url) {
+      embedCode += `\n  data-hero-image-url="${config.branding.hero_image_url}"`;
     }
 
     embedCode += `
@@ -977,7 +1503,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       </div>
     );
   }
-
 
   return (
     <div className={styles.container}>
@@ -1076,15 +1601,69 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               />
             </div>
             <div className={styles.formGroup}>
-              <label>Logo URL (optional)</label>
+              <label>Company Logo</label>
+              {brandLogo ? (
+                <div className={styles.brandLogoDisplay}>
+                  <img
+                    src={brandLogo}
+                    alt="Company Logo"
+                    style={{
+                      maxWidth: '200px',
+                      maxHeight: '100px',
+                      objectFit: 'contain',
+                    }}
+                  />
+                  <p className={styles.brandLogoNote}>
+                    Logo is managed in{' '}
+                    <a href="/admin" target="_blank" rel="noopener noreferrer">
+                      Brand Management
+                    </a>
+                  </p>
+                </div>
+              ) : (
+                <div className={styles.brandLogoMissing}>
+                  <p>No company logo uploaded.</p>
+                  <p>
+                    Upload a logo in{' '}
+                    <a href="/admin" target="_blank" rel="noopener noreferrer">
+                      Brand Management
+                    </a>
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className={styles.formGroup}>
+              <label>Hero Image (optional)</label>
+              <p className={styles.fieldNote}>
+                Upload a hero image to be displayed on the widget&apos;s welcome
+                screen alongside your logo.
+              </p>
               <input
-                type="url"
-                value={config.branding.logo || ''}
-                onChange={e =>
-                  handleConfigChange('branding', 'logo', e.target.value)
-                }
-                placeholder="https://example.com/logo.png"
+                type="file"
+                accept="image/*"
+                onChange={handleHeroImageUpload}
+                className={styles.fileInput}
               />
+              {config.branding.hero_image_url && (
+                <div className={styles.heroImagePreview}>
+                  <img
+                    src={config.branding.hero_image_url}
+                    alt="Hero image preview"
+                    style={{
+                      maxWidth: '300px',
+                      maxHeight: '200px',
+                      objectFit: 'contain',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={removeHeroImage}
+                    className={styles.removeImageButton}
+                  >
+                    Remove Hero Image
+                  </button>
+                </div>
+              )}
             </div>
           </CollapsibleSection>
           {/* Widget Colors Section */}
@@ -1317,6 +1896,24 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               />
             </div>
             <div className={styles.formGroup}>
+              <label>Welcome Button Text</label>
+              <input
+                type="text"
+                value={config.welcomeButtonText}
+                onChange={e =>
+                  setConfig(prev => ({
+                    ...prev,
+                    welcomeButtonText: e.target.value,
+                  }))
+                }
+                placeholder="Start My Free Estimate"
+              />
+              <small className={styles.fieldNote}>
+                Text for the button on the welcome screen (different from the
+                final submit button)
+              </small>
+            </div>
+            <div className={styles.formGroup}>
               <label>Submit Button Text</label>
               <input
                 type="text"
@@ -1344,6 +1941,228 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 placeholder="Thank you! Your information has been submitted successfully. We will contact you soon."
               />
             </div>
+          </CollapsibleSection>
+          {/* Pest Options Section */}
+          <CollapsibleSection
+            sectionKey="pestOptions"
+            title="Pest Options"
+            description="Configure which pest options are available in your widget. Customers will select from these options."
+            isExpanded={expandedSections.pestOptions}
+            onToggle={() => toggleSection('pestOptions')}
+            styles={styles}
+          >
+            {pestOptionsLoading ? (
+              <div className={styles.loading}>Loading pest options...</div>
+            ) : (
+              <div className={styles.pestOptionsManager}>
+                {/* Current Pest Options */}
+                <div className={styles.currentPestOptions}>
+                  <h4>Current Pest Options</h4>
+                  {companyPestOptions.length === 0 ? (
+                    <p>
+                      No pest options configured. Add some from the available
+                      options below.
+                    </p>
+                  ) : (
+                    <div className={styles.pestOptionsList}>
+                      {companyPestOptions.map(option => (
+                        <div key={option.id} className={styles.pestOptionItem}>
+                          <div className={styles.pestOptionInfo}>
+                            <span
+                              className={styles.pestIcon}
+                              dangerouslySetInnerHTML={{
+                                __html: option.icon_svg,
+                              }}
+                            ></span>
+                            <div className={styles.pestDetails}>
+                              <div className={styles.pestName}>
+                                {option.custom_label || option.name}
+                              </div>
+                              <div className={styles.pestCategory}>
+                                Category: {option.category}
+                              </div>
+                            </div>
+                          </div>
+                          <div className={styles.pestOptionActions}>
+                            <input
+                              type="text"
+                              placeholder={option.name}
+                              value={option.custom_label || ''}
+                              onChange={e =>
+                                updatePestOptionLabel(option.id, e.target.value)
+                              }
+                              className={styles.customLabelInput}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePestOption(option.id)}
+                              className={styles.removeButton}
+                              title="Remove pest option"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Available Pest Types */}
+                <div className={styles.availablePestTypes}>
+                  <h4>Available Pest Types</h4>
+                  <div className={styles.pestTypesGrid}>
+                    {availablePestTypes
+                      .filter(
+                        type =>
+                          !companyPestOptions.some(
+                            option => option.pest_id === type.id
+                          )
+                      )
+                      .map(type => (
+                        <div key={type.id} className={styles.pestTypeCard}>
+                          <div className={styles.pestTypeInfo}>
+                            <span
+                              className={styles.pestIcon}
+                              dangerouslySetInnerHTML={{
+                                __html: type.icon_svg,
+                              }}
+                            ></span>
+                            <div className={styles.pestDetails}>
+                              <div className={styles.pestName}>{type.name}</div>
+                              <div className={styles.pestCategory}>
+                                {type.pest_categories?.name ||
+                                  'Unknown Category'}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addPestOption(type)}
+                            className={styles.addButton}
+                            title="Add to widget"
+                          >
+                            +
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                  {availablePestTypes.filter(
+                    type =>
+                      !companyPestOptions.some(
+                        option => option.pest_id === type.id
+                      )
+                  ).length === 0 && (
+                    <p>
+                      All available pest types are already added to your widget.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </CollapsibleSection>
+          {/* Service Plans Section */}
+          <CollapsibleSection
+            sectionKey="servicePlans"
+            title="Service Plans"
+            description="Manage service plans that customers can select based on their pest issues."
+            isExpanded={expandedSections.servicePlans}
+            onToggle={() => toggleSection('servicePlans')}
+            styles={styles}
+          >
+            {servicePlansLoading ? (
+              <div className={styles.loading}>Loading service plans...</div>
+            ) : (
+              <div className={styles.servicePlansManager}>
+                <div className={styles.servicePlansHeader}>
+                  <h4>Current Service Plans ({servicePlans.length})</h4>
+                  <button
+                    type="button"
+                    onClick={() => openPlanModal()}
+                    className={styles.createPlanButton}
+                  >
+                    + Create New Plan
+                  </button>
+                </div>
+
+                {servicePlans.length === 0 ? (
+                  <div className={styles.noPlans}>
+                    <p>No service plans configured yet.</p>
+                    <p>
+                      Create your first plan to enable dynamic plan suggestions
+                      in the widget.
+                    </p>
+                  </div>
+                ) : (
+                  <div className={styles.plansTable}>
+                    <div className={styles.plansTableHeader}>
+                      <div>Plan Name</div>
+                      <div>Category</div>
+                      <div>Price</div>
+                      <div>Coverage</div>
+                      <div>Status</div>
+                      <div>Actions</div>
+                    </div>
+                    {servicePlans.map(plan => (
+                      <div key={plan.id} className={styles.planRow}>
+                        <div className={styles.planName}>
+                          <strong>{plan.plan_name}</strong>
+                          {plan.highlight_badge && (
+                            <span className={styles.planBadge}>
+                              {plan.highlight_badge}
+                            </span>
+                          )}
+                          <div className={styles.planDescription}>
+                            {plan.plan_description}
+                          </div>
+                        </div>
+                        <div className={styles.planCategory}>
+                          {plan.plan_category || 'Standard'}
+                        </div>
+                        <div className={styles.planPrice}>
+                          <div>
+                            ${plan.recurring_price}/{plan.billing_frequency}
+                          </div>
+                          {plan.initial_price && (
+                            <div className={styles.initialPrice}>
+                              Setup: ${plan.initial_price}
+                            </div>
+                          )}
+                        </div>
+                        <div className={styles.planCoverage}>
+                          {plan.pest_coverage?.length || 0} pests
+                        </div>
+                        <div className={styles.planStatus}>
+                          <span
+                            className={`${styles.statusIndicator} ${plan.is_active ? styles.active : styles.inactive}`}
+                          >
+                            {plan.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className={styles.planActions}>
+                          <button
+                            type="button"
+                            onClick={() => openPlanModal(plan)}
+                            className={styles.editButton}
+                            title="Edit plan"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteServicePlan(plan.id)}
+                            className={styles.deleteButton}
+                            title="Delete plan"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </CollapsibleSection>
           {/* Service Areas Section */}
           <CollapsibleSection
@@ -1388,7 +2207,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                   {config.service_areas.map(area => (
                     <span key={area} className={styles.serviceArea}>
                       {area}
-                      <button type="button" onClick={() => removeServiceArea(area)}>×</button>
+                      <button
+                        type="button"
+                        onClick={() => removeServiceArea(area)}
+                      >
+                        ×
+                      </button>
                     </span>
                   ))}
                 </div>
@@ -1522,16 +2346,22 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 <div className={styles.domainSection}>
                   <h4>Custom Email Domain</h4>
                   <p className={styles.domainSectionDescription}>
-                    Configure a custom domain for sending emails to customers. This allows emails to be sent from your domain (e.g., noreply@{config.branding.companyName.toLowerCase().replace(/\s+/g, '')}.com) instead of the default system domain.
+                    Configure a custom domain for sending emails to customers.
+                    This allows emails to be sent from your domain (e.g.,
+                    noreply@
+                    {config.branding.companyName
+                      .toLowerCase()
+                      .replace(/\s+/g, '')}
+                    .com) instead of the default system domain.
                   </p>
-                  
+
                   {domainError && (
                     <div className={styles.domainError}>
                       <AlertTriangle size={16} />
                       {domainError}
                     </div>
                   )}
-                  
+
                   {!domainConfig.configured ? (
                     <div className={styles.domainForm}>
                       <div className={styles.formGroup}>
@@ -1539,46 +2369,70 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                         <input
                           type="text"
                           value={domainForm.domain}
-                          onChange={e => setDomainForm(prev => ({ ...prev, domain: e.target.value }))}
+                          onChange={e =>
+                            setDomainForm(prev => ({
+                              ...prev,
+                              domain: e.target.value,
+                            }))
+                          }
                           placeholder="example.com"
                           disabled={domainLoading}
                         />
                         <small className={styles.fieldNote}>
-                          Enter your company&apos;s domain name (without www or http://)
+                          Enter your company&apos;s domain name (without www or
+                          http://)
                         </small>
                       </div>
-                      
+
                       <div className={styles.formGroup}>
                         <label>Email Sending Region</label>
                         <select
                           value={domainForm.region}
-                          onChange={e => setDomainForm(prev => ({ ...prev, region: e.target.value }))}
+                          onChange={e =>
+                            setDomainForm(prev => ({
+                              ...prev,
+                              region: e.target.value,
+                            }))
+                          }
                           disabled={domainLoading}
                         >
-                          <option value="us-east-1">US East (N. Virginia)</option>
+                          <option value="us-east-1">
+                            US East (N. Virginia)
+                          </option>
                           <option value="eu-west-1">EU West (Ireland)</option>
-                          <option value="sa-east-1">South America (São Paulo)</option>
-                          <option value="ap-northeast-1">Asia Pacific (Tokyo)</option>
+                          <option value="sa-east-1">
+                            South America (São Paulo)
+                          </option>
+                          <option value="ap-northeast-1">
+                            Asia Pacific (Tokyo)
+                          </option>
                         </select>
                         <small className={styles.fieldNote}>
-                          Choose the region closest to your customers for better delivery
+                          Choose the region closest to your customers for better
+                          delivery
                         </small>
                       </div>
-                      
+
                       <div className={styles.formGroup}>
                         <label>Email Prefix</label>
                         <input
                           type="text"
                           value={domainForm.customReturnPath}
-                          onChange={e => setDomainForm(prev => ({ ...prev, customReturnPath: e.target.value }))}
+                          onChange={e =>
+                            setDomainForm(prev => ({
+                              ...prev,
+                              customReturnPath: e.target.value,
+                            }))
+                          }
                           placeholder="noreply"
                           disabled={domainLoading}
                         />
                         <small className={styles.fieldNote}>
-                          The prefix for your email address (e.g., &quot;noreply&quot; creates noreply@yourdomain.com)
+                          The prefix for your email address (e.g.,
+                          &quot;noreply&quot; creates noreply@yourdomain.com)
                         </small>
                       </div>
-                      
+
                       <button
                         onClick={handleDomainSubmit}
                         disabled={domainLoading || !domainForm.domain.trim()}
@@ -1601,14 +2455,24 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                           <div>
                             <strong>{domainConfig.name}</strong>
                             <div className={styles.domainStatus}>
-                              Status: {domainConfig.status === 'verified' ? 'Verified' : 
-                                      domainConfig.status === 'pending' ? 'Verification Pending' :
-                                      domainConfig.status === 'failed' ? 'Verification Failed' :
-                                      domainConfig.status === 'temporary_failure' ? 'Temporary Failure' :
-                                      'Not Started'}
+                              Status:{' '}
+                              {domainConfig.status === 'verified'
+                                ? 'Verified'
+                                : domainConfig.status === 'pending'
+                                  ? 'Verification Pending'
+                                  : domainConfig.status === 'failed'
+                                    ? 'Verification Failed'
+                                    : domainConfig.status ===
+                                        'temporary_failure'
+                                      ? 'Temporary Failure'
+                                      : 'Not Started'}
                               {domainConfig.verifiedAt && (
                                 <span className={styles.verifiedDate}>
-                                  (Verified {new Date(domainConfig.verifiedAt).toLocaleDateString()})
+                                  (Verified{' '}
+                                  {new Date(
+                                    domainConfig.verifiedAt
+                                  ).toLocaleDateString()}
+                                  )
                                 </span>
                               )}
                             </div>
@@ -1622,7 +2486,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             type="button"
                           >
                             {domainLoading ? (
-                              <RefreshCw size={16} className={styles.spinning} />
+                              <RefreshCw
+                                size={16}
+                                className={styles.spinning}
+                              />
                             ) : (
                               <RefreshCw size={16} />
                             )}
@@ -1639,12 +2506,14 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                           </button>
                         </div>
                       </div>
-                      
+
                       {domainConfig.records.length > 0 && (
                         <div className={styles.dnsRecords}>
                           <h5>DNS Records to Add</h5>
                           <p className={styles.dnsInstructions}>
-                            Add these DNS records to your domain&apos;s DNS settings. Contact your domain provider if you need help.
+                            Add these DNS records to your domain&apos;s DNS
+                            settings. Contact your domain provider if you need
+                            help.
                           </p>
                           <div className={styles.recordsList}>
                             {domainConfig.records.map((record, index) => (
@@ -1656,9 +2525,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                                   <div className={styles.recordStatus}>
                                     {getRecordStatusIcon(record.status)}
                                     <span className={styles.recordStatusText}>
-                                      {record.status === 'verified' ? 'Verified' :
-                                       record.status === 'pending' ? 'Pending' :
-                                       record.status === 'failed' ? 'Failed' : 'Not Checked'}
+                                      {record.status === 'verified'
+                                        ? 'Verified'
+                                        : record.status === 'pending'
+                                          ? 'Pending'
+                                          : record.status === 'failed'
+                                            ? 'Failed'
+                                            : 'Not Checked'}
                                     </span>
                                   </div>
                                 </div>
@@ -1669,7 +2542,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                                   </div>
                                   <div className={styles.recordField}>
                                     <label>Value:</label>
-                                    <code className={styles.recordValue}>{record.value}</code>
+                                    <code className={styles.recordValue}>
+                                      {record.value}
+                                    </code>
                                   </div>
                                   {record.priority && (
                                     <div className={styles.recordField}>
@@ -1687,23 +2562,31 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                               </div>
                             ))}
                           </div>
-                          
+
                           {domainConfig.status !== 'verified' && (
                             <div className={styles.verificationNote}>
                               <AlertTriangle size={16} />
                               <div>
                                 <strong>Domain not yet verified</strong>
-                                <p>After adding these DNS records, click &quot;Check Status&quot; to verify your domain. Verification can take up to 72 hours.</p>
+                                <p>
+                                  After adding these DNS records, click
+                                  &quot;Check Status&quot; to verify your
+                                  domain. Verification can take up to 72 hours.
+                                </p>
                               </div>
                             </div>
                           )}
-                          
+
                           {domainConfig.status === 'verified' && (
                             <div className={styles.successNote}>
                               <CheckCircle size={16} />
                               <div>
                                 <strong>Domain verified successfully!</strong>
-                                <p>Emails will now be sent from {domainForm.customReturnPath}@{domainConfig.name}</p>
+                                <p>
+                                  Emails will now be sent from{' '}
+                                  {domainForm.customReturnPath}@
+                                  {domainConfig.name}
+                                </p>
                               </div>
                             </div>
                           )}
@@ -1789,7 +2672,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.embedCodeGroup}>
               <h4>Minimal Configuration (Recommended)</h4>
               <p className={styles.embedDescription}>
-                Clean, simple embed code. Customizations will be loaded from
+                Optimized embed code with essential styling to prevent flash of
+                default styles. Additional customizations will be loaded from
                 your saved configuration.
               </p>
               <div className={styles.embedCode}>
@@ -1875,6 +2759,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               <EmbedPreview companyId={selectedCompany.id} />
             </div>
           </div>
+        )}
+
+        {/* Service Plan Modal */}
+        {showPlanModal && (
+          <ServicePlanModal
+            plan={editingPlan}
+            isOpen={showPlanModal}
+            onClose={() => setShowPlanModal(false)}
+            onSave={editingPlan ? updateServicePlan : createServicePlan}
+            availablePestTypes={availablePestTypes}
+          />
         )}
       </div>
     </div>

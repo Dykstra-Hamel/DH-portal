@@ -24,7 +24,7 @@ interface PartialLead {
   progressiveState: any;
   engagementMetrics: any;
   leadSource: string;
-  serviceAreaStatus: 'served' | 'outside_area';
+  serviceAreaStatus: 'served' | 'outside_area' | 'unknown';
 }
 
 interface Pagination {
@@ -262,8 +262,12 @@ export default function PartialLeadsManager() {
                     <td>{getCompletionBadge(lead.completionPercentage)}</td>
                     <td>{lead.leadSource}</td>
                     <td>
-                      <span className={`${styles.badge} ${lead.serviceAreaStatus === 'served' ? styles.success : styles.danger}`}>
-                        {lead.serviceAreaStatus === 'served' ? 'Served' : 'Outside Area'}
+                      <span className={`${styles.badge} ${
+                        lead.serviceAreaStatus === 'served' ? styles.success : 
+                        lead.serviceAreaStatus === 'unknown' ? styles.warning : styles.danger
+                      }`}>
+                        {lead.serviceAreaStatus === 'served' ? 'Served' : 
+                         lead.serviceAreaStatus === 'unknown' ? 'Unknown' : 'Outside Area'}
                       </span>
                     </td>
                     <td>
@@ -356,8 +360,11 @@ export default function PartialLeadsManager() {
 
                 <div className={styles.detailSection}>
                   <h4>Form Data</h4>
-                  {selectedLead.form_data.pestIssue && (
-                    <p><strong>Pest Issue:</strong> {selectedLead.form_data.pestIssue}</p>
+                  {selectedLead.form_data.pestType && (
+                    <p><strong>Pest Issue:</strong> {selectedLead.form_data.pestType
+                      .split(' ')
+                      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                      .join(' ')}</p>
                   )}
                   {selectedLead.form_data.address && (
                     <p><strong>Address:</strong> {selectedLead.form_data.address}</p>

@@ -123,7 +123,8 @@ export async function GET(request: NextRequest) {
       progressiveState: lead.attribution_data?.progressive_state || null,
       engagementMetrics: extractEngagementMetrics(lead.attribution_data),
       leadSource: determineLeadSource(lead.attribution_data),
-      serviceAreaStatus: lead.service_area_data?.served ? 'served' : 'outside_area',
+      serviceAreaStatus: lead.service_area_data?.status === 'unknown' ? 'unknown' : 
+                         lead.service_area_data?.served ? 'served' : 'outside_area',
       // Add actual company data
       companies: companiesMap.get(lead.company_id) || { id: lead.company_id, name: 'Unknown Company', website: '' },
       // Add actual lead data for converted partial leads

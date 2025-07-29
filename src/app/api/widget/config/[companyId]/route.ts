@@ -105,6 +105,7 @@ export async function GET(
     const defaultConfig = {
       branding: {
         companyName: widgetConfig.branding?.companyName || company.name,
+        hero_image_url: widgetConfig.branding?.hero_image_url || null,
       },
       headers: {
         headerText: widgetConfig.headers?.headerText || '',
@@ -118,7 +119,51 @@ export async function GET(
         fallback: widgetConfig.messaging?.fallback || 'Let me connect you with one of our specialists who can help you right away.',
       },
       submitButtonText: widgetConfig.submitButtonText || 'Get My Quote',
+      welcomeButtonText: widgetConfig.welcomeButtonText || 'Start My Free Estimate',
       successMessage: widgetConfig.successMessage || 'Thank you! Your information has been submitted successfully. We will contact you soon.',
+    };
+
+    // Fetch company's pest options
+    const { data: pestOptions } = await supabase
+      .from('company_pest_options')
+      .select(`
+        pest_id,
+        custom_label,
+        display_order,
+        pest_types (
+          name,
+          slug,
+          icon_svg,
+          pest_categories (
+            name,
+            slug
+          )
+        )
+      `)
+      .eq('company_id', company.id)
+      .eq('is_active', true)
+      .order('display_order');
+
+    // Transform pest options for widget consumption
+    const widgetPestOptions = (pestOptions || []).map((option: any) => ({
+      id: option.pest_types.slug,
+      label: option.custom_label || option.pest_types.name,
+      value: option.pest_types.slug,
+      icon: option.pest_types.icon_svg,
+      category: option.pest_types.pest_categories?.name || 'Unknown',
+    }));
+
+    // Fetch company's service plans count for widget config
+    const { data: servicePlansData } = await supabase
+      .from('service_plans')
+      .select('id, is_active')
+      .eq('company_id', company.id);
+
+    const servicePlansInfo = {
+      enabled: (servicePlansData || []).length > 0,
+      count: (servicePlansData || []).length,
+      activeCount: (servicePlansData || []).filter(plan => plan.is_active).length,
+      hasCustomPlans: (servicePlansData || []).length > 0,
     };
 
     // Only return safe, public configuration data
@@ -130,11 +175,14 @@ export async function GET(
       colors: defaultConfig.colors,
       messaging: defaultConfig.messaging,
       submitButtonText: defaultConfig.submitButtonText,
+      welcomeButtonText: defaultConfig.welcomeButtonText,
       successMessage: defaultConfig.successMessage,
       addressApi: widgetConfig.addressApi || {
         enabled: false,
         maxSuggestions: 5,
       },
+      pestOptions: widgetPestOptions,
+      servicePlans: servicePlansInfo,
       hasConfiguration: Boolean(
         company.widget_config && company.widget_config.ai_knowledge
       ),
