@@ -1,9 +1,10 @@
-import { Resend } from 'resend';
+// import { Resend } from 'resend';
 import { EmailRecipient, LeadNotificationData } from './types';
 import { generateLeadCreatedEmailTemplate } from './templates/lead-created';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from './index';
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+// const resend = new Resend(process.env.RESEND_API_KEY!);
 
 export async function sendLeadCreatedNotifications(
   recipients: string[],
@@ -14,51 +15,28 @@ export async function sendLeadCreatedNotifications(
   companyId?: string
 ) {
   try {
-    // Get custom domain configuration for the company
-    let fromEmail = process.env.RESEND_FROM_EMAIL || 'notifications@yourdomain.com';
-    let fromName = process.env.RESEND_FROM_NAME || 'PCOcentral';
+    // Use MailerSend with hard-coded from email
+    const fromEmail = MAILERSEND_FROM_EMAIL;
+    let fromName = 'Northwest Exterminating';
 
     if (companyId) {
       try {
         const supabase = createAdminClient();
         
-        // Get company name and domain settings
+        // Get company name
         const { data: company } = await supabase
           .from('companies')
           .select('name')
           .eq('id', companyId)
           .single();
-          
-        const { data: domainSettings } = await supabase
-          .from('company_settings')
-          .select('setting_key, setting_value')
-          .eq('company_id', companyId)
-          .in('setting_key', ['email_domain', 'email_domain_status', 'email_domain_prefix']);
 
-        if (company && domainSettings) {
-          const settingsMap = domainSettings.reduce((acc, setting) => {
-            acc[setting.setting_key] = setting.setting_value;
-            return acc;
-          }, {} as Record<string, string>);
-
-          const emailDomain = settingsMap.email_domain;
-          const domainStatus = settingsMap.email_domain_status;
-          const emailPrefix = settingsMap.email_domain_prefix || 'noreply';
-
-          if (emailDomain && domainStatus === 'verified') {
-            // Use the custom domain for sending
-            fromEmail = `${emailPrefix}@${emailDomain}`;
-            fromName = company.name;
-          }
+        if (company) {
+          fromName = company.name;
         }
       } catch (error) {
-        console.warn('Failed to load custom domain configuration, using default:', error);
-        // Continue with default configuration
+        console.warn('Failed to load company name, using default:', error);
       }
     }
-
-    // Format from field with name
-    const fromField = `${fromName} <${fromEmail}>`;
 
     const results = [];
 
@@ -74,18 +52,46 @@ export async function sendLeadCreatedNotifications(
         // Generate subject line
         const subject = generateSubjectLine(leadData, emailConfig?.subjectLine);
 
-        const { data, error } = await resend.emails.send({
-          from: fromField,
-          to: [email],
+        // Send email using MailerSend
+        const mailersendPayload = {
+          from: {
+            email: fromEmail,
+            name: fromName
+          },
+          to: [
+            {
+              email: email
+            }
+          ],
           subject: subject,
-          html: generateLeadCreatedEmailTemplate(recipientName, leadData),
+          html: generateLeadCreatedEmailTemplate(recipientName, leadData)
+        };
+
+        const response = await fetch('https://api.mailersend.com/v1/email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
+          },
+          body: JSON.stringify(mailersendPayload),
         });
 
-        if (error) {
-          console.error(`Failed to send lead notification to ${email}:`, error);
-          results.push({ email, success: false, error: error.message });
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error(`Failed to send lead notification to ${email}:`, response.status, errorData);
+          results.push({ email, success: false, error: `MailerSend error: ${response.status}` });
         } else {
-          results.push({ email, success: true, data });
+          let responseData: any = {};
+          try {
+            const responseText = await response.text();
+            if (responseText.trim()) {
+              responseData = JSON.parse(responseText);
+            }
+          } catch (error) {
+            console.log('MailerSend response was not JSON, but email may have sent successfully');
+          }
+          
+          results.push({ email, success: true, data: responseData });
         }
       } catch (emailError) {
         console.error(`Error sending email to ${email}:`, emailError);
