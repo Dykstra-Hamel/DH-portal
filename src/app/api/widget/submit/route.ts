@@ -707,6 +707,32 @@ export async function POST(request: NextRequest) {
       // Don't fail the lead creation due to email issues
     }
 
+    // Send SMS confirmation (immediate)
+    try {
+      const smsResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/widget/send-sms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerPhone: submission.contactInfo.phone,
+          customerName: submission.contactInfo.name,
+          pestType: submission.pestType
+        }),
+      });
+
+      if (smsResponse.ok) {
+        const smsResult = await smsResponse.json();
+        console.log('SMS confirmation sent:', smsResult);
+      } else {
+        const smsError = await smsResponse.json();
+        console.error('SMS sending failed:', smsError);
+      }
+    } catch (error) {
+      console.error('Error sending SMS confirmation:', error);
+      // Don't fail the lead creation due to SMS issues
+    }
+
     // Schedule automatic quote email (10 seconds after submission)
     setTimeout(async () => {
       try {
