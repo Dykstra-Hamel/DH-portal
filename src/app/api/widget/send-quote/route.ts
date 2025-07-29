@@ -21,6 +21,7 @@ interface QuoteRequest {
     factors: string[];
   };
   urgency?: string;
+  selectedPlan?: string;
 }
 
 // CORS headers for cross-origin requests
@@ -67,6 +68,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
     }
 
+    // Fetch service plan data if selectedPlan is provided
+    let servicePlan: { id: string; plan_name: string; initial_price: number; recurring_price: number; billing_frequency: string; } | undefined;
+    if (quoteData.selectedPlan) {
+      const { data: planData, error: planError } = await supabase
+        .from('service_plans')
+        .select('id, plan_name, initial_price, recurring_price, billing_frequency')
+        .eq('id', quoteData.selectedPlan)
+        .eq('company_id', quoteData.companyId)
+        .eq('is_active', true)
+        .single();
+
+      if (!planError && planData) {
+        servicePlan = planData;
+      }
+    }
+
     // Extract first name from customer name
     const firstName = quoteData.customerName.split(' ')[0] || quoteData.customerName;
     
@@ -77,7 +94,8 @@ export async function POST(request: NextRequest) {
       address: quoteData.address || 'your location',
       urgency: quoteData.urgency || '1-2-days',
       companyName: company.name,
-      customerEmail: quoteData.customerEmail
+      customerEmail: quoteData.customerEmail,
+      selectedPlan: servicePlan
     };
 
     const emailHtml = generateQuoteEmailTemplate(quoteEmailData);

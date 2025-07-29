@@ -802,7 +802,8 @@ async function sendDelayedQuoteEmail(submission: WidgetSubmission, company: any)
       homeSize: submission.homeSize || undefined,
       address: submission.address || undefined,
       estimatedPrice: estimatedPrice,
-      urgency: submission.urgency
+      urgency: submission.urgency,
+      selectedPlan: submission.selectedPlan
     };
 
     // Make internal API call to send quote email
