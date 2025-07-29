@@ -121,6 +121,7 @@ export async function GET(
       submitButtonText: widgetConfig.submitButtonText || 'Get My Quote',
       welcomeButtonText: widgetConfig.welcomeButtonText || 'Start My Free Estimate',
       successMessage: widgetConfig.successMessage || 'Thank you! Your information has been submitted successfully. We will contact you soon.',
+      welcomeBenefits: widgetConfig.messaging?.welcomeBenefits || [],
     };
 
     // Fetch company's pest options
@@ -177,6 +178,7 @@ export async function GET(
       submitButtonText: defaultConfig.submitButtonText,
       welcomeButtonText: defaultConfig.welcomeButtonText,
       successMessage: defaultConfig.successMessage,
+      welcomeBenefits: defaultConfig.welcomeBenefits,
       addressApi: widgetConfig.addressApi || {
         enabled: false,
         maxSuggestions: 5,

@@ -152,6 +152,10 @@ interface WidgetConfigData {
   messaging: {
     welcome: string;
     fallback: string;
+    welcomeBenefits: Array<{
+      text: string;
+      icon: string;
+    }>;
   };
   notifications: {
     emails: string[];
@@ -237,6 +241,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     messaging: {
       welcome: 'Get Started',
       fallback: 'Get your free pest control estimate in just a few steps.',
+      welcomeBenefits: [],
     },
     notifications: {
       emails: [],
@@ -514,6 +519,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         fallback:
           widgetConfig.messaging?.fallback ||
           'Get your free pest control estimate in just a few steps.',
+        welcomeBenefits: widgetConfig.messaging?.welcomeBenefits || [],
       },
       notifications: {
         emails: widgetConfig.notifications?.emails || [],
@@ -1086,6 +1092,41 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       [section]: {
         ...(prev[section] as any),
         [field]: value,
+      },
+    }));
+  };
+
+  const handleAddBenefit = () => {
+    setConfig(prev => ({
+      ...prev,
+      messaging: {
+        ...prev.messaging,
+        welcomeBenefits: [
+          ...prev.messaging.welcomeBenefits,
+          { text: '', icon: '' }
+        ],
+      },
+    }));
+  };
+
+  const handleRemoveBenefit = (index: number) => {
+    setConfig(prev => ({
+      ...prev,
+      messaging: {
+        ...prev.messaging,
+        welcomeBenefits: prev.messaging.welcomeBenefits.filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const handleBenefitChange = (index: number, field: 'text' | 'icon', value: string) => {
+    setConfig(prev => ({
+      ...prev,
+      messaging: {
+        ...prev.messaging,
+        welcomeBenefits: prev.messaging.welcomeBenefits.map((benefit, i) =>
+          i === index ? { ...benefit, [field]: value } : benefit
+        ),
       },
     }));
   };
@@ -1941,6 +1982,73 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                 rows={3}
                 placeholder="Thank you! Your information has been submitted successfully. We will contact you soon."
               />
+            </div>
+
+            {/* Welcome Benefits Section */}
+            <div className={styles.formGroup}>
+              <label>Welcome Benefits</label>
+              <p className={styles.fieldNote}>
+                Add custom benefits with text and SVG icons to display on the welcome screen.
+              </p>
+              
+              {config.messaging.welcomeBenefits.map((benefit, index) => (
+                <div key={index} className={styles.benefitItem}>
+                  <div className={styles.benefitHeader}>
+                    <h4>Benefit {index + 1}</h4>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBenefit(index)}
+                      className={styles.removeButton}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  
+                  <div className={styles.benefitFields}>
+                    <div className={styles.formGroup}>
+                      <label>Benefit Text</label>
+                      <input
+                        type="text"
+                        value={benefit.text}
+                        onChange={e => handleBenefitChange(index, 'text', e.target.value)}
+                        placeholder="e.g., Fully Licensed & Insured"
+                      />
+                    </div>
+                    
+                    <div className={styles.formGroup}>
+                      <label>SVG Icon</label>
+                      <textarea
+                        value={benefit.icon}
+                        onChange={e => handleBenefitChange(index, 'icon', e.target.value)}
+                        placeholder="<svg>...</svg>"
+                        rows={4}
+                        className={styles.svgInput}
+                      />
+                    </div>
+                    
+                    {benefit.icon && benefit.text && (
+                      <div className={styles.benefitPreview}>
+                        <div className={styles.previewLabel}>Preview:</div>
+                        <div className={styles.previewItem}>
+                          <span 
+                            className={styles.previewIcon}
+                            dangerouslySetInnerHTML={{ __html: benefit.icon }}
+                          />
+                          <span className={styles.previewText}>{benefit.text}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              <button
+                type="button"
+                onClick={handleAddBenefit}
+                className={styles.addButton}
+              >
+                + Add Benefit
+              </button>
             </div>
           </CollapsibleSection>
           {/* Pest Options Section */}

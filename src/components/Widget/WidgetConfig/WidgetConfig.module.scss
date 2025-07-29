@@ -1856,3 +1856,76 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+// Welcome Benefits Management Styles
+.benefitItem {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #f8fafc;
+}
+
+.benefitHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  
+  h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #374151;
+  }
+}
+
+.benefitFields {
+  display: grid;
+  gap: 16px;
+}
+
+.svgInput {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.benefitPreview {
+  padding: 12px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  
+  .previewLabel {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+}
+
+.previewItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  
+  .previewIcon {
+    display: flex;
+    align-items: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+  }
+  
+  .previewText {
+    font-size: 16px;
+    color: #374151;
+  }
+}
