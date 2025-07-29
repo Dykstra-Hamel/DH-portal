@@ -2654,6 +2654,7 @@
         flex-direction: column;
         align-items: center;
         cursor: pointer;
+        width: 160px;
         transition: all 0.2s ease;
       }
       .dh-pest-icon {
@@ -2693,10 +2694,13 @@
       }
       .dh-pest-label {
         text-align: center;
-        font-size: 14px;
-        font-weight: 500;
-        color: #374151;
         margin-top: 8px;
+        width: 100%;
+        color: #4E4E4E;
+        font-family: Outfit;
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 18px;
       }
       .dh-pest-option:hover .dh-pest-icon {
         border-color: ${primaryColor};
