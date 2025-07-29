@@ -4859,7 +4859,7 @@
         initialOfferStep.id = 'dh-step-initial-offer';
         initialOfferStep.innerHTML = `
         <div class="dh-form-step-content">
-      <h2 class="dh-step-heading">Great! We can take care of those <span id="offer-pest-type">pests</span>, usually within one business day, starting at just <span id="offer-price">$229</span>.</h2>
+      <h2 class="dh-step-heading">Great! We can take care of those <span id="offer-pest-type">pests</span>, usually within one business day, starting at just <span id="offer-price">$</span>.</h2>
       <p class="dh-step-instruction">How would you like to proceed?</p>
       <div class="dh-offer-options">
         <button class="dh-offer-btn dh-offer-btn-primary" id="lets-schedule" data-choice="schedule">Schedule Now!</button>
