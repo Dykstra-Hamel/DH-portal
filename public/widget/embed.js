@@ -1546,6 +1546,9 @@
               progressiveFormManager.setupRealTimeValidation();
             }
 
+            // Setup phone formatting for all phone input fields
+            progressiveFormManager.setupPhoneFormatting();
+
             // Initialize step analytics
             if (widgetState.formState.progressiveFeatures.stepAnalytics) {
               progressiveFormManager.initializeStepAnalytics();
@@ -1823,6 +1826,78 @@
           });
         },
 
+        setupPhoneFormatting: () => {
+          // Setup event listeners for phone formatting
+          const setupPhoneField = (fieldId) => {
+            const field = document.getElementById(fieldId);
+            if (field && !field.hasAttribute('data-phone-formatted')) {
+              // Mark as formatted to avoid duplicate listeners
+              field.setAttribute('data-phone-formatted', 'true');
+              
+              // Handle input events for real-time formatting
+              field.addEventListener('input', (event) => {
+                progressiveFormManager.handlePhoneInput(field);
+              });
+
+              // Handle paste events
+              field.addEventListener('paste', (event) => {
+                setTimeout(() => {
+                  progressiveFormManager.handlePhoneInput(field);
+                }, 0);
+              });
+
+              // Handle keydown to prevent invalid characters
+              field.addEventListener('keydown', (event) => {
+                const allowedKeys = [
+                  'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
+                  'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                  'Home', 'End'
+                ];
+                
+                // Allow digits and control keys
+                if (allowedKeys.includes(event.key) || 
+                    (event.key >= '0' && event.key <= '9') ||
+                    (event.ctrlKey || event.metaKey)) {
+                  return;
+                }
+                
+                // Prevent other characters
+                event.preventDefault();
+              });
+            }
+          };
+
+          // Setup both phone fields
+          setupPhoneField('phone-input');
+          setupPhoneField('quote-phone-input');
+
+          // Also setup a mutation observer to catch dynamically added phone fields
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1) {
+                  if (node.id === 'phone-input' || node.id === 'quote-phone-input') {
+                    setupPhoneField(node.id);
+                  } else if (node.querySelector) {
+                    const phoneInput = node.querySelector('#phone-input');
+                    const quotePhoneInput = node.querySelector('#quote-phone-input');
+                    if (phoneInput) setupPhoneField('phone-input');
+                    if (quotePhoneInput) setupPhoneField('quote-phone-input');
+                  }
+                }
+              });
+            });
+          });
+
+          observer.observe(document.body, {
+            childList: true,
+            subtree: true
+          });
+
+          // Store observer for cleanup
+          widgetState.phoneFormattingObserver = observer;
+        },
+
         validateField: field => {
           try {
             const fieldName = field.id || field.name;
@@ -1877,6 +1952,7 @@
                 break;
 
               case 'phone-input':
+              case 'quote-phone-input':
                 if (value) {
                   const cleanPhone = value.replace(/[\s\-\(\)]/g, '');
 
@@ -1889,15 +1965,6 @@
                   } else if (cleanPhone.length > 15) {
                     isValid = false;
                     errorMessage = 'Phone number is too long';
-                  } else {
-                    // Format suggestion
-                    if (cleanPhone.length === 10 && !value.includes('(')) {
-                      const formatted = `(${cleanPhone.slice(0, 3)}) ${cleanPhone.slice(3, 6)}-${cleanPhone.slice(6)}`;
-                      progressiveFormManager.suggestFieldFormat(
-                        field,
-                        formatted
-                      );
-                    }
                   }
                 }
                 break;
@@ -2165,6 +2232,66 @@
                 progressiveFormManager.calculateStepCompletion().overall,
               cleanupReason: 'widget_closed',
             });
+          }
+        },
+
+        // Phone formatting utilities
+        formatPhoneNumber: (value) => {
+          // Remove all non-numeric characters
+          const cleanValue = value.replace(/\D/g, '');
+          
+          // Handle different lengths of input
+          if (cleanValue.length === 0) {
+            return '';
+          } else if (cleanValue.length <= 3) {
+            return `(${cleanValue}`;
+          } else if (cleanValue.length <= 6) {
+            return `(${cleanValue.slice(0, 3)}) ${cleanValue.slice(3)}`;
+          } else if (cleanValue.length <= 10) {
+            return `(${cleanValue.slice(0, 3)}) ${cleanValue.slice(3, 6)}-${cleanValue.slice(6)}`;
+          } else {
+            // Limit to 10 digits for US phone numbers
+            return `(${cleanValue.slice(0, 3)}) ${cleanValue.slice(3, 6)}-${cleanValue.slice(6, 10)}`;
+          }
+        },
+
+        handlePhoneInput: (input) => {
+          // Store cursor position
+          const cursorPosition = input.selectionStart;
+          const oldValue = input.value;
+          const oldLength = oldValue.length;
+          
+          // Format the phone number
+          const formattedValue = progressiveFormManager.formatPhoneNumber(input.value);
+          
+          // Only update if value changed to avoid infinite loops
+          if (formattedValue !== oldValue) {
+            input.value = formattedValue;
+            
+            // Calculate new cursor position
+            const newLength = formattedValue.length;
+            const lengthDiff = newLength - oldLength;
+            let newCursorPosition = cursorPosition + lengthDiff;
+            
+            // Adjust cursor position to avoid placing it on formatting characters
+            if (newCursorPosition > 0 && newCursorPosition < formattedValue.length) {
+              const charAtCursor = formattedValue[newCursorPosition - 1];
+              if (charAtCursor === '(' || charAtCursor === ')' || charAtCursor === ' ' || charAtCursor === '-') {
+                newCursorPosition = Math.min(newCursorPosition + 1, formattedValue.length);
+              }
+            }
+            
+            // Set cursor position
+            setTimeout(() => {
+              input.setSelectionRange(newCursorPosition, newCursorPosition);
+            }, 0);
+            
+            // Trigger floating label update
+            setTimeout(() => {
+              if (typeof window.updateAllFloatingLabels === 'function') {
+                window.updateAllFloatingLabels();
+              }
+            }, 0);
           }
         },
       };
@@ -2445,6 +2572,101 @@
       .dh-form-input:focus { 
         border-color: ${primaryColor}; 
         box-shadow: 0 0 0 3px ${primaryFocus}; 
+      }
+      
+      /* Floating Label Styles */
+      .dh-floating-input {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      
+      .dh-floating-input .dh-form-input {
+        padding: 20px 16px 8px 16px;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+      
+      .dh-input-with-icon .dh-form-input {
+        padding-left: 50px;
+      }
+      
+      .dh-floating-label {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: ${backgroundColor};
+        padding: 0 4px;
+        color: #9ca3af;
+        font-size: 16px;
+        font-weight: 400;
+        pointer-events: none;
+        transition: all 0.2s ease-in-out;
+        z-index: 1;
+        font-family: Outfit;
+      }
+      
+      .dh-input-with-icon .dh-floating-label {
+        left: 50px;
+      }
+      
+      /* Floating state - when focused or has content */
+      .dh-floating-input .dh-form-input:focus + .dh-floating-label,
+      .dh-floating-input .dh-form-input:not(:placeholder-shown) + .dh-floating-label {
+        top: 12px;
+        transform: translateY(-50%);
+        font-size: 12px;
+        font-weight: 500;
+        color: ${primaryColor};
+        left: 12px;
+      }
+      
+      .dh-input-with-icon .dh-form-input:focus + .dh-floating-label,
+      .dh-input-with-icon .dh-form-input:not(:placeholder-shown) + .dh-floating-label {
+        left: 46px;
+      }
+      
+      /* Focused input border */
+      .dh-floating-input .dh-form-input:focus {
+        border-color: ${primaryColor};
+        box-shadow: 0 0 0 2px ${primaryFocus};
+      }
+      
+      /* Input icon styles */
+      .dh-input-icon {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6b7280;
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      .dh-input-icon svg {
+        display: block;
+      }
+      
+      .dh-floating-input .dh-form-input:focus ~ .dh-input-icon {
+        color: ${primaryColor};
+      }
+      
+      /* Textarea specific styles */
+      .dh-floating-input textarea.dh-form-input {
+        resize: vertical;
+        min-height: 80px;
+        padding-top: 24px;
+        padding-bottom: 12px;
+      }
+      
+      .dh-floating-input textarea.dh-form-input + .dh-floating-label {
+        top: 24px;
+      }
+      
+      .dh-floating-input textarea.dh-form-input:focus + .dh-floating-label,
+      .dh-floating-input textarea.dh-form-input:not(:placeholder-shown) + .dh-floating-label {
+        top: 8px;
       }
       .dh-prefilled-field { 
         background: #f0f9ff !important;
@@ -4861,20 +5083,28 @@
         
         <!-- Editable address form fields -->
         <div class="dh-form-group">
-          <label class="dh-form-label">Street Address</label>
-          <input type="text" class="dh-form-input" id="street-input" placeholder="123 Main Street">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="street-input" placeholder=" ">
+            <label class="dh-floating-label" for="street-input">Street Address</label>
+          </div>
         </div>
         <div class="dh-form-group">
-          <label class="dh-form-label">City</label>
-          <input type="text" class="dh-form-input" id="city-input" placeholder="Your City">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="city-input" placeholder=" ">
+            <label class="dh-floating-label" for="city-input">City</label>
+          </div>
         </div>
         <div class="dh-form-group">
-          <label class="dh-form-label">State</label>
-          <input type="text" class="dh-form-input" id="state-input" placeholder="State">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="state-input" placeholder=" ">
+            <label class="dh-floating-label" for="state-input">State</label>
+          </div>
         </div>
         <div class="dh-form-group">
-          <label class="dh-form-label">ZIP Code</label>
-          <input type="text" class="dh-form-input" id="zip-input" placeholder="12345">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="zip-input" placeholder=" ">
+            <label class="dh-floating-label" for="zip-input">ZIP Code</label>
+          </div>
         </div>
       </div>
       </div>
@@ -4937,36 +5167,73 @@
       <p class="dh-step-instruction">Fill out the details below and we&apos;ll get you taken care of.</p>
       <div class="dh-form-row">
         <div class="dh-form-group">
-          <label class="dh-form-label">First Name</label>
-          <input type="text" class="dh-form-input" id="first-name-input" placeholder="John">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="first-name-input" placeholder=" ">
+            <label class="dh-floating-label" for="first-name-input">First Name</label>
+          </div>
         </div>
         <div class="dh-form-group">
-          <label class="dh-form-label">Last Name</label>
-          <input type="text" class="dh-form-input" id="last-name-input" placeholder="Smith">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="last-name-input" placeholder=" ">
+            <label class="dh-floating-label" for="last-name-input">Last Name</label>
+          </div>
         </div>
       </div>
       <div class="dh-form-group">
-        <label class="dh-form-label">Email Address</label>
-        <input type="email" class="dh-form-input" id="email-input" placeholder="john@example.com">
+        <div class="dh-floating-input dh-input-with-icon">
+          <div class="dh-input-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <input type="email" class="dh-form-input" id="email-input" placeholder=" ">
+          <label class="dh-floating-label" for="email-input">Email Address</label>
+        </div>
       </div>
       <div class="dh-form-group">
-        <label class="dh-form-label">Cell Phone Number</label>
-        <input type="tel" class="dh-form-input" id="phone-input" placeholder="(555) 123-4567">
+        <div class="dh-floating-input dh-input-with-icon">
+          <div class="dh-input-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </div>
+          <input type="tel" class="dh-form-input" id="phone-input" placeholder=" ">
+          <label class="dh-floating-label" for="phone-input">Cell Phone Number</label>
+        </div>
       </div>
       <div class="dh-form-row">
         <div class="dh-form-group">
-          <label class="dh-form-label">Preferred Start Date</label>
-          <input type="date" class="dh-form-input" id="start-date-input">
+          <div class="dh-floating-input dh-input-with-icon">
+            <div class="dh-input-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <input type="date" class="dh-form-input" id="start-date-input" placeholder=" ">
+            <label class="dh-floating-label" for="start-date-input">Preferred Start Date</label>
+          </div>
         </div>
         <div class="dh-form-group">
-          <label class="dh-form-label">Preferred Arrival Time</label>
-          <select class="dh-form-input" id="arrival-time-input">
-            <option value="">Select time</option>
-            <option value="morning">Morning (8 AM - 12 PM)</option>
-            <option value="afternoon">Afternoon (12 PM - 5 PM)</option>
-            <option value="evening">Evening (5 PM - 8 PM)</option>
-            <option value="anytime">Anytime</option>
-          </select>
+          <div class="dh-floating-input dh-input-with-icon">
+            <div class="dh-input-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12,6 12,12 16,14"/>
+              </svg>
+            </div>
+            <select class="dh-form-input" id="arrival-time-input">
+              <option value=""></option>
+              <option value="morning">Morning (8 AM - 12 PM)</option>
+              <option value="afternoon">Afternoon (12 PM - 5 PM)</option>
+              <option value="evening">Evening (5 PM - 8 PM)</option>
+              <option value="anytime">Anytime</option>
+            </select>
+            <label class="dh-floating-label" for="arrival-time-input">Select Preferred Arrival Time</label>
+          </div>
         </div>
       </div>
       <div class="dh-form-group">
@@ -4993,21 +5260,40 @@
       <p class="dh-step-instruction">We just need a few details to prepare your personalized quote.</p>
       <div class="dh-form-row">
         <div class="dh-form-group">
-          <label class="dh-form-label">First Name</label>
-          <input type="text" class="dh-form-input" id="quote-first-name-input" placeholder="John">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="quote-first-name-input" placeholder=" ">
+            <label class="dh-floating-label" for="quote-first-name-input">First Name</label>
+          </div>
         </div>
         <div class="dh-form-group">
-          <label class="dh-form-label">Last Name</label>
-          <input type="text" class="dh-form-input" id="quote-last-name-input" placeholder="Smith">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="quote-last-name-input" placeholder=" ">
+            <label class="dh-floating-label" for="quote-last-name-input">Last Name</label>
+          </div>
         </div>
       </div>
       <div class="dh-form-group">
-        <label class="dh-form-label">Email Address</label>
-        <input type="email" class="dh-form-input" id="quote-email-input" placeholder="john@example.com">
+        <div class="dh-floating-input dh-input-with-icon">
+          <div class="dh-input-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <input type="email" class="dh-form-input" id="quote-email-input" placeholder=" ">
+          <label class="dh-floating-label" for="quote-email-input">Email Address</label>
+        </div>
       </div>
       <div class="dh-form-group">
-        <label class="dh-form-label">Phone Number</label>
-        <input type="tel" class="dh-form-input" id="quote-phone-input" placeholder="(555) 123-4567">
+        <div class="dh-floating-input dh-input-with-icon">
+          <div class="dh-input-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </div>
+          <input type="tel" class="dh-form-input" id="quote-phone-input" placeholder=" ">
+          <label class="dh-floating-label" for="quote-phone-input">Phone Number</label>
+        </div>
       </div>
       </div>
       <div class="dh-form-button-group">
@@ -5070,7 +5356,10 @@
         </div>
       </div>
       <div class="dh-form-group">
-        <textarea class="dh-form-input" id="exit-feedback" placeholder="Any other feedback?" rows="3"></textarea>
+        <div class="dh-floating-input">
+          <textarea class="dh-form-input" id="exit-feedback" placeholder=" " rows="3"></textarea>
+          <label class="dh-floating-label" for="exit-feedback">Any other feedback?</label>
+        </div>
       </div>
       <div class="dh-form-button-group">
         <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
@@ -6161,6 +6450,13 @@
             if (displayMode) displayMode.style.display = 'block';
             if (addressNext) addressNext.disabled = false;
           }
+
+          // Update floating labels for pre-filled address fields
+          setTimeout(() => {
+            if (typeof window.updateAllFloatingLabels === 'function') {
+              window.updateAllFloatingLabels();
+            }
+          }, 0);
         } catch (error) {
           console.error('Error populating address fields:', error);
         }
@@ -6838,6 +7134,13 @@
 
                 // Enable next button
                 addressNext.disabled = false;
+
+                // Update floating labels for pre-filled address fields
+                setTimeout(() => {
+                  if (typeof window.updateAllFloatingLabels === 'function') {
+                    window.updateAllFloatingLabels();
+                  }
+                }, 0);
 
                 hideSuggestions();
 
@@ -7722,6 +8025,149 @@
         };
       };
 
+      // Initialize floating label functionality
+      const initializeFloatingLabels = () => {
+        // Function to check if input has value and update label state
+        const updateFloatingLabel = input => {
+          const label = input.nextElementSibling;
+          if (label && label.classList.contains('dh-floating-label')) {
+            if (input.value.trim() !== '' || input === document.activeElement) {
+              label.style.top = '12px';
+              label.style.transform = 'translateY(-50%)';
+              label.style.fontSize = '12px';
+              label.style.fontWeight = '500';
+              label.style.color =
+                widgetState.widgetConfig?.colors?.primary || '#3b82f6';
+            } else {
+              label.style.top = '50%';
+              label.style.transform = 'translateY(-50%)';
+              label.style.fontSize = '16px';
+              label.style.fontWeight = '400';
+              label.style.color = '#9ca3af';
+            }
+          }
+        };
+
+        // Special handling for textareas
+        const updateTextareaLabel = textarea => {
+          const label = textarea.nextElementSibling;
+          if (label && label.classList.contains('dh-floating-label')) {
+            if (
+              textarea.value.trim() !== '' ||
+              textarea === document.activeElement
+            ) {
+              label.style.top = '8px';
+              label.style.transform = 'none';
+              label.style.fontSize = '12px';
+              label.style.fontWeight = '500';
+              label.style.color =
+                widgetState.widgetConfig?.colors?.primary || '#3b82f6';
+            } else {
+              label.style.top = '24px';
+              label.style.transform = 'none';
+              label.style.fontSize = '16px';
+              label.style.fontWeight = '400';
+              label.style.color = '#9ca3af';
+            }
+          }
+        };
+
+        // Set up event listeners for all floating inputs
+        const setupFloatingInputListeners = () => {
+          const floatingInputs = document.querySelectorAll(
+            '.dh-floating-input .dh-form-input'
+          );
+
+          floatingInputs.forEach(input => {
+            // Initial state check
+            if (input.tagName.toLowerCase() === 'textarea') {
+              updateTextareaLabel(input);
+            } else {
+              updateFloatingLabel(input);
+            }
+
+            // Focus event
+            input.addEventListener('focus', () => {
+              if (input.tagName.toLowerCase() === 'textarea') {
+                updateTextareaLabel(input);
+              } else {
+                updateFloatingLabel(input);
+              }
+            });
+
+            // Blur event
+            input.addEventListener('blur', () => {
+              if (input.tagName.toLowerCase() === 'textarea') {
+                updateTextareaLabel(input);
+              } else {
+                updateFloatingLabel(input);
+              }
+            });
+
+            // Input event for real-time updates
+            input.addEventListener('input', () => {
+              if (input.tagName.toLowerCase() === 'textarea') {
+                updateTextareaLabel(input);
+              } else {
+                updateFloatingLabel(input);
+              }
+            });
+
+            // Change event for select elements
+            if (input.tagName.toLowerCase() === 'select') {
+              input.addEventListener('change', () => {
+                updateFloatingLabel(input);
+              });
+            }
+          });
+        };
+
+        // Initial setup
+        setupFloatingInputListeners();
+
+        // Re-setup when DOM changes (for dynamic content)
+        const observer = new MutationObserver(mutations => {
+          let shouldResetup = false;
+          mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+              if (
+                node.nodeType === 1 &&
+                (node.classList?.contains('dh-floating-input') ||
+                  node.querySelector?.('.dh-floating-input'))
+              ) {
+                shouldResetup = true;
+              }
+            });
+          });
+
+          if (shouldResetup) {
+            setTimeout(setupFloatingInputListeners, 100);
+          }
+        });
+
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+        });
+
+        // Store observer for cleanup if needed
+        widgetState.floatingLabelObserver = observer;
+
+        // Public function to manually trigger floating label updates (for programmatic value changes)
+        window.updateAllFloatingLabels = () => {
+          const floatingInputs = document.querySelectorAll(
+            '.dh-floating-input .dh-form-input'
+          );
+          floatingInputs.forEach(input => {
+            if (input.tagName.toLowerCase() === 'textarea') {
+              updateTextareaLabel(input);
+            } else {
+              updateFloatingLabel(input);
+            }
+          });
+        };
+      };
+
       // Initialize widget
       const init = async () => {
         try {
@@ -7826,6 +8272,9 @@
               return;
             }
           }
+
+          // Initialize floating label functionality
+          initializeFloatingLabels();
 
           // Initialize first step
           showStep('welcome');
