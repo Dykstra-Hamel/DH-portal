@@ -112,7 +112,7 @@ Aiden`;
     return NextResponse.json({
       success: true,
       message: 'SMS sent successfully to ' + e164Phone,
-      smsId: responseData.data?.id || 'unknown'
+      smsId: (responseData as any)?.data?.id || 'unknown'
     }, { headers: corsHeaders });
 
   } catch (error) {
