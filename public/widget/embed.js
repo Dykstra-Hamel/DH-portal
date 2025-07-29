@@ -4485,11 +4485,11 @@
           },
           cockroaches: {
             default: 'cockroaches',
-            comparison: 'cockroaches',
+            comparison: 'roaches',
           },
           roaches: {
             default: 'cockroaches',
-            comparison: 'cockroaches',
+            comparison: 'roaches',
           },
           rodents: {
             default: 'rodents',
@@ -4589,6 +4589,17 @@
               'default'
             );
             addressPestType.textContent = pestText;
+          }
+
+          const addressPestTypeTwo = document.getElementById(
+            'address-pest-type-two'
+          );
+          if (addressPestTypeTwo) {
+            const pestText = getPestTypeDisplay(
+              widgetState.formData.pestType,
+              'comparison'
+            );
+            addressPestTypeTwo.textContent = pestText;
           }
 
           // Update address step pest icon
@@ -4815,7 +4826,7 @@
       <h2 class="dh-step-heading">Yuck, <span id="address-pest-type">pests</span>! We hate those. No worries, we got you!</h2>
       <!-- Address Search Mode (Initial State) -->
       <div id="address-search-mode">
-        <p class="dh-step-instruction">Dealing with pests is a hassle, but our licensed and trained techs will have you free of ants in no time! </p>
+        <p class="dh-step-instruction">Dealing with pests is a hassle, but our licensed and trained techs will have you free of <span id="address-pest-type-two">pests</span> in no time!</p>
         <div class="dh-form-group">
           <div class="dh-address-autocomplete">
             <label class="dh-address-form-label" for="address-search-input">Let's make sure you're in our service area.</label>
