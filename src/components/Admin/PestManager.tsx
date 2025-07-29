@@ -195,7 +195,7 @@ export default function PestManager() {
           name: pest.name,
           slug: pest.slug,
           description: pest.description,
-          category: pest.category,
+          category_id: pest.category_id,
           icon_svg: pest.icon_svg,
           is_active: !pest.is_active
         }),
