@@ -12,6 +12,7 @@ import CallsManager from './CallsManager';
 import PartialLeadsManager from './PartialLeadsManager';
 import AttributionAnalytics from './AttributionAnalytics';
 import FormAnalytics from './FormAnalytics';
+import PestManager from './PestManager';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -28,7 +29,8 @@ type AdminSection =
   | 'calls'
   | 'partial-leads'
   | 'attribution-analytics'
-  | 'form-analytics';
+  | 'form-analytics'
+  | 'pest-management';
 
 export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [activeSection, setActiveSection] = useState<AdminSection>('users');
@@ -55,6 +57,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <AttributionAnalytics />;
       case 'form-analytics':
         return <FormAnalytics />;
+      case 'pest-management':
+        return <PestManager />;
       default:
         return <UsersManager />;
     }
@@ -127,6 +131,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           onClick={() => setActiveSection('form-analytics')}
         >
           Form Analytics
+        </button>
+        <button
+          className={`${styles.navButton} ${activeSection === 'pest-management' ? styles.active : ''}`}
+          onClick={() => setActiveSection('pest-management')}
+        >
+          Pest Management
         </button>
       </nav>
 

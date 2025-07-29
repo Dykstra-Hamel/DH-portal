@@ -26,17 +26,26 @@ export async function authenticatedFetch(
   });
 
   if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ error: 'Request failed' }));
-    console.error('API Error:', {
+    let errorData: any;
+    try {
+      errorData = await response.json();
+    } catch (parseError) {
+      errorData = { 
+        error: 'Request failed - invalid JSON response',
+        responseText: await response.text().catch(() => 'Unable to read response')
+      };
+    }
+    
+    const errorDetails = {
       url,
       status: response.status,
       statusText: response.statusText,
       error: errorData,
       headers: Object.fromEntries(response.headers.entries()),
-    });
-    throw new Error(errorData.error || `HTTP ${response.status}`);
+    };
+    
+    console.error('API Error:', errorDetails);
+    throw new Error(errorData?.error || errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
   }
 
   return response.json();

@@ -4,18 +4,19 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 interface PartialSaveRequest {
   companyId: string;
   sessionId: string;
-  stepCompleted: 'address_validated' | 'contact_started';
+  stepCompleted: 'pest_issue_completed' | 'urgency_completed' | 'address_validated' | 'contact_started';
   formData: {
-    pestIssue?: string;
-    address: string;
-    addressDetails: {
-      street: string;
-      city: string;
-      state: string;
-      zip: string;
+    pestType?: string;
+    urgency?: string;
+    address?: string;
+    addressDetails?: {
+      street?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
     };
-    latitude: number;
-    longitude: number;
+    latitude: number | null;
+    longitude: number | null;
     contactInfo?: {
       name?: string;
       phone?: string;
@@ -97,11 +98,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate coordinate data
-    if (typeof formData.latitude !== 'number' || typeof formData.longitude !== 'number') {
+    // Validate coordinate data - only required for steps after address entry
+    const requiresCoordinates = !['pest_issue_completed', 'urgency_completed'].includes(stepCompleted);
+    if (requiresCoordinates && (typeof formData.latitude !== 'number' || typeof formData.longitude !== 'number')) {
       return NextResponse.json(
         { 
-          error: 'Invalid coordinate data: latitude and longitude must be numbers',
+          error: 'Invalid coordinate data: latitude and longitude must be numbers for this step',
           success: false
         },
         {

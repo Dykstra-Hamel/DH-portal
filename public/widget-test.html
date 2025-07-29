@@ -243,16 +243,48 @@
         </div>
         
         <div class="example-code">
-          <h4>🎨 Custom Styled Widget</h4>
+          <h4>🎨 Custom Styled Widget (No Flash Test)</h4>
           <code id="example-custom">&lt;script 
   src="/widget.js"
   data-company-id="22222222-2222-2222-2222-222222222222"
   data-base-url="http://localhost:3000"
   data-header-text="Get Your Custom Quote"
   data-primary-color="#ff6b35"
+  data-secondary-color="#2d3748"
   data-background-color="#f9fafb"
+  data-text-color="#1a202c"
+  data-welcome-title="Welcome!"
+  data-welcome-description="Get your custom estimate in seconds."
 &gt;&lt;/script&gt;</code>
           <button onclick="useExample('example-custom')">Use This</button>
+        </div>
+        
+        <div class="example-code">
+          <h4>⚡ Performance Test (Cached Config)</h4>
+          <code id="example-cached">&lt;script 
+  src="/widget.js"
+  data-company-id="22222222-2222-2222-2222-222222222222"
+  data-base-url="http://localhost:3000"
+  data-primary-color="#10b981"
+  data-secondary-color="#059669"
+  data-background-color="#ecfdf5"
+  data-text-color="#047857"
+&gt;&lt;/script&gt;</code>
+          <button onclick="useExample('example-cached')">Use This</button>
+        </div>
+        
+        <div class="example-code">
+          <h4>🚀 Flow Test (Auto-Advance Steps)</h4>
+          <code id="example-flow">&lt;script 
+  src="/widget.js"
+  data-company-id="22222222-2222-2222-2222-222222222222"
+  data-base-url="http://localhost:3000"
+  data-primary-color="#8b5cf6"
+  data-secondary-color="#7c3aed"
+  data-background-color="#faf5ff"
+  data-text-color="#581c87"
+&gt;&lt;/script&gt;</code>
+          <button onclick="useExample('example-flow')">Use This</button>
         </div>
       </div>
       
@@ -338,6 +370,7 @@ Example:
         }
         
         debugLog('Testing new widget code...');
+        debugLog('Timestamp: Widget load started at ' + Date.now());
         
         // Clear existing widget state
         if (window.DHWidgetLoaded) {
@@ -347,6 +380,15 @@ Example:
         
         // Clear container
         container.innerHTML = '<p style="color: #64748b;">Loading widget...</p>';
+        
+        // Clear localStorage cache for fresh test
+        try {
+          const cacheKeys = Object.keys(localStorage).filter(key => key.startsWith('dh_widget_config_'));
+          cacheKeys.forEach(key => localStorage.removeItem(key));
+          debugLog(`Cleared ${cacheKeys.length} cached configs for fresh test`);
+        } catch (e) {
+          debugLog('Cache clear failed (non-critical): ' + e.message);
+        }
         
         // Remove any existing modals
         const existingModals = document.querySelectorAll('.dh-modal-overlay');
@@ -428,6 +470,26 @@ Example:
         window.location.reload();
       }
 
+      // Monitor for step changes and data saving
+      let lastStep = '';
+      const observeStepChanges = () => {
+        const checkStep = () => {
+          const currentStep = document.querySelector('.dh-form-step:not([style*="display: none"])');
+          if (currentStep && currentStep.id !== lastStep) {
+            lastStep = currentStep.id;
+            debugLog(`Step changed to: ${currentStep.id}`);
+            
+            // Log form data if available
+            if (window.widgetState && window.widgetState.formData) {
+              debugLog(`Form data: ${JSON.stringify(window.widgetState.formData)}`);
+            }
+          }
+        };
+        
+        // Check every 500ms for step changes
+        setInterval(checkStep, 500);
+      };
+
       // Monitor for errors
       window.addEventListener('error', function(e) {
         debugLog(`JavaScript Error: ${e.message}`, 'error');
@@ -440,6 +502,7 @@ Example:
       // Initialize
       document.addEventListener('DOMContentLoaded', function() {
         debugLog('Widget test page loaded and ready');
+        observeStepChanges();
       });
     </script>
   </body>

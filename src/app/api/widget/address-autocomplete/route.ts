@@ -250,6 +250,34 @@ export async function POST(request: NextRequest) {
           return null;
         }
 
+        // Enhanced debugging for coordinate accuracy
+        console.log('🏠 GOOGLE PLACES API RESPONSE:', {
+          formattedAddress: detailsData.formattedAddress,
+          coordinates: { 
+            lat: detailsData.location?.latitude, 
+            lng: detailsData.location?.longitude 
+          },
+          addressTypes: suggestion.placePrediction.types,
+          isStreetAddress: suggestion.placePrediction.types?.includes('street_address'),
+          placeId: placeId
+        });
+
+        // Coordinate quality validation
+        const isStreetAddress = suggestion.placePrediction.types?.includes('street_address');
+        const hasLocation = detailsData.location?.latitude && detailsData.location?.longitude;
+        
+        if (!isStreetAddress) {
+          console.warn('Address may not be rooftop-accurate - not a street address:', {
+            types: suggestion.placePrediction.types,
+            formattedAddress: detailsData.formattedAddress
+          });
+        }
+        
+        if (!hasLocation) {
+          console.error('No coordinates available for place:', placeId);
+          return null;
+        }
+
         // Transform to old format for compatibility
         return {
           place_id: placeId,
