@@ -544,7 +544,11 @@ export async function POST(request: NextRequest) {
     // Attempt auto-call if enabled (don't fail lead creation if this fails)
     let autoCallEnabled = false;
     try {
-      autoCallEnabled = await shouldAutoCall(submission.companyId);
+      // TEMPORARY: Disable auto-calling
+      console.log('Auto-calling temporarily disabled');
+      autoCallEnabled = false; // Force disable
+      
+      // autoCallEnabled = await shouldAutoCall(submission.companyId);
 
       if (autoCallEnabled) {
         // Extract address components for the call
