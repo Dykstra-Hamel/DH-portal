@@ -6940,10 +6940,9 @@
                     data.suggestions &&
                     data.suggestions.length > 0
                   ) {
-                    const lowestPrice = Math.min(
-                      ...data.suggestions.map(plan => plan.initial_price)
-                    );
-                    offerPrice.textContent = `$${lowestPrice}`;
+                    // Use the first plan's price since API sorts by best coverage match
+                    const bestMatchPrice = data.suggestions[0].initial_price;
+                    offerPrice.textContent = `$${bestMatchPrice}`;
                   } else {
                     offerPrice.textContent = '$'; // Fallback price
                   }
