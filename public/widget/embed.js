@@ -3677,6 +3677,14 @@
         background: radial-gradient(59.99% 58.34% at 70.4% 74.11%, ${primaryColor} 0%, rgba(255, 255, 255, 0.90) 100%);
       }
 
+      .dh-welcome-svg-background img {
+        display: block;
+        position: relative;
+        width: 100%;
+        height: auto;
+        pointer-events: none;
+      }
+
       .dh-progress-bar {
         display: flex;
         align-items: center;
@@ -4352,7 +4360,7 @@
         // Set welcome screen background in bottom corner
         const bgSvg = document.createElement('div');
         bgSvg.className = 'dh-welcome-svg-background';
-        // bgSvg.innerHTML = ``
+        bgSvg.innerHTML = `<img src="https://cwmckkfkcjxznkpdxgie.supabase.co/storage/v1/object/public/brand-assets/general/background-pests.svg" alt="" />`;
 
         // Assemble welcome container
         welcomeContainer.appendChild(welcomeContent);
