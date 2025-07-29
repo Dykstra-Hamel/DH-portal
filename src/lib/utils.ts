@@ -74,3 +74,33 @@ export const isValidPhoneNumber = (
 ): boolean => {
   return normalizePhoneNumber(phoneNumber) !== null;
 };
+
+/**
+ * Converts a phone number to E.164 format for SMS/calling
+ * @param phoneNumber - The phone number to convert
+ * @returns E.164 formatted phone number (+1xxxxxxxxxx) or null if invalid
+ */
+export const toE164PhoneNumber = (
+  phoneNumber: string | null | undefined
+): string | null => {
+  if (!phoneNumber) return null;
+
+  // Remove all non-digit characters
+  const digits = phoneNumber.replace(/\D/g, '');
+  
+  // Handle US numbers
+  let cleanDigits = digits;
+  
+  // Remove country code if present (1 at the beginning)
+  if (cleanDigits.startsWith('1') && cleanDigits.length === 11) {
+    cleanDigits = cleanDigits.substring(1);
+  }
+  
+  // Must be exactly 10 digits for a valid US phone number
+  if (cleanDigits.length !== 10) {
+    return null;
+  }
+  
+  // Return E.164 format with US country code
+  return `+1${cleanDigits}`;
+};
