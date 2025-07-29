@@ -42,3 +42,12 @@ export interface EmailNotificationConfig {
   subjectLine?: string;
   enabled: boolean;
 }
+
+export interface QuoteEmailData {
+  firstName: string;
+  pestType: string;
+  address: string;
+  urgency: string;
+  companyName?: string;
+  customerEmail: string;
+}

@@ -1,23 +1,42 @@
-import { Resend } from 'resend';
+// import { Resend } from 'resend';
 import { EmailRecipient, LeadNotificationData } from './types';
 import { generateLeadCreatedEmailTemplate } from './templates/lead-created';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from './index';
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+// const resend = new Resend(process.env.RESEND_API_KEY!);
 
 export async function sendLeadCreatedNotifications(
   recipients: string[],
   leadData: LeadNotificationData,
   emailConfig?: {
     subjectLine?: string;
-  }
+  },
+  companyId?: string
 ) {
   try {
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL || 'notifications@yourdomain.com';
-    const fromName = process.env.RESEND_FROM_NAME || 'PCOcentral';
+    // Use MailerSend with hard-coded from email
+    const fromEmail = MAILERSEND_FROM_EMAIL;
+    let fromName = 'Northwest Exterminating';
 
-    // Format from field with name
-    const fromField = `${fromName} <${fromEmail}>`;
+    if (companyId) {
+      try {
+        const supabase = createAdminClient();
+        
+        // Get company name
+        const { data: company } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('id', companyId)
+          .single();
+
+        if (company) {
+          fromName = company.name;
+        }
+      } catch (error) {
+        console.warn('Failed to load company name, using default:', error);
+      }
+    }
 
     const results = [];
 
@@ -33,19 +52,46 @@ export async function sendLeadCreatedNotifications(
         // Generate subject line
         const subject = generateSubjectLine(leadData, emailConfig?.subjectLine);
 
-        const { data, error } = await resend.emails.send({
-          from: fromField,
-          to: [email],
+        // Send email using MailerSend
+        const mailersendPayload = {
+          from: {
+            email: fromEmail,
+            name: fromName
+          },
+          to: [
+            {
+              email: email
+            }
+          ],
           subject: subject,
-          html: generateLeadCreatedEmailTemplate(recipientName, leadData),
+          html: generateLeadCreatedEmailTemplate(recipientName, leadData)
+        };
+
+        const response = await fetch('https://api.mailersend.com/v1/email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
+          },
+          body: JSON.stringify(mailersendPayload),
         });
 
-        if (error) {
-          console.error(`Failed to send lead notification to ${email}:`, error);
-          results.push({ email, success: false, error: error.message });
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error(`Failed to send lead notification to ${email}:`, response.status, errorData);
+          results.push({ email, success: false, error: `MailerSend error: ${response.status}` });
         } else {
-          console.log(`Lead notification sent successfully to ${email}:`, data);
-          results.push({ email, success: true, data });
+          let responseData: any = {};
+          try {
+            const responseText = await response.text();
+            if (responseText.trim()) {
+              responseData = JSON.parse(responseText);
+            }
+          } catch (error) {
+            console.log('MailerSend response was not JSON, but email may have sent successfully');
+          }
+          
+          results.push({ email, success: true, data: responseData });
         }
       } catch (emailError) {
         console.error(`Error sending email to ${email}:`, emailError);
@@ -61,9 +107,6 @@ export async function sendLeadCreatedNotifications(
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
 
-    console.log(
-      `Lead notification results: ${successCount} sent, ${failureCount} failed`
-    );
 
     return {
       success: successCount > 0,

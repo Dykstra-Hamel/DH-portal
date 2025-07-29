@@ -128,7 +128,7 @@ export async function getCompanyCoordinates(company: Company): Promise<GeocodeRe
   const addressString = buildAddressString(company);
   
   if (!addressString || addressString.trim().length < 5) {
-    console.log('Company has insufficient address data, using fallback coordinates');
+    console.warn('Company has insufficient address data, using fallback coordinates');
     return FALLBACK_COORDINATES;
   }
 
@@ -136,7 +136,7 @@ export async function getCompanyCoordinates(company: Company): Promise<GeocodeRe
   const geocodeResult = await geocodeAddress(addressString);
   
   if (!geocodeResult) {
-    console.log('Geocoding failed for company address, using fallback coordinates');
+    console.warn('Geocoding failed for company address, using fallback coordinates');
     return FALLBACK_COORDINATES;
   }
 

@@ -25,6 +25,7 @@ This is a Next.js application with Supabase authentication supporting Google OAu
 - The SCSS files should live in a folder with the component it is intended to style. for example, for a hero component, there should be a Hero folder in the components folder, with both a hero.tsx, and a hero.modules.scss file within it.
 - Prefer functional components with hooks
 - Use absolute imports with `@/` prefix
+- when we ask for you to get our code ready for production, look specifically at the code that has been changed on the current branch and look for improvements in: Security Vulnerabilities, ineffeciencies or redundencies, and unnecessary console logging.
 
 ## Local Testing
 
