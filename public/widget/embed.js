@@ -6919,7 +6919,7 @@
             // Update price based on available service plans
             if (offerPrice) {
               // Get suggested plans to show starting price
-              fetch('/api/widget/suggested-plans', {
+              fetch(config.baseUrl + '/api/widget/suggested-plans', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -7008,7 +7008,7 @@
                 }
 
                 // Get suggested plans
-                const response = await fetch('/api/widget/suggested-plans', {
+                const response = await fetch(config.baseUrl + '/api/widget/suggested-plans', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
