@@ -106,6 +106,7 @@ interface ServicePlan {
   highlight_badge: string | null;
   color_scheme: any;
   requires_quote: boolean;
+  plan_image_url: string | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;

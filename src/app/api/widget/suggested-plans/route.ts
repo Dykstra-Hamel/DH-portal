@@ -41,6 +41,7 @@ interface PlanSuggestion {
   highlight_badge: string | null;
   color_scheme: any;
   requires_quote: boolean;
+  plan_image_url: string | null;
   coverage_match: {
     covered_pests: number;
     total_selected: number;
@@ -120,6 +121,7 @@ export async function POST(request: NextRequest) {
         highlight_badge,
         color_scheme,
         requires_quote,
+        plan_image_url,
         plan_pest_coverage (
           pest_id,
           coverage_level,
@@ -186,6 +188,7 @@ export async function POST(request: NextRequest) {
         highlight_badge: plan.highlight_badge,
         color_scheme: plan.color_scheme,
         requires_quote: plan.requires_quote,
+        plan_image_url: plan.plan_image_url,
         coverage_match: {
           covered_pests: coveredPests.length,
           total_selected: selectedPests.length,
