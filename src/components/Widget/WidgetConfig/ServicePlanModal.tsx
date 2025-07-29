@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 import styles from './WidgetConfig.module.scss';
 
 interface ServicePlan {
@@ -18,6 +20,7 @@ interface ServicePlan {
   highlight_badge: string | null;
   color_scheme: any;
   requires_quote: boolean;
+  plan_image_url: string | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;
@@ -70,6 +73,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     display_order: 1,
     highlight_badge: '',
     requires_quote: false,
+    plan_image_url: '',
     is_active: true,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
   });
@@ -92,6 +96,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         display_order: plan.display_order,
         highlight_badge: plan.highlight_badge || '',
         requires_quote: plan.requires_quote,
+        plan_image_url: plan.plan_image_url || '',
         is_active: plan.is_active,
         pest_coverage: plan.pest_coverage?.map(pc => ({
           pest_id: pc.pest_id,
@@ -114,6 +119,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         display_order: 1,
         highlight_badge: '',
         requires_quote: false,
+        plan_image_url: '',
         is_active: true,
         pest_coverage: [],
       });
@@ -191,6 +197,71 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   const getPestCoverageLevel = (pestId: string): string => {
     const coverage = formData.pest_coverage.find(pc => pc.pest_id === pestId);
     return coverage?.coverage_level || 'none';
+  };
+
+  // File upload functionality
+  const uploadFile = async (
+    file: File,
+    bucket: string,
+    folder: string
+  ): Promise<string | null> => {
+    try {
+      const supabase = createClient();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()
+        .toString(36)
+        .substring(2, 15)}.${fileExt}`;
+      const filePath = `${folder}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      return null;
+    }
+  };
+
+  const deleteFileFromStorage = async (url: string) => {
+    try {
+      const supabase = createClient();
+      const urlParts = url.split('/');
+      const bucket = urlParts[urlParts.length - 3];
+      const folder = urlParts[urlParts.length - 2];
+      const fileName = urlParts[urlParts.length - 1];
+      const filePath = `${folder}/${fileName}`;
+
+      await supabase.storage.from(bucket).remove([filePath]);
+    } catch (error) {
+      console.error('Error deleting file:', error);
+    }
+  };
+
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // If there's an existing image, delete it from storage first
+    if (formData.plan_image_url) {
+      await deleteFileFromStorage(formData.plan_image_url);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'service-plans');
+    if (url) {
+      handleInputChange('plan_image_url', url);
+      // Clear the input so the same file can be selected again if needed
+      event.target.value = '';
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -365,6 +436,37 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   onChange={(e) => handleInputChange('highlight_badge', e.target.value)}
                   placeholder="e.g., Most Popular, Best Value"
                 />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Plan Image</label>
+                <div className={styles.fileUploadSection}>
+                  <div className={styles.fileUploadInfo}>
+                    <small>
+                      Upload an image to display with this plan. Images are stored in{' '}
+                      <code>
+                        /brand-assets/service-plans/
+                      </code>
+                    </small>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className={styles.fileInput}
+                  />
+                  {formData.plan_image_url && formData.plan_image_url.trim() && (
+                    <div className={styles.imagePreview}>
+                      <Image
+                        src={formData.plan_image_url}
+                        alt="Plan Image"
+                        width={200}
+                        height={120}
+                        style={{ objectFit: 'cover', borderRadius: '8px' }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className={styles.checkboxGroup}>

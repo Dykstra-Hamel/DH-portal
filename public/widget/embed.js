@@ -3236,40 +3236,10 @@
         overflow: hidden;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       }
-      .dh-plan-image-placeholder {
-        position: relative;
-        height: 240px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      .dh-plan-image-actual {
         display: flex;
         align-items: center;
         justify-content: center;
-      }
-      .dh-service-image {
-        width: 80px;
-        height: 80px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 50%;
-        border: 3px solid rgba(255, 255, 255, 0.3);
-      }
-      .dh-carousel-dots {
-        position: absolute;
-        bottom: 16px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 8px;
-      }
-      .dh-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.4);
-        cursor: pointer;
-        transition: all 0.2s ease;
-      }
-      .dh-dot.active {
-        background: white;
-        transform: scale(1.2);
       }
 
       /* Plan Actions */
@@ -4052,6 +4022,20 @@
           padding-bottom: 80px;
         }
 
+        /* iOS-specific safe area handling */
+        .dh-ios-device .dh-form-button-group {
+          padding-bottom: calc(20px + env(safe-area-inset-bottom, 60px));
+        }
+
+        /* Additional iOS styling for specific steps */
+        .dh-ios-device #dh-step-contact .dh-form-button-group {
+          padding-bottom: calc(40px + env(safe-area-inset-bottom, 80px));
+        }
+
+        .dh-ios-device #dh-step-exit-survey .dh-form-button-group {
+          padding-bottom: calc(20px + env(safe-area-inset-bottom, 60px));
+        }
+
         .form-submit-step-back {
           left: 50%;
           transform: translateX(-50%);
@@ -4090,11 +4074,11 @@
           }
 
           .dh-step-heading {
-            font-size: 40px;
+            font-size: 30px;
           }
 
           .dh-step-instruction {
-            font-size: 22px;
+            font-size: 18px;
           }
 
           .dh-address-header {
@@ -4135,6 +4119,10 @@
           .dh-plan-tabs {
             justify-content: flex-start;
             overflow-x: auto;
+          }
+
+          .dh-pest-icon, .dh-pest-option {
+            width: 120px;
           }
 
       }
@@ -5047,9 +5035,11 @@
         outOfServiceStep.className = 'dh-form-step';
         outOfServiceStep.id = 'dh-step-out-of-service';
         outOfServiceStep.innerHTML = `
+        <div class="dh-form-step-content">
       <div class="dh-form-out-of-service">
         <h3>We're sorry, we don't currently service your area</h3>
         <p>Unfortunately, your location is outside our current service area. We're always expanding, so please check back with us in the future!</p>
+      </div>
         <div class="dh-form-button-group">
           <button class="dh-form-btn dh-form-btn-secondary" onclick="changeAddress()">Try Different Address</button>
         </div>
@@ -7008,16 +6998,19 @@
                 }
 
                 // Get suggested plans
-                const response = await fetch(config.baseUrl + '/api/widget/suggested-plans', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    companyId: config.companyId,
-                    selectedPests: [widgetState.formData.pestType],
-                  }),
-                });
+                const response = await fetch(
+                  config.baseUrl + '/api/widget/suggested-plans',
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      companyId: config.companyId,
+                      selectedPests: [widgetState.formData.pestType],
+                    }),
+                  }
+                );
 
                 const data = await response.json();
 
@@ -7113,24 +7106,15 @@
                       <p class="dh-plan-price-detail">Service continues after the initial service at $${plan.recurring_price}/${plan.billing_frequency}.</p>
                     </div>
                   </div>
+                  ${plan.plan_image_url ? `
                   <div class="dh-plan-visual">
                     <div class="dh-plan-image-container">
-                      <div class="dh-plan-image-placeholder">
-                        <div class="dh-image-carousel">
-                          <div class="dh-carousel-slide active">
-                            <div class="dh-placeholder-content">
-                              <div class="dh-service-image"></div>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="dh-carousel-dots">
-                          <span class="dh-dot active"></span>
-                          <span class="dh-dot"></span>
-                          <span class="dh-dot"></span>
-                        </div>
+                      <div class="dh-plan-image-actual">
+                        <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="width: 100%; height: 240px; object-fit: cover; border-radius: 12px;" />
                       </div>
                     </div>
                   </div>
+                  ` : ''}
                   <div class="dh-plan-coverage-icons">
                       <div class="dh-coverage-icon">
                         <span class="dh-coverage-checkmark">✓</span>
@@ -7772,11 +7756,30 @@
         }
       };
 
+      // iOS detection function
+      const isIOS = () => {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      };
+
+      // Apply iOS-specific class for safe area handling
+      const handleIOSStyles = () => {
+        if (isIOS()) {
+          const widgetContainer = document.getElementById('dh-widget-' + config.companyId);
+          if (widgetContainer) {
+            widgetContainer.classList.add('dh-ios-device');
+          }
+        }
+      };
+
       // Wait for DOM to be ready
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', () => {
+          init();
+          handleIOSStyles();
+        });
       } else {
         init();
+        handleIOSStyles();
       }
     } // end initializeWidget function
   } catch (error) {
