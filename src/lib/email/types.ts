@@ -50,4 +50,11 @@ export interface QuoteEmailData {
   urgency: string;
   companyName?: string;
   customerEmail: string;
+  selectedPlan?: {
+    id: string;
+    plan_name: string;
+    initial_price: number;
+    recurring_price: number;
+    billing_frequency: string;
+  };
 }
