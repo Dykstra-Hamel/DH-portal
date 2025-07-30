@@ -955,7 +955,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                     <span
                                       class="tinyMce-placeholder"
                                       style="word-break: break-word"
-                                      >Intitial Cost: ${initialPrice}</span
+                                      >${recurringPrice}</span
                                     >
                                   </h1>
                                 </td>
@@ -1000,8 +1000,8 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                     "
                                   >
                                     <p align="center" style="margin: 0">
-                                      20% Off List Price ($149)<br />Then only
-                                      ${recurringPrice}<br />Quote Code:
+                                      20% Off List Price ($149)<br />Initial
+                                      cost: ${initialPrice}<br />Quote Code:
                                       1753736966782-SL4XF
                                     </p>
                                   </div>
