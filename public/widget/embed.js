@@ -2709,13 +2709,25 @@
       } 
       .dh-form-step { 
         display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
       } 
       .dh-form-step.welcome { 
         display: none;
         padding: 0;
+        opacity: 1;
       } 
       .dh-form-step.active { 
         display: block; 
+        opacity: 1;
+      }
+      
+      .dh-form-step.fade-in {
+        animation: fadeIn 0.4s ease forwards;
+      }
+      
+      .dh-form-step.fade-out {
+        animation: fadeOut 0.3s ease forwards;
       } 
 
       .dh-form-step-content {
@@ -3010,8 +3022,19 @@
         line-height: 18px;
         font-family: Outfit, sans-serif;
         font-weight: 500; 
-        transition: all 0.2s ease; 
-        } 
+        transition: all 0.2s ease;
+        transform: translateY(0);
+        }
+        
+      .dh-form-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      
+      .dh-form-btn:active {
+        transform: translateY(0);
+        transition: all 0.1s ease;
+      } 
       .dh-form-btn-primary { 
         background: ${primaryColor}; 
         color: white;
@@ -3085,6 +3108,78 @@
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
+      }
+      
+      /* Animation keyframes for smooth transitions */
+      @keyframes fadeIn {
+        from { 
+          opacity: 0; 
+        }
+        to { 
+          opacity: 1; 
+        }
+      }
+      
+      @keyframes fadeOut {
+        from { 
+          opacity: 1; 
+        }
+        to { 
+          opacity: 0; 
+        }
+      }
+      
+      @keyframes slideInUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      @keyframes slideOutDown {
+        from {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        to {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+      }
+      
+      @keyframes scaleIn {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      
+      @keyframes scaleOut {
+        from {
+          opacity: 1;
+          transform: scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+      }
+      
+      /* Respect user's motion preferences */
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
       }
       .dh-pest-selection {
         display: flex;
@@ -3178,6 +3273,13 @@
         align-items: center;
         justify-content: center;
         z-index: 10;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      
+      .dh-pest-loading.show {
+        opacity: 1;
+      }
         border-radius: 20px;
       }
       .dh-pest-loading .dh-loading-spinner {
@@ -3200,6 +3302,13 @@
         align-items: center;
         justify-content: center;
         z-index: 10;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      
+      .dh-urgency-loading.show {
+        opacity: 1;
+      }
         border-radius: 20px;
       }
       .dh-urgency-loading .dh-loading-spinner {
@@ -3222,6 +3331,13 @@
         align-items: center;
         justify-content: center;
         z-index: 10;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      
+      .dh-quote-loading.show {
+        opacity: 1;
+      }
         border-radius: 20px;
       }
       .dh-quote-loading .dh-loading-spinner {
@@ -4117,6 +4233,16 @@
         z-index: 999999;
         padding: 20px;
         box-sizing: border-box;
+        opacity: 0;
+        transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+      }
+      
+      .dh-modal-overlay.show {
+        opacity: 1;
+      }
+      
+      .dh-modal-overlay.hide {
+        opacity: 0;
       }
       
       .dh-modal-content {
@@ -4130,6 +4256,19 @@
         font-family: "Outfit", sans-serif;
         display: flex;
         flex-direction: column;
+        transform: scale(0.95);
+        transition: transform 0.3s ease, opacity 0.3s ease;
+        opacity: 0;
+      }
+      
+      .dh-modal-overlay.show .dh-modal-content {
+        transform: scale(1);
+        opacity: 1;
+      }
+      
+      .dh-modal-overlay.hide .dh-modal-content {
+        transform: scale(0.95);
+        opacity: 0;
       }
       
       /* Welcome Screen Styles */
@@ -4804,17 +4943,25 @@
             }
           }
 
-          // Show modal
+          // Show modal with smooth animation
           modal.style.display = 'flex';
           document.body.style.overflow = 'hidden'; // Prevent background scroll
+          
+          // Force reflow to ensure display is set before animation
+          modal.offsetHeight;
+          
+          // Add show class for animation
+          modal.classList.add('show');
 
-          // Focus management
-          const firstFocusable = modal.querySelector(
-            'input, button, select, textarea'
-          );
-          if (firstFocusable) {
-            firstFocusable.focus();
-          }
+          // Focus management after animation starts
+          setTimeout(() => {
+            const firstFocusable = modal.querySelector(
+              'input, button, select, textarea'
+            );
+            if (firstFocusable) {
+              firstFocusable.focus();
+            }
+          }, 100);
         }
       };
 
@@ -4822,8 +4969,17 @@
       const closeModal = () => {
         const modal = document.getElementById('dh-modal-overlay');
         if (modal) {
-          modal.style.display = 'none';
-          document.body.style.overflow = ''; // Restore scroll
+          // Add hide class for animation
+          modal.classList.remove('show');
+          modal.classList.add('hide');
+          
+          // Wait for animation before hiding
+          setTimeout(() => {
+            modal.style.display = 'none';
+            modal.classList.remove('hide');
+            document.body.style.overflow = ''; // Restore scroll
+          }, 300); // Match CSS transition duration
+          
           // State is automatically preserved since we're not destroying the widget
         }
       };
@@ -5996,111 +6152,140 @@
 
       // Step navigation
       const showStep = async stepName => {
-        // Hide all steps
-        document.querySelectorAll('.dh-form-step').forEach(step => {
-          step.classList.remove('active');
-        });
+        // Get current and target steps for animation
+        const currentActiveStep = document.querySelector('.dh-form-step.active');
+        const targetStep = document.getElementById('dh-step-' + stepName);
+        
+        if (!targetStep) return;
 
-        // Show current step
-        const currentStep = document.getElementById('dh-step-' + stepName);
-
-        if (currentStep) {
-          currentStep.classList.add('active');
+        // Special handling for welcome screen - no animations
+        if (stepName === 'welcome') {
+          // Just hide all steps and show welcome immediately
+          document.querySelectorAll('.dh-form-step').forEach(step => {
+            step.classList.remove('active', 'fade-in', 'fade-out');
+          });
+          targetStep.classList.add('active');
           widgetState.currentStep = stepName;
+        } else {
+          // For non-welcome steps, use fade animations
+          
+          // If there's a currently active step, animate it out first
+          if (currentActiveStep && currentActiveStep !== targetStep) {
+            currentActiveStep.classList.add('fade-out');
+            
+            // Wait for fade out animation
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            currentActiveStep.classList.remove('active', 'fade-out');
+          } else {
+            // Just hide all steps if no current active step
+            document.querySelectorAll('.dh-form-step').forEach(step => {
+              step.classList.remove('active', 'fade-in', 'fade-out');
+            });
+          }
 
-          // Update modal overflow behavior
-          updateModalOverflow(stepName);
-
-          // Scroll to top of modal content
+          // Show target step with fade-in animation
+          targetStep.classList.add('active', 'fade-in');
+          widgetState.currentStep = stepName;
+          
+          // Clean up animation class after animation completes
           setTimeout(() => {
-            const scrollContainer =
-              stepName === 'welcome'
-                ? document.querySelector('.dh-modal-content')
-                : document.querySelector('.dh-form-widget');
+            targetStep.classList.remove('fade-in');
+          }, 400);
+        }
 
-            if (scrollContainer) {
-              scrollContainer.scrollTop = 0;
+        // Update modal overflow behavior
+        updateModalOverflow(stepName);
+
+        // Scroll to top of modal content
+        setTimeout(() => {
+          const scrollContainer =
+            stepName === 'welcome'
+              ? document.querySelector('.dh-modal-content')
+              : document.querySelector('.dh-form-widget');
+
+          if (scrollContainer) {
+            scrollContainer.scrollTop = 0;
+          }
+        }, 50); // Small delay to ensure DOM updates are complete
+
+        // Update progress bar
+        updateProgressBar(stepName);
+
+        // Update dynamic text based on form data
+        await updateDynamicText();
+
+        // Load plans when reaching plan selection step
+        if (stepName === 'plan-selection') {
+          loadSuggestedPlans();
+        }
+
+        // Populate address fields when reaching address step
+        if (stepName === 'address') {
+          setTimeout(() => {
+            if (typeof window.populateAddressFields === 'function') {
+              window.populateAddressFields();
             }
-          }, 50); // Small delay to ensure DOM updates are complete
+          }, 0);
+        }
 
-          // Update progress bar
-          updateProgressBar(stepName);
+        // Initialize floating labels only for new inputs in the current step
+        setTimeout(() => {
+          const currentStepInputs = targetStep.querySelectorAll(
+            '.dh-floating-input .dh-form-input'
+          );
 
-          // Update dynamic text based on form data
-          await updateDynamicText();
+          currentStepInputs.forEach(input => {
+            // Check if this input already has event listeners by looking for a data attribute
+            if (!input.hasAttribute('data-floating-initialized')) {
+              // Mark as initialized
+              input.setAttribute('data-floating-initialized', 'true');
 
-          // Load plans when reaching plan selection step
-          if (stepName === 'plan-selection') {
-            loadSuggestedPlans();
-          }
-
-          // Populate address fields when reaching address step
-          if (stepName === 'address') {
-            setTimeout(() => {
-              if (typeof window.populateAddressFields === 'function') {
-                window.populateAddressFields();
+              // Initial state check
+              if (input.tagName.toLowerCase() === 'textarea') {
+                updateTextareaLabel(input);
+              } else {
+                updateFloatingLabel(input);
               }
-            }, 0);
-          }
 
-          // Initialize floating labels only for new inputs in the current step
-          setTimeout(() => {
-            const currentStepInputs = currentStep.querySelectorAll(
-              '.dh-floating-input .dh-form-input'
-            );
-
-            currentStepInputs.forEach(input => {
-              // Check if this input already has event listeners by looking for a data attribute
-              if (!input.hasAttribute('data-floating-initialized')) {
-                // Mark as initialized
-                input.setAttribute('data-floating-initialized', 'true');
-
-                // Initial state check
+              // Add event listeners
+              input.addEventListener('focus', () => {
                 if (input.tagName.toLowerCase() === 'textarea') {
                   updateTextareaLabel(input);
                 } else {
                   updateFloatingLabel(input);
                 }
+              });
 
-                // Add event listeners
-                input.addEventListener('focus', () => {
-                  if (input.tagName.toLowerCase() === 'textarea') {
-                    updateTextareaLabel(input);
-                  } else {
-                    updateFloatingLabel(input);
-                  }
-                });
-
-                input.addEventListener('blur', () => {
-                  if (input.tagName.toLowerCase() === 'textarea') {
-                    updateTextareaLabel(input);
-                  } else {
-                    updateFloatingLabel(input);
-                  }
-                });
-
-                input.addEventListener('input', () => {
-                  if (input.tagName.toLowerCase() === 'textarea') {
-                    updateTextareaLabel(input);
-                  } else {
-                    updateFloatingLabel(input);
-                  }
-                });
-
-                if (input.tagName.toLowerCase() === 'select') {
-                  input.addEventListener('change', () => {
-                    updateFloatingLabel(input);
-                  });
+              input.addEventListener('blur', () => {
+                if (input.tagName.toLowerCase() === 'textarea') {
+                  updateTextareaLabel(input);
+                } else {
+                  updateFloatingLabel(input);
                 }
+              });
+
+              input.addEventListener('input', () => {
+                if (input.tagName.toLowerCase() === 'textarea') {
+                  updateTextareaLabel(input);
+                } else {
+                  updateFloatingLabel(input);
+                }
+              });
+
+              if (input.tagName.toLowerCase() === 'select') {
+                input.addEventListener('change', () => {
+                  updateFloatingLabel(input);
+                });
               }
-            });
-          }, 100);
-        } else {
-          // If recovery step doesn't exist, fallback to welcome
-          if (stepName === 'recovery') {
-            resetAddressFieldStates();
-            showStep('welcome');
-          }
+            }
+          });
+        }, 100);
+
+        // Handle recovery step fallback
+        if (stepName === 'recovery' && !targetStep) {
+          resetAddressFieldStates();
+          showStep('welcome');
         }
       };
 
@@ -6303,11 +6488,9 @@
 
       // Proceed to quote function - navigate from quote-contact to plan-comparison
       window.proceedToQuote = async () => {
-        // Show loading overlay
+        // Show loading overlay with animation
         const quoteLoadingEl = document.getElementById('quote-loading');
-        if (quoteLoadingEl) {
-          quoteLoadingEl.style.display = 'flex';
-        }
+        showLoadingOverlay(quoteLoadingEl);
 
         try {
           // Save quote contact info
@@ -6347,17 +6530,13 @@
 
             // Hide loading overlay after everything is complete
             setTimeout(() => {
-              if (quoteLoadingEl) {
-                quoteLoadingEl.style.display = 'none';
-              }
+              hideLoadingOverlay(quoteLoadingEl);
             }, 100); // Brief delay to ensure step transition is visible
           }
         } catch (error) {
           console.error('Error during quote processing:', error);
           // Fallback: hide loading and proceed anyway
-          if (quoteLoadingEl) {
-            quoteLoadingEl.style.display = 'none';
-          }
+          hideLoadingOverlay(quoteLoadingEl);
           await showStep('plan-comparison');
           setupStepValidation('plan-comparison');
           updateProgressBar('plan-comparison');
@@ -7376,6 +7555,25 @@
         }
       };
 
+      // Helper functions for smooth loading animations
+      const showLoadingOverlay = (loadingElement) => {
+        if (loadingElement) {
+          loadingElement.style.display = 'flex';
+          // Force reflow
+          loadingElement.offsetHeight;
+          loadingElement.classList.add('show');
+        }
+      };
+
+      const hideLoadingOverlay = (loadingElement) => {
+        if (loadingElement) {
+          loadingElement.classList.remove('show');
+          setTimeout(() => {
+            loadingElement.style.display = 'none';
+          }, 300); // Match CSS transition duration
+        }
+      };
+
       // Fetch plan comparison data for selected pest
       const fetchPlanComparisonData = async () => {
         try {
@@ -7745,10 +7943,8 @@
                   // Add selected class to clicked option
                   pestOption.classList.add('selected');
 
-                  // Show centered loading overlay
-                  if (pestLoadingEl) {
-                    pestLoadingEl.style.display = 'flex';
-                  }
+                  // Show centered loading overlay with animation
+                  showLoadingOverlay(pestLoadingEl);
 
                   // Store selection
                   const pestValue = pestOption.dataset.pest;
@@ -7797,16 +7993,12 @@
 
                     // Hide loading overlay after everything is complete
                     setTimeout(() => {
-                      if (pestLoadingEl) {
-                        pestLoadingEl.style.display = 'none';
-                      }
+                      hideLoadingOverlay(pestLoadingEl);
                     }, 100); // Brief delay to ensure step transition is visible
                   } catch (error) {
                     console.error('Error updating dynamic text:', error);
                     // Fallback: hide loading and proceed anyway
-                    if (pestLoadingEl) {
-                      pestLoadingEl.style.display = 'none';
-                    }
+                    hideLoadingOverlay(pestLoadingEl);
                     await showStep('address');
                     setupStepValidation('address');
                     updateProgressBar('address');
@@ -8071,10 +8263,8 @@
                   // Add selected class to clicked option
                   e.target.classList.add('selected');
 
-                  // Show centered loading overlay
-                  if (urgencyLoadingEl) {
-                    urgencyLoadingEl.style.display = 'flex';
-                  }
+                  // Show centered loading overlay with animation
+                  showLoadingOverlay(urgencyLoadingEl);
 
                   // Store selection
                   widgetState.formData.urgency = e.target.dataset.urgency;
@@ -8111,16 +8301,12 @@
 
                     // Hide loading overlay after everything is complete
                     setTimeout(() => {
-                      if (urgencyLoadingEl) {
-                        urgencyLoadingEl.style.display = 'none';
-                      }
+                      hideLoadingOverlay(urgencyLoadingEl);
                     }, 100); // Brief delay to ensure step transition is visible
                   } catch (error) {
                     console.error('Error during urgency selection:', error);
                     // Fallback: hide loading and proceed anyway
-                    if (urgencyLoadingEl) {
-                      urgencyLoadingEl.style.display = 'none';
-                    }
+                    hideLoadingOverlay(urgencyLoadingEl);
                     await showStep('initial-offer');
                     setupStepValidation('initial-offer');
                     updateProgressBar('initial-offer');
