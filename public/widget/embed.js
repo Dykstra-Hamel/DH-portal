@@ -4714,6 +4714,34 @@
             if (widgetState.widgetConfig) {
               updateWelcomeStep();
             }
+
+            // Check for form recovery after form is created in modal
+            setTimeout(async () => {
+              const serverRecoveryData = await checkForPartialLead();
+              const localRecoveryData = progressiveFormManager.loadLocalFormState();
+              
+              // Determine if recovery should be offered based on either data source
+              const recoveryData = await evaluateRecoveryData(serverRecoveryData, localRecoveryData);
+              
+              if (recoveryData) {
+                const recovered = recoverFormData(recoveryData);
+                if (recovered) {
+                  // Show recovery prompt instead of going directly to welcome
+                  showRecoveryPrompt(recoveryData);
+                  return;
+                }
+              }
+
+              // Initialize first step if no recovery was shown
+              showStep('welcome');
+            }, 100);
+          } else {
+            // For subsequent modal opens, just show the current step
+            if (widgetState.currentStep) {
+              showStep(widgetState.currentStep);
+            } else {
+              showStep('welcome');
+            }
           }
 
           // Show modal
@@ -5971,6 +5999,12 @@
               }
             });
           }, 100);
+        } else {
+          // If recovery step doesn't exist, fallback to welcome
+          if (stepName === 'recovery') {
+            resetAddressFieldStates();
+            showStep('welcome');
+          }
         }
       };
 
@@ -6209,6 +6243,72 @@
         updateProgressBar('contact');
       };
 
+      // Reset address field states for fresh starts
+      const resetAddressFieldStates = () => {
+        try {
+          // Reset address search input
+          const addressSearchInput = document.getElementById('address-search-input');
+          if (addressSearchInput) {
+            addressSearchInput.value = '';
+          }
+
+          // Reset address display fields
+          const streetInput = document.getElementById('street-input');
+          const cityInput = document.getElementById('city-input');
+          const stateInput = document.getElementById('state-input');
+          const zipInput = document.getElementById('zip-input');
+
+          if (streetInput) streetInput.value = '';
+          if (cityInput) cityInput.value = '';
+          if (stateInput) stateInput.value = '';
+          if (zipInput) zipInput.value = '';
+
+          // Reset address mode visibility - force search mode
+          const searchMode = document.getElementById('address-search-mode');
+          const displayMode = document.getElementById('address-display-mode');
+
+          if (searchMode) searchMode.style.display = 'block';
+          if (displayMode) displayMode.style.display = 'none';
+
+          // Reset address imagery state
+          const loadingEl = document.getElementById('image-loading');
+          const imageEl = document.getElementById('address-image');
+          const errorEl = document.getElementById('image-error');
+
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (imageEl) {
+            imageEl.style.display = 'none';
+            imageEl.src = '';
+          }
+          if (errorEl) errorEl.style.display = 'none';
+
+          // Reset address next button state
+          const addressNext = document.getElementById('address-next');
+          if (addressNext) {
+            addressNext.textContent = 'Continue';
+          }
+
+          // Clear any address suggestions
+          const suggestions = document.getElementById('address-suggestions');
+          if (suggestions) {
+            suggestions.innerHTML = '';
+            suggestions.style.display = 'none';
+          }
+
+          // Clear any address-related error states
+          const addressFields = [addressSearchInput, streetInput, cityInput, stateInput, zipInput];
+          addressFields.forEach(field => {
+            if (field) {
+              progressiveFormManager.clearFieldError(field);
+            }
+          });
+
+          console.log('Address field states reset for fresh start');
+        } catch (error) {
+          console.warn('Error resetting address field states:', error);
+        }
+      };
+
       // Change address function - switch back to search mode
       window.changeAddress = () => {
         // Show search mode, hide display mode
@@ -6400,6 +6500,79 @@
         }
       };
 
+      // Unified recovery evaluation function
+      window.evaluateRecoveryData = async (serverData, localData) => {
+        // Priority 1: Server-side partial lead data (most reliable)
+        if (serverData && serverData.success && serverData.hasPartialLead && !serverData.expired) {
+          return serverData;
+        }
+        
+        // Priority 2: Recent local storage data (fallback)
+        if (localData && hasSignificantLocalData(localData)) {
+          // Convert local data to server recovery data format
+          return convertLocalToRecoveryFormat(localData);
+        }
+        
+        // No significant recovery data found
+        return null;
+      };
+
+      // Check if local data is significant enough for recovery
+      const hasSignificantLocalData = (localData) => {
+        if (!localData || !localData.formData) {
+          return false;
+        }
+        
+        const formData = localData.formData;
+        
+        // Consider data significant if it has:
+        // - Address information (like the screenshot issue)
+        // - Contact information  
+        // - Pest type selection
+        // - Any step beyond welcome
+        const hasAddress = !!(formData.address || formData.addressStreet);
+        const hasPestType = !!formData.pestType;
+        const hasContactInfo = !!(formData.contactInfo && (formData.contactInfo.name || formData.contactInfo.email || formData.contactInfo.phone));
+        const hasAdvancedStep = !!(localData.currentStep && localData.currentStep !== 'welcome');
+        
+        return hasAddress || hasPestType || hasContactInfo || hasAdvancedStep;
+      };
+
+      // Convert local storage data format to server recovery data format
+      const convertLocalToRecoveryFormat = (localData) => {
+        return {
+          success: true,
+          hasPartialLead: true,
+          expired: false,
+          formData: localData.formData,
+          stepCompleted: getStepFromLocalData(localData),
+          partialLeadId: null, // Local data doesn't have server-side ID
+          dataSource: 'localStorage', // Track data source
+          localData: localData // Keep original local data for reference
+        };
+      };
+
+      // Determine step completion status from local data
+      const getStepFromLocalData = (localData) => {
+        if (!localData) return 'welcome';
+        
+        const formData = localData.formData;
+        const currentStep = localData.currentStep;
+        
+        // Determine the most advanced step based on available data
+        if (formData.contactInfo && (formData.contactInfo.name || formData.contactInfo.email)) {
+          return 'contact_started';
+        } else if (formData.address || formData.addressStreet) {
+          return 'address_completed';
+        } else if (formData.pestType) {
+          return 'pest_issue_completed';
+        } else if (currentStep && currentStep !== 'welcome') {
+          return currentStep + '_started';
+        }
+        
+        return 'welcome';
+      };
+
       // Form recovery functions
       window.checkForPartialLead = async () => {
         if (!widgetState.sessionId) {
@@ -6516,11 +6689,13 @@
       // Recovery UI functions
       window.showRecoveryPrompt = recoveryData => {
         try {
-          // Populate recovery details
+          // Populate recovery details with enhanced information
           const detailsList = document.getElementById('dh-recovery-details');
           if (detailsList && recoveryData.formData) {
             detailsList.innerHTML = '';
 
+
+            // Add saved information details
             if (recoveryData.formData.pestType) {
               const li = document.createElement('li');
               const capitalizedPestType = recoveryData.formData.pestType
@@ -6534,28 +6709,58 @@
               detailsList.appendChild(li);
             }
 
+            // Show address information (this is what was causing the screenshot issue)
             if (recoveryData.formData.address) {
               const li = document.createElement('li');
               li.textContent = `Address: ${recoveryData.formData.address}`;
+              detailsList.appendChild(li);
+            } else if (recoveryData.formData.addressStreet) {
+              const li = document.createElement('li');
+              let addressText = recoveryData.formData.addressStreet;
+              if (recoveryData.formData.addressCity) {
+                addressText += `, ${recoveryData.formData.addressCity}`;
+              }
+              if (recoveryData.formData.addressState) {
+                addressText += `, ${recoveryData.formData.addressState}`;
+              }
+              li.textContent = `Address: ${addressText}`;
               detailsList.appendChild(li);
             }
 
             if (
               recoveryData.formData.contactInfo &&
               (recoveryData.formData.contactInfo.name ||
-                recoveryData.formData.contactInfo.email)
+                recoveryData.formData.contactInfo.email ||
+                recoveryData.formData.contactInfo.phone)
             ) {
               const li = document.createElement('li');
               li.textContent = 'Contact information';
               detailsList.appendChild(li);
             }
+
+            // Add timestamp information if available from local data
+            if (recoveryData.localData && recoveryData.localData.progressiveState) {
+              const timestamp = new Date(recoveryData.localData.progressiveState.autoSaveTimestamp);
+              if (!isNaN(timestamp.getTime())) {
+                const timeInfo = document.createElement('li');
+                timeInfo.style.fontSize = '0.85em';
+                timeInfo.style.color = '#888';
+                timeInfo.style.marginTop = '8px';
+                timeInfo.textContent = `Last saved: ${timestamp.toLocaleDateString()} at ${timestamp.toLocaleTimeString()}`;
+                detailsList.appendChild(timeInfo);
+              }
+            }
           }
+
+          // Store recovery data for continue/start fresh actions
+          widgetState.pendingRecoveryData = recoveryData;
 
           // Show the recovery step
           showStep('recovery');
         } catch (error) {
           console.error('Error showing recovery prompt:', error);
-          // Fallback to welcome step
+          // Fallback to welcome step with cleanup
+          resetAddressFieldStates();
           showStep('welcome');
         }
       };
@@ -6655,6 +6860,9 @@
             clearInterval(progressiveFormManager.autoSaveTimer);
             progressiveFormManager.autoSaveTimer = null;
           }
+
+          // Reset address field states before showing welcome step
+          resetAddressFieldStates();
 
           showStep('welcome');
           setupStepValidation('welcome');
@@ -8799,22 +9007,33 @@
             });
           }
 
-          // Check for form recovery after attribution is initialized
-          const recoveryData = await checkForPartialLead();
-          if (recoveryData) {
-            const recovered = recoverFormData(recoveryData);
-            if (recovered) {
-              // Show recovery prompt instead of going directly to welcome
-              showRecoveryPrompt(recoveryData);
-              return;
-            }
-          }
-
-          // Initialize floating label functionality
+          // Initialize floating label functionality  
           initializeFloatingLabels();
 
-          // Initialize first step
-          showStep('welcome');
+          // For inline mode, check for recovery and initialize first step
+          // For button mode, step initialization happens when modal opens
+          if (config.displayMode !== 'button') {
+            // Check for form recovery in inline mode
+            setTimeout(async () => {
+              const serverRecoveryData = await checkForPartialLead();
+              const localRecoveryData = progressiveFormManager.loadLocalFormState();
+              
+              // Determine if recovery should be offered based on either data source
+              const recoveryData = await evaluateRecoveryData(serverRecoveryData, localRecoveryData);
+              
+              if (recoveryData) {
+                const recovered = recoverFormData(recoveryData);
+                if (recovered) {
+                  // Show recovery prompt instead of going directly to welcome
+                  showRecoveryPrompt(recoveryData);
+                  return;
+                }
+              }
+
+              // Initialize first step if no recovery was shown
+              showStep('welcome');
+            }, 100);
+          }
         } catch (error) {
           showErrorState(
             'Initialization Error',
