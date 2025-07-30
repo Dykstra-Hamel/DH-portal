@@ -2192,7 +2192,7 @@
             '.dh-field-error, .dh-field-warning, .dh-field-success, .dh-format-suggestion'
           );
           indicators?.forEach(el => el.remove());
-          
+
           // Also check parentNode in case of nested structure
           const parentIndicators = field.parentNode?.querySelectorAll(
             '.dh-field-error, .dh-field-warning, .dh-field-success, .dh-format-suggestion'
@@ -2241,7 +2241,7 @@
           if (field.id) {
             widgetState.formState.fieldsWithErrors.delete(field.id);
           }
-          
+
           // Use the comprehensive clearFieldIndicators method
           progressiveFormManager.clearFieldIndicators(field);
         },
@@ -2251,19 +2251,19 @@
           if (field.hasAttribute('data-realtime-validation')) {
             return;
           }
-          
+
           // Mark field as having real-time validation
           field.setAttribute('data-realtime-validation', 'true');
-          
+
           // Create validation functions for this specific field
           const validateField = () => {
             const fieldName = field.id;
             const value = field.value.trim();
-            
+
             // Basic validation logic based on field type
             let isValid = true;
             let errorMessage = '';
-            
+
             switch (fieldName) {
               case 'first-name-input':
               case 'quote-first-name-input':
@@ -2272,7 +2272,7 @@
                   errorMessage = 'First name is required';
                 }
                 break;
-                
+
               case 'last-name-input':
               case 'quote-last-name-input':
                 if (!value) {
@@ -2280,7 +2280,7 @@
                   errorMessage = 'Last name is required';
                 }
                 break;
-                
+
               case 'email-input':
               case 'quote-email-input':
                 if (!value) {
@@ -2294,7 +2294,7 @@
                   }
                 }
                 break;
-                
+
               case 'phone-input':
               case 'quote-phone-input':
                 if (!value) {
@@ -2311,24 +2311,25 @@
                   }
                 }
                 break;
-                
+
               case 'start-date-input':
                 if (!value) {
                   isValid = false;
                   errorMessage = 'Preferred start date is required';
                 } else if (!isDateInFuture(value)) {
                   isValid = false;
-                  errorMessage = 'Please select a date that is at least one day in the future';
+                  errorMessage =
+                    'Please select a date that is at least one day in the future';
                 }
                 break;
-                
+
               case 'arrival-time-input':
                 if (!value) {
                   isValid = false;
                   errorMessage = 'Preferred arrival time is required';
                 }
                 break;
-                
+
               case 'address-search-input':
                 if (!value) {
                   isValid = false;
@@ -2336,7 +2337,7 @@
                 }
                 break;
             }
-            
+
             if (isValid) {
               progressiveFormManager.clearFieldError(field);
               // Optionally show success state
@@ -2345,14 +2346,14 @@
               progressiveFormManager.showFieldError(field, errorMessage);
             }
           };
-          
+
           // Clear error immediately on input
           const clearErrorOnInput = () => {
             if (widgetState.formState.fieldsWithErrors.has(field.id)) {
               progressiveFormManager.clearFieldError(field);
             }
           };
-          
+
           // Add event listeners
           field.addEventListener('input', clearErrorOnInput);
           field.addEventListener('blur', validateField);
@@ -4718,11 +4719,15 @@
             // Check for form recovery after form is created in modal
             setTimeout(async () => {
               const serverRecoveryData = await checkForPartialLead();
-              const localRecoveryData = progressiveFormManager.loadLocalFormState();
-              
+              const localRecoveryData =
+                progressiveFormManager.loadLocalFormState();
+
               // Determine if recovery should be offered based on either data source
-              const recoveryData = await evaluateRecoveryData(serverRecoveryData, localRecoveryData);
-              
+              const recoveryData = await evaluateRecoveryData(
+                serverRecoveryData,
+                localRecoveryData
+              );
+
               if (recoveryData) {
                 const recovered = recoverFormData(recoveryData);
                 if (recovered) {
@@ -6049,9 +6054,14 @@
           // Validate that an address has been entered
           if (!widgetState.formData.address) {
             // Show error message
-            const addressSearchInput = document.getElementById('address-search-input');
+            const addressSearchInput = document.getElementById(
+              'address-search-input'
+            );
             if (addressSearchInput) {
-              progressiveFormManager.showFieldError(addressSearchInput, 'Please enter your address to continue');
+              progressiveFormManager.showFieldError(
+                addressSearchInput,
+                'Please enter your address to continue'
+              );
             } else {
               alert('Please enter your address to continue.');
             }
@@ -6247,7 +6257,9 @@
       const resetAddressFieldStates = () => {
         try {
           // Reset address search input
-          const addressSearchInput = document.getElementById('address-search-input');
+          const addressSearchInput = document.getElementById(
+            'address-search-input'
+          );
           if (addressSearchInput) {
             addressSearchInput.value = '';
           }
@@ -6296,7 +6308,13 @@
           }
 
           // Clear any address-related error states
-          const addressFields = [addressSearchInput, streetInput, cityInput, stateInput, zipInput];
+          const addressFields = [
+            addressSearchInput,
+            streetInput,
+            cityInput,
+            stateInput,
+            zipInput,
+          ];
           addressFields.forEach(field => {
             if (field) {
               progressiveFormManager.clearFieldError(field);
@@ -6503,43 +6521,55 @@
       // Unified recovery evaluation function
       window.evaluateRecoveryData = async (serverData, localData) => {
         // Priority 1: Server-side partial lead data (most reliable)
-        if (serverData && serverData.success && serverData.hasPartialLead && !serverData.expired) {
+        if (
+          serverData &&
+          serverData.success &&
+          serverData.hasPartialLead &&
+          !serverData.expired
+        ) {
           return serverData;
         }
-        
+
         // Priority 2: Recent local storage data (fallback)
         if (localData && hasSignificantLocalData(localData)) {
           // Convert local data to server recovery data format
           return convertLocalToRecoveryFormat(localData);
         }
-        
+
         // No significant recovery data found
         return null;
       };
 
       // Check if local data is significant enough for recovery
-      const hasSignificantLocalData = (localData) => {
+      const hasSignificantLocalData = localData => {
         if (!localData || !localData.formData) {
           return false;
         }
-        
+
         const formData = localData.formData;
-        
+
         // Consider data significant if it has:
         // - Address information (like the screenshot issue)
-        // - Contact information  
+        // - Contact information
         // - Pest type selection
         // - Any step beyond welcome
         const hasAddress = !!(formData.address || formData.addressStreet);
         const hasPestType = !!formData.pestType;
-        const hasContactInfo = !!(formData.contactInfo && (formData.contactInfo.name || formData.contactInfo.email || formData.contactInfo.phone));
-        const hasAdvancedStep = !!(localData.currentStep && localData.currentStep !== 'welcome');
-        
+        const hasContactInfo = !!(
+          formData.contactInfo &&
+          (formData.contactInfo.name ||
+            formData.contactInfo.email ||
+            formData.contactInfo.phone)
+        );
+        const hasAdvancedStep = !!(
+          localData.currentStep && localData.currentStep !== 'welcome'
+        );
+
         return hasAddress || hasPestType || hasContactInfo || hasAdvancedStep;
       };
 
       // Convert local storage data format to server recovery data format
-      const convertLocalToRecoveryFormat = (localData) => {
+      const convertLocalToRecoveryFormat = localData => {
         return {
           success: true,
           hasPartialLead: true,
@@ -6548,19 +6578,22 @@
           stepCompleted: getStepFromLocalData(localData),
           partialLeadId: null, // Local data doesn't have server-side ID
           dataSource: 'localStorage', // Track data source
-          localData: localData // Keep original local data for reference
+          localData: localData, // Keep original local data for reference
         };
       };
 
       // Determine step completion status from local data
-      const getStepFromLocalData = (localData) => {
+      const getStepFromLocalData = localData => {
         if (!localData) return 'welcome';
-        
+
         const formData = localData.formData;
         const currentStep = localData.currentStep;
-        
+
         // Determine the most advanced step based on available data
-        if (formData.contactInfo && (formData.contactInfo.name || formData.contactInfo.email)) {
+        if (
+          formData.contactInfo &&
+          (formData.contactInfo.name || formData.contactInfo.email)
+        ) {
           return 'contact_started';
         } else if (formData.address || formData.addressStreet) {
           return 'address_completed';
@@ -6569,7 +6602,7 @@
         } else if (currentStep && currentStep !== 'welcome') {
           return currentStep + '_started';
         }
-        
+
         return 'welcome';
       };
 
@@ -6694,7 +6727,6 @@
           if (detailsList && recoveryData.formData) {
             detailsList.innerHTML = '';
 
-
             // Add saved information details
             if (recoveryData.formData.pestType) {
               const li = document.createElement('li');
@@ -6739,8 +6771,13 @@
             }
 
             // Add timestamp information if available from local data
-            if (recoveryData.localData && recoveryData.localData.progressiveState) {
-              const timestamp = new Date(recoveryData.localData.progressiveState.autoSaveTimestamp);
+            if (
+              recoveryData.localData &&
+              recoveryData.localData.progressiveState
+            ) {
+              const timestamp = new Date(
+                recoveryData.localData.progressiveState.autoSaveTimestamp
+              );
               if (!isNaN(timestamp.getTime())) {
                 const timeInfo = document.createElement('li');
                 timeInfo.style.fontSize = '0.85em';
@@ -7841,7 +7878,7 @@
                     data.suggestions.length > 0
                   ) {
                     // Use the first plan's price since API sorts by best coverage match
-                    const bestMatchPrice = data.suggestions[0].initial_price;
+                    const bestMatchPrice = data.suggestions[0].recurring_price;
                     offerPrice.textContent = `$${bestMatchPrice}`;
                   } else {
                     offerPrice.textContent = '$'; // Fallback price
@@ -8378,7 +8415,7 @@
                   startDate &&
                   arrivalTime &&
                   termsAccepted;
-                  
+
                 // Note: Button stays enabled, validation happens on click
                 return isValid;
               };
@@ -8730,21 +8767,21 @@
         return tomorrow.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
       };
 
-      const isDateInFuture = (dateString) => {
+      const isDateInFuture = dateString => {
         if (!dateString) return false;
-        
+
         const selectedDate = new Date(dateString);
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        
+
         // Reset time components for accurate date-only comparison
         tomorrow.setHours(0, 0, 0, 0);
         selectedDate.setHours(0, 0, 0, 0);
-        
+
         return selectedDate >= tomorrow;
       };
 
-      const formatDateForInput = (date) => {
+      const formatDateForInput = date => {
         return date.toISOString().split('T')[0];
       };
 
@@ -8757,156 +8794,228 @@
         const startDateInput = document.getElementById('start-date-input');
         const arrivalTimeInput = document.getElementById('arrival-time-input');
         const termsCheckbox = document.getElementById('terms-checkbox');
-        
+
         // Clear existing errors
-        [firstNameInput, lastNameInput, phoneInput, emailInput, startDateInput, arrivalTimeInput].forEach(input => {
+        [
+          firstNameInput,
+          lastNameInput,
+          phoneInput,
+          emailInput,
+          startDateInput,
+          arrivalTimeInput,
+        ].forEach(input => {
           if (input) {
             progressiveFormManager.clearFieldError(input);
           }
         });
-        
+
         let hasErrors = false;
-        
+
         // Validate required fields
         if (!firstNameInput?.value.trim()) {
-          progressiveFormManager.showFieldError(firstNameInput, 'First name is required');
+          progressiveFormManager.showFieldError(
+            firstNameInput,
+            'First name is required'
+          );
           hasErrors = true;
         }
-        
+
         if (!lastNameInput?.value.trim()) {
-          progressiveFormManager.showFieldError(lastNameInput, 'Last name is required');
+          progressiveFormManager.showFieldError(
+            lastNameInput,
+            'Last name is required'
+          );
           hasErrors = true;
         }
-        
+
         if (!phoneInput?.value.trim()) {
-          progressiveFormManager.showFieldError(phoneInput, 'Phone number is required');
+          progressiveFormManager.showFieldError(
+            phoneInput,
+            'Phone number is required'
+          );
           hasErrors = true;
         } else {
           // Validate phone format
           const cleanPhone = phoneInput.value.replace(/[\s\-\(\)]/g, '');
           if (!/^[\d\+]+$/.test(cleanPhone)) {
-            progressiveFormManager.showFieldError(phoneInput, 'Please enter a valid phone number');
+            progressiveFormManager.showFieldError(
+              phoneInput,
+              'Please enter a valid phone number'
+            );
             hasErrors = true;
           } else if (cleanPhone.length < 10) {
-            progressiveFormManager.showFieldError(phoneInput, 'Phone number must be at least 10 digits');
+            progressiveFormManager.showFieldError(
+              phoneInput,
+              'Phone number must be at least 10 digits'
+            );
             hasErrors = true;
           }
         }
-        
+
         if (!emailInput?.value.trim()) {
-          progressiveFormManager.showFieldError(emailInput, 'Email address is required');
+          progressiveFormManager.showFieldError(
+            emailInput,
+            'Email address is required'
+          );
           hasErrors = true;
         } else {
           // Validate email format
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           if (!emailRegex.test(emailInput.value)) {
-            progressiveFormManager.showFieldError(emailInput, 'Please enter a valid email address');
+            progressiveFormManager.showFieldError(
+              emailInput,
+              'Please enter a valid email address'
+            );
             hasErrors = true;
           }
         }
-        
+
         if (!startDateInput?.value) {
-          progressiveFormManager.showFieldError(startDateInput, 'Preferred start date is required');
+          progressiveFormManager.showFieldError(
+            startDateInput,
+            'Preferred start date is required'
+          );
           hasErrors = true;
         } else if (!isDateInFuture(startDateInput.value)) {
-          progressiveFormManager.showFieldError(startDateInput, 'Please select a date that is at least one day in the future');
+          progressiveFormManager.showFieldError(
+            startDateInput,
+            'Please select a date that is at least one day in the future'
+          );
           hasErrors = true;
         }
-        
+
         if (!arrivalTimeInput?.value) {
-          progressiveFormManager.showFieldError(arrivalTimeInput, 'Preferred arrival time is required');
+          progressiveFormManager.showFieldError(
+            arrivalTimeInput,
+            'Preferred arrival time is required'
+          );
           hasErrors = true;
         }
-        
+
         if (!termsCheckbox?.checked) {
           // Use the standard error system for terms checkbox
           const termsContainer = termsCheckbox.closest('.dh-form-group');
           if (termsContainer) {
             // Create a temporary container element to use with showFieldError
-            let termsErrorContainer = termsContainer.querySelector('.dh-terms-error-container');
+            let termsErrorContainer = termsContainer.querySelector(
+              '.dh-terms-error-container'
+            );
             if (!termsErrorContainer) {
               termsErrorContainer = document.createElement('div');
               termsErrorContainer.className = 'dh-terms-error-container';
               termsErrorContainer.id = 'terms-checkbox-container';
               termsContainer.appendChild(termsErrorContainer);
             }
-            
-            progressiveFormManager.showFieldError(termsErrorContainer, 'You must agree to the terms and conditions');
-            
+
+            progressiveFormManager.showFieldError(
+              termsErrorContainer,
+              'You must agree to the terms and conditions'
+            );
+
             // Add real-time clearing for terms checkbox
             const clearTermsError = () => {
               if (termsCheckbox.checked) {
                 progressiveFormManager.clearFieldError(termsErrorContainer);
               }
             };
-            
+
             // Remove existing listeners to prevent duplicates
             termsCheckbox.removeEventListener('change', clearTermsError);
             termsCheckbox.addEventListener('change', clearTermsError);
           }
-          
+
           hasErrors = true;
         }
-        
+
         if (!hasErrors) {
           // All validation passed, proceed with form submission
           submitForm();
         }
       };
-      
+
       window.proceedToQuoteWithValidation = () => {
-        const quoteFirstNameInput = document.getElementById('quote-first-name-input');
-        const quoteLastNameInput = document.getElementById('quote-last-name-input');
+        const quoteFirstNameInput = document.getElementById(
+          'quote-first-name-input'
+        );
+        const quoteLastNameInput = document.getElementById(
+          'quote-last-name-input'
+        );
         const quoteEmailInput = document.getElementById('quote-email-input');
         const quotePhoneInput = document.getElementById('quote-phone-input');
-        
+
         // Clear existing errors
-        [quoteFirstNameInput, quoteLastNameInput, quoteEmailInput, quotePhoneInput].forEach(input => {
+        [
+          quoteFirstNameInput,
+          quoteLastNameInput,
+          quoteEmailInput,
+          quotePhoneInput,
+        ].forEach(input => {
           if (input) {
             progressiveFormManager.clearFieldError(input);
           }
         });
-        
+
         let hasErrors = false;
-        
+
         // Validate required fields
         if (!quoteFirstNameInput?.value.trim()) {
-          progressiveFormManager.showFieldError(quoteFirstNameInput, 'First name is required');
+          progressiveFormManager.showFieldError(
+            quoteFirstNameInput,
+            'First name is required'
+          );
           hasErrors = true;
         }
-        
+
         if (!quoteLastNameInput?.value.trim()) {
-          progressiveFormManager.showFieldError(quoteLastNameInput, 'Last name is required');
+          progressiveFormManager.showFieldError(
+            quoteLastNameInput,
+            'Last name is required'
+          );
           hasErrors = true;
         }
-        
+
         if (!quoteEmailInput?.value.trim()) {
-          progressiveFormManager.showFieldError(quoteEmailInput, 'Email address is required');
+          progressiveFormManager.showFieldError(
+            quoteEmailInput,
+            'Email address is required'
+          );
           hasErrors = true;
         } else {
           // Validate email format
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           if (!emailRegex.test(quoteEmailInput.value)) {
-            progressiveFormManager.showFieldError(quoteEmailInput, 'Please enter a valid email address');
+            progressiveFormManager.showFieldError(
+              quoteEmailInput,
+              'Please enter a valid email address'
+            );
             hasErrors = true;
           }
         }
-        
+
         if (!quotePhoneInput?.value.trim()) {
-          progressiveFormManager.showFieldError(quotePhoneInput, 'Phone number is required');
+          progressiveFormManager.showFieldError(
+            quotePhoneInput,
+            'Phone number is required'
+          );
           hasErrors = true;
         } else {
           // Validate phone format
           const cleanPhone = quotePhoneInput.value.replace(/[\s\-\(\)]/g, '');
           if (!/^[\d\+]+$/.test(cleanPhone)) {
-            progressiveFormManager.showFieldError(quotePhoneInput, 'Please enter a valid phone number');
+            progressiveFormManager.showFieldError(
+              quotePhoneInput,
+              'Please enter a valid phone number'
+            );
             hasErrors = true;
           } else if (cleanPhone.length < 10) {
-            progressiveFormManager.showFieldError(quotePhoneInput, 'Phone number must be at least 10 digits');
+            progressiveFormManager.showFieldError(
+              quotePhoneInput,
+              'Phone number must be at least 10 digits'
+            );
             hasErrors = true;
           }
         }
-        
+
         if (!hasErrors) {
           // All validation passed, proceed with quote
           proceedToQuote();
@@ -9007,7 +9116,7 @@
             });
           }
 
-          // Initialize floating label functionality  
+          // Initialize floating label functionality
           initializeFloatingLabels();
 
           // For inline mode, check for recovery and initialize first step
@@ -9016,11 +9125,15 @@
             // Check for form recovery in inline mode
             setTimeout(async () => {
               const serverRecoveryData = await checkForPartialLead();
-              const localRecoveryData = progressiveFormManager.loadLocalFormState();
-              
+              const localRecoveryData =
+                progressiveFormManager.loadLocalFormState();
+
               // Determine if recovery should be offered based on either data source
-              const recoveryData = await evaluateRecoveryData(serverRecoveryData, localRecoveryData);
-              
+              const recoveryData = await evaluateRecoveryData(
+                serverRecoveryData,
+                localRecoveryData
+              );
+
               if (recoveryData) {
                 const recovered = recoverFormData(recoveryData);
                 if (recovered) {
