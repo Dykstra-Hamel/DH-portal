@@ -737,6 +737,48 @@ export async function POST(request: NextRequest) {
       // Don't fail the lead creation due to SMS issues
     }
 
+    // Send voicemail drop (immediate or delayed)
+    try {
+      const voicemailResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/slybroadcast/send-voicemail`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerPhone: submission.contactInfo.phone,
+          customerName: submission.contactInfo.name,
+          pestType: submission.pestType,
+          urgency: submission.urgency,
+          address: submission.address || (submission.addressDetails ? 
+            `${submission.addressDetails.street}, ${submission.addressDetails.city}, ${submission.addressDetails.state} ${submission.addressDetails.zip}` : ''),
+          delayMinutes: 2, // 2 minute delay after form submission
+          leadId: lead.id,
+          companyId: submission.companyId
+        }),
+      });
+
+      if (voicemailResponse.ok) {
+        const voicemailResult = await voicemailResponse.json();
+        if (voicemailResult.success) {
+          console.log('✅ Voicemail drop sent successfully:', {
+            sessionId: voicemailResult.sessionId,
+            message: voicemailResult.message,
+            leadId: lead.id
+          });
+        } else if (voicemailResult.skipped) {
+          console.log('⚠️ Voicemail drop skipped (disabled)');
+        } else {
+          console.error('❌ Voicemail drop failed:', voicemailResult.error);
+        }
+      } else {
+        const voicemailError = await voicemailResponse.json();
+        console.error('💥 Voicemail API request failed:', voicemailError);
+      }
+    } catch (error) {
+      console.error('Error sending voicemail drop:', error);
+      // Don't fail the lead creation due to voicemail issues
+    }
+
     // Schedule automatic quote email (10 seconds after submission)
     setTimeout(async () => {
       try {
