@@ -3154,25 +3154,6 @@
         border-color: ${primaryColor};
         color: white;
       }
-      .dh-pest-option.processing .dh-pest-icon {
-        border-color: ${primaryColor};
-        color: white;
-        position: relative;
-        pointer-events: none;
-      }
-      .dh-pest-option.processing .dh-pest-icon::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 20px;
-        height: 20px;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-top: 2px solid white;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
       .dh-step-instruction {
         color: #4E4E4E;
         text-align: center;
@@ -3185,6 +3166,72 @@
         text-align: center;
         padding: 40px 20px;
         color: ${textColor};
+      }
+      .dh-pest-loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        border-radius: 20px;
+      }
+      .dh-pest-loading .dh-loading-spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid #e5e7eb;
+        border-top: 4px solid ${primaryColor};
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0;
+      }
+      .dh-urgency-loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        border-radius: 20px;
+      }
+      .dh-urgency-loading .dh-loading-spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid #e5e7eb;
+        border-top: 4px solid ${primaryColor};
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0;
+      }
+      .dh-quote-loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        border-radius: 20px;
+      }
+      .dh-quote-loading .dh-loading-spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid #e5e7eb;
+        border-top: 4px solid ${primaryColor};
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0;
       }
       .dh-loading-spinner {
         width: 32px;
@@ -3657,6 +3704,14 @@
         font-size: 20px;
         font-weight: 400;
         line-height: 25px;
+      }
+      .dh-plan-price-disclaimer {
+        color: #4E4E4E;
+        font-family: Outfit;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 14px;
+        margin-top: 4px;
       }
 
       .dh-plan-coverage-icons {
@@ -5060,152 +5115,169 @@
       };
 
       // Helper function to update dynamic text based on form data
-      const updateDynamicText = () => {
+      const updateDynamicText = async () => {
         // Wait for DOM to be ready
-        setTimeout(() => {
-          // Update urgency step pest type
-          const urgencyPestType = document.getElementById('urgency-pest-type');
-          if (urgencyPestType) {
-            const pestText = getPestTypeDisplay(
-              widgetState.formData.pestType,
-              'default'
-            );
-            urgencyPestType.textContent = pestText;
-          }
-
-          // Update address step pest type
-          const addressPestType = document.getElementById('address-pest-type');
-          if (addressPestType) {
-            const pestText = getPestTypeDisplay(
-              widgetState.formData.pestType,
-              'default'
-            );
-            addressPestType.textContent = pestText;
-          }
-
-          const addressPestTypeTwo = document.getElementById(
-            'address-pest-type-two'
-          );
-          if (addressPestTypeTwo) {
-            const pestText = getPestTypeDisplay(
-              widgetState.formData.pestType,
-              'comparison'
-            );
-            addressPestTypeTwo.textContent = pestText;
-          }
-
-          // Update address step pest icon
-          const addressPestIcon = document.getElementById('address-pest-icon');
-          if (addressPestIcon) {
-            const currentIcon = getPestIcon();
-            if (currentIcon) {
-              addressPestIcon.innerHTML = currentIcon;
+        return new Promise(resolve => {
+          setTimeout(() => {
+            // Update urgency step pest type
+            const urgencyPestType =
+              document.getElementById('urgency-pest-type');
+            if (urgencyPestType) {
+              const pestText = getPestTypeDisplay(
+                widgetState.formData.pestType,
+                'default'
+              );
+              urgencyPestType.textContent = pestText;
             }
-          }
 
-          // Update initial offer step pest type
-          const offerPestType = document.getElementById('offer-pest-type');
-          if (offerPestType) {
-            offerPestType.textContent = getPestTypeDisplay(
-              widgetState.formData.pestType,
-              'default'
-            );
-          }
-
-          // Update plan comparison step pest type
-          const comparisonPestType = document.getElementById(
-            'comparison-pest-type'
-          );
-          if (comparisonPestType) {
-            comparisonPestType.textContent = getPestTypeDisplay(
-              widgetState.formData.pestType,
-              'comparison'
-            );
-          }
-
-          // Update completion step with customer name
-          const completionMessage = document.querySelector(
-            '#dh-step-complete h3'
-          );
-          if (completionMessage && widgetState.formData.contactInfo) {
-            const { firstName, lastName } = widgetState.formData.contactInfo;
-            if (firstName) {
-              const customerName = lastName
-                ? `${firstName} ${lastName}`
-                : firstName;
-              completionMessage.textContent = `Thank you for your request, ${customerName}!`;
+            // Update address step pest type
+            const addressPestType =
+              document.getElementById('address-pest-type');
+            if (addressPestType) {
+              const pestText = getPestTypeDisplay(
+                widgetState.formData.pestType,
+                'default'
+              );
+              addressPestType.textContent = pestText;
             }
-          }
 
-          // Update completion step with additional personalized info
-          const completionDescription = document.querySelector(
-            '#dh-step-complete p'
-          );
-          if (completionDescription && widgetState.formData.contactInfo) {
-            const { firstName } = widgetState.formData.contactInfo;
-            const pestType = getPestTypeDisplay(
-              widgetState.formData.pestType,
-              'default'
+            const addressPestTypeTwo = document.getElementById(
+              'address-pest-type-two'
             );
-            const addressCity = widgetState.formData.addressCity;
-
-            let message = "We've received your information";
-            if (firstName) {
-              message = `Hi ${firstName}! We've received your information`;
+            if (addressPestTypeTwo) {
+              const pestText = getPestTypeDisplay(
+                widgetState.formData.pestType,
+                'comparison'
+              );
+              addressPestTypeTwo.textContent = pestText;
             }
-            if (pestType !== 'pests' && addressCity) {
-              message += ` for ${pestType} service in ${addressCity}`;
-            } else if (pestType !== 'pests') {
-              message += ` for ${pestType} service`;
-            } else if (addressCity) {
-              message += ` for service in ${addressCity}`;
+
+            // Update address step pest icon
+            const addressPestIcon =
+              document.getElementById('address-pest-icon');
+            if (addressPestIcon) {
+              const currentIcon = getPestIcon();
+              if (currentIcon) {
+                addressPestIcon.innerHTML = currentIcon;
+              }
             }
-            message +=
-              ' and will contact you within 24 hours with your free estimate. Keep an eye on your email and phone for our response.';
 
-            completionDescription.textContent = message;
-          }
+            // Update initial offer step pest type
+            const offerPestType = document.getElementById('offer-pest-type');
+            if (offerPestType) {
+              offerPestType.textContent = getPestTypeDisplay(
+                widgetState.formData.pestType,
+                'default'
+              );
+            }
 
-          // Update urgency timeline references based on selection
-          const urgencyTimelineRef = document.getElementById(
-            'urgency-timeline-ref'
-          );
-          if (urgencyTimelineRef && widgetState.formData.urgency) {
-            const timelineMap = {
-              yesterday: 'as soon as possible',
-              '1-2-days': 'within 1-2 days',
-              'next-week': 'within the next week',
-              'next-month': 'within the next month',
-              'no-rush': 'when convenient',
-            };
-            urgencyTimelineRef.textContent =
-              timelineMap[widgetState.formData.urgency] || 'soon';
-          }
+            // Update initial offer step price
+            const offerPrice = document.getElementById('offer-price');
+            if (offerPrice && widgetState.formData.offerPrice) {
+              offerPrice.textContent = `$${widgetState.formData.offerPrice}`;
+            } else if (offerPrice) {
+              offerPrice.textContent = '$'; // Fallback if no price available
+            }
 
-          // Update service address references
-          const serviceAddressRefs = document.querySelectorAll(
-            '.service-address-ref'
-          );
-          if (serviceAddressRefs.length > 0 && widgetState.formData.address) {
-            const shortAddress =
-              widgetState.formData.addressStreet &&
+            // Update plan comparison step pest type
+            const comparisonPestType = document.getElementById(
+              'comparison-pest-type'
+            );
+            if (comparisonPestType) {
+              comparisonPestType.textContent = getPestTypeDisplay(
+                widgetState.formData.pestType,
+                'comparison'
+              );
+            }
+
+            // Update completion step with customer name
+            const completionMessage = document.querySelector(
+              '#dh-step-complete h3'
+            );
+            if (completionMessage && widgetState.formData.contactInfo) {
+              const { firstName, lastName } = widgetState.formData.contactInfo;
+              if (firstName) {
+                const customerName = lastName
+                  ? `${firstName} ${lastName}`
+                  : firstName;
+                completionMessage.textContent = `Thank you for your request, ${customerName}!`;
+              }
+            }
+
+            // Update completion step with additional personalized info
+            const completionDescription = document.querySelector(
+              '#dh-step-complete p'
+            );
+            if (completionDescription && widgetState.formData.contactInfo) {
+              const { firstName } = widgetState.formData.contactInfo;
+              const pestType = getPestTypeDisplay(
+                widgetState.formData.pestType,
+                'default'
+              );
+              const addressCity = widgetState.formData.addressCity;
+
+              let message = "We've received your information";
+              if (firstName) {
+                message = `Hi ${firstName}! We've received your information`;
+              }
+              if (pestType !== 'pests' && addressCity) {
+                message += ` for ${pestType} service in ${addressCity}`;
+              } else if (pestType !== 'pests') {
+                message += ` for ${pestType} service`;
+              } else if (addressCity) {
+                message += ` for service in ${addressCity}`;
+              }
+              message +=
+                ' and will contact you within 24 hours with your free estimate. Keep an eye on your email and phone for our response.';
+
+              completionDescription.textContent = message;
+            }
+
+            // Update urgency timeline references based on selection
+            const urgencyTimelineRef = document.getElementById(
+              'urgency-timeline-ref'
+            );
+            if (urgencyTimelineRef && widgetState.formData.urgency) {
+              const timelineMap = {
+                yesterday: 'as soon as possible',
+                '1-2-days': 'within 1-2 days',
+                'next-week': 'within the next week',
+                'next-month': 'within the next month',
+                'no-rush': 'when convenient',
+              };
+              urgencyTimelineRef.textContent =
+                timelineMap[widgetState.formData.urgency] || 'soon';
+            }
+
+            // Update service address references
+            const serviceAddressRefs = document.querySelectorAll(
+              '.service-address-ref'
+            );
+            if (serviceAddressRefs.length > 0 && widgetState.formData.address) {
+              const shortAddress =
+                widgetState.formData.addressStreet &&
+                widgetState.formData.addressCity
+                  ? `${widgetState.formData.addressStreet}, ${widgetState.formData.addressCity}`
+                  : widgetState.formData.address;
+              serviceAddressRefs.forEach(ref => {
+                ref.textContent = shortAddress;
+              });
+            }
+
+            // Update customer address city references
+            const addressCityRefs =
+              document.querySelectorAll('.address-city-ref');
+            if (
+              addressCityRefs.length > 0 &&
               widgetState.formData.addressCity
-                ? `${widgetState.formData.addressStreet}, ${widgetState.formData.addressCity}`
-                : widgetState.formData.address;
-            serviceAddressRefs.forEach(ref => {
-              ref.textContent = shortAddress;
-            });
-          }
-
-          // Update customer address city references
-          const addressCityRefs =
-            document.querySelectorAll('.address-city-ref');
-          if (addressCityRefs.length > 0 && widgetState.formData.addressCity) {
-            addressCityRefs.forEach(ref => {
-              ref.textContent = widgetState.formData.addressCity;
-            });
-          }
-        }, 100); // Small delay to ensure DOM is ready
+            ) {
+              addressCityRefs.forEach(ref => {
+                ref.textContent = widgetState.formData.addressCity;
+              });
+            }
+            resolve(); // Resolve the promise when all updates are complete
+          }, 100); // Small delay to ensure DOM is ready
+        });
       };
 
       // Helper function to add progress bar to a form step
@@ -5272,11 +5344,14 @@
           `;
 
         pestStep.innerHTML = `
-        <div class="dh-form-step-content">
+        <div class="dh-form-step-content" style="position: relative;">
           <h2 class="dh-step-heading">What's your main pest issue?</h2>
           <p class="dh-step-instruction">What kind of pest issue are you experiencing?</p>
           <div class="dh-pest-selection">
             ${pestOptionsHtml}
+          </div>
+          <div class="dh-pest-loading" id="pest-loading" style="display: none;">
+            <div class="dh-loading-spinner"></div>
           </div>
         </div>
         <div class="dh-form-button-group">
@@ -5386,7 +5461,7 @@
         urgencyStep.className = 'dh-form-step';
         urgencyStep.id = 'dh-step-urgency';
         urgencyStep.innerHTML = `
-        <div class="dh-form-step-content">
+        <div class="dh-form-step-content" style="position: relative;">
       <h2 class="dh-step-heading">Excellent. How soon are you wanting to get rid of those pesky <span id="urgency-pest-type">pests</span>?</h2>
       <p class="dh-step-instruction">Select your preferred timeline to continue</p>
       <div class="dh-urgency-selection">
@@ -5394,6 +5469,9 @@
         <div class="dh-urgency-option" data-urgency="1-2-days">Within 1-2 days</div>
         <div class="dh-urgency-option" data-urgency="next-week">Within the next week</div>
         <div class="dh-urgency-option" data-urgency="no-rush">I&apos;m not in a rush</div>
+      </div>
+      <div class="dh-urgency-loading" id="urgency-loading" style="display: none;">
+        <div class="dh-loading-spinner"></div>
       </div>
       </div>
       <div class="dh-form-button-group">
@@ -5519,7 +5597,7 @@
         quoteContactStep.className = 'dh-form-step';
         quoteContactStep.id = 'dh-step-quote-contact';
         quoteContactStep.innerHTML = `
-        <div class="dh-form-step-content">
+        <div class="dh-form-step-content" style="position: relative;">
       <h2 class="dh-step-heading">Let&apos;s get you a detailed quote</h2>
       <p class="dh-step-instruction">We just need a few details to prepare your personalized quote.</p>
       <div class="dh-form-row">
@@ -5558,6 +5636,9 @@
           <input type="tel" class="dh-form-input" id="quote-phone-input" placeholder=" ">
           <label class="dh-floating-label" for="quote-phone-input" data-default-text="(888) 888-8888" data-focused-text="Cell Phone Number">Cell Phone Number</label>
         </div>
+      </div>
+      <div class="dh-quote-loading" id="quote-loading" style="display: none;">
+        <div class="dh-loading-spinner"></div>
       </div>
       </div>
       <div class="dh-form-button-group">
@@ -5828,10 +5909,20 @@
             )
             .join('');
 
-          // Update the pest selection HTML
-          const pestSelection = pestStep.querySelector('.dh-pest-selection');
-          if (pestSelection) {
-            pestSelection.innerHTML = pestOptionsHtml;
+          // Update the entire step content to include the loading overlay
+          const stepContent = pestStep.querySelector('.dh-form-step-content');
+          if (stepContent) {
+            stepContent.innerHTML = `
+              <h2 class="dh-step-heading">What's your main pest issue?</h2>
+              <p class="dh-step-instruction">What kind of pest issue are you experiencing?</p>
+              <div class="dh-pest-selection">
+                ${pestOptionsHtml}
+              </div>
+              <div class="dh-pest-loading" id="pest-loading" style="display: none;">
+                <div class="dh-loading-spinner"></div>
+              </div>
+            `;
+            stepContent.style.position = 'relative';
             // Re-setup validation for the updated pest step
             setupStepValidation('pest-issue');
           }
@@ -5904,7 +5995,7 @@
       };
 
       // Step navigation
-      const showStep = stepName => {
+      const showStep = async stepName => {
         // Hide all steps
         document.querySelectorAll('.dh-form-step').forEach(step => {
           step.classList.remove('active');
@@ -5936,7 +6027,7 @@
           updateProgressBar(stepName);
 
           // Update dynamic text based on form data
-          updateDynamicText();
+          await updateDynamicText();
 
           // Load plans when reaching plan selection step
           if (stepName === 'plan-selection') {
@@ -6211,32 +6302,63 @@
       };
 
       // Proceed to quote function - navigate from quote-contact to plan-comparison
-      window.proceedToQuote = () => {
-        // Save quote contact info
-        const quoteFirstName = document
-          .getElementById('quote-first-name-input')
-          ?.value.trim();
-        const quoteLastName = document
-          .getElementById('quote-last-name-input')
-          ?.value.trim();
-        const quoteEmail = document
-          .getElementById('quote-email-input')
-          ?.value.trim();
-        const quotePhone = document
-          .getElementById('quote-phone-input')
-          ?.value.trim();
+      window.proceedToQuote = async () => {
+        // Show loading overlay
+        const quoteLoadingEl = document.getElementById('quote-loading');
+        if (quoteLoadingEl) {
+          quoteLoadingEl.style.display = 'flex';
+        }
 
-        if (quoteFirstName && quoteLastName && quoteEmail && quotePhone) {
-          widgetState.formData.contactInfo = {
-            firstName: quoteFirstName,
-            lastName: quoteLastName,
-            name: `${quoteFirstName} ${quoteLastName}`,
-            email: quoteEmail,
-            phone: quotePhone,
-          };
+        try {
+          // Save quote contact info
+          const quoteFirstName = document
+            .getElementById('quote-first-name-input')
+            ?.value.trim();
+          const quoteLastName = document
+            .getElementById('quote-last-name-input')
+            ?.value.trim();
+          const quoteEmail = document
+            .getElementById('quote-email-input')
+            ?.value.trim();
+          const quotePhone = document
+            .getElementById('quote-phone-input')
+            ?.value.trim();
 
-          // Navigate to plan comparison
-          showStep('plan-comparison');
+          if (quoteFirstName && quoteLastName && quoteEmail && quotePhone) {
+            widgetState.formData.contactInfo = {
+              firstName: quoteFirstName,
+              lastName: quoteLastName,
+              name: `${quoteFirstName} ${quoteLastName}`,
+              email: quoteEmail,
+              phone: quotePhone,
+            };
+
+            // Fetch plan comparison data and ensure minimum loading time
+            await Promise.all([
+              fetchPlanComparisonData(),
+              updateDynamicText(),
+              createMinimumLoadingTime(1000), // Ensure loading shows for at least 1 second
+            ]);
+
+            // Navigate to plan comparison with pre-loaded data
+            await showStep('plan-comparison');
+            setupStepValidation('plan-comparison');
+            updateProgressBar('plan-comparison');
+
+            // Hide loading overlay after everything is complete
+            setTimeout(() => {
+              if (quoteLoadingEl) {
+                quoteLoadingEl.style.display = 'none';
+              }
+            }, 100); // Brief delay to ensure step transition is visible
+          }
+        } catch (error) {
+          console.error('Error during quote processing:', error);
+          // Fallback: hide loading and proceed anyway
+          if (quoteLoadingEl) {
+            quoteLoadingEl.style.display = 'none';
+          }
+          await showStep('plan-comparison');
           setupStepValidation('plan-comparison');
           updateProgressBar('plan-comparison');
         }
@@ -7216,6 +7338,114 @@
         }
       };
 
+      // Helper function to ensure minimum loading time for better UX
+      const createMinimumLoadingTime = ms => {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      };
+
+      // Helper function to format billing frequency to natural language
+      const formatBillingFrequency = (frequency) => {
+        if (!frequency) return '';
+        
+        const freq = frequency.toLowerCase().trim();
+        
+        switch (freq) {
+          case 'monthly':
+            return '/month';
+          case 'quarterly':
+            return '/quarter';
+          case 'annually':
+          case 'yearly':
+            return '/year';
+          case 'weekly':
+            return '/week';
+          case 'biannually':
+          case 'semi-annually':
+          case 'semiannually':
+            return '/6 months';
+          case 'daily':
+            return '/day';
+          default:
+            // Fallback: try to convert "ly" endings to natural form
+            if (freq.endsWith('ly')) {
+              const base = freq.slice(0, -2);
+              return `/${base}`;
+            }
+            // Final fallback: return as-is with forward slash
+            return `/${frequency}`;
+        }
+      };
+
+      // Fetch plan comparison data for selected pest
+      const fetchPlanComparisonData = async () => {
+        try {
+          const response = await fetch(
+            config.baseUrl + '/api/widget/suggested-plans',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                companyId: config.companyId,
+                selectedPests: [widgetState.formData.pestType],
+              }),
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.success && data.suggestions && data.suggestions.length > 0) {
+            // Store plan data in widget state for immediate use
+            widgetState.formData.planComparisonData = data.suggestions;
+            return data.suggestions;
+          } else {
+            widgetState.formData.planComparisonData = null;
+            return null;
+          }
+        } catch (error) {
+          console.warn('Error fetching plan comparison data:', error);
+          widgetState.formData.planComparisonData = null;
+          return null;
+        }
+      };
+
+      // Fetch pricing data for selected pest
+      const fetchPricingData = async () => {
+        try {
+          const response = await fetch(
+            config.baseUrl + '/api/widget/suggested-plans',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                companyId: config.companyId,
+                selectedPests: [widgetState.formData.pestType],
+              }),
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.success && data.suggestions && data.suggestions.length > 0) {
+            // Use the first plan's price since API sorts by best coverage match
+            const bestMatchPrice = data.suggestions[0].recurring_price;
+            // Store pricing data in widget state for immediate use
+            widgetState.formData.offerPrice = bestMatchPrice;
+            return bestMatchPrice;
+          } else {
+            widgetState.formData.offerPrice = null;
+            return null;
+          }
+        } catch (error) {
+          console.warn('Error fetching plan prices:', error);
+          widgetState.formData.offerPrice = null;
+          return null;
+        }
+      };
+
       // Load suggested plans based on selected pest
       const loadSuggestedPlans = async () => {
         const planLoadingEl = document.getElementById('plan-loading');
@@ -7320,7 +7550,7 @@
               </div>
               <div class="dh-plan-price">
                 <span class="dh-plan-price-main">$${plan.recurring_price}</span>
-                <span class="dh-plan-price-frequency">/${plan.billing_frequency}</span>
+                <span class="dh-plan-price-frequency">${formatBillingFrequency(plan.billing_frequency)}</span>
               </div>
               <p class="dh-plan-description">${plan.plan_description || ''}</p>
               <ul class="dh-plan-features">
@@ -7495,13 +7725,14 @@
             if (pestOptions) {
               pestOptions.forEach(option => {
                 option.addEventListener('click', async e => {
-                  // Prevent double-clicking
-                  if (option.classList.contains('processing')) return;
+                  // Prevent double-clicking if loading overlay is visible
+                  const pestLoadingEl = document.getElementById('pest-loading');
+                  if (pestLoadingEl && pestLoadingEl.style.display === 'flex')
+                    return;
 
                   // Remove selected class from all options
                   pestOptions.forEach(opt => {
                     opt.classList.remove('selected');
-                    opt.classList.remove('processing');
                   });
 
                   // Find the parent pest option element
@@ -7511,9 +7742,14 @@
                     return;
                   }
 
-                  // Add selected class and processing state to clicked option
+                  // Add selected class to clicked option
                   pestOption.classList.add('selected');
-                  pestOption.classList.add('processing');
+
+                  // Show centered loading overlay
+                  if (pestLoadingEl) {
+                    pestLoadingEl.style.display = 'flex';
+                  }
+
                   // Store selection
                   const pestValue = pestOption.dataset.pest;
 
@@ -7542,22 +7778,39 @@
                     console.warn('Error saving pest selection:', error);
                   }
 
-                  // Show brief visual feedback
-                  setTimeout(() => {
-                    pestOption.classList.remove('processing');
-
-                    // Update dynamic text now that pestType is set
-                    updateDynamicText();
+                  // Update dynamic text in background before step transition
+                  try {
+                    // Wait for both content updates AND minimum loading time
+                    await Promise.all([
+                      updateDynamicText(),
+                      createMinimumLoadingTime(1000), // Ensure loading shows for at least 1 second
+                    ]);
 
                     // Update step completion tracking
                     const completionStatus =
                       progressiveFormManager.calculateStepCompletion();
 
                     // Auto-advance to address validation step
-                    showStep('address');
+                    await showStep('address');
                     setupStepValidation('address');
                     updateProgressBar('address');
-                  }, 300); // Brief delay for visual feedback
+
+                    // Hide loading overlay after everything is complete
+                    setTimeout(() => {
+                      if (pestLoadingEl) {
+                        pestLoadingEl.style.display = 'none';
+                      }
+                    }, 100); // Brief delay to ensure step transition is visible
+                  } catch (error) {
+                    console.error('Error updating dynamic text:', error);
+                    // Fallback: hide loading and proceed anyway
+                    if (pestLoadingEl) {
+                      pestLoadingEl.style.display = 'none';
+                    }
+                    await showStep('address');
+                    setupStepValidation('address');
+                    updateProgressBar('address');
+                  }
                 });
               });
             }
@@ -7801,51 +8054,77 @@
             if (urgencyOptions) {
               urgencyOptions.forEach(option => {
                 option.addEventListener('click', async e => {
-                  // Prevent double-clicking
-                  if (option.classList.contains('processing')) return;
+                  // Prevent double-clicking if loading overlay is visible
+                  const urgencyLoadingEl =
+                    document.getElementById('urgency-loading');
+                  if (
+                    urgencyLoadingEl &&
+                    urgencyLoadingEl.style.display === 'flex'
+                  )
+                    return;
 
                   // Remove selected class from all options
                   urgencyOptions.forEach(opt => {
                     opt.classList.remove('selected');
-                    opt.classList.remove('processing');
                   });
 
-                  // Add selected class and processing state to clicked option
+                  // Add selected class to clicked option
                   e.target.classList.add('selected');
-                  e.target.classList.add('processing');
+
+                  // Show centered loading overlay
+                  if (urgencyLoadingEl) {
+                    urgencyLoadingEl.style.display = 'flex';
+                  }
 
                   // Store selection
                   widgetState.formData.urgency = e.target.dataset.urgency;
 
-                  // Save progress immediately
                   try {
-                    const partialSaveResult = await savePartialLead(
-                      { served: false, status: 'unknown' }, // Service area unknown until address validated
-                      'urgency_completed'
-                    );
+                    // Save progress, fetch pricing data, ensure minimum loading time, and update text - all in parallel
+                    const [partialSaveResult, pricingData] = await Promise.all([
+                      savePartialLead(
+                        { served: false, status: 'unknown' }, // Service area unknown until address validated
+                        'urgency_completed'
+                      ),
+                      fetchPricingData(),
+                      Promise.all([
+                        updateDynamicText(),
+                        createMinimumLoadingTime(1000), // Ensure loading shows for at least 1 second
+                      ]),
+                    ]);
+
                     if (!partialSaveResult.success) {
                       console.warn(
                         'Failed to save urgency selection:',
                         partialSaveResult.error
                       );
                     }
-                  } catch (error) {
-                    console.warn('Error saving urgency selection:', error);
-                  }
-
-                  // Show brief visual feedback
-                  setTimeout(() => {
-                    e.target.classList.remove('processing');
 
                     // Update step completion tracking
                     const completionStatus =
                       progressiveFormManager.calculateStepCompletion();
 
                     // Auto-advance to initial offer step
-                    showStep('initial-offer');
+                    await showStep('initial-offer');
                     setupStepValidation('initial-offer');
                     updateProgressBar('initial-offer');
-                  }, 300); // Brief delay for visual feedback
+
+                    // Hide loading overlay after everything is complete
+                    setTimeout(() => {
+                      if (urgencyLoadingEl) {
+                        urgencyLoadingEl.style.display = 'none';
+                      }
+                    }, 100); // Brief delay to ensure step transition is visible
+                  } catch (error) {
+                    console.error('Error during urgency selection:', error);
+                    // Fallback: hide loading and proceed anyway
+                    if (urgencyLoadingEl) {
+                      urgencyLoadingEl.style.display = 'none';
+                    }
+                    await showStep('initial-offer');
+                    setupStepValidation('initial-offer');
+                    updateProgressBar('initial-offer');
+                  }
                 });
               });
             }
@@ -7855,40 +8134,8 @@
             const letsScheduleBtn = document.getElementById('lets-schedule');
             const detailedQuoteBtn = document.getElementById('detailed-quote');
             const noThanksBtn = document.getElementById('no-thanks');
-            const offerPrice = document.getElementById('offer-price');
 
-            // Update price based on available service plans
-            if (offerPrice) {
-              // Get suggested plans to show starting price
-              fetch(config.baseUrl + '/api/widget/suggested-plans', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  companyId: config.companyId,
-                  selectedPests: [widgetState.formData.pestType],
-                }),
-              })
-                .then(response => response.json())
-                .then(data => {
-                  if (
-                    data.success &&
-                    data.suggestions &&
-                    data.suggestions.length > 0
-                  ) {
-                    // Use the first plan's price since API sorts by best coverage match
-                    const bestMatchPrice = data.suggestions[0].recurring_price;
-                    offerPrice.textContent = `$${bestMatchPrice}`;
-                  } else {
-                    offerPrice.textContent = '$'; // Fallback price
-                  }
-                })
-                .catch(error => {
-                  console.warn('Error fetching plan prices:', error);
-                  offerPrice.textContent = '$'; // Fallback price
-                });
-            }
+            // Pricing is now handled in the urgency step for smoother transitions
 
             // Add click handlers for each button
             if (letsScheduleBtn) {
@@ -7942,40 +8189,51 @@
 
                 if (!comparisonPlanTabs || !comparisonPlanContent) return;
 
-                // Show loading state
-                if (comparisonPlanLoading) {
-                  comparisonPlanLoading.style.display = 'block';
-                }
+                let suggestions = null;
 
-                // Get suggested plans
-                const response = await fetch(
-                  config.baseUrl + '/api/widget/suggested-plans',
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      companyId: config.companyId,
-                      selectedPests: [widgetState.formData.pestType],
-                    }),
+                // Check if we have pre-loaded data from quote form submission
+                if (widgetState.formData.planComparisonData) {
+                  suggestions = widgetState.formData.planComparisonData;
+                } else {
+                  // Show loading state for fallback API call
+                  if (comparisonPlanLoading) {
+                    comparisonPlanLoading.style.display = 'block';
                   }
-                );
 
-                const data = await response.json();
+                  // Fallback: Get suggested plans via API if no pre-loaded data
+                  const response = await fetch(
+                    config.baseUrl + '/api/widget/suggested-plans',
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        companyId: config.companyId,
+                        selectedPests: [widgetState.formData.pestType],
+                      }),
+                    }
+                  );
 
-                // Hide loading state
-                if (comparisonPlanLoading) {
-                  comparisonPlanLoading.style.display = 'none';
+                  const data = await response.json();
+
+                  // Hide loading state
+                  if (comparisonPlanLoading) {
+                    comparisonPlanLoading.style.display = 'none';
+                  }
+
+                  if (
+                    data.success &&
+                    data.suggestions &&
+                    data.suggestions.length > 0
+                  ) {
+                    suggestions = data.suggestions;
+                  }
                 }
 
-                if (
-                  data.success &&
-                  data.suggestions &&
-                  data.suggestions.length > 0
-                ) {
+                if (suggestions && suggestions.length > 0) {
                   // Limit to first 3 plans (best matches)
-                  const plans = data.suggestions.slice(0, 3);
+                  const plans = suggestions.slice(0, 3);
 
                   // Generate tabs HTML
                   const tabsHtml = plans
@@ -8051,9 +8309,10 @@
                     
                     <div class="dh-plan-pricing">
                       <div class="dh-plan-price">
-                        <span class="dh-plan-price-label">Just $${plan.initial_price} to get started.</span>
+                        <span class="dh-plan-price-label">Service starts at just $${plan.recurring_price}${formatBillingFrequency(plan.billing_frequency)}.</span>
                       </div>
-                      <p class="dh-plan-price-detail">Service continues after the initial service at $${plan.recurring_price}/${plan.billing_frequency}.</p>
+                      <p class="dh-plan-price-detail">Initial setup fee of $${plan.initial_price}* to get started.</p>
+                      <p class="dh-plan-price-disclaimer">*Pricing may vary based on initial inspection findings and other factors.</p>
                     </div>
                   </div>
                   ${
