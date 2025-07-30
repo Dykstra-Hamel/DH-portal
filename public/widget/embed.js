@@ -1549,6 +1549,9 @@
             // Setup phone formatting for all phone input fields
             progressiveFormManager.setupPhoneFormatting();
 
+            // Setup calendar icon click handlers
+            progressiveFormManager.setupCalendarIconClick();
+
             // Initialize step analytics
             if (widgetState.formState.progressiveFeatures.stepAnalytics) {
               progressiveFormManager.initializeStepAnalytics();
@@ -1828,39 +1831,50 @@
 
         setupPhoneFormatting: () => {
           // Setup event listeners for phone formatting
-          const setupPhoneField = (fieldId) => {
+          const setupPhoneField = fieldId => {
             const field = document.getElementById(fieldId);
             if (field && !field.hasAttribute('data-phone-formatted')) {
               // Mark as formatted to avoid duplicate listeners
               field.setAttribute('data-phone-formatted', 'true');
-              
+
               // Handle input events for real-time formatting
-              field.addEventListener('input', (event) => {
+              field.addEventListener('input', event => {
                 progressiveFormManager.handlePhoneInput(field);
               });
 
               // Handle paste events
-              field.addEventListener('paste', (event) => {
+              field.addEventListener('paste', event => {
                 setTimeout(() => {
                   progressiveFormManager.handlePhoneInput(field);
                 }, 0);
               });
 
               // Handle keydown to prevent invalid characters
-              field.addEventListener('keydown', (event) => {
+              field.addEventListener('keydown', event => {
                 const allowedKeys = [
-                  'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
-                  'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-                  'Home', 'End'
+                  'Backspace',
+                  'Delete',
+                  'Tab',
+                  'Escape',
+                  'Enter',
+                  'ArrowLeft',
+                  'ArrowRight',
+                  'ArrowUp',
+                  'ArrowDown',
+                  'Home',
+                  'End',
                 ];
-                
+
                 // Allow digits and control keys
-                if (allowedKeys.includes(event.key) || 
-                    (event.key >= '0' && event.key <= '9') ||
-                    (event.ctrlKey || event.metaKey)) {
+                if (
+                  allowedKeys.includes(event.key) ||
+                  (event.key >= '0' && event.key <= '9') ||
+                  event.ctrlKey ||
+                  event.metaKey
+                ) {
                   return;
                 }
-                
+
                 // Prevent other characters
                 event.preventDefault();
               });
@@ -1872,15 +1886,19 @@
           setupPhoneField('quote-phone-input');
 
           // Also setup a mutation observer to catch dynamically added phone fields
-          const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-              mutation.addedNodes.forEach((node) => {
+          const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+              mutation.addedNodes.forEach(node => {
                 if (node.nodeType === 1) {
-                  if (node.id === 'phone-input' || node.id === 'quote-phone-input') {
+                  if (
+                    node.id === 'phone-input' ||
+                    node.id === 'quote-phone-input'
+                  ) {
                     setupPhoneField(node.id);
                   } else if (node.querySelector) {
                     const phoneInput = node.querySelector('#phone-input');
-                    const quotePhoneInput = node.querySelector('#quote-phone-input');
+                    const quotePhoneInput =
+                      node.querySelector('#quote-phone-input');
                     if (phoneInput) setupPhoneField('phone-input');
                     if (quotePhoneInput) setupPhoneField('quote-phone-input');
                   }
@@ -1891,11 +1909,52 @@
 
           observer.observe(document.body, {
             childList: true,
-            subtree: true
+            subtree: true,
           });
 
           // Store observer for cleanup
           widgetState.phoneFormattingObserver = observer;
+        },
+
+        setupCalendarIconClick: () => {
+          // Setup click handler for calendar icons to open date picker
+          document.addEventListener('click', event => {
+            const calendarIcon = event.target.closest(
+              '.dh-input-icon[data-type="calendar"]'
+            );
+            if (calendarIcon) {
+              // Find the associated date input
+              const container = calendarIcon.closest('.dh-floating-input');
+              const dateInput = container?.querySelector('input[type="date"]');
+
+              if (dateInput) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                try {
+                  // Try modern showPicker() method first (Chrome 99+)
+                  if (
+                    dateInput.showPicker &&
+                    typeof dateInput.showPicker === 'function'
+                  ) {
+                    dateInput.showPicker();
+                  } else {
+                    // Fallback: focus and click the input
+                    dateInput.focus();
+
+                    // Small delay to ensure focus is set before clicking
+                    setTimeout(() => {
+                      dateInput.click();
+                    }, 10);
+                  }
+                } catch (error) {
+                  // Fallback if showPicker() fails
+                  dateInput.focus();
+                  dateInput.click();
+                }
+              }
+            }
+          });
         },
 
         validateField: field => {
@@ -2236,10 +2295,10 @@
         },
 
         // Phone formatting utilities
-        formatPhoneNumber: (value) => {
+        formatPhoneNumber: value => {
           // Remove all non-numeric characters
           const cleanValue = value.replace(/\D/g, '');
-          
+
           // Handle different lengths of input
           if (cleanValue.length === 0) {
             return '';
@@ -2255,37 +2314,50 @@
           }
         },
 
-        handlePhoneInput: (input) => {
+        handlePhoneInput: input => {
           // Store cursor position
           const cursorPosition = input.selectionStart;
           const oldValue = input.value;
           const oldLength = oldValue.length;
-          
+
           // Format the phone number
-          const formattedValue = progressiveFormManager.formatPhoneNumber(input.value);
-          
+          const formattedValue = progressiveFormManager.formatPhoneNumber(
+            input.value
+          );
+
           // Only update if value changed to avoid infinite loops
           if (formattedValue !== oldValue) {
             input.value = formattedValue;
-            
+
             // Calculate new cursor position
             const newLength = formattedValue.length;
             const lengthDiff = newLength - oldLength;
             let newCursorPosition = cursorPosition + lengthDiff;
-            
+
             // Adjust cursor position to avoid placing it on formatting characters
-            if (newCursorPosition > 0 && newCursorPosition < formattedValue.length) {
+            if (
+              newCursorPosition > 0 &&
+              newCursorPosition < formattedValue.length
+            ) {
               const charAtCursor = formattedValue[newCursorPosition - 1];
-              if (charAtCursor === '(' || charAtCursor === ')' || charAtCursor === ' ' || charAtCursor === '-') {
-                newCursorPosition = Math.min(newCursorPosition + 1, formattedValue.length);
+              if (
+                charAtCursor === '(' ||
+                charAtCursor === ')' ||
+                charAtCursor === ' ' ||
+                charAtCursor === '-'
+              ) {
+                newCursorPosition = Math.min(
+                  newCursorPosition + 1,
+                  formattedValue.length
+                );
               }
             }
-            
+
             // Set cursor position
             setTimeout(() => {
               input.setSelectionRange(newCursorPosition, newCursorPosition);
             }, 0);
-            
+
             // Trigger floating label update
             setTimeout(() => {
               if (typeof window.updateAllFloatingLabels === 'function') {
@@ -2573,6 +2645,19 @@
         border-color: ${primaryColor}; 
         box-shadow: 0 0 0 3px ${primaryFocus}; 
       }
+
+      select.dh-form-input {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background: url('https://cwmckkfkcjxznkpdxgie.supabase.co/storage/v1/object/public/brand-assets/general/select-arrow.svg') no-repeat right 12px center;
+      }
+      
+      /* Hide default calendar icon for date inputs */
+      .dh-form-input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0;
+        cursor: pointer;
+      }
       
       /* Floating Label Styles */
       .dh-floating-input {
@@ -2588,7 +2673,7 @@
       }
       
       .dh-input-with-icon .dh-form-input {
-        padding-left: 50px;
+        padding-left: 60px;
       }
       
       .dh-floating-label {
@@ -2608,15 +2693,15 @@
       }
       
       .dh-input-with-icon .dh-floating-label {
-        left: 50px;
+        left: 60px;
       }
       
       /* Floating state - when focused or has content */
       .dh-floating-input .dh-form-input:focus + .dh-floating-label,
       .dh-floating-input .dh-form-input:not(:placeholder-shown) + .dh-floating-label {
-        top: 12px;
+        top: 14px;
         transform: translateY(-50%);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 500;
         color: ${primaryColor};
         left: 12px;
@@ -2624,7 +2709,7 @@
       
       .dh-input-with-icon .dh-form-input:focus + .dh-floating-label,
       .dh-input-with-icon .dh-form-input:not(:placeholder-shown) + .dh-floating-label {
-        left: 46px;
+        left: 56px;
       }
       
       /* Focused input border */
@@ -2642,6 +2727,29 @@
         color: #6b7280;
         z-index: 2;
         pointer-events: none;
+        padding-right: 12px;
+      }
+      
+      /* Full-height border separator for inputs with icons */
+      .dh-input-with-icon::before {
+        content: '';
+        position: absolute;
+        left: 48px;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background-color: #e5e7eb;
+        z-index: 1;
+      }
+      
+      /* Make calendar icons clickable */
+      .dh-input-icon[data-type="calendar"] {
+        pointer-events: auto;
+        cursor: pointer;
+      }
+      
+      .dh-input-icon[data-type="calendar"]:hover {
+        color: ${primaryColor};
       }
 
       .dh-input-icon svg {
@@ -4203,6 +4311,14 @@
         transform: translateY(-1px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
       }
+
+      #dh-step-contact .dh-form-row, #dh-step-contact .dh-form-group {
+        width: 390px;
+      }
+
+      #dh-step-contact .dh-form-row .dh-form-group {
+        width: 100%;
+      }
       
       /* Mobile modal adjustments */
       @media (max-width: 768px) {
@@ -5199,41 +5315,39 @@
             </svg>
           </div>
           <input type="tel" class="dh-form-input" id="phone-input" placeholder=" ">
-          <label class="dh-floating-label" for="phone-input">Cell Phone Number</label>
+          <label class="dh-floating-label" for="phone-input" data-default-text="(888) 888-8888" data-focused-text="Cell Phone Number">Cell Phone Number</label>
         </div>
       </div>
-      <div class="dh-form-row">
-        <div class="dh-form-group">
-          <div class="dh-floating-input dh-input-with-icon">
-            <div class="dh-input-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-            </div>
-            <input type="date" class="dh-form-input" id="start-date-input" placeholder=" ">
-            <label class="dh-floating-label" for="start-date-input">Preferred Start Date</label>
+      <div class="dh-form-group">
+        <div class="dh-floating-input dh-input-with-icon">
+          <div class="dh-input-icon" data-type="calendar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
           </div>
+          <input type="date" class="dh-form-input" id="start-date-input" placeholder=" ">
+          <label class="dh-floating-label" for="start-date-input">Preferred Start Date</label>
         </div>
-        <div class="dh-form-group">
-          <div class="dh-floating-input dh-input-with-icon">
-            <div class="dh-input-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12,6 12,12 16,14"/>
-              </svg>
-            </div>
-            <select class="dh-form-input" id="arrival-time-input">
-              <option value=""></option>
-              <option value="morning">Morning (8 AM - 12 PM)</option>
-              <option value="afternoon">Afternoon (12 PM - 5 PM)</option>
-              <option value="evening">Evening (5 PM - 8 PM)</option>
-              <option value="anytime">Anytime</option>
-            </select>
-            <label class="dh-floating-label" for="arrival-time-input">Select Preferred Arrival Time</label>
+      </div>
+      <div class="dh-form-group">
+        <div class="dh-floating-input dh-input-with-icon">
+          <div class="dh-input-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12,6 12,12 16,14"/>
+            </svg>
           </div>
+          <select class="dh-form-input" id="arrival-time-input">
+            <option value=""></option>
+            <option value="morning">Morning (8 AM - 12 PM)</option>
+            <option value="afternoon">Afternoon (12 PM - 5 PM)</option>
+            <option value="evening">Evening (5 PM - 8 PM)</option>
+            <option value="anytime">Anytime</option>
+          </select>
+          <label class="dh-floating-label" for="arrival-time-input">Select Preferred Arrival Time</label>
         </div>
       </div>
       <div class="dh-form-group">
@@ -5292,7 +5406,7 @@
             </svg>
           </div>
           <input type="tel" class="dh-form-input" id="quote-phone-input" placeholder=" ">
-          <label class="dh-floating-label" for="quote-phone-input">Phone Number</label>
+          <label class="dh-floating-label" for="quote-phone-input" data-default-text="(888) 888-8888" data-focused-text="Cell Phone Number">Cell Phone Number</label>
         </div>
       </div>
       </div>
@@ -5678,6 +5792,68 @@
           if (stepName === 'plan-selection') {
             loadSuggestedPlans();
           }
+          
+          // Populate address fields when reaching address step
+          if (stepName === 'address') {
+            setTimeout(() => {
+              if (typeof window.populateAddressFields === 'function') {
+                window.populateAddressFields();
+              }
+            }, 0);
+          }
+
+          // Initialize floating labels only for new inputs in the current step
+          setTimeout(() => {
+            const currentStepInputs = currentStep.querySelectorAll('.dh-floating-input .dh-form-input');
+            
+            currentStepInputs.forEach(input => {
+              
+              // Check if this input already has event listeners by looking for a data attribute
+              if (!input.hasAttribute('data-floating-initialized')) {
+                // Mark as initialized
+                input.setAttribute('data-floating-initialized', 'true');
+                
+                
+                // Initial state check
+                if (input.tagName.toLowerCase() === 'textarea') {
+                  updateTextareaLabel(input);
+                } else {
+                  updateFloatingLabel(input);
+                }
+
+                // Add event listeners
+                input.addEventListener('focus', () => {
+                  if (input.tagName.toLowerCase() === 'textarea') {
+                    updateTextareaLabel(input);
+                  } else {
+                    updateFloatingLabel(input);
+                  }
+                });
+
+                input.addEventListener('blur', () => {
+                  if (input.tagName.toLowerCase() === 'textarea') {
+                    updateTextareaLabel(input);
+                  } else {
+                    updateFloatingLabel(input);
+                  }
+                });
+
+                input.addEventListener('input', () => {
+                  if (input.tagName.toLowerCase() === 'textarea') {
+                    updateTextareaLabel(input);
+                  } else {
+                    updateFloatingLabel(input);
+                  }
+                });
+
+                if (input.tagName.toLowerCase() === 'select') {
+                  input.addEventListener('change', () => {
+                    updateFloatingLabel(input);
+                  });
+                }
+              }
+            });
+          }, 100);
         }
       };
 
@@ -6453,6 +6629,13 @@
 
           // Update floating labels for pre-filled address fields
           setTimeout(() => {
+            // Mark address inputs as initialized to prevent step initialization from overriding
+            [streetInput, cityInput, stateInput, zipInput].forEach(input => {
+              if (input) {
+                input.setAttribute('data-floating-initialized', 'true');
+              }
+            });
+            
             if (typeof window.updateAllFloatingLabels === 'function') {
               window.updateAllFloatingLabels();
             }
@@ -7137,6 +7320,18 @@
 
                 // Update floating labels for pre-filled address fields
                 setTimeout(() => {
+                  // Mark address inputs as initialized to prevent step initialization from overriding
+                  const streetInput = document.getElementById('street-input');
+                  const cityInput = document.getElementById('city-input');
+                  const stateInput = document.getElementById('state-input');
+                  const zipInput = document.getElementById('zip-input');
+                  
+                  [streetInput, cityInput, stateInput, zipInput].forEach(input => {
+                    if (input) {
+                      input.setAttribute('data-floating-initialized', 'true');
+                    }
+                  });
+                  
                   if (typeof window.updateAllFloatingLabels === 'function') {
                     window.updateAllFloatingLabels();
                   }
@@ -8025,20 +8220,35 @@
         };
       };
 
-      // Initialize floating label functionality
-      const initializeFloatingLabels = () => {
-        // Function to check if input has value and update label state
-        const updateFloatingLabel = input => {
+      // Function to check if input has value and update label state
+      const updateFloatingLabel = input => {
           const label = input.nextElementSibling;
           if (label && label.classList.contains('dh-floating-label')) {
-            if (input.value.trim() !== '' || input === document.activeElement) {
-              label.style.top = '12px';
+            const isPhoneInput =
+              input.id === 'phone-input' || input.id === 'quote-phone-input';
+            const isDateInput = input.type === 'date';
+            const hasValue = input.value.trim() !== '';
+            const isFocused = input === document.activeElement;
+
+            // Date inputs should always show floating label since they have placeholder text
+            if (hasValue || isFocused || isDateInput) {
+              // Floating state - show field name for phones
+              if (isPhoneInput) {
+                label.textContent =
+                  label.getAttribute('data-focused-text') || label.textContent;
+              }
+              label.style.top = '14px';
               label.style.transform = 'translateY(-50%)';
-              label.style.fontSize = '12px';
+              label.style.fontSize = '11px';
               label.style.fontWeight = '500';
               label.style.color =
                 widgetState.widgetConfig?.colors?.primary || '#3b82f6';
             } else {
+              // Default state - show format placeholder for phones
+              if (isPhoneInput) {
+                const defaultText = label.getAttribute('data-default-text');
+                label.textContent = defaultText || label.textContent;
+              }
               label.style.top = '50%';
               label.style.transform = 'translateY(-50%)';
               label.style.fontSize = '16px';
@@ -8048,8 +8258,8 @@
           }
         };
 
-        // Special handling for textareas
-        const updateTextareaLabel = textarea => {
+      // Special handling for textareas
+      const updateTextareaLabel = textarea => {
           const label = textarea.nextElementSibling;
           if (label && label.classList.contains('dh-floating-label')) {
             if (
@@ -8058,7 +8268,7 @@
             ) {
               label.style.top = '8px';
               label.style.transform = 'none';
-              label.style.fontSize = '12px';
+              label.style.fontSize = '11px';
               label.style.fontWeight = '500';
               label.style.color =
                 widgetState.widgetConfig?.colors?.primary || '#3b82f6';
@@ -8072,8 +8282,8 @@
           }
         };
 
-        // Set up event listeners for all floating inputs
-        const setupFloatingInputListeners = () => {
+      // Set up event listeners for all floating inputs  
+      const setupFloatingInputListeners = () => {
           const floatingInputs = document.querySelectorAll(
             '.dh-floating-input .dh-form-input'
           );
@@ -8122,6 +8332,8 @@
           });
         };
 
+      // Initialize floating label functionality  
+      const initializeFloatingLabels = () => {
         // Initial setup
         setupFloatingInputListeners();
 
