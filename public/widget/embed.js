@@ -238,6 +238,7 @@
           validationErrors: {},
           fieldCompletionStatus: {},
           stepCompletionPercentage: {},
+          fieldsWithErrors: new Set(), // Track fields that currently have errors
           userEngagement: {
             startTime: null,
             stepTimes: {},
@@ -2175,26 +2176,9 @@
           // Remove existing indicators
           progressiveFormManager.clearFieldIndicators(field);
 
-          // Add success styling to field
+          // Add success styling to field (border color only, no checkmark)
           field.style.borderColor = '#10b981';
           field.style.boxShadow = '0 0 0 1px #10b981';
-
-          // Add checkmark indicator
-          const successEl = document.createElement('div');
-          successEl.className = 'dh-field-success';
-          successEl.innerHTML = '✓';
-          successEl.style.cssText = `
-            position: absolute;
-            right: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #10b981;
-            font-weight: bold;
-            pointer-events: none;
-          `;
-
-          field.parentNode.style.position = 'relative';
-          field.parentNode.appendChild(successEl);
         },
 
         clearFieldIndicators: field => {
@@ -2202,11 +2186,18 @@
           field.style.borderColor = '';
           field.style.boxShadow = '';
 
-          // Remove all indicator elements
-          const indicators = field.parentNode?.querySelectorAll(
+          // Remove all indicator elements from both parentNode and form-group container
+          const container = field.closest('.dh-form-group') || field.parentNode;
+          const indicators = container?.querySelectorAll(
             '.dh-field-error, .dh-field-warning, .dh-field-success, .dh-format-suggestion'
           );
           indicators?.forEach(el => el.remove());
+          
+          // Also check parentNode in case of nested structure
+          const parentIndicators = field.parentNode?.querySelectorAll(
+            '.dh-field-error, .dh-field-warning, .dh-field-success, .dh-format-suggestion'
+          );
+          parentIndicators?.forEach(el => el.remove());
         },
 
         showFieldError: (field, message) => {
@@ -2220,7 +2211,10 @@
           errorEl.style.cssText = `
             color: #ef4444;
             font-size: 12px;
-            margin-top: 4px;
+            margin-top: 8px;
+            display: block;
+            width: 100%;
+            line-height: 1.4;
             animation: fadeIn 0.3s ease;
           `;
 
@@ -2228,15 +2222,141 @@
           field.style.borderColor = '#ef4444';
           field.style.boxShadow = '0 0 0 1px #ef4444';
 
-          // Insert error message
-          if (field.parentNode) {
-            field.parentNode.appendChild(errorEl);
+          // Track field as having error
+          if (field.id) {
+            widgetState.formState.fieldsWithErrors.add(field.id);
+            // Add real-time validation for this field
+            progressiveFormManager.addRealTimeValidation(field);
+          }
+
+          // Insert error message at container level for full width
+          const container = field.closest('.dh-form-group') || field.parentNode;
+          if (container) {
+            container.appendChild(errorEl);
           }
         },
 
         clearFieldError: field => {
+          // Remove from error tracking
+          if (field.id) {
+            widgetState.formState.fieldsWithErrors.delete(field.id);
+          }
+          
           // Use the comprehensive clearFieldIndicators method
           progressiveFormManager.clearFieldIndicators(field);
+        },
+
+        addRealTimeValidation: field => {
+          // Check if this field already has real-time validation
+          if (field.hasAttribute('data-realtime-validation')) {
+            return;
+          }
+          
+          // Mark field as having real-time validation
+          field.setAttribute('data-realtime-validation', 'true');
+          
+          // Create validation functions for this specific field
+          const validateField = () => {
+            const fieldName = field.id;
+            const value = field.value.trim();
+            
+            // Basic validation logic based on field type
+            let isValid = true;
+            let errorMessage = '';
+            
+            switch (fieldName) {
+              case 'first-name-input':
+              case 'quote-first-name-input':
+                if (!value) {
+                  isValid = false;
+                  errorMessage = 'First name is required';
+                }
+                break;
+                
+              case 'last-name-input':
+              case 'quote-last-name-input':
+                if (!value) {
+                  isValid = false;
+                  errorMessage = 'Last name is required';
+                }
+                break;
+                
+              case 'email-input':
+              case 'quote-email-input':
+                if (!value) {
+                  isValid = false;
+                  errorMessage = 'Email address is required';
+                } else {
+                  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                  if (!emailRegex.test(value)) {
+                    isValid = false;
+                    errorMessage = 'Please enter a valid email address';
+                  }
+                }
+                break;
+                
+              case 'phone-input':
+              case 'quote-phone-input':
+                if (!value) {
+                  isValid = false;
+                  errorMessage = 'Phone number is required';
+                } else {
+                  const cleanPhone = value.replace(/[\s\-\(\)]/g, '');
+                  if (!/^[\d\+]+$/.test(cleanPhone)) {
+                    isValid = false;
+                    errorMessage = 'Please enter a valid phone number';
+                  } else if (cleanPhone.length < 10) {
+                    isValid = false;
+                    errorMessage = 'Phone number must be at least 10 digits';
+                  }
+                }
+                break;
+                
+              case 'start-date-input':
+                if (!value) {
+                  isValid = false;
+                  errorMessage = 'Preferred start date is required';
+                } else if (!isDateInFuture(value)) {
+                  isValid = false;
+                  errorMessage = 'Please select a date that is at least one day in the future';
+                }
+                break;
+                
+              case 'arrival-time-input':
+                if (!value) {
+                  isValid = false;
+                  errorMessage = 'Preferred arrival time is required';
+                }
+                break;
+                
+              case 'address-search-input':
+                if (!value) {
+                  isValid = false;
+                  errorMessage = 'Please enter your address to continue';
+                }
+                break;
+            }
+            
+            if (isValid) {
+              progressiveFormManager.clearFieldError(field);
+              // Optionally show success state
+              progressiveFormManager.showFieldSuccess(field);
+            } else {
+              progressiveFormManager.showFieldError(field, errorMessage);
+            }
+          };
+          
+          // Clear error immediately on input
+          const clearErrorOnInput = () => {
+            if (widgetState.formState.fieldsWithErrors.has(field.id)) {
+              progressiveFormManager.clearFieldError(field);
+            }
+          };
+          
+          // Add event listeners
+          field.addEventListener('input', clearErrorOnInput);
+          field.addEventListener('blur', validateField);
+          field.addEventListener('change', validateField);
         },
 
         initializeStepAnalytics: () => {
@@ -2936,13 +3056,6 @@
         left: 20px;
         bottom: 20px;
         background: transparent;
-      }
-      .dh-form-btn:disabled { 
-        opacity: 0.6; 
-        cursor: not-allowed;
-      }
-      .dh-form-btn:disabled svg { 
-        transform: none;
       }
       .dh-form-btn.submitting {
         position: relative;
@@ -4186,12 +4299,16 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        outline: none;
       }
       
       .dh-welcome-button:hover {
         background: ${secondaryDark};
         transform: translateY(1px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+      .dh-welcome-button:focus {
+        outline: none;
       }
       
       .dh-button-arrow {
@@ -5226,7 +5343,7 @@
       </div>
       <div class="dh-form-button-group">
         <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-        <button class="dh-form-btn dh-form-btn-secondary" onclick="nextStep()" disabled id="address-next">Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+        <button class="dh-form-btn dh-form-btn-secondary" onclick="nextStep()" id="address-next">Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
       </div>
     `;
         steps.push(addressStep);
@@ -5359,7 +5476,7 @@
       </div>
       <div class="dh-form-button-group">
         <button class="dh-form-btn dh-form-btn-back form-submit-step-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-        <button class="dh-form-btn dh-form-btn-primary" onclick="submitForm()" disabled id="contact-submit">Schedule My Service</button>
+        <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="contact-submit">Schedule My Service</button>
       </div>
     `;
         steps.push(contactStep);
@@ -5412,7 +5529,7 @@
       </div>
       <div class="dh-form-button-group">
         <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-        <button class="dh-form-btn dh-form-btn-primary" onclick="proceedToQuote()" disabled id="quote-contact-submit">Get a Quote</button>
+        <button class="dh-form-btn dh-form-btn-primary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">Get a Quote</button>
       </div>
     `;
         steps.push(quoteContactStep);
@@ -5792,7 +5909,7 @@
           if (stepName === 'plan-selection') {
             loadSuggestedPlans();
           }
-          
+
           // Populate address fields when reaching address step
           if (stepName === 'address') {
             setTimeout(() => {
@@ -5804,16 +5921,16 @@
 
           // Initialize floating labels only for new inputs in the current step
           setTimeout(() => {
-            const currentStepInputs = currentStep.querySelectorAll('.dh-floating-input .dh-form-input');
-            
+            const currentStepInputs = currentStep.querySelectorAll(
+              '.dh-floating-input .dh-form-input'
+            );
+
             currentStepInputs.forEach(input => {
-              
               // Check if this input already has event listeners by looking for a data attribute
               if (!input.hasAttribute('data-floating-initialized')) {
                 // Mark as initialized
                 input.setAttribute('data-floating-initialized', 'true');
-                
-                
+
                 // Initial state check
                 if (input.tagName.toLowerCase() === 'textarea') {
                   updateTextareaLabel(input);
@@ -5895,9 +6012,21 @@
         if (widgetState.currentStep === 'address') {
           const addressNext = document.getElementById('address-next');
 
+          // Validate that an address has been entered
+          if (!widgetState.formData.address) {
+            // Show error message
+            const addressSearchInput = document.getElementById('address-search-input');
+            if (addressSearchInput) {
+              progressiveFormManager.showFieldError(addressSearchInput, 'Please enter your address to continue');
+            } else {
+              alert('Please enter your address to continue.');
+            }
+            return;
+          }
+
           // Show loading state
           if (addressNext) {
-            addressNext.disabled = true;
+            // Address next button stays enabled
             addressNext.textContent = 'Checking Service Area...';
           }
 
@@ -5942,8 +6071,7 @@
           } finally {
             // Reset button state
             if (addressNext) {
-              addressNext.disabled = false;
-              addressNext.textContent = 'Next';
+              addressNext.textContent = 'Continue';
             }
           }
           return;
@@ -6104,7 +6232,7 @@
           document.getElementById('zip-input').value = '';
 
           // Disable next button until new address is selected
-          addressNext.disabled = true;
+          // Address next button stays enabled
 
           // Clear form data
           widgetState.formData.addressStreet = '';
@@ -6468,6 +6596,7 @@
             validationErrors: {},
             fieldCompletionStatus: {},
             stepCompletionPercentage: {},
+            fieldsWithErrors: new Set(), // Reset error tracking
             userEngagement: {
               startTime: new Date().toISOString(),
               returningUser: false,
@@ -6624,7 +6753,7 @@
 
             if (searchMode) searchMode.style.display = 'none';
             if (displayMode) displayMode.style.display = 'block';
-            if (addressNext) addressNext.disabled = false;
+            // Address next button stays enabled
           }
 
           // Update floating labels for pre-filled address fields
@@ -6635,7 +6764,7 @@
                 input.setAttribute('data-floating-initialized', 'true');
               }
             });
-            
+
             if (typeof window.updateAllFloatingLabels === 'function') {
               window.updateAllFloatingLabels();
             }
@@ -6800,7 +6929,6 @@
         const submitBtn = document.getElementById('contact-submit');
         if (submitBtn) {
           if (isSubmitting) {
-            submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
             submitBtn.classList.add('submitting');
           } else {
@@ -6815,7 +6943,6 @@
               const email = emailInput.value.trim();
               const isValid = name && phone && email && email.includes('@');
 
-              submitBtn.disabled = !isValid;
               submitBtn.textContent = 'Get My Free Estimate';
               submitBtn.classList.remove('submitting');
             }
@@ -7316,7 +7443,7 @@
                 loadAddressImagery(address);
 
                 // Enable next button
-                addressNext.disabled = false;
+                // Address next button stays enabled
 
                 // Update floating labels for pre-filled address fields
                 setTimeout(() => {
@@ -7325,13 +7452,15 @@
                   const cityInput = document.getElementById('city-input');
                   const stateInput = document.getElementById('state-input');
                   const zipInput = document.getElementById('zip-input');
-                  
-                  [streetInput, cityInput, stateInput, zipInput].forEach(input => {
-                    if (input) {
-                      input.setAttribute('data-floating-initialized', 'true');
+
+                  [streetInput, cityInput, stateInput, zipInput].forEach(
+                    input => {
+                      if (input) {
+                        input.setAttribute('data-floating-initialized', 'true');
+                      }
                     }
-                  });
-                  
+                  );
+
                   if (typeof window.updateAllFloatingLabels === 'function') {
                     window.updateAllFloatingLabels();
                   }
@@ -7852,7 +7981,7 @@
                   // Store selection
                   widgetState.formData.exitReason = option.dataset.reason;
                   // Enable submit button
-                  if (surveySubmitBtn) surveySubmitBtn.disabled = false;
+                  // Survey submit button stays enabled
                 });
               });
             }
@@ -7910,9 +8039,8 @@
                 quoteEmailInput.value.trim() &&
                 quotePhoneInput.value.trim();
 
-              if (quoteSubmitBtn) {
-                quoteSubmitBtn.disabled = !isValid;
-              }
+              // Note: Button stays enabled, validation happens on click
+              return isValid;
             };
 
             // Add event listeners for real-time validation
@@ -7950,6 +8078,11 @@
               emailInput &&
               submitBtn
             ) {
+              // Set minimum date for start date input to tomorrow
+              if (startDateInput) {
+                startDateInput.setAttribute('min', getTomorrowDate());
+              }
+
               // Pre-fill form fields with existing contact info (if available)
               const prefillContactForm = () => {
                 const contactInfo = widgetState.formData.contactInfo;
@@ -8037,7 +8170,9 @@
                   startDate &&
                   arrivalTime &&
                   termsAccepted;
-                submitBtn.disabled = !isValid;
+                  
+                // Note: Button stays enabled, validation happens on click
+                return isValid;
               };
 
               // Add event listeners for all form fields
@@ -8222,117 +8357,117 @@
 
       // Function to check if input has value and update label state
       const updateFloatingLabel = input => {
-          const label = input.nextElementSibling;
-          if (label && label.classList.contains('dh-floating-label')) {
-            const isPhoneInput =
-              input.id === 'phone-input' || input.id === 'quote-phone-input';
-            const isDateInput = input.type === 'date';
-            const hasValue = input.value.trim() !== '';
-            const isFocused = input === document.activeElement;
+        const label = input.nextElementSibling;
+        if (label && label.classList.contains('dh-floating-label')) {
+          const isPhoneInput =
+            input.id === 'phone-input' || input.id === 'quote-phone-input';
+          const isDateInput = input.type === 'date';
+          const hasValue = input.value.trim() !== '';
+          const isFocused = input === document.activeElement;
 
-            // Date inputs should always show floating label since they have placeholder text
-            if (hasValue || isFocused || isDateInput) {
-              // Floating state - show field name for phones
-              if (isPhoneInput) {
-                label.textContent =
-                  label.getAttribute('data-focused-text') || label.textContent;
-              }
-              label.style.top = '14px';
-              label.style.transform = 'translateY(-50%)';
-              label.style.fontSize = '11px';
-              label.style.fontWeight = '500';
-              label.style.color =
-                widgetState.widgetConfig?.colors?.primary || '#3b82f6';
-            } else {
-              // Default state - show format placeholder for phones
-              if (isPhoneInput) {
-                const defaultText = label.getAttribute('data-default-text');
-                label.textContent = defaultText || label.textContent;
-              }
-              label.style.top = '50%';
-              label.style.transform = 'translateY(-50%)';
-              label.style.fontSize = '16px';
-              label.style.fontWeight = '400';
-              label.style.color = '#9ca3af';
+          // Date inputs should always show floating label since they have placeholder text
+          if (hasValue || isFocused || isDateInput) {
+            // Floating state - show field name for phones
+            if (isPhoneInput) {
+              label.textContent =
+                label.getAttribute('data-focused-text') || label.textContent;
             }
+            label.style.top = '14px';
+            label.style.transform = 'translateY(-50%)';
+            label.style.fontSize = '11px';
+            label.style.fontWeight = '500';
+            label.style.color =
+              widgetState.widgetConfig?.colors?.primary || '#3b82f6';
+          } else {
+            // Default state - show format placeholder for phones
+            if (isPhoneInput) {
+              const defaultText = label.getAttribute('data-default-text');
+              label.textContent = defaultText || label.textContent;
+            }
+            label.style.top = '50%';
+            label.style.transform = 'translateY(-50%)';
+            label.style.fontSize = '16px';
+            label.style.fontWeight = '400';
+            label.style.color = '#9ca3af';
           }
-        };
+        }
+      };
 
       // Special handling for textareas
       const updateTextareaLabel = textarea => {
-          const label = textarea.nextElementSibling;
-          if (label && label.classList.contains('dh-floating-label')) {
-            if (
-              textarea.value.trim() !== '' ||
-              textarea === document.activeElement
-            ) {
-              label.style.top = '8px';
-              label.style.transform = 'none';
-              label.style.fontSize = '11px';
-              label.style.fontWeight = '500';
-              label.style.color =
-                widgetState.widgetConfig?.colors?.primary || '#3b82f6';
-            } else {
-              label.style.top = '24px';
-              label.style.transform = 'none';
-              label.style.fontSize = '16px';
-              label.style.fontWeight = '400';
-              label.style.color = '#9ca3af';
-            }
+        const label = textarea.nextElementSibling;
+        if (label && label.classList.contains('dh-floating-label')) {
+          if (
+            textarea.value.trim() !== '' ||
+            textarea === document.activeElement
+          ) {
+            label.style.top = '8px';
+            label.style.transform = 'none';
+            label.style.fontSize = '11px';
+            label.style.fontWeight = '500';
+            label.style.color =
+              widgetState.widgetConfig?.colors?.primary || '#3b82f6';
+          } else {
+            label.style.top = '24px';
+            label.style.transform = 'none';
+            label.style.fontSize = '16px';
+            label.style.fontWeight = '400';
+            label.style.color = '#9ca3af';
           }
-        };
+        }
+      };
 
-      // Set up event listeners for all floating inputs  
+      // Set up event listeners for all floating inputs
       const setupFloatingInputListeners = () => {
-          const floatingInputs = document.querySelectorAll(
-            '.dh-floating-input .dh-form-input'
-          );
+        const floatingInputs = document.querySelectorAll(
+          '.dh-floating-input .dh-form-input'
+        );
 
-          floatingInputs.forEach(input => {
-            // Initial state check
+        floatingInputs.forEach(input => {
+          // Initial state check
+          if (input.tagName.toLowerCase() === 'textarea') {
+            updateTextareaLabel(input);
+          } else {
+            updateFloatingLabel(input);
+          }
+
+          // Focus event
+          input.addEventListener('focus', () => {
             if (input.tagName.toLowerCase() === 'textarea') {
               updateTextareaLabel(input);
             } else {
               updateFloatingLabel(input);
             }
+          });
 
-            // Focus event
-            input.addEventListener('focus', () => {
-              if (input.tagName.toLowerCase() === 'textarea') {
-                updateTextareaLabel(input);
-              } else {
-                updateFloatingLabel(input);
-              }
-            });
-
-            // Blur event
-            input.addEventListener('blur', () => {
-              if (input.tagName.toLowerCase() === 'textarea') {
-                updateTextareaLabel(input);
-              } else {
-                updateFloatingLabel(input);
-              }
-            });
-
-            // Input event for real-time updates
-            input.addEventListener('input', () => {
-              if (input.tagName.toLowerCase() === 'textarea') {
-                updateTextareaLabel(input);
-              } else {
-                updateFloatingLabel(input);
-              }
-            });
-
-            // Change event for select elements
-            if (input.tagName.toLowerCase() === 'select') {
-              input.addEventListener('change', () => {
-                updateFloatingLabel(input);
-              });
+          // Blur event
+          input.addEventListener('blur', () => {
+            if (input.tagName.toLowerCase() === 'textarea') {
+              updateTextareaLabel(input);
+            } else {
+              updateFloatingLabel(input);
             }
           });
-        };
 
-      // Initialize floating label functionality  
+          // Input event for real-time updates
+          input.addEventListener('input', () => {
+            if (input.tagName.toLowerCase() === 'textarea') {
+              updateTextareaLabel(input);
+            } else {
+              updateFloatingLabel(input);
+            }
+          });
+
+          // Change event for select elements
+          if (input.tagName.toLowerCase() === 'select') {
+            input.addEventListener('change', () => {
+              updateFloatingLabel(input);
+            });
+          }
+        });
+      };
+
+      // Initialize floating label functionality
       const initializeFloatingLabels = () => {
         // Initial setup
         setupFloatingInputListeners();
@@ -8378,6 +8513,196 @@
             }
           });
         };
+      };
+
+      // Date utility functions for validation
+      const getTomorrowDate = () => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
+      };
+
+      const isDateInFuture = (dateString) => {
+        if (!dateString) return false;
+        
+        const selectedDate = new Date(dateString);
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        // Reset time components for accurate date-only comparison
+        tomorrow.setHours(0, 0, 0, 0);
+        selectedDate.setHours(0, 0, 0, 0);
+        
+        return selectedDate >= tomorrow;
+      };
+
+      const formatDateForInput = (date) => {
+        return date.toISOString().split('T')[0];
+      };
+
+      // New validation functions for button clicks
+      window.submitFormWithValidation = () => {
+        const firstNameInput = document.getElementById('first-name-input');
+        const lastNameInput = document.getElementById('last-name-input');
+        const phoneInput = document.getElementById('phone-input');
+        const emailInput = document.getElementById('email-input');
+        const startDateInput = document.getElementById('start-date-input');
+        const arrivalTimeInput = document.getElementById('arrival-time-input');
+        const termsCheckbox = document.getElementById('terms-checkbox');
+        
+        // Clear existing errors
+        [firstNameInput, lastNameInput, phoneInput, emailInput, startDateInput, arrivalTimeInput].forEach(input => {
+          if (input) {
+            progressiveFormManager.clearFieldError(input);
+          }
+        });
+        
+        let hasErrors = false;
+        
+        // Validate required fields
+        if (!firstNameInput?.value.trim()) {
+          progressiveFormManager.showFieldError(firstNameInput, 'First name is required');
+          hasErrors = true;
+        }
+        
+        if (!lastNameInput?.value.trim()) {
+          progressiveFormManager.showFieldError(lastNameInput, 'Last name is required');
+          hasErrors = true;
+        }
+        
+        if (!phoneInput?.value.trim()) {
+          progressiveFormManager.showFieldError(phoneInput, 'Phone number is required');
+          hasErrors = true;
+        } else {
+          // Validate phone format
+          const cleanPhone = phoneInput.value.replace(/[\s\-\(\)]/g, '');
+          if (!/^[\d\+]+$/.test(cleanPhone)) {
+            progressiveFormManager.showFieldError(phoneInput, 'Please enter a valid phone number');
+            hasErrors = true;
+          } else if (cleanPhone.length < 10) {
+            progressiveFormManager.showFieldError(phoneInput, 'Phone number must be at least 10 digits');
+            hasErrors = true;
+          }
+        }
+        
+        if (!emailInput?.value.trim()) {
+          progressiveFormManager.showFieldError(emailInput, 'Email address is required');
+          hasErrors = true;
+        } else {
+          // Validate email format
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(emailInput.value)) {
+            progressiveFormManager.showFieldError(emailInput, 'Please enter a valid email address');
+            hasErrors = true;
+          }
+        }
+        
+        if (!startDateInput?.value) {
+          progressiveFormManager.showFieldError(startDateInput, 'Preferred start date is required');
+          hasErrors = true;
+        } else if (!isDateInFuture(startDateInput.value)) {
+          progressiveFormManager.showFieldError(startDateInput, 'Please select a date that is at least one day in the future');
+          hasErrors = true;
+        }
+        
+        if (!arrivalTimeInput?.value) {
+          progressiveFormManager.showFieldError(arrivalTimeInput, 'Preferred arrival time is required');
+          hasErrors = true;
+        }
+        
+        if (!termsCheckbox?.checked) {
+          // Use the standard error system for terms checkbox
+          const termsContainer = termsCheckbox.closest('.dh-form-group');
+          if (termsContainer) {
+            // Create a temporary container element to use with showFieldError
+            let termsErrorContainer = termsContainer.querySelector('.dh-terms-error-container');
+            if (!termsErrorContainer) {
+              termsErrorContainer = document.createElement('div');
+              termsErrorContainer.className = 'dh-terms-error-container';
+              termsErrorContainer.id = 'terms-checkbox-container';
+              termsContainer.appendChild(termsErrorContainer);
+            }
+            
+            progressiveFormManager.showFieldError(termsErrorContainer, 'You must agree to the terms and conditions');
+            
+            // Add real-time clearing for terms checkbox
+            const clearTermsError = () => {
+              if (termsCheckbox.checked) {
+                progressiveFormManager.clearFieldError(termsErrorContainer);
+              }
+            };
+            
+            // Remove existing listeners to prevent duplicates
+            termsCheckbox.removeEventListener('change', clearTermsError);
+            termsCheckbox.addEventListener('change', clearTermsError);
+          }
+          
+          hasErrors = true;
+        }
+        
+        if (!hasErrors) {
+          // All validation passed, proceed with form submission
+          submitForm();
+        }
+      };
+      
+      window.proceedToQuoteWithValidation = () => {
+        const quoteFirstNameInput = document.getElementById('quote-first-name-input');
+        const quoteLastNameInput = document.getElementById('quote-last-name-input');
+        const quoteEmailInput = document.getElementById('quote-email-input');
+        const quotePhoneInput = document.getElementById('quote-phone-input');
+        
+        // Clear existing errors
+        [quoteFirstNameInput, quoteLastNameInput, quoteEmailInput, quotePhoneInput].forEach(input => {
+          if (input) {
+            progressiveFormManager.clearFieldError(input);
+          }
+        });
+        
+        let hasErrors = false;
+        
+        // Validate required fields
+        if (!quoteFirstNameInput?.value.trim()) {
+          progressiveFormManager.showFieldError(quoteFirstNameInput, 'First name is required');
+          hasErrors = true;
+        }
+        
+        if (!quoteLastNameInput?.value.trim()) {
+          progressiveFormManager.showFieldError(quoteLastNameInput, 'Last name is required');
+          hasErrors = true;
+        }
+        
+        if (!quoteEmailInput?.value.trim()) {
+          progressiveFormManager.showFieldError(quoteEmailInput, 'Email address is required');
+          hasErrors = true;
+        } else {
+          // Validate email format
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(quoteEmailInput.value)) {
+            progressiveFormManager.showFieldError(quoteEmailInput, 'Please enter a valid email address');
+            hasErrors = true;
+          }
+        }
+        
+        if (!quotePhoneInput?.value.trim()) {
+          progressiveFormManager.showFieldError(quotePhoneInput, 'Phone number is required');
+          hasErrors = true;
+        } else {
+          // Validate phone format
+          const cleanPhone = quotePhoneInput.value.replace(/[\s\-\(\)]/g, '');
+          if (!/^[\d\+]+$/.test(cleanPhone)) {
+            progressiveFormManager.showFieldError(quotePhoneInput, 'Please enter a valid phone number');
+            hasErrors = true;
+          } else if (cleanPhone.length < 10) {
+            progressiveFormManager.showFieldError(quotePhoneInput, 'Phone number must be at least 10 digits');
+            hasErrors = true;
+          }
+        }
+        
+        if (!hasErrors) {
+          // All validation passed, proceed with quote
+          proceedToQuote();
+        }
       };
 
       // Initialize widget
