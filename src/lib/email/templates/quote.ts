@@ -68,10 +68,14 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
   const singularPestType = getSingularPestType(pestType);
   const formattedUrgency = formatUrgencyDisplay(urgency);
   const urgencyMessage = getUrgencyMessage(urgency);
-  
+
   // Use selectedPlan pricing if available, otherwise fallback to defaults
-  const recurringPrice = selectedPlan?.recurring_price ? `$${selectedPlan.recurring_price} ${selectedPlan.billing_frequency.charAt(0).toUpperCase() + selectedPlan.billing_frequency.slice(1)}` : '$49 Monthly';
-  const initialPrice = selectedPlan?.initial_price ? `$${selectedPlan.initial_price}` : '$199';
+  const recurringPrice = selectedPlan?.recurring_price
+    ? `$${selectedPlan.recurring_price} ${selectedPlan.billing_frequency.charAt(0).toUpperCase() + selectedPlan.billing_frequency.slice(1)}`
+    : '$49 Monthly';
+  const initialPrice = selectedPlan?.initial_price
+    ? `$${selectedPlan.initial_price}`
+    : '$199';
 
   return `<!doctype html>
 <html
@@ -237,6 +241,10 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
         }
 
         .button_block .alignment {
+          text-align: center !important;
+        }
+
+        .row-1 .column-2 .block-1.paragraph_block td.pad {
           text-align: center !important;
         }
 
