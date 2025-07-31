@@ -452,7 +452,10 @@ export async function POST(request: NextRequest) {
     notes += `Pest Type: ${submission.pestType}\n`;
     notes += `Urgency: ${submission.urgency}\n`;
     if (submission.selectedPlan) {
-      notes += `Selected Plan: ${submission.selectedPlan}\n`;
+      const planName = typeof submission.selectedPlan === 'object' && submission.selectedPlan?.name 
+        ? submission.selectedPlan.name 
+        : submission.selectedPlan;
+      notes += `Selected Plan: ${planName}\n`;
     }
     if (submission.recommendedPlan) {
       notes += `Recommended Plan: ${submission.recommendedPlan}\n`;
@@ -591,7 +594,10 @@ export async function POST(request: NextRequest) {
         customerComments += `Pest Type: ${submission.pestType}\n`;
         customerComments += `Urgency: ${submission.urgency}\n`;
         if (submission.selectedPlan) {
-          customerComments += `Selected Plan: ${submission.selectedPlan}\n`;
+          const planName = typeof submission.selectedPlan === 'object' && submission.selectedPlan?.name 
+            ? submission.selectedPlan.name 
+            : submission.selectedPlan;
+          customerComments += `Selected Plan: ${planName}\n`;
         }
         if (submission.recommendedPlan) {
           customerComments += `Recommended Plan: ${submission.recommendedPlan}\n`;
@@ -673,7 +679,9 @@ export async function POST(request: NextRequest) {
             customerPhone: submission.contactInfo.phone,
             pestType: submission.pestType,
             urgency: submission.urgency,
-            selectedPlan: submission.selectedPlan,
+            selectedPlan: typeof submission.selectedPlan === 'object' && submission.selectedPlan?.name 
+              ? submission.selectedPlan.name 
+              : submission.selectedPlan || null,
             recommendedPlan: submission.recommendedPlan,
             address: submission.address,
             homeSize: submission.homeSize,
