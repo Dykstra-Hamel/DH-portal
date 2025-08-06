@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 interface PartialSaveRequest {
   companyId: string;
@@ -56,19 +57,18 @@ interface PartialSaveRequest {
 
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return await handleCorsPrelight(request, 'widget');
 }
 
 // Save partial form submission
 export async function POST(request: NextRequest) {
   try {
+    // Validate origin first
+    const { isValid, origin, response: corsResponse } = await validateOrigin(request, 'widget');
+    if (!isValid && corsResponse) {
+      return corsResponse;
+    }
+
     const body: PartialSaveRequest = await request.json();
     const {
       companyId,
@@ -82,38 +82,22 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!companyId || !sessionId || !formData || !attributionData) {
-      return NextResponse.json(
-        { 
-          error: 'Missing required fields: companyId, sessionId, formData, and attributionData are required',
-          success: false
-        },
-        {
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
+      return createCorsErrorResponse(
+        'Missing required fields: companyId, sessionId, formData, and attributionData are required',
+        origin,
+        'widget',
+        400
       );
     }
 
     // Validate coordinate data - only required for steps after address entry
     const requiresCoordinates = !['pest_issue_completed', 'urgency_completed'].includes(stepCompleted);
     if (requiresCoordinates && (typeof formData.latitude !== 'number' || typeof formData.longitude !== 'number')) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid coordinate data: latitude and longitude must be numbers for this step',
-          success: false
-        },
-        {
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
+      return createCorsErrorResponse(
+        'Invalid coordinate data: latitude and longitude must be numbers for this step',
+        origin,
+        'widget',
+        400
       );
     }
 
@@ -144,20 +128,11 @@ export async function POST(request: NextRequest) {
 
     if (sessionError) {
       console.error('Error creating/updating widget session:', sessionError);
-      return NextResponse.json(
-        {
-          error: 'Failed to create session',
-          success: false,
-          details: sessionError.message || sessionError
-        },
-        {
-          status: 500,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
+      return createCorsErrorResponse(
+        `Failed to create session: ${sessionError.message || sessionError}`,
+        origin,
+        'widget',
+        500
       );
     }
 
@@ -186,56 +161,30 @@ export async function POST(request: NextRequest) {
 
     if (partialLeadError) {
       console.error('Error creating/updating partial lead:', partialLeadError);
-      return NextResponse.json(
-        {
-          error: 'Failed to save partial lead data',
-          success: false,
-          details: partialLeadError.message || partialLeadError
-        },
-        {
-          status: 500,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
+      return createCorsErrorResponse(
+        `Failed to save partial lead data: ${partialLeadError.message || partialLeadError}`,
+        origin,
+        'widget',
+        500
       );
     }
 
 
-    return NextResponse.json(
-      {
-        success: true,
-        partialLeadId: partialLead.id,
-        sessionId: sessionId,
-        stepCompleted: stepCompleted,
-        serviceAreaServed: serviceAreaData.served
-      },
-      {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      }
-    );
+    return createCorsResponse({
+      success: true,
+      partialLeadId: partialLead.id,
+      sessionId: sessionId,
+      stepCompleted: stepCompleted,
+      serviceAreaServed: serviceAreaData.served
+    }, origin, 'widget');
 
   } catch (error) {
     console.error('Error in partial-save endpoint:', error);
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        success: false
-      },
-      {
-        status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      }
+    return createCorsErrorResponse(
+      'Internal server error',
+      null,
+      'widget',
+      500
     );
   }
 }

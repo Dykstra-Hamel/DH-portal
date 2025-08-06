@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 interface RecoverFormRequest {
   companyId: string;
@@ -8,56 +9,39 @@ interface RecoverFormRequest {
 
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return await handleCorsPrelight(request, 'widget');
 }
 
 // Recover partial form data for continuation
 export async function POST(request: NextRequest) {
   try {
+    // Validate origin first
+    const { isValid, origin, response: corsResponse } = await validateOrigin(request, 'widget');
+    if (!isValid && corsResponse) {
+      return corsResponse;
+    }
+
     const body: RecoverFormRequest = await request.json();
     const { companyId, sessionId } = body;
 
     // Validate required fields
     if (!companyId || !sessionId) {
-      return NextResponse.json(
-        { 
-          error: 'Missing required fields: companyId and sessionId are required',
-          success: false
-        },
-        {
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
+      return createCorsErrorResponse(
+        'Missing required fields: companyId and sessionId are required',
+        origin,
+        'widget',
+        400
       );
     }
 
     // Validate UUID formats
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(companyId) || !uuidRegex.test(sessionId)) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid UUID format for companyId or sessionId',
-          success: false
-        },
-        {
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
+      return createCorsErrorResponse(
+        'Invalid UUID format for companyId or sessionId',
+        origin,
+        'widget',
+        400
       );
     }
 
@@ -86,36 +70,19 @@ export async function POST(request: NextRequest) {
     if (partialLeadError) {
       // If no partial lead found, that's not necessarily an error
       if (partialLeadError.code === 'PGRST116') {
-        return NextResponse.json(
-          {
-            success: true,
-            hasPartialLead: false,
-            message: 'No partial lead found for this session'
-          },
-          {
-            headers: {
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'POST, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type',
-            },
-          }
-        );
+        return createCorsResponse({
+          success: true,
+          hasPartialLead: false,
+          message: 'No partial lead found for this session'
+        }, origin, 'widget');
       }
 
       console.error('Error retrieving partial lead:', partialLeadError);
-      return NextResponse.json(
-        {
-          error: 'Failed to retrieve partial lead data',
-          success: false
-        },
-        {
-          status: 500,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
+      return createCorsErrorResponse(
+        'Failed to retrieve partial lead data',
+        origin,
+        'widget',
+        500
       );
     }
 
@@ -123,21 +90,12 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const expiresAt = new Date(partialLead.expires_at);
     if (now > expiresAt) {
-      return NextResponse.json(
-        {
-          success: true,
-          hasPartialLead: false,
-          expired: true,
-          message: 'Partial lead has expired'
-        },
-        {
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
-      );
+      return createCorsResponse({
+        success: true,
+        hasPartialLead: false,
+        expired: true,
+        message: 'Partial lead has expired'
+      }, origin, 'widget');
     }
 
     // Also get the widget session data for additional context
@@ -190,32 +148,15 @@ export async function POST(request: NextRequest) {
     }
 
 
-    return NextResponse.json(
-      recoveryData,
-      {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      }
-    );
+    return createCorsResponse(recoveryData, origin, 'widget');
 
   } catch (error) {
     console.error('Error in recover-form endpoint:', error);
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        success: false
-      },
-      {
-        status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      }
+    return createCorsErrorResponse(
+      'Internal server error',
+      null,
+      'widget',
+      500
     );
   }
 }

@@ -3,10 +3,53 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = await request.json();
+    // Verify the webhook is from Retell with proper authentication
+    const authHeader = request.headers.get('authorization');
+    const retellWebhookSecret = process.env.RETELL_WEBHOOK_SECRET;
+    
+    if (!retellWebhookSecret) {
+      console.error('Retell Webhook: RETELL_WEBHOOK_SECRET not configured');
+      return NextResponse.json(
+        { error: 'Webhook secret not configured' },
+        { status: 500 }
+      );
+    }
+    
+    // Validate authorization header
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Retell Webhook: Missing or invalid authorization header');
+      return NextResponse.json(
+        { error: 'Unauthorized - missing bearer token' },
+        { status: 401 }
+      );
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Use constant-time comparison to prevent timing attacks
+    const expectedToken = Buffer.from(retellWebhookSecret, 'utf8');
+    const providedToken = Buffer.from(token, 'utf8');
+    
+    // Ensure buffers are the same length to prevent length-based timing attacks
+    if (expectedToken.length !== providedToken.length) {
+      console.error('Retell Webhook: Invalid webhook secret');
+      return NextResponse.json(
+        { error: 'Unauthorized - invalid token' },
+        { status: 401 }
+      );
+    }
+    
+    // Use crypto.timingSafeEqual for constant-time comparison
+    const { timingSafeEqual } = await import('crypto');
+    if (!timingSafeEqual(expectedToken, providedToken)) {
+      console.error('Retell Webhook: Invalid webhook secret');
+      return NextResponse.json(
+        { error: 'Unauthorized - invalid token' },
+        { status: 401 }
+      );
+    }
 
-    // Verify the webhook is from Retell (you should add proper authentication)
-    // const authHeader = request.headers.get('authorization');
+    const payload = await request.json();
 
     // Get event type - Retell sends this as 'event' at top level
     const eventType = payload.event;
@@ -578,37 +621,42 @@ async function findCustomerByPhone(phoneNumber: string | undefined) {
     normalizedPhone.slice(-10), // 2074789013 (10 digits, remove country code)
   ];
 
-  let customer = null;
-
-  // Try each phone pattern by normalizing database phone numbers during query
+  // Try each phone pattern using database-level normalization for security
   for (const pattern of phonePatterns) {
-    // Use raw SQL to normalize database phone numbers and compare
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, phone')
-      .filter('phone', 'not.is', null)
-      .limit(100); // Get a reasonable batch to filter in JS
+    try {
+      // Use Supabase's built-in functions to normalize and compare phone numbers safely
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id')
+        .or(`phone.eq.${pattern},phone.eq.+1${pattern.slice(-10)},phone.eq.(${pattern.slice(-3, -7)}) ${pattern.slice(-7, -4)}-${pattern.slice(-4)}`)
+        .limit(1)
+        .single();
 
-    if (data) {
-      // Find customer by normalizing phone numbers in JavaScript
-      customer = data.find(c => {
-        const normalizedDbPhone = c.phone?.replace(/\D/g, '') || '';
-        return (
-          normalizedDbPhone === pattern || normalizedDbPhone === `1${pattern}`
-        );
-      });
-
-      if (customer) {
-        break;
+      if (data && !error) {
+        return data.id;
       }
-    }
-
-    if (error) {
-      console.error('findCustomerByPhone: error querying customers:', error);
+    } catch (error) {
+      // Try next pattern if this one fails
+      console.error('findCustomerByPhone: pattern failed:', pattern, error);
     }
   }
 
-  return customer?.id || null;
+  // Fallback: try exact match without formatting
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('phone', phoneNumber)
+      .single();
+
+    if (data && !error) {
+      return data.id;
+    }
+  } catch (error) {
+    console.error('findCustomerByPhone: exact match failed:', error);
+  }
+
+  return null;
 }
 
 function extractCallData(

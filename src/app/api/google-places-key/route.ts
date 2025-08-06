@@ -1,36 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return await handleCorsPrelight(request, 'widget');
 }
 
-// Helper function to add CORS headers
-const addCorsHeaders = (response: NextResponse) => {
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-  return response;
-};
-
 export async function GET(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  
+  // Validate origin first
+  const { isValid, origin: validatedOrigin, response } = await validateOrigin(request, 'widget');
+  
+  if (!isValid && response) {
+    return response;
+  }
+
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   
   if (!apiKey) {
-    return addCorsHeaders(
-      NextResponse.json(
-        { error: 'Google Places API key not configured' }, 
-        { status: 500 }
-      )
+    return createCorsErrorResponse(
+      'Google Places API key not configured',
+      origin,
+      'widget',
+      500
     );
   }
 
-  return addCorsHeaders(NextResponse.json({ apiKey }));
+  return createCorsResponse({ apiKey }, origin, 'widget');
 }

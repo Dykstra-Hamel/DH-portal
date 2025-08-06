@@ -2,6 +2,39 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 // Auto-calling functions - implemented inline below
 import { normalizePhoneNumber } from '@/lib/utils';
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
+
+// ServicePlan interface for typing
+interface ServicePlan {
+  id: string;
+  company_id: string;
+  plan_name: string;
+  plan_description: string;
+  plan_category: string;
+  initial_price: number;
+  recurring_price: number;
+  billing_frequency: string;
+  treatment_frequency: string;
+  includes_inspection: boolean;
+  plan_features: string[];
+  plan_faqs: Array<{ question: string; answer: string }>;
+  display_order: number;
+  highlight_badge: string | null;
+  color_scheme: any;
+  requires_quote: boolean;
+  plan_image_url: string | null;
+  is_active: boolean;
+  pest_coverage?: Array<{
+    pest_id: string;
+    coverage_level: string;
+    pest_name: string;
+    pest_slug: string;
+    pest_icon: string;
+    pest_category: string;
+  }>;
+  created_at: string;
+  updated_at: string;
+}
 import {
   sendLeadCreatedNotifications,
   validateEmails,
@@ -57,7 +90,7 @@ async function handleAutoLeadCall(
   pestData?: {
     pestType: string;
     urgency: string;
-    selectedPlan?: string;
+    selectedPlan?: ServicePlan;
     recommendedPlan?: string;
   }
 ): Promise<{
@@ -185,30 +218,15 @@ function determineLeadSourceFromAttribution(attributionData: any): string {
 }
 
 // Handle CORS preflight requests
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+export async function OPTIONS(request: NextRequest) {
+  return await handleCorsPrelight(request, 'widget');
 }
-
-// Helper function to add CORS headers
-const addCorsHeaders = (response: NextResponse) => {
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-  return response;
-};
 
 interface WidgetSubmission {
   companyId: string;
   pestType: string;
   urgency: string;
-  selectedPlan?: string;
+  selectedPlan?: ServicePlan;
   recommendedPlan?: string;
   address: string; // Formatted address for backward compatibility
   addressDetails?: {
@@ -259,6 +277,12 @@ interface WidgetSubmission {
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate origin first
+    const { isValid, origin, response } = await validateOrigin(request, 'widget');
+    if (!isValid && response) {
+      return response;
+    }
+
     const submission: WidgetSubmission = await request.json();
 
     // Validate required fields
@@ -267,11 +291,34 @@ export async function POST(request: NextRequest) {
       !submission.contactInfo?.email ||
       !submission.contactInfo?.name
     ) {
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'Company ID, name, and email are required' },
-          { status: 400 }
-        )
+      return createCorsErrorResponse(
+        'Company ID, name, and email are required',
+        origin,
+        'widget',
+        400
+      );
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(submission.contactInfo.email)) {
+      return createCorsErrorResponse(
+        'Invalid email format',
+        origin,
+        'widget',
+        400
+      );
+    }
+
+    // Validate field lengths to prevent abuse
+    if (submission.contactInfo.name.length > 100 || 
+        submission.contactInfo.email.length > 254 ||
+        (submission.contactInfo.phone && submission.contactInfo.phone.length > 20)) {
+      return createCorsErrorResponse(
+        'Input field too long',
+        origin,
+        'widget',
+        400
       );
     }
 
@@ -356,26 +403,36 @@ export async function POST(request: NextRequest) {
     let existingCustomer = null;
 
     // First, try to find by email
-    const { data: emailCustomer } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('email', submission.contactInfo.email)
-      .eq('company_id', submission.companyId)
-      .single();
-
-    if (emailCustomer) {
-      existingCustomer = emailCustomer;
-    } else if (normalizedPhone) {
-      // If no email match and we have a valid phone, try phone lookup
-      const { data: phoneCustomer } = await supabase
+    try {
+      const { data: emailCustomer, error: emailError } = await supabase
         .from('customers')
         .select('id')
-        .eq('phone', normalizedPhone)
+        .eq('email', submission.contactInfo.email)
         .eq('company_id', submission.companyId)
         .single();
 
-      if (phoneCustomer) {
-        existingCustomer = phoneCustomer;
+      if (emailCustomer && !emailError) {
+        existingCustomer = emailCustomer;
+      }
+    } catch (error) {
+      // No customer found with this email for this company
+    }
+
+    // If no email match and we have a valid phone, try phone lookup
+    if (!existingCustomer && normalizedPhone) {
+      try {
+        const { data: phoneCustomer, error: phoneError } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('phone', normalizedPhone)
+          .eq('company_id', submission.companyId)
+          .single();
+
+        if (phoneCustomer && !phoneError) {
+          existingCustomer = phoneCustomer;
+        }
+      } catch (error) {
+        // No customer found with this phone for this company
       }
     }
 
@@ -424,11 +481,11 @@ export async function POST(request: NextRequest) {
 
       if (customerError || !newCustomer) {
         console.error('Error creating customer:', customerError);
-        return addCorsHeaders(
-          NextResponse.json(
-            { error: 'Failed to create customer' },
-            { status: 500 }
-          )
+        return createCorsErrorResponse(
+          'Failed to create customer',
+          origin,
+          'widget',
+          500
         );
       }
 
@@ -452,10 +509,7 @@ export async function POST(request: NextRequest) {
     notes += `Pest Type: ${submission.pestType}\n`;
     notes += `Urgency: ${submission.urgency}\n`;
     if (submission.selectedPlan) {
-      const planName = typeof submission.selectedPlan === 'object' && submission.selectedPlan?.name 
-        ? submission.selectedPlan.name 
-        : submission.selectedPlan;
-      notes += `Selected Plan: ${planName}\n`;
+      notes += `Selected Plan: ${submission.selectedPlan.plan_name}\n`;
     }
     if (submission.recommendedPlan) {
       notes += `Recommended Plan: ${submission.recommendedPlan}\n`;
@@ -515,8 +569,11 @@ export async function POST(request: NextRequest) {
 
     if (leadError || !lead) {
       console.error('Error creating lead:', leadError);
-      return addCorsHeaders(
-        NextResponse.json({ error: 'Failed to create lead' }, { status: 500 })
+      return createCorsErrorResponse(
+        'Failed to create lead',
+        origin,
+        'widget',
+        500
       );
     }
 
@@ -547,9 +604,8 @@ export async function POST(request: NextRequest) {
     // Attempt auto-call if enabled (don't fail lead creation if this fails)
     let autoCallEnabled = false;
     try {
-      // TEMPORARY: Disable auto-calling
-      console.log('Auto-calling temporarily disabled');
-      autoCallEnabled = false; // Force disable
+      // Auto-calling disabled
+      autoCallEnabled = false;
       
       // autoCallEnabled = await shouldAutoCall(submission.companyId);
 
@@ -594,10 +650,7 @@ export async function POST(request: NextRequest) {
         customerComments += `Pest Type: ${submission.pestType}\n`;
         customerComments += `Urgency: ${submission.urgency}\n`;
         if (submission.selectedPlan) {
-          const planName = typeof submission.selectedPlan === 'object' && submission.selectedPlan?.name 
-            ? submission.selectedPlan.name 
-            : submission.selectedPlan;
-          customerComments += `Selected Plan: ${planName}\n`;
+          customerComments += `Selected Plan: ${submission.selectedPlan.plan_name}\n`;
         }
         if (submission.recommendedPlan) {
           customerComments += `Recommended Plan: ${submission.recommendedPlan}\n`;
@@ -679,9 +732,7 @@ export async function POST(request: NextRequest) {
             customerPhone: submission.contactInfo.phone,
             pestType: submission.pestType,
             urgency: submission.urgency,
-            selectedPlan: typeof submission.selectedPlan === 'object' && submission.selectedPlan?.name 
-              ? submission.selectedPlan.name 
-              : submission.selectedPlan || null,
+            selectedPlan: submission.selectedPlan?.plan_name,
             recommendedPlan: submission.recommendedPlan,
             address: submission.address,
             homeSize: submission.homeSize,
@@ -735,7 +786,6 @@ export async function POST(request: NextRequest) {
 
       if (smsResponse.ok) {
         const smsResult = await smsResponse.json();
-        console.log('SMS confirmation sent:', smsResult);
       } else {
         const smsError = await smsResponse.json();
         console.error('SMS sending failed:', smsError);
@@ -745,47 +795,6 @@ export async function POST(request: NextRequest) {
       // Don't fail the lead creation due to SMS issues
     }
 
-    // Send voicemail drop (immediate or delayed)
-    try {
-      const voicemailResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/slybroadcast/send-voicemail`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customerPhone: submission.contactInfo.phone,
-          customerName: submission.contactInfo.name,
-          pestType: submission.pestType,
-          urgency: submission.urgency,
-          address: submission.address || (submission.addressDetails ? 
-            `${submission.addressDetails.street}, ${submission.addressDetails.city}, ${submission.addressDetails.state} ${submission.addressDetails.zip}` : ''),
-          delayMinutes: 2, // 2 minute delay after form submission
-          leadId: lead.id,
-          companyId: submission.companyId
-        }),
-      });
-
-      if (voicemailResponse.ok) {
-        const voicemailResult = await voicemailResponse.json();
-        if (voicemailResult.success) {
-          console.log('✅ Voicemail drop sent successfully:', {
-            sessionId: voicemailResult.sessionId,
-            message: voicemailResult.message,
-            leadId: lead.id
-          });
-        } else if (voicemailResult.skipped) {
-          console.log('⚠️ Voicemail drop skipped (disabled)');
-        } else {
-          console.error('❌ Voicemail drop failed:', voicemailResult.error);
-        }
-      } else {
-        const voicemailError = await voicemailResponse.json();
-        console.error('💥 Voicemail API request failed:', voicemailError);
-      }
-    } catch (error) {
-      console.error('Error sending voicemail drop:', error);
-      // Don't fail the lead creation due to voicemail issues
-    }
 
     // Schedule automatic quote email (10 seconds after submission)
     setTimeout(async () => {
@@ -798,8 +807,8 @@ export async function POST(request: NextRequest) {
     }, 10 * 1000); // 10 seconds in milliseconds
 
     // Return success response
-    return addCorsHeaders(
-      NextResponse.json({
+    return createCorsResponse(
+      {
         success: true,
         customerId,
         leadId: lead.id,
@@ -827,12 +836,18 @@ export async function POST(request: NextRequest) {
           gclid: finalAttributionData.gclid || null,
           trafficSource: finalAttributionData.traffic_source || null,
         },
-      })
+      },
+      origin,
+      'widget'
     );
   } catch (error) {
     console.error('Error in widget submit:', error);
-    return addCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    // For error case, we can't access origin, so use null
+    return createCorsErrorResponse(
+      'Internal server error',
+      null,
+      'widget',
+      500
     );
   }
 }
@@ -871,7 +886,6 @@ async function sendDelayedQuoteEmail(submission: WidgetSubmission, company: any)
     }
 
     const result = await response.json();
-    console.log('Delayed quote email sent successfully:', result);
     
   } catch (error) {
     console.error('Failed to send delayed quote email:', error);

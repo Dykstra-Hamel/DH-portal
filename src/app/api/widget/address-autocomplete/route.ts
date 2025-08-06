@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return await handleCorsPrelight(request, 'widget');
 }
 
-// Helper function to add CORS headers
-const addCorsHeaders = (response: NextResponse) => {
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-  return response;
-};
 
 interface AddressAutocompleteRequest {
   input: string;
@@ -112,27 +99,31 @@ const buildStreetAddress = (addressComponents: GooglePlaceDetailsAddressComponen
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate origin first
+    const { isValid, origin, response: corsResponse } = await validateOrigin(request, 'widget');
+    if (!isValid && corsResponse) {
+      return corsResponse;
+    }
+
     const { input, companyId, sessionToken }: AddressAutocompleteRequest =
       await request.json();
 
     // Validate input
     if (!input || !companyId) {
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'Input and companyId are required' },
-          { status: 400 }
-        )
+      return createCorsErrorResponse(
+        'Input and companyId are required',
+        origin,
+        'widget',
+        400
       );
     }
 
     // Minimum input length to prevent excessive API calls
     if (input.trim().length < 2) {
-      return addCorsHeaders(
-        NextResponse.json({
-          success: true,
-          suggestions: [],
-        })
-      );
+      return createCorsResponse({
+        success: true,
+        suggestions: [],
+      }, origin, 'widget');
     }
 
     // Check if company exists and has address API enabled
@@ -144,9 +135,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (companyError || !company) {
-      return addCorsHeaders(
-        NextResponse.json({ error: 'Company not found' }, { status: 404 })
-      );
+      return createCorsErrorResponse('Company not found', origin, 'widget', 404);
     }
 
     // Check if address API is enabled for this company
@@ -155,23 +144,21 @@ export async function POST(request: NextRequest) {
 
     if (!addressApiConfig.enabled) {
       // Return empty suggestions if API is disabled
-      return addCorsHeaders(
-        NextResponse.json({
-          success: true,
-          suggestions: [],
-        })
-      );
+      return createCorsResponse({
+        success: true,
+        suggestions: [],
+      }, origin, 'widget');
     }
 
     // Get Google Places API key
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
       console.error('GOOGLE_PLACES_API_KEY not configured');
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'Address API not configured' },
-          { status: 500 }
-        )
+      return createCorsErrorResponse(
+        'Address API not configured',
+        origin,
+        'widget',
+        500
       );
     }
 
@@ -205,11 +192,11 @@ export async function POST(request: NextRequest) {
         response.status,
         response.statusText
       );
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'Address lookup service unavailable' },
-          { status: 503 }
-        )
+      return createCorsErrorResponse(
+        'Address lookup service unavailable',
+        origin,
+        'widget',
+        503
       );
     }
 
@@ -217,12 +204,10 @@ export async function POST(request: NextRequest) {
 
     // If no suggestions, return empty results
     if (!data.suggestions?.length) {
-      return addCorsHeaders(
-        NextResponse.json({
-          success: true,
-          suggestions: [],
-        })
-      );
+      return createCorsResponse({
+        success: true,
+        suggestions: [],
+      }, origin, 'widget');
     }
 
     // Get Place Details for each prediction to get full address information
@@ -249,18 +234,6 @@ export async function POST(request: NextRequest) {
           console.error('Place Details API returned empty data');
           return null;
         }
-
-        // Enhanced debugging for coordinate accuracy
-        console.log('🏠 GOOGLE PLACES API RESPONSE:', {
-          formattedAddress: detailsData.formattedAddress,
-          coordinates: { 
-            lat: detailsData.location?.latitude, 
-            lng: detailsData.location?.longitude 
-          },
-          addressTypes: suggestion.placePrediction.types,
-          isStreetAddress: suggestion.placePrediction.types?.includes('street_address'),
-          placeId: placeId
-        });
 
         // Coordinate quality validation
         const isStreetAddress = suggestion.placePrediction.types?.includes('street_address');
@@ -315,16 +288,17 @@ export async function POST(request: NextRequest) {
       lon: place.geometry.location.lng,
     }));
 
-    return addCorsHeaders(
-      NextResponse.json({
-        success: true,
-        suggestions,
-      })
-    );
+    return createCorsResponse({
+      success: true,
+      suggestions,
+    }, origin, 'widget');
   } catch (error) {
     console.error('Error in address autocomplete:', error);
-    return addCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return createCorsErrorResponse(
+      'Internal server error',
+      null,
+      'widget',
+      500
     );
   }
 }

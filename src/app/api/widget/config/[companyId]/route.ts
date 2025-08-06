@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return await handleCorsPrelight(request, 'widget');
 }
 
 export async function GET(
@@ -18,19 +12,20 @@ export async function GET(
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
+    // Validate origin first
+    const { isValid, origin, response } = await validateOrigin(request, 'widget');
+    if (!isValid && response) {
+      return response;
+    }
+
     const { companyId } = await params;
 
     if (!companyId) {
-      return NextResponse.json(
-        { error: 'Company ID is required' },
-        {
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
+      return createCorsErrorResponse(
+        'Company ID is required',
+        origin,
+        'widget',
+        400
       );
     }
 
@@ -55,17 +50,7 @@ export async function GET(
 
     if (companyError || !company) {
       console.error('Error fetching company:', companyError);
-      return NextResponse.json(
-        { error: 'Company not found' },
-        {
-          status: 404,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        }
-      );
+      return createCorsErrorResponse('Company not found', origin, 'widget', 404);
     }
 
     // Default color values
@@ -190,31 +175,17 @@ export async function GET(
       ),
     };
 
-    return NextResponse.json(
-      {
-        success: true,
-        config: publicConfig,
-      },
-      {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      }
-    );
+    return createCorsResponse({
+      success: true,
+      config: publicConfig,
+    }, origin, 'widget');
   } catch (error) {
     console.error('Error in widget config:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      {
-        status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      }
+    return createCorsErrorResponse(
+      'Internal server error',
+      null,
+      'widget',
+      500
     );
   }
 }

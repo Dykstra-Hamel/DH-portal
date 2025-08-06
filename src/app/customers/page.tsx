@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -126,23 +126,7 @@ export default function CustomersPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // Fetch customers when filters change
-  useEffect(() => {
-    if (isAdmin) {
-      fetchCustomersAdmin();
-    } else if (selectedCompany) {
-      fetchCustomers();
-    }
-  }, [
-    selectedCompany,
-    adminSelectedCompany,
-    isAdmin,
-    searchQuery,
-    sortKey,
-    sortDirection,
-  ]);
-
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     if (!selectedCompany) return;
 
     try {
@@ -160,9 +144,9 @@ export default function CustomersPage() {
     } finally {
       setCustomersLoading(false);
     }
-  };
+  }, [selectedCompany, searchQuery, sortKey, sortDirection]);
 
-  const fetchCustomersAdmin = async () => {
+  const fetchCustomersAdmin = useCallback(async () => {
     try {
       setCustomersLoading(true);
       const filters = {
@@ -179,7 +163,25 @@ export default function CustomersPage() {
     } finally {
       setCustomersLoading(false);
     }
-  };
+  }, [adminSelectedCompany, searchQuery, sortKey, sortDirection]);
+
+  // Fetch customers when filters change
+  useEffect(() => {
+    if (isAdmin) {
+      fetchCustomersAdmin();
+    } else if (selectedCompany) {
+      fetchCustomers();
+    }
+  }, [
+    selectedCompany,
+    adminSelectedCompany,
+    isAdmin,
+    searchQuery,
+    sortKey,
+    sortDirection,
+    fetchCustomers,
+    fetchCustomersAdmin,
+  ]);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {

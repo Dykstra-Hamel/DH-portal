@@ -79,10 +79,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate secure random password
+    const crypto = await import('crypto');
+    const randomPassword = crypto.randomBytes(16).toString('base64').slice(0, 16);
+    
     // Create user via Supabase auth admin
     const { data, error } = await supabase.auth.admin.createUser({
       email: userData.email,
-      password: 'tempPassword123', // Default password, user should reset
+      password: randomPassword, // Secure random password, user should reset
       user_metadata: {
         first_name: userData.first_name,
         last_name: userData.last_name,

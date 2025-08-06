@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import { generateQuoteEmailTemplate } from '@/lib/email/templates/quote';
 import { QuoteEmailData } from '@/lib/email/types';
 import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from '@/lib/email';
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 // const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -24,23 +25,19 @@ interface QuoteRequest {
   selectedPlan?: string;
 }
 
-// CORS headers for cross-origin requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
 // Handle preflight OPTIONS request
-export async function OPTIONS() {
-  return new Response(null, { 
-    status: 200, 
-    headers: corsHeaders 
-  });
+export async function OPTIONS(request: NextRequest) {
+  return await handleCorsPrelight(request, 'widget');
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate origin first
+    const { isValid, origin, response: corsResponse } = await validateOrigin(request, 'widget');
+    if (!isValid && corsResponse) {
+      return corsResponse;
+    }
+
     const quoteData: QuoteRequest = await request.json();
 
     // Validate required fields
@@ -49,9 +46,11 @@ export async function POST(request: NextRequest) {
       !quoteData.customerEmail ||
       !quoteData.customerName
     ) {
-      return NextResponse.json(
-        { error: 'Company ID, customer email, and name are required' },
-        { status: 400, headers: corsHeaders }
+      return createCorsErrorResponse(
+        'Company ID, customer email, and name are required',
+        origin,
+        'widget',
+        400
       );
     }
 
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     if (companyError || !company) {
       console.error('Error fetching company:', companyError);
-      return NextResponse.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
+      return createCorsErrorResponse('Company not found', origin, 'widget', 404);
     }
 
     // Fetch service plan data if selectedPlan is provided
@@ -131,9 +130,11 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const errorData = await response.text();
       console.error('DEBUG: MailerSend email sending failed:', response.status, errorData);
-      return NextResponse.json(
-        { error: 'Failed to send quote email', details: errorData },
-        { status: 500, headers: corsHeaders }
+      return createCorsErrorResponse(
+        'Failed to send quote email',
+        origin,
+        'widget',
+        500
       );
     }
 
@@ -148,16 +149,18 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('DEBUG: Email sent successfully via MailerSend:', responseData);
-    return NextResponse.json({
+    return createCorsResponse({
       success: true,
       emailId: responseData?.data?.id || 'unknown',
       message: 'Quote sent successfully to ' + quoteData.customerEmail,
-    }, { headers: corsHeaders });
+    }, origin, 'widget');
   } catch (error) {
     console.error('Error in send quote:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers: corsHeaders }
+    return createCorsErrorResponse(
+      'Internal server error',
+      null,
+      'widget',
+      500
     );
   }
 }

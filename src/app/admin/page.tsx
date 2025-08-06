@@ -65,7 +65,7 @@ export default function AdminPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [router, supabase]);
 
   if (loading) {
     return <div>Loading...</div>;
