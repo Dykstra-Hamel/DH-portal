@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
   Save,
@@ -334,13 +334,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   });
   const [domainLoading, setDomainLoading] = useState(false);
   const [domainError, setDomainError] = useState<string | null>(null);
-  // Default color values
-  const defaultColors = {
+  // Default color values - memoized to prevent re-creation on every render
+  const defaultColors = useMemo(() => ({
     primary: '#3b82f6',
     secondary: '#1e293b',
     background: '#ffffff',
     text: '#374151',
-  };
+  }), []);
 
   // Toggle section expansion
   const toggleSection = (sectionKey: keyof typeof expandedSections) => {
@@ -395,7 +395,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       },
     };
     return resolved;
-  }, [brandColors, defaultColors]);
+  }, [defaultColors]);
   // Handle color changes with override tracking
   const handleColorChange = (
     colorType: 'primary' | 'secondary' | 'background' | 'text',
@@ -520,7 +520,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     // Set the notification emails input field
     const emails = widgetConfig.notifications?.emails || [];
     setNotificationEmailsInput(emails.join('\n'));
-  }, [defaultColors]);
+  }, []);
 
   // Load company data when selected company changes
   useEffect(() => {
@@ -537,7 +537,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         loadDomainConfiguration(selectedCompanyId);
       }
     }
-  }, [selectedCompanyId, companies, loadCompanyConfig]);
+  }, [selectedCompanyId]);
 
   const geocodeCompanyAddress = async (company: Company) => {
     try {
