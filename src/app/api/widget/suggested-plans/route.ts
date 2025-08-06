@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return await handleCorsPrelight(request, 'widget');
 }
-
-// Helper function to add CORS headers
-const addCorsHeaders = (response: NextResponse) => {
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-  return response;
-};
 
 interface SuggestedPlansRequest {
   companyId: string;
@@ -52,23 +38,29 @@ interface PlanSuggestion {
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate origin first
+    const { isValid, origin, response: corsResponse } = await validateOrigin(request, 'widget');
+    if (!isValid && corsResponse) {
+      return corsResponse;
+    }
+
     const { companyId, selectedPests }: SuggestedPlansRequest = await request.json();
 
     if (!companyId) {
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'Company ID is required' },
-          { status: 400 }
-        )
+      return createCorsErrorResponse(
+        'Company ID is required',
+        origin,
+        'widget',
+        400
       );
     }
 
     if (!selectedPests || selectedPests.length === 0) {
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'At least one pest must be selected' },
-          { status: 400 }
-        )
+      return createCorsErrorResponse(
+        'At least one pest must be selected',
+        origin,
+        'widget',
+        400
       );
     }
 
@@ -83,22 +75,22 @@ export async function POST(request: NextRequest) {
 
     if (pestError) {
       console.error('Error fetching pest types:', pestError);
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'Failed to fetch pest information' },
-          { status: 500 }
-        )
+      return createCorsErrorResponse(
+        'Failed to fetch pest information',
+        origin,
+        'widget',
+        500
       );
     }
 
     const pestIds = pestTypes?.map(pest => pest.id) || [];
     
     if (pestIds.length === 0) {
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'No valid pests found' },
-          { status: 400 }
-        )
+      return createCorsErrorResponse(
+        'No valid pests found',
+        origin,
+        'widget',
+        400
       );
     }
 
@@ -137,22 +129,20 @@ export async function POST(request: NextRequest) {
 
     if (plansError) {
       console.error('Error fetching service plans:', plansError);
-      return addCorsHeaders(
-        NextResponse.json(
-          { error: 'Failed to fetch service plans' },
-          { status: 500 }
-        )
+      return createCorsErrorResponse(
+        'Failed to fetch service plans',
+        origin,
+        'widget',
+        500
       );
     }
 
     if (!servicePlans || servicePlans.length === 0) {
-      return addCorsHeaders(
-        NextResponse.json({
-          success: true,
-          suggestions: [],
-          message: 'No service plans available for this company',
-        })
-      );
+      return createCorsResponse({
+        success: true,
+        suggestions: [],
+        message: 'No service plans available for this company',
+      }, origin, 'widget');
     }
 
     // Calculate coverage match for each plan
@@ -207,24 +197,22 @@ export async function POST(request: NextRequest) {
              (servicePlans.find(p => p.id === b.id)?.display_order || 0);
     });
 
-    return addCorsHeaders(
-      NextResponse.json({
-        success: true,
-        suggestions: sortedSuggestions,
-        metadata: {
-          total_plans: sortedSuggestions.length,
-          perfect_matches: sortedSuggestions.filter(s => s.coverage_match.coverage_percentage === 100).length,
-          selected_pests: selectedPests,
-        },
-      })
-    );
+    return createCorsResponse({
+      success: true,
+      suggestions: sortedSuggestions,
+      metadata: {
+        total_plans: sortedSuggestions.length,
+        perfect_matches: sortedSuggestions.filter(s => s.coverage_match.coverage_percentage === 100).length,
+        selected_pests: selectedPests,
+      },
+    }, origin, 'widget');
   } catch (error) {
     console.error('Error in suggested plans:', error);
-    return addCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
+    return createCorsErrorResponse(
+      'Internal server error',
+      null,
+      'widget',
+      500
     );
   }
 }

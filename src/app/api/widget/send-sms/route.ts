@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizePhoneNumber, toE164PhoneNumber } from '@/lib/utils';
-
-// CORS headers for cross-origin requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 // Handle preflight OPTIONS request
-export async function OPTIONS() {
-  return new Response(null, { 
-    status: 200, 
-    headers: corsHeaders 
-  });
+export async function OPTIONS(request: NextRequest) {
+  return await handleCorsPrelight(request, 'widget');
 }
 
 interface SMSRequest {
@@ -24,39 +15,53 @@ interface SMSRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate origin first
+    const { isValid, origin, response: corsResponse } = await validateOrigin(request, 'widget');
+    if (!isValid && corsResponse) {
+      return corsResponse;
+    }
+
     const smsData: SMSRequest = await request.json();
 
     // Validate required fields
     if (!smsData.customerPhone || !smsData.customerName || !smsData.pestType) {
-      return NextResponse.json(
-        { error: 'Phone number, customer name, and pest type are required' },
-        { status: 400, headers: corsHeaders }
+      return createCorsErrorResponse(
+        'Phone number, customer name, and pest type are required',
+        origin,
+        'widget',
+        400
       );
     }
 
     // Validate and format phone number
     const normalizedPhone = normalizePhoneNumber(smsData.customerPhone);
     if (!normalizedPhone) {
-      return NextResponse.json(
-        { error: 'Invalid phone number format' },
-        { status: 400, headers: corsHeaders }
+      return createCorsErrorResponse(
+        'Invalid phone number format',
+        origin,
+        'widget',
+        400
       );
     }
 
     const e164Phone = toE164PhoneNumber(smsData.customerPhone);
     if (!e164Phone) {
-      return NextResponse.json(
-        { error: 'Could not format phone number for SMS' },
-        { status: 400, headers: corsHeaders }
+      return createCorsErrorResponse(
+        'Could not format phone number for SMS',
+        origin,
+        'widget',
+        400
       );
     }
 
     // Check for MailerSend API token
     if (!process.env.MAILERSEND_API_TOKEN) {
       console.error('MAILERSEND_API_TOKEN not configured');
-      return NextResponse.json(
-        { error: 'SMS service not configured' },
-        { status: 500, headers: corsHeaders }
+      return createCorsErrorResponse(
+        'SMS service not configured',
+        origin,
+        'widget',
+        500
       );
     }
 
@@ -102,24 +107,28 @@ Aiden`;
 
     if (!response.ok) {
       console.error('MailerSend SMS API error:', responseData);
-      return NextResponse.json(
-        { error: 'Failed to send SMS', details: responseData },
-        { status: response.status, headers: corsHeaders }
+      return createCorsErrorResponse(
+        `Failed to send SMS: ${JSON.stringify(responseData)}`,
+        origin,
+        'widget',
+        response.status
       );
     }
 
     console.log('SMS sent successfully:', responseData);
-    return NextResponse.json({
+    return createCorsResponse({
       success: true,
       message: 'SMS sent successfully to ' + e164Phone,
       smsId: (responseData as any)?.data?.id || 'unknown'
-    }, { headers: corsHeaders });
+    }, origin, 'widget');
 
   } catch (error) {
     console.error('Error in SMS route:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers: corsHeaders }
+    return createCorsErrorResponse(
+      'Internal server error',
+      null,
+      'widget',
+      500
     );
   }
 }

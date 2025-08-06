@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api-client';
 import WidgetConfig from '../Widget/WidgetConfig';
+import GlobalWidgetDomains from './GlobalWidgetDomains';
 
 interface Company {
   id: string;
@@ -150,11 +151,14 @@ const WidgetManager: React.FC = () => {
   }
 
   return (
-    <WidgetConfig
-      companies={companies}
-      selectedCompanyId={selectedCompanyId}
-      onCompanyChange={handleCompanyChange}
-    />
+    <div>
+      <GlobalWidgetDomains />
+      <WidgetConfig
+        companies={companies}
+        selectedCompanyId={selectedCompanyId}
+        onCompanyChange={handleCompanyChange}
+      />
+    </div>
   );
 };
 

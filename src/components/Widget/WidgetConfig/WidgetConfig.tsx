@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import {
   Save,
   Copy,
@@ -349,7 +350,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }));
   };
   // Color resolution function
-  const resolveColors = (
+  const resolveColors = useCallback((
     brandColors: { primary?: string; secondary?: string },
     overrides?: {
       primary?: string;
@@ -394,7 +395,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       },
     };
     return resolved;
-  };
+  }, [brandColors, defaultColors]);
   // Handle color changes with override tracking
   const handleColorChange = (
     colorType: 'primary' | 'secondary' | 'background' | 'text',
@@ -451,7 +452,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         text: resolved.text.value,
       },
     }));
-  }, [brandColors, config.colorOverrides]);
+  }, [brandColors, config.colorOverrides, resolveColors]);
   // Fetch Google API key on component mount
   useEffect(() => {
     const fetchGoogleApiKey = async () => {
@@ -467,23 +468,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     };
     fetchGoogleApiKey();
   }, []);
-  // Load company data when selected company changes
-  useEffect(() => {
-    if (selectedCompanyId) {
-      const company = companies.find(c => c.id === selectedCompanyId);
-      if (company) {
-        setSelectedCompany(company);
-        loadCompanyConfig(company);
-        fetchBrandColors(selectedCompanyId);
-        loadServiceAreas(selectedCompanyId);
-        loadPestOptions(selectedCompanyId);
-        loadServicePlans(selectedCompanyId);
-        geocodeCompanyAddress(company);
-        loadDomainConfiguration(selectedCompanyId);
-      }
-    }
-  }, [selectedCompanyId, companies]);
-  const loadCompanyConfig = (company: Company) => {
+
+  const loadCompanyConfig = useCallback((company: Company) => {
     const widgetConfig = company.widget_config || {};
     setConfig({
       branding: {
@@ -534,7 +520,25 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     // Set the notification emails input field
     const emails = widgetConfig.notifications?.emails || [];
     setNotificationEmailsInput(emails.join('\n'));
-  };
+  }, [defaultColors]);
+
+  // Load company data when selected company changes
+  useEffect(() => {
+    if (selectedCompanyId) {
+      const company = companies.find(c => c.id === selectedCompanyId);
+      if (company) {
+        setSelectedCompany(company);
+        loadCompanyConfig(company);
+        fetchBrandColors(selectedCompanyId);
+        loadServiceAreas(selectedCompanyId);
+        loadPestOptions(selectedCompanyId);
+        loadServicePlans(selectedCompanyId);
+        geocodeCompanyAddress(company);
+        loadDomainConfiguration(selectedCompanyId);
+      }
+    }
+  }, [selectedCompanyId, companies, loadCompanyConfig]);
+
   const geocodeCompanyAddress = async (company: Company) => {
     try {
       const coordinates = await getCompanyCoordinates(company);
@@ -1646,9 +1650,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               <label>Company Logo</label>
               {brandLogo ? (
                 <div className={styles.brandLogoDisplay}>
-                  <img
+                  <Image
                     src={brandLogo}
                     alt="Company Logo"
+                    width={200}
+                    height={100}
                     style={{
                       maxWidth: '200px',
                       maxHeight: '100px',
@@ -1688,9 +1694,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               />
               {config.branding.hero_image_url && (
                 <div className={styles.heroImagePreview}>
-                  <img
+                  <Image
                     src={config.branding.hero_image_url}
                     alt="Hero image preview"
+                    width={300}
+                    height={200}
                     style={{
                       maxWidth: '300px',
                       maxHeight: '200px',

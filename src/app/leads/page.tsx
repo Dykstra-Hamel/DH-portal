@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -123,16 +123,7 @@ export default function LeadsPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // Fetch leads when selectedCompany changes (regular user) or adminSelectedCompany changes (admin)
-  useEffect(() => {
-    if (isAdmin) {
-      fetchLeadsAdmin();
-    } else if (selectedCompany) {
-      fetchLeads();
-    }
-  }, [selectedCompany, adminSelectedCompany, isAdmin]);
-
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     if (!selectedCompany) return;
 
     try {
@@ -145,9 +136,9 @@ export default function LeadsPage() {
     } finally {
       setLeadsLoading(false);
     }
-  };
+  }, [selectedCompany]);
 
-  const fetchLeadsAdmin = async () => {
+  const fetchLeadsAdmin = useCallback(async () => {
     try {
       setLeadsLoading(true);
       const filters = adminSelectedCompany
@@ -161,7 +152,16 @@ export default function LeadsPage() {
     } finally {
       setLeadsLoading(false);
     }
-  };
+  }, [adminSelectedCompany]);
+
+  // Fetch leads when selectedCompany changes (regular user) or adminSelectedCompany changes (admin)
+  useEffect(() => {
+    if (isAdmin) {
+      fetchLeadsAdmin();
+    } else if (selectedCompany) {
+      fetchLeads();
+    }
+  }, [selectedCompany, adminSelectedCompany, isAdmin, fetchLeads, fetchLeadsAdmin]);
 
   if (loading) {
     return <div>Loading...</div>;

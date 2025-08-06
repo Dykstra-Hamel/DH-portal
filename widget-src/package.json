@@ -1,0 +1,12 @@
+{
+  "name": "dh-widget-source",
+  "version": "1.0.0",
+  "description": "DH Widget source files for maintainable development",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch"
+  },
+  "keywords": ["widget", "embed", "form"],
+  "author": "DH Portal",
+  "license": "ISC"
+}

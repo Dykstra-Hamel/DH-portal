@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -104,14 +104,7 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // Fetch customer when customerId is available
-  useEffect(() => {
-    if (customerId && !loading) {
-      fetchCustomer();
-    }
-  }, [customerId, loading, isAdmin]);
-
-  const fetchCustomer = async () => {
+  const fetchCustomer = useCallback(async () => {
     if (!customerId) return;
 
     try {
@@ -129,7 +122,14 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
     } finally {
       setCustomerLoading(false);
     }
-  };
+  }, [customerId, isAdmin]);
+
+  // Fetch customer when customerId is available
+  useEffect(() => {
+    if (customerId && !loading) {
+      fetchCustomer();
+    }
+  }, [customerId, loading, isAdmin, fetchCustomer]);
 
   const handleBack = () => {
     router.push('/customers');
