@@ -37,10 +37,16 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const [marketingOpen, setMarketingOpen] = useState(false);
   const [helpfulToolsOpen, setHelpfulToolsOpen] = useState(false);
   const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const pathname = usePathname();
   const isPublicPage = pathname === '/login' || pathname === '/sign-up';
   const { isAdminForAnyCompany } = useIsCompanyAdminAny();
+
+  // Handle client-side hydration
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const router = useRouter();
 
@@ -79,6 +85,11 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   }, [isPublicPage]);
 
   if (collapsed) {
+    return null;
+  }
+
+  // Prevent hydration mismatch by not rendering until hydrated
+  if (!isHydrated) {
     return null;
   }
 
@@ -184,14 +195,12 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         {/* Bottom Section */}
         <div className="sidebar-bottom-section">
           <div className="sidebar-bottom-nav">
-            {(isAdminForAnyCompany || isGlobalAdmin) && (
-              <SidebarSingleNavItem
-                itemText="Settings"
-                icon={Settings}
-                path="/settings"
-              />
-            )}
-            <SidebarSingleNavItem itemText="Log Out" icon={LogOut} path="#" />
+            <SidebarSingleNavItem
+              itemText="Settings"
+              icon={Settings}
+              path="/settings"
+            />
+            <SidebarSingleNavItem itemText="Log Out" icon={LogOut} onClick={handleSignOut} />
           </div>
         </div>
       </div>

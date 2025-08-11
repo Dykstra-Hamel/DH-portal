@@ -18,6 +18,9 @@ interface Company {
   country: string;
   industry: string | null;
   size: string | null;
+  ga_property_id: string | null;
+  callrail_api_token: string | null;
+  callrail_account_id: string | null;
   created_at: string;
 }
 
@@ -39,6 +42,9 @@ export default function CompaniesManager() {
     country: 'United States',
     industry: '',
     size: '',
+    ga_property_id: '',
+    callrail_api_token: '',
+    callrail_account_id: '',
   });
 
   useEffect(() => {
@@ -48,7 +54,29 @@ export default function CompaniesManager() {
   const loadCompanies = async () => {
     try {
       const companiesData = await adminAPI.getCompanies();
-      setCompanies(companiesData);
+      
+      // Load GA property IDs and CallRail API tokens from company settings for each company
+      const companiesWithSettings = await Promise.all(
+        companiesData.map(async (company: Company) => {
+          try {
+            const response = await fetch(`/api/companies/${company.id}/settings`);
+            if (response.ok) {
+              const { settings } = await response.json();
+              return {
+                ...company,
+                ga_property_id: settings.ga_property_id?.value || null,
+                callrail_api_token: settings.callrail_api_token?.value || null,
+                callrail_account_id: settings.callrail_account_id?.value || null
+              };
+            }
+          } catch (error) {
+            console.error(`Error loading settings for company ${company.id}:`, error);
+          }
+          return { ...company, ga_property_id: null, callrail_api_token: null, callrail_account_id: null };
+        })
+      );
+      
+      setCompanies(companiesWithSettings);
     } catch (error) {
       console.error('Error loading companies:', error);
     } finally {
@@ -60,7 +88,44 @@ export default function CompaniesManager() {
     e.preventDefault();
 
     try {
-      await adminAPI.createCompany(formData);
+      const { ga_property_id, callrail_api_token, callrail_account_id, ...companyData } = formData;
+      const newCompany = await adminAPI.createCompany(companyData);
+      
+      // Save settings to company_settings if provided
+      const settingsToSave: any = {};
+      
+      if (ga_property_id && ga_property_id.trim()) {
+        settingsToSave.ga_property_id = {
+          value: ga_property_id.trim(),
+          type: 'string'
+        };
+      }
+      
+      if (callrail_api_token && callrail_api_token.trim()) {
+        settingsToSave.callrail_api_token = {
+          value: callrail_api_token.trim(),
+          type: 'string'
+        };
+      }
+      
+      if (callrail_account_id && callrail_account_id.trim()) {
+        settingsToSave.callrail_account_id = {
+          value: callrail_account_id.trim(),
+          type: 'string'
+        };
+      }
+      
+      if (Object.keys(settingsToSave).length > 0) {
+        try {
+          await fetch(`/api/companies/${newCompany.id}/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ settings: settingsToSave }),
+          });
+        } catch (error) {
+          console.error('Error saving company settings:', error);
+        }
+      }
 
       setFormData({
         name: '',
@@ -75,6 +140,9 @@ export default function CompaniesManager() {
         country: 'United States',
         industry: '',
         size: '',
+        ga_property_id: '',
+        callrail_api_token: '',
+        callrail_account_id: '',
       });
       setShowCreateForm(false);
       loadCompanies();
@@ -88,20 +156,49 @@ export default function CompaniesManager() {
     if (!editingCompany) return;
 
     try {
+      const { ga_property_id, callrail_api_token, callrail_account_id, ...companyData } = editingCompany;
+      
+      // Update company data (without settings fields)
       await adminAPI.updateCompany(editingCompany.id, {
-        name: editingCompany.name,
-        description: editingCompany.description,
-        website: editingCompany.website,
-        email: editingCompany.email,
-        phone: editingCompany.phone,
-        address: editingCompany.address,
-        city: editingCompany.city,
-        state: editingCompany.state,
-        zip_code: editingCompany.zip_code,
-        country: editingCompany.country,
-        industry: editingCompany.industry,
-        size: editingCompany.size,
+        name: companyData.name,
+        description: companyData.description,
+        website: companyData.website,
+        email: companyData.email,
+        phone: companyData.phone,
+        address: companyData.address,
+        city: companyData.city,
+        state: companyData.state,
+        zip_code: companyData.zip_code,
+        country: companyData.country,
+        industry: companyData.industry,
+        size: companyData.size,
       });
+      
+      // Update settings
+      try {
+        await fetch(`/api/companies/${editingCompany.id}/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            settings: {
+              ga_property_id: {
+                value: ga_property_id?.trim() || '',
+                type: 'string'
+              },
+              callrail_api_token: {
+                value: callrail_api_token?.trim() || '',
+                type: 'string'
+              },
+              callrail_account_id: {
+                value: callrail_account_id?.trim() || '',
+                type: 'string'
+              }
+            }
+          }),
+        });
+      } catch (error) {
+        console.error('Error updating company settings:', error);
+      }
 
       setEditingCompany(null);
       loadCompanies();
@@ -308,6 +405,64 @@ export default function CompaniesManager() {
         </select>
       </div>
 
+      <div className={styles.formGroup}>
+        <label>Google Analytics Property ID:</label>
+        <input
+          type="text"
+          placeholder="e.g., 123456789"
+          value={company ? company.ga_property_id || '' : formData.ga_property_id}
+          onChange={e => {
+            if (company) {
+              setEditingCompany({ ...company, ga_property_id: e.target.value });
+            } else {
+              setFormData({ ...formData, ga_property_id: e.target.value });
+            }
+          }}
+        />
+        <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+          Enter the GA4 Property ID (numbers only) to enable analytics dashboard for this company
+        </small>
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>CallRail API Token:</label>
+        <input
+          type="password"
+          placeholder="Enter CallRail API token"
+          value={company ? company.callrail_api_token || '' : formData.callrail_api_token}
+          onChange={e => {
+            if (company) {
+              setEditingCompany({ ...company, callrail_api_token: e.target.value });
+            } else {
+              setFormData({ ...formData, callrail_api_token: e.target.value });
+            }
+          }}
+        />
+        <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+          Enter your CallRail API token to enable call analytics dashboard for this company
+        </small>
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>CallRail Account ID:</label>
+        <input
+          type="text"
+          placeholder="e.g., ACC28a0b8ba54bf4a1bbc85e8c5bb9aa15d"
+          value={company ? company.callrail_account_id || '' : formData.callrail_account_id}
+          onChange={e => {
+            if (company) {
+              setEditingCompany({ ...company, callrail_account_id: e.target.value });
+            } else {
+              setFormData({ ...formData, callrail_account_id: e.target.value });
+            }
+          }}
+        />
+        <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+          Enter the specific CallRail Account ID to use for this company (found in CallRail dashboard URL)
+        </small>
+      </div>
+
+
       <div className={styles.formActions}>
         <button type="submit" className={styles.saveButton}>
           {company ? 'Save' : 'Create'}
@@ -367,6 +522,7 @@ export default function CompaniesManager() {
               <th>Industry</th>
               <th>Size</th>
               <th>Email</th>
+              <th>Analytics</th>
               <th>Created</th>
               <th>Actions</th>
             </tr>
@@ -378,6 +534,15 @@ export default function CompaniesManager() {
                 <td>{company.industry || '-'}</td>
                 <td>{company.size || '-'}</td>
                 <td>{company.email || '-'}</td>
+                <td>
+                  {company.ga_property_id ? (
+                    <span style={{ color: '#10b981', fontWeight: '500' }}>
+                      ✓ {company.ga_property_id}
+                    </span>
+                  ) : (
+                    <span style={{ color: '#6b7280' }}>Not configured</span>
+                  )}
+                </td>
                 <td>{new Date(company.created_at).toLocaleDateString()}</td>
                 <td>
                   <div className={styles.actions}>

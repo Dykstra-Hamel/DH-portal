@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import AccountLinking from '@/components/AccountLinking/AccountLinking';
+import AnalyticsDashboard from '@/components/Analytics/AnalyticsDashboard';
+import CallAnalyticsDashboard from '@/components/Analytics/CallAnalyticsDashboard';
 import styles from './Dashboard.module.scss';
 
 interface Profile {
@@ -44,6 +46,7 @@ export default function Dashboard({
   onCompanyChange,
 }: DashboardProps) {
   const router = useRouter();
+  const [analyticsView, setAnalyticsView] = useState<'website' | 'calls'>('website');
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -135,20 +138,49 @@ export default function Dashboard({
           )}
         </div>
 
-        <div className={styles.content}>
-          <div className={styles.card}>
-            <h3>Dashboard Content</h3>
-            <p>This is where your dashboard content will go.</p>
-            {selectedCompany && (
-              <p>
-                Currently viewing: <strong>{selectedCompany.name}</strong>
-              </p>
-            )}
+        {/* Analytics View Toggle */}
+        {selectedCompany && (
+          <div className={styles.analyticsToggle}>
+            <div className={styles.toggleContainer}>
+              <button
+                className={`${styles.toggleButton} ${analyticsView === 'website' ? styles.active : ''}`}
+                onClick={() => setAnalyticsView('website')}
+              >
+                📊 Website Analytics
+              </button>
+              <button
+                className={`${styles.toggleButton} ${analyticsView === 'calls' ? styles.active : ''}`}
+                onClick={() => setAnalyticsView('calls')}
+              >
+                📞 Call Analytics
+              </button>
+            </div>
           </div>
+        )}
 
-          <div className={styles.card}>
-            <AccountLinking user={user} />
-          </div>
+        <div className={styles.content}>
+          {selectedCompany ? (
+            <>
+              {analyticsView === 'website' ? (
+                <AnalyticsDashboard
+                  companyId={selectedCompany.id}
+                  companyName={selectedCompany.name}
+                  userRole={profile.role}
+                />
+              ) : (
+                <CallAnalyticsDashboard
+                  companyId={selectedCompany.id}
+                  companyName={selectedCompany.name}
+                  userRole={profile.role}
+                />
+              )}
+            </>
+          ) : (
+            <div className={styles.card}>
+              <h3>Select a Company</h3>
+              <p>Please select a company to view its analytics dashboard.</p>
+            </div>
+          )}
         </div>
       </main>
     </div>

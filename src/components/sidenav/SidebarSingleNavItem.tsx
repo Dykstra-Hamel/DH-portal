@@ -6,21 +6,39 @@ import styles from './sidenav.module.scss';
 interface SidebarItemProps {
   itemText: string;
   icon: LucideIcon;
-  path: string;
+  path?: string;
+  onClick?: () => void;
 }
 
 export function SidebarSingleNavItem({
   path,
   itemText,
   icon: Icon,
+  onClick,
 }: SidebarItemProps) {
   const pathname = usePathname();
-  const isActive = pathname === path;
+  const isActive = path ? pathname === path : false;
 
+  // If onClick is provided, render a button instead of a link
+  if (onClick) {
+    return (
+      <div className={styles.sidebarNavItem}>
+        <button
+          onClick={onClick}
+          className={`${styles.sidebarNavLink} ${isActive ? styles.sidebarNavLinkActive : ''}`}
+        >
+          <Icon size={16} />
+          {itemText}
+        </button>
+      </div>
+    );
+  }
+
+  // Default behavior: render a Link
   return (
     <div className={styles.sidebarNavItem}>
       <Link
-        href={path}
+        href={path || '#'}
         className={`${styles.sidebarNavLink} ${isActive ? styles.sidebarNavLinkActive : ''}`}
       >
         <Icon size={16} />

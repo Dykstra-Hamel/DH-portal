@@ -60,6 +60,47 @@
   padding: 2rem;
 }
 
+.mainNavigation {
+  display: flex;
+  gap: 0;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.mainNavButton {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-right: 1px solid #e5e7eb;
+
+  &:last-child {
+    border-right: none;
+  }
+
+  &:hover {
+    background: #f9fafb;
+    color: #374151;
+  }
+
+  &.active {
+    background: #3b82f6;
+    color: white;
+
+    &:hover {
+      background: #2563eb;
+    }
+  }
+}
+
 .loading,
 .settingsLoading {
   display: flex;

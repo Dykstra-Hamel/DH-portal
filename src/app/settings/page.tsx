@@ -17,6 +17,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import KnowledgeBase from '@/components/KnowledgeBase/KnowledgeBase';
+import AccountLinking from '@/components/AccountLinking/AccountLinking';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -64,6 +65,7 @@ export default function SettingsPage() {
     text: string;
   } | null>(null);
   const [activeTab, setActiveTab] = useState<'widget' | 'knowledge-base'>('widget');
+  const [activeSection, setActiveSection] = useState<'user' | 'company'>('user');
   const router = useRouter();
 
   const {
@@ -240,24 +242,8 @@ export default function SettingsPage() {
     return <div className={styles.loading}>Redirecting...</div>;
   }
 
-  // Check if user has admin access to any company OR is global admin
-  if (!isAdminForAnyCompany && !isGlobalAdmin) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.accessDenied}>
-          <AlertCircle size={48} className={styles.icon} />
-          <h1>Access Denied</h1>
-          <p>You need company admin privileges to access settings.</p>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className={styles.backButton}
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Show user settings to all users, company settings only to admins
+  const showCompanySettings = isAdminForAnyCompany || isGlobalAdmin;
 
   const availableCompanies = isGlobalAdmin ? allCompanies : adminCompanies;
   const selectedCompany = availableCompanies.find(
@@ -270,7 +256,7 @@ export default function SettingsPage() {
         <div className={styles.headerContent}>
           <div className={styles.titleSection}>
             <SettingsIcon size={24} className={styles.titleIcon} />
-            <h1 className={styles.title}>Company Settings</h1>
+            <h1 className={styles.title}>Settings</h1>
           </div>
           <button
             onClick={() => router.push('/dashboard')}
@@ -282,124 +268,187 @@ export default function SettingsPage() {
       </header>
 
       <main className={styles.main}>
-        {/* Company Selector */}
-        {availableCompanies.length > 1 && (
-          <div className={styles.companySelector}>
-            <label htmlFor="company-select" className={styles.label}>
-              Select Company:
-            </label>
-            <select
-              id="company-select"
-              value={selectedCompanyId}
-              onChange={e => setSelectedCompanyId(e.target.value)}
-              className={styles.select}
+        {/* Main Section Navigation */}
+        <div className={styles.mainNavigation}>
+          <button
+            className={`${styles.mainNavButton} ${activeSection === 'user' ? styles.active : ''}`}
+            onClick={() => setActiveSection('user')}
+          >
+            User Settings
+          </button>
+          {showCompanySettings && (
+            <button
+              className={`${styles.mainNavButton} ${activeSection === 'company' ? styles.active : ''}`}
+              onClick={() => setActiveSection('company')}
             >
-              {availableCompanies.map(userCompany => (
-                <option
-                  key={userCompany.company_id}
-                  value={userCompany.company_id}
-                >
-                  {userCompany.companies.name}
-                </option>
-              ))}
-            </select>
+              Company Settings
+            </button>
+          )}
+        </div>
+
+        {/* User Settings Section */}
+        {activeSection === 'user' && (
+          <div className={styles.settingsSection}>
+            <h2 className={styles.sectionTitle}>User Settings</h2>
+            
+            <div className={styles.settingsForm}>
+              {/* Profile Information */}
+              <div className={styles.settingGroup}>
+                <h3 className={styles.groupTitle}>Profile Information</h3>
+                <p className={styles.groupDescription}>
+                  Your personal account information.
+                </p>
+                
+                <div className={styles.setting}>
+                  <div className={styles.settingInfo}>
+                    <label className={styles.settingLabel}>Name</label>
+                    <p className={styles.settingDescription}>
+                      {profile?.first_name} {profile?.last_name}
+                    </p>
+                  </div>
+                </div>
+
+                <div className={styles.setting}>
+                  <div className={styles.settingInfo}>
+                    <label className={styles.settingLabel}>Email</label>
+                    <p className={styles.settingDescription}>
+                      {profile?.email || user?.email}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Linked Accounts */}
+              <div className={styles.settingGroup}>
+                <AccountLinking user={user} />
+              </div>
+            </div>
           </div>
         )}
 
-        {selectedCompany && (
-          <div className={styles.settingsSection}>
-            <h2 className={styles.sectionTitle}>
-              Settings for {selectedCompany.companies.name}
-            </h2>
-
-            {message && (
-              <div className={`${styles.message} ${styles[message.type]}`}>
-                {message.type === 'success' ? (
-                  <CheckCircle size={16} />
-                ) : (
-                  <AlertCircle size={16} />
-                )}
-                {message.text}
-              </div>
-            )}
-
-            {/* Tab Navigation */}
-            <div className={styles.tabNavigation}>
-              <button
-                className={`${styles.tabButton} ${activeTab === 'widget' ? styles.active : ''}`}
-                onClick={() => setActiveTab('widget')}
-              >
-                Widget Settings
-              </button>
-              <button
-                className={`${styles.tabButton} ${activeTab === 'knowledge-base' ? styles.active : ''}`}
-                onClick={() => setActiveTab('knowledge-base')}
-              >
-                Knowledge Base
-              </button>
-            </div>
-
-            {settingsLoading ? (
-              <div className={styles.settingsLoading}>Loading settings...</div>
-            ) : (
-              <div className={styles.settingsForm}>
-                {/* Widget Settings Tab */}
-                {activeTab === 'widget' && (
-                  <>
-                    <div className={styles.settingGroup}>
-                      <h3 className={styles.groupTitle}>Widget Form Settings</h3>
-                      <p className={styles.groupDescription}>
-                        Configure the lead capture widget for your website.
-                      </p>
-                      
-                      <div className={styles.setting}>
-                        <div className={styles.settingInfo}>
-                          <label htmlFor="widget-enabled" className={styles.settingLabel}>
-                            Enable Widget
-                          </label>
-                          <p className={styles.settingDescription}>
-                            Enable or disable the lead capture widget.
-                          </p>
-                        </div>
-                        <div className={styles.settingControl}>
-                          <label className={styles.toggle}>
-                            <input
-                              id="widget-enabled"
-                              type="checkbox"
-                              checked={settings.widget_enabled?.value === true}
-                              onChange={e => handleSettingChange('widget_enabled', e.target.checked)}
-                            />
-                            <span className={styles.toggleSlider}></span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Knowledge Base Tab */}
-                {activeTab === 'knowledge-base' && (
-                  <div className={styles.knowledgeBaseSection}>
-                    <KnowledgeBase companyId={selectedCompanyId} />
-                  </div>
-                )}
-
-                {/* Save Button - only show for widget tab */}
-                {activeTab === 'widget' && (
-                  <div className={styles.actions}>
-                    <button
-                      onClick={handleSave}
-                      disabled={saving || (!isCompanyAdmin && !isGlobalAdmin)}
-                      className={styles.saveButton}
+        {/* Company Settings Section */}
+        {activeSection === 'company' && showCompanySettings && (
+          <>
+            {/* Company Selector */}
+            {availableCompanies.length > 1 && (
+              <div className={styles.companySelector}>
+                <label htmlFor="company-select" className={styles.label}>
+                  Select Company:
+                </label>
+                <select
+                  id="company-select"
+                  value={selectedCompanyId}
+                  onChange={e => setSelectedCompanyId(e.target.value)}
+                  className={styles.select}
+                >
+                  {availableCompanies.map(userCompany => (
+                    <option
+                      key={userCompany.company_id}
+                      value={userCompany.company_id}
                     >
-                      <Save size={16} />
-                      {saving ? 'Saving...' : 'Save Settings'}
-                    </button>
+                      {userCompany.companies.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {selectedCompany && (
+              <div className={styles.settingsSection}>
+                <h2 className={styles.sectionTitle}>
+                  Settings for {selectedCompany.companies.name}
+                </h2>
+
+                {message && (
+                  <div className={`${styles.message} ${styles[message.type]}`}>
+                    {message.type === 'success' ? (
+                      <CheckCircle size={16} />
+                    ) : (
+                      <AlertCircle size={16} />
+                    )}
+                    {message.text}
+                  </div>
+                )}
+
+                {/* Tab Navigation */}
+                <div className={styles.tabNavigation}>
+                  <button
+                    className={`${styles.tabButton} ${activeTab === 'widget' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('widget')}
+                  >
+                    Widget Settings
+                  </button>
+                  <button
+                    className={`${styles.tabButton} ${activeTab === 'knowledge-base' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('knowledge-base')}
+                  >
+                    Knowledge Base
+                  </button>
+                </div>
+
+                {settingsLoading ? (
+                  <div className={styles.settingsLoading}>Loading settings...</div>
+                ) : (
+                  <div className={styles.settingsForm}>
+                    {/* Widget Settings Tab */}
+                    {activeTab === 'widget' && (
+                      <>
+                        <div className={styles.settingGroup}>
+                          <h3 className={styles.groupTitle}>Widget Form Settings</h3>
+                          <p className={styles.groupDescription}>
+                            Configure the lead capture widget for your website.
+                          </p>
+                          
+                          <div className={styles.setting}>
+                            <div className={styles.settingInfo}>
+                              <label htmlFor="widget-enabled" className={styles.settingLabel}>
+                                Enable Widget
+                              </label>
+                              <p className={styles.settingDescription}>
+                                Enable or disable the lead capture widget.
+                              </p>
+                            </div>
+                            <div className={styles.settingControl}>
+                              <label className={styles.toggle}>
+                                <input
+                                  id="widget-enabled"
+                                  type="checkbox"
+                                  checked={settings.widget_enabled?.value === true}
+                                  onChange={e => handleSettingChange('widget_enabled', e.target.checked)}
+                                />
+                                <span className={styles.toggleSlider}></span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Knowledge Base Tab */}
+                    {activeTab === 'knowledge-base' && (
+                      <div className={styles.knowledgeBaseSection}>
+                        <KnowledgeBase companyId={selectedCompanyId} />
+                      </div>
+                    )}
+
+                    {/* Save Button - only show for widget tab */}
+                    {activeTab === 'widget' && (
+                      <div className={styles.actions}>
+                        <button
+                          onClick={handleSave}
+                          disabled={saving || (!isCompanyAdmin && !isGlobalAdmin)}
+                          className={styles.saveButton}
+                        >
+                          <Save size={16} />
+                          {saving ? 'Saving...' : 'Save Settings'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
-          </div>
+          </>
         )}
       </main>
     </div>
