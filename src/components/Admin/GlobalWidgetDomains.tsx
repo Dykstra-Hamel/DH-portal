@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Globe, Plus, X, AlertTriangle, CheckCircle, Save } from 'lucide-react';
+import { Globe, Plus, X, AlertTriangle, CheckCircle, Save, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import styles from './GlobalWidgetDomains.module.scss';
 
 interface GlobalWidgetDomainsProps {
@@ -16,6 +16,9 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [domainsCollapsed, setDomainsCollapsed] = useState(true);
+  const [infoCollapsed, setInfoCollapsed] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load current domains
   const loadDomains = async () => {
@@ -46,20 +49,23 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
     const trimmed = newDomain.trim();
     if (!trimmed) return;
 
+    // Auto-strip trailing slashes
+    const cleanUrl = trimmed.replace(/\/+$/, '');
+
     // Basic client-side validation
     try {
-      const url = new URL(trimmed);
+      const url = new URL(cleanUrl);
       if (url.protocol !== 'http:' && url.protocol !== 'https:') {
         setError('Domain must start with http:// or https://');
         return;
       }
       
-      if (domains.includes(trimmed.toLowerCase())) {
+      if (domains.includes(cleanUrl.toLowerCase())) {
         setError('Domain already exists in the list');
         return;
       }
 
-      const updatedDomains = [...domains, trimmed.toLowerCase()];
+      const updatedDomains = [...domains, cleanUrl.toLowerCase()];
       setDomains(updatedDomains);
       setNewDomain('');
       setError(null);
@@ -86,13 +92,13 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
           setError(data.error || 'Failed to add domain');
           // Revert the change if save failed
           setDomains(domains);
-          setNewDomain(trimmed); // Restore input
+          setNewDomain(cleanUrl); // Restore input
         }
       } catch (error) {
         setError('Failed to add domain');
         // Revert the change if save failed
         setDomains(domains);
-        setNewDomain(trimmed); // Restore input
+        setNewDomain(cleanUrl); // Restore input
       } finally {
         setSaving(false);
       }
@@ -147,6 +153,11 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
     }
   };
 
+  // Filter domains based on search query
+  const filteredDomains = domains.filter(domain =>
+    domain.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   useEffect(() => {
     loadDomains();
   }, []);
@@ -159,8 +170,7 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
           <h2>Global Widget Domains</h2>
         </div>
         <p className={styles.description}>
-          Manage the global whitelist of domains that can embed widgets for any company. 
-          This is a security feature that controls which websites can load your widget scripts.
+          Global whitelist for widget embedding.
         </p>
       </div>
 
@@ -199,67 +209,103 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
           </button>
         </div>
         <div className={styles.helpText}>
-          Enter the full URL including https://. Subdomains will also be allowed automatically.
+          Enter full URL (https://example.com). Trailing slashes auto-removed.
         </div>
       </div>
 
       <div className={styles.domainsList}>
-        <div className={styles.listHeader}>
-          <h3>Allowed Domains ({domains.length})</h3>
-          {saving && (
-            <div className={styles.savingIndicator}>
-              <Save size={16} />
-              Saving...
-            </div>
-          )}
+        <div className={styles.listHeader} onClick={() => setDomainsCollapsed(!domainsCollapsed)}>
+          <div className={styles.headerLeft}>
+            {domainsCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+            <h3>Allowed Domains ({domains.length})</h3>
+          </div>
+          <div className={styles.headerRight}>
+            {saving && (
+              <div className={styles.savingIndicator}>
+                <Save size={16} />
+                Saving...
+              </div>
+            )}
+          </div>
         </div>
 
-        {loading ? (
-          <div className={styles.loading}>Loading domains...</div>
-        ) : domains.length === 0 ? (
-          <div className={styles.emptyState}>
-            <Globe size={48} />
-            <h3>No domains configured</h3>
-            <p>
-              Your widget will only work on localhost and your main site URL.<br />
-              Add domains above to allow widgets on partner/client websites.
-            </p>
-          </div>
-        ) : (
-          <div className={styles.domains}>
-            {domains.map((domain, index) => (
-              <div key={index} className={styles.domainItem}>
-                <div className={styles.domainUrl}>
-                  <Globe size={16} />
-                  {domain}
+        {!domainsCollapsed && (
+          <>
+            {domains.length > 0 && (
+              <div className={styles.searchSection}>
+                <div className={styles.searchInput}>
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search domains..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
                 </div>
-                <button
-                  onClick={() => removeDomain(index)}
-                  className={styles.removeButton}
-                  disabled={saving}
-                  title="Remove domain"
-                >
-                  <X size={16} />
-                </button>
               </div>
-            ))}
-          </div>
+            )}
+
+            {loading ? (
+              <div className={styles.loading}>Loading domains...</div>
+            ) : domains.length === 0 ? (
+              <div className={styles.emptyState}>
+                <Globe size={24} />
+                <h3>No domains configured</h3>
+                <p>Add domains above to allow widgets on partner/client websites.</p>
+              </div>
+            ) : filteredDomains.length === 0 && searchQuery ? (
+              <div className={styles.emptyState}>
+                <Search size={24} />
+                <h3>No domains found</h3>
+                <p>No domains match &quot;{searchQuery}&quot;</p>
+              </div>
+            ) : (
+              <div className={styles.domains}>
+                {filteredDomains.map((domain, index) => {
+                  const originalIndex = domains.indexOf(domain);
+                  return (
+                    <div key={originalIndex} className={styles.domainItem}>
+                      <div className={styles.domainUrl}>
+                        <Globe size={14} />
+                        {domain}
+                      </div>
+                      <button
+                        onClick={() => removeDomain(originalIndex)}
+                        className={styles.removeButton}
+                        disabled={saving}
+                        title="Remove domain"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       <div className={styles.infoSection}>
-        <h4>Security Notes:</h4>
-        <ul>
-          <li><strong>Global whitelist:</strong> Any domain listed here can embed widgets for ALL companies</li>
-          <li><strong>HTTPS recommended:</strong> Use HTTPS domains for production security</li>
-          <li><strong>Subdomain support:</strong> Adding &quot;example.com&quot; automatically allows &quot;www.example.com&quot;</li>
-          <li><strong>Immediate effect:</strong> Changes take effect immediately when saved</li>
-          <li><strong>Always allowed:</strong> Localhost and your main site URL are always permitted</li>
-        </ul>
-        {lastUpdated && (
-          <div className={styles.lastUpdated}>
-            Last updated: {new Date(lastUpdated).toLocaleString()}
-          </div>
+        <div className={styles.infoHeader} onClick={() => setInfoCollapsed(!infoCollapsed)}>
+          {infoCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          <h4>Security Notes</h4>
+        </div>
+        
+        {!infoCollapsed && (
+          <>
+            <ul>
+              <li><strong>Global whitelist:</strong> Any domain listed here can embed widgets for ALL companies</li>
+              <li><strong>HTTPS recommended:</strong> Use HTTPS domains for production security</li>
+              <li><strong>Immediate effect:</strong> Changes take effect immediately when saved</li>
+              <li><strong>Always allowed:</strong> Localhost and your main site URL are always permitted</li>
+            </ul>
+            {lastUpdated && (
+              <div className={styles.lastUpdated}>
+                Last updated: {new Date(lastUpdated).toLocaleString()}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
