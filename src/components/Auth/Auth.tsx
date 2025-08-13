@@ -115,6 +115,7 @@ export default function Auth() {
   if (!user) {
     return (
       <div className={styles.authWrapper}>
+        <h1>DYKSTRA|HAMEL</h1>
         <div className={styles.buttonWrapper}>
           <button onClick={signInWithGoogle} className="button primaryButton">
             Sign in with Google
@@ -124,7 +125,7 @@ export default function Auth() {
           </button>
         </div>
 
-        <div className="">
+        <div className={styles.magicLinkFormWrapper}>
           <h2 className={styles.magicLinkHeading}>
             Or sign in with magic link:
           </h2>

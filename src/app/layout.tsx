@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
-import { Sidebar } from '@/components/sidenav/Sidebar';
+import { MobileMenuButton } from '@/components/MobileMenu/MobileMenu';
 import '@/styles/main.scss';
 
 const outfit = Outfit({
@@ -10,7 +10,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: 'DH | Portal',
+  title: 'PCOCENTRAL',
   description: 'Home of the Dykstra Hamel Portal',
 };
 
@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.className}`}>
       <body>
-        <Sidebar />
+        <MobileMenuButton />
         <section className="pageWrapper">{children}</section>
       </body>
     </html>

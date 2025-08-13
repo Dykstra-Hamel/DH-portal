@@ -1,18 +1,31 @@
 @use '../../styles/Buttons.scss';
 
 .authWrapper {
-  width: 435px;
-  max-width: 100%;
+  width: 100vw;
+  height: 100vh;
   padding: 0 2rem;
+  justify-self: center;
+  align-self: center;
+  position: relative;
+  display: flex;
+  flex-flow: column;
+  margin: 0 auto;
+  justify-content: center;
+  align-items: center;
+
+  h1,
+  h2 {
+    text-align: center;
+  }
 
   .buttonWrapper {
     display: flex;
     position: relative;
     flex-flow: row wrap;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     gap: 1rem;
-    margin-bottom: 2rem;
+    margin: 2rem 0;
   }
 
   .authFormButton {
@@ -28,6 +41,16 @@
       border: 1px solid #73d2de;
       color: #353535;
     }
+
+    @media screen and (width <= 480px) {
+      border-radius: 4px;
+      margin-top: 5px;
+    }
+  }
+
+  .magicLinkFormWrapper {
+    max-width: 100%;
+    width: 470px;
   }
 
   .magicLinkHeading {
@@ -48,6 +71,15 @@
       border-radius: 4px 0 0 4px;
       outline: none;
       flex-grow: 1;
+    }
+
+    @media screen and (width <= 480px) {
+      flex-flow: column;
+
+      input {
+        border-radius: 4px;
+        width: 100%;
+      }
     }
   }
 }
