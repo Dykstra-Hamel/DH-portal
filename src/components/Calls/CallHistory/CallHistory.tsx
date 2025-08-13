@@ -158,7 +158,10 @@ export function CallHistory({
               {(call.home_size ||
                 call.yard_size ||
                 call.budget_range ||
-                call.timeline) && (
+                call.timeline ||
+                call.pest_issue ||
+                call.street_address ||
+                call.preferred_service_time) && (
                 <div className={styles.extractedInfo}>
                   <h4>Call Insights</h4>
                   <div className={styles.insights}>
@@ -186,10 +189,22 @@ export function CallHistory({
                         <span>{call.timeline}</span>
                       </div>
                     )}
-                    {call.decision_maker && (
+                    {call.pest_issue && (
                       <div className={styles.insight}>
-                        <label>Decision Maker:</label>
-                        <span>{call.decision_maker}</span>
+                        <label>Pest Issue:</label>
+                        <span>{call.pest_issue}</span>
+                      </div>
+                    )}
+                    {call.street_address && (
+                      <div className={styles.insight}>
+                        <label>Address:</label>
+                        <span>{call.street_address}</span>
+                      </div>
+                    )}
+                    {call.preferred_service_time && (
+                      <div className={styles.insight}>
+                        <label>Preferred Service Time:</label>
+                        <span>{call.preferred_service_time}</span>
                       </div>
                     )}
                   </div>

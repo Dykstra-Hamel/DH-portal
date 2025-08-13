@@ -25,7 +25,6 @@ interface CallRecord {
   pest_issue: string;
   street_address: string;
   preferred_service_time: string;
-  contacted_other_companies: boolean;
   opt_out_sensitive_data_storage: boolean;
   disconnect_reason: string;
   created_at: string;
@@ -323,7 +322,6 @@ export default function CallsManager() {
                       <th>Pest Issue</th>
                       <th>Address</th>
                       <th>Service Time</th>
-                      <th>Called Others</th>
                       <th>Data Opt-Out</th>
                       <th>Actions</th>
                     </tr>
@@ -365,7 +363,6 @@ export default function CallsManager() {
                         <td>{call.pest_issue || 'N/A'}</td>
                         <td>{call.street_address || 'N/A'}</td>
                         <td>{call.preferred_service_time || 'N/A'}</td>
-                        <td>{call.contacted_other_companies ? 'Yes' : 'No'}</td>
                         <td>{call.opt_out_sensitive_data_storage ? 'Yes' : 'No'}</td>
                         <td>
                           <button
@@ -519,11 +516,53 @@ export default function CallsManager() {
 
                 <div className={styles.setting}>
                   <div className={styles.settingInfo}>
-                    <label htmlFor="retell-agent-id" className={styles.settingLabel}>
-                      Retell Agent ID
+                    <label htmlFor="retell-inbound-agent-id" className={styles.settingLabel}>
+                      Retell Inbound Agent ID
                     </label>
                     <p className={styles.settingDescription}>
-                      {settings.retell_agent_id?.description || 'Company-specific Retell AI agent ID'}
+                      {settings.retell_inbound_agent_id?.description || 'Retell AI agent ID for handling inbound calls'}
+                    </p>
+                  </div>
+                  <div className={styles.settingControl}>
+                    <input
+                      id="retell-inbound-agent-id"
+                      type="text"
+                      value={settings.retell_inbound_agent_id?.value || ''}
+                      onChange={(e) => handleSettingChange('retell_inbound_agent_id', e.target.value)}
+                      className={styles.textInput}
+                      placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.setting}>
+                  <div className={styles.settingInfo}>
+                    <label htmlFor="retell-outbound-agent-id" className={styles.settingLabel}>
+                      Retell Outbound Agent ID
+                    </label>
+                    <p className={styles.settingDescription}>
+                      {settings.retell_outbound_agent_id?.description || 'Retell AI agent ID for handling outbound calls from form submissions'}
+                    </p>
+                  </div>
+                  <div className={styles.settingControl}>
+                    <input
+                      id="retell-outbound-agent-id"
+                      type="text"
+                      value={settings.retell_outbound_agent_id?.value || ''}
+                      onChange={(e) => handleSettingChange('retell_outbound_agent_id', e.target.value)}
+                      className={styles.textInput}
+                      placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.setting}>
+                  <div className={styles.settingInfo}>
+                    <label htmlFor="retell-agent-id" className={styles.settingLabel}>
+                      Legacy Retell Agent ID
+                    </label>
+                    <p className={styles.settingDescription}>
+                      {settings.retell_agent_id?.description || 'Legacy agent ID (use inbound/outbound specific IDs instead)'}
                     </p>
                   </div>
                   <div className={styles.settingControl}>
@@ -534,6 +573,7 @@ export default function CallsManager() {
                       onChange={(e) => handleSettingChange('retell_agent_id', e.target.value)}
                       className={styles.textInput}
                       placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
+                      style={{ opacity: 0.7 }}
                     />
                   </div>
                 </div>
@@ -755,10 +795,6 @@ export default function CallsManager() {
                 <div className={styles.detailItem}>
                   <strong>Preferred Service Time:</strong>{' '}
                   {selectedCall.preferred_service_time || 'N/A'}
-                </div>
-                <div className={styles.detailItem}>
-                  <strong>Contacted Other Companies:</strong>{' '}
-                  {selectedCall.contacted_other_companies ? 'Yes' : 'No'}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Data Opt-Out:</strong>{' '}

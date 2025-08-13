@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const retellWebhookSecret = process.env.RETELL_WEBHOOK_SECRET;
     
     if (!retellWebhookSecret) {
-      console.error('Retell Webhook: RETELL_WEBHOOK_SECRET not configured');
+      console.error('Retell Outbound Webhook: RETELL_WEBHOOK_SECRET not configured');
       return NextResponse.json(
         { error: 'Webhook secret not configured' },
         { status: 500 }
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     
     // Validate authorization header
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('Retell Webhook: Missing or invalid authorization header');
+      console.error('Retell Outbound Webhook: Missing or invalid authorization header');
       return NextResponse.json(
         { error: 'Unauthorized - missing bearer token' },
         { status: 401 }
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     
     // Ensure buffers are the same length to prevent length-based timing attacks
     if (expectedToken.length !== providedToken.length) {
-      console.error('Retell Webhook: Invalid webhook secret');
+      console.error('Retell Outbound Webhook: Invalid webhook secret');
       return NextResponse.json(
         { error: 'Unauthorized - invalid token' },
         { status: 401 }
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // Use crypto.timingSafeEqual for constant-time comparison
     const { timingSafeEqual } = await import('crypto');
     if (!timingSafeEqual(expectedToken, providedToken)) {
-      console.error('Retell Webhook: Invalid webhook secret');
+      console.error('Retell Outbound Webhook: Invalid webhook secret');
       return NextResponse.json(
         { error: 'Unauthorized - invalid token' },
         { status: 401 }
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     const { call_id } = callData;
 
     if (!call_id) {
-      console.error('Retell Webhook: No call_id provided');
+      console.error('Retell Outbound Webhook: No call_id provided');
       return NextResponse.json(
         { error: 'call_id is required' },
         { status: 400 }
@@ -68,23 +68,28 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Handle different event types
+    // Handle different event types for outbound calls
     switch (eventType) {
       case 'call_started':
-        return await handleCallStarted(supabase, callData);
+        return await handleOutboundCallStarted(supabase, callData);
 
       case 'call_ended':
-        return await handleCallEnded(supabase, callData);
+        return await handleOutboundCallEnded(supabase, callData);
 
       case 'call_analyzed':
-        return await handleCallAnalyzed(supabase, callData);
+        return await handleOutboundCallAnalyzed(supabase, callData);
 
       default:
-        // Fallback for unknown event types - try to update existing record
-        return await handleGenericUpdate(supabase, callData);
+        // Log unknown event types but don't fail
+        console.warn('Retell Outbound Webhook: Unknown event type:', eventType);
+        return NextResponse.json({
+          success: true,
+          message: 'Event type not handled',
+          eventType
+        });
     }
   } catch (error) {
-    console.error('Retell Webhook: Error processing webhook:', error);
+    console.error('Retell Outbound Webhook: Error processing webhook:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -92,8 +97,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle call_started event - create initial call record and lead
-async function handleCallStarted(supabase: any, callData: any) {
+// Handle outbound call_started event - find existing lead from dynamic variables
+async function handleOutboundCallStarted(supabase: any, callData: any) {
   const {
     call_id,
     from_number,
@@ -105,19 +110,19 @@ async function handleCallStarted(supabase: any, callData: any) {
     retell_llm_id, // Alternative field name
   } = callData;
 
-  // Check if this is a follow-up call
-  const isFollowUp = retell_llm_dynamic_variables?.is_follow_up === 'true';
+  // For outbound calls, always expect a lead_id in dynamic variables (from form submission)
   const providedLeadId = retell_llm_dynamic_variables?.lead_id;
+  const companyIdFromDynamicVars = retell_llm_dynamic_variables?.company_id;
 
   let lead = null;
   let customerId = null;
-  let companyId = null;
+  let companyId = companyIdFromDynamicVars;
 
-  if (isFollowUp && providedLeadId) {
-    // For follow-up calls, use the provided lead ID
+  if (providedLeadId) {
+    // Find existing lead from dynamic variables
     const result = await supabase
       .from('leads')
-      .select('id, customer_id, company_id, comments')
+      .select('id, customer_id, company_id, comments, lead_status')
       .eq('id', providedLeadId)
       .single();
 
@@ -126,72 +131,56 @@ async function handleCallStarted(supabase: any, callData: any) {
       customerId = result.data.customer_id;
       companyId = result.data.company_id;
     } else {
-      console.error('Retell Webhook: Follow-up call but lead not found:', providedLeadId);
+      console.error('Retell Outbound Webhook: Lead not found for ID:', providedLeadId);
+      return NextResponse.json(
+        { error: 'Lead not found for outbound call' },
+        { status: 404 }
+      );
     }
   } else {
-    // For new calls, determine company from agent ID and always create a new lead
+    // Fallback: try to determine company from agent ID and find lead
     const agentIdValue = agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
-    companyId = await findCompanyByAgentId(agentIdValue);
+    companyId = await findCompanyByOutboundAgentId(agentIdValue);
 
     if (!companyId) {
-      console.error('Retell Webhook: No company found for agent ID:', agentIdValue);
+      console.error('Retell Outbound Webhook: No company found for outbound agent ID:', agentIdValue);
       return NextResponse.json(
-        { error: 'Company not found for agent ID' },
+        { error: 'Company not found for outbound agent ID' },
         { status: 404 }
       );
     }
 
-    // Find or create customer from phone number
+    // Try to find customer by phone number
     customerId = await findCustomerByPhone(to_number);
 
-    if (!customerId) {
-      // Create new customer if not found
-      const { data: newCustomer, error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          phone: to_number,
-          company_id: companyId,
-          created_at: new Date().toISOString(),
-        })
-        .select('id')
+    if (customerId) {
+      // Find most recent lead for this customer
+      const result = await supabase
+        .from('leads')
+        .select('id, customer_id, company_id, comments, lead_status')
+        .eq('customer_id', customerId)
+        .eq('company_id', companyId)
+        .in('lead_status', ['new', 'contacted', 'qualified'])
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
 
-      if (customerError) {
-        console.error('Retell Webhook: Error creating customer:', customerError);
+      if (result.data) {
+        lead = result.data;
+      } else {
+        console.error('Retell Outbound Webhook: No suitable lead found for outbound call');
         return NextResponse.json(
-          { error: 'Failed to create customer' },
-          { status: 500 }
+          { error: 'No suitable lead found for outbound call' },
+          { status: 404 }
         );
       }
-
-      customerId = newCustomer.id;
-    }
-
-    // Always create a new lead for inbound calls
-    const { data: newLead, error: leadError } = await supabase
-      .from('leads')
-      .insert({
-        company_id: companyId,
-        customer_id: customerId,
-        lead_source: 'cold_call',
-        lead_type: 'phone_call',
-        lead_status: 'new', // Will be updated based on AI qualification later
-        priority: 'medium',
-        comments: `📞 Inbound call started at ${new Date().toLocaleString()}`,
-        created_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single();
-
-    if (leadError) {
-      console.error('Retell Webhook: Error creating lead:', leadError);
+    } else {
+      console.error('Retell Outbound Webhook: Customer not found for outbound call');
       return NextResponse.json(
-        { error: 'Failed to create lead' },
-        { status: 500 }
+        { error: 'Customer not found for outbound call' },
+        { status: 404 }
       );
     }
-
-    lead = { id: newLead.id, customer_id: customerId, company_id: companyId };
   }
 
   // Extract data from dynamic variables (available immediately)
@@ -201,9 +190,9 @@ async function handleCallStarted(supabase: any, callData: any) {
     undefined
   );
 
-  // Find parent call ID for follow-up calls
+  // Find parent call ID for follow-up calls (not typically needed for outbound)
   let parentCallId = null;
-  if (isFollowUp && lead?.id) {
+  if (retell_llm_dynamic_variables?.is_follow_up === 'true' && lead?.id) {
     const parentCallResult = await supabase
       .from('call_records')
       .select('call_id')
@@ -258,12 +247,12 @@ async function handleCallStarted(supabase: any, callData: any) {
     success: true,
     call_record_id: callRecord.id,
     lead_id: lead?.id,
-    action: isFollowUp ? 'follow_up_call_started' : 'new_lead_created',
+    action: 'outbound_call_started',
   });
 }
 
-// Handle call_ended event - update with end time and basic info (or create if missing)
-async function handleCallEnded(supabase: any, callData: any) {
+// Handle outbound call_ended event - update with end time and basic info
+async function handleOutboundCallEnded(supabase: any, callData: any) {
   const {
     call_id,
     call_status,
@@ -479,8 +468,8 @@ async function handleCallEnded(supabase: any, callData: any) {
   });
 }
 
-// Handle call_analyzed event - update with all analysis data
-async function handleCallAnalyzed(supabase: any, callData: any) {
+// Handle outbound call_analyzed event - update with all analysis data (no AI qualification)
+async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
   const {
     call_id,
     recording_url,
@@ -532,11 +521,8 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
     );
   }
 
-  // Update lead status based on AI qualification decision
+  // Update lead status based on call success (no AI qualification for outbound)
   if (callRecord.leads) {
-    const isFollowUp = retell_llm_dynamic_variables?.is_follow_up === 'true';
-    const isQualified = retell_llm_dynamic_variables?.is_qualified;
-
     const updateData: any = {
       comments: callRecord.leads.comments || '',
       updated_at: new Date().toISOString(),
@@ -545,27 +531,18 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
     // Add analysis summary if available
     if (extractedData.summary) {
       updateData.comments =
-        `${updateData.comments}\n\n📊 Call Analysis: ${extractedData.summary}`.trim();
+        `${updateData.comments}\n\n📊 Outbound Call Analysis: ${extractedData.summary}`.trim();
     }
 
-    // Update lead status based on AI qualification decision
-    if (isQualified === 'true' || isQualified === true) {
-      // AI determined this is a qualified lead - keep as 'new' for follow-up
-      updateData.lead_status = 'new';
-      updateData.comments = `${updateData.comments}\n\n✅ AI Qualification: QUALIFIED - Ready for follow-up`.trim();
-    } else if (isQualified === 'false' || isQualified === false) {
-      // AI determined this is not a qualified lead
-      updateData.lead_status = 'unqualified';
-      updateData.comments = `${updateData.comments}\n\n❌ AI Qualification: UNQUALIFIED - Not a sales opportunity`.trim();
+    // Update lead status based on call success (traditional outbound logic)
+    if (call_analysis?.call_successful === true) {
+      // Successful outbound call - advance to qualified
+      updateData.lead_status = 'qualified';
+      updateData.comments = `${updateData.comments}\n\n✅ Outbound Call: SUCCESSFUL - Advanced to qualified`.trim();
     } else {
-      // No qualification decision provided - fallback to old logic for backward compatibility
-      if (call_analysis?.call_successful === true) {
-        updateData.lead_status = 'new';
-        updateData.comments = `${updateData.comments}\n\n📞 Call completed successfully - No AI qualification provided`.trim();
-      } else if (!isFollowUp) {
-        updateData.lead_status = 'contacted';
-        updateData.comments = `${updateData.comments}\n\n📞 Initial contact made - No AI qualification provided`.trim();
-      }
+      // Unsuccessful outbound call - mark as contacted
+      updateData.lead_status = 'contacted';
+      updateData.comments = `${updateData.comments}\n\n📞 Outbound Call: ATTEMPTED - Marked as contacted`.trim();
     }
 
     await supabase
@@ -577,7 +554,7 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
   return NextResponse.json({
     success: true,
     call_record_id: callRecord.id,
-    action: 'analyzed',
+    action: 'outbound_call_analyzed',
   });
 }
 
@@ -717,37 +694,46 @@ async function findCustomerByPhone(phoneNumber: string | undefined) {
   return null;
 }
 
-// Find company by Retell agent ID
-async function findCompanyByAgentId(agentId: string | undefined) {
+// Find company by Retell outbound agent ID
+async function findCompanyByOutboundAgentId(agentId: string | undefined) {
   if (!agentId) {
-    console.warn('findCompanyByAgentId: No agent ID provided');
+    console.warn('findCompanyByOutboundAgentId: No agent ID provided');
     return null;
   }
 
   const supabase = createAdminClient();
 
   try {
+    // First try to find by specific outbound agent ID
     const { data, error } = await supabase
+      .from('company_settings')
+      .select('company_id')
+      .eq('setting_key', 'retell_outbound_agent_id')
+      .eq('setting_value', agentId)
+      .single();
+
+    if (data && !error) {
+      console.log('findCompanyByOutboundAgentId: Found company', data.company_id, 'for outbound agent', agentId);
+      return data.company_id;
+    }
+
+    // Fallback to legacy retell_agent_id for backward compatibility
+    const { data: legacyData, error: legacyError } = await supabase
       .from('company_settings')
       .select('company_id')
       .eq('setting_key', 'retell_agent_id')
       .eq('setting_value', agentId)
       .single();
 
-    if (error) {
-      console.error('findCompanyByAgentId: Database error:', error);
-      return null;
+    if (legacyData && !legacyError) {
+      console.log('findCompanyByOutboundAgentId: Found company', legacyData.company_id, 'for legacy agent', agentId);
+      return legacyData.company_id;
     }
 
-    if (data) {
-      console.log('findCompanyByAgentId: Found company', data.company_id, 'for agent', agentId);
-      return data.company_id;
-    }
-
-    console.warn('findCompanyByAgentId: No company found for agent ID:', agentId);
+    console.warn('findCompanyByOutboundAgentId: No company found for outbound agent ID:', agentId);
     return null;
   } catch (error) {
-    console.error('findCompanyByAgentId: Error:', error);
+    console.error('findCompanyByOutboundAgentId: Error:', error);
     return null;
   }
 }

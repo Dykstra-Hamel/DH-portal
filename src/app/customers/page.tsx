@@ -233,14 +233,39 @@ export default function CustomersPage() {
             onChange={setSearchQuery}
             placeholder="Search customers by name, phone, or email"
           />
-          {isAdmin && (
+          {isAdmin ? (
             <CompanyDropdown
               selectedCompanyId={adminSelectedCompany}
               onCompanyChange={setAdminSelectedCompany}
               includeAllOption={true}
               placeholder="Select company to view customers"
             />
-          )}
+          ) : userCompanies.length > 1 ? (
+            <div className={styles.companySelector}>
+              <label htmlFor="user-company-select" className={styles.selectorLabel}>
+                Select Company:
+              </label>
+              <select
+                id="user-company-select"
+                value={selectedCompany?.id || ''}
+                onChange={(e) => {
+                  const company = userCompanies.find(uc => uc.companies.id === e.target.value)?.companies;
+                  setSelectedCompany(company || null);
+                }}
+                className={styles.companySelect}
+              >
+                {userCompanies.map(uc => (
+                  <option key={uc.companies.id} value={uc.companies.id}>
+                    {uc.companies.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : userCompanies.length === 1 ? (
+            <div className={styles.singleCompanyHeader}>
+              <h3>Customers for {userCompanies[0].companies.name}</h3>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -248,18 +273,24 @@ export default function CustomersPage() {
         <div className={styles.customersSection}>
           <div className={styles.sectionHeader}>
             <h2>
-              {isAdmin
-                ? adminSelectedCompany
-                  ? `Customers for ${customers.length > 0 ? customers[0].company?.name || 'Selected Company' : 'Selected Company'}`
-                  : 'All Customers (All Companies)'
-                : `Customers for ${selectedCompany?.name}`}
+              {userCompanies.length === 1 && !isAdmin
+                ? 'Customers' // Don't repeat company name if already shown above
+                : isAdmin
+                  ? adminSelectedCompany
+                    ? `Customers for ${customers.length > 0 ? customers[0].company?.name || 'Selected Company' : 'Selected Company'}`
+                    : 'All Customers (All Companies)'
+                  : userCompanies.length > 1
+                    ? `Customers for ${selectedCompany?.name}`
+                    : `Customers for ${selectedCompany?.name}`}
             </h2>
             <p>
               {isAdmin
                 ? adminSelectedCompany
                   ? 'Customers for the selected company'
                   : 'All customers across all companies'
-                : 'All customers for your company'}
+                : userCompanies.length === 1
+                  ? 'All customers for your company'
+                  : 'All customers for the selected company'}
             </p>
           </div>
 

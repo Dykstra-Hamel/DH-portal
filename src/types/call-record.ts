@@ -29,6 +29,11 @@ export interface CallRecord {
   timeline?: string;
   pain_points?: string[];
   decision_maker?: string;
+  pest_issue?: string;
+  street_address?: string;
+  preferred_service_time?: string;
+  contacted_other_companies?: boolean;
+  opt_out_sensitive_data_storage?: boolean;
 
   disconnect_reason?: string;
   retell_variables?: any;

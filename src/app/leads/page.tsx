@@ -42,7 +42,7 @@ export default function LeadsPage() {
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    'new' | 'contacted' | 'qualified' | 'quoted' | 'all'
+    'new' | 'contacted' | 'qualified' | 'quoted' | 'unqualified' | 'all'
   >('all');
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminSelectedCompany, setAdminSelectedCompany] = useState<
@@ -177,20 +177,21 @@ export default function LeadsPage() {
       ? leads
       : leads.filter(lead => lead.lead_status === activeTab);
 
-  // Calculate lead counts for active statuses only
+  // Calculate lead counts for all statuses
   const leadCounts = {
     all: leads.length,
     new: leads.filter(lead => lead.lead_status === 'new').length,
     contacted: leads.filter(lead => lead.lead_status === 'contacted').length,
     qualified: leads.filter(lead => lead.lead_status === 'qualified').length,
     quoted: leads.filter(lead => lead.lead_status === 'quoted').length,
+    unqualified: leads.filter(lead => lead.lead_status === 'unqualified').length,
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <h1>Leads</h1>
-        {isAdmin && (
+        {isAdmin ? (
           <div className={styles.adminControls}>
             <CompanyDropdown
               selectedCompanyId={adminSelectedCompany}
@@ -199,25 +200,56 @@ export default function LeadsPage() {
               placeholder="Select company to view leads"
             />
           </div>
-        )}
+        ) : userCompanies.length > 1 ? (
+          <div className={styles.companySelector}>
+            <label htmlFor="user-company-select" className={styles.selectorLabel}>
+              Select Company:
+            </label>
+            <select
+              id="user-company-select"
+              value={selectedCompany?.id || ''}
+              onChange={(e) => {
+                const company = userCompanies.find(uc => uc.companies.id === e.target.value)?.companies;
+                setSelectedCompany(company || null);
+              }}
+              className={styles.companySelect}
+            >
+              {userCompanies.map(uc => (
+                <option key={uc.companies.id} value={uc.companies.id}>
+                  {uc.companies.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : userCompanies.length === 1 ? (
+          <div className={styles.singleCompanyHeader}>
+            <h3>Leads for {userCompanies[0].companies.name}</h3>
+          </div>
+        ) : null}
       </div>
 
       {(selectedCompany || isAdmin) && (
         <div className={styles.leadsSection}>
           <div className={styles.sectionHeader}>
             <h2>
-              {isAdmin
-                ? adminSelectedCompany
-                  ? 'Leads for Selected Company'
-                  : 'All Leads (All Companies)'
-                : `Leads for ${selectedCompany?.name}`}
+              {userCompanies.length === 1 && !isAdmin
+                ? 'Leads' // Don't repeat company name if already shown above
+                : isAdmin
+                  ? adminSelectedCompany
+                    ? 'Leads for Selected Company'
+                    : 'All Leads (All Companies)'
+                  : userCompanies.length > 1
+                    ? `Leads for ${selectedCompany?.name}`
+                    : `Leads for ${selectedCompany?.name}`}
             </h2>
             <p>
               {isAdmin
                 ? adminSelectedCompany
                   ? 'Leads for the selected company'
                   : 'All leads across all companies'
-                : 'All leads for your company'}
+                : userCompanies.length === 1
+                  ? 'All leads for your company'
+                  : 'All leads for the selected company'}
             </p>
           </div>
 

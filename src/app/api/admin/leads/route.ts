@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     // Use admin client to fetch leads
     const supabase = createAdminClient();
 
-    // Build query - filter to active leads only by default
+    // Build query - include all leads including unqualified
     let query = supabase
       .from('leads')
       .select(
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         )
       `
       )
-      .in('lead_status', ['new', 'contacted', 'qualified', 'quoted'])
+      .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
       .order('created_at', { ascending: false });
 
     // Apply filters

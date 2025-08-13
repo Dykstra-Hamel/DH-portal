@@ -22,6 +22,7 @@ import {
   Mail,
   FileText,
   Package,
+  Phone,
 } from 'lucide-react';
 import styles from './sidenav.module.scss';
 import { SidebarSection } from './SidebarSection';
@@ -131,6 +132,11 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               itemText="Customers"
               icon={Users}
               path="/customers"
+            />
+            <SidebarSectionNavItem
+              itemText="Call Records"
+              icon={Phone}
+              path="/call-records"
             />
             {/* <SidebarSectionNavItem itemText="Routing" icon={Route} path="#" />
             <SidebarSectionNavItem

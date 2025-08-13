@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get active leads for this company only
+    // Get all leads for this company (including unqualified)
     const { data: leads, error } = await supabase
       .from('leads')
       .select(
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       `
       )
       .eq('company_id', companyId)
-      .in('lead_status', ['new', 'contacted', 'qualified', 'quoted'])
+      .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
       .order('created_at', { ascending: false });
 
     if (error) {

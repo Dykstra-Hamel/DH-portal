@@ -193,6 +193,13 @@
     td {
       font-size: 0.875rem;
       color: #6b7280;
+      
+      &.pestIssueCell {
+        max-width: 150px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     }
 
     tr:hover {
