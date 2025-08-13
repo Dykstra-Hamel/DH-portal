@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { sendEvent } from '@/lib/inngest/client';
 
 export async function GET(
   request: NextRequest,
@@ -119,10 +120,10 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    // First get the lead to check company access
+    // First get the lead to check company access and capture current status
     const { data: existingLead, error: existingLeadError } = await supabase
       .from('leads')
-      .select('company_id')
+      .select('company_id, lead_status')
       .eq('id', id)
       .single();
 
@@ -185,6 +186,35 @@ export async function PUT(
         { error: 'Failed to update lead' },
         { status: 500 }
       );
+    }
+
+    // Check if lead status changed and trigger automation
+    const oldStatus = existingLead.lead_status;
+    const newStatus = body.lead_status;
+    
+    if (newStatus && oldStatus !== newStatus) {
+      try {
+        await sendEvent({
+          name: 'lead/status-changed',
+          data: {
+            leadId: id,
+            companyId: existingLead.company_id,
+            fromStatus: oldStatus,
+            toStatus: newStatus,
+            leadData: {
+              ...lead,
+              oldStatus,
+              newStatus,
+            },
+            userId: user.id,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        console.log(`Lead status changed event sent: ${oldStatus} → ${newStatus} for lead ${id}`);
+      } catch (eventError) {
+        console.error('Error sending lead status changed event:', eventError);
+        // Don't fail the API call if event sending fails
+      }
     }
 
     // Get assigned user profile if lead has one

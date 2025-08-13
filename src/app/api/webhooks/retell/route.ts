@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { sendEvent } from '@/lib/inngest/client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,7 +9,6 @@ export async function POST(request: NextRequest) {
     const retellWebhookSecret = process.env.RETELL_WEBHOOK_SECRET;
     
     if (!retellWebhookSecret) {
-      console.error('Retell Webhook: RETELL_WEBHOOK_SECRET not configured');
       return NextResponse.json(
         { error: 'Webhook secret not configured' },
         { status: 500 }
@@ -472,6 +472,45 @@ async function handleCallEnded(supabase: any, callData: any) {
       .eq('id', callRecord.leads.id);
   }
 
+  // Send event to call outcome tracker for automation workflows
+  try {
+    // Check if this call was initiated by automation
+    const { data: automationLog } = await supabase
+      .from('call_automation_log')
+      .select('execution_id, workflow_id, step_id')
+      .eq('call_id', call_id)
+      .single();
+
+    if (automationLog) {
+      // Map call status to outcome
+      let callOutcome: 'successful' | 'failed' | 'no_answer' | 'busy' | 'voicemail' = 'failed';
+      
+      if (call_status === 'completed') {
+        callOutcome = duration_ms && duration_ms > 10000 ? 'successful' : 'no_answer';
+      } else if (call_status === 'no-answer') {
+        callOutcome = 'no_answer';
+      } else if (call_status === 'busy') {
+        callOutcome = 'busy';
+      } else if (disconnection_reason === 'voicemail_reached') {
+        callOutcome = 'voicemail';
+      }
+
+      await sendEvent({
+        name: 'retell/call_ended',
+        data: {
+          call_id,
+          call_status: call_status || 'completed',
+          call_duration: duration_ms ? Math.round(duration_ms / 1000) : 0,
+          transcript: '',
+          call_analysis: null
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send call outcome event:', error);
+    // Don't fail the webhook if event sending fails
+  }
+
   return NextResponse.json({
     success: true,
     call_record_id: callRecord.id,
@@ -572,6 +611,60 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
       .from('leads')
       .update(updateData)
       .eq('id', callRecord.leads.id);
+  }
+
+  // Send comprehensive call outcome event with analysis data
+  try {
+    // Check if this call was initiated by automation
+    const { data: automationLog } = await supabase
+      .from('call_automation_log')
+      .select('execution_id, workflow_id, step_id, company_id, lead_id')
+      .eq('call_id', call_id)
+      .single();
+
+    if (automationLog) {
+      // Determine call outcome based on analysis
+      let callOutcome: 'successful' | 'failed' | 'no_answer' | 'busy' | 'voicemail' = 'failed';
+      
+      if (call_analysis?.call_successful === true) {
+        callOutcome = 'successful';
+      } else if (callData.call_status === 'no-answer') {
+        callOutcome = 'no_answer';
+      } else if (callData.call_status === 'busy') {
+        callOutcome = 'busy';
+      } else if (callData.disconnection_reason === 'voicemail_reached') {
+        callOutcome = 'voicemail';
+      }
+
+      // Parse analysis data for conditional branching
+      const callAnalysisData = call_analysis ? {
+        sentiment: (call_analysis.user_sentiment?.toLowerCase() as 'positive' | 'negative' | 'neutral') || 'neutral',
+        appointmentScheduled: call_analysis.appointment_scheduled === true || call_analysis.call_summary?.toLowerCase().includes('appointment'),
+        followUpRequested: call_analysis.follow_up_requested === true || call_analysis.call_summary?.toLowerCase().includes('follow up'),
+        objections: call_analysis.objections || [],
+        leadQuality: call_analysis.lead_quality || (call_analysis.call_successful ? 'warm' : 'cold') as 'hot' | 'warm' | 'cold'
+      } : undefined;
+
+      await sendEvent({
+        name: 'automation/call_completed',
+        data: {
+          callId: call_id,
+          companyId: automationLog.company_id,
+          leadId: automationLog.lead_id,
+          executionId: automationLog.execution_id,
+          workflowId: automationLog.workflow_id || '',
+          stepId: automationLog.step_id || '',
+          callOutcome,
+          callDuration: callData.duration_ms ? Math.round(callData.duration_ms / 1000) : 0,
+          callTranscript: transcript || '',
+          callAnalysis: callAnalysisData,
+          retellCallData: callData
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send call analysis outcome event:', error);
+    // Don't fail the webhook if event sending fails
   }
 
   return NextResponse.json({

@@ -129,15 +129,15 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               path="/leads"
             />
             <SidebarSectionNavItem
-              itemText="Customers"
-              icon={Users}
-              path="/customers"
-            />
-            <SidebarSectionNavItem
               itemText="Call Records"
               icon={Phone}
               path="/call-records"
             />
+            {/* <SidebarSectionNavItem
+              itemText="Customers"
+              icon={Users}
+              path="/customers"
+             */}
             {/* <SidebarSectionNavItem itemText="Routing" icon={Route} path="#" />
             <SidebarSectionNavItem
               itemText="Tech Revenue"
@@ -152,7 +152,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           </SidebarSection>
 
           {/* Marketing Section */}
-          <SidebarSection
+          {/* <SidebarSection
             sectionTitle="Marketing"
             sectionState={marketingOpen}
             setSectionState={setMarketingOpen}
@@ -176,8 +176,8 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               itemText="Email Campaigns"
               icon={Mail}
               path="#"
-            /> */}
-          </SidebarSection>
+            />
+          </SidebarSection> */}
 
           {/* Helpful Tools Section */}
           {/* <SidebarSection
@@ -201,12 +201,16 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         {/* Bottom Section */}
         <div className="sidebar-bottom-section">
           <div className="sidebar-bottom-nav">
-            <SidebarSingleNavItem
+            {/* <SidebarSingleNavItem
               itemText="Settings"
               icon={Settings}
               path="/settings"
+            /> */}
+            <SidebarSingleNavItem
+              itemText="Log Out"
+              icon={LogOut}
+              onClick={handleSignOut}
             />
-            <SidebarSingleNavItem itemText="Log Out" icon={LogOut} onClick={handleSignOut} />
           </div>
         </div>
       </div>

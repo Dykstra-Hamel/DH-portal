@@ -20,6 +20,92 @@
   }
 }
 
+// Primary Navigation - Main Categories
+.primaryNavigation {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 1rem;
+}
+
+.primaryNavButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.875rem 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #64748b;
+  white-space: nowrap;
+
+  &:hover {
+    background-color: #f1f5f9;
+    color: #334155;
+  }
+
+  &.active {
+    background-color: #3b82f6;
+    color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+    &:hover {
+      background-color: #2563eb;
+    }
+
+    .navIcon {
+      color: white;
+    }
+  }
+}
+
+.navIcon {
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+// Secondary Navigation - Subsections
+.secondaryNavigation {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  padding: 0.75rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.secondaryNavButton {
+  background: none;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #64748b;
+  white-space: nowrap;
+
+  &:hover {
+    background-color: #e2e8f0;
+    color: #374151;
+  }
+
+  &.active {
+    background-color: white;
+    color: #3b82f6;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+}
+
+// Legacy navigation styles (keep for compatibility)
 .navigation {
   display: flex;
   gap: 0.5rem;
@@ -54,6 +140,41 @@
   }
 }
 
+.companySelector {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.1),
+    0 1px 2px 0 rgba(0, 0, 0, 0.06);
+
+  label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+  }
+}
+
+.companySelect {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background-color: white;
+  font-size: 0.875rem;
+  color: #374151;
+  min-width: 200px;
+  
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+}
+
 .content {
   background-color: white;
   border-radius: 0.5rem;
@@ -61,4 +182,86 @@
   box-shadow:
     0 1px 3px 0 rgba(0, 0, 0, 0.1),
     0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .adminDashboard {
+    padding: 1rem;
+  }
+
+  // Primary navigation responsive
+  .primaryNavigation {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .primaryNavButton {
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+    
+    span {
+      display: none; // Hide text labels on very small screens
+    }
+  }
+
+  // Secondary navigation responsive
+  .secondaryNavigation {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+
+  .secondaryNavButton {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  // Legacy navigation responsive
+  .navigation {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .navButton {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .companySelector {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+
+    label {
+      margin-bottom: 0;
+    }
+  }
+
+  .companySelect {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .content {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .primaryNavButton {
+    justify-content: center;
+    padding: 0.75rem 0.5rem;
+    flex: 1;
+    min-width: 0;
+
+    span {
+      display: block;
+      font-size: 0.75rem;
+    }
+  }
+
+  .navIcon {
+    display: none; // Hide icons on very small screens to save space
+  }
 }

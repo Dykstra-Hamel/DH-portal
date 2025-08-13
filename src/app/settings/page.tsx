@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import KnowledgeBase from '@/components/KnowledgeBase/KnowledgeBase';
 import AccountLinking from '@/components/AccountLinking/AccountLinking';
+import AutomationSettings from '@/components/Automation/AutomationSettings';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -64,7 +65,7 @@ export default function SettingsPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'widget' | 'knowledge-base'>('widget');
+  const [activeTab, setActiveTab] = useState<'widget' | 'knowledge-base' | 'automation'>('widget');
   const [activeSection, setActiveSection] = useState<'user' | 'company'>('user');
   const router = useRouter();
 
@@ -379,6 +380,12 @@ export default function SettingsPage() {
                     Widget Settings
                   </button>
                   <button
+                    className={`${styles.tabButton} ${activeTab === 'automation' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('automation')}
+                  >
+                    Automation
+                  </button>
+                  <button
                     className={`${styles.tabButton} ${activeTab === 'knowledge-base' ? styles.active : ''}`}
                     onClick={() => setActiveTab('knowledge-base')}
                   >
@@ -422,6 +429,13 @@ export default function SettingsPage() {
                           </div>
                         </div>
                       </>
+                    )}
+
+                    {/* Automation Tab */}
+                    {activeTab === 'automation' && (
+                      <div className={styles.automationSection}>
+                        <AutomationSettings companyId={selectedCompanyId} />
+                      </div>
                     )}
 
                     {/* Knowledge Base Tab */}

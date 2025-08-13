@@ -1,0 +1,480 @@
+.abTestManager {
+  padding: 1.5rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+
+    h3 {
+      margin: 0;
+      color: #1f2937;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .createButton {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background: #2563eb;
+      }
+
+      &:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 2rem;
+
+    .tab {
+      background: none;
+      border: none;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      font-weight: 500;
+      color: #6b7280;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+
+      &:hover {
+        color: #374151;
+      }
+
+      &.active {
+        color: #3b82f6;
+        border-bottom-color: #3b82f6;
+      }
+    }
+  }
+
+  .loading {
+    text-align: center;
+    padding: 3rem;
+    color: #6b7280;
+    font-style: italic;
+  }
+
+  .emptyState {
+    text-align: center;
+    padding: 3rem;
+
+    p {
+      color: #6b7280;
+      margin-bottom: 1.5rem;
+      font-size: 1.1rem;
+    }
+
+    .createButton {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background: #059669;
+      }
+    }
+  }
+
+  .campaignsList {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .campaignCard {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: box-shadow 0.2s;
+
+    &:hover {
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .campaignHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      h4 {
+        margin: 0;
+        color: #1f2937;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+
+      .status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        color: white;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-transform: capitalize;
+      }
+    }
+
+    .campaignMeta {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      color: #6b7280;
+      font-size: 0.875rem;
+    }
+
+    .campaignActions {
+      display: flex;
+      gap: 1rem;
+
+      button {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+        background: white;
+        color: #374151;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #f9fafb;
+          border-color: #9ca3af;
+        }
+
+        &:first-child {
+          background: #3b82f6;
+          color: white;
+          border-color: #3b82f6;
+
+          &:hover {
+            background: #2563eb;
+            border-color: #2563eb;
+          }
+        }
+      }
+    }
+  }
+
+  .analytics {
+    padding: 3rem;
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
+  }
+
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+
+    .modalContent {
+      background: white;
+      border-radius: 12px;
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+      min-width: 600px;
+    }
+
+    .modalHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid #e5e7eb;
+
+      h4 {
+        margin: 0;
+        color: #1f2937;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+
+      button {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #6b7280;
+        cursor: pointer;
+        padding: 0;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        &:hover {
+          background: #f3f4f6;
+        }
+      }
+    }
+
+    .modalBody {
+      padding: 2rem;
+
+      .formGroup {
+        margin-bottom: 1.5rem;
+
+        label {
+          display: block;
+          margin-bottom: 0.5rem;
+          color: #374151;
+          font-weight: 500;
+        }
+
+        input, select {
+          width: 100%;
+          padding: 0.75rem;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 1rem;
+          transition: border-color 0.2s;
+
+          &:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          }
+        }
+      }
+
+      .variantsSection {
+        margin-bottom: 2rem;
+
+        .variantsHeader {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+
+          h5 {
+            margin: 0;
+            color: #1f2937;
+            font-weight: 600;
+          }
+
+          button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            cursor: pointer;
+
+            &:hover {
+              background: #059669;
+            }
+          }
+        }
+
+        .variantRow {
+          display: grid;
+          grid-template-columns: 1fr 2fr 100px auto;
+          gap: 1rem;
+          margin-bottom: 1rem;
+          align-items: end;
+
+          .removeButton {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            white-space: nowrap;
+
+            &:hover {
+              background: #dc2626;
+            }
+          }
+        }
+      }
+
+      .statisticalSettings {
+        .settingsRow {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1rem;
+        }
+
+        h5 {
+          margin-bottom: 1rem;
+          color: #1f2937;
+          font-weight: 600;
+        }
+      }
+
+      .winnerAlert {
+        background: #f0f9ff;
+        border: 1px solid #0ea5e9;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+
+        h5 {
+          margin: 0 0 0.5rem 0;
+          color: #0c4a6e;
+          font-weight: 600;
+        }
+
+        p {
+          margin: 0.5rem 0;
+          color: #0c4a6e;
+        }
+      }
+
+      .resultsTable {
+        margin-bottom: 2rem;
+        overflow-x: auto;
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+
+          th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+          }
+
+          th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+          }
+
+          td {
+            color: #6b7280;
+          }
+        }
+      }
+
+      .promotionSection {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        border-radius: 8px;
+        padding: 1.5rem;
+
+        h5 {
+          margin: 0 0 1rem 0;
+          color: #92400e;
+          font-weight: 600;
+        }
+
+        p {
+          margin-bottom: 1.5rem;
+          color: #92400e;
+        }
+
+        .promotionButtons {
+          display: flex;
+          gap: 1rem;
+
+          .promoteButton {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+
+            &:hover {
+              background: #059669;
+            }
+          }
+
+          .forcePromoteButton {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+
+            &:hover {
+              background: #d97706;
+            }
+          }
+        }
+      }
+    }
+
+    .modalFooter {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      padding: 1.5rem 2rem;
+      border-top: 1px solid #e5e7eb;
+      background: #f9fafb;
+
+      button {
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:first-child {
+          background: white;
+          border: 1px solid #d1d5db;
+          color: #374151;
+
+          &:hover {
+            background: #f9fafb;
+          }
+        }
+
+        &:last-child {
+          background: #3b82f6;
+          border: 1px solid #3b82f6;
+          color: white;
+
+          &:hover {
+            background: #2563eb;
+          }
+
+          &:disabled {
+            background: #9ca3af;
+            border-color: #9ca3af;
+            cursor: not-allowed;
+          }
+        }
+      }
+    }
+  }
+}

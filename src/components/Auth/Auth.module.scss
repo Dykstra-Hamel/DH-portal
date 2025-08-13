@@ -1,0 +1,53 @@
+@use '../../styles/Buttons.scss';
+
+.authWrapper {
+  width: 435px;
+  max-width: 100%;
+  padding: 0 2rem;
+
+  .buttonWrapper {
+    display: flex;
+    position: relative;
+    flex-flow: row wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .authFormButton {
+    @extend .button;
+
+    color: #fff;
+    background: #353535;
+    border: 1px solid #353535;
+    border-radius: 0 4px 4px 0;
+
+    &:hover {
+      background: #73d2de;
+      border: 1px solid #73d2de;
+      color: #353535;
+    }
+  }
+
+  .magicLinkHeading {
+    text-align: center;
+  }
+
+  .magicLinkForm {
+    display: flex;
+    position: relative;
+    justify-content: center;
+    align-items: center;
+    margin-top: 1rem;
+
+    input {
+      padding: 1rem 0.5rem;
+      font-size: 1rem;
+      border: 1px solid #353535;
+      border-radius: 4px 0 0 4px;
+      outline: none;
+      flex-grow: 1;
+    }
+  }
+}

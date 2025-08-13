@@ -6,16 +6,17 @@ export default function Home() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <Image
+        {/* <Image
           className={styles.logo}
           src="/icon-192x192.png"
           alt="DH Portal logo"
           width={150}
           height={150}
           priority
-        />
+        /> */}
 
-        <h1>Welcome to DH Portal</h1>
+        <h1>DYKSTRA|HAMEL</h1>
+        <h2>Welcome to PCOCENTRAL</h2>
 
         <div
           style={{
