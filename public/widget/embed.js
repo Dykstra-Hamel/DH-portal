@@ -1,6 +1,6 @@
 /**
  * DH Widget - Built from Source
- * Generated: 2025-08-13T03:59:24.570Z
+ * Generated: 2025-08-13T19:55:17.933Z
  * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
  */
 

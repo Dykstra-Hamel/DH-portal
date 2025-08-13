@@ -1,6 +1,7 @@
 .container {
   padding: 24px;
-  max-width: 1200px;
+  width: 1200px;
+  max-width: 85vw;
   margin: 0 auto;
 }
 
@@ -524,6 +525,45 @@
 
   .header h1 {
     font-size: 1.5rem;
+  }
+  .backButton {
+    align-self: flex-end;
+  }
+
+  .editButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .editActions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .content,
+  .customerInfo,
+  .notes {
+    padding: 16px;
+  }
+
+  .leadsSection {
+    grid-column: 1 / -1;
+  }
+
+  .leadsHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .leadsTabs {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
   }
 }
 
