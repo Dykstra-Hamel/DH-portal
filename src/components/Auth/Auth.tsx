@@ -5,12 +5,17 @@ import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import styles from './Auth.module.scss';
+import { OTPInput } from './OTPInput';
 
 export default function Auth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [authMethod, setAuthMethod] = useState<'magic-link' | 'otp'>('magic-link');
   const router = useRouter();
 
   useEffect(() => {
@@ -102,6 +107,72 @@ export default function Auth() {
     }
   };
 
+  const signInWithOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+      },
+    });
+
+    if (error) {
+      console.error('Error sending OTP:', error);
+      setOtpError(error.message);
+    } else {
+      setOtpSent(true);
+      setOtpError('');
+    }
+  };
+
+  const verifyOtp = async (token: string) => {
+    setVerifyingOtp(true);
+    setOtpError('');
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
+
+    if (error) {
+      console.error('Error verifying OTP:', error);
+      setOtpError(error.message);
+      setVerifyingOtp(false);
+    } else {
+      // Success - user will be redirected by auth state change
+      setVerifyingOtp(false);
+    }
+  };
+
+  const resendOtp = async () => {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+      },
+    });
+
+    if (error) {
+      setOtpError(error.message);
+    } else {
+      setOtpError('');
+    }
+  };
+
+  const resetForm = () => {
+    setEmail('');
+    setMagicLinkSent(false);
+    setOtpSent(false);
+    setOtpError('');
+    setAuthMethod('magic-link');
+  };
+
   const signOut = async () => {
     const supabase = createClient();
     const { error } = await supabase.auth.signOut();
@@ -127,27 +198,108 @@ export default function Auth() {
 
         <div className={styles.magicLinkFormWrapper}>
           <h2 className={styles.magicLinkHeading}>
-            Or sign in with magic link:
+            Or sign in with email:
           </h2>
-          {magicLinkSent ? (
-            <div className="">Magic link sent! Check your email.</div>
-          ) : (
-            <form
-              onSubmit={signInWithMagicLink}
-              className={styles.magicLinkForm}
+          
+          {/* Auth method toggle */}
+          <div className={styles.authMethodToggle}>
+            <button
+              type="button"
+              className={authMethod === 'magic-link' ? styles.activeToggle : styles.inactiveToggle}
+              onClick={() => setAuthMethod('magic-link')}
             >
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className=""
-                required
-              />
-              <button type="submit" className={styles.authFormButton}>
-                Send Magic Link
-              </button>
-            </form>
+              Magic Link
+            </button>
+            <button
+              type="button"
+              className={authMethod === 'otp' ? styles.activeToggle : styles.inactiveToggle}
+              onClick={() => setAuthMethod('otp')}
+            >
+              OTP Code
+            </button>
+          </div>
+
+          {/* Magic Link Flow */}
+          {authMethod === 'magic-link' && (
+            <>
+              {magicLinkSent ? (
+                <div className={styles.successMessage}>
+                  Magic link sent! Check your email.
+                  <div className={styles.otpActions}>
+                    <button type="button" onClick={resetForm} className={styles.backButton}>
+                      ← Back to login
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={signInWithMagicLink} className={styles.magicLinkForm}>
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                  />
+                  <button type="submit" className={styles.authFormButton}>
+                    Send Magic Link
+                  </button>
+                </form>
+              )}
+            </>
+          )}
+
+          {/* OTP Flow */}
+          {authMethod === 'otp' && (
+            <>
+              {!otpSent ? (
+                <form onSubmit={signInWithOtp} className={styles.magicLinkForm}>
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                  />
+                  <button type="submit" className={styles.authFormButton}>
+                    Send OTP Code
+                  </button>
+                </form>
+              ) : (
+                <div className={styles.otpVerificationContainer}>
+                  <p>Enter the 6-digit code sent to {email}</p>
+                  
+                  <OTPInput
+                    length={6}
+                    onComplete={verifyOtp}
+                    loading={verifyingOtp}
+                  />
+                  
+                  {otpError && (
+                    <div className={styles.errorMessage}>
+                      {otpError}
+                    </div>
+                  )}
+                  
+                  <div className={styles.otpActions}>
+                    <button 
+                      type="button" 
+                      onClick={resendOtp} 
+                      className={styles.resendButton}
+                      disabled={verifyingOtp}
+                    >
+                      Resend Code
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={resetForm} 
+                      className={styles.backButton}
+                    >
+                      ← Back to login
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
