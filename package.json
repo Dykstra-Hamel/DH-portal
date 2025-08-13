@@ -19,6 +19,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "migratedb": "supabase db push --linked",
+    "mig-up": "supabase migration up",
     "seed": "node scripts/seed-with-users.js",
     "seed-automations": "node scripts/seed-automation-data.js",
     "restartdb": "supabase db reset --local",
