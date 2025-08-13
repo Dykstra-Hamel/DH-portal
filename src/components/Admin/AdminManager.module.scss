@@ -461,7 +461,8 @@
 
 .adminManager {
   padding: 1.5rem;
-  max-width: 1600px;
+  width: 1600px;
+  max-width: 95vw;
   margin: 0 auto;
 
   h2 {
@@ -882,6 +883,10 @@
 
 // Responsive design updates
 @media (max-width: 768px) {
+  .recordsHeader {
+    flex-direction: column;
+    align-items: center;
+  }
   .photographyGrid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;

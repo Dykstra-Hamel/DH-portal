@@ -119,6 +119,7 @@
 
 .fullWidthChart {
   width: 100%;
+  max-width: 90vw;
 }
 
 // Loading state
@@ -147,8 +148,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 // Error and not configured states
@@ -208,7 +213,7 @@
 @media (max-width: 768px) {
   .analyticsHeader {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: 16px;
 
     .title {
@@ -216,7 +221,15 @@
     }
   }
 
+  .analyticsContainer {
+    max-width: 95vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
   .metricsCards {
+    width: 100%;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
   }
@@ -229,17 +242,12 @@
     }
   }
 
-
   .chartsGrid {
     gap: 16px;
   }
 }
 
 @media (max-width: 480px) {
-  .analyticsContainer {
-    padding: 0 8px;
-  }
-
   .periodSelector {
     flex-direction: column;
     align-items: flex-start;
