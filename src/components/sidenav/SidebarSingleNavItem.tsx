@@ -8,6 +8,7 @@ interface SidebarItemProps {
   icon: LucideIcon;
   path?: string;
   onClick?: () => void;
+  onLinkClick?: () => void;
 }
 
 export function SidebarSingleNavItem({
@@ -15,6 +16,7 @@ export function SidebarSingleNavItem({
   itemText,
   icon: Icon,
   onClick,
+  onLinkClick,
 }: SidebarItemProps) {
   const pathname = usePathname();
   const isActive = path ? pathname === path : false;
@@ -40,6 +42,7 @@ export function SidebarSingleNavItem({
       <Link
         href={path || '#'}
         className={`${styles.sidebarNavLink} ${isActive ? styles.sidebarNavLinkActive : ''}`}
+        onClick={onLinkClick}
       >
         <Icon size={16} />
         {itemText}

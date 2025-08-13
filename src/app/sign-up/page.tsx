@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import styles from '@/app/styles/page.module.scss';
+import styles from './page.module.scss';
 
 interface FormErrors {
   firstName?: string;

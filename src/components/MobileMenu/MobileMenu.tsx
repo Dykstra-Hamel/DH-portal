@@ -11,9 +11,13 @@ export function MobileMenuButton() {
     setIsActive(!isActive);
   };
 
+  const closeSidebar = () => {
+    setIsActive(false);
+  };
+
   return (
     <>
-      <Sidebar isActive={isActive} />
+      <Sidebar isActive={isActive} onLinkClick={closeSidebar} />
       <div className="mobileMenuButton" onClick={toggleSidebar}>
         <Menu size={32} />
       </div>

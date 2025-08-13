@@ -138,6 +138,7 @@
     z-index: 999;
     width: 100%;
     left: -100%;
+    transition: all 0.3s ease-out;
 
     &.active {
       left: 0;

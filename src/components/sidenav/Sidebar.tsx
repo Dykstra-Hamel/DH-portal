@@ -32,9 +32,10 @@ import { SidebarSingleNavItem } from './SidebarSingleNavItem';
 interface SidebarProps {
   collapsed?: boolean;
   isActive?: boolean;
+  onLinkClick?: () => void;
 }
 
-export function Sidebar({ collapsed = false, isActive = false }: SidebarProps) {
+export function Sidebar({ collapsed = false, isActive = false, onLinkClick }: SidebarProps) {
   const [companyOpen, setCompanyOpen] = useState(true);
   const [marketingOpen, setMarketingOpen] = useState(false);
   const [helpfulToolsOpen, setHelpfulToolsOpen] = useState(false);
@@ -97,7 +98,7 @@ export function Sidebar({ collapsed = false, isActive = false }: SidebarProps) {
 
   if (!isPublicPage && pathname !== '/') {
     return (
-      <div className={`${styles.sidebar} ${isActive ? 'active' : ''}`}>
+      <div className={`${styles.sidebar} ${isActive ? styles.active : ''}`}>
         {/* Logo Section */}
         <div className={styles.sidebarLogoSection}>
           <Image
@@ -116,6 +117,7 @@ export function Sidebar({ collapsed = false, isActive = false }: SidebarProps) {
             itemText="Dashboard"
             icon={LayoutDashboard}
             path="/dashboard"
+            onLinkClick={onLinkClick}
           />
 
           {/* Company Section */}
@@ -128,11 +130,13 @@ export function Sidebar({ collapsed = false, isActive = false }: SidebarProps) {
               itemText="Leads"
               icon={UserPlus}
               path="/leads"
+              onLinkClick={onLinkClick}
             />
             <SidebarSectionNavItem
               itemText="Call Records"
               icon={Phone}
               path="/call-records"
+              onLinkClick={onLinkClick}
             />
             {/* <SidebarSectionNavItem
               itemText="Customers"
@@ -210,7 +214,10 @@ export function Sidebar({ collapsed = false, isActive = false }: SidebarProps) {
             <SidebarSingleNavItem
               itemText="Log Out"
               icon={LogOut}
-              onClick={handleSignOut}
+              onClick={() => {
+                handleSignOut();
+                onLinkClick?.();
+              }}
             />
           </div>
         </div>
