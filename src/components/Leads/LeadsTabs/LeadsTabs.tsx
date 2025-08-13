@@ -4,7 +4,7 @@ import React from 'react';
 import { LeadStatus } from '@/types/lead';
 import styles from './LeadsTabs.module.scss';
 
-type ActiveLeadStatus = 'new' | 'contacted' | 'qualified' | 'quoted';
+type ActiveLeadStatus = 'new' | 'contacted' | 'qualified' | 'quoted' | 'unqualified';
 
 interface LeadsTabsProps {
   activeTab: ActiveLeadStatus | 'all';
@@ -17,17 +17,18 @@ const LeadsTabs: React.FC<LeadsTabsProps> = ({
   onTabChange,
   leadCounts,
 }) => {
-  // Only show active lead statuses
-  const activeLeadStatusOptions = [
+  // Show all lead statuses including unqualified
+  const leadStatusOptions = [
     { value: 'new', label: 'New' },
     { value: 'contacted', label: 'Contacted' },
     { value: 'qualified', label: 'Qualified' },
     { value: 'quoted', label: 'Quoted' },
+    { value: 'unqualified', label: 'Unqualified' },
   ];
 
   const tabs = [
-    { key: 'all' as const, label: 'All Active Leads', count: leadCounts.all },
-    ...activeLeadStatusOptions.map(status => ({
+    { key: 'all' as const, label: 'All Leads', count: leadCounts.all },
+    ...leadStatusOptions.map(status => ({
       key: status.value as ActiveLeadStatus,
       label: status.label,
       count: leadCounts[status.value as ActiveLeadStatus],

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getCompanyRetellConfig,
+  getCompanyOutboundRetellConfig,
   logRetellConfigError,
 } from '@/lib/retell-config';
 
@@ -19,6 +19,7 @@ interface RetellCallRequest {
   state?: string;
   zipCode?: string;
   companyId: string;
+  leadId?: string; // Pass lead ID for outbound calls
 }
 
 interface RetellCallPayload {
@@ -43,6 +44,7 @@ interface RetellCallPayload {
     company_name: string;
     company_url?: string;
     is_follow_up: string;
+    lead_id?: string; // Include lead ID for outbound call tracking
   };
 }
 
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
       state,
       zipCode,
       companyId,
+      leadId,
     } = body;
 
     // Note: Knowledge base functionality has been simplified to direct Retell AI integration
@@ -122,9 +125,9 @@ export async function POST(request: NextRequest) {
     const { createAdminClient } = await import('@/lib/supabase/server-admin');
     const supabase = createAdminClient();
 
-    // Fetch both company settings and company info in parallel
+    // Fetch both company outbound settings and company info in parallel
     const [configResult, companyResult] = await Promise.all([
-      getCompanyRetellConfig(companyId),
+      getCompanyOutboundRetellConfig(companyId),
       supabase
         .from('companies')
         .select('name, website')
@@ -141,14 +144,14 @@ export async function POST(request: NextRequest) {
 
       // Provide specific error message for frontend
       let errorMessage =
-        'Retell configuration is not complete for this company.';
+        'Retell outbound configuration is not complete for this company.';
       if (
         configResult.missingSettings &&
         configResult.missingSettings.length > 0
       ) {
         errorMessage += ` Missing: ${configResult.missingSettings.join(', ')}.`;
       }
-      errorMessage += ' Please configure Call Settings in the admin dashboard.';
+      errorMessage += ' Please configure Outbound Call Settings in the admin dashboard.';
 
       return NextResponse.json(
         {
@@ -217,6 +220,7 @@ export async function POST(request: NextRequest) {
         company_name: company.name,
         company_url: company.website || '',
         is_follow_up: 'false', // Default to false, can be overridden by caller
+        lead_id: leadId || '', // Include lead ID for outbound call tracking
       },
     };
 

@@ -70,15 +70,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Manually join the relationships with profiles and companies
+    // Manually join the relationships with profiles, users, and companies
     const relationshipsWithJoins =
-      relationshipsData?.map(rel => ({
-        ...rel,
-        profiles: profilesData?.find(profile => profile.id === rel.user_id),
-        companies: companiesData?.find(
-          company => company.id === rel.company_id
-        ),
-      })) || [];
+      relationshipsData?.map(rel => {
+        const userProfile = profilesData?.find(profile => profile.id === rel.user_id);
+        const authUser = authUsers.users?.find(user => user.id === rel.user_id);
+        
+        return {
+          ...rel,
+          profiles: userProfile ? {
+            ...userProfile,
+            email: authUser?.email || 'No email', // Include email from auth.users
+          } : {
+            first_name: 'Unknown',
+            last_name: 'User',
+            email: authUser?.email || 'No email',
+          },
+          companies: companiesData?.find(
+            company => company.id === rel.company_id
+          ),
+        };
+      }) || [];
 
     return NextResponse.json({
       relationships: relationshipsWithJoins,

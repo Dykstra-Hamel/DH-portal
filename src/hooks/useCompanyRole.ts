@@ -133,3 +133,65 @@ export function useCurrentCompanyRole(
 ): UseCompanyRoleReturn {
   return useCompanyRole(selectedCompany?.id);
 }
+
+// Helper hook to check if user is global admin
+export function useIsGlobalAdmin(): {
+  isGlobalAdmin: boolean;
+  isLoading: boolean;
+  error: string | null;
+} {
+  const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkGlobalAdmin = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const supabase = createClient();
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          setError('Not authenticated');
+          setIsGlobalAdmin(false);
+          return;
+        }
+
+        // Get user profile to check role
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          setError('Failed to fetch user profile');
+          setIsGlobalAdmin(false);
+          return;
+        }
+
+        setIsGlobalAdmin(profile?.role === 'admin');
+      } catch (err) {
+        console.error('Error checking global admin status:', err);
+        setError('An unexpected error occurred');
+        setIsGlobalAdmin(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkGlobalAdmin();
+  }, []);
+
+  return {
+    isGlobalAdmin,
+    isLoading,
+    error,
+  };
+}
