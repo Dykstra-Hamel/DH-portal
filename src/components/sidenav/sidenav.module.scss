@@ -132,4 +132,15 @@
       }
     }
   }
+
+  @media screen and (width <= 600px) {
+    position: absolute;
+    z-index: 999;
+    width: 100%;
+    left: -100%;
+
+    &.active {
+      left: 0;
+    }
+  }
 }

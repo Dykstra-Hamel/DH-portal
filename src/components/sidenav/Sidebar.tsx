@@ -31,9 +31,10 @@ import { SidebarSingleNavItem } from './SidebarSingleNavItem';
 
 interface SidebarProps {
   collapsed?: boolean;
+  isActive?: boolean;
 }
 
-export function Sidebar({ collapsed = false }: SidebarProps) {
+export function Sidebar({ collapsed = false, isActive = false }: SidebarProps) {
   const [companyOpen, setCompanyOpen] = useState(true);
   const [marketingOpen, setMarketingOpen] = useState(false);
   const [helpfulToolsOpen, setHelpfulToolsOpen] = useState(false);
@@ -96,7 +97,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
 
   if (!isPublicPage && pathname !== '/') {
     return (
-      <div className={styles.sidebar}>
+      <div className={`${styles.sidebar} ${isActive ? 'active' : ''}`}>
         {/* Logo Section */}
         <div className={styles.sidebarLogoSection}>
           <Image
