@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
-import './styles/globals.scss';
 import { Sidebar } from '@/components/sidenav/Sidebar';
 import '@/styles/main.scss';
 
@@ -24,7 +23,7 @@ export default function RootLayout({
     <html lang="en" className={`${outfit.className}`}>
       <body>
         <Sidebar />
-        <section className="page">{children}</section>
+        <section className="pageWrapper">{children}</section>
       </body>
     </html>
   );
