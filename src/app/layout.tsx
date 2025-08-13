@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
 import './styles/globals.scss';
 import { Sidebar } from '@/components/sidenav/Sidebar';
+import '@/styles/main.scss';
 
 const outfit = Outfit({
   subsets: ['latin'],

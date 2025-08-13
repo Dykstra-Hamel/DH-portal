@@ -1,0 +1,19 @@
+.button {
+  padding: 1rem;
+  font-size: 1rem;
+  border: none;
+  outline: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+
+  &.primaryButton {
+    color: #fff;
+    background: #353535;
+
+    &:hover {
+      background: #73d2de;
+      color: #353535;
+    }
+  }
+}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import styles from './Auth.module.scss';
 
 export default function Auth() {
   const [user, setUser] = useState<User | null>(null);
@@ -113,22 +114,27 @@ export default function Auth() {
 
   if (!user) {
     return (
-      <div className="">
-        <div className="">
-          <button onClick={signInWithGoogle} className="">
+      <div className={styles.authWrapper}>
+        <div className={styles.buttonWrapper}>
+          <button onClick={signInWithGoogle} className="button primaryButton">
             Sign in with Google
           </button>
-          <button onClick={signInWithFacebook} className="">
+          <button onClick={signInWithFacebook} className="button primaryButton">
             Sign in with Facebook
           </button>
         </div>
 
         <div className="">
-          <h3 className="">Or sign in with magic link:</h3>
+          <h2 className={styles.magicLinkHeading}>
+            Or sign in with magic link:
+          </h2>
           {magicLinkSent ? (
             <div className="">Magic link sent! Check your email.</div>
           ) : (
-            <form onSubmit={signInWithMagicLink} className="">
+            <form
+              onSubmit={signInWithMagicLink}
+              className={styles.magicLinkForm}
+            >
               <input
                 type="email"
                 placeholder="Enter your email"
@@ -137,7 +143,7 @@ export default function Auth() {
                 className=""
                 required
               />
-              <button type="submit" className="">
+              <button type="submit" className={styles.authFormButton}>
                 Send Magic Link
               </button>
             </form>
