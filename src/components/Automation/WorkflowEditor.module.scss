@@ -1,0 +1,598 @@
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+
+  .modalContent {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    max-width: 800px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .closeButton {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: none;
+      color: #64748b;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #e2e8f0;
+        color: #334155;
+      }
+    }
+  }
+
+  .modalBody {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+  }
+
+  .modalFooter {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 24px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+
+    .cancelButton {
+      padding: 10px 16px;
+      border: 1px solid #d1d5db;
+      background: white;
+      color: #374151;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #f9fafb;
+        border-color: #9ca3af;
+      }
+    }
+
+    .testButton {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover:not(:disabled) {
+        background: #059669;
+      }
+
+      &:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+      }
+    }
+
+    .saveButton {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover:not(:disabled) {
+        background: #2563eb;
+      }
+
+      &:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+      }
+    }
+  }
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border-radius: 6px;
+  font-size: 14px;
+
+  &.success {
+    background: #f0f9f3;
+    border: 1px solid #c6f6d5;
+    color: #22543d;
+  }
+
+  &.error {
+    background: #fed7d7;
+    border: 1px solid #feb2b2;
+    color: #c53030;
+  }
+}
+
+.formSection {
+  margin-bottom: 32px;
+
+  h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+}
+
+.formGroup {
+  margin-bottom: 16px;
+
+  label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+
+    &.checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+
+      input[type="checkbox"] {
+        margin: 0;
+        width: 16px;
+        height: 16px;
+      }
+    }
+  }
+
+  .statusCheckboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      cursor: pointer;
+
+      input[type="checkbox"] {
+        margin: 0;
+        width: 14px;
+        height: 14px;
+      }
+    }
+  }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  }
+
+  small {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Workflow Steps
+.addStepButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+
+  .addStepButton {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #e2e8f0;
+      border-color: #94a3b8;
+    }
+  }
+}
+
+.workflowSteps {
+  .emptySteps {
+    text-align: center;
+    padding: 40px 20px;
+    color: #64748b;
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+
+    p {
+      margin: 0;
+      font-size: 14px;
+    }
+  }
+}
+
+.workflowStep {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .stepHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    cursor: pointer;
+    user-select: none;
+
+    .stepInfo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+
+      .stepIcon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: #f1f5f9;
+        border-radius: 6px;
+        color: #475569;
+      }
+
+      .stepDetails {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .stepTitle {
+          font-weight: 500;
+          color: #1e293b;
+          font-size: 14px;
+        }
+
+        .stepDescription {
+          font-size: 12px;
+          color: #64748b;
+        }
+      }
+    }
+
+    .stepActions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+
+      .moveButton, .deleteButton, .expandButton {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .moveButton {
+        color: #64748b;
+
+        &:hover {
+          background: #f1f5f9;
+          color: #334155;
+        }
+      }
+
+      .deleteButton {
+        color: #dc2626;
+
+        &:hover {
+          background: #fef2f2;
+        }
+      }
+
+      .expandButton {
+        color: #64748b;
+
+        &:hover {
+          background: #f1f5f9;
+          color: #334155;
+        }
+      }
+    }
+  }
+
+  .stepContent {
+    padding: 0 16px 16px 16px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+  }
+}
+
+// Test Results Styles
+.testResults {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+
+  h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  h4 {
+    margin: 16px 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+  }
+}
+
+.testSummary {
+  .summaryStats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .statItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+
+    .statLabel {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .statValue {
+      font-size: 14px;
+      color: #1e293b;
+      font-weight: 600;
+    }
+  }
+}
+
+.testSteps {
+  margin-bottom: 20px;
+}
+
+.testStep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+
+  .stepNumber {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    min-width: 50px;
+  }
+
+  .stepType {
+    font-size: 11px;
+    font-weight: 500;
+    color: #64748b;
+    text-transform: uppercase;
+    min-width: 80px;
+  }
+
+  .stepMessage {
+    flex: 1;
+    font-size: 13px;
+    color: #374151;
+  }
+
+  .stepIcon {
+    flex-shrink: 0;
+  }
+
+  &.success {
+    border-left: 3px solid #10b981;
+    
+    .stepIcon {
+      color: #10b981;
+    }
+  }
+
+  &.error {
+    border-left: 3px solid #ef4444;
+    
+    .stepIcon {
+      color: #ef4444;
+    }
+  }
+}
+
+.emailPreviews {
+  .emailPreview {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 8px;
+
+    .previewHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+
+      .previewTitle {
+        font-size: 13px;
+        font-weight: 500;
+        color: #1e293b;
+      }
+
+      .previewDelay {
+        font-size: 11px;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    }
+
+    .previewSubject {
+      font-size: 12px;
+      color: #374151;
+      
+      strong {
+        color: #1e293b;
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .modal {
+    padding: 10px;
+
+    .modalContent {
+      max-height: 95vh;
+    }
+
+    .modalHeader,
+    .modalBody,
+    .modalFooter {
+      padding: 16px;
+    }
+
+    .formRow {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .workflowStep {
+    .stepHeader {
+      .stepActions {
+        .moveButton, .deleteButton, .expandButton {
+          width: 32px;
+          height: 32px;
+        }
+      }
+    }
+  }
+
+  .testSummary {
+    .summaryStats {
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+  }
+}

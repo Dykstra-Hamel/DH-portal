@@ -40,6 +40,7 @@ import {
   validateEmails,
   LeadNotificationData,
 } from '@/lib/email';
+import { sendEvent } from '@/lib/inngest/client';
 
 // Helper function to check if auto-calling is enabled for a company
 async function shouldAutoCall(companyId: string): Promise<boolean> {
@@ -704,6 +705,41 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Error in auto-call process:', error);
       // Don't fail the lead creation due to call issues
+    }
+
+    // Trigger Inngest automation workflows (don't fail lead creation if this fails)
+    try {
+      await sendEvent({
+        name: 'lead/created',
+        data: {
+          leadId: lead.id,
+          companyId: submission.companyId,
+          customerId,
+          leadData: {
+            customerName: submission.contactInfo.name,
+            customerEmail: submission.contactInfo.email,
+            customerPhone: submission.contactInfo.phone,
+            pestType: submission.pestType,
+            urgency: submission.urgency,
+            address: submission.address,
+            homeSize: submission.homeSize,
+            selectedPlan: submission.selectedPlan?.plan_name,
+            estimatedPrice: submission.estimatedPrice,
+          },
+          attribution: {
+            leadSource,
+            utmSource: finalAttributionData.utm_source,
+            utmMedium: finalAttributionData.utm_medium,
+            utmCampaign: finalAttributionData.utm_campaign,
+          },
+          createdAt: new Date().toISOString(),
+        },
+      });
+      
+      console.log(`Inngest automation triggered for lead ${lead.id}`);
+    } catch (error) {
+      console.error('Error triggering Inngest automation:', error);
+      // Don't fail the lead creation due to automation trigger issues
     }
 
     // Send email notifications (don't fail lead creation if this fails)
