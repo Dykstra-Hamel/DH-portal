@@ -45,6 +45,13 @@ export async function GET(request: NextRequest) {
             last_name,
             email
           )
+        ),
+        customers (
+          id,
+          first_name,
+          last_name,
+          email,
+          company_id
         )
       `
       );
@@ -52,7 +59,7 @@ export async function GET(request: NextRequest) {
     if (isAdmin) {
       // Global admin: can see all calls or filter by specific company
       if (companyIdFilter && companyIdFilter !== 'all') {
-        query = query.eq('leads.company_id', companyIdFilter);
+        query = query.or(`leads.company_id.eq.${companyIdFilter},customers.company_id.eq.${companyIdFilter}`);
       }
       // If no filter or 'all' selected, return all calls (no additional filtering)
     } else {
@@ -81,8 +88,8 @@ export async function GET(request: NextRequest) {
       const companyIds = userCompanies.map(uc => uc.company_id);
 
       if (companyIdFilter && companyIds.includes(companyIdFilter)) {
-        // Filter by specific company if user has access to it
-        query = query.eq('leads.company_id', companyIdFilter);
+        // Filter by specific company if user has access to it - check both lead and customer company access
+        query = query.or(`leads.company_id.eq.${companyIdFilter},customers.company_id.eq.${companyIdFilter}`);
       } else if (companyIdFilter) {
         // User requested a company they don't have access to
         return NextResponse.json(
@@ -108,8 +115,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Filter out calls that don't have leads (shouldn't happen but safety check)
-    const filteredCalls = calls?.filter(call => call.leads) || [];
+    // Filter out calls that don't have either leads or customers (shouldn't happen but safety check)
+    const filteredCalls = calls?.filter(call => call.leads || call.customers) || [];
 
     return NextResponse.json(filteredCalls);
   } catch (error) {
