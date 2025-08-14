@@ -24,6 +24,7 @@ import {
 } from '@/types/lead';
 import { CallHistory } from '@/components/Calls/CallHistory/CallHistory';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
+import { formatDateForDisplay } from '@/lib/utils';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -350,14 +351,34 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     return entries.map((entry, index) => {
       const trimmedEntry = entry.trim();
 
+      // Function to parse and format timestamps in comment text
+      const formatTimestampsInText = (text: string) => {
+        // Pattern to match ISO timestamps in comments (e.g., "2025-08-14T17:24:00.000Z")
+        const isoTimestampPattern = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/g;
+        
+        return text.replace(isoTimestampPattern, (match) => {
+          try {
+            return formatDateForDisplay(match);
+          } catch (error) {
+            // If parsing fails, return the original timestamp
+            console.error('Failed to parse timestamp:', match, error);
+            return match;
+          }
+        });
+      };
+
       // Check if this entry starts with a call record pattern
       if (
         trimmedEntry.startsWith('📞 Call on') ||
+        trimmedEntry.startsWith('📞 Inbound call started at') ||
+        trimmedEntry.startsWith('📞 Inbound call on') ||
         trimmedEntry.startsWith('📊 Call Analysis:')
       ) {
         return (
           <div key={index} className={styles.commentEntry}>
-            <div className={styles.callEntry}>{trimmedEntry}</div>
+            <div className={styles.callEntry}>
+              {formatTimestampsInText(trimmedEntry)}
+            </div>
           </div>
         );
       }
@@ -375,13 +396,13 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
         );
       }
 
-      // Regular comment - split by newlines and preserve formatting
+      // Regular comment - split by newlines and preserve formatting, but still format any timestamps
       const lines = trimmedEntry.split('\n');
       return (
         <div key={index} className={styles.commentEntry}>
           <div className={styles.regularComment}>
             {lines.map((line, lineIndex) => (
-              <div key={lineIndex}>{line}</div>
+              <div key={lineIndex}>{formatTimestampsInText(line)}</div>
             ))}
           </div>
         </div>

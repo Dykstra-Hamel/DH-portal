@@ -5,6 +5,7 @@ import { Phone, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
 import { CallRecord } from '@/types/call-record';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
+import { formatDateForDisplay } from '@/lib/utils';
 import styles from './CallHistory.module.scss';
 
 interface CallHistoryProps {
@@ -51,13 +52,7 @@ export function CallHistory({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatDateForDisplay(dateString);
   };
 
   const getSentimentColor = (sentiment?: string) => {

@@ -104,3 +104,26 @@ export const toE164PhoneNumber = (
   // Return E.164 format with US country code
   return `+1${cleanDigits}`;
 };
+
+/**
+ * Formats a date for display in the user's local timezone
+ * Consistent formatting across the application for timestamps
+ * @param date - Date string, Date object, or timestamp
+ * @returns Formatted date string in local timezone
+ */
+export const formatDateForDisplay = (date: string | Date | number): string => {
+  const dateObj = new Date(date);
+  
+  // Check if date is valid
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
+  return dateObj.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};

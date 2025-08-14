@@ -321,7 +321,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       lead_type: 'phone_call',
       lead_status: 'new', // Will be updated based on AI qualification later
       priority: 'medium',
-      comments: `📞 Inbound call started at ${new Date().toLocaleString()}`,
+      comments: `📞 Inbound call started at ${new Date().toISOString()}`,
       created_at: new Date().toISOString(),
     })
     .select('id')
@@ -439,14 +439,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
   if (callRecord?.leads) {
     const callOutcome = call_status === 'completed' ? 'completed' : call_status || 'ended';
     const callDate = end_timestamp ? new Date(end_timestamp) : new Date();
-    const formattedDate = callDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const callSummary = `📞 Inbound call on ${formattedDate} - Status: ${callOutcome}${disconnection_reason ? ` (${disconnection_reason})` : ''}`;
+    const callSummary = `📞 Inbound call on ${callDate.toISOString()} - Status: ${callOutcome}${disconnection_reason ? ` (${disconnection_reason})` : ''}`;
     
     await supabase
       .from('leads')

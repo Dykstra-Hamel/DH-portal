@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Timestamp Formatting</title>
+</head>
+<body>
+    <h1>Testing Client-side Timestamp Formatting</h1>
+    
+    <h2>Original ISO Timestamp</h2>
+    <p id="iso-timestamp">2025-08-14T17:24:00.000Z</p>
+    
+    <h2>Formatted for Display (Local Time)</h2>
+    <p id="formatted-timestamp"></p>
+    
+    <h2>Browser Timezone</h2>
+    <p id="browser-timezone"></p>
+    
+    <h2>Test Comment Text with Timestamps</h2>
+    <div id="test-comments">
+        <p>📞 Inbound call started at 2025-08-14T17:24:00.000Z</p>
+        <p>📞 Call on 2025-08-14T17:30:15.123Z - Status: completed</p>
+    </div>
+    
+    <h2>Processed Comments (Client-side formatting)</h2>
+    <div id="processed-comments"></div>
+
+    <script>
+        // Copy the formatDateForDisplay function logic
+        function formatDateForDisplay(date) {
+            const dateObj = new Date(date);
+            
+            // Check if date is valid
+            if (isNaN(dateObj.getTime())) {
+                return 'Invalid Date';
+            }
+            
+            return dateObj.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        }
+        
+        // Test the formatting
+        const isoTimestamp = '2025-08-14T17:24:00.000Z';
+        const formatted = formatDateForDisplay(isoTimestamp);
+        
+        document.getElementById('formatted-timestamp').textContent = formatted;
+        document.getElementById('browser-timezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        
+        // Test comment processing
+        const testComments = [
+            '📞 Inbound call started at 2025-08-14T17:24:00.000Z',
+            '📞 Call on 2025-08-14T17:30:15.123Z - Status: completed'
+        ];
+        
+        const processedComments = testComments.map(comment => {
+            const isoTimestampPattern = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/g;
+            return comment.replace(isoTimestampPattern, (match) => {
+                try {
+                    return formatDateForDisplay(match);
+                } catch (error) {
+                    console.error('Failed to parse timestamp:', match, error);
+                    return match;
+                }
+            });
+        });
+        
+        const processedDiv = document.getElementById('processed-comments');
+        processedComments.forEach(comment => {
+            const p = document.createElement('p');
+            p.textContent = comment;
+            processedDiv.appendChild(p);
+        });
+        
+        // Show timezone info
+        console.log('Browser timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+        console.log('ISO timestamp:', isoTimestamp);
+        console.log('Formatted timestamp:', formatted);
+    </script>
+</body>
+</html>
