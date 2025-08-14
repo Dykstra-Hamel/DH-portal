@@ -83,6 +83,12 @@
     }
   }
 
+  .resetPasswordForm {
+    @extend .magicLinkForm;
+
+    flex-flow: row wrap;
+  }
+
   .emailPasswordForm {
     display: flex;
     position: relative;
@@ -181,6 +187,9 @@
   color: #6b7280;
   cursor: pointer;
   font-size: 0.875rem;
+  width: 100%;
+  text-align: right;
+  margin-top: 5px;
 
   &:hover {
     color: #374151;
@@ -246,4 +255,45 @@
   font-size: 0.875rem;
   text-align: center;
   margin: 0.5rem 0;
+}
+
+.forgotPasswordLink {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  width: 100%;
+  text-align: center;
+
+  &:hover {
+    color: #2563eb;
+  }
+}
+
+.passwordInputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  input {
+    margin: 5px 0;
+    padding-right: 3rem;
+  }
+
+  .passwordToggle {
+    position: absolute;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 0.875rem;
+
+    &:hover {
+      color: #374151;
+    }
+  }
 }

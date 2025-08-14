@@ -19,8 +19,9 @@ export default function Auth() {
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authMethod, setAuthMethod] = useState<
-    'magic-link' | 'otp' | 'password'
+    'magic-link' | 'otp' | 'password' | 'reset-password'
   >('password');
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -188,6 +189,30 @@ export default function Auth() {
     }
   };
 
+  const sendPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+
+    setPasswordError('');
+    const supabase = createClient();
+    const redirectOrigin =
+      process.env.NODE_ENV === 'development'
+        ? 'http://localhost:3000'
+        : window.location.origin;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${redirectOrigin}/auth/confirm?next=/account/update-password`,
+    });
+
+    if (error) {
+      console.error('Error sending password reset email:', error);
+      setPasswordError(error.message);
+    } else {
+      setResetEmailSent(true);
+      setPasswordError('');
+    }
+  };
+
   const resetForm = () => {
     setEmail('');
     setPassword('');
@@ -195,6 +220,7 @@ export default function Auth() {
     setOtpSent(false);
     setOtpError('');
     setPasswordError('');
+    setResetEmailSent(false);
     setAuthMethod('password');
   };
 
@@ -296,6 +322,13 @@ export default function Auth() {
               <button type="submit" className={styles.authFormButton}>
                 Sign In
               </button>
+              <button
+                type="button"
+                onClick={() => setAuthMethod('reset-password')}
+                className={styles.forgotPasswordLink}
+              >
+                Forgot your password?
+              </button>
             </form>
           )}
 
@@ -374,6 +407,52 @@ export default function Auth() {
                     >
                       Resend Code
                     </button>
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className={styles.backButton}
+                    >
+                      ← Back to login
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Password Reset Flow */}
+          {authMethod === 'reset-password' && (
+            <>
+              {!resetEmailSent ? (
+                <form
+                  onSubmit={sendPasswordReset}
+                  className={styles.resetPasswordForm}
+                >
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                  />
+                  {passwordError && (
+                    <div className={styles.errorMessage}>{passwordError}</div>
+                  )}
+                  <button type="submit" className={styles.authFormButton}>
+                    Send Reset Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className={styles.backButton}
+                  >
+                    ← Back to login
+                  </button>
+                </form>
+              ) : (
+                <div className={styles.successMessage}>
+                  Password reset link sent! Check your email.
+                  <div className={styles.otpActions}>
                     <button
                       type="button"
                       onClick={resetForm}
