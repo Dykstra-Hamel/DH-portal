@@ -38,6 +38,13 @@ interface CallRecord {
       email: string;
     };
   };
+  customers?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    company_id: string;
+  };
 }
 
 interface Company {
@@ -354,14 +361,20 @@ export default function CallRecordsPage() {
                     <tr key={call.id}>
                       <td>{formatDate(call.start_timestamp)}</td>
                       <td>
-                        {call.leads?.customers
-                          ? `${call.leads.customers.first_name} ${call.leads.customers.last_name}`
-                          : 'Unknown'}
-                        {call.leads?.customers?.email && (
-                          <div className={styles.subText}>
-                            {call.leads.customers.email}
-                          </div>
-                        )}
+                        {(() => {
+                          const customer = call.leads?.customers || call.customers;
+                          return customer
+                            ? `${customer.first_name} ${customer.last_name}`
+                            : 'Unknown';
+                        })()}
+                        {(() => {
+                          const customer = call.leads?.customers || call.customers;
+                          return customer?.email && (
+                            <div className={styles.subText}>
+                              {customer.email}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>{formatPhoneNumber(call.phone_number)}</td>
                       <td>
@@ -437,9 +450,12 @@ export default function CallRecordsPage() {
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Customer:</strong>{' '}
-                  {selectedCall.leads?.customers
-                    ? `${selectedCall.leads.customers.first_name} ${selectedCall.leads.customers.last_name}`
-                    : 'Unknown'}
+                  {(() => {
+                    const customer = selectedCall.leads?.customers || selectedCall.customers;
+                    return customer
+                      ? `${customer.first_name} ${customer.last_name}`
+                      : 'Unknown';
+                  })()}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Phone:</strong>{' '}
@@ -548,11 +564,12 @@ export default function CallRecordsPage() {
                 <br />
                 <strong>Date:</strong> {formatDate(callToDelete.start_timestamp)}
                 <br />
-                <strong>Customer:</strong> {
-                  callToDelete.leads?.customers
-                    ? `${callToDelete.leads.customers.first_name} ${callToDelete.leads.customers.last_name}`
-                    : 'Unknown'
-                }
+                <strong>Customer:</strong> {(() => {
+                  const customer = callToDelete.leads?.customers || callToDelete.customers;
+                  return customer
+                    ? `${customer.first_name} ${customer.last_name}`
+                    : 'Unknown';
+                })()}
               </div>
             </div>
             <div className={styles.modalActions}>

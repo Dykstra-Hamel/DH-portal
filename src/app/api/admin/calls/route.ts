@@ -27,6 +27,13 @@ export async function GET(request: NextRequest) {
             last_name,
             email
           )
+        ),
+        customers (
+          id,
+          first_name,
+          last_name,
+          email,
+          company_id
         )
       `
       )
