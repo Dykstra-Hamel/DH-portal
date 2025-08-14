@@ -72,7 +72,11 @@
       </div>
 
       <div style="text-align: center">
-        <a href="{{ .ConfirmationURL }}" class="button">Accept Invitation</a>
+        <a
+          href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite"
+          class="button"
+          >Accept Invitation</a
+        >
       </div>
 
       <p>
