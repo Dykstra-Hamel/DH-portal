@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { createClient } from '@/lib/supabase/client';
 import { useIsGlobalAdmin } from '@/hooks/useCompanyRole';
-import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import styles from '@/components/Admin/AdminManager.module.scss';
 
 interface CallRecord {
@@ -58,6 +58,11 @@ export default function CallRecordsPage() {
   const [callsLoading, setCallsLoading] = useState(false);
   const [callsError, setCallsError] = useState<string | null>(null);
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
+  
+  // Delete State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [callToDelete, setCallToDelete] = useState<CallRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadCompanies = async () => {
     try {
@@ -210,6 +215,55 @@ export default function CallRecordsPage() {
     }
   };
 
+  const handleDeleteClick = (call: CallRecord) => {
+    setCallToDelete(call);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!callToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      
+      const supabase = createClient();
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session.session?.access_token) {
+        throw new Error('No authentication session');
+      }
+
+      const response = await fetch(`/api/calls/${callToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to delete call record');
+      }
+
+      // Refresh the calls list
+      await loadCalls();
+
+      setShowDeleteModal(false);
+      setCallToDelete(null);
+    } catch (error) {
+      console.error('Error deleting call record:', error);
+      alert(`Failed to delete call record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setCallToDelete(null);
+  };
+
   return (
     <div className={styles.adminManager}>
       <div className={styles.header}>
@@ -336,12 +390,21 @@ export default function CallRecordsPage() {
                       <td>{call.preferred_service_time || 'N/A'}</td>
                       <td>{call.opt_out_sensitive_data_storage ? 'Yes' : 'No'}</td>
                       <td>
-                        <button
-                          className={styles.actionButton}
-                          onClick={() => setSelectedCall(call)}
-                        >
-                          View Details
-                        </button>
+                        <div className={styles.callActions}>
+                          <button
+                            className={styles.actionButton}
+                            onClick={() => setSelectedCall(call)}
+                          >
+                            View Details
+                          </button>
+                          <button
+                            className={styles.callDeleteButton}
+                            onClick={() => handleDeleteClick(call)}
+                            title="Delete call record"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -453,6 +516,60 @@ export default function CallRecordsPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && callToDelete && (
+        <div className={styles.modal} onClick={handleDeleteCancel}>
+          <div
+            className={styles.modalContent}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h3>Delete Call Record</h3>
+              <button
+                className={styles.closeButton}
+                onClick={handleDeleteCancel}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <p>
+                Are you sure you want to delete this call record? This action cannot be undone.
+              </p>
+              <div className={styles.callInfo}>
+                <strong>Call ID:</strong> {callToDelete.call_id}
+                <br />
+                <strong>Phone:</strong> {formatPhoneNumber(callToDelete.phone_number)}
+                <br />
+                <strong>Date:</strong> {formatDate(callToDelete.start_timestamp)}
+                <br />
+                <strong>Customer:</strong> {
+                  callToDelete.leads?.customers
+                    ? `${callToDelete.leads.customers.first_name} ${callToDelete.leads.customers.last_name}`
+                    : 'Unknown'
+                }
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                onClick={handleDeleteCancel}
+                className={styles.cancelButton}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className={styles.confirmDeleteButton}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Call Record'}
+              </button>
             </div>
           </div>
         </div>

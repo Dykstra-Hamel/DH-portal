@@ -124,35 +124,6 @@
   }
 }
 
-.userInfo {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #374151;
-  font-size: 13px;
-
-  svg {
-    opacity: 0.7;
-  }
-}
-
-.unassigned {
-  color: #9ca3af;
-  font-style: italic;
-}
-
-.valueInfo {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 500;
-  color: #059669;
-
-  svg {
-    opacity: 0.7;
-  }
-}
-
 .dateInfo {
   display: flex;
   align-items: center;
@@ -210,5 +181,87 @@
   p {
     margin: 0;
     font-size: 16px;
+  }
+}
+
+// Modal styles
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  h3 {
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  p {
+    margin: 0 0 24px 0;
+    color: #6b7280;
+    line-height: 1.5;
+  }
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancelButton,
+.confirmDeleteButton {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+}
+
+.cancelButton {
+  background-color: white;
+  color: #374151;
+  border-color: #d1d5db;
+
+  &:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+  }
+}
+
+.confirmDeleteButton {
+  background-color: #ef4444;
+  color: white;
+
+  &:hover {
+    background-color: #dc2626;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
   }
 }

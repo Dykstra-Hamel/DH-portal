@@ -13,6 +13,7 @@ import {
   Save,
   X,
   PhoneCall,
+  Trash2,
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
 import {
@@ -51,6 +52,8 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
   const [saving, setSaving] = useState(false);
   const [callHistoryRefresh, setCallHistoryRefresh] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -304,6 +307,37 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
     }
   };
 
+  const handleDeleteClick = () => {
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!leadId) return;
+
+    try {
+      setIsDeleting(true);
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete lead');
+      }
+
+      // Redirect to leads page after successful deletion
+      router.push('/leads');
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      alert('Failed to delete lead. Please try again.');
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -470,10 +504,20 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
               </button>
             </div>
           ) : (
-            <button onClick={handleEdit} className={styles.editButton}>
-              <Edit size={16} />
-              Edit Lead
-            </button>
+            <>
+              <button onClick={handleEdit} className={styles.editButton}>
+                <Edit size={16} />
+                Edit Lead
+              </button>
+              <button 
+                onClick={handleDeleteClick} 
+                className={styles.deleteButton}
+                disabled={isEditing}
+              >
+                <Trash2 size={16} />
+                Delete Lead
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -839,6 +883,58 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className={styles.modalOverlay} onClick={handleDeleteCancel}>
+          <div
+            className={styles.modal}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h3>Delete Lead</h3>
+              <button
+                className={styles.closeButton}
+                onClick={handleDeleteCancel}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <p>
+                Are you sure you want to delete this lead? This action cannot be undone.
+              </p>
+              <div className={styles.leadInfo}>
+                <strong>Service Type:</strong> {lead?.service_type || 'Not specified'}
+                <br />
+                <strong>Customer:</strong> {
+                  lead?.customer
+                    ? `${lead.customer.first_name} ${lead.customer.last_name}`
+                    : 'No customer linked'
+                }
+                <br />
+                <strong>Status:</strong> {lead?.lead_status || 'Unknown'}
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                onClick={handleDeleteCancel}
+                className={styles.cancelButton}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className={styles.confirmDeleteButton}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Lead'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
