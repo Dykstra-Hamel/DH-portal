@@ -19,12 +19,16 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const companyIdFilter = url.searchParams.get('company_id');
     
+    // Log the received company_id for debugging
+    console.log('Received company_id:', companyIdFilter, 'Type:', typeof companyIdFilter);
+    
     // Validate company_id format if provided
-    if (companyIdFilter && companyIdFilter !== 'all') {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(companyIdFilter)) {
+    if (companyIdFilter && companyIdFilter !== 'all' && companyIdFilter.trim() !== '') {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(companyIdFilter.trim())) {
+        console.error('Invalid company ID format received:', companyIdFilter);
         return NextResponse.json(
-          { error: 'Invalid company ID format' },
+          { error: `Invalid company ID format: ${companyIdFilter}` },
           { status: 400 }
         );
       }
@@ -56,15 +60,10 @@ export async function GET(request: NextRequest) {
       `
       );
 
-    if (isAdmin) {
-      // Global admin: can see all calls or filter by specific company
-      if (companyIdFilter && companyIdFilter !== 'all') {
-        query = query.or(`leads.company_id.eq.${companyIdFilter},customers.company_id.eq.${companyIdFilter}`);
-      }
-      // If no filter or 'all' selected, return all calls (no additional filtering)
-    } else {
-      // Regular user: only see calls from their associated companies
-      const { data: userCompanies, error: companiesError } = await supabase
+    // Get company access for filtering
+    let userCompanies = [];
+    if (!isAdmin) {
+      const { data: companies, error: companiesError } = await supabase
         .from('user_companies')
         .select('company_id')
         .eq('user_id', user.id);
@@ -77,34 +76,17 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      if (!userCompanies || userCompanies.length === 0) {
+      if (!companies || companies.length === 0) {
         return NextResponse.json(
           { error: 'User not associated with any company' },
           { status: 403 }
         );
       }
 
-      // Extract company IDs
-      const companyIds = userCompanies.map(uc => uc.company_id);
-
-      if (companyIdFilter && companyIds.includes(companyIdFilter)) {
-        // Filter by specific company if user has access to it - check both lead and customer company access
-        query = query.or(`leads.company_id.eq.${companyIdFilter},customers.company_id.eq.${companyIdFilter}`);
-      } else if (companyIdFilter) {
-        // User requested a company they don't have access to
-        return NextResponse.json(
-          { error: 'Access denied to requested company' },
-          { status: 403 }
-        );
-      } else {
-        // No company filter provided - require company selection for regular users
-        return NextResponse.json(
-          { error: 'Company selection required' },
-          { status: 400 }
-        );
-      }
+      userCompanies = companies.map(uc => uc.company_id);
     }
 
+    // Apply filtering - we'll filter the results after the query to handle both leads and customers
     const { data: calls, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
@@ -115,8 +97,47 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Filter out calls that don't have either leads or customers (shouldn't happen but safety check)
-    const filteredCalls = calls?.filter(call => call.leads || call.customers) || [];
+    // Filter calls based on user permissions and company filter
+    let filteredCalls = calls || [];
+
+    // Filter out calls that don't have either leads or customers
+    filteredCalls = filteredCalls.filter(call => call.leads || call.customers);
+
+    // Apply company-based filtering
+    if (isAdmin) {
+      // Admin users: filter by specific company if requested
+      if (companyIdFilter && companyIdFilter !== 'all') {
+        filteredCalls = filteredCalls.filter(call => {
+          const leadCompanyId = call.leads?.company_id;
+          const customerCompanyId = call.customers?.company_id;
+          return leadCompanyId === companyIdFilter || customerCompanyId === companyIdFilter;
+        });
+      }
+      // If no filter or 'all', show all calls (no additional filtering)
+    } else {
+      // Non-admin users: only show calls from their associated companies
+      if (companyIdFilter && userCompanies.includes(companyIdFilter)) {
+        // Filter by specific company if user has access to it
+        filteredCalls = filteredCalls.filter(call => {
+          const leadCompanyId = call.leads?.company_id;
+          const customerCompanyId = call.customers?.company_id;
+          return leadCompanyId === companyIdFilter || customerCompanyId === companyIdFilter;
+        });
+      } else if (companyIdFilter) {
+        // User requested a company they don't have access to
+        return NextResponse.json(
+          { error: 'Access denied to requested company' },
+          { status: 403 }
+        );
+      } else {
+        // No company filter - show calls from all user's associated companies
+        filteredCalls = filteredCalls.filter(call => {
+          const leadCompanyId = call.leads?.company_id;
+          const customerCompanyId = call.customers?.company_id;
+          return userCompanies.includes(leadCompanyId) || userCompanies.includes(customerCompanyId);
+        });
+      }
+    }
 
     return NextResponse.json(filteredCalls);
   } catch (error) {

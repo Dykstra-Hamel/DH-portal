@@ -39,6 +39,13 @@ interface CallRecord {
       email: string;
     };
   };
+  customers?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    company_id: string;
+  };
 }
 
 interface Company {
@@ -107,8 +114,10 @@ export default function CallsManager() {
       // Filter calls by company if a specific company is selected
       if (companyId && companyId !== 'all') {
         data = data.filter((call: CallRecord) => {
-          // Check if the call's lead belongs to the selected company
-          return call.leads?.company_id === companyId;
+          // Check if the call's lead belongs to the selected company OR direct customer belongs to company
+          const leadCompanyId = call.leads?.company_id;
+          const customerCompanyId = call.customers?.company_id;
+          return leadCompanyId === companyId || customerCompanyId === companyId;
         });
       }
       
@@ -385,14 +394,20 @@ export default function CallsManager() {
                       <tr key={call.id}>
                         <td>{formatDate(call.start_timestamp)}</td>
                         <td>
-                          {call.leads?.customers
-                            ? `${call.leads.customers.first_name} ${call.leads.customers.last_name}`
-                            : 'Unknown'}
-                          {call.leads?.customers?.email && (
-                            <div className={styles.subText}>
-                              {call.leads.customers.email}
-                            </div>
-                          )}
+                          {(() => {
+                            const customer = call.leads?.customers || call.customers;
+                            return customer
+                              ? `${customer.first_name} ${customer.last_name}`
+                              : 'Unknown';
+                          })()}
+                          {(() => {
+                            const customer = call.leads?.customers || call.customers;
+                            return customer?.email && (
+                              <div className={styles.subText}>
+                                {customer.email}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td>{formatPhoneNumber(call.phone_number)}</td>
                         <td>
@@ -807,9 +822,12 @@ export default function CallsManager() {
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Customer:</strong>{' '}
-                  {selectedCall.leads?.customers
-                    ? `${selectedCall.leads.customers.first_name} ${selectedCall.leads.customers.last_name}`
-                    : 'Unknown'}
+                  {(() => {
+                    const customer = selectedCall.leads?.customers || selectedCall.customers;
+                    return customer
+                      ? `${customer.first_name} ${customer.last_name}`
+                      : 'Unknown';
+                  })()}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Phone:</strong>{' '}
