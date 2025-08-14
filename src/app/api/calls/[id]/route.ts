@@ -24,7 +24,11 @@ export async function DELETE(
       .from('call_records')
       .select(`
         id,
-        leads!inner (
+        leads (
+          id,
+          company_id
+        ),
+        customers (
           id,
           company_id
         )
@@ -45,7 +49,10 @@ export async function DELETE(
 
     // If not admin, verify user has access to the company
     if (!isAdmin) {
-      if (!callRecord.leads || !(callRecord.leads as any).company_id) {
+      // Get company ID from either lead or customer
+      const companyId = (callRecord.leads as any)?.company_id || (callRecord.customers as any)?.company_id;
+      
+      if (!companyId) {
         return NextResponse.json(
           { error: 'Call record not associated with a company' },
           { status: 400 }
@@ -56,7 +63,7 @@ export async function DELETE(
         .from('user_companies')
         .select('id')
         .eq('user_id', user.id)
-        .eq('company_id', (callRecord.leads as any).company_id)
+        .eq('company_id', companyId)
         .single();
 
       if (userCompanyError || !userCompany) {
