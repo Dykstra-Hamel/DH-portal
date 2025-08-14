@@ -154,6 +154,33 @@ export default function LeadsPage() {
     }
   }, [adminSelectedCompany]);
 
+  const handleDeleteLead = async (leadId: string) => {
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete lead');
+      }
+
+      // Refresh leads after successful deletion
+      if (isAdmin) {
+        fetchLeadsAdmin();
+      } else {
+        fetchLeads();
+      }
+
+      // You could add a toast notification here if you have a toast system
+      console.log('Lead deleted successfully');
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      // You could show an error toast here
+      alert('Failed to delete lead. Please try again.');
+    }
+  };
+
   // Fetch leads when selectedCompany changes (regular user) or adminSelectedCompany changes (admin)
   useEffect(() => {
     if (isAdmin) {
@@ -268,8 +295,9 @@ export default function LeadsPage() {
               />
               <LeadsTable
                 leads={filteredLeads}
-                showActions={false}
+                showActions={true}
                 showCompanyColumn={isAdmin && !adminSelectedCompany}
+                onDelete={handleDeleteLead}
               />
             </>
           )}

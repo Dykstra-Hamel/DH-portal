@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Edit, Trash2, Calendar, User, Phone, Mail } from 'lucide-react';
+import React, { useState } from 'react';
+import { Edit, Trash2, Calendar, Phone, Mail } from 'lucide-react';
 import {
   Lead,
   leadSourceOptions,
@@ -20,6 +20,48 @@ interface LeadsTableProps {
   showCompanyColumn?: boolean;
 }
 
+interface ConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  leadName: string;
+}
+
+const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  leadName,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <h3>Delete Lead</h3>
+        <p>
+          Are you sure you want to delete the lead for <strong>{leadName}</strong>?
+          This action cannot be undone.
+        </p>
+        <div className={styles.modalActions}>
+          <button
+            onClick={onClose}
+            className={styles.cancelButton}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className={styles.confirmDeleteButton}
+          >
+            Delete Lead
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const LeadsTable: React.FC<LeadsTableProps> = ({
   leads,
   onEdit,
@@ -28,6 +70,8 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
   showCompanyColumn = false,
 }) => {
   const router = useRouter();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const handleRowClick = (leadId: string, event: React.MouseEvent) => {
     // Don't navigate if clicking on action buttons
@@ -35,6 +79,24 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
       return;
     }
     router.push(`/leads/${leadId}`);
+  };
+
+  const handleDeleteClick = (lead: Lead) => {
+    setSelectedLead(lead);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (selectedLead && onDelete) {
+      onDelete(selectedLead.id);
+    }
+    setShowDeleteModal(false);
+    setSelectedLead(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setSelectedLead(null);
   };
   const getStatusColor = (status: string) => {
     const statusColorMap: { [key: string]: string } = {
@@ -63,10 +125,6 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
     return dateString ? new Date(dateString).toLocaleDateString() : '';
   };
 
-  const formatCurrency = (amount: number | null | undefined) => {
-    return amount ? `$${amount.toLocaleString()}` : '';
-  };
-
   if (leads.length === 0) {
     return (
       <div className={styles.emptyState}>
@@ -87,10 +145,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
             <th>Status</th>
             <th>Priority</th>
             <th>Service</th>
-            <th>Assigned To</th>
-            <th>Value</th>
             <th>Created</th>
-            <th>Next Follow-up</th>
             {showActions && <th>Actions</th>}
           </tr>
         </thead>
@@ -184,35 +239,9 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                 </div>
               </td>
               <td>
-                {lead.assigned_user ? (
-                  <div className={styles.userInfo}>
-                    <User size={14} />
-                    {lead.assigned_user.first_name}{' '}
-                    {lead.assigned_user.last_name}
-                  </div>
-                ) : (
-                  <span className={styles.unassigned}>Unassigned</span>
-                )}
-              </td>
-              <td>
-                <div className={styles.valueInfo}>
-                  {lead.estimated_value ? (
-                    formatCurrency(lead.estimated_value)
-                  ) : (
-                    <span className={styles.noValue}>—</span>
-                  )}
-                </div>
-              </td>
-              <td>
                 <div className={styles.dateInfo}>
                   <Calendar size={14} />
                   {formatDate(lead.created_at)}
-                </div>
-              </td>
-              <td>
-                <div className={styles.dateInfo}>
-                  <Calendar size={14} />
-                  {formatDate(lead.next_follow_up_at)}
                 </div>
               </td>
               {showActions && (
@@ -226,7 +255,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                       <Edit size={16} />
                     </button>
                     <button
-                      onClick={() => onDelete?.(lead.id)}
+                      onClick={() => handleDeleteClick(lead)}
                       className={styles.deleteButton}
                       title="Delete lead"
                     >
@@ -239,6 +268,17 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
           ))}
         </tbody>
       </table>
+      
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        leadName={
+          selectedLead?.customer
+            ? `${selectedLead.customer.first_name} ${selectedLead.customer.last_name}`
+            : 'this lead'
+        }
+      />
     </div>
   );
 };
