@@ -15,7 +15,12 @@ export default function Auth() {
   const [otpSent, setOtpSent] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState('');
-  const [authMethod, setAuthMethod] = useState<'magic-link' | 'otp'>('magic-link');
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [authMethod, setAuthMethod] = useState<
+    'magic-link' | 'otp' | 'password'
+  >('password');
   const router = useRouter();
 
   useEffect(() => {
@@ -165,12 +170,32 @@ export default function Auth() {
     }
   };
 
+  const signInWithPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+
+    setPasswordError('');
+    const supabase = createClient();
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Error signing in with password:', error);
+      setPasswordError(error.message);
+    }
+  };
+
   const resetForm = () => {
     setEmail('');
+    setPassword('');
     setMagicLinkSent(false);
     setOtpSent(false);
     setOtpError('');
-    setAuthMethod('magic-link');
+    setPasswordError('');
+    setAuthMethod('password');
   };
 
   const signOut = async () => {
@@ -197,27 +222,82 @@ export default function Auth() {
         </div>
 
         <div className={styles.magicLinkFormWrapper}>
-          <h2 className={styles.magicLinkHeading}>
-            Or sign in with email:
-          </h2>
-          
+          <h2 className={styles.magicLinkHeading}>Or sign in with email:</h2>
+
           {/* Auth method toggle */}
           <div className={styles.authMethodToggle}>
             <button
               type="button"
-              className={authMethod === 'magic-link' ? styles.activeToggle : styles.inactiveToggle}
+              className={
+                authMethod === 'password'
+                  ? styles.activeToggle
+                  : styles.inactiveToggle
+              }
+              onClick={() => setAuthMethod('password')}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              className={
+                authMethod === 'magic-link'
+                  ? styles.activeToggle
+                  : styles.inactiveToggle
+              }
               onClick={() => setAuthMethod('magic-link')}
             >
               Magic Link
             </button>
             <button
               type="button"
-              className={authMethod === 'otp' ? styles.activeToggle : styles.inactiveToggle}
+              className={
+                authMethod === 'otp'
+                  ? styles.activeToggle
+                  : styles.inactiveToggle
+              }
               onClick={() => setAuthMethod('otp')}
             >
               OTP Code
             </button>
           </div>
+
+          {/* Password Flow */}
+          {authMethod === 'password' && (
+            <form
+              onSubmit={signInWithPassword}
+              className={styles.emailPasswordForm}
+            >
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
+              <div className={styles.passwordInputWrapper}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {passwordError && (
+                <div className={styles.errorMessage}>{passwordError}</div>
+              )}
+              <button type="submit" className={styles.authFormButton}>
+                Sign In
+              </button>
+            </form>
+          )}
 
           {/* Magic Link Flow */}
           {authMethod === 'magic-link' && (
@@ -226,13 +306,20 @@ export default function Auth() {
                 <div className={styles.successMessage}>
                   Magic link sent! Check your email.
                   <div className={styles.otpActions}>
-                    <button type="button" onClick={resetForm} className={styles.backButton}>
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className={styles.backButton}
+                    >
                       ← Back to login
                     </button>
                   </div>
                 </div>
               ) : (
-                <form onSubmit={signInWithMagicLink} className={styles.magicLinkForm}>
+                <form
+                  onSubmit={signInWithMagicLink}
+                  className={styles.magicLinkForm}
+                >
                   <input
                     type="email"
                     placeholder="Enter your email"
@@ -267,31 +354,29 @@ export default function Auth() {
               ) : (
                 <div className={styles.otpVerificationContainer}>
                   <p>Enter the 6-digit code sent to {email}</p>
-                  
+
                   <OTPInput
                     length={6}
                     onComplete={verifyOtp}
                     loading={verifyingOtp}
                   />
-                  
+
                   {otpError && (
-                    <div className={styles.errorMessage}>
-                      {otpError}
-                    </div>
+                    <div className={styles.errorMessage}>{otpError}</div>
                   )}
-                  
+
                   <div className={styles.otpActions}>
-                    <button 
-                      type="button" 
-                      onClick={resendOtp} 
+                    <button
+                      type="button"
+                      onClick={resendOtp}
                       className={styles.resendButton}
                       disabled={verifyingOtp}
                     >
                       Resend Code
                     </button>
-                    <button 
-                      type="button" 
-                      onClick={resetForm} 
+                    <button
+                      type="button"
+                      onClick={resetForm}
                       className={styles.backButton}
                     >
                       ← Back to login

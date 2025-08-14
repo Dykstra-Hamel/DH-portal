@@ -82,6 +82,29 @@
       }
     }
   }
+
+  .emailPasswordForm {
+    display: flex;
+    position: relative;
+    flex-flow: column;
+    width: 100%;
+
+    input {
+      padding: 1rem 0.5rem;
+      font-size: 1rem;
+      border: 1px solid #353535;
+      border-radius: 4px;
+      outline: none;
+      flex-grow: 1;
+      width: 100%;
+      margin: 5px 0;
+    }
+
+    .authFormButton {
+      border-radius: 4px;
+      margin-top: 5px;
+    }
+  }
 }
 
 .otpContainer {
