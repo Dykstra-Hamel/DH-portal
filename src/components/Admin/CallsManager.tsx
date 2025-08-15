@@ -423,7 +423,7 @@ export default function CallsManager() {
                       <input
                         id="auto-call-enabled"
                         type="checkbox"
-                        checked={settings.auto_call_enabled?.value === true}
+                        checked={settings.auto_call_enabled?.value === true || settings.auto_call_enabled?.value === 'true'}
                         onChange={(e) => handleSettingChange('auto_call_enabled', e.target.checked)}
                       />
                       <span className={styles.toggleSlider}></span>
@@ -445,7 +445,7 @@ export default function CallsManager() {
                       <input
                         id="off-hour-calling"
                         type="checkbox"
-                        checked={settings.off_hour_calling_enabled?.value === true}
+                        checked={settings.off_hour_calling_enabled?.value === true || settings.off_hour_calling_enabled?.value === 'true'}
                         onChange={(e) => handleSettingChange('off_hour_calling_enabled', e.target.checked)}
                       />
                       <span className={styles.toggleSlider}></span>
@@ -624,17 +624,50 @@ export default function CallsManager() {
               {/* Business Hours Settings */}
               <div className={styles.settingGroup}>
                 <div className={styles.collapsibleHeader} onClick={() => setBusinessHoursExpanded(!businessHoursExpanded)}>
-                  <h3 className={styles.groupTitle}>Business Hours</h3>
+                  <h3 className={styles.groupTitle}>Business Hours & Timezone</h3>
                   {businessHoursExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </div>
-                <p className={`${styles.groupDescription} ${settings.off_hour_calling_enabled?.value ? styles.disabledDescription : ''}`}>
-                  {settings.off_hour_calling_enabled?.value 
-                    ? 'Business hours settings are inactive when Off-Hour Calling is enabled. Disable Off-Hour Calling to use these settings.'
-                    : 'Configure business hours for this company to control when calls can be made.'}
+                <p className={styles.groupDescription}>
+                  Configure business hours and timezone for this company. These settings are used for business hours webhook logic and reporting.
+                  {settings.off_hour_calling_enabled?.value && (
+                    <span className={styles.noteText}> Note: Off-Hour Calling is currently enabled, so calls will be allowed outside these hours.</span>
+                  )}
                 </p>
 
-                {businessHoursExpanded && ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
-                  <div key={day} className={`${styles.businessHoursDay} ${settings.off_hour_calling_enabled?.value ? styles.disabledSection : ''}`}>
+                {businessHoursExpanded && (
+                  <>
+                    {/* Company Timezone Setting */}
+                    <div className={styles.setting}>
+                      <div className={styles.settingInfo}>
+                        <label htmlFor="company-timezone" className={styles.settingLabel}>
+                          Company Timezone
+                        </label>
+                        <p className={styles.settingDescription}>
+                          {settings.company_timezone?.description || 'Timezone used for business hours calculations'}
+                        </p>
+                      </div>
+                      <div className={styles.settingControl}>
+                        <select
+                          id="company-timezone"
+                          value={settings.company_timezone?.value || 'America/New_York'}
+                          onChange={(e) => handleSettingChange('company_timezone', e.target.value)}
+                          className={styles.textInput}
+                        >
+                          <option value="America/New_York">Eastern (America/New_York)</option>
+                          <option value="America/Chicago">Central (America/Chicago)</option>
+                          <option value="America/Denver">Mountain (America/Denver)</option>
+                          <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
+                          <option value="America/Phoenix">Arizona (America/Phoenix)</option>
+                          <option value="America/Anchorage">Alaska (America/Anchorage)</option>
+                          <option value="Pacific/Honolulu">Hawaii (Pacific/Honolulu)</option>
+                          <option value="UTC">UTC</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Daily Business Hours */}
+                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                  <div key={day} className={styles.businessHoursDay}>
                     <div className={styles.dayHeader}>
                       <span className={styles.dayName}>
                         {day.charAt(0).toUpperCase() + day.slice(1)}
@@ -703,7 +736,9 @@ export default function CallsManager() {
                       </div>
                     )}
                   </div>
-                ))}
+                    ))}
+                  </>
+                )}
               </div>
 
               {/* Save Button */}
