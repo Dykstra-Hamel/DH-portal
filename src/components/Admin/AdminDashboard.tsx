@@ -10,7 +10,8 @@ import UserCompanyManager from './UserCompanyManager';
 import BrandManager from './BrandManager';
 import ProjectsManager from './ProjectsManager';
 import WidgetManager from './WidgetManager';
-import CallsManager from './CallsManager';
+import CallRecordsManager from './CallRecordsManager';
+import CallSettingsManager from './CallSettingsManager';
 import PartialLeadsManager from './PartialLeadsManager';
 import AttributionAnalytics from './AttributionAnalytics';
 import FormAnalytics from './FormAnalytics';
@@ -27,9 +28,9 @@ type AdminCategory = 'users' | 'companies' | 'analytics' | 'automation' | 'syste
 
 type UserSubsection = 'users' | 'relationships';
 type CompanySubsection = 'companies' | 'projects' | 'brands';
-type AnalyticsSubsection = 'attribution' | 'forms' | 'calls' | 'partial-leads';
+type AnalyticsSubsection = 'attribution' | 'forms' | 'call-records' | 'partial-leads';
 type AutomationSubsection = 'templates' | 'executions';
-type SystemSubsection = 'widgets' | 'pest-management';
+type SystemSubsection = 'widgets' | 'pest-management' | 'calling';
 
 type AdminSubsection = UserSubsection | CompanySubsection | AnalyticsSubsection | AutomationSubsection | SystemSubsection;
 
@@ -41,7 +42,8 @@ type AdminSection =
   | 'brands'
   | 'projects'
   | 'widgets'
-  | 'calls'
+  | 'call-records'
+  | 'call-settings'
   | 'partial-leads'
   | 'attribution-analytics'
   | 'form-analytics'
@@ -95,7 +97,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
     subsections: [
       { id: 'attribution', label: 'Attribution Analytics', legacySection: 'attribution-analytics' },
       { id: 'forms', label: 'Form Analytics', legacySection: 'form-analytics' },
-      { id: 'calls', label: 'Calls', legacySection: 'calls' },
+      { id: 'call-records', label: 'Call Records', legacySection: 'call-records' },
       { id: 'partial-leads', label: 'Partial Leads', legacySection: 'partial-leads' },
     ],
   },
@@ -115,6 +117,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
     subsections: [
       { id: 'widgets', label: 'Widget Config', legacySection: 'widgets' },
       { id: 'pest-management', label: 'Pest Management', legacySection: 'pest-management' },
+      { id: 'calling', label: 'Calling', legacySection: 'call-settings' },
     ],
   },
 ];
@@ -189,8 +192,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <ProjectsManager user={user} />;
       case 'widgets':
         return <WidgetManager />;
-      case 'calls':
-        return <CallsManager />;
+      case 'call-records':
+        return <CallRecordsManager />;
+      case 'call-settings':
+        return <CallSettingsManager />;
       case 'partial-leads':
         return <PartialLeadsManager />;
       case 'attribution-analytics':
