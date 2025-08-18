@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { adminAPI } from '@/lib/api-client';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
+import { createClient } from '@/lib/supabase/client';
+import { Trash2 } from 'lucide-react';
 import styles from './AdminManager.module.scss';
 
 interface CallRecord {
@@ -25,6 +26,8 @@ interface CallRecord {
   preferred_service_time: string;
   opt_out_sensitive_data_storage: boolean;
   disconnect_reason: string;
+  archived?: boolean;
+  billable_duration_seconds?: number;
   created_at: string;
   leads?: {
     id: string;
@@ -36,6 +39,13 @@ interface CallRecord {
       last_name: string;
       email: string;
     };
+  };
+  customers?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    company_id: string;
   };
 }
 
@@ -52,6 +62,18 @@ export default function CallRecordsManager() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
+  
+  
+  // Delete State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [callToDelete, setCallToDelete] = useState<CallRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Billing Report State
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   useEffect(() => {
     loadCompanies();
@@ -59,10 +81,28 @@ export default function CallRecordsManager() {
 
   const loadCompanies = async () => {
     try {
-      const companiesData = await adminAPI.getCompanies();
+      const supabase = createClient();
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session.session?.access_token) {
+        throw new Error('No authentication session');
+      }
+      
+      const response = await fetch('/api/admin/companies', {
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch companies');
+      }
+      
+      const companiesData = await response.json();
       setCompanies(companiesData);
     } catch (err) {
-      console.error('Failed to load companies:', err);
+      setError('Failed to load companies. Please refresh and try again.');
     }
   };
 
@@ -70,13 +110,35 @@ export default function CallRecordsManager() {
     try {
       setLoading(true);
       setError(null);
-      let data = await adminAPI.getAllCalls();
+      
+      // Use direct admin API call that includes archived calls
+      const supabase = createClient();
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session.session?.access_token) {
+        throw new Error('No authentication session');
+      }
+
+      const response = await fetch('/api/admin/calls', {
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch calls');
+      }
+      
+      let data = await response.json();
       
       // Filter calls by company if a specific company is selected
       if (companyId && companyId !== 'all') {
         data = data.filter((call: CallRecord) => {
-          // Check if the call's lead belongs to the selected company
-          return call.leads?.company_id === companyId;
+          // Check if the call's lead belongs to the selected company OR direct customer belongs to company
+          const leadCompanyId = call.leads?.company_id;
+          const customerCompanyId = call.customers?.company_id;
+          return leadCompanyId === companyId || customerCompanyId === companyId;
         });
       }
       
@@ -95,6 +157,13 @@ export default function CallRecordsManager() {
 
   const formatDuration = (seconds: number) => {
     if (!seconds) return 'N/A';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatBillableDuration = (seconds: number | null | undefined) => {
+    if (seconds === null || seconds === undefined) return 'N/A';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
@@ -146,6 +215,156 @@ export default function CallRecordsManager() {
     }
   };
 
+
+  const handleDeleteClick = (call: CallRecord) => {
+    setCallToDelete(call);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!callToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      
+      const supabase = createClient();
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session.session?.access_token) {
+        throw new Error('No authentication session');
+      }
+
+      const response = await fetch(`/api/admin/calls/${callToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to delete call record');
+      }
+
+      // Refresh the calls list
+      loadCalls(selectedCompanyId);
+
+      setShowDeleteModal(false);
+      setCallToDelete(null);
+    } catch (error) {
+      setError(`Failed to delete call record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setCallToDelete(null);
+  };
+
+  const generateCSV = (reportData: any) => {
+    const headers = ['Company Name', 'Period', 'Total Calls', 'Total Billable Minutes', 'Total Billable Hours'];
+    const csvContent = [
+      headers.join(','),
+      ...reportData.breakdown.map((row: any) => [
+        `"${row.companyName}"`,
+        row.period,
+        row.totalCalls,
+        row.totalBillableMinutes,
+        row.totalBillableHours
+      ].join(','))
+    ].join('\n');
+
+    return csvContent;
+  };
+
+  const downloadCSV = (csvContent: string, filename: string) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGenerateReport = async () => {
+    setReportError(null);
+
+    // Validation
+    if (!selectedCompanyId || selectedCompanyId === 'all') {
+      setReportError('Please select a specific company for the billing report.');
+      return;
+    }
+
+    if (!reportStartDate || !reportEndDate) {
+      setReportError('Please select both start and end dates.');
+      return;
+    }
+
+    const start = new Date(reportStartDate);
+    const end = new Date(reportEndDate);
+
+    if (start >= end) {
+      setReportError('Start date must be before end date.');
+      return;
+    }
+
+    try {
+      setIsGeneratingReport(true);
+      
+      const supabase = createClient();
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session.session?.access_token) {
+        throw new Error('No authentication session');
+      }
+
+      const queryParams = new URLSearchParams({
+        companyId: selectedCompanyId,
+        startDate: reportStartDate,
+        endDate: reportEndDate,
+      });
+
+      const response = await fetch(`/api/admin/calls/billing-report?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to generate billing report');
+      }
+
+      const reportData = await response.json();
+
+      if (reportData.success) {
+        // Generate CSV and download
+        const csvContent = generateCSV(reportData.data);
+        const companyName = reportData.data.companyName.replace(/[^a-zA-Z0-9]/g, '-');
+        const filename = `billing-report-${companyName}-${reportStartDate}-${reportEndDate}.csv`;
+        
+        downloadCSV(csvContent, filename);
+        
+        // Report generated successfully - no alert needed as file downloads
+      } else {
+        throw new Error('Report generation failed');
+      }
+
+    } catch (error) {
+      setReportError(`Failed to generate billing report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   return (
     <div className={styles.adminManager}>
       <div className={styles.header}>
@@ -173,6 +392,49 @@ export default function CallRecordsManager() {
         </select>
       </div>
 
+      {/* Billing Report Section */}
+      {selectedCompanyId && selectedCompanyId !== 'all' && (
+        <div className={styles.reportSection}>
+          <h3>Generate Billing Report</h3>
+          <div className={styles.reportControls}>
+            <div className={styles.dateInputs}>
+              <div className={styles.inputGroup}>
+                <label htmlFor="startDate">Start Date:</label>
+                <input
+                  id="startDate"
+                  type="date"
+                  value={reportStartDate}
+                  onChange={(e) => setReportStartDate(e.target.value)}
+                  className={styles.dateInput}
+                />
+              </div>
+              <div className={styles.inputGroup}>
+                <label htmlFor="endDate">End Date:</label>
+                <input
+                  id="endDate"
+                  type="date"
+                  value={reportEndDate}
+                  onChange={(e) => setReportEndDate(e.target.value)}
+                  className={styles.dateInput}
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleGenerateReport}
+              disabled={isGeneratingReport || !reportStartDate || !reportEndDate}
+              className={styles.generateReportButton}
+            >
+              {isGeneratingReport ? 'Generating...' : 'Generate Billing Report'}
+            </button>
+          </div>
+          {reportError && (
+            <div className={styles.reportError}>
+              {reportError}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       <div className={styles.tabContent}>
         {!selectedCompanyId ? (
@@ -199,11 +461,13 @@ export default function CallRecordsManager() {
                     <th>Phone</th>
                     <th>Status</th>
                     <th>Duration</th>
+                    <th>Billable</th>
                     <th>Sentiment</th>
                     <th>Pest Issue</th>
                     <th>Address</th>
                     <th>Service Time</th>
                     <th>Data Opt-Out</th>
+                    <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -212,14 +476,20 @@ export default function CallRecordsManager() {
                     <tr key={call.id}>
                       <td>{formatDate(call.start_timestamp)}</td>
                       <td>
-                        {call.leads?.customers
-                          ? `${call.leads.customers.first_name} ${call.leads.customers.last_name}`
-                          : 'Unknown'}
-                        {call.leads?.customers?.email && (
-                          <div className={styles.subText}>
-                            {call.leads.customers.email}
-                          </div>
-                        )}
+                        {(() => {
+                          const customer = call.leads?.customers || call.customers;
+                          return customer
+                            ? `${customer.first_name} ${customer.last_name}`
+                            : 'Unknown';
+                        })()}
+                        {(() => {
+                          const customer = call.leads?.customers || call.customers;
+                          return customer?.email && (
+                            <div className={styles.subText}>
+                              {customer.email}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>{formatPhoneNumber(call.phone_number)}</td>
                       <td>
@@ -233,6 +503,7 @@ export default function CallRecordsManager() {
                         </span>
                       </td>
                       <td>{formatDuration(call.duration_seconds)}</td>
+                      <td>{formatBillableDuration(call.billable_duration_seconds)}</td>
                       <td>
                         <span
                           className={styles.sentiment}
@@ -246,12 +517,31 @@ export default function CallRecordsManager() {
                       <td>{call.preferred_service_time || 'N/A'}</td>
                       <td>{call.opt_out_sensitive_data_storage ? 'Yes' : 'No'}</td>
                       <td>
-                        <button
-                          className={styles.actionButton}
-                          onClick={() => setSelectedCall(call)}
+                        <span
+                          className={styles.status}
+                          style={{
+                            backgroundColor: call.archived ? '#6b7280' : '#10b981',
+                          }}
                         >
-                          View Details
-                        </button>
+                          {call.archived ? 'Archived' : 'Active'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className={styles.callActions}>
+                          <button
+                            className={styles.actionButton}
+                            onClick={() => setSelectedCall(call)}
+                          >
+                            View Details
+                          </button>
+                          <button
+                            className={styles.callDeleteButton}
+                            onClick={() => handleDeleteClick(call)}
+                            title="Delete call record"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -284,9 +574,12 @@ export default function CallRecordsManager() {
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Customer:</strong>{' '}
-                  {selectedCall.leads?.customers
-                    ? `${selectedCall.leads.customers.first_name} ${selectedCall.leads.customers.last_name}`
-                    : 'Unknown'}
+                  {(() => {
+                    const customer = selectedCall.leads?.customers || selectedCall.customers;
+                    return customer
+                      ? `${customer.first_name} ${customer.last_name}`
+                      : 'Unknown';
+                  })()}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Phone:</strong>{' '}
@@ -310,6 +603,10 @@ export default function CallRecordsManager() {
                 <div className={styles.detailItem}>
                   <strong>Duration:</strong>{' '}
                   {formatDuration(selectedCall.duration_seconds)}
+                </div>
+                <div className={styles.detailItem}>
+                  <strong>Billable Duration:</strong>{' '}
+                  {formatBillableDuration(selectedCall.billable_duration_seconds)}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Sentiment:</strong> {selectedCall.sentiment || 'N/A'}
@@ -367,6 +664,62 @@ export default function CallRecordsManager() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && callToDelete && (
+        <div className={styles.modal} onClick={handleDeleteCancel}>
+          <div
+            className={styles.modalContent}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h3>Delete Call Record</h3>
+              <button
+                className={styles.closeButton}
+                onClick={handleDeleteCancel}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <p>
+                Are you sure you want to permanently delete this call record? This action cannot be undone.
+              </p>
+              <div className={styles.callInfo}>
+                <strong>Call ID:</strong> {callToDelete.call_id}
+                <br />
+                <strong>Phone:</strong> {formatPhoneNumber(callToDelete.phone_number)}
+                <br />
+                <strong>Date:</strong> {formatDate(callToDelete.start_timestamp)}
+                <br />
+                <strong>Customer:</strong> {(() => {
+                  const customer = callToDelete.leads?.customers || callToDelete.customers;
+                  return customer
+                    ? `${customer.first_name} ${customer.last_name}`
+                    : 'Unknown';
+                })()}
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                onClick={handleDeleteCancel}
+                className={styles.cancelButton}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className={styles.confirmDeleteButton}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Call Record'}
+              </button>
             </div>
           </div>
         </div>

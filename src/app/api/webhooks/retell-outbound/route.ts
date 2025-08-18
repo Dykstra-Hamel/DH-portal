@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 
+// Helper function to calculate billable duration (rounded up to nearest 30 seconds)
+function calculateBillableDuration(durationSeconds: number | null): number | null {
+  if (!durationSeconds || durationSeconds <= 0) return 30; // Minimum billable time
+  return Math.ceil(durationSeconds / 30) * 30;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Verify the webhook is from Retell with proper authentication
@@ -377,6 +383,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
           ? new Date(end_timestamp).toISOString()
           : new Date().toISOString(),
         duration_seconds: duration_ms ? Math.round(duration_ms / 1000) : null,
+        billable_duration_seconds: calculateBillableDuration(duration_ms ? Math.round(duration_ms / 1000) : null),
         disconnect_reason: disconnection_reason,
         retell_variables: retell_llm_dynamic_variables,
         opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,

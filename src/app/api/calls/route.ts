@@ -58,7 +58,8 @@ export async function GET(request: NextRequest) {
           company_id
         )
       `
-      );
+      )
+      .eq('archived', false);
 
     // Get company access for filtering
     let userCompanies = [];

@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendEvent } from '@/lib/inngest/client';
 
+// Helper function to calculate billable duration (rounded up to nearest 30 seconds)
+function calculateBillableDuration(durationSeconds: number | null): number | null {
+  if (!durationSeconds || durationSeconds <= 0) return 30; // Minimum billable time
+  return Math.ceil(durationSeconds / 30) * 30;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Verify the webhook is from Retell with proper authentication
@@ -284,6 +290,10 @@ async function handleCallEnded(supabase: any, callData: any) {
     undefined
   );
 
+  // Calculate duration and billable duration
+  const durationSeconds = duration_ms ? Math.round(duration_ms / 1000) : null;
+  const billableDurationSeconds = calculateBillableDuration(durationSeconds);
+
   // Try to update existing call record first
   const { data: existingRecord, error: updateError } = await supabase
     .from('call_records')
@@ -292,7 +302,8 @@ async function handleCallEnded(supabase: any, callData: any) {
       end_timestamp: end_timestamp
         ? new Date(end_timestamp).toISOString()
         : new Date().toISOString(),
-      duration_seconds: duration_ms ? Math.round(duration_ms / 1000) : null,
+      duration_seconds: durationSeconds,
+      billable_duration_seconds: billableDurationSeconds,
       disconnect_reason: disconnection_reason,
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
@@ -387,7 +398,8 @@ async function handleCallEnded(supabase: any, callData: any) {
         end_timestamp: end_timestamp
           ? new Date(end_timestamp).toISOString()
           : new Date().toISOString(),
-        duration_seconds: duration_ms ? Math.round(duration_ms / 1000) : null,
+        duration_seconds: durationSeconds,
+        billable_duration_seconds: billableDurationSeconds,
         disconnect_reason: disconnection_reason,
         retell_variables: retell_llm_dynamic_variables,
         opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
@@ -703,6 +715,10 @@ async function handleGenericUpdate(supabase: any, callData: any) {
     transcript
   );
 
+  // Calculate duration and billable duration
+  const durationSeconds = duration_ms ? Math.round(duration_ms / 1000) : null;
+  const billableDurationSeconds = calculateBillableDuration(durationSeconds);
+
   const { data: callRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
@@ -710,7 +726,8 @@ async function handleGenericUpdate(supabase: any, callData: any) {
       end_timestamp: end_timestamp
         ? new Date(end_timestamp).toISOString()
         : null,
-      duration_seconds: duration_ms ? Math.round(duration_ms / 1000) : null,
+      duration_seconds: durationSeconds,
+      billable_duration_seconds: billableDurationSeconds,
       recording_url,
       transcript,
       call_analysis,
