@@ -263,7 +263,7 @@ export default function Auth() {
             >
               Password
             </button>
-            <button
+            {/* <button
               type="button"
               className={
                 authMethod === 'magic-link'
@@ -273,7 +273,7 @@ export default function Auth() {
               onClick={() => setAuthMethod('magic-link')}
             >
               Magic Link
-            </button>
+            </button> */}
             <button
               type="button"
               className={
@@ -283,7 +283,7 @@ export default function Auth() {
               }
               onClick={() => setAuthMethod('otp')}
             >
-              OTP Code
+              OTP Code/Magic Link
             </button>
           </div>
 
@@ -381,12 +381,15 @@ export default function Auth() {
                     required
                   />
                   <button type="submit" className={styles.authFormButton}>
-                    Send OTP Code
+                    Send Code/Link
                   </button>
                 </form>
               ) : (
                 <div className={styles.otpVerificationContainer}>
-                  <p>Enter the 6-digit code sent to {email}</p>
+                  <p>
+                    Enter the 6-digit code sent to {email}, or click the login
+                    link included in the email.
+                  </p>
 
                   <OTPInput
                     length={6}
