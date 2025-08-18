@@ -3,6 +3,12 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import { Retell } from 'retell-sdk';
 import { normalizePhoneNumber } from '@/lib/utils';
 
+// Helper function to calculate billable duration (rounded up to nearest 30 seconds)
+function calculateBillableDuration(durationSeconds: number | null): number | null {
+  if (!durationSeconds || durationSeconds <= 0) return 30; // Minimum billable time
+  return Math.ceil(durationSeconds / 30) * 30;
+}
+
 // Simple rate limiting store (in production, use Redis or similar)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
@@ -412,6 +418,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
         ? new Date(end_timestamp).toISOString()
         : new Date().toISOString(),
       duration_seconds: duration_ms ? Math.round(duration_ms / 1000) : null,
+      billable_duration_seconds: calculateBillableDuration(duration_ms ? Math.round(duration_ms / 1000) : null),
       disconnect_reason: disconnection_reason,
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,

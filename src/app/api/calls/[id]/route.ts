@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 
-export async function DELETE(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -15,6 +15,10 @@ export async function DELETE(
 
     const { id } = await params;
     const supabase = createAdminClient();
+
+    // Get request body to determine action
+    const body = await request.json();
+    const { archived } = body;
 
     // Check if user is global admin
     const isAdmin = await isAuthorizedAdmin(user);
@@ -74,26 +78,26 @@ export async function DELETE(
       }
     }
 
-    // Delete the call record
-    const { error: deleteError } = await supabase
+    // Archive the call record
+    const { error: updateError } = await supabase
       .from('call_records')
-      .delete()
+      .update({ archived: archived ?? true })
       .eq('id', id);
 
-    if (deleteError) {
-      console.error('Error deleting call record:', deleteError);
+    if (updateError) {
+      console.error('Error archiving call record:', updateError);
       return NextResponse.json(
-        { error: 'Failed to delete call record' },
+        { error: 'Failed to archive call record' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Call record deleted successfully' 
+      message: 'Call record archived successfully' 
     });
   } catch (error) {
-    console.error('Error in call record delete API:', error);
+    console.error('Error in call record archive API:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

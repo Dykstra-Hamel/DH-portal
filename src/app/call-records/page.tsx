@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { createClient } from '@/lib/supabase/client';
 import { useIsGlobalAdmin } from '@/hooks/useCompanyRole';
-import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Archive } from 'lucide-react';
 import styles from '@/components/Admin/AdminManager.module.scss';
 
 interface CallRecord {
@@ -26,6 +26,8 @@ interface CallRecord {
   preferred_service_time: string;
   opt_out_sensitive_data_storage: boolean;
   disconnect_reason: string;
+  archived?: boolean;
+  billable_duration_seconds?: number;
   created_at: string;
   leads?: {
     id: string;
@@ -66,10 +68,10 @@ export default function CallRecordsPage() {
   const [callsError, setCallsError] = useState<string | null>(null);
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
   
-  // Delete State
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [callToDelete, setCallToDelete] = useState<CallRecord | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Archive State
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [callToArchive, setCallToArchive] = useState<CallRecord | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
 
   const loadCompanies = async () => {
     try {
@@ -176,6 +178,7 @@ export default function CallRecordsPage() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString();
@@ -222,16 +225,16 @@ export default function CallRecordsPage() {
     }
   };
 
-  const handleDeleteClick = (call: CallRecord) => {
-    setCallToDelete(call);
-    setShowDeleteModal(true);
+  const handleArchiveClick = (call: CallRecord) => {
+    setCallToArchive(call);
+    setShowArchiveModal(true);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!callToDelete) return;
+  const handleArchiveConfirm = async () => {
+    if (!callToArchive) return;
 
     try {
-      setIsDeleting(true);
+      setIsArchiving(true);
       
       const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
@@ -240,35 +243,35 @@ export default function CallRecordsPage() {
         throw new Error('No authentication session');
       }
 
-      const response = await fetch(`/api/calls/${callToDelete.id}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/calls/${callToArchive.id}`, {
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${session.session.access_token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ archived: true }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to delete call record');
+        throw new Error(errorData.error || 'Failed to archive call record');
       }
 
       // Refresh the calls list
       await loadCalls();
 
-      setShowDeleteModal(false);
-      setCallToDelete(null);
+      setShowArchiveModal(false);
+      setCallToArchive(null);
     } catch (error) {
-      console.error('Error deleting call record:', error);
-      alert(`Failed to delete call record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setCallsError(`Failed to archive call record: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setIsDeleting(false);
+      setIsArchiving(false);
     }
   };
 
-  const handleDeleteCancel = () => {
-    setShowDeleteModal(false);
-    setCallToDelete(null);
+  const handleArchiveCancel = () => {
+    setShowArchiveModal(false);
+    setCallToArchive(null);
   };
 
   return (
@@ -411,11 +414,11 @@ export default function CallRecordsPage() {
                             View Details
                           </button>
                           <button
-                            className={styles.callDeleteButton}
-                            onClick={() => handleDeleteClick(call)}
-                            title="Delete call record"
+                            className={styles.callArchiveButton}
+                            onClick={() => handleArchiveClick(call)}
+                            title="Archive call record"
                           >
-                            <Trash2 size={16} />
+                            <Archive size={16} />
                           </button>
                         </div>
                       </td>
@@ -537,35 +540,35 @@ export default function CallRecordsPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && callToDelete && (
-        <div className={styles.modal} onClick={handleDeleteCancel}>
+      {/* Archive Confirmation Modal */}
+      {showArchiveModal && callToArchive && (
+        <div className={styles.modal} onClick={handleArchiveCancel}>
           <div
             className={styles.modalContent}
             onClick={e => e.stopPropagation()}
           >
             <div className={styles.modalHeader}>
-              <h3>Delete Call Record</h3>
+              <h3>Archive Call Record</h3>
               <button
                 className={styles.closeButton}
-                onClick={handleDeleteCancel}
+                onClick={handleArchiveCancel}
               >
                 ×
               </button>
             </div>
             <div className={styles.modalBody}>
               <p>
-                Are you sure you want to delete this call record? This action cannot be undone.
+                Are you sure you want to archive this call record? Archived calls will be hidden from the main view but can be restored if needed.
               </p>
               <div className={styles.callInfo}>
-                <strong>Call ID:</strong> {callToDelete.call_id}
+                <strong>Call ID:</strong> {callToArchive.call_id}
                 <br />
-                <strong>Phone:</strong> {formatPhoneNumber(callToDelete.phone_number)}
+                <strong>Phone:</strong> {formatPhoneNumber(callToArchive.phone_number)}
                 <br />
-                <strong>Date:</strong> {formatDate(callToDelete.start_timestamp)}
+                <strong>Date:</strong> {formatDate(callToArchive.start_timestamp)}
                 <br />
                 <strong>Customer:</strong> {(() => {
-                  const customer = callToDelete.leads?.customers || callToDelete.customers;
+                  const customer = callToArchive.leads?.customers || callToArchive.customers;
                   return customer
                     ? `${customer.first_name} ${customer.last_name}`
                     : 'Unknown';
@@ -574,18 +577,18 @@ export default function CallRecordsPage() {
             </div>
             <div className={styles.modalActions}>
               <button
-                onClick={handleDeleteCancel}
+                onClick={handleArchiveCancel}
                 className={styles.cancelButton}
-                disabled={isDeleting}
+                disabled={isArchiving}
               >
                 Cancel
               </button>
               <button
-                onClick={handleDeleteConfirm}
-                className={styles.confirmDeleteButton}
-                disabled={isDeleting}
+                onClick={handleArchiveConfirm}
+                className={styles.confirmArchiveButton}
+                disabled={isArchiving}
               >
-                {isDeleting ? 'Deleting...' : 'Delete Call Record'}
+                {isArchiving ? 'Archiving...' : 'Archive Call Record'}
               </button>
             </div>
           </div>
