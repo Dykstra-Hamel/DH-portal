@@ -19,14 +19,11 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const companyIdFilter = url.searchParams.get('company_id');
     
-    // Log the received company_id for debugging
-    console.log('Received company_id:', companyIdFilter, 'Type:', typeof companyIdFilter);
     
     // Validate company_id format if provided
     if (companyIdFilter && companyIdFilter !== 'all' && companyIdFilter.trim() !== '') {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(companyIdFilter.trim())) {
-        console.error('Invalid company ID format received:', companyIdFilter);
         return NextResponse.json(
           { error: `Invalid company ID format: ${companyIdFilter}` },
           { status: 400 }
@@ -91,9 +88,15 @@ export async function GET(request: NextRequest) {
     const { data: calls, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching calls:', error);
+      console.error('Error fetching calls with full details:', {
+        error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       return NextResponse.json(
-        { error: 'Unable to retrieve data' },
+        { error: 'Unable to retrieve data', details: error.message },
         { status: 500 }
       );
     }

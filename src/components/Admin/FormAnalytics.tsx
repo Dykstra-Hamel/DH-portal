@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/lib/api-client';
 import styles from './AdminManager.module.scss';
 
@@ -43,12 +43,7 @@ export default function FormAnalytics() {
   });
   const [companies, setCompanies] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchAnalytics();
-    fetchCompanies();
-  }, [filters]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams({
@@ -69,9 +64,9 @@ export default function FormAnalytics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  const fetchCompanies = async () => {
+  const fetchCompanies = useCallback(async () => {
     try {
       const data = await authenticatedFetch('/api/admin/companies');
       // Companies API returns array directly (not wrapped in success/data)
@@ -79,7 +74,12 @@ export default function FormAnalytics() {
     } catch (error) {
       console.error('Error fetching companies:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchAnalytics();
+    fetchCompanies();
+  }, [fetchAnalytics, fetchCompanies]);
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) return `${Math.round(seconds)}s`;

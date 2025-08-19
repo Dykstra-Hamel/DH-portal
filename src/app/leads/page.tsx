@@ -173,7 +173,6 @@ export default function LeadsPage() {
       }
 
       // You could add a toast notification here if you have a toast system
-      console.log('Lead deleted successfully');
     } catch (error) {
       console.error('Error deleting lead:', error);
       // You could show an error toast here

@@ -114,7 +114,6 @@ export async function POST(request: NextRequest) {
       case 'view_submission':
         return await handleViewSubmission(payload);
       default:
-        console.log('Unhandled interaction type:', payload.type);
         return NextResponse.json({ text: 'Interaction received' });
     }
   } catch (error) {
@@ -144,7 +143,6 @@ async function handleBlockActions(payload: SlackInteractivePayload) {
       // Handle status update action (future implementation)
       return handleUpdateStatusAction(payload, action);
     default:
-      console.log('Unhandled action_id:', action.action_id);
       return NextResponse.json({ text: 'Action received' });
   }
 }
@@ -155,9 +153,7 @@ async function handleViewProjectAction(
 ) {
   // This is a URL button, so it will open the admin panel
   // We can log the interaction or update analytics
-  console.log(
-    `User ${payload.user.name} clicked "View in Admin Panel" for project`
-  );
+  // User clicked "View in Admin Panel" for project
 
   // Return a response to acknowledge the interaction
   return NextResponse.json({
@@ -212,7 +208,6 @@ async function handleShortcut(payload: SlackInteractivePayload) {
 
 async function handleViewSubmission(payload: SlackInteractivePayload) {
   // Handle modal form submissions
-  console.log('View submission payload:', JSON.stringify(payload, null, 2));
 
   // Extract callback_id to determine which modal was submitted
   const callbackId = (payload as any).view?.callback_id;
@@ -240,12 +235,6 @@ async function handleProjectAssignmentSubmission(
     const note = values.assignment_note?.note_input?.value || '';
     const projectId = privateMetadata.projectId;
 
-    console.log('Assignment submission:', {
-      projectId,
-      selectedUser,
-      note,
-      submittedBy: payload.user.name,
-    });
 
     if (!selectedUser || !projectId) {
       return NextResponse.json({
@@ -282,14 +271,12 @@ async function handleProjectAssignmentSubmission(
     }
 
     // Try to find the user in our database by email
-    console.log('Looking for user with email:', assigneeEmail);
     const { data: userProfile, error: userError } = await supabase
       .from('profiles')
       .select('id, first_name, last_name, email')
       .eq('email', assigneeEmail)
       .single();
 
-    console.log('User profile query result:', { userProfile, userError });
 
     let updatedProject: any = null;
     let dbAssignmentSuccess = false;
@@ -300,7 +287,6 @@ async function handleProjectAssignmentSubmission(
 
     if (userProfile && !userError) {
       // User found in database - try to assign
-      console.log('Updating project:', projectId, 'with user:', userProfile.id);
       const { data: projectUpdate, error: updateError } = await supabase
         .from('projects')
         .update({
@@ -316,7 +302,6 @@ async function handleProjectAssignmentSubmission(
         )
         .single();
 
-      console.log('Project update result:', { projectUpdate, updateError });
 
       if (projectUpdate && !updateError) {
         updatedProject = projectUpdate;
@@ -324,12 +309,10 @@ async function handleProjectAssignmentSubmission(
           `${userProfile.first_name} ${userProfile.last_name}`.trim() ||
           assigneeName;
         dbAssignmentSuccess = true;
-        console.log('Project assigned successfully in database');
       } else {
         console.error('Error updating project in database:', updateError);
       }
     } else {
-      console.log('User not found in database, will send notifications only');
     }
 
     // Get basic project info for notifications (fallback if DB assignment failed)
@@ -486,8 +469,6 @@ async function handleProjectAssignmentSubmission(
     const channelResult = await channelResponse.json();
     const assigneeResult = await assigneeResponse.json();
 
-    console.log('Channel message result:', channelResult);
-    console.log('Assignee DM result:', assigneeResult);
 
     // Always return success to close the modal - notifications were sent
     return NextResponse.json({

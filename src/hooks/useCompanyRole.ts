@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 interface UserCompany {
@@ -30,7 +30,7 @@ export function useCompanyRole(companyId?: string): UseCompanyRoleReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchUserCompanies = async () => {
+  const fetchUserCompanies = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -86,11 +86,11 @@ export function useCompanyRole(companyId?: string): UseCompanyRoleReturn {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [companyId]);
 
   useEffect(() => {
     fetchUserCompanies();
-  }, [companyId]);
+  }, [companyId, fetchUserCompanies]);
 
   const isCompanyAdmin = role
     ? ['admin', 'manager', 'owner'].includes(role)

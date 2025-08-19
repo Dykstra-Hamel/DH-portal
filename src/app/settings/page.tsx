@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -124,14 +124,9 @@ export default function SettingsPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // Fetch all companies for global admins
-  useEffect(() => {
-    if (isGlobalAdmin && profile) {
-      fetchAllCompanies();
-    }
-  }, [isGlobalAdmin, profile]);
-
-  const fetchAllCompanies = async () => {
+  const fetchAllCompanies = useCallback(async () => {
+    if (!profile) return;
+    
     try {
       setCompaniesLoading(true);
       const companies = await adminAPI.getCompanies();
@@ -139,7 +134,7 @@ export default function SettingsPage() {
       // Convert to UserCompany format for consistency
       const userCompanies: UserCompany[] = companies.map((company: any) => ({
         id: `global-${company.id}`,
-        user_id: profile!.id,
+        user_id: profile.id,
         company_id: company.id,
         role: 'admin', // Global admins have admin role
         is_primary: false,
@@ -154,24 +149,9 @@ export default function SettingsPage() {
     } finally {
       setCompaniesLoading(false);
     }
-  };
+  }, [profile]);
 
-  // Set default selected company when companies are loaded
-  useEffect(() => {
-    const availableCompanies = isGlobalAdmin ? allCompanies : adminCompanies;
-    if (!selectedCompanyId && availableCompanies.length > 0) {
-      setSelectedCompanyId(availableCompanies[0].company_id);
-    }
-  }, [adminCompanies, allCompanies, selectedCompanyId, isGlobalAdmin]);
-
-  // Fetch settings when company is selected
-  useEffect(() => {
-    if (selectedCompanyId && (isCompanyAdmin || isGlobalAdmin)) {
-      fetchSettings();
-    }
-  }, [selectedCompanyId, isCompanyAdmin, isGlobalAdmin]);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     if (!selectedCompanyId) return;
 
     try {
@@ -192,7 +172,29 @@ export default function SettingsPage() {
     } finally {
       setSettingsLoading(false);
     }
-  };
+  }, [selectedCompanyId]);
+
+  // Fetch all companies for global admins
+  useEffect(() => {
+    if (isGlobalAdmin && profile) {
+      fetchAllCompanies();
+    }
+  }, [isGlobalAdmin, profile, fetchAllCompanies]);
+
+  // Set default selected company when companies are loaded
+  useEffect(() => {
+    const availableCompanies = isGlobalAdmin ? allCompanies : adminCompanies;
+    if (!selectedCompanyId && availableCompanies.length > 0) {
+      setSelectedCompanyId(availableCompanies[0].company_id);
+    }
+  }, [adminCompanies, allCompanies, selectedCompanyId, isGlobalAdmin]);
+
+  // Fetch settings when company is selected
+  useEffect(() => {
+    if (selectedCompanyId && (isCompanyAdmin || isGlobalAdmin)) {
+      fetchSettings();
+    }
+  }, [selectedCompanyId, isCompanyAdmin, isGlobalAdmin, fetchSettings]);
 
   const handleSettingChange = (key: string, value: any) => {
     setSettings(prev => ({

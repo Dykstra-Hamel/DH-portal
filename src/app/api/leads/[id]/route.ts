@@ -211,7 +211,6 @@ export async function PUT(
             timestamp: new Date().toISOString(),
           },
         });
-        console.log(`Lead status changed event sent: ${oldStatus} → ${newStatus} for lead ${id}`);
       } catch (eventError) {
         console.error('Error sending lead status changed event:', eventError);
         // Don't fail the API call if event sending fails

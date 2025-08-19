@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     // Use admin client to fetch leads
     const supabase = createAdminClient();
 
-    // Build query - include all leads including unqualified
+    // Build query to include customer and company data directly
+    // For assigned users, we'll need to fetch profiles separately since assigned_to references auth.users
     let query = supabase
       .from('leads')
       .select(

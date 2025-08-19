@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -110,14 +110,7 @@ export default function ProjectsPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // Fetch projects when selectedCompany changes
-  useEffect(() => {
-    if (selectedCompany) {
-      fetchProjects();
-    }
-  }, [selectedCompany]);
-
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     if (!selectedCompany) return;
 
     try {
@@ -130,7 +123,14 @@ export default function ProjectsPage() {
     } finally {
       setProjectsLoading(false);
     }
-  };
+  }, [selectedCompany]);
+
+  // Fetch projects when selectedCompany changes
+  useEffect(() => {
+    if (selectedCompany) {
+      fetchProjects();
+    }
+  }, [selectedCompany, fetchProjects]);
 
   if (loading) {
     return <div>Loading...</div>;

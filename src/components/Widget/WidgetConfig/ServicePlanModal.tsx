@@ -42,6 +42,10 @@ interface PestType {
   category: string;
   icon_svg: string;
   is_active: boolean;
+  pest_categories?: {
+    name: string;
+    slug: string;
+  };
 }
 
 interface ServicePlanModalProps {
@@ -291,7 +295,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         pest_name: pestType?.name || '',
         pest_slug: pestType?.slug || '',
         pest_icon: pestType?.icon_svg || '',
-        pest_category: pestType?.category || '',
+        pest_category: pestType?.pest_categories?.name || pestType?.category || 'Unknown',
       };
     });
 

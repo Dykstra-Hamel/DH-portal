@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart3, TrendingUp, Users, Mail, Target, Award, Calendar, Activity } from 'lucide-react';
 import styles from './ABTestAnalytics.module.scss';
 
@@ -50,11 +50,7 @@ export default function ABTestAnalytics({ companyId }: ABTestAnalyticsProps) {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'30d' | '90d' | '1y' | 'all'>('90d');
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [companyId, timeRange]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/companies/${companyId}/ab-tests/analytics?timeRange=${timeRange}`);
@@ -132,7 +128,11 @@ export default function ABTestAnalytics({ companyId }: ABTestAnalyticsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, timeRange]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   if (loading) {
     return (

@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build query with company join
+    // Build query with company join and lead data
     let query = supabase
       .from('customers')
       .select(
@@ -54,6 +54,11 @@ export async function GET(request: NextRequest) {
         company:companies(
           id,
           name
+        ),
+        leads(
+          id,
+          lead_status,
+          estimated_value
         )
       `
       )
@@ -70,16 +75,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Apply sorting
+    // Apply sorting - validate sortBy field exists on customers table
+    const validSortFields = [
+      'created_at', 'updated_at', 'first_name', 'last_name', 
+      'email', 'phone', 'city', 'state', 'customer_status'
+    ];
+    
+    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
     const ascending = sortOrder === 'asc';
-    query = query.order(sortBy, { ascending });
+    query = query.order(safeSortBy, { ascending });
 
     const { data: customers, error } = await query;
 
     if (error) {
-      console.error('Error fetching customers:', error);
+      console.error('Error fetching customers with details:', {
+        error,
+        sortBy: safeSortBy,
+        sortOrder,
+        companyId,
+        status,
+        search
+      });
       return NextResponse.json(
-        { error: 'Failed to fetch customers' },
+        { error: 'Failed to fetch customers', details: error.message },
         { status: 500 }
       );
     }
@@ -88,84 +106,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Get lead counts for each customer
-    const customerIds = customers.map(c => c.id);
-    const { data: leadCounts, error: leadCountError } = await supabase
-      .from('leads')
-      .select('customer_id, lead_status, estimated_value')
-      .in('customer_id', customerIds);
-
-    if (leadCountError) {
-      console.error('Error fetching lead counts:', leadCountError);
-      // Continue without lead counts rather than failing
-    }
-
-    // Group lead data by customer
-    const leadCountsByCustomer = new Map();
-    const totalValuesByCustomer = new Map();
-
-    if (leadCounts) {
-      leadCounts.forEach(lead => {
-        const customerId = lead.customer_id;
-
-        // Count leads by status
-        if (!leadCountsByCustomer.has(customerId)) {
-          leadCountsByCustomer.set(customerId, {
-            total: 0,
-            new: 0,
-            contacted: 0,
-            qualified: 0,
-            quoted: 0,
-            won: 0,
-            lost: 0,
-            unqualified: 0,
-          });
-          totalValuesByCustomer.set(customerId, 0);
-        }
-
-        const counts = leadCountsByCustomer.get(customerId);
-        counts.total += 1;
-        if (lead.lead_status in counts) {
-          counts[lead.lead_status] += 1;
-        }
-
-        // Sum estimated values
-        if (lead.estimated_value) {
-          const currentTotal = totalValuesByCustomer.get(customerId) || 0;
-          totalValuesByCustomer.set(
-            customerId,
-            currentTotal + lead.estimated_value
-          );
-        }
-      });
-    }
-
-    // Enhance customers with lead counts and total values
+    // Calculate lead statistics per customer with better performance
     const enhancedCustomers = customers.map(customer => {
-      const leadCounts = leadCountsByCustomer.get(customer.id) || {
-        total: 0,
-        new: 0,
-        contacted: 0,
-        qualified: 0,
-        quoted: 0,
-        won: 0,
-        lost: 0,
-        unqualified: 0,
+      const leads = customer.leads || [];
+      
+      const leadCounts = {
+        total: leads.length,
+        new: leads.filter((l: any) => l.lead_status === 'new').length,
+        contacted: leads.filter((l: any) => l.lead_status === 'contacted').length,
+        qualified: leads.filter((l: any) => l.lead_status === 'qualified').length,
+        quoted: leads.filter((l: any) => l.lead_status === 'quoted').length,
+        won: leads.filter((l: any) => l.lead_status === 'won').length,
+        lost: leads.filter((l: any) => l.lead_status === 'lost').length,
+        unqualified: leads.filter((l: any) => l.lead_status === 'unqualified').length,
       };
 
       // Calculate active leads (new, contacted, qualified, quoted)
-      const activeLeads =
-        leadCounts.new +
-        leadCounts.contacted +
-        leadCounts.qualified +
-        leadCounts.quoted;
+      const activeLeads = leadCounts.new + leadCounts.contacted + 
+                          leadCounts.qualified + leadCounts.quoted;
+
+      // Calculate total estimated value
+      const totalEstimatedValue = leads.reduce(
+        (sum: number, lead: any) => sum + (lead.estimated_value || 0), 
+        0
+      );
+
+      // Remove the leads array from the response to avoid sending unnecessary data
+      const { leads: _, ...customerWithoutLeads } = customer;
 
       return {
-        ...customer,
+        ...customerWithoutLeads,
         lead_counts: leadCounts,
         active_leads: activeLeads,
         total_leads: leadCounts.total,
-        total_estimated_value: totalValuesByCustomer.get(customer.id) || 0,
+        total_estimated_value: totalEstimatedValue,
       };
     });
 

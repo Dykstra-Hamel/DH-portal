@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Save,
@@ -75,70 +75,61 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
     automation_max_emails_per_day: 10,
   });
 
-  useEffect(() => {
-    if (companyId) {
-      fetchAutomationData();
-    }
-  }, [companyId]);
-
-  const fetchAutomationData = async () => {
+  const fetchAutomationData = useCallback(async () => {
+    if (!companyId) return;
+    
     try {
       setLoading(true);
       const supabase = createClient();
 
       // Fetch company information
-      const { data: companyData, error: companyError } = await supabase
+      const { data: company } = await supabase
         .from('companies')
-        .select('name')
+        .select('*')
         .eq('id', companyId)
         .single();
 
-      if (companyError) {
-        console.error('Error fetching company:', companyError);
-      } else {
-        setCompanyName(companyData?.name || '');
+      if (company) {
+        setCompanyName(company.name || '');
       }
 
       // Fetch workflows
-      const { data: workflowsData, error: workflowsError } = await supabase
+      const { data: workflows } = await supabase
         .from('automation_workflows')
         .select('*')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
+        .eq('company_id', companyId);
 
-      if (workflowsError) {
-        console.error('Error fetching workflows:', workflowsError);
-      } else {
-        setWorkflows(workflowsData || []);
+      if (workflows) {
+        setWorkflows(workflows);
       }
 
       // Fetch email templates
-      const { data: templatesData, error: templatesError } = await supabase
+      const { data: templates } = await supabase
         .from('email_templates')
         .select('*')
-        .eq('company_id', companyId)
-        .order('name');
+        .eq('company_id', companyId);
 
-      if (templatesError) {
-        console.error('Error fetching templates:', templatesError);
-      } else {
-        setTemplates(templatesData || []);
+      if (templates) {
+        setTemplates(templates);
       }
 
-      // Fetch automation settings
-      const { data: settingsData } = await supabase
-        .from('company_settings')
-        .select('setting_key, setting_value')
-        .eq('company_id', companyId)
-        .in('setting_key', ['automation_enabled', 'automation_business_hours_only', 'automation_max_emails_per_day']);
-
-      if (settingsData) {
-        const settingsMap = new Map(settingsData.map(s => [s.setting_key, s.setting_value]));
-        setAutomationSettings({
-          automation_enabled: settingsMap.get('automation_enabled') === 'true',
-          automation_business_hours_only: settingsMap.get('automation_business_hours_only') === 'true',
-          automation_max_emails_per_day: parseInt(settingsMap.get('automation_max_emails_per_day') || '10'),
-        });
+      // Fetch automation settings via API
+      try {
+        const settingsResponse = await fetch(`/api/companies/${companyId}/settings`);
+        if (settingsResponse.ok) {
+          const settingsData = await settingsResponse.json();
+          if (settingsData.success && settingsData.settings) {
+            const settings = settingsData.settings;
+            setAutomationSettings({
+              automation_enabled: settings.automation_enabled?.value ?? true,
+              automation_business_hours_only: settings.automation_business_hours_only?.value ?? true,
+              automation_max_emails_per_day: settings.automation_max_emails_per_day?.value ?? 10,
+            });
+          }
+        }
+      } catch (settingsError) {
+        console.error('Error fetching settings:', settingsError);
+        // Keep default values if settings fetch fails
       }
     } catch (error) {
       console.error('Error fetching automation data:', error);
@@ -146,7 +137,12 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId]);
+
+  useEffect(() => {
+    fetchAutomationData();
+  }, [fetchAutomationData]);
+
 
   const handleToggleWorkflow = async (workflowId: string, currentActive: boolean) => {
     try {

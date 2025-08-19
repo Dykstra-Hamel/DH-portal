@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Upload, FileText, Link2, Type, RefreshCw, AlertCircle, CheckCircle, Info, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import styles from './KnowledgeBase.module.scss'
 
@@ -45,12 +45,7 @@ export default function KnowledgeBase({ companyId }: KnowledgeBaseProps) {
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    loadKnowledgeBase()
-    loadRetellKnowledgeBase()
-  }, [companyId])
-
-  const loadKnowledgeBase = async () => {
+  const loadKnowledgeBase = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/companies/${companyId}/knowledge-base`)
@@ -61,18 +56,15 @@ export default function KnowledgeBase({ companyId }: KnowledgeBaseProps) {
           retell_api_key: '',
           retell_knowledge_base_id: ''
         })
-      } else {
-        throw new Error('Failed to load knowledge base settings')
       }
     } catch (error) {
-      console.error('Error loading knowledge base settings:', error)
-      setError('Failed to load knowledge base settings')
+      console.error('Error loading knowledge base:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [companyId])
 
-  const loadRetellKnowledgeBase = async () => {
+  const loadRetellKnowledgeBase = useCallback(async () => {
     try {
       setRetellLoading(true)
       const response = await fetch(`/api/companies/${companyId}/knowledge-base/retell`)
@@ -81,16 +73,21 @@ export default function KnowledgeBase({ companyId }: KnowledgeBaseProps) {
         const data = await response.json()
         setRetellItems(data.items || [])
       } else {
-        console.warn('Failed to load Retell AI knowledge base:', await response.text())
         setRetellItems([])
       }
     } catch (error) {
-      console.warn('Error loading Retell AI knowledge base:', error)
+      console.error('Error loading Retell knowledge base:', error)
       setRetellItems([])
     } finally {
       setRetellLoading(false)
     }
-  }
+  }, [companyId])
+
+  useEffect(() => {
+    loadKnowledgeBase()
+    loadRetellKnowledgeBase()
+  }, [loadKnowledgeBase, loadRetellKnowledgeBase])
+
 
 
   const showMessage = (message: string, type: 'success' | 'error') => {

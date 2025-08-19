@@ -7,19 +7,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Admin Customer Leads API: Starting request');
-
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Customer Leads API: Unauthorized access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    console.log('Admin Customer Leads API: Fetching leads for customer', {
-      customerId: id,
-    });
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
@@ -65,11 +59,6 @@ export async function GET(
       );
     }
 
-    console.log('Admin Customer Leads API: Successfully fetched leads', {
-      customerId: id,
-      count: leads?.length || 0,
-    });
-
     return NextResponse.json(leads || []);
   } catch (error) {
     console.error('Admin Customer Leads API: Internal error:', error);
@@ -85,21 +74,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Admin Customer Leads API: Starting POST request');
-
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.log('Admin Customer Leads API: Unauthorized POST access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await request.json();
-    console.log('Admin Customer Leads API: Creating lead for customer', {
-      customerId: id,
-      body,
-    });
 
     // Use admin client to create lead
     const supabase = createAdminClient();
@@ -158,11 +140,6 @@ export async function POST(
         { status: 500 }
       );
     }
-
-    console.log('Admin Customer Leads API: Successfully created lead', {
-      customerId: id,
-      leadId: lead.id,
-    });
 
     return NextResponse.json(lead, { status: 201 });
   } catch (error) {
