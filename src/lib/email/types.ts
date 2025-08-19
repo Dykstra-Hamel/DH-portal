@@ -58,3 +58,28 @@ export interface QuoteEmailData {
     billing_frequency: string;
   };
 }
+
+export interface CallSummaryEmailData {
+  callId: string;
+  companyName: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone: string;
+  fromNumber?: string;
+  callStatus: string;
+  callDuration?: number;
+  callDate: string;
+  sentiment?: 'positive' | 'negative' | 'neutral';
+  transcript?: string;
+  callSummary?: string;
+  pestIssue?: string;
+  streetAddress?: string;
+  homeSize?: string;
+  yardSize?: string;
+  decisionMaker?: string;
+  preferredServiceTime?: string;
+  contactedOtherCompanies?: boolean;
+  leadId?: string;
+  recordingUrl?: string;
+  disconnectReason?: string;
+}
