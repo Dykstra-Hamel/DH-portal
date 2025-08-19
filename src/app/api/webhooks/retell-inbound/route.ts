@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { Retell } from 'retell-sdk';
 import { normalizePhoneNumber } from '@/lib/utils';
+import { sendCallSummaryNotifications } from '@/lib/email/call-summary-notifications';
+import { CallSummaryEmailData } from '@/lib/email/types';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(durationSeconds: number | null): number | null {
@@ -624,6 +626,13 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     }
   }
 
+  // Send call summary emails if enabled
+  try {
+    await sendCallSummaryEmailsIfEnabled(supabase, callRecord, callData, extractedData);
+  } catch (error) {
+    console.error(`[Call Summary Emails] Error sending emails for call ${callData.call_id}:`, error);
+  }
+
   return NextResponse.json({
     success: true,
     call_record_id: callRecord.id,
@@ -687,4 +696,141 @@ function extractCallData(
   }
 
   return extractedData;
+}
+
+// Helper function to send call summary emails if enabled for the company
+async function sendCallSummaryEmailsIfEnabled(
+  supabase: any,
+  callRecord: any,
+  callData: any,
+  extractedData: any
+) {
+  const callId = callData.call_id;
+  
+  try {
+    // Determine company ID from the call record
+    let companyId = null;
+    
+    // Try to get company ID from the lead association
+    if (callRecord.leads?.id) {
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('company_id')
+        .eq('id', callRecord.leads.id)
+        .single();
+      
+      if (lead) {
+        companyId = lead.company_id;
+      }
+    }
+    
+    // If no company ID found from lead, try to find via call settings
+    if (!companyId) {
+      const agentId = callData.agent_id || callData.retell_llm_id || callData.llm_id;
+      if (agentId) {
+        const { data: companySetting } = await supabase
+          .from('company_settings')
+          .select('company_id')
+          .or(`setting_key.eq.retell_inbound_agent_id,setting_key.eq.retell_outbound_agent_id`)
+          .eq('setting_value', agentId)
+          .single();
+        
+        if (companySetting) {
+          companyId = companySetting.company_id;
+        }
+      }
+    }
+    
+    if (!companyId) {
+      console.warn(`[Call Summary Emails] No company ID found for call ${callId}`);
+      return;
+    }
+
+    // Check if call summary emails are enabled for this company
+    const { data: emailSettings } = await supabase
+      .from('company_settings')
+      .select('setting_key, setting_value')
+      .eq('company_id', companyId)
+      .in('setting_key', ['call_summary_emails_enabled', 'call_summary_email_recipients']);
+
+    const settingsMap = emailSettings?.reduce((acc: any, setting: any) => {
+      acc[setting.setting_key] = setting.setting_value;
+      return acc;
+    }, {}) || {};
+
+    const emailsEnabled = settingsMap.call_summary_emails_enabled === 'true';
+    const recipients = settingsMap.call_summary_email_recipients || '';
+
+    if (!emailsEnabled || !recipients.trim()) {
+      return;
+    }
+
+    // Get company name and customer data
+    const { data: company } = await supabase
+      .from('companies')
+      .select('name')
+      .eq('id', companyId)
+      .single();
+
+    let customerData = null;
+    if (callRecord.customer_id) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('name, email')
+        .eq('id', callRecord.customer_id)
+        .single();
+      
+      customerData = customer;
+    }
+
+    // Prepare call summary email data
+    const callSummaryData: CallSummaryEmailData = {
+      callId: callData.call_id,
+      companyName: company?.name || 'Unknown Company',
+      customerName: customerData?.name || extractedData.decision_maker || undefined,
+      customerEmail: customerData?.email || undefined,
+      customerPhone: callRecord.phone_number,
+      fromNumber: callRecord.from_number,
+      callStatus: callRecord.call_status || callData.call_status || 'completed',
+      callDuration: callRecord.duration_seconds || (callData.duration_ms ? Math.round(callData.duration_ms / 1000) : undefined),
+      callDate: callRecord.end_timestamp || callRecord.start_timestamp || new Date().toISOString(),
+      sentiment: extractedData.sentiment,
+      transcript: callData.transcript,
+      callSummary: extractedData.summary || callData.call_analysis?.call_summary,
+      pestIssue: extractedData.pest_issue,
+      streetAddress: extractedData.street_address,
+      homeSize: extractedData.home_size,
+      yardSize: extractedData.yard_size,
+      decisionMaker: extractedData.decision_maker,
+      preferredServiceTime: extractedData.preferred_service_time,
+      contactedOtherCompanies: extractedData.contacted_other_companies,
+      leadId: callRecord.lead_id,
+      recordingUrl: callData.recording_url,
+      disconnectReason: callData.disconnection_reason || callRecord.disconnect_reason,
+    };
+
+    // Parse recipient emails
+    const emailList = recipients
+      .split(',')
+      .map((email: string) => email.trim())
+      .filter((email: string) => email.length > 0);
+
+    if (emailList.length === 0) {
+      console.warn(`[Call Summary Emails] No valid email recipients for call ${callId}`);
+      return;
+    }
+
+    // Send the emails
+    const result = await sendCallSummaryNotifications(
+      emailList,
+      callSummaryData,
+      undefined,
+      companyId
+    );
+
+    console.log(`[Call Summary Emails] Sent to ${result.successCount}/${emailList.length} recipients for call ${callId}`);
+
+  } catch (error) {
+    console.error(`[Call Summary Emails] Error processing call ${callId}:`, error);
+  }
 }

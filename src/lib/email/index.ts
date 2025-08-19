@@ -17,4 +17,5 @@ export const MAILERSEND_FROM_EMAIL = 'noreply@nwexterminating.com';
 // Re-export all email services
 export * from './project-notifications';
 export * from './lead-notifications';
+export * from './call-summary-notifications';
 export * from './types';

@@ -355,6 +355,98 @@ export default function CallSettingsManager() {
               </div>
             </div>
 
+            {/* Call Summary Emails */}
+            <div className={styles.settingGroup}>
+              <h3 className={styles.groupTitle}>Call Summary Emails</h3>
+              <p className={styles.groupDescription}>
+                Configure automatic email notifications with call summaries after calls are completed.
+              </p>
+
+              <div className={styles.setting}>
+                <div className={styles.settingInfo}>
+                  <label htmlFor="call-summary-emails-enabled" className={styles.settingLabel}>
+                    Enable Call Summary Emails
+                  </label>
+                  <p className={styles.settingDescription}>
+                    {settings.call_summary_emails_enabled?.description || 'Send detailed call summaries via email when calls complete'}
+                  </p>
+                </div>
+                <div className={styles.settingControl}>
+                  <label className={styles.toggle}>
+                    <input
+                      id="call-summary-emails-enabled"
+                      type="checkbox"
+                      checked={settings.call_summary_emails_enabled?.value === true || settings.call_summary_emails_enabled?.value === 'true'}
+                      onChange={(e) => handleSettingChange('call_summary_emails_enabled', e.target.checked)}
+                    />
+                    <span className={styles.toggleSlider}></span>
+                  </label>
+                </div>
+              </div>
+
+              {(settings.call_summary_emails_enabled?.value === true || settings.call_summary_emails_enabled?.value === 'true') && (
+                <div className={styles.setting}>
+                  <div className={styles.settingInfo}>
+                    <label htmlFor="call-summary-email-recipients" className={styles.settingLabel}>
+                      Email Recipients
+                    </label>
+                    <p className={styles.settingDescription}>
+                      Enter email addresses separated by commas. These recipients will receive detailed call summaries including transcripts, analysis, and customer information.
+                    </p>
+                  </div>
+                  <div className={styles.settingControl}>
+                    <textarea
+                      id="call-summary-email-recipients"
+                      value={settings.call_summary_email_recipients?.value || ''}
+                      onChange={(e) => handleSettingChange('call_summary_email_recipients', e.target.value)}
+                      className={styles.textArea}
+                      placeholder="manager@company.com, sales@company.com, support@company.com"
+                      rows={3}
+                      style={{ resize: 'vertical', minHeight: '80px' }}
+                    />
+                    {settings.call_summary_email_recipients?.value && (
+                      <div className={styles.emailValidation}>
+                        {(() => {
+                          const emails = settings.call_summary_email_recipients?.value
+                            .split(',')
+                            .map((email: string) => email.trim())
+                            .filter((email: string) => email.length > 0);
+                          
+                          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                          const validEmails = emails.filter((email: string) => emailRegex.test(email));
+                          const invalidEmails = emails.filter((email: string) => !emailRegex.test(email));
+                          
+                          return (
+                            <div style={{ marginTop: '8px' }}>
+                              {validEmails.length > 0 && (
+                                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#059669' }}>
+                                  ✓ {validEmails.length} valid email{validEmails.length !== 1 ? 's' : ''}: {validEmails.slice(0, 3).join(', ')}{validEmails.length > 3 ? ` and ${validEmails.length - 3} more` : ''}
+                                </p>
+                              )}
+                              {invalidEmails.length > 0 && (
+                                <p style={{ margin: '0', fontSize: '12px', color: '#dc2626' }}>
+                                  ✗ {invalidEmails.length} invalid email{invalidEmails.length !== 1 ? 's' : ''}: {invalidEmails.slice(0, 2).join(', ')}{invalidEmails.length > 2 ? '...' : ''}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(settings.call_summary_emails_enabled?.value === true || settings.call_summary_emails_enabled?.value === 'true') && (
+                <div style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9', borderRadius: '6px', padding: '16px', marginTop: '16px' }}>
+                  <p style={{ margin: '0', fontSize: '14px', color: '#0369a1', lineHeight: '1.5' }}>
+                    <strong>📧 Email Content Preview:</strong><br />
+                    Call summary emails include call details, transcript, sentiment analysis, customer information, service details, and call recording links when available. Emails are sent automatically when calls complete.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Business Hours Settings */}
             <div className={styles.settingGroup}>
               <div className={styles.collapsibleHeader} onClick={() => setBusinessHoursExpanded(!businessHoursExpanded)}>
