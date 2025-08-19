@@ -735,8 +735,6 @@ export async function POST(request: NextRequest) {
           createdAt: new Date().toISOString(),
         },
       });
-      
-      console.log(`Inngest automation triggered for lead ${lead.id}`);
     } catch (error) {
       console.error('Error triggering Inngest automation:', error);
       // Don't fail the lead creation due to automation trigger issues

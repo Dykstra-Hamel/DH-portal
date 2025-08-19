@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/lib/api-client';
 import styles from './AdminManager.module.scss';
 
@@ -53,12 +53,7 @@ export default function PartialLeadsManager() {
   });
   const [companies, setCompanies] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchPartialLeads();
-    fetchCompanies();
-  }, [filters]);
-
-  const fetchPartialLeads = async () => {
+  const fetchPartialLeads = useCallback(async () => {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams({
@@ -81,17 +76,22 @@ export default function PartialLeadsManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  const fetchCompanies = async () => {
+  const fetchCompanies = useCallback(async () => {
     try {
       const data = await authenticatedFetch('/api/admin/companies');
-      // Companies API returns array directly (not wrapped in success/data)
       setCompanies(data || []);
     } catch (error) {
       console.error('Error fetching companies:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchPartialLeads();
+    fetchCompanies();
+  }, [fetchPartialLeads, fetchCompanies]);
+
 
   const fetchLeadDetails = async (leadId: string) => {
     try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   Save,
@@ -114,6 +114,30 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
   const [testResults, setTestResults] = useState<any>(null);
   const [showTestResults, setShowTestResults] = useState(false);
 
+  const fetchTemplates = useCallback(async () => {
+    try {
+      setLoading(true);
+      const supabase = createClient();
+      
+      const { data, error } = await supabase
+        .from('email_templates')
+        .select('id, name, subject_line, template_type')
+        .eq('company_id', companyId)
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching templates:', error);
+      } else {
+        setTemplates(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId]);
+
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
@@ -146,31 +170,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
         });
       }
     }
-  }, [isOpen, workflow]);
-
-  const fetchTemplates = async () => {
-    try {
-      setLoading(true);
-      const supabase = createClient();
-      
-      const { data, error } = await supabase
-        .from('email_templates')
-        .select('id, name, subject_line, template_type')
-        .eq('company_id', companyId)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) {
-        console.error('Error fetching templates:', error);
-      } else {
-        setTemplates(data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching templates:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isOpen, workflow, fetchTemplates]);
 
   const handleSave = async () => {
     try {

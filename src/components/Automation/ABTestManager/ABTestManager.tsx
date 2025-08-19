@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ABTestAnalytics from '../ABTestAnalytics/ABTestAnalytics';
 import styles from './ABTestManager.module.scss';
 
@@ -91,19 +91,16 @@ export default function ABTestManager({ companyId, emailTemplates, onRefreshTemp
     minimum_sample_size: 100
   });
 
-  useEffect(() => {
-    fetchCampaigns();
-  }, [companyId]);
-
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = useCallback(async () => {
     try {
+      setLoading(true);
       const response = await fetch(`/api/companies/${companyId}/ab-tests`);
       if (response.ok) {
         const data = await response.json();
         // Extract campaigns array from API response structure
         setCampaigns(data.campaigns || []);
       } else {
-        console.error('Failed to fetch campaigns:', response.status);
+        console.error('Failed to fetch campaigns');
         setCampaigns([]);
       }
     } catch (error) {
@@ -112,7 +109,12 @@ export default function ABTestManager({ companyId, emailTemplates, onRefreshTemp
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId]);
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, [fetchCampaigns]);
+
 
   const createCampaign = async () => {
     try {

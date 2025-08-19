@@ -520,26 +520,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     // Set the notification emails input field
     const emails = widgetConfig.notifications?.emails || [];
     setNotificationEmailsInput(emails.join('\n'));
-  }, []);
+  }, [defaultColors.background, defaultColors.primary, defaultColors.secondary, defaultColors.text]);
 
-  // Load company data when selected company changes
-  useEffect(() => {
-    if (selectedCompanyId) {
-      const company = companies.find(c => c.id === selectedCompanyId);
-      if (company) {
-        setSelectedCompany(company);
-        loadCompanyConfig(company);
-        fetchBrandColors(selectedCompanyId);
-        loadServiceAreas(selectedCompanyId);
-        loadPestOptions(selectedCompanyId);
-        loadServicePlans(selectedCompanyId);
-        geocodeCompanyAddress(company);
-        loadDomainConfiguration(selectedCompanyId);
-      }
-    }
-  }, [selectedCompanyId]);
-
-  const geocodeCompanyAddress = async (company: Company) => {
+  const geocodeCompanyAddress = useCallback(async (company: Company) => {
     try {
       const coordinates = await getCompanyCoordinates(company);
       setMapCenter({ lat: coordinates.lat, lng: coordinates.lng });
@@ -563,8 +546,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       console.error('Error geocoding company address:', error);
       // setMapCenter will remain null, ServiceAreaMap will use fallback
     }
-  };
-  const fetchBrandColors = async (companyId: string) => {
+  }, []);
+
+  const fetchBrandColors = useCallback(async (companyId: string) => {
     try {
       setBrandLoading(true);
       const supabase = createClient();
@@ -590,10 +574,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     } finally {
       setBrandLoading(false);
     }
-  };
+  }, []);
 
-  // Load domain configuration from company settings
-  const loadDomainConfiguration = async (companyId: string) => {
+  const loadDomainConfiguration = useCallback(async (companyId: string) => {
     try {
       const response = await fetch(`/api/companies/${companyId}/settings`);
       if (response.ok) {
@@ -630,7 +613,77 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     } catch (error) {
       console.error('Error loading domain configuration:', error);
     }
-  };
+  }, []);
+
+  const loadServiceAreas = useCallback(async (companyId: string) => {
+    try {
+      const response = await fetch(`/api/service-areas/${companyId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setServiceAreas(data.serviceAreas || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading service areas:', error);
+      setServiceAreas([]);
+    }
+  }, []);
+
+  const loadPestOptions = useCallback(async (companyId: string) => {
+    try {
+      setPestOptionsLoading(true);
+      const response = await fetch(`/api/admin/pest-options/${companyId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCompanyPestOptions(data.data.companyPestOptions || []);
+          setAvailablePestTypes(data.data.availablePestTypes || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading pest options:', error);
+      setCompanyPestOptions([]);
+      setAvailablePestTypes([]);
+    } finally {
+      setPestOptionsLoading(false);
+    }
+  }, []);
+
+  const loadServicePlans = useCallback(async (companyId: string) => {
+    try {
+      setServicePlansLoading(true);
+      const response = await fetch(`/api/admin/service-plans/${companyId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setServicePlans(data.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading service plans:', error);
+      setServicePlans([]);
+    } finally {
+      setServicePlansLoading(false);
+    }
+  }, []);
+
+  // Load company data when selected company changes
+  useEffect(() => {
+    if (selectedCompanyId) {
+      const company = companies.find(c => c.id === selectedCompanyId);
+      if (company) {
+        setSelectedCompany(company);
+        loadCompanyConfig(company);
+        fetchBrandColors(selectedCompanyId);
+        loadServiceAreas(selectedCompanyId);
+        loadPestOptions(selectedCompanyId);
+        loadServicePlans(selectedCompanyId);
+        geocodeCompanyAddress(company);
+        loadDomainConfiguration(selectedCompanyId);
+      }
+    }
+  }, [selectedCompanyId, companies, loadCompanyConfig, fetchBrandColors, loadServiceAreas, loadPestOptions, loadServicePlans, geocodeCompanyAddress, loadDomainConfiguration]);
 
   // Create or update domain
   const handleDomainSubmit = async () => {
@@ -801,40 +854,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         return <Clock size={14} className={styles.recordStatusDefault} />;
     }
   };
-  const loadServiceAreas = async (companyId: string) => {
-    try {
-      const response = await fetch(`/api/service-areas/${companyId}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setServiceAreas(data.serviceAreas || []);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading service areas:', error);
-      setServiceAreas([]);
-    }
-  };
-
-  const loadPestOptions = async (companyId: string) => {
-    try {
-      setPestOptionsLoading(true);
-      const response = await fetch(`/api/admin/pest-options/${companyId}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setCompanyPestOptions(data.data.companyPestOptions || []);
-          setAvailablePestTypes(data.data.availablePestTypes || []);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading pest options:', error);
-      setCompanyPestOptions([]);
-      setAvailablePestTypes([]);
-    } finally {
-      setPestOptionsLoading(false);
-    }
-  };
 
   const savePestOptions = async (pestOptions: CompanyPestOption[]) => {
     if (!selectedCompany) return;
@@ -880,7 +899,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       name: pestType.name,
       slug: pestType.slug,
       description: pestType.description,
-      category: pestType.category,
+      category: pestType.pest_categories?.name || 'Unknown',
       icon_svg: pestType.icon_svg,
       custom_label: null,
       display_order: companyPestOptions.length + 1,
@@ -916,24 +935,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   // Service Plans Management Functions
-  const loadServicePlans = async (companyId: string) => {
-    try {
-      setServicePlansLoading(true);
-      const response = await fetch(`/api/admin/service-plans/${companyId}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setServicePlans(data.data || []);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading service plans:', error);
-      setServicePlans([]);
-    } finally {
-      setServicePlansLoading(false);
-    }
-  };
-
   const createServicePlan = async (planData: Partial<ServicePlan>) => {
     if (!selectedCompany) return;
     try {

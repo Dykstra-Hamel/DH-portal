@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { adminAPI } from '@/lib/api-client';
@@ -46,11 +46,7 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
     clearError,
   } = useProjects();
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchProjects, filters]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [usersData, companiesData] = await Promise.all([
         adminAPI.getUsers(),
@@ -69,7 +65,11 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
     } catch (error) {
       console.error('Error fetching data:', error);
     }
-  };
+  }, [fetchProjects, filters, user.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSubmit = async (formData: ProjectFormData) => {
     try {

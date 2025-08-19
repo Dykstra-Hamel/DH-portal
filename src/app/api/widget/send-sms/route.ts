@@ -102,7 +102,7 @@ Aiden`;
         responseData = JSON.parse(responseText);
       }
     } catch (error) {
-      console.log('MailerSend response was not JSON, but SMS may have sent successfully');
+      // MailerSend response was not JSON, but SMS may have sent successfully
     }
 
     if (!response.ok) {
@@ -115,7 +115,6 @@ Aiden`;
       );
     }
 
-    console.log('SMS sent successfully:', responseData);
     return createCorsResponse({
       success: true,
       message: 'SMS sent successfully to ' + e164Phone,

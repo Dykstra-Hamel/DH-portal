@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CallRailCall } from '@/lib/callrail/client';
 import { 
   CallAnalytics, 
@@ -50,7 +50,7 @@ export default function CallAnalyticsDashboard({
   const [selectedPeriod, setSelectedPeriod] = useState<7 | 30 | 90>(30);
   const [selectedCall, setSelectedCall] = useState<CallRailCall | null>(null);
 
-  const fetchCallData = async (days: number = 30) => {
+  const fetchCallData = useCallback(async (days: number = 30) => {
     setLoading(true);
     setError(null);
     
@@ -73,13 +73,13 @@ export default function CallAnalyticsDashboard({
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId]);
 
   useEffect(() => {
     if (companyId) {
       fetchCallData(selectedPeriod);
     }
-  }, [companyId, selectedPeriod]);
+  }, [companyId, selectedPeriod, fetchCallData]);
 
   const handlePeriodChange = (period: 7 | 30 | 90) => {
     setSelectedPeriod(period);

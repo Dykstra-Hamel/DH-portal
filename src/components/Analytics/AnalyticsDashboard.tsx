@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { GAAnalyticsResponse } from '@/lib/google-analytics/types';
 import { generateDemoAnalyticsData } from '@/lib/analytics-demo-data';
 import TrafficChart from './Charts/TrafficChart';
@@ -23,7 +23,7 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
   const [configured, setConfigured] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<7 | 30 | 90>(30);
 
-  const fetchAnalyticsData = async (days: number = 30) => {
+  const fetchAnalyticsData = useCallback(async (days: number = 30) => {
     setLoading(true);
     setError(null);
     
@@ -46,13 +46,13 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId]);
 
   useEffect(() => {
     if (companyId) {
       fetchAnalyticsData(selectedPeriod);
     }
-  }, [companyId, selectedPeriod]);
+  }, [companyId, selectedPeriod, fetchAnalyticsData]);
 
   const handlePeriodChange = (period: 7 | 30 | 90) => {
     setSelectedPeriod(period);

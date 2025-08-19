@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plus,
   Edit,
@@ -35,15 +35,9 @@ interface LibraryTemplate {
   updated_at: string;
 }
 
-interface TemplateCategories {
-  categories: string[];
-}
 
 export default function TemplateLibraryManager() {
   const [templates, setTemplates] = useState<LibraryTemplate[]>([]);
-  const [categories, setCategories] = useState<TemplateCategories>({
-    categories: []
-  });
   const [loading, setLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<LibraryTemplate | null>(null);
@@ -80,12 +74,7 @@ export default function TemplateLibraryManager() {
     companyPhone: '(555) 123-4567'
   };
 
-  useEffect(() => {
-    fetchTemplates();
-    fetchCategories();
-  }, []);
-
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -98,30 +87,25 @@ export default function TemplateLibraryManager() {
       if (response.ok) {
         const data = await response.json();
         setTemplates(data.templates);
-        setMessage(null); // Clear any previous errors
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || 'Failed to fetch templates';
-        setMessage({ type: 'error', text: errorMessage });
+        console.error('Failed to fetch templates');
+        setMessage({ type: 'error', text: 'Failed to load templates' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Network error occurred' });
+      console.error('Error fetching templates:', error);
+      setMessage({ type: 'error', text: 'Failed to load templates' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, categoryFilter, featuredFilter]);
 
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch('/api/template-library/categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
-      }
-    } catch (error) {
-      // Categories fetch failure is not critical, silently continue
-    }
-  };
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+
+
 
   const handleCreate = () => {
     setEditingTemplate(null);

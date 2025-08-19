@@ -103,8 +103,6 @@ export async function POST(request: NextRequest) {
     const fromEmail = MAILERSEND_FROM_EMAIL;
 
     // Send email using MailerSend
-    console.log('DEBUG: Attempting to send email to:', quoteData.customerEmail);
-    
     const mailersendPayload = {
       from: {
         email: fromEmail
@@ -145,10 +143,9 @@ export async function POST(request: NextRequest) {
         responseData = JSON.parse(responseText);
       }
     } catch (error) {
-      console.log('MailerSend response was not JSON, but email may have sent successfully');
+      // MailerSend response was not JSON, but email may have sent successfully
     }
 
-    console.log('DEBUG: Email sent successfully via MailerSend:', responseData);
     return createCorsResponse({
       success: true,
       emailId: responseData?.data?.id || 'unknown',

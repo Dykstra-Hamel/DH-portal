@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styles from './ExecutionManager.module.scss';
 
 interface Execution {
@@ -49,7 +49,7 @@ export default function ExecutionManager({ companyId, workflowId, leadId }: Exec
   });
   const [cancelling, setCancelling] = useState<Set<string>>(new Set());
 
-  const fetchExecutions = async (offset = 0) => {
+  const fetchExecutions = useCallback(async (offset = 0) => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -74,7 +74,7 @@ export default function ExecutionManager({ companyId, workflowId, leadId }: Exec
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, statusFilter, workflowId, leadId, pagination.limit]);
 
   const cancelExecution = async (executionId: string, reason?: string) => {
     try {
@@ -108,9 +108,10 @@ export default function ExecutionManager({ companyId, workflowId, leadId }: Exec
     }
   };
 
+
   useEffect(() => {
     fetchExecutions();
-  }, [companyId, workflowId, leadId, statusFilter]);
+  }, [fetchExecutions]);
 
   const getStatusBadge = (status: string) => {
     const className = `${styles.statusBadge} ${styles[status]}`;

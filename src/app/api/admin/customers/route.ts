@@ -24,12 +24,17 @@ export async function GET(request: NextRequest) {
     // Use admin client to fetch customers
     const supabase = createAdminClient();
 
-    // Build query with company join
+    // Build optimized query with company join and leads data in one go
     let query = supabase.from('customers').select(`
         *,
         company:companies(
           id,
           name
+        ),
+        leads(
+          id,
+          lead_status,
+          estimated_value
         )
       `);
 
@@ -47,16 +52,40 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Apply sorting
-    const ascending = sortOrder === 'asc';
-    query = query.order(sortBy, { ascending });
+    // Apply sorting with validation - handle company field specially
+    const validCustomerFields = [
+      'created_at', 'updated_at', 'first_name', 'last_name', 
+      'email', 'phone', 'city', 'state', 'customer_status'
+    ];
+    
+    let actualSortBy = sortBy;
+    const actualSortOrder = sortOrder;
+    
+    // If sorting by company, we'll need to sort after the query since it's a joined field
+    if (sortBy === 'company') {
+      // Default to created_at for the database query, we'll sort by company name after
+      actualSortBy = 'created_at';
+    } else if (!validCustomerFields.includes(sortBy)) {
+      // Fallback to created_at for invalid fields
+      actualSortBy = 'created_at';
+    }
+    
+    const ascending = actualSortOrder === 'asc';
+    query = query.order(actualSortBy, { ascending });
 
     const { data: customers, error } = await query;
 
     if (error) {
-      console.error('Admin Customers API: Error fetching customers:', error);
+      console.error('Admin Customers API: Error fetching customers:', {
+        error,
+        sortBy: actualSortBy,
+        sortOrder: actualSortOrder,
+        companyId,
+        status,
+        search
+      });
       return NextResponse.json(
-        { error: 'Failed to fetch customers' },
+        { error: 'Failed to fetch customers', details: error.message },
         { status: 500 }
       );
     }
@@ -65,35 +94,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Get lead counts for each customer
-    const customerIds = customers.map(c => c.id);
-    const { data: leadCounts, error: leadCountError } = await supabase
-      .from('leads')
-      .select('customer_id, lead_status, estimated_value')
-      .in('customer_id', customerIds);
-
-    if (leadCountError) {
-      console.error(
-        'Admin Customers API: Error fetching lead counts:',
-        leadCountError
-      );
-      // Continue without lead counts rather than failing
-    }
-
-    // Enhance customers with lead statistics
+    // Calculate lead statistics efficiently from the joined data
     const enhancedCustomers = customers.map(customer => {
-      const customerLeads =
-        leadCounts?.filter(l => l.customer_id === customer.id) || [];
-      const activeLeads = customerLeads.filter(l =>
+      const customerLeads = customer.leads || [];
+      const activeLeads = customerLeads.filter((l: any) =>
         ['new', 'contacted', 'qualified', 'quoted'].includes(l.lead_status)
       );
       const totalValue = customerLeads.reduce(
-        (sum, l) => sum + (l.estimated_value || 0),
+        (sum: number, l: any) => sum + (l.estimated_value || 0),
         0
       );
 
+      // Remove leads array to reduce response size
+      const { leads: _, ...customerWithoutLeads } = customer;
+
       return {
-        ...customer,
+        ...customerWithoutLeads,
         full_name: `${customer.first_name} ${customer.last_name}`,
         total_leads: customerLeads.length,
         active_leads: activeLeads.length,
@@ -101,6 +117,16 @@ export async function GET(request: NextRequest) {
         last_activity: customer.updated_at,
       };
     });
+
+    // Handle company sorting after the query since it's a joined field
+    if (sortBy === 'company') {
+      enhancedCustomers.sort((a, b) => {
+        const aCompanyName = a.company?.name || '';
+        const bCompanyName = b.company?.name || '';
+        const comparison = aCompanyName.localeCompare(bCompanyName);
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+    }
 
     return NextResponse.json(enhancedCustomers);
   } catch (error) {
