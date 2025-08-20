@@ -185,9 +185,9 @@ async function findCompanyByInboundAgentId(agentId: string | undefined) {
   }
 }
 
-// Find customer by phone number and return full customer object
-async function findCustomerByPhone(phoneNumber: string | undefined) {
-  if (!phoneNumber) {
+// Find customer by phone number and company ID and return full customer object
+async function findCustomerByPhone(phoneNumber: string | undefined, companyId: string | undefined) {
+  if (!phoneNumber || !companyId) {
     return null;
   }
 
@@ -198,6 +198,7 @@ async function findCustomerByPhone(phoneNumber: string | undefined) {
       .from('customers')
       .select('id, first_name, last_name, address, city, state, zip_code')
       .eq('phone', phoneNumber)
+      .eq('company_id', companyId)
       .single();
 
     if (data && !error) {
@@ -287,7 +288,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   }
 
   // Find or create customer from caller's phone number
-  const existingCustomer = await findCustomerByPhone(customerPhone);
+  const existingCustomer = await findCustomerByPhone(customerPhone, companyId);
   let customerId;
 
   if (!existingCustomer) {
@@ -306,14 +307,30 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
 
     if (customerError) {
       console.error(`❌ [${requestId}] Customer creation failed:`, customerError.message);
-      return NextResponse.json(
-        { error: 'Failed to create customer' },
-        { status: 500 }
-      );
+      
+      // If it's a unique constraint violation, try to find the existing customer
+      if (customerError.code === '23505' && customerError.message.includes('customers_phone_company_unique')) {
+        console.log(`🔄 [${requestId}] Attempting to find existing customer after constraint violation`);
+        const retryCustomer = await findCustomerByPhone(customerPhone, companyId);
+        if (retryCustomer) {
+          customerId = retryCustomer.id;
+          console.log(`✅ [${requestId}] Found existing customer ${customerId} after constraint violation`);
+        } else {
+          return NextResponse.json(
+            { error: 'Customer constraint violation and retry failed' },
+            { status: 500 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: 'Failed to create customer' },
+          { status: 500 }
+        );
+      }
+    } else {
+      customerId = newCustomer.id;
+      console.log(`✅ [${requestId}] Created customer ${customerId}`);
     }
-
-    customerId = newCustomer.id;
-    console.log(`✅ [${requestId}] Created customer ${customerId}`);
   } else {
     customerId = existingCustomer.id;
     console.log(`✅ [${requestId}] Found existing customer ${customerId}`);
