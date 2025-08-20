@@ -314,6 +314,12 @@
   gap: 12px;
 }
 
+.saveStatus {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .unsavedIndicator {
   font-weight: 600;
   color: #ef4444;
@@ -377,4 +383,200 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+// Validation and editing styles
+.validationSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.validationError {
+  color: #ef4444;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.areaNameSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+
+  .hasError {
+    color: #ef4444;
+    cursor: pointer;
+    
+    &:hover {
+      color: #dc2626;
+    }
+  }
+
+  h5 {
+    cursor: pointer;
+    transition: color 0.2s;
+    
+    &:hover {
+      color: #3b82f6;
+    }
+  }
+}
+
+.nameInput {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  min-width: 0;
+  flex: 1;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &.error {
+    border-color: #ef4444;
+    
+    &:focus {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+    font-style: italic;
+  }
+}
+
+.errorMessage {
+  color: #ef4444;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.editingControls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.editActions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.saveEdit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #059669;
+  }
+}
+
+.cancelEdit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 0.75rem;
+  line-height: 1;
+
+  &:hover {
+    background: #4b5563;
+  }
+}
+
+// Additional form styles
+.required {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.fieldError {
+  color: #ef4444;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.addButton {
+  padding: 0.5rem 1rem;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover:not(:disabled) {
+    background: #059669;
+  }
+
+  &.disabled,
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+  }
+}
+
+.unnamedArea {
+  color: #9ca3af;
+  font-style: italic;
+  margin: 0;
+}
+
+.allGoodIndicator {
+  font-weight: 600;
+  color: #10b981;
+  font-size: 14px;
+}
+
+.editableAreaName {
+  cursor: pointer;
+  transition: color 0.2s;
+  margin: 0;
+  
+  &:hover {
+    color: #3b82f6;
+  }
+  
+  &.unnamedArea {
+    color: #9ca3af;
+    font-style: italic;
+  }
+}
+
+.noAreasIndicator {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 14px;
 }
