@@ -1126,6 +1126,9 @@ async function createLeadsForCompanies(users) {
       'trade_show',
       'webinar',
       'content_marketing',
+      'paid',
+      'social_media',
+      'other',
     ];
     const leadTypes = [
       'phone_call',
@@ -1302,11 +1305,27 @@ async function createLeadsForCompanies(users) {
       }
     }
 
+    // Debug: Check all lead_source values before inserting
+    const uniqueLeadSources = [...new Set(leads.map(lead => lead.lead_source))];
+    log(`About to insert ${leads.length} leads with lead_source values: ${uniqueLeadSources.join(', ')}`);
+    
+    // Validate all lead_source values against constraint
+    const allowedLeadSources = ['organic', 'referral', 'google_cpc', 'facebook_ads', 'linkedin', 'email_campaign', 'cold_call', 'trade_show', 'webinar', 'content_marketing', 'paid', 'social_media', 'other'];
+    const invalidSources = uniqueLeadSources.filter(source => !allowedLeadSources.includes(source));
+    
+    if (invalidSources.length > 0) {
+      error(`Found invalid lead_source values: ${invalidSources.join(', ')}`);
+      error(`Allowed values are: ${allowedLeadSources.join(', ')}`);
+      return false;
+    }
+
     // Insert leads
     const { error: leadError } = await localClient.from('leads').insert(leads);
 
     if (leadError) {
       error(`Failed to create leads: ${leadError.message}`);
+      // Additional debugging: show which lead caused the error
+      error(`Sample of leads being inserted:`, JSON.stringify(leads.slice(0, 3), null, 2));
       return false;
     }
 

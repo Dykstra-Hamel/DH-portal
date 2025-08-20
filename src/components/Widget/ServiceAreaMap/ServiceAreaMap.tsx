@@ -77,6 +77,10 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>(
     'idle'
   );
+  
+  // Validation state tracking
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
 
 
   const mapContainerStyle = {
@@ -153,30 +157,29 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
     const currentAreaName = newAreaNameRef.current;
     const currentAreaPriority = newAreaPriorityRef.current;
 
-    if (currentAreaName.trim()) {
-      const newArea: ServiceArea = {
-        id: `temp-${Date.now()}`,
-        name: currentAreaName,
-        type: 'polygon',
-        polygon: coordinates,
-        priority: currentAreaPriority,
-        isActive: true,
-      };
+    // Always create the area, even without a name (validation happens on save)
+    const newArea: ServiceArea = {
+      id: `temp-${Date.now()}`,
+      name: currentAreaName.trim() || '', // Allow empty names
+      type: 'polygon',
+      polygon: coordinates,
+      priority: currentAreaPriority,
+      isActive: true,
+    };
 
-      setServiceAreas(prev => [...prev, newArea]);
-      setHasUnsavedChanges(true);
-    } else {
-      // Remove the drawn polygon from the map if no name was provided
-      polygon.setMap(null);
-    }
+    setServiceAreas(prev => [...prev, newArea]);
+    setHasUnsavedChanges(true);
 
-    // Always reset drawing state after completion
+    // Remove the drawing polygon from the map (it will be rendered by our area display logic)
+    polygon.setMap(null);
+
+    // Reset form for next area but keep creation mode active
     setNewAreaName('');
     setNewAreaPriority(0);
     newAreaNameRef.current = '';
     newAreaPriorityRef.current = 0;
-    setIsCreatingArea(false);
     setDrawingMode(null);
+    // Keep isCreatingArea true so form stays visible for next area
   }, []);
 
   const handleCircleComplete = useCallback((circle: google.maps.Circle) => {
@@ -187,34 +190,33 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
     const currentAreaName = newAreaNameRef.current;
     const currentAreaPriority = newAreaPriorityRef.current;
 
-    if (currentAreaName.trim()) {
-      const newArea: ServiceArea = {
-        id: `temp-${Date.now()}`,
-        name: currentAreaName,
-        type: 'radius',
-        center: {
-          lat: center?.lat() || 0,
-          lng: center?.lng() || 0,
-        },
-        radius: radiusMiles,
-        priority: currentAreaPriority,
-        isActive: true,
-      };
+    // Always create the area, even without a name (validation happens on save)
+    const newArea: ServiceArea = {
+      id: `temp-${Date.now()}`,
+      name: currentAreaName.trim() || '', // Allow empty names
+      type: 'radius',
+      center: {
+        lat: center?.lat() || 0,
+        lng: center?.lng() || 0,
+      },
+      radius: radiusMiles,
+      priority: currentAreaPriority,
+      isActive: true,
+    };
 
-      setServiceAreas(prev => [...prev, newArea]);
-      setHasUnsavedChanges(true);
-    } else {
-      // Remove the drawn circle from the map if no name was provided
-      circle.setMap(null);
-    }
+    setServiceAreas(prev => [...prev, newArea]);
+    setHasUnsavedChanges(true);
 
-    // Always reset drawing state after completion
+    // Remove the drawing circle from the map (it will be rendered by our area display logic)
+    circle.setMap(null);
+
+    // Reset form for next area but keep creation mode active
     setNewAreaName('');
     setNewAreaPriority(0);
     newAreaNameRef.current = '';
     newAreaPriorityRef.current = 0;
-    setIsCreatingArea(false);
     setDrawingMode(null);
+    // Keep isCreatingArea true so form stays visible for next area
   }, []);
 
   const onLoad = useCallback(
@@ -302,6 +304,8 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
     setNewAreaPriority(0);
   };
 
+  // Removed completeAreaCreation - using auto-add workflow now
+
   const deleteArea = (areaId: string) => {
     setServiceAreas(prev => prev.filter(area => area.id !== areaId));
     setHasUnsavedChanges(true);
@@ -319,10 +323,58 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
     setHasUnsavedChanges(true);
   };
 
-  // getPolygonPaths function no longer needed with direct Google Maps API
+  const updateAreaName = (areaId: string, newName: string) => {
+    setServiceAreas(prev =>
+      prev.map(area =>
+        area.id === areaId ? { ...area, name: newName } : area
+      )
+    );
+    setHasUnsavedChanges(true);
+    
+    // Clear validation error for this area if name is now provided
+    if (newName.trim() && validationErrors[areaId]) {
+      setValidationErrors(prev => {
+        const updated = { ...prev };
+        delete updated[areaId];
+        return updated;
+      });
+    }
+  };
+
+  const startEditingArea = (areaId: string) => {
+    setEditingAreaId(areaId);
+  };
+
+  const finishEditingArea = () => {
+    setEditingAreaId(null);
+  };
+
+  // Validation helper function
+  const validateServiceAreas = () => {
+    const errors: {[key: string]: string} = {};
+    
+    serviceAreas.forEach(area => {
+      if (!area.name.trim()) {
+        errors[area.id] = 'Area name is required';
+      }
+    });
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSave = async () => {
-    if (!hasUnsavedChanges || isSaving) return;
+    if (isSaving) return;
+
+    // Run validation and show errors, but allow save attempt
+    const isValid = validateServiceAreas();
+    
+    if (!isValid) {
+      // Show validation errors but don't prevent save - let backend handle it
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+      return;
+    }
 
     setIsSaving(true);
     setSaveStatus('idle');
@@ -331,6 +383,7 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
       await onSave(serviceAreas);
       setHasUnsavedChanges(false);
       setSaveStatus('success');
+      setValidationErrors({}); // Clear validation errors on successful save
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
       console.error('Error saving service areas:', error);
@@ -372,7 +425,9 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
           ) : (
             <div className={styles.creationForm}>
               <div className={styles.formGroup}>
-                <label>Area Name:</label>
+                <label>
+                  Area Name: <span className={styles.required}>*</span>
+                </label>
                 <input
                   type="text"
                   value={newAreaName}
@@ -381,8 +436,12 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
                     newAreaNameRef.current = e.target.value;
                   }}
                   placeholder="Enter area name"
+                  className={!newAreaName.trim() && drawingMode === null ? styles.error : ''}
                   required
                 />
+                {!newAreaName.trim() && drawingMode === null && (
+                  <span className={styles.fieldError}>Area name is required</span>
+                )}
               </div>
 
               <div className={styles.formGroup}>
@@ -400,15 +459,17 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
                 />
               </div>
 
-
               <div className={styles.formActions}>
                 <p className={styles.instruction}>
                   {drawingMode === 'polygon'
                     ? 'Click on the map to draw a polygon area'
-                    : 'Click on the map to place the circle center, then drag to set the radius'}
+                    : drawingMode === 'radius'
+                      ? 'Click on the map to place the circle center, then drag to set the radius'
+                      : 'Ready to draw another area, or click "Save Service Areas" below when finished.'}
                 </p>
+                
                 <button onClick={cancelDrawing} className={styles.cancelButton}>
-                  Cancel
+                  Done Adding Areas
                 </button>
               </div>
             </div>
@@ -447,13 +508,23 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
           <h4>Service Areas ({serviceAreas.length})</h4>
 
           <div className={styles.saveSection}>
-            {hasUnsavedChanges && (
-              <span className={styles.unsavedIndicator}>Unsaved changes</span>
-            )}
+            <div className={styles.saveStatus}>
+              {Object.keys(validationErrors).length > 0 ? (
+                <div className={styles.validationSummary}>
+                  <span className={styles.validationError}>
+                    {Object.keys(validationErrors).length} area(s) need names before saving
+                  </span>
+                </div>
+              ) : serviceAreas.length > 0 ? (
+                <span className={styles.allGoodIndicator}>Ready to save {serviceAreas.length} area(s)</span>
+              ) : (
+                <span className={styles.noAreasIndicator}>No areas to save</span>
+              )}
+            </div>
 
             <button
               onClick={handleSave}
-              disabled={!hasUnsavedChanges || isSaving}
+              disabled={isSaving || serviceAreas.length === 0}
               className={`${styles.saveButton} ${saveStatus === 'success' ? styles.success : ''} ${saveStatus === 'error' ? styles.error : ''}`}
             >
               {isSaving ? (
@@ -488,7 +559,38 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
               >
                 <div className={styles.areaHeader}>
                   <div className={styles.areaInfo}>
-                    <h5>{area.name}</h5>
+                    <div className={styles.areaNameSection}>
+                      {editingAreaId === area.id ? (
+                        <input
+                          type="text"
+                          value={area.name}
+                          onChange={e => updateAreaName(area.id, e.target.value)}
+                          onBlur={finishEditingArea}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') finishEditingArea();
+                            if (e.key === 'Escape') finishEditingArea();
+                          }}
+                          className={`${styles.nameInput} ${validationErrors[area.id] ? styles.error : ''}`}
+                          onClick={e => e.stopPropagation()}
+                          autoFocus
+                          placeholder="Enter area name"
+                        />
+                      ) : (
+                        <h5 
+                          className={`${styles.editableAreaName} ${validationErrors[area.id] ? styles.hasError : ''} ${!area.name ? styles.unnamedArea : ''}`}
+                          onClick={e => {
+                            e.stopPropagation();
+                            startEditingArea(area.id);
+                          }}
+                          title="Click to edit name"
+                        >
+                          {area.name || 'Unnamed Area'}
+                        </h5>
+                      )}
+                      {validationErrors[area.id] && (
+                        <span className={styles.errorMessage}>{validationErrors[area.id]}</span>
+                      )}
+                    </div>
                     <span className={styles.areaType}>
                       {area.type === 'polygon' && <Square size={14} />}
                       {area.type === 'radius' && <CircleIcon size={14} />}

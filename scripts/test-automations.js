@@ -95,7 +95,7 @@ async function testLeadCreation() {
       urgency: 'high',
       address: '789 Automation Blvd, Test City, TS 12345',
       home_size: 2500,
-      lead_source: 'website',
+      lead_source: 'organic',
       company_id: TEST_COMPANY_ID,
       status: 'new'
     };

@@ -23,6 +23,9 @@
 # misc
 .DS_Store
 *.pem
+EXPORT-INSTRUCTIONS.md
+company-data-import.sql
+export-company-data-final.sql
 
 # debug
 npm-debug.log*

@@ -231,7 +231,14 @@ export async function PUT(
 
     const { serviceAreas } = body;
 
+    console.log('🔍 Service Areas PUT Request Debug:', {
+      companyId,
+      serviceAreasCount: serviceAreas?.length,
+      serviceAreasData: serviceAreas
+    });
+
     if (!Array.isArray(serviceAreas)) {
+      console.error('❌ Service areas is not an array:', serviceAreas);
       return NextResponse.json(
         { error: 'Service areas must be an array' },
         { status: 400 }
@@ -248,9 +255,19 @@ export async function PUT(
       .eq('company_id', companyId);
 
     if (deleteError) {
-      console.error('Error deleting existing service areas:', deleteError);
+      console.error('❌ Error deleting existing service areas:', deleteError);
+      console.error('❌ Delete error details:', {
+        message: deleteError.message,
+        details: deleteError.details,
+        hint: deleteError.hint,
+        code: deleteError.code
+      });
       return NextResponse.json(
-        { error: 'Failed to update service areas' },
+        { 
+          error: 'Failed to delete existing service areas', 
+          details: deleteError.message,
+          code: deleteError.code 
+        },
         { status: 500 }
       );
     }
@@ -286,9 +303,21 @@ export async function PUT(
         .insert(insertData);
 
       if (insertError) {
-        console.error('Error inserting service areas:', insertError);
+        console.error('❌ Error inserting service areas:', insertError);
+        console.error('❌ Insert error details:', {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code
+        });
+        console.error('❌ Insert data that failed:', insertData);
         return NextResponse.json(
-          { error: 'Failed to update service areas' },
+          { 
+            error: 'Failed to insert service areas', 
+            details: insertError.message,
+            code: insertError.code,
+            insertData 
+          },
           { status: 500 }
         );
       }
@@ -299,9 +328,13 @@ export async function PUT(
       message: 'Service areas updated successfully',
     });
   } catch (error) {
-    console.error('Error in service areas PUT:', error);
+    console.error('❌ Unexpected error in service areas PUT:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error', 
+        details: error instanceof Error ? error.message : String(error) 
+      },
       { status: 500 }
     );
   }
