@@ -684,7 +684,13 @@ function extractCallData(
     extractedData.yard_size = callAnalysis.custom_analysis_data.yard_size || null;
     extractedData.pest_issue = callAnalysis.custom_analysis_data.pest_issue || null;
     extractedData.street_address = callAnalysis.custom_analysis_data.customer_street_address || null;
-    extractedData.preferred_service_time = callAnalysis.custom_analysis_data.preferred_service_time || null;
+    // Handle preferred_service_time - map invalid values to null
+    const rawPreferredTime = callAnalysis.custom_analysis_data.preferred_service_time;
+    if (rawPreferredTime && ['AM', 'PM', 'anytime'].includes(rawPreferredTime)) {
+      extractedData.preferred_service_time = rawPreferredTime;
+    } else {
+      extractedData.preferred_service_time = null;
+    }
     
     // Extract customer address and name fields
     extractedData.customer_city = callAnalysis.custom_analysis_data.customer_city || null;
