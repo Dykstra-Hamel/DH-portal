@@ -6,7 +6,9 @@ import { sendCallSummaryNotifications } from '@/lib/email/call-summary-notificat
 import { CallSummaryEmailData } from '@/lib/email/types';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
-function calculateBillableDuration(durationSeconds: number | null): number | null {
+function calculateBillableDuration(
+  durationSeconds: number | null
+): number | null {
   if (!durationSeconds || durationSeconds <= 0) return 30; // Minimum billable time
   return Math.ceil(durationSeconds / 30) * 30;
 }
@@ -14,7 +16,11 @@ function calculateBillableDuration(durationSeconds: number | null): number | nul
 // Simple rate limiting store (in production, use Redis or similar)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-function isRateLimited(ip: string, limit: number = 100, windowMs: number = 60000): boolean {
+function isRateLimited(
+  ip: string,
+  limit: number = 100,
+  windowMs: number = 60000
+): boolean {
   const now = Date.now();
   const key = ip;
   const record = rateLimitStore.get(key);
@@ -35,13 +41,16 @@ function isRateLimited(ip: string, limit: number = 100, windowMs: number = 60000
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
-  
+
   try {
     console.log(`📞 [${requestId}] Retell inbound webhook received`);
-    
+
     // Apply rate limiting
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
-    
+    const ip =
+      request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
+
     if (isRateLimited(ip, 50, 60000)) {
       console.warn(`⚠️ [${requestId}] Rate limit exceeded`);
       return NextResponse.json(
@@ -53,11 +62,11 @@ export async function POST(request: NextRequest) {
     // Verify the webhook is from Retell using signature verification
     const retellWebhookSecret = process.env.RETELL_WEBHOOK_SECRET;
     const signature = request.headers.get('x-retell-signature');
-    
+
     if (!retellWebhookSecret || !signature) {
       console.error(`❌ [${requestId}] Webhook authentication not configured`);
     }
-    
+
     if (!retellWebhookSecret) {
       console.error(`❌ [${requestId}] RETELL_WEBHOOK_SECRET not configured`);
       return NextResponse.json(
@@ -65,7 +74,7 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     if (!signature) {
       console.error(`❌ [${requestId}] Missing signature header`);
       return NextResponse.json(
@@ -75,14 +84,14 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = await request.json();
-    
+
     // Verify webhook signature using Retell SDK
     const isValidSignature = Retell.verify(
       JSON.stringify(payload),
       retellWebhookSecret,
       signature
     );
-    
+
     if (!isValidSignature) {
       console.error(`❌ [${requestId}] Invalid webhook signature`);
       return NextResponse.json(
@@ -97,8 +106,10 @@ export async function POST(request: NextRequest) {
     // Extract data from the nested call object
     const callData = payload.call || payload;
     const { call_id } = callData;
-    
-    console.log(`📞 [${requestId}] Processing ${eventType} for call ${call_id}`);
+
+    console.log(
+      `📞 [${requestId}] Processing ${eventType} for call ${call_id}`
+    );
 
     if (!call_id) {
       console.error(`❌ [${requestId}] No call_id provided in payload`);
@@ -113,7 +124,7 @@ export async function POST(request: NextRequest) {
     // Add request ID to context for downstream functions
     callData._requestId = requestId;
     let result;
-    
+
     switch (eventType) {
       case 'call_started':
         result = await handleInboundCallStarted(supabase, callData);
@@ -132,18 +143,20 @@ export async function POST(request: NextRequest) {
         result = NextResponse.json({
           success: true,
           message: 'Event type not handled',
-          eventType
+          eventType,
         });
         break;
     }
-    
+
     const duration = Date.now() - startTime;
     console.log(`✅ [${requestId}] Completed ${eventType} in ${duration}ms`);
     return result;
-    
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ [${requestId}] Webhook error after ${duration}ms:`, error instanceof Error ? error.message : error);
+    console.error(
+      `❌ [${requestId}] Webhook error after ${duration}ms:`,
+      error instanceof Error ? error.message : error
+    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -186,13 +199,16 @@ async function findCompanyByInboundAgentId(agentId: string | undefined) {
 }
 
 // Find customer by phone number and company ID and return full customer object
-async function findCustomerByPhone(phoneNumber: string | undefined, companyId: string | undefined) {
+async function findCustomerByPhone(
+  phoneNumber: string | undefined,
+  companyId: string | undefined
+) {
   if (!phoneNumber || !companyId) {
     return null;
   }
 
   const supabase = createAdminClient();
-  
+
   try {
     const { data, error } = await supabase
       .from('customers')
@@ -204,7 +220,7 @@ async function findCustomerByPhone(phoneNumber: string | undefined, companyId: s
     if (data && !error) {
       return data;
     }
-    
+
     if (error && error.code !== 'PGRST116') {
       console.error('Customer lookup failed:', error.message);
     }
@@ -216,25 +232,30 @@ async function findCustomerByPhone(phoneNumber: string | undefined, companyId: s
 }
 
 // Format address components into a single formatted address string
-function formatAddress(street: string | null, city: string | null, state: string | null, zip: string | null): string {
+function formatAddress(
+  street: string | null,
+  city: string | null,
+  state: string | null,
+  zip: string | null
+): string {
   const components = [];
-  
+
   if (street && street.trim() !== '') {
     components.push(street.trim());
   }
-  
+
   if (city && city.trim() !== '') {
     components.push(city.trim());
   }
-  
+
   if (state && state.trim() !== '') {
     components.push(state.trim());
   }
-  
+
   if (zip && zip.trim() !== '') {
     components.push(zip.trim());
   }
-  
+
   return components.join(', ');
 }
 
@@ -251,7 +272,7 @@ function hasExistingAddress(customer: any): boolean {
 // Handle inbound call_started event - create new lead immediately
 async function handleInboundCallStarted(supabase: any, callData: any) {
   const requestId = callData._requestId;
-  
+
   const {
     call_id,
     from_number,
@@ -266,7 +287,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   // For inbound calls, from_number is the caller (potential customer)
   const rawCustomerPhone = from_number;
   const customerPhone = normalizePhoneNumber(rawCustomerPhone);
-  
+
   if (!customerPhone) {
     console.error(`❌ [${requestId}] Invalid phone number format`);
     return NextResponse.json(
@@ -274,9 +295,10 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       { status: 400 }
     );
   }
-  
+
   // Determine company from inbound agent ID
-  const agentIdValue = agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
+  const agentIdValue =
+    agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
   const companyId = await findCompanyByInboundAgentId(agentIdValue);
 
   if (!companyId) {
@@ -299,22 +321,35 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
         phone: customerPhone,
         company_id: companyId,
         first_name: 'Inbound', // Default name for inbound callers
-        last_name: 'Caller',   // Will be updated when we get actual name
+        last_name: 'Caller', // Will be updated when we get actual name
         created_at: new Date().toISOString(),
       })
       .select('id')
       .single();
 
     if (customerError) {
-      console.error(`❌ [${requestId}] Customer creation failed:`, customerError.message);
-      
+      console.error(
+        `❌ [${requestId}] Customer creation failed:`,
+        customerError.message
+      );
+
       // If it's a unique constraint violation, try to find the existing customer
-      if (customerError.code === '23505' && customerError.message.includes('customers_phone_company_unique')) {
-        console.log(`🔄 [${requestId}] Attempting to find existing customer after constraint violation`);
-        const retryCustomer = await findCustomerByPhone(customerPhone, companyId);
+      if (
+        customerError.code === '23505' &&
+        customerError.message.includes('customers_phone_company_unique')
+      ) {
+        console.log(
+          `🔄 [${requestId}] Attempting to find existing customer after constraint violation`
+        );
+        const retryCustomer = await findCustomerByPhone(
+          customerPhone,
+          companyId
+        );
         if (retryCustomer) {
           customerId = retryCustomer.id;
-          console.log(`✅ [${requestId}] Found existing customer ${customerId} after constraint violation`);
+          console.log(
+            `✅ [${requestId}] Found existing customer ${customerId} after constraint violation`
+          );
         } else {
           return NextResponse.json(
             { error: 'Customer constraint violation and retry failed' },
@@ -361,10 +396,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   }
 
   // Extract data (will be mostly empty until call_analyzed event)
-  const extractedData = extractCallData(
-    undefined,
-    undefined
-  );
+  const extractedData = extractCallData(undefined, undefined);
 
   // Create call record
   const { data: callRecord, error: insertError } = await supabase
@@ -393,14 +425,19 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     .single();
 
   if (insertError) {
-    console.error(`❌ [${requestId}] Call record creation failed:`, insertError.message);
+    console.error(
+      `❌ [${requestId}] Call record creation failed:`,
+      insertError.message
+    );
     return NextResponse.json(
       { error: 'Failed to create call record' },
       { status: 500 }
     );
   }
 
-  console.log(`✅ [${requestId}] Created lead ${newLead.id} and call record ${callRecord.id}`);
+  console.log(
+    `✅ [${requestId}] Created lead ${newLead.id} and call record ${callRecord.id}`
+  );
 
   return NextResponse.json({
     success: true,
@@ -423,10 +460,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
   } = callData;
 
   // Extract updated data from dynamic variables
-  const extractedData = extractCallData(
-    undefined,
-    undefined
-  );
+  const extractedData = extractCallData(undefined, undefined);
 
   // Update call record
   const { data: callRecord, error: updateError } = await supabase
@@ -437,7 +471,9 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
         ? new Date(end_timestamp).toISOString()
         : new Date().toISOString(),
       duration_seconds: duration_ms ? Math.round(duration_ms / 1000) : null,
-      billable_duration_seconds: calculateBillableDuration(duration_ms ? Math.round(duration_ms / 1000) : null),
+      billable_duration_seconds: calculateBillableDuration(
+        duration_ms ? Math.round(duration_ms / 1000) : null
+      ),
       disconnect_reason: disconnection_reason,
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
@@ -454,7 +490,10 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
     .single();
 
   if (updateError) {
-    console.error('Retell Inbound Webhook: Error updating call record:', updateError);
+    console.error(
+      'Retell Inbound Webhook: Error updating call record:',
+      updateError
+    );
     return NextResponse.json(
       { error: 'Failed to update call record' },
       { status: 500 }
@@ -463,15 +502,17 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
 
   // Update lead with call summary and dynamic variables
   if (callRecord?.leads) {
-    const callOutcome = call_status === 'completed' ? 'completed' : call_status || 'ended';
+    const callOutcome =
+      call_status === 'completed' ? 'completed' : call_status || 'ended';
     const callDate = end_timestamp ? new Date(end_timestamp) : new Date();
     const callSummary = `📞 Inbound call on ${callDate.toISOString()} - Status: ${callOutcome}${disconnection_reason ? ` (${disconnection_reason})` : ''}`;
-    
+
     await supabase
       .from('leads')
       .update({
         last_contacted_at: new Date().toISOString(),
         comments: `${callRecord.leads.comments || ''}\n\n${callSummary}`.trim(),
+        service_type: extractedData.pest_issue,
         updated_at: new Date().toISOString(),
       })
       .eq('id', callRecord.leads.id);
@@ -496,10 +537,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
   } = callData;
 
   // Extract data from call analysis and transcript
-  const extractedData = extractCallData(
-    call_analysis,
-    transcript
-  );
+  const extractedData = extractCallData(call_analysis, transcript);
 
   // Update call record with analysis data
   const { data: callRecord, error: updateError } = await supabase
@@ -524,7 +562,10 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     .single();
 
   if (updateError) {
-    console.error('Retell Inbound Webhook: Error updating call record:', updateError);
+    console.error(
+      'Retell Inbound Webhook: Error updating call record:',
+      updateError
+    );
     return NextResponse.json(
       { error: 'Failed to update call record' },
       { status: 500 }
@@ -535,7 +576,6 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
   if (callRecord.leads) {
     // Get is_qualified from call analysis (Post-Call Analysis)
     const isQualified = call_analysis?.custom_analysis_data?.is_qualified;
-    
 
     const updateData: any = {
       comments: callRecord.leads.comments || '',
@@ -552,16 +592,17 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     if (isQualified === 'true' || isQualified === true) {
       // AI determined this is a qualified lead - keep as 'new' for follow-up
       updateData.lead_status = 'new';
-      updateData.comments = `${updateData.comments}\n\n✅ AI Qualification: QUALIFIED - Ready for follow-up`.trim();
+      updateData.comments =
+        `${updateData.comments}\n\n✅ AI Qualification: QUALIFIED - Ready for follow-up`.trim();
     } else if (isQualified === 'false' || isQualified === false) {
       // AI determined this is not a qualified lead
       updateData.lead_status = 'unqualified';
-      updateData.comments = `${updateData.comments}\n\n❌ AI Qualification: UNQUALIFIED - Not a sales opportunity`.trim();
+      updateData.comments =
+        `${updateData.comments}\n\n❌ AI Qualification: UNQUALIFIED - Not a sales opportunity`.trim();
     } else {
       // No qualification decision provided - keep as 'new' for inbound calls (available for follow-up)
       updateData.lead_status = 'new';
     }
-    
 
     await supabase
       .from('leads')
@@ -577,23 +618,32 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       .select('id, first_name, last_name, address, city, state, zip_code')
       .eq('id', callRecord.customer_id)
       .single();
-    
+
     if (customerFetchError) {
-      console.error('Failed to fetch customer data:', customerFetchError.message);
+      console.error(
+        'Failed to fetch customer data:',
+        customerFetchError.message
+      );
     } else if (existingCustomer) {
       // Get customer data from call analysis (Post-Call Analysis)
-      const customerFirstName = call_analysis.custom_analysis_data.customer_first_name;
-      const customerLastName = call_analysis.custom_analysis_data.customer_last_name;
-      const customerStreetAddress = call_analysis.custom_analysis_data.customer_street_address;
+      const customerFirstName =
+        call_analysis.custom_analysis_data.customer_first_name;
+      const customerLastName =
+        call_analysis.custom_analysis_data.customer_last_name;
+      const customerStreetAddress =
+        call_analysis.custom_analysis_data.customer_street_address;
       const customerCity = call_analysis.custom_analysis_data.customer_city;
       const customerState = call_analysis.custom_analysis_data.customer_state;
       const customerZip = call_analysis.custom_analysis_data.customer_zip;
-      
+
       // Build update object conditionally
       const customerUpdateData: any = {};
-      
+
       // Name updates: ONLY update if customer still has default placeholder names
-      if (existingCustomer.first_name === 'Inbound' && existingCustomer.last_name === 'Caller') {
+      if (
+        existingCustomer.first_name === 'Inbound' &&
+        existingCustomer.last_name === 'Caller'
+      ) {
         if (customerFirstName && customerFirstName.trim() !== '') {
           customerUpdateData.first_name = customerFirstName.trim();
         }
@@ -601,23 +651,28 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
           customerUpdateData.last_name = customerLastName.trim();
         }
       }
-      
+
       // Address updates: ONLY if customer has NO existing address data
       if (!hasExistingAddress(existingCustomer)) {
         if (customerCity && customerCity.trim() !== '') {
           customerUpdateData.city = customerCity.trim();
         }
-        
+
         if (customerState && customerState.trim() !== '') {
           customerUpdateData.state = customerState.trim();
         }
-        
+
         if (customerZip && customerZip.trim() !== '') {
           customerUpdateData.zip_code = customerZip.trim();
         }
-        
+
         // Create formatted address from components and store in address field
-        if (customerStreetAddress || customerCity || customerState || customerZip) {
+        if (
+          customerStreetAddress ||
+          customerCity ||
+          customerState ||
+          customerZip
+        ) {
           customerUpdateData.address = formatAddress(
             customerStreetAddress,
             customerCity,
@@ -626,16 +681,16 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
           );
         }
       }
-      
+
       // Only update if we have changes to make
       if (Object.keys(customerUpdateData).length > 0) {
         customerUpdateData.updated_at = new Date().toISOString();
-        
+
         const { error: customerUpdateError } = await supabase
           .from('customers')
           .update(customerUpdateData)
           .eq('id', callRecord.customer_id);
-          
+
         if (customerUpdateError) {
           console.error('Customer update failed:', customerUpdateError.message);
         }
@@ -645,9 +700,17 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
 
   // Send call summary emails if enabled
   try {
-    await sendCallSummaryEmailsIfEnabled(supabase, callRecord, callData, extractedData);
+    await sendCallSummaryEmailsIfEnabled(
+      supabase,
+      callRecord,
+      callData,
+      extractedData
+    );
   } catch (error) {
-    console.error(`[Call Summary Emails] Error sending emails for call ${callData.call_id}:`, error);
+    console.error(
+      `[Call Summary Emails] Error sending emails for call ${callData.call_id}:`,
+      error
+    );
   }
 
   return NextResponse.json({
@@ -658,10 +721,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
 }
 
 // Extract structured data from call analysis and transcript
-function extractCallData(
-  callAnalysis: any,
-  transcript: string | undefined
-) {
+function extractCallData(callAnalysis: any, transcript: string | undefined) {
   const extractedData = {
     sentiment: 'neutral',
     home_size: null as string | null,
@@ -680,29 +740,43 @@ function extractCallData(
 
   // Extract from call analysis (Post-Call Analysis) - primary data source
   if (callAnalysis?.custom_analysis_data) {
-    extractedData.home_size = callAnalysis.custom_analysis_data.home_size || null;
-    extractedData.yard_size = callAnalysis.custom_analysis_data.yard_size || null;
-    extractedData.pest_issue = callAnalysis.custom_analysis_data.pest_issue || null;
-    extractedData.street_address = callAnalysis.custom_analysis_data.customer_street_address || null;
+    extractedData.home_size =
+      callAnalysis.custom_analysis_data.home_size || null;
+    extractedData.yard_size =
+      callAnalysis.custom_analysis_data.yard_size || null;
+    extractedData.pest_issue =
+      callAnalysis.custom_analysis_data.pest_issue || null;
+    extractedData.street_address =
+      callAnalysis.custom_analysis_data.customer_street_address || null;
     // Handle preferred_service_time - map invalid values to null
-    const rawPreferredTime = callAnalysis.custom_analysis_data.preferred_service_time;
-    if (rawPreferredTime && ['AM', 'PM', 'anytime'].includes(rawPreferredTime)) {
+    const rawPreferredTime =
+      callAnalysis.custom_analysis_data.preferred_service_time;
+    if (
+      rawPreferredTime &&
+      ['AM', 'PM', 'anytime'].includes(rawPreferredTime)
+    ) {
       extractedData.preferred_service_time = rawPreferredTime;
     } else {
       extractedData.preferred_service_time = null;
     }
-    
+
     // Extract customer address and name fields
-    extractedData.customer_city = callAnalysis.custom_analysis_data.customer_city || null;
-    extractedData.customer_state = callAnalysis.custom_analysis_data.customer_state || null;
-    extractedData.customer_zip = callAnalysis.custom_analysis_data.customer_zip || null;
-    extractedData.customer_first_name = callAnalysis.custom_analysis_data.customer_first_name || null;
-    extractedData.customer_last_name = callAnalysis.custom_analysis_data.customer_last_name || null;
+    extractedData.customer_city =
+      callAnalysis.custom_analysis_data.customer_city || null;
+    extractedData.customer_state =
+      callAnalysis.custom_analysis_data.customer_state || null;
+    extractedData.customer_zip =
+      callAnalysis.custom_analysis_data.customer_zip || null;
+    extractedData.customer_first_name =
+      callAnalysis.custom_analysis_data.customer_first_name || null;
+    extractedData.customer_last_name =
+      callAnalysis.custom_analysis_data.customer_last_name || null;
   }
 
   // Extract sentiment and summary from call analysis
   if (callAnalysis) {
-    extractedData.sentiment = callAnalysis.user_sentiment?.toLowerCase() || 'neutral';
+    extractedData.sentiment =
+      callAnalysis.user_sentiment?.toLowerCase() || 'neutral';
     extractedData.summary = callAnalysis.call_summary || '';
   }
 
@@ -729,11 +803,11 @@ async function sendCallSummaryEmailsIfEnabled(
   extractedData: any
 ) {
   const callId = callData.call_id;
-  
+
   try {
     // Determine company ID from the call record
     let companyId = null;
-    
+
     // Try to get company ID from the lead association
     if (callRecord.leads?.id) {
       const { data: lead } = await supabase
@@ -741,31 +815,36 @@ async function sendCallSummaryEmailsIfEnabled(
         .select('company_id')
         .eq('id', callRecord.leads.id)
         .single();
-      
+
       if (lead) {
         companyId = lead.company_id;
       }
     }
-    
+
     // If no company ID found from lead, try to find via call settings
     if (!companyId) {
-      const agentId = callData.agent_id || callData.retell_llm_id || callData.llm_id;
+      const agentId =
+        callData.agent_id || callData.retell_llm_id || callData.llm_id;
       if (agentId) {
         const { data: companySetting } = await supabase
           .from('company_settings')
           .select('company_id')
-          .or(`setting_key.eq.retell_inbound_agent_id,setting_key.eq.retell_outbound_agent_id`)
+          .or(
+            `setting_key.eq.retell_inbound_agent_id,setting_key.eq.retell_outbound_agent_id`
+          )
           .eq('setting_value', agentId)
           .single();
-        
+
         if (companySetting) {
           companyId = companySetting.company_id;
         }
       }
     }
-    
+
     if (!companyId) {
-      console.warn(`[Call Summary Emails] No company ID found for call ${callId}`);
+      console.warn(
+        `[Call Summary Emails] No company ID found for call ${callId}`
+      );
       return;
     }
 
@@ -774,12 +853,16 @@ async function sendCallSummaryEmailsIfEnabled(
       .from('company_settings')
       .select('setting_key, setting_value')
       .eq('company_id', companyId)
-      .in('setting_key', ['call_summary_emails_enabled', 'call_summary_email_recipients']);
+      .in('setting_key', [
+        'call_summary_emails_enabled',
+        'call_summary_email_recipients',
+      ]);
 
-    const settingsMap = emailSettings?.reduce((acc: any, setting: any) => {
-      acc[setting.setting_key] = setting.setting_value;
-      return acc;
-    }, {}) || {};
+    const settingsMap =
+      emailSettings?.reduce((acc: any, setting: any) => {
+        acc[setting.setting_key] = setting.setting_value;
+        return acc;
+      }, {}) || {};
 
     const emailsEnabled = settingsMap.call_summary_emails_enabled === 'true';
     const recipients = settingsMap.call_summary_email_recipients || '';
@@ -802,7 +885,7 @@ async function sendCallSummaryEmailsIfEnabled(
         .select('name, email')
         .eq('id', callRecord.customer_id)
         .single();
-      
+
       customerData = customer;
     }
 
@@ -810,16 +893,25 @@ async function sendCallSummaryEmailsIfEnabled(
     const callSummaryData: CallSummaryEmailData = {
       callId: callData.call_id,
       companyName: company?.name || 'Unknown Company',
-      customerName: customerData?.name || extractedData.decision_maker || undefined,
+      customerName:
+        customerData?.name || extractedData.decision_maker || undefined,
       customerEmail: customerData?.email || undefined,
       customerPhone: callRecord.phone_number,
       fromNumber: callRecord.from_number,
       callStatus: callRecord.call_status || callData.call_status || 'completed',
-      callDuration: callRecord.duration_seconds || (callData.duration_ms ? Math.round(callData.duration_ms / 1000) : undefined),
-      callDate: callRecord.end_timestamp || callRecord.start_timestamp || new Date().toISOString(),
+      callDuration:
+        callRecord.duration_seconds ||
+        (callData.duration_ms
+          ? Math.round(callData.duration_ms / 1000)
+          : undefined),
+      callDate:
+        callRecord.end_timestamp ||
+        callRecord.start_timestamp ||
+        new Date().toISOString(),
       sentiment: extractedData.sentiment,
       transcript: callData.transcript,
-      callSummary: extractedData.summary || callData.call_analysis?.call_summary,
+      callSummary:
+        extractedData.summary || callData.call_analysis?.call_summary,
       pestIssue: extractedData.pest_issue,
       streetAddress: extractedData.street_address,
       homeSize: extractedData.home_size,
@@ -829,7 +921,8 @@ async function sendCallSummaryEmailsIfEnabled(
       contactedOtherCompanies: extractedData.contacted_other_companies,
       leadId: callRecord.lead_id,
       recordingUrl: callData.recording_url,
-      disconnectReason: callData.disconnection_reason || callRecord.disconnect_reason,
+      disconnectReason:
+        callData.disconnection_reason || callRecord.disconnect_reason,
     };
 
     // Parse recipient emails
@@ -839,7 +932,9 @@ async function sendCallSummaryEmailsIfEnabled(
       .filter((email: string) => email.length > 0);
 
     if (emailList.length === 0) {
-      console.warn(`[Call Summary Emails] No valid email recipients for call ${callId}`);
+      console.warn(
+        `[Call Summary Emails] No valid email recipients for call ${callId}`
+      );
       return;
     }
 
@@ -851,9 +946,13 @@ async function sendCallSummaryEmailsIfEnabled(
       companyId
     );
 
-    console.log(`[Call Summary Emails] Sent to ${result.successCount}/${emailList.length} recipients for call ${callId}`);
-
+    console.log(
+      `[Call Summary Emails] Sent to ${result.successCount}/${emailList.length} recipients for call ${callId}`
+    );
   } catch (error) {
-    console.error(`[Call Summary Emails] Error processing call ${callId}:`, error);
+    console.error(
+      `[Call Summary Emails] Error processing call ${callId}:`,
+      error
+    );
   }
 }
