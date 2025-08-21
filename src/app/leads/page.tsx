@@ -17,6 +17,7 @@ interface Profile {
   first_name: string;
   last_name: string;
   email: string;
+  role?: string;
 }
 
 interface Company {
@@ -39,10 +40,11 @@ export default function LeadsPage() {
   const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [archivedLeads, setArchivedLeads] = useState<Lead[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    'new' | 'contacted' | 'qualified' | 'quoted' | 'unqualified' | 'all'
+    'new' | 'contacted' | 'qualified' | 'quoted' | 'unqualified' | 'all' | 'archived'
   >('all');
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminSelectedCompany, setAdminSelectedCompany] = useState<
@@ -138,6 +140,21 @@ export default function LeadsPage() {
     }
   }, [selectedCompany]);
 
+  const fetchArchivedLeads = useCallback(async () => {
+    if (!selectedCompany) return;
+
+    try {
+      setLeadsLoading(true);
+      const archivedLeadsData = await adminAPI.getUserArchivedLeads(selectedCompany.id);
+      setArchivedLeads(archivedLeadsData || []);
+    } catch (error) {
+      console.error('Error fetching archived leads:', error);
+      setArchivedLeads([]);
+    } finally {
+      setLeadsLoading(false);
+    }
+  }, [selectedCompany]);
+
   const fetchLeadsAdmin = useCallback(async () => {
     try {
       setLeadsLoading(true);
@@ -149,6 +166,22 @@ export default function LeadsPage() {
     } catch (error) {
       console.error('Error fetching admin leads:', error);
       setLeads([]);
+    } finally {
+      setLeadsLoading(false);
+    }
+  }, [adminSelectedCompany]);
+
+  const fetchArchivedLeadsAdmin = useCallback(async () => {
+    try {
+      setLeadsLoading(true);
+      const filters = adminSelectedCompany
+        ? { companyId: adminSelectedCompany }
+        : {};
+      const archivedLeadsData = await adminAPI.getArchivedLeads(filters);
+      setArchivedLeads(archivedLeadsData || []);
+    } catch (error) {
+      console.error('Error fetching archived admin leads:', error);
+      setArchivedLeads([]);
     } finally {
       setLeadsLoading(false);
     }
@@ -180,14 +213,78 @@ export default function LeadsPage() {
     }
   };
 
+  const handleEditLead = (lead: Lead) => {
+    router.push(`/leads/${lead.id}?edit=true`);
+  };
+
+  const handleArchiveLead = async (leadId: string) => {
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ archived: true }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to archive lead');
+      }
+
+      // Refresh both active and archived leads after successful archiving
+      if (isAdmin) {
+        fetchLeadsAdmin();
+        fetchArchivedLeadsAdmin();
+      } else {
+        fetchLeads();
+        fetchArchivedLeads();
+      }
+    } catch (error) {
+      console.error('Error archiving lead:', error);
+      alert('Failed to archive lead. Please try again.');
+    }
+  };
+
+  const handleUnarchiveLead = async (leadId: string) => {
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ archived: false }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to unarchive lead');
+      }
+
+      // Refresh both active and archived leads after successful unarchiving
+      if (isAdmin) {
+        fetchLeadsAdmin();
+        fetchArchivedLeadsAdmin();
+      } else {
+        fetchLeads();
+        fetchArchivedLeads();
+      }
+    } catch (error) {
+      console.error('Error unarchiving lead:', error);
+      alert('Failed to unarchive lead. Please try again.');
+    }
+  };
+
   // Fetch leads when selectedCompany changes (regular user) or adminSelectedCompany changes (admin)
   useEffect(() => {
     if (isAdmin) {
       fetchLeadsAdmin();
+      fetchArchivedLeadsAdmin();
     } else if (selectedCompany) {
       fetchLeads();
+      fetchArchivedLeads();
     }
-  }, [selectedCompany, adminSelectedCompany, isAdmin, fetchLeads, fetchLeadsAdmin]);
+  }, [selectedCompany, adminSelectedCompany, isAdmin, fetchLeads, fetchLeadsAdmin, fetchArchivedLeads, fetchArchivedLeadsAdmin]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -199,9 +296,11 @@ export default function LeadsPage() {
 
   // Filter leads based on active tab
   const filteredLeads =
-    activeTab === 'all'
-      ? leads
-      : leads.filter(lead => lead.lead_status === activeTab);
+    activeTab === 'archived'
+      ? archivedLeads
+      : activeTab === 'all'
+        ? leads
+        : leads.filter(lead => lead.lead_status === activeTab);
 
   // Calculate lead counts for all statuses
   const leadCounts = {
@@ -211,6 +310,7 @@ export default function LeadsPage() {
     qualified: leads.filter(lead => lead.lead_status === 'qualified').length,
     quoted: leads.filter(lead => lead.lead_status === 'quoted').length,
     unqualified: leads.filter(lead => lead.lead_status === 'unqualified').length,
+    archived: archivedLeads.length,
   };
 
   return (
@@ -296,7 +396,12 @@ export default function LeadsPage() {
                 leads={filteredLeads}
                 showActions={true}
                 showCompanyColumn={isAdmin && !adminSelectedCompany}
+                onEdit={handleEditLead}
                 onDelete={handleDeleteLead}
+                onArchive={handleArchiveLead}
+                onUnarchive={handleUnarchiveLead}
+                userProfile={profile}
+                showArchived={activeTab === 'archived'}
               />
             </>
           )}

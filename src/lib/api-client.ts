@@ -263,6 +263,19 @@ export const adminAPI = {
     return authenticatedFetch(url);
   },
 
+  async getArchivedLeads(
+    filters: { companyId?: string; status?: string; priority?: string } = {}
+  ) {
+    const queryParams = new URLSearchParams();
+    if (filters.companyId) queryParams.append('companyId', filters.companyId);
+    if (filters.status) queryParams.append('status', filters.status);
+    if (filters.priority) queryParams.append('priority', filters.priority);
+    queryParams.append('includeArchived', 'true');
+
+    const url = `/api/admin/leads?${queryParams.toString()}`;
+    return authenticatedFetch(url);
+  },
+
   async getLead(leadId: string) {
     return authenticatedFetch(`/api/admin/leads/${leadId}`);
   },
@@ -304,6 +317,10 @@ export const adminAPI = {
   // Non-admin leads endpoints
   async getUserLeads(companyId: string) {
     return authenticatedFetch(`/api/leads?companyId=${companyId}`);
+  },
+
+  async getUserArchivedLeads(companyId: string) {
+    return authenticatedFetch(`/api/leads?companyId=${companyId}&includeArchived=true`);
   },
 
   // Non-admin customers endpoints

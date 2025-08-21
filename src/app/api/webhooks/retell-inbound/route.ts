@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
 
   try {
-    console.log(`📞 [${requestId}] Retell inbound webhook received`);
 
     // Apply rate limiting
     const ip =
@@ -107,9 +106,6 @@ export async function POST(request: NextRequest) {
     const callData = payload.call || payload;
     const { call_id } = callData;
 
-    console.log(
-      `📞 [${requestId}] Processing ${eventType} for call ${call_id}`
-    );
 
     if (!call_id) {
       console.error(`❌ [${requestId}] No call_id provided in payload`);
@@ -148,8 +144,6 @@ export async function POST(request: NextRequest) {
         break;
     }
 
-    const duration = Date.now() - startTime;
-    console.log(`✅ [${requestId}] Completed ${eventType} in ${duration}ms`);
     return result;
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -276,7 +270,6 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   const {
     call_id,
     from_number,
-    to_number,
     start_timestamp,
     retell_llm_dynamic_variables,
     opt_out_sensitive_data_storage,
@@ -338,18 +331,12 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
         customerError.code === '23505' &&
         customerError.message.includes('customers_phone_company_unique')
       ) {
-        console.log(
-          `🔄 [${requestId}] Attempting to find existing customer after constraint violation`
-        );
         const retryCustomer = await findCustomerByPhone(
           customerPhone,
           companyId
         );
         if (retryCustomer) {
           customerId = retryCustomer.id;
-          console.log(
-            `✅ [${requestId}] Found existing customer ${customerId} after constraint violation`
-          );
         } else {
           return NextResponse.json(
             { error: 'Customer constraint violation and retry failed' },
@@ -364,11 +351,9 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       }
     } else {
       customerId = newCustomer.id;
-      console.log(`✅ [${requestId}] Created customer ${customerId}`);
     }
   } else {
     customerId = existingCustomer.id;
-    console.log(`✅ [${requestId}] Found existing customer ${customerId}`);
   }
 
   // Always create a new lead for inbound calls
@@ -435,9 +420,6 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     );
   }
 
-  console.log(
-    `✅ [${requestId}] Created lead ${newLead.id} and call record ${callRecord.id}`
-  );
 
   return NextResponse.json({
     success: true,
@@ -939,16 +921,13 @@ async function sendCallSummaryEmailsIfEnabled(
     }
 
     // Send the emails
-    const result = await sendCallSummaryNotifications(
+    await sendCallSummaryNotifications(
       emailList,
       callSummaryData,
       undefined,
       companyId
     );
 
-    console.log(
-      `[Call Summary Emails] Sent to ${result.successCount}/${emailList.length} recipients for call ${callId}`
-    );
   } catch (error) {
     console.error(
       `[Call Summary Emails] Error processing call ${callId}:`,

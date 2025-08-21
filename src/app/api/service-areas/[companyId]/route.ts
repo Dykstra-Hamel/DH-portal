@@ -231,11 +231,6 @@ export async function PUT(
 
     const { serviceAreas } = body;
 
-    console.log('🔍 Service Areas PUT Request Debug:', {
-      companyId,
-      serviceAreasCount: serviceAreas?.length,
-      serviceAreasData: serviceAreas
-    });
 
     if (!Array.isArray(serviceAreas)) {
       console.error('❌ Service areas is not an array:', serviceAreas);

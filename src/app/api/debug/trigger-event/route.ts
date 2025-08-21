@@ -17,8 +17,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log('🔄 Manual event trigger:', event.name);
-    console.log('📊 Event data:', JSON.stringify(event.data, null, 2));
 
     // Send the event to Inngest
     await sendEvent(event);

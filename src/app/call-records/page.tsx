@@ -100,8 +100,8 @@ export default function CallRecordsPage() {
       const data = await response.json();
       setCompanies(data.companies || []);
 
-      // For non-admin users with single company, pre-select it
-      if (!data.isAdmin && data.companies?.length === 1) {
+      // For non-admin users, pre-select the first company
+      if (!data.isAdmin && data.companies?.length >= 1) {
         setSelectedCompanyId(data.companies[0].id);
       }
     } catch (err) {

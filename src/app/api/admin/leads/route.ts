@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
+    const includeArchived = searchParams.get('includeArchived') === 'true';
 
     // Use admin client to fetch leads
     const supabase = createAdminClient();
@@ -39,8 +40,18 @@ export async function GET(request: NextRequest) {
         )
       `
       )
-      .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
       .order('created_at', { ascending: false });
+
+    // Apply archived filter
+    if (includeArchived) {
+      // If including archived, only show archived leads
+      query = query.eq('archived', true);
+    } else {
+      // Default behavior: show active leads (exclude archived)
+      query = query
+        .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
+        .or('archived.is.null,archived.eq.false');
+    }
 
     // Apply filters
     if (companyId) {

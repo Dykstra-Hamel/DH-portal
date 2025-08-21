@@ -143,6 +143,7 @@
 }
 
 .editButton,
+.archiveButton,
 .deleteButton {
   padding: 6px;
   border: none;
@@ -160,6 +161,15 @@
 
   &:hover {
     background-color: #2563eb;
+  }
+}
+
+.archiveButton {
+  background-color: #f59e0b;
+  color: white;
+
+  &:hover {
+    background-color: #d97706;
   }
 }
 
@@ -227,7 +237,8 @@
 }
 
 .cancelButton,
-.confirmDeleteButton {
+.confirmDeleteButton,
+.confirmArchiveButton {
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 14px;
@@ -263,5 +274,18 @@
 
   &:focus {
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  }
+}
+
+.confirmArchiveButton {
+  background-color: #f59e0b;
+  color: white;
+
+  &:hover {
+    background-color: #d97706;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
   }
 }

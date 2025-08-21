@@ -1247,7 +1247,7 @@ async function createLeadsForCompanies(users) {
           const lastName =
             lastNames[Math.floor(Math.random() * lastNames.length)];
           linkedCustomer = {
-            id: `${leadIndex.toString().padStart(8, '0')}-CUST-TEMP-${company.id.substring(0, 8)}`,
+            id: `${leadIndex.toString().padStart(8, '0')}-4444-4444-4444-444444444444`,
             company_id: company.id,
             first_name: firstName,
             last_name: lastName,
@@ -1561,6 +1561,392 @@ async function getExistingLocalUser() {
   }
 }
 
+// Helper function to generate realistic call analysis data
+function generateCallAnalysis(serviceType, sentiment, callStatus) {
+  const analysisTemplates = {
+    positive: {
+      termite: {
+        pest_issue: 'Termite activity in basement, customer concerned about structural damage',
+        pain_points: ['structural damage', 'property value loss', 'ongoing infestation'],
+        home_size: ['2500 sq ft', '3 bedroom house', '1800 sq ft ranch', '2-story colonial'],
+        yard_size: ['0.5 acre', '1/4 acre', 'small yard', 'large lot'],
+        budget_range: ['$3000-5000', '$2000-4000', '$1500-3000'],
+        timeline: ['ASAP', 'within 2 weeks', 'this month'],
+        decision_maker: 'homeowner ready to proceed',
+      },
+      ant: {
+        pest_issue: 'Ant infestation in kitchen and bathroom areas',
+        pain_points: ['food contamination', 'unsanitary conditions', 'embarrassing for guests'],
+        home_size: ['1200 sq ft', '2 bedroom condo', '1500 sq ft apartment'],
+        budget_range: ['$200-400', '$300-500', '$150-350'],
+        timeline: ['this week', 'ASAP', 'within 3 days'],
+        decision_maker: 'homeowner authorized to hire',
+      },
+      rodent: {
+        pest_issue: 'Mouse/rat activity in attic and garage',
+        pain_points: ['health concerns', 'damage to property', 'noise at night'],
+        home_size: ['3 bedroom house', '2200 sq ft', '2-story home'],
+        budget_range: ['$400-800', '$500-1000', '$300-600'],
+        timeline: ['within 1 week', 'ASAP', 'this month'],
+        decision_maker: 'spouse needs to discuss but very interested',
+      }
+    },
+    neutral: {
+      termite: {
+        pest_issue: 'Possible termite signs, wants inspection first',
+        pain_points: ['uncertain about extent', 'need professional assessment'],
+        home_size: ['average size home', '3 bedroom'],
+        budget_range: ['depends on findings', 'need estimate first'],
+        timeline: ['flexible timing', 'within month'],
+        decision_maker: 'gathering multiple quotes',
+      }
+    },
+    negative: {
+      general: {
+        pest_issue: 'General inquiry, not ready to commit',
+        pain_points: ['price shopping', 'not sure if needed'],
+        budget_range: ['looking for cheapest option', 'very price sensitive'],
+        timeline: ['maybe later', 'still thinking'],
+        decision_maker: 'not decision maker, just gathering info',
+      }
+    }
+  };
+
+  const serviceKey = serviceType.toLowerCase().includes('termite') ? 'termite' : 
+                    serviceType.toLowerCase().includes('ant') ? 'ant' : 
+                    serviceType.toLowerCase().includes('rodent') || serviceType.toLowerCase().includes('mouse') || serviceType.toLowerCase().includes('rat') ? 'rodent' : 'general';
+  
+  const sentimentData = analysisTemplates[sentiment] || analysisTemplates['neutral'];
+  const serviceData = sentimentData[serviceKey] || sentimentData['general'] || sentimentData[Object.keys(sentimentData)[0]];
+
+  if (!serviceData) return null;
+
+  return {
+    pest_issue: serviceData.pest_issue,
+    pain_points: Array.isArray(serviceData.pain_points) ? serviceData.pain_points : [serviceData.pain_points],
+    home_size: Array.isArray(serviceData.home_size) ? 
+      serviceData.home_size[Math.floor(Math.random() * serviceData.home_size.length)] : 
+      serviceData.home_size,
+    yard_size: Array.isArray(serviceData.yard_size) ? 
+      serviceData.yard_size[Math.floor(Math.random() * serviceData.yard_size.length)] : 
+      serviceData.yard_size || 'average yard',
+    budget_range: Array.isArray(serviceData.budget_range) ? 
+      serviceData.budget_range[Math.floor(Math.random() * serviceData.budget_range.length)] : 
+      serviceData.budget_range,
+    timeline: Array.isArray(serviceData.timeline) ? 
+      serviceData.timeline[Math.floor(Math.random() * serviceData.timeline.length)] : 
+      serviceData.timeline,
+    decision_maker: serviceData.decision_maker,
+  };
+}
+
+// Helper function to generate realistic call transcripts
+function generateCallTranscript(serviceType, sentiment, callStatus, duration) {
+  if (callStatus !== 'completed' || duration < 30) {
+    return null; // No transcript for failed/short calls
+  }
+
+  const transcriptTemplates = {
+    positive: [
+      `Agent: Thank you for calling Elite Pest Solutions, how can I help you today?
+Customer: Hi, I think I have a ${serviceType.toLowerCase()} problem and need someone to come take a look.
+Agent: I'd be happy to help you with that. Can you describe what you're seeing?
+Customer: [Details about pest issue and concerns]
+Agent: Based on what you're telling me, I'd like to schedule one of our technicians for an inspection. We can have someone out as early as tomorrow.
+Customer: That sounds great, what would that cost?
+Agent: [Provides pricing information and schedules appointment]
+Customer: Perfect, I'll see you tomorrow then.`,
+
+      `Agent: Elite Pest Solutions, this is [Agent Name].
+Customer: Hi, I got your number from my neighbor. They said you did great work on their ${serviceType.toLowerCase()} issue.
+Agent: That's wonderful to hear! I'd love to help you with your pest control needs. What seems to be the problem?
+Customer: [Describes pest situation]
+Agent: We've had great success treating that type of issue. Let me explain our approach and schedule a time to come out.
+[Discussion of treatment options and scheduling]
+Customer: This all sounds very professional. When can you start?`,
+    ],
+    neutral: [
+      `Agent: Thank you for calling Elite Pest Solutions.
+Customer: Hi, I'm calling to get some information about ${serviceType.toLowerCase()} services.
+Agent: I'd be happy to help. Are you currently experiencing an issue?
+Customer: Well, I'm not sure yet. I wanted to know what an inspection would cost.
+Agent: [Provides inspection pricing and information]
+Customer: Okay, let me think about it and I'll call you back.
+Agent: Of course, take your time. Do you have any other questions I can answer?`,
+
+      `Agent: Elite Pest Solutions, how can I help?
+Customer: I'm getting quotes for ${serviceType.toLowerCase()} treatment. What are your rates?
+Agent: I'd be happy to provide pricing. Can you tell me a bit about your situation?
+Customer: [Basic description]
+Agent: [Provides general pricing ranges]
+Customer: Alright, I'm comparing a few companies. I'll let you know.`,
+    ],
+    negative: [
+      `Agent: Elite Pest Solutions, this is [Agent Name].
+Customer: Yeah, I'm calling about pest control but your prices seem really high.
+Agent: I understand price is a concern. Let me explain what's included in our service.
+Customer: I can get it done cheaper elsewhere.
+Agent: I appreciate you considering us. If you'd like to discuss options that might work better for your budget...
+Customer: No, I think I'll go with someone else. Thanks anyway.`,
+
+      `Agent: Thank you for calling Elite Pest Solutions.
+Customer: Hi, I called earlier but never heard back about scheduling.
+Agent: I apologize for that. Let me look up your information and get that scheduled right away.
+Customer: Actually, I already hired someone else. You guys took too long.
+Agent: I'm very sorry about that delay. Is there anything I can do to make this right?
+Customer: No, it's too late now.`,
+    ]
+  };
+
+  const templates = transcriptTemplates[sentiment] || transcriptTemplates['neutral'];
+  const template = templates[Math.floor(Math.random() * templates.length)];
+  
+  return template.replace(/\[Agent Name\]/g, ['Sarah', 'Mike', 'Jennifer', 'David'][Math.floor(Math.random() * 4)]);
+}
+
+// Create call records linked to existing leads
+async function createCallRecordsForLeads() {
+  try {
+    log('Creating call records for leads...');
+
+    // First, clear existing call records
+    const { error: clearError } = await localClient
+      .from('call_records')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Keep a dummy record if needed
+
+    if (clearError) {
+      error(`Failed to clear existing call records: ${clearError.message}`);
+      return false;
+    }
+
+    // Get all leads and their associated customers
+    const { data: leadsWithCustomers, error: leadError } = await localClient
+      .from('leads')
+      .select(`
+        id,
+        service_type,
+        lead_status,
+        company_id,
+        customer_id,
+        customers (
+          id,
+          phone,
+          first_name,
+          last_name,
+          address,
+          city,
+          state
+        )
+      `);
+
+    if (leadError) {
+      error(`Failed to fetch leads with customers: ${leadError.message}`);
+      return false;
+    }
+
+    if (leadsWithCustomers.length === 0) {
+      log('No leads found to create call records for');
+      return true;
+    }
+
+    const callStatuses = ['completed', 'failed', 'busy', 'no_answer'];
+    const statusDistribution = [0.7, 0.15, 0.1, 0.05]; // 70% completed, 15% failed, 10% busy, 5% no answer
+    const sentiments = ['positive', 'neutral', 'negative'];
+    const sentimentDistribution = [0.5, 0.3, 0.2]; // 50% positive, 30% neutral, 20% negative
+    const preferredTimes = ['AM', 'PM', 'anytime'];
+    const disconnectReasons = [
+      'customer_hung_up',
+      'call_completed',
+      'technical_issue',
+      'no_answer',
+      'busy_signal',
+      'voicemail'
+    ];
+
+    const callRecords = [];
+    let callIndex = 1;
+
+    // Create 1-3 calls per lead, with some leads having multiple calls (follow-ups)
+    for (const lead of leadsWithCustomers) {
+      if (!lead.customers) continue; // Skip leads without customers
+
+      const numCalls = Math.random() < 0.7 ? 1 : Math.random() < 0.9 ? 2 : 3; // 70% have 1 call, 20% have 2, 10% have 3
+
+      for (let i = 0; i < numCalls; i++) {
+        // Determine call status based on distribution
+        let callStatus = 'completed';
+        const statusRand = Math.random();
+        let cumulativeProb = 0;
+        for (let j = 0; j < callStatuses.length; j++) {
+          cumulativeProb += statusDistribution[j];
+          if (statusRand <= cumulativeProb) {
+            callStatus = callStatuses[j];
+            break;
+          }
+        }
+
+        // Determine sentiment for completed calls
+        let sentiment = 'neutral';
+        if (callStatus === 'completed') {
+          const sentimentRand = Math.random();
+          let cumulativeSentiment = 0;
+          for (let j = 0; j < sentiments.length; j++) {
+            cumulativeSentiment += sentimentDistribution[j];
+            if (sentimentRand <= cumulativeSentiment) {
+              sentiment = sentiments[j];
+              break;
+            }
+          }
+        }
+
+        // Generate call timing (last 90 days, with more recent calls)
+        const daysAgo = Math.floor(Math.random() * 90);
+        const hoursOffset = Math.floor(Math.random() * 24);
+        const minutesOffset = Math.floor(Math.random() * 60);
+        const startTime = new Date();
+        startTime.setDate(startTime.getDate() - daysAgo);
+        startTime.setHours(hoursOffset, minutesOffset, 0, 0);
+
+        // Generate call duration based on status
+        let durationSeconds = 0;
+        if (callStatus === 'completed') {
+          // Completed calls: 30 seconds to 30 minutes, most around 3-8 minutes
+          const minDuration = 30;
+          const maxDuration = 1800; // 30 minutes
+          durationSeconds = Math.floor(Math.random() * (maxDuration - minDuration)) + minDuration;
+          
+          // Weight towards shorter calls (3-8 minutes)
+          if (Math.random() < 0.7) {
+            durationSeconds = Math.floor(Math.random() * 300) + 180; // 3-8 minutes
+          }
+        } else if (callStatus === 'failed' || callStatus === 'busy') {
+          durationSeconds = Math.floor(Math.random() * 30) + 5; // 5-35 seconds
+        } else {
+          durationSeconds = Math.floor(Math.random() * 60) + 10; // 10-70 seconds
+        }
+
+        const endTime = new Date(startTime.getTime() + durationSeconds * 1000);
+
+        // Calculate billable duration (round up to nearest 30 seconds)
+        const billableDuration = callStatus === 'completed' && durationSeconds >= 30 
+          ? Math.ceil(durationSeconds / 30) * 30 
+          : 30; // Minimum billing
+
+        // Generate call analysis data for completed calls
+        const analysisData = callStatus === 'completed' ? 
+          generateCallAnalysis(lead.service_type || 'General Pest Control', sentiment, callStatus) : 
+          null;
+
+        // Generate realistic phone numbers
+        const customerPhone = lead.customers.phone || 
+          `(${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`;
+        
+        const fromNumbers = [
+          '(555) 123-4567', // Elite Pest Solutions
+          '(555) 987-6543', // Guardian Pest Control  
+          '(555) 456-7890', // Green Shield
+          '(555) 321-0987', // Metro Bug Busters
+          '(555) 654-3210', // Pacific Pest
+          '(555) 888-9999'  // Apex Termite
+        ];
+        const fromNumber = fromNumbers[Math.floor(Math.random() * fromNumbers.length)];
+
+        // Generate call record
+        const callRecord = {
+          id: `${callIndex.toString().padStart(8, '0')}-3333-3333-3333-333333333333`,
+          call_id: `retell_${Date.now()}_${callIndex}_${Math.random().toString(36).substring(2, 8)}`,
+          lead_id: lead.id,
+          customer_id: lead.customer_id,
+          phone_number: customerPhone,
+          from_number: fromNumber,
+          call_status: callStatus,
+          start_timestamp: startTime.toISOString(),
+          end_timestamp: callStatus !== 'no_answer' ? endTime.toISOString() : null,
+          duration_seconds: durationSeconds,
+          billable_duration_seconds: billableDuration,
+          recording_url: callStatus === 'completed' && durationSeconds > 60 ? 
+            `https://recordings.retell.ai/${Date.now()}_${callIndex}.mp3` : null,
+          transcript: generateCallTranscript(lead.service_type || 'General Pest Control', sentiment, callStatus, durationSeconds),
+          call_analysis: callStatus === 'completed' && analysisData ? {
+            call_summary: `${sentiment} call regarding ${lead.service_type || 'pest control'} services`,
+            key_topics: [lead.service_type || 'pest control', 'pricing', 'scheduling'],
+            sentiment_analysis: {
+              overall_sentiment: sentiment,
+              confidence: Math.random() * 0.3 + 0.7 // 70-100% confidence
+            },
+            extracted_info: analysisData,
+            // Store budget, timeline, pain points, and decision maker in JSONB since columns were dropped
+            budget_range: analysisData?.budget_range,
+            timeline: analysisData?.timeline,
+            pain_points: analysisData?.pain_points,
+            decision_maker: analysisData?.decision_maker
+          } : null,
+          
+          // Extracted structured data (only columns that still exist)
+          sentiment: callStatus === 'completed' ? sentiment : null,
+          home_size: analysisData?.home_size || null,
+          yard_size: analysisData?.yard_size || null,
+          pest_issue: analysisData?.pest_issue || null,
+          street_address: lead.customers.address || `${Math.floor(Math.random() * 9999) + 1} Main St`,
+          preferred_service_time: preferredTimes[Math.floor(Math.random() * preferredTimes.length)],
+          contacted_other_companies: Math.random() < 0.4, // 40% have contacted others
+          opt_out_sensitive_data_storage: Math.random() < 0.1, // 10% opt out
+          
+          disconnect_reason: disconnectReasons[
+            callStatus === 'completed' ? 1 : // call_completed
+            callStatus === 'failed' ? Math.floor(Math.random() * 3) + 2 : // technical_issue, no_answer, busy_signal
+            callStatus === 'busy' ? 4 : // busy_signal
+            callStatus === 'no_answer' ? 3 : // no_answer
+            Math.floor(Math.random() * disconnectReasons.length)
+          ],
+          
+          retell_variables: {
+            lead_source: 'website_form',
+            customer_type: 'residential',
+            callback_requested: Math.random() < 0.3,
+            appointment_scheduled: callStatus === 'completed' && sentiment === 'positive' && Math.random() < 0.8
+          },
+          
+          parent_call_id: null, // For follow-up calls - null for initial calls
+          archived: false,
+          created_at: new Date(startTime.getTime() - 60000).toISOString(), // Created 1 minute before call
+          updated_at: endTime ? endTime.toISOString() : startTime.toISOString()
+        };
+
+        callRecords.push(callRecord);
+        callIndex++;
+      }
+    }
+
+    // Insert call records in batches to avoid overwhelming the database
+    const batchSize = 50;
+    let insertedCount = 0;
+
+    for (let i = 0; i < callRecords.length; i += batchSize) {
+      const batch = callRecords.slice(i, i + batchSize);
+      
+      const { error: insertError } = await localClient
+        .from('call_records')
+        .insert(batch);
+
+      if (insertError) {
+        error(`Failed to insert call records batch ${Math.floor(i / batchSize) + 1}: ${insertError.message}`);
+        return false;
+      }
+
+      insertedCount += batch.length;
+      log(`Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(callRecords.length / batchSize)} (${insertedCount}/${callRecords.length} call records)`);
+    }
+
+    log(`Successfully created ${callRecords.length} call records for ${leadsWithCustomers.length} leads`);
+    return true;
+  } catch (err) {
+    error(`Error creating call records: ${err.message}`);
+    return false;
+  }
+}
+
 // Create seed data using existing user
 async function createSeedWithExistingUser(existingUser) {
   try {
@@ -1669,6 +2055,12 @@ async function main() {
       process.exit(1);
     }
 
+    // Step 7: Create call records for leads
+    const callRecordSuccess = await createCallRecordsForLeads();
+    if (!callRecordSuccess) {
+      process.exit(1);
+    }
+
     log('Database seeding completed successfully!');
     log('Summary:');
     log(`- ${users.length} total users pulled from production`);
@@ -1677,6 +2069,7 @@ async function main() {
     log('- Projects created for all companies');
     log('- Customers created for all companies');
     log('- Leads created for all companies');
+    log('- Call records created for leads (with realistic pest control conversations)');
     log('- All seed data ready for development');
   } catch (err) {
     error(`Fatal error: ${err.message}`);

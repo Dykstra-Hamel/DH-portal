@@ -852,7 +852,6 @@ async function findCompanyByAgentId(agentId: string | undefined) {
     }
 
     if (data) {
-      console.log('findCompanyByAgentId: Found company', data.company_id, 'for agent', agentId);
       return data.company_id;
     }
 
@@ -1128,7 +1127,6 @@ async function sendCallSummaryEmailsIfEnabled(
       companyId
     );
 
-    console.log(`[Call Summary Emails] Sent to ${result.successCount}/${emailList.length} recipients for call ${callId}`);
 
   } catch (error) {
     console.error(`[Call Summary Emails] Error processing call ${callId}:`, error);

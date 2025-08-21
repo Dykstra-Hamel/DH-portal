@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Edit,
@@ -39,8 +39,9 @@ interface LeadPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function LeadDetailPage({ params }: LeadPageProps) {
+function LeadDetailPageContent({ params }: LeadPageProps) {
   const [user, setUser] = useState<User | null>(null);
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
   const [leadLoading, setLeadLoading] = useState(true);
@@ -134,6 +135,14 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
       fetchLead();
     }
   }, [leadId, loading, fetchLead]);
+
+  // Auto-trigger edit mode when edit=true parameter is present
+  useEffect(() => {
+    const shouldAutoEdit = searchParams.get('edit') === 'true';
+    if (shouldAutoEdit && lead && !isEditing && !leadLoading) {
+      handleEdit();
+    }
+  }, [lead, isEditing, leadLoading, searchParams]);
 
   const handleBack = () => {
     router.push('/leads');
@@ -936,5 +945,13 @@ export default function LeadDetailPage({ params }: LeadPageProps) {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LeadDetailPage({ params }: LeadPageProps) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LeadDetailPageContent params={params} />
+    </Suspense>
   );
 }

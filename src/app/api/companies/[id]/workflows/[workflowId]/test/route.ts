@@ -118,7 +118,6 @@ export async function POST(
     let inngestEventId = null;
     if (triggerActualEvents) {
       try {
-        console.log(`🚀 Triggering actual workflow/test event for workflow: ${workflow.name}`);
         
         await sendEvent({
           name: 'workflow/test',
@@ -134,7 +133,6 @@ export async function POST(
         });
         
         inngestEventId = `workflow-test-${executionId}`;
-        console.log(`✅ Workflow test event sent to Inngest: ${inngestEventId}`);
       } catch (eventError) {
         console.error('❌ Failed to send Inngest event:', eventError);
         // Don't fail the test, just log the error

@@ -7,9 +7,9 @@ import styles from './LeadsTabs.module.scss';
 type ActiveLeadStatus = 'new' | 'contacted' | 'qualified' | 'quoted' | 'unqualified';
 
 interface LeadsTabsProps {
-  activeTab: ActiveLeadStatus | 'all';
-  onTabChange: (tab: ActiveLeadStatus | 'all') => void;
-  leadCounts: Record<ActiveLeadStatus | 'all', number>;
+  activeTab: ActiveLeadStatus | 'all' | 'archived';
+  onTabChange: (tab: ActiveLeadStatus | 'all' | 'archived') => void;
+  leadCounts: Record<ActiveLeadStatus | 'all' | 'archived', number>;
 }
 
 const LeadsTabs: React.FC<LeadsTabsProps> = ({
@@ -33,6 +33,7 @@ const LeadsTabs: React.FC<LeadsTabsProps> = ({
       label: status.label,
       count: leadCounts[status.value as ActiveLeadStatus],
     })),
+    { key: 'archived' as const, label: 'Archived', count: leadCounts.archived },
   ];
 
   return (

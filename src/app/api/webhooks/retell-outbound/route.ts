@@ -720,7 +720,6 @@ async function findCompanyByOutboundAgentId(agentId: string | undefined) {
       .single();
 
     if (data && !error) {
-      console.log('findCompanyByOutboundAgentId: Found company', data.company_id, 'for outbound agent', agentId);
       return data.company_id;
     }
 
@@ -733,7 +732,6 @@ async function findCompanyByOutboundAgentId(agentId: string | undefined) {
       .single();
 
     if (legacyData && !legacyError) {
-      console.log('findCompanyByOutboundAgentId: Found company', legacyData.company_id, 'for legacy agent', agentId);
       return legacyData.company_id;
     }
 
