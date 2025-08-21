@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
+    const includeArchived = searchParams.get('includeArchived') === 'true';
 
     if (!companyId) {
       return NextResponse.json(
@@ -41,8 +42,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all leads for this company (including unqualified)
-    const { data: leads, error } = await supabase
+    // Build query based on whether archived leads are requested
+    let query = supabase
       .from('leads')
       .select(
         `
@@ -57,8 +58,19 @@ export async function GET(request: NextRequest) {
       `
       )
       .eq('company_id', companyId)
-      .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
       .order('created_at', { ascending: false });
+
+    if (includeArchived) {
+      // If including archived, only show archived leads
+      query = query.eq('archived', true);
+    } else {
+      // Default behavior: show active leads (exclude archived)
+      query = query
+        .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
+        .or('archived.is.null,archived.eq.false');
+    }
+
+    const { data: leads, error } = await query;
 
     if (error) {
       console.error('Error fetching leads:', error);

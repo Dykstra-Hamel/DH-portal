@@ -53,6 +53,7 @@ export interface Lead {
   referrer_url?: string;
   ip_address?: string;
   user_agent?: string;
+  archived?: boolean;
   created_at: string;
   updated_at: string;
 

@@ -28,14 +28,11 @@ export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
   
   try {
-    console.log(`🕐 [${requestId}] Business hours webhook received at ${new Date().toISOString()}`);
-    console.log(`📥 [${requestId}] Headers:`, Object.fromEntries(request.headers.entries()));
     
     // Apply rate limiting
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     
     if (isRateLimited(ip, 50, 60000)) {
-      console.warn(`⚠️ [${requestId}] Rate limit exceeded`);
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
         { status: 429 }
@@ -63,7 +60,6 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = await request.json();
-    console.log(`📦 [${requestId}] Received payload:`, JSON.stringify(payload, null, 2));
     
     // Verify webhook signature using Retell SDK
     const isValidSignature = Retell.verify(
@@ -91,7 +87,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { agent_id, from_number, to_number } = callInbound;
-    console.log(`📞 [${requestId}] Processing business hours check for call from ${from_number} to ${to_number}`);
 
     const supabase = createAdminClient();
     
@@ -109,7 +104,6 @@ export async function POST(request: NextRequest) {
       
       if (agentCompany) {
         companyId = agentCompany.company_id;
-        console.log(`✅ [${requestId}] Found company ${companyId} from agent_id`);
       }
     }
     
@@ -125,7 +119,6 @@ export async function POST(request: NextRequest) {
       
       if (fallbackCompany) {
         companyId = fallbackCompany.id;
-        console.warn(`⚠️ [${requestId}] Using fallback company ${companyId} (no agent mapping found)`);
       }
     }
     
@@ -205,7 +198,6 @@ export async function POST(request: NextRequest) {
     const currentDay = currentTime.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     const currentTimeStr = currentTime.toTimeString().slice(0, 5); // HH:MM format
     
-    console.log(`🕐 [${requestId}] Current time: ${currentTimeStr} on ${currentDay} (${companyTimezone})`);
     
     // Check if current time is during business hours
     let isDuringBusinessHours = false;
@@ -221,15 +213,11 @@ export async function POST(request: NextRequest) {
         const isBeforeEnd = currentTimeStr <= endTime;
         isDuringBusinessHours = isAfterStart && isBeforeEnd;
         
-        console.log(`🕐 [${requestId}] Business hours for ${currentDay}: ${startTime} - ${endTime}, current: ${currentTimeStr}, in hours: ${isDuringBusinessHours}`);
       }
     } else {
-      console.log(`🕐 [${requestId}] ${currentDay} is not a business day`);
     }
     
     const duration = Date.now() - startTime;
-    console.log(`✅ [${requestId}] Business hours check completed in ${duration}ms`);
-    console.log(`📊 [${requestId}] Result: during_hours=${isDuringBusinessHours}, off_hour_enabled=${offHourCallingEnabled}`);
     
     // Return response with dynamic variables for Retell
     const response = {
@@ -241,7 +229,6 @@ export async function POST(request: NextRequest) {
       }
     };
     
-    console.log(`📤 [${requestId}] Sending response:`, JSON.stringify(response, null, 2));
     return NextResponse.json(response);
     
   } catch (error) {
@@ -259,7 +246,6 @@ export async function POST(request: NextRequest) {
       }
     };
     
-    console.log(`📤 [${requestId}] Sending error response:`, JSON.stringify(errorResponse, null, 2));
     return NextResponse.json(errorResponse);
   }
 }

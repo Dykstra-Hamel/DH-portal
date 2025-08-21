@@ -78,7 +78,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch the recording info from CallRail (this returns JSON with the actual audio URL)
-    console.log('Fetching recording info from:', recordingUrl);
     
     const recordingInfoResponse = await fetch(recordingUrl, {
       headers: {
@@ -87,7 +86,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log('Recording info response status:', recordingInfoResponse.status);
 
     if (!recordingInfoResponse.ok) {
       const errorText = await recordingInfoResponse.text();
@@ -100,7 +98,6 @@ export async function GET(request: NextRequest) {
 
     // Parse the JSON response to get the actual audio file URL
     const recordingInfo = await recordingInfoResponse.json();
-    console.log('Recording info response:', recordingInfo);
 
     // The actual audio file URL should be in the response
     const actualAudioUrl = recordingInfo.url || recordingInfo.recording_url || recordingInfo.file_url;
@@ -113,7 +110,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Fetching actual audio from:', actualAudioUrl);
 
     // Now fetch the actual audio file
     const audioResponse = await fetch(actualAudioUrl, {

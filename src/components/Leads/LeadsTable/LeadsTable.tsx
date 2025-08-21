@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Edit, Trash2, Calendar, Phone, Mail } from 'lucide-react';
+import { Edit, Trash2, Archive, ArchiveRestore, Calendar, Phone, Mail } from 'lucide-react';
 import {
   Lead,
   leadSourceOptions,
@@ -16,8 +16,12 @@ interface LeadsTableProps {
   leads: Lead[];
   onEdit?: (lead: Lead) => void;
   onDelete?: (leadId: string) => void;
+  onArchive?: (leadId: string) => void;
+  onUnarchive?: (leadId: string) => void;
   showActions?: boolean;
   showCompanyColumn?: boolean;
+  showArchived?: boolean;
+  userProfile?: { role?: string };
 }
 
 interface ConfirmationModalProps {
@@ -25,6 +29,7 @@ interface ConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   leadName: string;
+  type: 'delete' | 'archive' | 'unarchive';
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -32,16 +37,26 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   onClose,
   onConfirm,
   leadName,
+  type,
 }) => {
   if (!isOpen) return null;
+
+  const isDelete = type === 'delete';
+  const isUnarchive = type === 'unarchive';
+  const actionText = isDelete ? 'Delete' : isUnarchive ? 'Restore' : 'Archive';
+  const description = isDelete 
+    ? 'This action cannot be undone.'
+    : isUnarchive
+      ? 'It will be restored to the active leads view.'
+      : 'It will be hidden from the main view but can be restored later.';
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <h3>Delete Lead</h3>
+        <h3>{actionText} Lead</h3>
         <p>
-          Are you sure you want to delete the lead for <strong>{leadName}</strong>?
-          This action cannot be undone.
+          Are you sure you want to {actionText.toLowerCase()} the lead for <strong>{leadName}</strong>?
+          {' '}{description}
         </p>
         <div className={styles.modalActions}>
           <button
@@ -52,9 +67,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           </button>
           <button
             onClick={onConfirm}
-            className={styles.confirmDeleteButton}
+            className={isDelete ? styles.confirmDeleteButton : styles.confirmArchiveButton}
           >
-            Delete Lead
+            {actionText} Lead
           </button>
         </div>
       </div>
@@ -66,12 +81,17 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
   leads,
   onEdit,
   onDelete,
+  onArchive,
+  onUnarchive,
   showActions = true,
   showCompanyColumn = false,
+  showArchived = false,
+  userProfile,
 }) => {
   const router = useRouter();
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [modalType, setModalType] = useState<'delete' | 'archive' | 'unarchive'>('delete');
 
   const handleRowClick = (leadId: string, event: React.MouseEvent) => {
     // Don't navigate if clicking on action buttons
@@ -83,19 +103,39 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
 
   const handleDeleteClick = (lead: Lead) => {
     setSelectedLead(lead);
-    setShowDeleteModal(true);
+    setModalType('delete');
+    setShowModal(true);
   };
 
-  const handleDeleteConfirm = () => {
-    if (selectedLead && onDelete) {
+  const handleArchiveClick = (lead: Lead) => {
+    setSelectedLead(lead);
+    setModalType('archive');
+    setShowModal(true);
+  };
+
+  const handleUnarchiveClick = (lead: Lead) => {
+    setSelectedLead(lead);
+    setModalType('unarchive');
+    setShowModal(true);
+  };
+
+  const handleConfirm = () => {
+    if (!selectedLead) return;
+
+    if (modalType === 'delete' && onDelete) {
       onDelete(selectedLead.id);
+    } else if (modalType === 'archive' && onArchive) {
+      onArchive(selectedLead.id);
+    } else if (modalType === 'unarchive' && onUnarchive) {
+      onUnarchive(selectedLead.id);
     }
-    setShowDeleteModal(false);
+
+    setShowModal(false);
     setSelectedLead(null);
   };
 
-  const handleDeleteCancel = () => {
-    setShowDeleteModal(false);
+  const handleCancel = () => {
+    setShowModal(false);
     setSelectedLead(null);
   };
   const getStatusColor = (status: string) => {
@@ -254,13 +294,32 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                     >
                       <Edit size={16} />
                     </button>
-                    <button
-                      onClick={() => handleDeleteClick(lead)}
-                      className={styles.deleteButton}
-                      title="Delete lead"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {showArchived ? (
+                      <button
+                        onClick={() => handleUnarchiveClick(lead)}
+                        className={styles.archiveButton}
+                        title="Restore lead"
+                      >
+                        <ArchiveRestore size={16} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleArchiveClick(lead)}
+                        className={styles.archiveButton}
+                        title="Archive lead"
+                      >
+                        <Archive size={16} />
+                      </button>
+                    )}
+                    {userProfile?.role === 'admin' && (
+                      <button
+                        onClick={() => handleDeleteClick(lead)}
+                        className={styles.deleteButton}
+                        title="Delete lead"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 </td>
               )}
@@ -270,14 +329,15 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
       </table>
       
       <ConfirmationModal
-        isOpen={showDeleteModal}
-        onClose={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
+        isOpen={showModal}
+        onClose={handleCancel}
+        onConfirm={handleConfirm}
         leadName={
           selectedLead?.customer
             ? `${selectedLead.customer.first_name} ${selectedLead.customer.last_name}`
             : 'this lead'
         }
+        type={modalType}
       />
     </div>
   );
