@@ -4462,33 +4462,70 @@ BEGIN
     END IF;
 END $$;
 
+-- Drop all possible conflicting signatures for promote_ab_test_winner
 DROP FUNCTION IF EXISTS public.promote_ab_test_winner(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.promote_ab_test_winner(UUID, VARCHAR) CASCADE;
+DROP FUNCTION IF EXISTS public.promote_ab_test_winner(UUID, VARCHAR(10)) CASCADE;
 
+-- Fix the original promote_ab_test_winner (UUID, VARCHAR(10)) RETURNS BOOLEAN
 CREATE OR REPLACE FUNCTION public.promote_ab_test_winner(
-    p_test_id UUID,
-    p_winning_variant_id UUID
-)
-RETURNS void
+    p_campaign_id UUID,
+    p_winner_variant VARCHAR(10)
+) RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = 'public'
 AS $function$
+DECLARE
+    v_campaign ab_test_campaigns%ROWTYPE;
+    v_winner_template_id UUID;
+    v_control_template_id UUID;
 BEGIN
-    -- Mark test as complete and set winner
-    UPDATE public.ab_tests 
-    SET status = 'completed', 
-        winning_variant_id = p_winning_variant_id,
-        ended_at = NOW()
-    WHERE id = p_test_id;
+    -- Get campaign details
+    SELECT * INTO v_campaign FROM ab_test_campaigns WHERE id = p_campaign_id;
     
-    -- If ab_tests table doesn't exist, try ab_test_campaigns
     IF NOT FOUND THEN
-        UPDATE public.ab_test_campaigns
-        SET is_active = false,
-            ended_at = NOW(),
-            winning_variant_id = p_winning_variant_id
-        WHERE id = p_test_id;
+        RAISE EXCEPTION 'Campaign not found: %', p_campaign_id;
     END IF;
+    
+    -- Get winner template ID
+    SELECT template_id INTO v_winner_template_id
+    FROM ab_test_variants
+    WHERE campaign_id = p_campaign_id AND variant_label = p_winner_variant;
+    
+    -- Get control template ID
+    SELECT template_id INTO v_control_template_id
+    FROM ab_test_variants
+    WHERE campaign_id = p_campaign_id AND is_control = true;
+    
+    -- If winner is not control, copy winner template over control template
+    IF v_winner_template_id != v_control_template_id THEN
+        UPDATE email_templates 
+        SET 
+            subject_line = winner.subject_line,
+            html_content = winner.html_content,
+            text_content = winner.text_content,
+            variables = winner.variables,
+            updated_at = NOW()
+        FROM (
+            SELECT subject_line, html_content, text_content, variables
+            FROM email_templates 
+            WHERE id = v_winner_template_id
+        ) AS winner
+        WHERE email_templates.id = v_control_template_id;
+    END IF;
+    
+    -- Update campaign status
+    UPDATE ab_test_campaigns 
+    SET 
+        status = 'completed',
+        winner_variant = p_winner_variant,
+        winner_determined_at = NOW(),
+        actual_end_date = NOW(),
+        updated_at = NOW()
+    WHERE id = p_campaign_id;
+    
+    RETURN TRUE;
 END;
 $function$;
 
@@ -5045,43 +5082,6 @@ BEGIN
 END;
 $function$;
 
--- Fix the original promote_ab_test_winner (UUID, VARCHAR)
-CREATE OR REPLACE FUNCTION public.promote_ab_test_winner(
-    p_campaign_id UUID,
-    p_winner_variant VARCHAR
-) RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = 'public'
-AS $function$
-BEGIN
-    -- Mark the specified variant as the winner for the campaign
-    UPDATE ab_test_campaigns 
-    SET 
-        is_active = false,
-        ended_at = NOW(),
-        winning_variant_name = p_winner_variant
-    WHERE id = p_campaign_id;
-    
-    -- Update campaign results if table exists
-    BEGIN
-        INSERT INTO ab_test_results (
-            campaign_id,
-            winning_variant,
-            concluded_at
-        ) VALUES (
-            p_campaign_id,
-            p_winner_variant,
-            NOW()
-        ) ON CONFLICT (campaign_id) DO UPDATE SET
-            winning_variant = EXCLUDED.winning_variant,
-            concluded_at = EXCLUDED.concluded_at;
-    EXCEPTION WHEN undefined_table THEN
-        -- Table doesn't exist, skip this step
-        NULL;
-    END;
-END;
-$function$;
 
 -- Fix the original import_template_from_library (4 parameters)
 -- Drop all possible versions of this function first
@@ -5231,23 +5231,6 @@ END $$;
 
 -- Fix the three most critical functions with their correct signatures
 
-CREATE OR REPLACE FUNCTION public.promote_ab_test_winner(
-    p_campaign_id UUID,
-    p_winner_variant VARCHAR
-) RETURNS void 
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = 'public'
-AS $$
-BEGIN
-    -- Mark the specified variant as the winner for the campaign
-    UPDATE ab_test_campaigns 
-    SET 
-        is_active = false,
-        ended_at = NOW()
-    WHERE id = p_campaign_id;
-END;
-$$;
 
 -- Drop all versions of import_template_from_library before recreating  
 DROP FUNCTION IF EXISTS public.import_template_from_library(UUID, UUID) CASCADE;
@@ -5712,23 +5695,6 @@ BEGIN
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.promote_ab_test_winner(
-    p_campaign_id UUID,
-    p_winner_variant VARCHAR
-) RETURNS void 
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $function$
-BEGIN
-    -- Mark the specified variant as the winner for the campaign
-    UPDATE public.ab_test_campaigns 
-    SET 
-        is_active = false,
-        ended_at = NOW()
-    WHERE id = p_campaign_id;
-END;
-$function$;
 
 -- Drop all versions of import_template_from_library before recreating
 DROP FUNCTION IF EXISTS public.import_template_from_library(UUID, UUID) CASCADE;
