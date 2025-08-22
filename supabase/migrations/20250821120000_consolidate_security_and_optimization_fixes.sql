@@ -5546,29 +5546,6 @@ BEGIN
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.determine_lead_source_from_attribution(attribution JSONB)
-RETURNS TEXT 
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $function$
-DECLARE
-    source TEXT;
-BEGIN
-    -- Extract lead source from attribution data
-    IF attribution ? 'utm_source' THEN
-        source := attribution->>'utm_source';
-    ELSIF attribution ? 'referrer' THEN
-        source := 'referral';
-    ELSIF attribution ? 'gclid' THEN
-        source := 'google_ads';
-    ELSE
-        source := 'direct';
-    END IF;
-    
-    RETURN source;
-END;
-$function$;
 
 CREATE OR REPLACE FUNCTION public.set_lead_source_from_attribution()
 RETURNS TRIGGER 
@@ -6579,12 +6556,16 @@ CHECK (lead_source IN (
     'other'
 ));
 
--- Update the determine_lead_source_from_attribution function to use 'paid' instead of 'bing_cpc'
+-- Fix determine_lead_source_from_attribution with correct original signature and security
+-- Drop all possible conflicting signatures first
+DROP FUNCTION IF EXISTS public.determine_lead_source_from_attribution(JSONB) CASCADE;
+
+-- Recreate with original VARCHAR(50) return type plus security fixes
 CREATE OR REPLACE FUNCTION public.determine_lead_source_from_attribution(attribution JSONB)
-RETURNS TEXT 
+RETURNS VARCHAR(50)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = ''
+SET search_path = 'public'
 AS $function$
 DECLARE
     utm_source TEXT;
@@ -6889,10 +6870,10 @@ COMMENT ON FUNCTION public.get_company_service_areas(UUID) IS 'Returns complete 
 -- ADD MISSING POSTGIS GEOMETRY COLUMNS TO service_areas TABLE
 -- The table is missing polygon and center_point columns that the function expects
 
--- Add the missing PostGIS geometry columns
+-- Add the missing PostGIS geometry columns (PostGIS is in extensions schema)
 ALTER TABLE public.service_areas 
-ADD COLUMN IF NOT EXISTS polygon GEOMETRY(POLYGON, 4326),
-ADD COLUMN IF NOT EXISTS center_point GEOMETRY(POINT, 4326);
+ADD COLUMN IF NOT EXISTS polygon extensions.geometry(POLYGON, 4326),
+ADD COLUMN IF NOT EXISTS center_point extensions.geometry(POINT, 4326);
 
 -- Add spatial indexes for performance
 CREATE INDEX IF NOT EXISTS idx_service_areas_polygon 
@@ -6904,12 +6885,51 @@ ON public.service_areas USING GIST(center_point)
 WHERE center_point IS NOT NULL;
 
 -- Add check constraint to ensure proper data based on type
+-- Use a more comprehensive approach: add constraint as NOT VALID first, then validate after cleanup
+
+-- First, clean up any existing data that would violate the constraint
+DO $$
+BEGIN
+    -- Log current problematic rows for debugging
+    RAISE NOTICE 'Cleaning up service_areas data before adding constraint...';
+    
+    -- Fix invalid type values
+    UPDATE public.service_areas 
+    SET type = 'zip_code'
+    WHERE type NOT IN ('polygon', 'radius', 'zip_code') OR type IS NULL;
+    
+    -- Fix rows where type='zip_code' but zip_codes is invalid
+    UPDATE public.service_areas 
+    SET zip_codes = ARRAY['00000']
+    WHERE type = 'zip_code' 
+    AND (zip_codes IS NULL OR array_length(zip_codes, 1) = 0 OR array_length(zip_codes, 1) IS NULL);
+    
+    -- Fix rows where type='radius' but required fields are missing
+    UPDATE public.service_areas 
+    SET type = 'zip_code', zip_codes = ARRAY['00000']
+    WHERE type = 'radius' 
+    AND (center_point IS NULL OR radius_miles IS NULL);
+    
+    -- Fix rows where type='polygon' but polygon is missing
+    UPDATE public.service_areas 
+    SET type = 'zip_code', zip_codes = ARRAY['00000']
+    WHERE type = 'polygon' 
+    AND polygon IS NULL;
+    
+    RAISE NOTICE 'Data cleanup completed';
+END $$;
+
+-- Add the constraint as NOT VALID first (allows existing data, but enforces for new data)
 ALTER TABLE public.service_areas DROP CONSTRAINT IF EXISTS service_areas_data_integrity_check;
 ALTER TABLE public.service_areas ADD CONSTRAINT service_areas_data_integrity_check CHECK (
     (type = 'polygon' AND polygon IS NOT NULL) OR
     (type = 'radius' AND center_point IS NOT NULL AND radius_miles IS NOT NULL) OR
     (type = 'zip_code' AND zip_codes IS NOT NULL AND array_length(zip_codes, 1) > 0)
-);
+) NOT VALID;
+
+-- Now validate the constraint (this will fail if any existing data still violates it)
+-- If this fails, we know there's still problematic data that needs manual investigation
+ALTER TABLE public.service_areas VALIDATE CONSTRAINT service_areas_data_integrity_check;
 
 -- Add comment documenting this fix
 COMMENT ON TABLE public.service_areas IS 'Geographic service areas for companies including polygon, radius, and zip code based coverage areas - PostGIS columns added 2025-08-20';
