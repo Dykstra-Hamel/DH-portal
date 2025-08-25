@@ -10,6 +10,7 @@ interface ServicePlan {
   plan_description: string;
   plan_category: string;
   initial_price: number;
+  initial_discount: number;
   recurring_price: number;
   billing_frequency: string;
   treatment_frequency: string;
@@ -21,6 +22,7 @@ interface ServicePlan {
   color_scheme: any;
   requires_quote: boolean;
   plan_image_url: string | null;
+  plan_disclaimer: string | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;
@@ -68,6 +70,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_description: '',
     plan_category: 'standard',
     initial_price: 0,
+    initial_discount: 0,
     recurring_price: 0,
     billing_frequency: 'monthly',
     treatment_frequency: 'monthly',
@@ -78,6 +81,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     highlight_badge: '',
     requires_quote: false,
     plan_image_url: '',
+    plan_disclaimer: '',
     is_active: true,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
   });
@@ -92,6 +96,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_description: plan.plan_description || '',
         plan_category: plan.plan_category || 'standard',
         initial_price: plan.initial_price || 0,
+        initial_discount: plan.initial_discount || 0,
         recurring_price: plan.recurring_price,
         billing_frequency: plan.billing_frequency,
         treatment_frequency: plan.treatment_frequency || 'monthly',
@@ -102,6 +107,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         highlight_badge: plan.highlight_badge || '',
         requires_quote: plan.requires_quote,
         plan_image_url: plan.plan_image_url || '',
+        plan_disclaimer: plan.plan_disclaimer || '',
         is_active: plan.is_active,
         pest_coverage: plan.pest_coverage?.map(pc => ({
           pest_id: pc.pest_id,
@@ -115,6 +121,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_description: '',
         plan_category: 'standard',
         initial_price: 0,
+        initial_discount: 0,
         recurring_price: 0,
         billing_frequency: 'monthly',
         treatment_frequency: 'monthly',
@@ -125,6 +132,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         highlight_badge: '',
         requires_quote: false,
         plan_image_url: '',
+        plan_disclaimer: '',
         is_active: true,
         pest_coverage: [],
       });
@@ -404,6 +412,23 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   />
                 </div>
                 <div className={styles.formGroup}>
+                  <label>Initial Discount ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.initial_discount}
+                    onChange={(e) => handleInputChange('initial_discount', parseFloat(e.target.value) || 0)}
+                    placeholder="Amount saved from normal price"
+                  />
+                  <small style={{color: '#666', fontSize: '12px', marginTop: '4px', display: 'block'}}>
+                    Normal price will be: ${((formData.initial_price || 0) + (formData.initial_discount || 0)).toFixed(2)}
+                  </small>
+                </div>
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
                   <label>Recurring Price ($) *</label>
                   <input
                     type="number"
@@ -413,6 +438,9 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     onChange={(e) => handleInputChange('recurring_price', parseFloat(e.target.value) || 0)}
                     required
                   />
+                </div>
+                <div className={styles.formGroup}>
+                  {/* Empty div to maintain grid layout */}
                 </div>
               </div>
 
@@ -495,6 +523,19 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Plan Disclaimer</label>
+                <textarea
+                  value={formData.plan_disclaimer}
+                  onChange={(e) => handleInputChange('plan_disclaimer', e.target.value)}
+                  placeholder="Enter disclaimer text for this plan (supports HTML)"
+                  rows={4}
+                />
+                <small style={{color: '#666', fontSize: '12px', marginTop: '4px', display: 'block'}}>
+                  Supports basic HTML formatting (bold, italic, links, etc.)
+                </small>
               </div>
 
               <div className={styles.checkboxGroup}>

@@ -16,5 +16,13 @@ BEGIN
     END IF;
 END $$;
 
--- Add comment to explain the constraint
-COMMENT ON CONSTRAINT customers_phone_company_unique ON customers IS 'Ensures phone uniqueness per company - same phone can exist across different companies but not within the same company';
+-- Add comment to explain the constraint (if constraint exists)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'customers_phone_company_unique'
+    ) THEN
+        COMMENT ON CONSTRAINT customers_phone_company_unique ON customers IS 'Ensures phone uniqueness per company - same phone can exist across different companies but not within the same company';
+    END IF;
+END $$;

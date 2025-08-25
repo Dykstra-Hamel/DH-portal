@@ -42,3 +42,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Database export/import files (contain sensitive connection strings and data)
+company-data-import*.sql
+EXPORT-INSTRUCTIONS.md

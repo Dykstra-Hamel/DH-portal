@@ -276,13 +276,14 @@
         isLoading: false,
         isSubmitting: false,
         widgetConfig: null,
-        currentStep: 'welcome',
+        currentStep: 'pest-issue',
         sessionId: sessionId,
         attributionData: attributionData,
         recoveryData: null,
         formData: {
           pestType: '',
           pestIcon: '',
+          pestBackgroundImage: '',
           urgency: '',
           selectedPlan: '',
           recommendedPlan: '',
@@ -329,9 +330,8 @@
 
       // Initialize step progress manager
       stepProgressManager = {
-        stepFlow: ['welcome', 'pest-issue', 'address', 'quote', 'complete'],
+        stepFlow: ['pest-issue', 'address', 'quote', 'complete'],
         stepLabels: {
-          welcome: 'Welcome',
           'pest-issue': 'Pest Issue',
           address: 'Address',
           quote: 'Quote',
@@ -340,7 +340,7 @@
         getProgressStep: actualStep => {
           const quoteSteps = [
             'urgency',
-            'initial-offer',
+            'how-we-do-it',
             'plan-comparison',
             'quote-contact',
             'contact',
@@ -375,6 +375,17 @@
             widgetState.currentStep
           );
           return stepProgressManager.stepFlow.indexOf(currentProgressStep);
+        },
+        getCompletedSteps: () => {
+          const completed = [];
+          const currentStepIndex = stepProgressManager.getCurrentStepIndex();
+          
+          // Add all steps before current step as completed
+          for (let i = 0; i < currentStepIndex; i++) {
+            completed.push(stepProgressManager.stepFlow[i]);
+          }
+          
+          return completed;
         },
       };
 
@@ -416,9 +427,108 @@
             return null;
           }
         },
+        
+        // Save current form state to localStorage
+        saveFormStateToLocalStorage: () => {
+          try {
+            const saveData = {
+              currentStep: widgetState.currentStep,
+              formData: { ...widgetState.formData },
+              completedSteps: stepProgressManager.getCompletedSteps(),
+              timestamp: new Date().toISOString(),
+              sessionId: widgetState.sessionId,
+              expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() // 48 hours
+            };
+            
+            // Remove sensitive or large data that shouldn't be persisted
+            delete saveData.formData.contactInfo;
+            
+            localStorage.setItem('dh_widget_progress_' + config.companyId, JSON.stringify(saveData));
+            widgetState.formState.lastSaved = new Date().toISOString();
+            
+            return true;
+          } catch (error) {
+            console.warn('Failed to save form state:', error);
+            return false;
+          }
+        },
+        
+        // Restore form state from localStorage
+        restoreFormStateFromLocalStorage: () => {
+          try {
+            const saved = localStorage.getItem('dh_widget_progress_' + config.companyId);
+            if (!saved) return null;
+            
+            const saveData = JSON.parse(saved);
+            
+            // Check if saved data has expired
+            if (new Date() > new Date(saveData.expiresAt)) {
+              progressiveFormManager.clearSavedFormState();
+              return null;
+            }
+            
+            return saveData;
+          } catch (error) {
+            console.warn('Failed to restore form state:', error);
+            return null;
+          }
+        },
+        
+        // Clear saved form state
+        clearSavedFormState: () => {
+          try {
+            localStorage.removeItem('dh_widget_progress_' + config.companyId);
+            return true;
+          } catch (error) {
+            console.warn('Failed to clear saved form state:', error);
+            return false;
+          }
+        },
+        
+        // Check if user has significant progress worth restoring
+        shouldPromptToContinue: (savedData) => {
+          if (!savedData) return false;
+          
+          const { formData, currentStep } = savedData;
+          
+          // Check for significant form completion
+          const hasSignificantProgress = !!(
+            formData.pestType ||
+            formData.address ||
+            formData.urgency ||
+            (currentStep !== 'pest-issue' && currentStep !== 'welcome')
+          );
+          
+          return hasSignificantProgress;
+        },
+        
+        // Start auto-save functionality
+        startAutoSave: () => {
+          if (!widgetState.formState.progressiveFeatures.autoSave) return;
+          
+          // Clear any existing timer
+          if (progressiveFormManager.autoSaveTimer) {
+            clearInterval(progressiveFormManager.autoSaveTimer);
+          }
+          
+          // Start new auto-save timer
+          progressiveFormManager.autoSaveTimer = setInterval(() => {
+            if (progressiveFormManager.hasSignificantFormData()) {
+              progressiveFormManager.saveFormStateToLocalStorage();
+            }
+          }, widgetState.formState.autoSaveInterval);
+        },
+        
+        // Stop auto-save functionality
+        stopAutoSave: () => {
+          if (progressiveFormManager.autoSaveTimer) {
+            clearInterval(progressiveFormManager.autoSaveTimer);
+            progressiveFormManager.autoSaveTimer = null;
+          }
+        },
         calculateStepCompletion: () => {
           const steps = {
-            welcome: widgetState.currentStep !== 'welcome' ? 100 : 0, // Completed if we've moved past welcome
+            // Remove welcome step completion tracking
             pest_issue: widgetState.formData.pestType ? 100 : 0, // Fixed field name from pestIssue to pestType
             address:
               (widgetState.formData.address ? 50 : 0) +
@@ -450,6 +560,12 @@
         
         // Clear field indicators (errors, warnings, success)
         clearFieldIndicators: field => {
+          // Check if field exists
+          if (!field) {
+            console.warn('clearFieldIndicators called with null field');
+            return;
+          }
+          
           // Reset field styling
           field.style.borderColor = '';
           field.style.boxShadow = '';
@@ -465,6 +581,12 @@
         },
         
         clearFieldError: field => {
+          // Check if field exists
+          if (!field) {
+            console.warn('clearFieldError called with null field');
+            return;
+          }
+          
           // Remove from error tracking
           if (field.id) {
             widgetState.formState.fieldsWithErrors.delete(field.id);
@@ -474,6 +596,12 @@
         },
         
         showFieldError: (field, message) => {
+          // Check if field exists
+          if (!field) {
+            console.warn('showFieldError called with null field');
+            return;
+          }
+          
           // Remove existing error
           progressiveFormManager.clearFieldError(field);
           
@@ -535,6 +663,318 @@
         }
       };
       
+      // Function to show continue prompt to users with saved progress
+      const showContinuePrompt = (savedData) => {
+        // Create overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'dh-continue-prompt-overlay';
+        overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+          backdrop-filter: blur(4px);
+          animation: fadeIn 0.3s ease;
+        `;
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'dh-continue-prompt-modal';
+        modal.style.cssText = `
+          background: white;
+          border-radius: 16px;
+          padding: 32px;
+          max-width: 480px;
+          width: 90%;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+          text-align: center;
+          animation: slideUp 0.3s ease;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        // Get step display name
+        const stepNames = {
+          'pest-issue': 'pest selection',
+          'address': 'address information',
+          'confirm-address': 'address confirmation',
+          'how-we-do-it': 'service information',
+          'quote-contact': 'contact information',
+          'plan-comparison': 'plan selection',
+          'contact': 'scheduling details'
+        };
+        
+        const currentStepName = stepNames[savedData.currentStep] || 'your information';
+        const timeAgo = getTimeAgo(new Date(savedData.timestamp));
+        
+        modal.innerHTML = `
+          <div style="margin-bottom: 24px;">
+            <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M9 11l3 3l8-8"></path>
+                <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9s4.03-9 9-9c1.51 0 2.93 0.37 4.18 1.03"></path>
+              </svg>
+            </div>
+            <h3 style="color: #1f2937; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Welcome back!</h3>
+            <p style="color: #6b7280; font-size: 16px; margin: 0; line-height: 1.5;">
+              We found your progress from ${timeAgo}. You were working on ${currentStepName}.
+            </p>
+          </div>
+          
+          <div style="display: flex; gap: 12px; flex-direction: column;">
+            <button id="continue-btn" style="
+              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+              color: white;
+              border: none;
+              border-radius: 12px;
+              padding: 16px 24px;
+              font-size: 16px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            ">Continue Where I Left Off</button>
+            <button id="start-over-btn" style="
+              background: transparent;
+              color: #6b7280;
+              border: 2px solid #e5e7eb;
+              border-radius: 12px;
+              padding: 14px 24px;
+              font-size: 16px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            ">Start Over</button>
+          </div>
+        `;
+        
+        // Add hover effects
+        const continueBtn = modal.querySelector('#continue-btn');
+        const startOverBtn = modal.querySelector('#start-over-btn');
+        
+        continueBtn.addEventListener('mouseenter', () => {
+          continueBtn.style.transform = 'translateY(-2px)';
+          continueBtn.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.3)';
+        });
+        continueBtn.addEventListener('mouseleave', () => {
+          continueBtn.style.transform = 'translateY(0)';
+          continueBtn.style.boxShadow = 'none';
+        });
+        
+        startOverBtn.addEventListener('mouseenter', () => {
+          startOverBtn.style.borderColor = '#9ca3af';
+          startOverBtn.style.color = '#374151';
+        });
+        startOverBtn.addEventListener('mouseleave', () => {
+          startOverBtn.style.borderColor = '#e5e7eb';
+          startOverBtn.style.color = '#6b7280';
+        });
+        
+        // Event handlers
+        continueBtn.addEventListener('click', () => {
+          overlay.remove();
+          restoreProgress(savedData);
+        });
+        
+        startOverBtn.addEventListener('click', () => {
+          overlay.remove();
+          progressiveFormManager.clearSavedFormState();
+          startFreshWidget();
+        });
+        
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) {
+            overlay.remove();
+            startFreshWidget(); // Default to fresh start if they click outside
+          }
+        });
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { 
+              opacity: 0;
+              transform: translateY(20px) scale(0.95);
+            }
+            to { 
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      };
+      
+      // Function to get human-readable time ago
+      const getTimeAgo = (date) => {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        if (diffDays === 1) return 'yesterday';
+        return `${diffDays} days ago`;
+      };
+      
+      // Function to restore progress from saved data
+      const restoreProgress = (savedData) => {
+        try {
+          // Restore form data
+          widgetState.formData = { ...widgetState.formData, ...savedData.formData };
+          widgetState.currentStep = savedData.currentStep;
+          
+          // Restore completed steps
+          if (savedData.completedSteps) {
+            savedData.completedSteps.forEach(step => {
+              stepProgressManager.markStepComplete(step);
+            });
+          }
+          
+          // Populate form fields with restored data
+          populateFormFields();
+          
+          // Navigate to saved step
+          showStep(savedData.currentStep);
+          setupStepValidation(savedData.currentStep);
+          
+          // Start auto-save
+          progressiveFormManager.startAutoSave();
+          
+          console.log('Progress restored successfully:', savedData);
+        } catch (error) {
+          console.error('Failed to restore progress:', error);
+          // Fallback to fresh start if restoration fails
+          startFreshWidget();
+        }
+      };
+      
+      // Function to populate form fields with restored data
+      const populateFormFields = () => {
+        const data = widgetState.formData;
+        
+        // Populate pest selection
+        if (data.pestType) {
+          const pestOption = document.querySelector(`[data-pest="${data.pestType}"]`);
+          if (pestOption) {
+            pestOption.classList.add('selected');
+          }
+        }
+        
+        // Populate address fields
+        if (data.address) {
+          const addressInput = document.getElementById('address-search-input');
+          if (addressInput) addressInput.value = data.address;
+        }
+        
+        if (data.addressStreet) {
+          const streetInput = document.getElementById('street-input') || document.getElementById('confirm-street-input');
+          if (streetInput) streetInput.value = data.addressStreet;
+        }
+        
+        if (data.addressCity) {
+          const cityInput = document.getElementById('city-input') || document.getElementById('confirm-city-input');
+          if (cityInput) cityInput.value = data.addressCity;
+        }
+        
+        if (data.addressState) {
+          const stateInput = document.getElementById('state-input') || document.getElementById('confirm-state-input');
+          if (stateInput) stateInput.value = data.addressState;
+        }
+        
+        if (data.addressZip) {
+          const zipInput = document.getElementById('zip-input') || document.getElementById('confirm-zip-input');
+          if (zipInput) zipInput.value = data.addressZip;
+        }
+        
+        // Populate contact information
+        if (data.contactInfo) {
+          const { firstName, lastName, email, phone } = data.contactInfo;
+          
+          if (firstName) {
+            const firstNameInput = document.getElementById('quote-first-name-input');
+            if (firstNameInput) {
+              firstNameInput.value = firstName;
+              updateFloatingLabel(firstNameInput);
+            }
+          }
+          
+          if (lastName) {
+            const lastNameInput = document.getElementById('quote-last-name-input');
+            if (lastNameInput) {
+              lastNameInput.value = lastName;
+              updateFloatingLabel(lastNameInput);
+            }
+          }
+          
+          if (email) {
+            const emailInput = document.getElementById('quote-email-input');
+            if (emailInput) {
+              emailInput.value = email;
+              updateFloatingLabel(emailInput);
+            }
+          }
+          
+          if (phone) {
+            const phoneInput = document.getElementById('quote-phone-input');
+            if (phoneInput) {
+              phoneInput.value = phone;
+              updateFloatingLabel(phoneInput);
+            }
+          }
+        }
+        
+        // Populate scheduling information
+        if (data.startDate) {
+          const startDateInput = document.getElementById('start-date-input');
+          if (startDateInput) {
+            startDateInput.value = data.startDate;
+            updateFloatingLabel(startDateInput);
+          }
+        }
+        
+        if (data.arrivalTime) {
+          const arrivalTimeInput = document.getElementById('arrival-time-input');
+          if (arrivalTimeInput) {
+            arrivalTimeInput.value = data.arrivalTime;
+            updateFloatingLabel(arrivalTimeInput);
+          }
+        }
+      };
+      
+      // Function to start fresh widget
+      const startFreshWidget = () => {
+        progressiveFormManager.startAutoSave();
+        showStep('pest-issue');
+        setupStepValidation('pest-issue');
+      };
+      
+      // Function to trigger immediate save after significant form changes
+      const triggerProgressSave = () => {
+        if (progressiveFormManager.hasSignificantFormData()) {
+          progressiveFormManager.saveFormStateToLocalStorage();
+        }
+      };
+      
+      // Make functions available globally for other modules
+      window.triggerProgressSave = triggerProgressSave;
+      
       // Load configuration first
       const configLoaded = await loadConfig();
       if (!configLoaded) {
@@ -549,6 +989,20 @@
       // Create styles with initial colors from data attributes
       const initialColors = getInitialColors();
       createStyles(initialColors);
+      
+      // Update styles with configuration-based colors after config is loaded
+      if (widgetState.widgetConfig && widgetState.widgetConfig.colors) {
+        updateWidgetColors(widgetState.widgetConfig.colors);
+      }
+      
+      // Update fonts after config is loaded
+      console.log('DEBUG: Widget config fonts:', widgetState.widgetConfig?.fonts);
+      if (widgetState.widgetConfig && widgetState.widgetConfig.fonts) {
+        console.log('DEBUG: Calling updateWidgetFonts with:', widgetState.widgetConfig.fonts);
+        updateWidgetFonts();
+      } else {
+        console.log('DEBUG: No font config found, using default');
+      }
       
       // Create the widget elements
       const elements = createWidget();
@@ -605,6 +1059,32 @@
           );
         }
       }
+      
+      // Check for saved progress and handle restoration
+      const savedData = progressiveFormManager.restoreFormStateFromLocalStorage();
+      if (savedData && progressiveFormManager.shouldPromptToContinue(savedData)) {
+        // Store saved data for potential restoration
+        widgetState.recoveryData = savedData;
+        
+        if (config.displayMode !== 'button') {
+          // For inline mode, show continue prompt immediately
+          setTimeout(() => {
+            showContinuePrompt(savedData);
+          }, 100);
+        }
+        // For button mode, continue prompt will be shown when modal opens
+      } else {
+        // No saved progress or not significant, initialize normally
+        if (config.displayMode !== 'button') {
+          setTimeout(() => {
+            console.log('DEBUG: Initializing first step (inline mode)');
+            progressiveFormManager.startAutoSave();
+            showStep('pest-issue');
+            setupStepValidation('pest-issue');
+          }, 100);
+        }
+      }
+      
     } catch (error) {
       console.error('DH Widget initialization failed:', error);
       showErrorState('INITIALIZATION_ERROR', 'Widget failed to initialize', error.message);

@@ -8,6 +8,7 @@ interface PestType {
   description: string;
   category_id: string;
   icon_svg: string;
+  widget_background_image: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -20,6 +21,7 @@ interface CreatePestTypeRequest {
   description?: string;
   category_id: string;
   icon_svg: string;
+  widget_background_image?: string;
   is_active?: boolean;
 }
 
@@ -159,6 +161,7 @@ export async function POST(request: NextRequest) {
         description: pestTypeData.description || null,
         category_id: pestTypeData.category_id,
         icon_svg: pestTypeData.icon_svg,
+        widget_background_image: pestTypeData.widget_background_image || null,
         is_active: pestTypeData.is_active !== false, // Default to true
       })
       .select()
@@ -254,6 +257,7 @@ export async function PUT(request: NextRequest) {
         description: pestTypeData.description || null,
         category_id: pestTypeData.category_id,
         icon_svg: pestTypeData.icon_svg,
+        widget_background_image: pestTypeData.widget_background_image || null,
         is_active: pestTypeData.is_active !== false,
       })
       .eq('id', pestTypeData.id)

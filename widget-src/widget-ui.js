@@ -21,24 +21,25 @@ const openModal = () => {
 
       // Initialize first step after a brief delay
       setTimeout(() => {
-        showStep('welcome');
+        showStep('pest-issue');
+        setupStepValidation('pest-issue');
       }, 100);
     } else {
       // For subsequent modal opens, just show the current step
       if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
         showStep(widgetState.currentStep);
       } else {
-        showStep('welcome');
+        showStep('pest-issue');
       }
     }
 
     // Show modal with smooth animation
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden'; // Prevent background scroll
-    
+
     // Force reflow to ensure display is set before animation
     modal.offsetHeight;
-    
+
     // Add show class for animation
     modal.classList.add('show');
 
@@ -61,82 +62,19 @@ const closeModal = () => {
     // Add hide class for animation
     modal.classList.remove('show');
     modal.classList.add('hide');
-    
+
     // Wait for animation before hiding
     setTimeout(() => {
       modal.style.display = 'none';
       modal.classList.remove('hide');
       document.body.style.overflow = ''; // Restore scroll
     }, 300); // Match CSS transition duration
-    
+
     // State is automatically preserved since we're not destroying the widget
   }
 };
 
-// Update progress bar function
-const updateProgressBar = stepName => {
-  // Update the current step in widget state
-  widgetState.currentStep = stepName;
-
-  // Find and update the global progress bar
-  const globalProgressBar = document.getElementById('dh-global-progress-bar');
-
-  if (globalProgressBar) {
-    // Replace the global progress bar with a new one reflecting current state
-    const newProgressBar = createCircularProgress();
-    newProgressBar.id = 'dh-global-progress-bar';
-    globalProgressBar.parentNode.replaceChild(
-      newProgressBar,
-      globalProgressBar
-    );
-  }
-};
-
-// Reusable circular progress component creator
-const createCircularProgress = () => {
-  const progressBar = document.createElement('div');
-  progressBar.className = 'dh-progress-bar';
-
-  stepProgressManager.stepFlow.forEach((stepName, index) => {
-    // Create step container
-    const stepContainer = document.createElement('div');
-    stepContainer.className = 'dh-progress-step-container';
-
-    // Create the step circle
-    const step = document.createElement('div');
-    const stepStatus = stepProgressManager.getStepStatus(stepName);
-    step.className = `dh-progress-step ${stepStatus}`;
-
-    // Add checkmark for completed step or empty for others
-    if (stepStatus === 'completed') {
-      step.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="17" height="13" viewBox="0 0 17 13" fill="none"><path d="M5.7 12.025L0 6.325L1.425 4.9L5.7 9.175L14.875 0L16.3 1.425L5.7 12.025Z" fill="white"/></svg>`;
-    } else {
-      step.textContent = '';
-    }
-
-    // Create step label
-    const stepLabel = document.createElement('div');
-    stepLabel.className = `dh-progress-step-label ${stepStatus}`;
-    stepLabel.textContent = stepProgressManager.stepLabels[stepName];
-
-    stepContainer.appendChild(step);
-    stepContainer.appendChild(stepLabel);
-    progressBar.appendChild(stepContainer);
-
-    // Add connecting line between steps (except after last step)
-    if (index < stepProgressManager.stepFlow.length - 1) {
-      const line = document.createElement('div');
-      const lineStatus =
-        stepProgressManager.getStepStatus(stepName) === 'completed'
-          ? 'active'
-          : '';
-      line.className = `dh-progress-line ${lineStatus}`;
-      progressBar.appendChild(line);
-    }
-  });
-
-  return progressBar;
-};
+// Progress bar functionality removed - no longer needed
 
 // Create button for modal trigger
 const createButton = () => {
@@ -205,6 +143,46 @@ const createInlineWidget = () => {
   formWidget.className = 'dh-form-widget';
   formWidget.id = 'dh-form-widget';
 
+  // Create close icon for all steps
+  const closeIcon = document.createElement('div');
+  closeIcon.className = 'dh-widget-close-icon';
+  closeIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 29 29" fill="none">
+    <path d="M14.5 28C21.9558 28 28 21.9558 28 14.5C28 7.04416 21.9558 1 14.5 1C7.04416 1 1 7.04416 1 14.5C1 21.9558 7.04416 28 14.5 28Z" fill="white" stroke="#515151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M18.5492 10.45L10.4492 18.55L18.5492 10.45Z" fill="white"/>
+    <path d="M18.5492 10.45L10.4492 18.55" stroke="#515151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M10.4492 10.45L18.5492 18.55L10.4492 10.45Z" fill="white"/>
+    <path d="M10.4492 10.45L18.5492 18.55" stroke="#515151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  // Add click handler for close functionality
+  closeIcon.addEventListener('click', () => {
+    if (config.displayMode === 'button') {
+      // For button mode, close the modal
+      closeModal();
+    } else {
+      // For inline mode, reset to first step or hide widget
+      showStep('pest-issue');
+      if (typeof resetWidgetState === 'function') {
+        resetWidgetState();
+      }
+    }
+  });
+
+  // Create global back button
+  const globalBackButton = document.createElement('button');
+  globalBackButton.className = 'dh-global-back-button';
+  globalBackButton.id = 'dh-global-back-button';
+  globalBackButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="16" viewBox="0 0 20 16" fill="none">
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M19.0006 7.99993C19.0006 8.41414 18.6648 8.74993 18.2506 8.74993H3.5609L9.03122 14.2193C9.32427 14.5124 9.32427 14.9875 9.03122 15.2806C8.73816 15.5736 8.26302 15.5736 7.96996 15.2806L1.21996 8.53055C1.07913 8.38988 1 8.19899 1 7.99993C1 7.80087 1.07913 7.60998 1.21996 7.4693L7.96996 0.719304C8.26302 0.426248 8.73816 0.426248 9.03122 0.719304C9.32427 1.01236 9.32427 1.4875 9.03122 1.78055L3.5609 7.24993H18.2506C18.6648 7.24993 19.0006 7.58571 19.0006 7.99993Z" fill="#515151" stroke="#515151"/>
+</svg> BACK`;
+
+  // Add click handler for global back button
+  globalBackButton.addEventListener('click', () => {
+    if (typeof previousStep === 'function') {
+      previousStep();
+    }
+  });
+
   // Create form elements
   const formContainer = document.createElement('div');
   formContainer.id = 'dh-form-container';
@@ -234,30 +212,21 @@ const createInlineWidget = () => {
   content.className = 'dh-form-content';
   content.id = 'dh-form-content';
 
-  // Create single global progress bar
-  const globalProgressBar = createCircularProgress();
-  globalProgressBar.id = 'dh-global-progress-bar';
-  content.appendChild(globalProgressBar);
-
   // Create form steps
   const steps = createFormSteps();
   steps.forEach(step => content.appendChild(step));
 
   // Assemble form elements into container
   formContainer.appendChild(content);
+  formWidget.appendChild(closeIcon);
+  formWidget.appendChild(globalBackButton);
   formWidget.appendChild(formContainer);
 
   return {
     formWidget: formWidget,
     formContainer: formContainer,
-    content: content
+    content: content,
   };
-};
-
-// Helper function to add progress bar to a form step
-const addProgressBarToStep = stepElement => {
-  const progressBar = createCircularProgress();
-  stepElement.insertBefore(progressBar, stepElement.firstChild);
 };
 
 // Main widget creation function
@@ -292,107 +261,9 @@ const updateModalOverflow = stepName => {
       modalContent.style.overflow = 'hidden';
     }
     if (formWidget) {
-      formWidget.style.maxHeight = '90vh';
-      formWidget.style.overflow = 'auto';
+      formWidget.style.overflow = 'visible';
     }
   }
 };
 
-// Create welcome screen content for Step 1 (new design) 
-const createWelcomeScreenContent = () => {
-  const welcomeContainer = document.createElement('div');
-  welcomeContainer.className = 'dh-welcome-screen';
-
-  // Left content area
-  const welcomeContent = document.createElement('div');
-  welcomeContent.className = 'dh-welcome-content';
-
-  // Welcome title
-  const welcomeTitle = document.createElement('h1');
-  welcomeTitle.className = 'dh-welcome-title';
-  welcomeTitle.textContent =
-    (typeof widgetState !== 'undefined' && widgetState.widgetConfig?.welcomeTitle) || 'Get help now!';
-
-  // Welcome description
-  const welcomeDescription = document.createElement('h2');
-  welcomeDescription.className = 'dh-welcome-description';
-  welcomeDescription.textContent =
-    (typeof widgetState !== 'undefined' && widgetState.widgetConfig?.welcomeDescription) ||
-    'For fast, affordable & professional pest solutions in your area.';
-
-  // Benefits list
-  const benefitsList = document.createElement('ul');
-  benefitsList.className = 'dh-welcome-benefits';
-
-  // Render custom benefits if available
-  if (
-    typeof widgetState !== 'undefined' &&
-    widgetState.widgetConfig?.welcomeBenefits &&
-    widgetState.widgetConfig.welcomeBenefits.length > 0
-  ) {
-    widgetState.widgetConfig.welcomeBenefits.forEach(benefit => {
-      const li = document.createElement('li');
-
-      // Create icon element
-      if (benefit.icon && benefit.icon.trim()) {
-        const iconElement = document.createElement('span');
-        iconElement.className = 'dh-benefit-icon';
-        iconElement.innerHTML = benefit.icon;
-        li.appendChild(iconElement);
-      }
-
-      // Create text element
-      const textElement = document.createElement('span');
-      textElement.className = 'dh-benefit-text';
-      textElement.textContent = benefit.text;
-      li.appendChild(textElement);
-
-      benefitsList.appendChild(li);
-    });
-  }
-
-  // Welcome button
-  const welcomeButton = document.createElement('button');
-  welcomeButton.className = 'dh-welcome-button';
-  welcomeButton.innerHTML = `
-    <span>${widgetState.widgetConfig?.welcomeButtonText || 'Start My Free Estimate'}</span>
-    <span class="dh-button-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></span>
-  `;
-  welcomeButton.addEventListener('click', () => {
-    nextStep();
-  });
-
-  // Terms disclaimer
-  const termsDisclaimer = document.createElement('p');
-  termsDisclaimer.className = 'dh-terms-disclaimer';
-  termsDisclaimer.textContent =
-    '*terms and conditions apply. See details for more information';
-
-  // Assemble content
-  welcomeContent.appendChild(welcomeTitle);
-  welcomeContent.appendChild(welcomeDescription);
-  welcomeContent.appendChild(benefitsList);
-  welcomeContent.appendChild(welcomeButton);
-  welcomeContent.appendChild(termsDisclaimer);
-
-  // Right hero area
-  const welcomeHero = document.createElement('div');
-  welcomeHero.className = 'dh-welcome-hero';
-
-  // Set hero image if available
-  if (widgetState.widgetConfig?.branding?.hero_image_url) {
-    welcomeHero.style.backgroundImage = `url(${widgetState.widgetConfig.branding.hero_image_url})`;
-  }
-
-  // Set welcome screen background in bottom corner
-  const bgSvg = document.createElement('div');
-  bgSvg.className = 'dh-welcome-svg-background';
-  bgSvg.innerHTML = `<img src="https://cwmckkfkcjxznkpdxgie.supabase.co/storage/v1/object/public/brand-assets/general/background-pests.svg" alt="" />`;
-
-  // Assemble welcome container
-  welcomeContainer.appendChild(welcomeContent);
-  welcomeContainer.appendChild(welcomeHero);
-  welcomeContainer.appendChild(bgSvg);
-
-  return welcomeContainer;
-};
+// Welcome screen function removed - widget now starts directly with pest issue selection

@@ -18,6 +18,7 @@ interface PlanSuggestion {
   plan_description: string;
   plan_category: string;
   initial_price: number;
+  initial_discount: number;
   recurring_price: number;
   billing_frequency: string;
   treatment_frequency: string;
@@ -28,6 +29,7 @@ interface PlanSuggestion {
   color_scheme: any;
   requires_quote: boolean;
   plan_image_url: string | null;
+  plan_disclaimer: string | null;
   coverage_match: {
     covered_pests: number;
     total_selected: number;
@@ -103,6 +105,7 @@ export async function POST(request: NextRequest) {
         plan_description,
         plan_category,
         initial_price,
+        initial_discount,
         recurring_price,
         billing_frequency,
         treatment_frequency,
@@ -114,6 +117,7 @@ export async function POST(request: NextRequest) {
         color_scheme,
         requires_quote,
         plan_image_url,
+        plan_disclaimer,
         plan_pest_coverage (
           pest_id,
           coverage_level,
@@ -169,6 +173,7 @@ export async function POST(request: NextRequest) {
         plan_description: plan.plan_description,
         plan_category: plan.plan_category,
         initial_price: plan.initial_price,
+        initial_discount: plan.initial_discount,
         recurring_price: plan.recurring_price,
         billing_frequency: plan.billing_frequency,
         treatment_frequency: plan.treatment_frequency,
@@ -179,6 +184,7 @@ export async function POST(request: NextRequest) {
         color_scheme: plan.color_scheme,
         requires_quote: plan.requires_quote,
         plan_image_url: plan.plan_image_url,
+        plan_disclaimer: plan.plan_disclaimer,
         coverage_match: {
           covered_pests: coveredPests.length,
           total_selected: selectedPests.length,

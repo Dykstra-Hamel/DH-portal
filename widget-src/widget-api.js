@@ -98,7 +98,7 @@
     const submitBtn = document.getElementById('contact-submit');
     if (submitBtn) {
       if (isSubmitting) {
-        submitBtn.textContent = 'Submitting...';
+        submitBtn.innerHTML = 'Submitting... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         submitBtn.classList.add('submitting');
       } else {
         // Only re-enable if form is valid
@@ -112,7 +112,7 @@
           const email = emailInput.value.trim();
           const isValid = name && phone && email && email.includes('@');
 
-          submitBtn.textContent = 'Get My Free Estimate';
+          submitBtn.innerHTML = 'Schedule Service <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
           submitBtn.classList.remove('submitting');
         }
       }
@@ -130,23 +130,11 @@
 
   // Form validation with submission
   window.submitFormWithValidation = () => {
-    const firstNameInput = document.getElementById('first-name-input');
-    const lastNameInput = document.getElementById('last-name-input');
-    const phoneInput = document.getElementById('phone-input');
-    const emailInput = document.getElementById('email-input');
     const startDateInput = document.getElementById('start-date-input');
     const arrivalTimeInput = document.getElementById('arrival-time-input');
-    const termsCheckbox = document.getElementById('terms-checkbox');
 
     // Clear existing errors
-    [
-      firstNameInput,
-      lastNameInput,
-      phoneInput,
-      emailInput,
-      startDateInput,
-      arrivalTimeInput,
-    ].forEach(input => {
+    [startDateInput, arrivalTimeInput].forEach(input => {
       if (input) {
         progressiveFormManager.clearFieldError(input);
       }
@@ -154,70 +142,14 @@
 
     let hasErrors = false;
 
-    // Validate required fields
-    if (!firstNameInput?.value.trim()) {
-      progressiveFormManager.showFieldError(
-        firstNameInput,
-        'First name is required'
-      );
-      hasErrors = true;
-    }
-
-    if (!lastNameInput?.value.trim()) {
-      progressiveFormManager.showFieldError(
-        lastNameInput,
-        'Last name is required'
-      );
-      hasErrors = true;
-    }
-
-    if (!phoneInput?.value.trim()) {
-      progressiveFormManager.showFieldError(
-        phoneInput,
-        'Phone number is required'
-      );
-      hasErrors = true;
-    } else {
-      // Validate phone format
-      const cleanPhone = phoneInput.value.replace(/[\s\-\(\)]/g, '');
-      if (!/^[\d\+]+$/.test(cleanPhone)) {
+    // Validate start date
+    if (!startDateInput || !startDateInput.value) {
+      if (startDateInput) {
         progressiveFormManager.showFieldError(
-          phoneInput,
-          'Please enter a valid phone number'
+          startDateInput,
+          'Preferred start date is required'
         );
-        hasErrors = true;
-      } else if (cleanPhone.length < 10) {
-        progressiveFormManager.showFieldError(
-          phoneInput,
-          'Phone number must be at least 10 digits'
-        );
-        hasErrors = true;
       }
-    }
-
-    if (!emailInput?.value.trim()) {
-      progressiveFormManager.showFieldError(
-        emailInput,
-        'Email address is required'
-      );
-      hasErrors = true;
-    } else {
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(emailInput.value)) {
-        progressiveFormManager.showFieldError(
-          emailInput,
-          'Please enter a valid email address'
-        );
-        hasErrors = true;
-      }
-    }
-
-    if (!startDateInput?.value) {
-      progressiveFormManager.showFieldError(
-        startDateInput,
-        'Preferred start date is required'
-      );
       hasErrors = true;
     } else if (!isDateInFuture(startDateInput.value)) {
       progressiveFormManager.showFieldError(
@@ -227,60 +159,21 @@
       hasErrors = true;
     }
 
-    if (!arrivalTimeInput?.value) {
-      progressiveFormManager.showFieldError(
-        arrivalTimeInput,
-        'Preferred arrival time is required'
-      );
-      hasErrors = true;
-    }
-
-    if (!termsCheckbox?.checked) {
-      // Use the standard error system for terms checkbox
-      const termsContainer = termsCheckbox.closest('.dh-form-group');
-      if (termsContainer) {
-        // Create a temporary container element to use with showFieldError
-        let termsErrorContainer = termsContainer.querySelector(
-          '.dh-terms-error-container'
-        );
-        if (!termsErrorContainer) {
-          termsErrorContainer = document.createElement('div');
-          termsErrorContainer.className = 'dh-terms-error-container';
-          termsErrorContainer.id = 'terms-checkbox-container';
-          termsContainer.appendChild(termsErrorContainer);
-        }
-
+    // Validate arrival time
+    if (!arrivalTimeInput || !arrivalTimeInput.value) {
+      if (arrivalTimeInput) {
         progressiveFormManager.showFieldError(
-          termsErrorContainer,
-          'You must agree to the terms and conditions'
+          arrivalTimeInput,
+          'Preferred arrival time is required'
         );
-
-        // Add real-time clearing for terms checkbox
-        const clearTermsError = () => {
-          if (termsCheckbox.checked) {
-            progressiveFormManager.clearFieldError(termsErrorContainer);
-          }
-        };
-
-        // Remove existing listeners to prevent duplicates
-        termsCheckbox.removeEventListener('change', clearTermsError);
-        termsCheckbox.addEventListener('change', clearTermsError);
       }
-
       hasErrors = true;
     }
 
     if (!hasErrors) {
-      // Save contact info to widget state before submission
-      widgetState.formData.contactInfo = {
-        firstName: firstNameInput.value.trim(),
-        lastName: lastNameInput.value.trim(),
-        name: `${firstNameInput.value.trim()} ${lastNameInput.value.trim()}`,
-        email: emailInput.value.trim(),
-        phone: phoneInput.value.trim(),
-        startDate: startDateInput.value,
-        arrivalTime: arrivalTimeInput.value,
-      };
+      // Save scheduling info to widget state before submission
+      widgetState.formData.startDate = startDateInput.value;
+      widgetState.formData.arrivalTime = arrivalTimeInput.value;
 
       // All validation passed, proceed with form submission
       submitForm();
@@ -491,12 +384,44 @@
       widgetState.formData.offerChoice = 'schedule-from-comparison';
       showStep('contact');
       setupStepValidation('contact');
-      updateProgressBar('contact');
     }, 500);
   };
 
-  // Helper function to format billing frequency to natural language
+  // Helper function to format billing frequency to natural language (abbreviated)
   const formatBillingFrequency = (frequency) => {
+    if (!frequency) return '';
+    
+    const freq = frequency.toLowerCase().trim();
+    
+    switch (freq) {
+      case 'monthly':
+        return '/mo';
+      case 'quarterly':
+        return '/qtr';
+      case 'annually':
+      case 'yearly':
+        return '/yr';
+      case 'weekly':
+        return '/wk';
+      case 'biannually':
+      case 'semi-annually':
+      case 'semiannually':
+        return '/6mo';
+      case 'daily':
+        return '/day';
+      default:
+        // Fallback: try to convert "ly" endings to natural form
+        if (freq.endsWith('ly')) {
+          const base = freq.slice(0, -2);
+          return `/${base}`;
+        }
+        // Final fallback: return as-is with forward slash
+        return `/${frequency}`;
+    }
+  };
+
+  // Helper function to format billing frequency with full words (for How We Do It step)
+  const formatBillingFrequencyFull = (frequency) => {
     if (!frequency) return '';
     
     const freq = frequency.toLowerCase().trim();
@@ -801,6 +726,7 @@
         phone: quotePhoneInput.value.trim(),
       };
 
+
       // Fetch plan comparison data and ensure minimum loading time
       await Promise.all([
         fetchPlanComparisonData(),
@@ -811,7 +737,6 @@
       // Navigate to plan comparison with pre-loaded data
       await showStep('plan-comparison');
       setupStepValidation('plan-comparison');
-      updateProgressBar('plan-comparison');
 
       // Hide loading overlay after everything is complete
       setTimeout(() => {
@@ -831,7 +756,6 @@
       // Fallback: proceed to plan comparison even if data fetch failed
       await showStep('plan-comparison');
       setupStepValidation('plan-comparison');
-      updateProgressBar('plan-comparison');
     }
   };
 
@@ -876,8 +800,66 @@
     }
   };
 
+  // Get the cheapest plan with full coverage for the selected pest
+  const getCheapestFullCoveragePlan = async () => {
+    try {
+      const requestBody = {
+        companyId: config.companyId,
+        selectedPests: [widgetState.formData.pestType],
+      };
+      
+      const response = await fetch(
+        config.baseUrl + '/api/widget/suggested-plans',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data.success && data.suggestions && data.suggestions.length > 0) {
+        // Filter for plans with 100% coverage
+        const fullCoveragePlans = data.suggestions.filter(plan => 
+          plan.coverage_match && plan.coverage_match.coverage_percentage === 100
+        );
+        
+        if (fullCoveragePlans.length > 0) {
+          // Sort by initial price (cheapest setup cost) and return the first one
+          const cheapestPlan = fullCoveragePlans.sort((a, b) => 
+            parseFloat(a.initial_price) - parseFloat(b.initial_price)
+          )[0];
+          
+          // Store the recommended plan data
+          widgetState.formData.recommendedPlan = cheapestPlan;
+          widgetState.formData.offerPrice = cheapestPlan.recurring_price;
+          
+          return cheapestPlan;
+        } else {
+          // No full coverage plans, use the best match available
+          const bestPlan = data.suggestions[0];
+          widgetState.formData.recommendedPlan = bestPlan;
+          widgetState.formData.offerPrice = bestPlan.recurring_price;
+          return bestPlan;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting cheapest full coverage plan:', error);
+      widgetState.formData.recommendedPlan = null;
+      widgetState.formData.offerPrice = null;
+      return null;
+    }
+  };
+
   // Expose functions to window for use by other modules
   window.fetchPlanComparisonData = fetchPlanComparisonData;
   window.fetchPricingData = fetchPricingData;
+  window.getCheapestFullCoveragePlan = getCheapestFullCoveragePlan;
+  window.formatBillingFrequencyFull = formatBillingFrequencyFull;
 
 })();
