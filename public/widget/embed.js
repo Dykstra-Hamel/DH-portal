@@ -1,6 +1,6 @@
 /**
  * DH Widget - Built from Source
- * Generated: 2025-08-21T13:52:37.253Z
+ * Generated: 2025-08-25T21:13:14.946Z
  * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
  */
 
@@ -276,6 +276,13 @@
   return icon || null;
   };
 
+  // Helper function to get the pest background image with fallback
+  const getPestBackgroundImage = () => {
+  const pestBackgroundImage = widgetState.formData.pestBackgroundImage;
+  const fallbackImage = widgetState.widgetConfig?.branding?.pestSelectBackgroundImage;
+  return pestBackgroundImage || fallbackImage || null;
+  };
+
   // Helper function to update dynamic text based on form data
   const updateDynamicText = async () => {
   // Wait for DOM to be ready
@@ -354,47 +361,20 @@
         );
       }
 
-      // Update completion step with customer name
+      // Update completion step title to Office Hours
       const completionMessage = document.querySelector(
         '#dh-step-complete h3'
       );
-      if (completionMessage && widgetState.formData.contactInfo) {
-        const { firstName, lastName } = widgetState.formData.contactInfo;
-        if (firstName) {
-          const customerName = lastName
-            ? `${firstName} ${lastName}`
-            : firstName;
-          completionMessage.textContent = `Thank you for your request, ${customerName}!`;
-        }
+      if (completionMessage) {
+        completionMessage.textContent = 'Office Hours';
       }
 
-      // Update completion step with additional personalized info
+      // Update completion step with Success Message
       const completionDescription = document.querySelector(
         '#dh-step-complete p'
       );
-      if (completionDescription && widgetState.formData.contactInfo) {
-        const { firstName } = widgetState.formData.contactInfo;
-        const pestType = getPestTypeDisplay(
-          widgetState.formData.pestType,
-          'default'
-        );
-        const addressCity = widgetState.formData.addressCity;
-
-        let message = "We've received your information";
-        if (firstName) {
-          message = `Hi ${firstName}! We've received your information`;
-        }
-        if (pestType !== 'pests' && addressCity) {
-          message += ` for ${pestType} service in ${addressCity}`;
-        } else if (pestType !== 'pests') {
-          message += ` for ${pestType} service`;
-        } else if (addressCity) {
-          message += ` for service in ${addressCity}`;
-        }
-        message +=
-          ' and will contact you within 24 hours with your free estimate. Keep an eye on your email and phone for our response.';
-
-        completionDescription.textContent = message;
+      if (completionDescription && widgetState.widgetConfig?.successMessage) {
+        completionDescription.textContent = widgetState.widgetConfig.successMessage;
       }
 
       // Update urgency timeline references based on selection
@@ -439,9 +419,52 @@
           ref.textContent = widgetState.formData.addressCity;
         });
       }
+      // Update step headings with variable replacement
+      updateStepHeadings();
+
       resolve(); // Resolve the promise when all updates are complete
     }, 100); // Small delay to ensure DOM is ready
   });
+  };
+
+
+  // Helper function to replace step heading variables
+  const replaceStepVariables = (text, pestType, recommendedPlan) => {
+  if (!text) return '';
+  
+  const pestText = getPestTypeDisplay(pestType, 'default');
+  const initialPrice = recommendedPlan?.initial_price ? `$${recommendedPlan.initial_price}` : '$';
+  const recurringPrice = recommendedPlan?.recurring_price && recommendedPlan?.billing_frequency 
+    ? `$${recommendedPlan.recurring_price}<span class="dh-price-frequency">${window.formatBillingFrequencyFull ? window.formatBillingFrequencyFull(recommendedPlan.billing_frequency) : formatBillingFrequency(recommendedPlan.billing_frequency)}</span>`
+    : '$';
+
+  return text
+    .replace(/\{pest\}/g, pestText)
+    .replace(/\{initialPrice\}/g, initialPrice)
+    .replace(/\{recurringPrice\}/g, recurringPrice);
+  };
+
+  // Function to update step headings with variables
+  const updateStepHeadings = () => {
+  const pestType = widgetState.formData.pestType;
+  const recommendedPlan = widgetState.formData.recommendedPlan;
+  const stepHeadings = widgetState.widgetConfig?.stepHeadings;
+  
+  if (!stepHeadings) return;
+  
+  // Update address step heading
+  const addressHeading = document.getElementById('address-step-heading');
+  if (addressHeading && stepHeadings.address) {
+    const processedText = replaceStepVariables(stepHeadings.address, pestType, recommendedPlan);
+    addressHeading.innerHTML = processedText;
+  }
+  
+  // Update how-we-do-it step heading
+  const howWeDoItHeading = document.getElementById('how-we-do-it-heading');
+  if (howWeDoItHeading && stepHeadings.howWeDoIt) {
+    const processedText = replaceStepVariables(stepHeadings.howWeDoIt, pestType, recommendedPlan);
+    howWeDoItHeading.innerHTML = processedText;
+  }
   };
 
   // Function to check if input has value and update label state
@@ -618,6 +641,124 @@
     }
   };
 
+  // Function to load address imagery as background image
+  const loadAddressBackgroundImagery = async (address, backgroundElementId) => {
+    const backgroundEl = document.getElementById(backgroundElementId);
+    
+    if (!backgroundEl) {
+      console.warn(`Background element not found: ${backgroundElementId}`);
+      return;
+    }
+
+    try {
+      // Get API key
+      const apiKeyResponse = await fetch(
+        config.baseUrl + '/api/google-places-key'
+      );
+      const apiKeyData = await apiKeyResponse.json();
+
+      if (!apiKeyData.apiKey) {
+        throw new Error('Google API key not available');
+      }
+
+      const apiKey = apiKeyData.apiKey;
+      const { lat, lon } = address;
+
+      // Check Street View availability using metadata API first
+      const hasStreetView = await checkStreetViewAvailability(
+        lat,
+        lon,
+        apiKey
+      );
+
+      if (hasStreetView) {
+        // Street View is available - set as background
+        try {
+          const streetViewUrl =
+            `https://maps.googleapis.com/maps/api/streetview?` +
+            `size=800x600&location=${lat},${lon}&heading=0&pitch=0&fov=90&key=${apiKey}`;
+
+          // Test if Street View image loads successfully
+          const testImage = new Image();
+          testImage.crossOrigin = 'anonymous';
+
+          await new Promise((resolve, reject) => {
+            testImage.onload = () => {
+              // Street View loaded successfully - set as background
+              backgroundEl.style.backgroundImage = `url('${streetViewUrl}')`;
+              backgroundEl.style.backgroundSize = 'cover';
+              backgroundEl.style.backgroundPosition = 'center';
+              backgroundEl.style.backgroundRepeat = 'no-repeat';
+              
+              // Store the URL in widget state for reuse in other steps
+              if (typeof widgetState !== 'undefined') {
+                widgetState.addressBackgroundUrl = streetViewUrl;
+              }
+              resolve();
+            };
+
+            testImage.onerror = () => {
+              // Street View failed to load, try satellite fallback
+              reject(new Error('Street View image failed to load'));
+            };
+
+            testImage.src = streetViewUrl;
+          });
+
+        } catch (streetViewError) {
+          console.warn('Street View failed, trying satellite:', streetViewError);
+          // Fall back to satellite view
+          await loadSatelliteBackground(lat, lon, apiKey, backgroundEl);
+        }
+      } else {
+        // No Street View available, use satellite
+        await loadSatelliteBackground(lat, lon, apiKey, backgroundEl);
+      }
+    } catch (error) {
+      console.error('Address background imagery failed:', error);
+      // Set a subtle fallback background or leave empty
+      backgroundEl.style.backgroundColor = '#f3f4f6';
+    }
+  };
+
+  // Helper function to load satellite view as background
+  const loadSatelliteBackground = async (lat, lon, apiKey, backgroundEl) => {
+    try {
+      const satelliteUrl = 
+        `https://maps.googleapis.com/maps/api/staticmap?` +
+        `center=${lat},${lon}&zoom=18&size=800x600&maptype=satellite&key=${apiKey}`;
+
+      const testImage = new Image();
+      testImage.crossOrigin = 'anonymous';
+
+      await new Promise((resolve, reject) => {
+        testImage.onload = () => {
+          backgroundEl.style.backgroundImage = `url('${satelliteUrl}')`;
+          backgroundEl.style.backgroundSize = 'cover';
+          backgroundEl.style.backgroundPosition = 'center';
+          backgroundEl.style.backgroundRepeat = 'no-repeat';
+          
+          // Store the URL in widget state for reuse in other steps
+          if (typeof widgetState !== 'undefined') {
+            widgetState.addressBackgroundUrl = satelliteUrl;
+          }
+          resolve();
+        };
+
+        testImage.onerror = () => {
+          reject(new Error('Satellite image failed to load'));
+        };
+
+        testImage.src = satelliteUrl;
+      });
+
+    } catch (error) {
+      console.error('Satellite background failed:', error);
+      // Set fallback background
+      backgroundEl.style.backgroundColor = '#f3f4f6';
+    }
+  };
+
   // Helper function to load satellite view
   const loadSatelliteView = async (lat, lon, formatted, apiKey, imageEl, loadingEl, errorEl) => {
     try {
@@ -756,6 +897,9 @@
     return '';
   };
 
+  // Expose functions to window for global access
+  window.updateStepHeadings = updateStepHeadings;
+
   // === WIDGET STYLES ===
   // Create CSS styles with full color palette
   const createStyles = (
@@ -807,10 +951,16 @@
   const primaryRgb = hexToRgb(primaryColor);
   const primaryFocus = `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, 0.1)`;
 
+  // Get font configuration from widget config
+  const fontName = widgetState.widgetConfig?.fonts?.primary?.name || 'Outfit';
+  const fontUrl =
+    widgetState.widgetConfig?.fonts?.primary?.url ||
+    'https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap';
+
   const styleElement = document.createElement('style');
   styleElement.id = 'dh-widget-styles';
   styleElement.textContent = `
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+  @import url('${fontUrl}');
   .dh-form-widget { 
   margin: 0 auto; 
   background: ${backgroundColor}; 
@@ -818,13 +968,70 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1); 
   overflow: visible; 
   color: ${textColor};
+  position: relative;
+  }
+  .dh-widget-close-icon {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 100;
+  cursor: pointer;
+  pointer-events: auto;
+  width: 29px;
+  height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+  }
+  .dh-widget-close-icon:hover {
+  opacity: 0.8;
+  }
+  .dh-widget-close-icon svg {
+  width: 29px;
+  height: 29px;
+  }
+  .dh-global-back-button {
+  position: absolute;
+  top: 67px;
+  left: 0px;
+  z-index: 90;
+  background: #E3E3E3;
+  color: #4A4A4A;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 0 60px 60px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: '${fontName}', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  opacity: 0.7;
+  }
+
+  .dh-global-back-button svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transision: all 0.2s ease;
+  }
+
+  .dh-global-back-button:hover svg {
+  transform: translateX(-2px);
+  }
+  .dh-global-back-button.hidden {
+  display: none;
   }
   .dh-form-content { 
   padding: 24px; 
   border-radius: 26px; 
   background: ${backgroundColor};
   } 
-  .dh-form-step { 
+  .dh-form-step {
+  height: 100%;
   display: none;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -835,7 +1042,7 @@
   opacity: 1;
   } 
   .dh-form-step.active { 
-  display: block; 
+  display: flex; 
   opacity: 1;
   }
 
@@ -848,17 +1055,125 @@
   } 
 
   .dh-form-step-content {
-    padding: 40px 80px;
-    border-bottom: 1px solid #cccccc;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-height: 90vh;
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+    border-bottom: none;
   }
+
+  #dh-step-plan-comparison .dh-form-step-content {
+   flex-wrap: wrap;
+  }
+
+  #dh-step-plan-comparison .dh-pest-hero {
+  width: 386px;
+  flex-shrink: 0;
+  }
+
+  .dh-plan-faqs-container {
+  width: 100%;
+  margin: 22px;
+  padding: 31px;
+  background: rgba(69, 69, 69, 0.05);
+  border-radius: 16px;
+  }
+
+  .dh-form-content-area {
+    flex: 1;
+    align-items: center;
+    padding: 37px 32px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 2;
+  }
+
+  .dh-price-frequency {
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 24px;
+  color: #515151;
+  }
+
+  .dh-price-suffix {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  }
+
   .dh-form-step h3 { 
   margin: 0 0 12px 0; 
   font-size: 18px; 
   color: ${secondaryColor}; 
   } 
+
+  h3.dh-how-we-do-it-title, .dh-safety-text {
+  font-size: 28px;
+  line-height: 30px;
+  font-weight: 700;
+  color: #4E4E4E;
+  }
+
+  .dh-how-we-do-it-text {
+    margin-right: 35px;
+    line-height: 24px;
+  }
+
+  .dh-how-we-do-it-content {
+   display: flex;
+   margin-top: 46px;
+  }
+
+  .dh-subspecies-section {
+  margin-top: 20px;
+  }
+
+  .dh-subspecies-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, auto);
+  gap: 8px 20px;
+  margin: 0 0 22px 0;
+  grid-auto-flow: column;
+  }
+
+  .dh-subspecies-grid .dh-subspecies-item {
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #4E4E4E;
+  }
+
+  .dh-subspecies-grid .dh-subspecies-item:before {
+  content: "•";
+  margin-right: 8px;
+  color: #4E4E4E;
+  font-weight: bold;
+  }
+
+  .dh-interior-image {
+   width: 244px;
+   height: 251px;
+   border-radius: 16px;
+  }
+
+  .dh-safety-message {
+   display: flex;
+   align-items: center;
+   margin-bottom: 53px;
+  }
+
   .dh-form-group { 
-  width: 515px;
-  max-width: 100%;
+  max-width: 515px;
+  width: 100%;
   margin: 0 auto 20px;
   } 
   .dh-form-label { 
@@ -866,13 +1181,13 @@
   font-weight: 500; 
   color: #4E4E4E; 
   margin-bottom: 6px; 
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 20px;
   line-height: 30px;
   } 
   .dh-address-form-label {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 24px;
   color: #4E4E4E;
   text-align: center;
   font-size: 20px;
@@ -886,7 +1201,7 @@
   border-radius: 8px; 
   outline: none; 
   font-size: 16px; 
-  font-family: inherit; 
+  font-family: "${fontName}", sans-serif; 
   box-sizing: border-box; 
   background: ${backgroundColor};
   color: ${textColor};
@@ -900,7 +1215,19 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background: url('https://cwmckkfkcjxznkpdxgie.supabase.co/storage/v1/object/public/brand-assets/general/select-arrow.svg') no-repeat right 12px center;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  background-size: 20px;
+  }
+
+  /* Style date inputs with dropdown arrow */
+  .dh-form-input[type="date"] {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  background-size: 20px;
   }
 
   /* Hide default calendar icon for date inputs - we use custom SVG */
@@ -927,11 +1254,6 @@
 
   .dh-floating-input .dh-form-input:focus ~ .dh-input-icon {
   color: #16a34a;
-  }
-
-  /* Contact step form field widths */
-  #dh-step-contact .dh-form-row, #dh-step-contact .dh-form-group {
-  width: 390px;
   }
 
   #dh-step-contact .dh-form-row .dh-form-group {
@@ -1052,7 +1374,7 @@
   pointer-events: none;
   transition: all 0.2s ease-in-out;
   z-index: 1;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   }
 
   .dh-input-with-icon .dh-floating-label {
@@ -1068,7 +1390,7 @@
   font-weight: 500;
   color: ${primaryColor};
   left: 12px;
-  background: ${backgroundColor};
+  background: transparent;
   }
 
   .dh-input-with-icon .dh-form-input:focus + .dh-floating-label,
@@ -1160,7 +1482,7 @@
   max-width: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 13px;
   margin: 0 auto;
   }
   .dh-form-row .dh-form-group {
@@ -1180,7 +1502,7 @@
   border-radius: 8px;
   outline: none;
   font-size: 16px;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   box-sizing: border-box;
   background: ${backgroundColor};
   color: ${textColor};
@@ -1193,7 +1515,7 @@
   }
 
   .dh-address-suggestions {
-  position: absolute;
+  position: relative;
   top: 100%;
   left: 0;
   right: 0;
@@ -1212,7 +1534,7 @@
   padding: 12px 16px;
   cursor: pointer;
   border-bottom: 1px solid #f3f4f6;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 14px;
   color: ${textColor};
   transition: background-color 0.2s ease;
@@ -1241,7 +1563,7 @@
   padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -1274,7 +1596,7 @@
   .dh-image-loading p {
   margin: 0;
   font-size: 14px;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   }
 
   .dh-image-error {
@@ -1288,7 +1610,7 @@
   border-radius: 8px;
   color: #dc2626;
   font-size: 14px;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   text-align: center;
   }
 
@@ -1302,7 +1624,9 @@
 
   /* Address Search Mode vs Display Mode */
   #address-search-mode {
-  display: block;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   }
 
   #address-display-mode {
@@ -1315,6 +1639,20 @@
 
   #address-search-mode.hidden {
   display: none;
+  }
+
+  /* Service Area Check Button */
+  #check-service-area-btn {
+  opacity: 0.6;
+  }
+
+  #check-service-area-btn:enabled {
+  opacity: 1;
+  }
+
+  #check-service-area-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
   }
 
   /* Selected Address Card Styling */
@@ -1374,7 +1712,7 @@
   .dh-image-loading p {
   margin: 8px 0 0 0;
   font-size: 14px;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   }
 
   /* Improved Error States */
@@ -1394,7 +1732,7 @@
   .dh-image-error p {
   margin: 0;
   font-size: 14px;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   }
 
   /* Address Form Specific Improvements */
@@ -1408,7 +1746,7 @@
   box-sizing: border-box;
   background: ${backgroundColor};
   color: ${textColor};
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   }
 
   .dh-address-search-field:focus {
@@ -1431,7 +1769,7 @@
   font-weight: 500;
   transition: all 0.2s ease;
   display: inline-block;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   }
 
   .dh-change-address-btn:hover {
@@ -1453,7 +1791,7 @@
 
   .dh-address-header p {
   margin: 0;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 16px;
   color: ${textColor};
   font-weight: 500;
@@ -1466,7 +1804,7 @@
   color: ${secondaryColor};
   margin-bottom: 8px;
   line-height: 1.4;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   }
 
   /* Urgency Step Styling */
@@ -1485,7 +1823,7 @@
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   cursor: pointer;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 16px;
   font-weight: 500;
   text-align: center;
@@ -1562,12 +1900,11 @@
   .dh-form-out-of-service {
   text-align: center;
   padding: 40px 0;
-  max-width: 500px;
   margin: 0 auto;
   }
 
   .dh-form-out-of-service h3 {
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 24px;
   font-weight: 600;
   color: ${secondaryColor};
@@ -1576,12 +1913,17 @@
   }
 
   .dh-form-out-of-service p {
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 16px;
   font-weight: 400;
   color: ${textColor};
   line-height: 1.5;
   margin: 0 0 24px 0;
+  }
+
+  /* Specific styling for out of service step heading */
+  #dh-step-out-of-service .dh-step-heading {
+  margin: auto;
   }
 
   /* Responsive styling for out-of-service */
@@ -1617,7 +1959,7 @@
 
   .dh-offer-options p {
   margin: 0;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 16px;
   font-weight: 500;
   color: ${textColor};
@@ -1627,7 +1969,7 @@
   padding: 16px 24px;
   border: 2px solid;
   border-radius: 8px;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-weight: 600;
   font-size: 20px;
   cursor: pointer;
@@ -1678,8 +2020,21 @@
   }
 
   @media (max-width: 480px) {
-  .dh-form-row {
-    grid-template-columns: 1fr;
+
+  .dh-safety-message {
+    flex-direction: row-reverse;
+  }
+
+  .dh-how-we-do-it-text {
+   margin-right: 0;
+  }
+
+  #how-we-do-it-interior-image {
+    width: 100vw;
+    object-fit: cover;
+    border-radius: 0;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
   }
   
   .dh-offer-options {
@@ -1708,6 +2063,11 @@
     padding: 16px;
     margin: 12px 0;
   }
+
+  .dh-form-button-group {
+    width: 100%;
+    padding: 0 !important;
+  }
   }
   .dh-form-checkbox-label {
   display: flex;
@@ -1717,12 +2077,15 @@
   line-height: 1.5;
   color: ${textColor};
   cursor: pointer;
+  margin-bottom: 80px;
   }
   .dh-form-checkbox {
-  width: auto !important;
+  width: 18px !important;
+  height: 18px !important;
   margin: 0 !important;
   flex-shrink: 0;
   margin-top: 2px !important;
+  cursor: pointer;
   } 
   .dh-form-select { 
   width: 100%; 
@@ -1731,7 +2094,7 @@
   border-radius: 8px; 
   outline: none; 
   font-size: 14px; 
-  font-family: inherit; 
+  font-family: "${fontName}", sans-serif; 
   background: ${backgroundColor}; 
   box-sizing: border-box; 
   color: ${textColor};
@@ -1768,12 +2131,11 @@
   display: flex; 
   position: relative;
   gap: 12px; 
-  margin-top: 24px; 
+  margin-top: auto; 
   justify-content: center;
   align-items: center;
   padding: 0 20px 20px 20px;
   border-radius: 0 0 26px 26px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, ${primaryLight} 100%);
   } 
   #dh-step-exit-survey .dh-form-button-group { 
   background: none;
@@ -1782,15 +2144,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 24px; 
+  gap: 25px;
+  padding: 20px 30px; 
   border: none; 
-  border-radius: 8px; 
+  border-radius: 60px; 
   cursor: pointer; 
   font-size: 18px;
   line-height: 18px;
-  font-family: Outfit, sans-serif;
-  font-weight: 500; 
+  font-family: "${fontName}", sans-serif;
+  font-weight: 700; 
   transition: all 0.2s ease;
   transform: translateY(0);
   }
@@ -1830,7 +2192,7 @@
   gap: 8px;
   background: #CBCBCB; 
   color: #4E4E4E;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 18px;
   font-weight: 500;
   line-height: 18px;
@@ -1869,7 +2231,12 @@
   bottom: 0;
   }
   .dh-form-btn.plan-no-thanks {
-    background: transparent;
+    background: #BFBFBF;
+    color: #515151;
+  }
+
+  .dh-form-btn.plan-no-thanks svg {
+    display: none;
   }
   .dh-form-btn.plan-no-thanks:hover {
     opacity: 0.8;
@@ -1950,10 +2317,10 @@
     transition-duration: 0.01ms !important;
   }
   }
+
   .dh-pest-selection {
-  display: flex;
-  gap: 20px;
-  padding: 20px 0;
+  gap: 32px;
+  padding: 0 0 20px 0;
   flex-flow: row wrap;
   justify-content: center;
   }
@@ -1962,20 +2329,18 @@
   flex-direction: column;
   align-items: center;
   cursor: pointer;
-  width: 160px;
   transition: all 0.2s ease;
   }
   .dh-pest-icon {
-  width: 160px;
-  height: 100px;
+  width: 103px;
+  height: 103px;
   border-radius: 10px;
-  border: 2px solid #e5e7eb;
+  border: 1px solid #D9D9D9;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 32px;
   margin-bottom: 12px;
-  background: white;
   transition: all 0.2s ease;
   flex-shrink: 0;
   }
@@ -1987,6 +2352,25 @@
   .dh-pest-icon svg path {
   fill: #4E4E4E;
   }
+  .dh-pest-label {
+  text-align: center;
+  margin-top: 8px;
+  width: 100%;
+  color: #4E4E4E;
+  font-family: "${fontName}", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 18px;
+  }
+  .dh-pest-option:hover .dh-pest-icon {
+  border-color: ${primaryColor};
+  }
+  .dh-pest-option.selected .dh-pest-icon {
+  border-color: ${primaryColor};
+  color: white;
+  }
+
+  /* Keep only these styles that are still used by other steps */
   .dh-address-pest-icon {
   display: block;
   margin: 0 auto 20px;
@@ -2000,30 +2384,12 @@
   .dh-address-pest-icon svg path {
   fill: ${primaryColor};
   }
-  .dh-pest-label {
-  text-align: center;
-  margin-top: 8px;
-  width: 100%;
-  color: #4E4E4E;
-  font-family: Outfit;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 18px;
-  }
-  .dh-pest-option:hover .dh-pest-icon {
-  border-color: ${primaryColor};
-  background: #f8fafc;
-  }
-  .dh-pest-option.selected .dh-pest-icon {
-  border-color: ${primaryColor};
-  color: white;
-  }
   .dh-step-instruction {
   color: #4E4E4E;
+  font-size: 16px;
+  line-height: 24px;
   text-align: center;
-  font-size: 26px;
-  font-weight: 400;
-  line-height: 103%;
+  font-weight: 500;
   margin: 20px 0;
   }
   .dh-plan-loading {
@@ -2060,6 +2426,413 @@
   animation: spin 1s linear infinite;
   margin: 0;
   }
+
+  /* New Pest Step Layout with Hero Image */
+  .dh-pest-step-container {
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+  position: relative;
+  overflow: visible;
+  }
+
+  .dh-pest-content {
+  flex: 1;
+  padding: 40px 70px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  align-items: center;
+  }
+
+  .dh-pest-logo {
+  margin-bottom: 40px;
+  }
+
+  .dh-pest-logo img {
+  max-height: 99px;
+  max-width: 224px;
+  height: auto;
+  width: auto;
+  }
+
+  .dh-pest-time-badge {
+  display: inline-block;
+  margin-bottom: 24px;
+  }
+
+  .dh-pest-time-badge span {
+  color: ${secondaryColor};
+  font-family: "${fontName}", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  }
+
+  .dh-pest-heading {
+  color: #515151;
+  font-family: "${fontName}", sans-serif;
+  font-size: 46px;
+  font-weight: 700;
+  line-height: 46px;
+  letter-spacing: -0.46px;
+  margin: 0 0 24px 0;
+  }
+
+  .dh-pest-instruction {
+  color: #4E4E4E;
+  font-family: "${fontName}", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  margin: 0 0 40px 0;
+  }
+
+  .dh-pest-selection {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+  }
+
+  .dh-pest-option:hover {
+  border-color: ${primaryColor};
+  }
+
+  .dh-pest-option:hover .dh-pest-icon svg path {
+  fill: ${primaryColor};
+  }
+
+  .dh-pest-option:hover .dh-pest-label {
+  color: ${primaryColor};
+  }
+
+  .dh-pest-option.selected {
+  border-color: ${primaryColor};
+  background: ${primaryColor};
+  }
+
+  .dh-pest-option.selected .dh-pest-icon svg path {
+  fill: white;
+  }
+
+  .dh-pest-option.selected .dh-pest-label {
+  color: white;
+  }
+
+
+
+  .dh-pest-icon svg {
+  width: 69px;
+  height: 69px;
+  fill: #6b7280;
+  transition: fill 0.2s ease;
+  }
+
+  .dh-pest-label {
+  text-align: center;
+  color: #374151;
+  font-family: "${fontName}", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 120%;
+  margin: 0;
+  transition: color 0.2s ease;
+  }
+
+  .dh-pest-hero {
+  width: 386px;
+  max-height: 90vh;
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  }
+
+  .dh-pest-hero:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 1) 80%
+  );
+  z-index: 2;
+  }
+
+  .dh-pest-hero:not(.step1):before {
+    background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 1) 100%
+  );
+  }
+
+  .dh-pest-bg-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 80%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #f3f4f6;
+  border-radius: 0 26px 26px 0;
+  z-index: 1;
+  }
+
+  /* Specific styling for confirm-address background */
+  #confirm-address-bg-image {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: background-image 0.3s ease;
+  }
+
+  .dh-pest-bg-image:not(.step1) {
+  height: 100%;
+  }
+
+  .dh-pest-hero-image {
+  position: fixed;
+  bottom: 0;
+  z-index: 2;
+  max-width: 453px;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0 26px 26px 0;
+  }
+
+  @media (max-width: 1280px) {
+   .dh-pest-hero-image {
+   max-width: 380px;
+   right: -70px;
+   }
+  }
+
+  /* Tablet Responsive - 1024px and below */
+  @media (max-width: 1024px) {
+  .dh-modal-overlay {
+    padding: 0 !important;
+  }
+
+  .dh-modal-content {
+    overflow-y: scroll !important;
+    border-radius: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    max-width: 100vw !important;
+  }
+
+  .dh-form-checkbox-label {
+    margin-bottom: 48px;
+  }
+
+  .dh-form-step-content {
+    flex-direction: column;
+    flex-wrap: nowrap !important;;
+  }
+
+  .dh-pest-hero {
+    width: 100%;
+  }
+
+  .dh-pest-hero-image {
+    display: none !important;
+  }
+
+  .dh-pest-bg-image {
+    border-radius: 0 !important;;
+  }
+
+  .dh-pest-hero:before {
+  background: linear-gradient(
+    to top,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 1) 100%
+  ) !important;
+  }
+
+  #dh-form-container {
+    width: 100%;
+  }
+  
+  .dh-pest-step-container {
+    width: 100%;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .dh-how-we-do-it-content {
+    flex-direction: column-reverse;
+    align-items: center;
+    margin-top: 0;
+  }
+  
+  .dh-how-we-do-it-text {
+    margin-top: 48px;
+  }
+
+  .dh-pest-bg-image {
+    position: relative;
+    width: 100%;
+    min-height: 240px;
+    border-radius: 0 0 26px 26px;
+    z-index: 1;
+    background-position: top;
+  }
+  
+  .dh-pest-bg-image:not(.step1) {
+    height: 200px;
+  }
+  
+  /* Confirm address mobile image styles */
+  #dh-step-confirm-address .dh-pest-hero {
+    display: none;
+  }
+  
+  #dh-step-confirm-address .dh-mobile-bg-image {
+    display: block;
+    margin: 24px 0;
+  }
+
+  .dh-plan-content-grid {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .dh-plan-visual {
+    order: -1;
+    margin: auto;
+  }
+
+  #dh-step-plan-comparison .dh-pest-hero {
+    display: none;
+  }
+  }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+  .dh-pest-step-container,
+  .dh-form-step-content {
+    flex-direction: column;
+    min-height: auto;
+  }
+  
+  .dh-pest-content,
+  .dh-form-content-area {
+    padding: 20px;
+  }
+  
+  .dh-pest-heading {
+    font-size: 30px;
+    line-height: 32px;
+  }
+  
+  .dh-pest-selection {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  
+  /* Global elements mobile responsive */
+  .dh-global-back-button {
+    top: 20px;
+    padding: 12px 18px;
+    font-size: 0;
+  }
+  
+  .dh-global-back-button svg {
+    width: 16px;
+    height: 14px;
+  }
+  
+  .dh-widget-close-icon {
+    top: 24px;
+    right: 20px;
+    width: 26px;
+    height: 26px;
+  }
+  
+  .dh-widget-close-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .dh-plan-faqs-container {
+    max-width: 100%;
+    width: unset;
+  }
+  }
+
+  /* Mobile background image for confirm address step */
+  .dh-mobile-bg-image {
+  display: none;
+  width: 100%;
+  max-width: 512px;
+  height: auto;
+  object-fit: cover;
+  border-radius: 12px;
+  }
+
+
+  @media (max-width: 480px) {
+
+  .dh-pest-logo {
+    margin-bottom: 24px;
+  }
+
+  .dh-pest-logo img {
+    max-height: 53px;
+    max-width: 119px;
+  }
+  
+  .dh-pest-heading {
+    font-size: 32px;
+    line-height: 32px;
+    letter-spacing: -0.3px;
+  }
+
+  .dh-pet-safety-image {
+    width: 144px;
+  }
+
+  .dh-safety-text {
+    font-size: 22px;
+    line-height: 26px;
+  }
+
+  .dh-subspecies-grid {
+    gap: 2px 20px;
+  }
+
+  .dh-form-btn:not(.plan-no-thanks) {
+    width: 100%;
+  }
+
+  .dh-plan-visual {
+    width: 100vw;
+    max-width: unset !important;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+  }
+
+  .dh-plan-visual img {
+    border-radius: 0 !important;
+  }
+
+  .dh-plan-image-container {
+    border-radius: 0 !important;
+  }
+  }
+
+
   .dh-urgency-loading {
   position: absolute;
   top: 0;
@@ -2139,7 +2912,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: inherit;
+  font-family: "${fontName}", sans-serif;
   display: inline-block;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
@@ -2171,6 +2944,7 @@
   padding: 20px;
   box-sizing: border-box;
   opacity: 0;
+  overflow: auto;
   transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
   }
 
@@ -2184,18 +2958,20 @@
 
   .dh-modal-content {
   border-radius: 26px;
-  max-width: 900px;
+  margin: auto;
+  max-width: 1078px;
   width: 90%;
-  max-height: 90vh;
+  min-height: 90vh;
   position: relative;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   background: white;
-  font-family: "Outfit", sans-serif;
+  font-family: "${fontName}", sans-serif;
   display: flex;
   flex-direction: column;
   transform: scale(0.95);
   transition: transform 0.3s ease, opacity 0.3s ease;
   opacity: 0;
+  overflow: visible;
   }
 
   .dh-modal-overlay.show .dh-modal-content {
@@ -2264,105 +3040,7 @@
   pointer-events: none;
   }
 
-  .dh-progress-bar {
-  display: flex;
-  align-items: center;
-  padding: 50px 50px 25px 50px;
-  justify-content: center;
-  width: 100%;
-  box-sizing: border-box;
-  }
-
-  .dh-progress-step-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  max-width: 32px;
-  position: relative;
-  }
-
-  .dh-progress-step {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-  position: relative;
-  z-index: 50;
-  }
-
-  .dh-progress-step.completed {
-  background: ${primaryColor};
-  color: white;
-  border: 3px solid ${primaryColor};
-  }
-
-  .dh-progress-step.active {
-  background: #fff;
-  color: white;
-  border: 3px solid ${secondaryColor};
-  }
-
-  .dh-progress-step.active::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: ${secondaryColor};
-  }
-
-  .dh-progress-step.inactive {
-  background: #fff;
-  color: #9ca3af;
-  border: 3px solid #D9D9D9;
-  }
-
-  .dh-progress-step-label {
-  display: block;
-  position: absolute;
-  bottom: -20px;
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-  line-height: 1.2;
-  white-space: nowrap;
-  }
-
-  .dh-progress-step-label.completed {
-  color: ${primaryColor};
-  font-weight: 600;
-  }
-
-  .dh-progress-step-label.active {
-  color: ${secondaryColor};
-  font-weight: 600;
-  }
-
-  .dh-progress-step-label.inactive {
-  color: #9ca3af;
-  }
-
-  .dh-progress-line {
-  flex: 1;
-  height: 2px;
-  background: #e5e7eb;
-  position: relative;
-  margin-left: -4px;
-  margin-right: -4px;
-  }
-
-  .dh-progress-line.active {
-  background: ${primaryColor};
-  }
+  /* Progress bar styles removed - no longer needed */
 
   .dh-welcome-title {
   font-size: 65px;
@@ -2456,7 +3134,7 @@
   }
 
   .dh-step-heading {
-  color: #4E4E4E;
+  color: #515151;
   text-align: center;
   font-size: 45px;
   font-weight: 700;
@@ -2475,7 +3153,7 @@
 
   .dh-modal-body {
   flex: 1;
-  overflow: visible;
+  overflow-y: visible;
   padding: 0;
   min-height: 0;
   }
@@ -2508,19 +3186,26 @@
 
   .dh-modal-body .dh-form-widget {
   margin: 0;
+  min-height: 100%;
+  display: flex;
   box-shadow: none;
   border-radius: 26px;
   padding: 0;
   }
 
+  #dh-form-container {
+  display: flex;
+  width: 100%;
+  }
+
   .dh-modal-body .dh-form-content {
+  height: 100%;
+  width: 100%;
   padding: 0;
   margin: 0;
   }
 
-  .dh-modal-body .dh-form-progress {
-  margin: 0 24px;
-  }
+  /* Progress styles removed */
 
   /* Mobile modal adjustments */
   @media (max-width: 768px) {
@@ -2529,7 +3214,7 @@
   }
   
   .dh-modal-content {
-    max-height: 95vh;
+    min-height: 95vh;
     width: 95%;
   }
   
@@ -2541,19 +3226,13 @@
     font-size: 20px;
   }
   
-  .dh-modal-body .dh-form-progress {
-    margin: 0 16px;
-  }
+  /* Progress styles removed */
   
   .dh-widget-button {
     padding: 14px 28px;
     font-size: 16px;
     width: 100%;
     max-width: 300px;
-  }
-
-  .dh-form-step-content {
-    padding: 40px;
   }
 
   .dh-step-heading {
@@ -2573,58 +3252,7 @@
   .dh-welcome-title {
     font-size: 28px;
   }
-  .dh-progress-bar {
-    margin-bottom: 30px;
-  }
-  }
-  @media (max-width: 650px) {
-  .dh-welcome-hero {
-    width: 250px;
-  }
-  .dh-welcome-svg-background {
-    width: 300px;
-    height: 400px;
-  }
-  }
-  @media (max-width: 600px) {
-  .dh-welcome-hero,
-  .dh-welcome-svg-background {
-    display: none;
-  }
-
-  .dh-welcome-content {
-    padding-right: 20px;
-    text-align: center;
-  }
-
-  .dh-welcome-title {
-    font-size: 40px
-  }
-
-  .dh-welcome-description {
-    max-width: 100%;
-    font-size: 22px;
-  }
-
-  .dh-welcome-button {
-    margin: 0 auto;
-  }
-
-  .dh-progress-bar {
-    padding: 20px 25px;
-  }
-
-  .dh-step-heading {
-    font-size: 30px;
-  }
-
-  .dh-step-instruction {
-    font-size: 18px;
-  }
-
-  .dh-form-step-content {
-    padding: 20px;
-  }
+  /* Progress styles removed */
   }
 
   /* Plan Comparison Styles - Exact Copy from Original */
@@ -2651,7 +3279,7 @@
   .dh-plan-tab-label {
   color: #4E4E4E;
   text-align: center;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 12px;
   font-style: normal;
   font-weight: 600;
@@ -2662,7 +3290,7 @@
   .dh-plan-tab-name {
   color: #4E4E4E;
   text-align: center;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 20px;
   font-weight: 400;
   line-height: 24px;
@@ -2680,12 +3308,7 @@
   margin: 32px 0;
   min-height: 400px;
   }
-  .dh-plan-details {
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 32px;
-  align-items: start;
-  }
+
   @media (max-width: 768px) {
   .dh-plan-details {
     grid-template-columns: 1fr;
@@ -2699,22 +3322,23 @@
   }
   .dh-form-step h3.dh-plan-title {
   color: #4E4E4E;
-  font-family: Outfit;
-  font-size: 40px;
-  font-weight: 500;
-  line-height: 50px;
+  font-family: "${fontName}", sans-serif;
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 24px;
   }
   .dh-plan-description {
   color: #4E4E4E;
-  font-family: Outfit;
-  font-size: 20px;
+  font-family: "${fontName}", sans-serif;
+  font-size: 16px;
   font-weight: 400;
-  line-height: 25px;
+  line-height: 24px;
   }
 
   .dh-plan-included h4 {
   color: #4E4E4E;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 20px;
   font-weight: 600;
   line-height: 33px;
@@ -2731,11 +3355,11 @@
   align-items: flex-start;
   gap: 12px;
   color: #4E4E4E;
-  font-family: Outfit;
-  font-size: 20px;
-  line-height: 23px;
-  font-weight: 400;
-  margin-bottom: 8px;
+  font-family: "${fontName}", sans-serif;
+  font-size: 16px;
+  line-height: 19px;
+  font-weight: 600;
+  margin-bottom: 16px;
   }
 
   .dh-feature-checkmark svg {
@@ -2746,20 +3370,26 @@
   stroke: ${primaryColor};
   }
 
-  .dh-plan-pricing {
-  margin: 24px 0 0;
-  padding: 20px 0 0;
-  }
   .dh-plan-price-label {
   color: #4E4E4E;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 26px;
   font-weight: 500;
   line-height: 30px;
   }
+
+  .dh-plan-recommendation-badge {
+  margin-bottom: 7px;
+  }
+
+  .dh-plan-pricing {
+  grid-column: span 2;
+  margin-left: 15px;
+  }
+  
   .dh-plan-price-detail {
   color: #4E4E4E;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 20px;
   font-weight: 400;
   line-height: 25px;
@@ -2767,12 +3397,19 @@
   }
   .dh-plan-price-disclaimer {
   color: #4E4E4E;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 18px;
+  margin-top: 20px;
+  }
+  .dh-plan-price-frequency {
+  font-family: "${fontName}", sans-serif;
   font-size: 16px;
-  font-weight: 400;
-  line-height: 20px;
-  margin: 0;
-  font-style: italic;
+  margin-top: 10px;
+  font-weight: 500;
+  line-height: 24px;
   }
 
   .dh-plan-coverage-icons {
@@ -2802,12 +3439,14 @@
   position: relative;
   }
   .dh-plan-image-container {
+  height: 100%;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   .dh-plan-image-actual {
   display: flex;
+  height: 100%;
   align-items: center;
   justify-content: center;
   }
@@ -2817,7 +3456,6 @@
   margin: 32px 0 0 0;
   display: flex;
   align-items: center;
-  flex-direction: column;
   gap: 12px;
   justify-content: center;
   }
@@ -2827,23 +3465,18 @@
   }
   }
 
-  .dh-form-btn.plan-no-thanks {
-  background: transparent;
-  }
   .dh-form-btn.plan-no-thanks:hover {
   opacity: 0.8;
   }
 
   /* FAQ Accordion Styles */
   .dh-plan-faqs {
-  margin: 40px 0 0 0;
   padding: 40px 0 0 0;
-  border-top: 1px solid #e5e7eb;
   }
   .dh-form-step h3.dh-faqs-title {
-  color: ${secondaryColor};
+  color: #515151;
   text-align: center;
-  font-family: Outfit;
+  font-family: "${fontName}", sans-serif;
   font-size: 26px;
   font-weight: 600;
   line-height: 103%;
@@ -2860,6 +3493,42 @@
   }
   .dh-faq-item:hover {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .dh-faq-item:last-of-type {
+  border-bottom: none;
+  }
+
+  .dh-plan-selection-label {
+  color: ${primaryColor};
+  font-family: "Source Sans 3";
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 28px;
+  }
+
+  .dh-plan-selection-dropdown {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding: 10px;
+  min-width: 333px;
+  width: 50%;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 22px;
+  padding-right: 30px;
+  border-radius: 4px;
+  border: 1px solid #BFBFBF;
+  font-weight: 700;
+  font-size: 16px;
+  }
+
+  .dh-plan-selection-section {
+  display: flex;
+  flex-direction: column;
   }
 
   .dh-faq-header {
@@ -2899,7 +3568,7 @@
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease-out;
-  background: ${backgroundColor};
+  background: transparent;
   }
   .dh-faq-answer {
   padding: 0 20px 16px 20px;
@@ -2913,7 +3582,7 @@
   @media (max-width: 768px) {
   .dh-plan-faqs {
     margin: 32px 0 0 0;
-    padding: 20px 0 0 0;
+    padding: 0;
   }
   .dh-faqs-title {
     font-size: 18px;
@@ -2929,13 +3598,14 @@
   .dh-faq-answer {
     padding: 0 16px 14px 16px;
   }
+
+  .dh-plan-pricing {
+    margin-left: 0;
+  }
   }
 
   /* Mobile Styles */
   @media (max-width: 650px) {
-  .dh-plan-visual {
-    order: 1;
-  }
 
   .dh-plan-main {
     order: 2;
@@ -2949,12 +3619,11 @@
   @media (max-width: 480px) {
   .dh-plan-title {
     font-size: 26px;
-    text-align: center;
   }
 
   .dh-plan-description {
     font-size: 18px;
-    text-align: center;
+  
   }
 
   .dh-plan-included h4 {
@@ -2986,6 +3655,91 @@
   flex-direction: column;
   gap: 12px;
   margin: 20px 0;
+  }
+
+  /* New Feedback Options Styles */
+  .dh-feedback-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 30px 0;
+  width: 100%;
+  max-width: 400px;
+  }
+
+  .dh-feedback-option {
+  position: relative;
+  cursor: pointer;
+  }
+
+  .dh-feedback-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  }
+
+  .dh-feedback-button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 2px solid #e5e5e5;
+  border-radius: 12px;
+  background: #fff;
+  transition: all 0.2s ease;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  }
+
+  .dh-feedback-button:hover {
+  border-color: #ccc;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .dh-feedback-radio:checked + .dh-feedback-button {
+  border-color: var(--primary-color, #27ae60);
+  background: rgba(39, 174, 96, 0.05);
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.15);
+  }
+
+  .dh-feedback-emoji {
+  font-size: 24px;
+  line-height: 1;
+  }
+
+  .dh-feedback-text {
+  flex: 1;
+  text-align: left;
+  }
+
+  /* Textarea Styles */
+  .dh-textarea-container {
+  width: 100%;
+  }
+
+  .dh-form-textarea {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid #e5e5e5;
+  border-radius: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 100px;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+  }
+
+  .dh-form-textarea:focus {
+  outline: none;
+  border-color: var(--primary-color, #27ae60);
+  box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.1);
+  }
+
+  .dh-form-textarea::placeholder {
+  color: #999;
   }
   .dh-survey-option {
   display: flex;
@@ -3029,6 +3783,454 @@
   color: #6b7280; 
   margin: 0; 
   }
+
+  #dh-step-decline-complete .dh-form-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  }
+
+  /* Plan content grid layout */
+  .dh-plan-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 247px;
+  gap: 20px;
+  align-items: start;
+  }
+
+  .dh-recommendation-text {
+  color: ${primaryColor};
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 13px; /* 130% */
+  letter-spacing: 1.9px;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+  }
+
+
+  .dh-plan-info {
+  /* Content takes up remaining space */
+  }
+
+  .dh-plan-visual {
+  max-width: 247px;
+  height: 100%;
+  /* Image on the right side */
+  }
+
+  .dh-plan-visual .dh-plan-image-actual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  }
+
+  /* New pricing layout styling */
+  .dh-plan-price-container {
+  display: flex;
+  margin: 10px 0 20px 10px;
+  align-items: center;
+  gap: 40px;
+  }
+
+  .dh-plan-price-left {
+  display: flex;
+  flex-direction: column;
+  position: relative
+  }
+
+  .dh-plan-price-left::after {
+    content: '';
+    position: absolute;
+    right: -22px;
+    top: 10px;
+    width: 1px;
+    height: 50px;
+    background: #BFBFBF; 
+  }
+
+  .dh-plan-price-starting {
+  color: #4E4E4E;
+  font-family: "${fontName}", sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  margin-bottom: 5px;
+  margin-left: 30px;
+  }
+
+  .dh-plan-price-recurring {
+  color: ${primaryColor};
+  font-family: "${fontName}", sans-serif;
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+  }
+
+  .dh-plan-price-right {
+  display: flex;
+  flex-direction: column;
+  }
+
+  .dh-plan-price-initial {
+  color: ${primaryColor};
+  font-family: "${fontName}", sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  margin-bottom: 5px;
+  }
+
+  .dh-plan-price-initial .dh-price-number {
+  font-weight: 700;
+  }
+
+  .dh-plan-price-initial span.dh-price-dollar {
+  font-size: 17px;
+  position: relative;
+  top: -7px;
+  font-weight: 700;
+  }
+
+  .dh-plan-price-normally {
+  color: #4E4E4E;
+  font-family: "${fontName}", sans-serif;
+  font-size: 19px;
+  font-weight: 400;
+  }
+
+  .dh-plan-price-normally span.dh-price-dollar {
+  font-size: 14px;
+  position: relative;
+  top: -5px;
+  }
+
+  .dh-plan-price-crossed {
+  text-decoration: line-through;
+  font-weight: 700;
+  }
+
+  /* Dollar sign styling */
+  .dh-plan-price-recurring .dh-price-dollar {
+  align-self: flex-start;
+  font-size: 37px;
+  }
+
+  /* Asterisk and frequency styling - stacked vertically and smaller */
+  .dh-price-asterisk {
+  font-size: 32px;
+  position: relative;
+  top: 5px;
+  color: #515151;
+  font-weight: 400;
+  margin-left: 2px;
+  align-self: flex-start;
+  }
+
+  /* Exit Survey Centered Layout */
+  .dh-exit-survey-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  }
+
+  .dh-exit-survey-centered .dh-step-heading {
+  font-size: 48px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  margin-bottom: 16px !important;
+  color: #333 !important;
+  }
+
+  .dh-exit-survey-centered .dh-step-instruction {
+  font-size: 20px !important;
+  line-height: 1.5 !important;
+  margin-bottom: 40px !important;
+  color: #666 !important;
+  max-width: 500px;
+  }
+
+  .dh-exit-survey-centered .dh-form-group {
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 24px;
+  }
+
+  /* Custom checkbox styling for exit survey */
+  .dh-checkbox-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  margin-bottom: 40px;
+  cursor: pointer;
+  }
+
+  .dh-checkbox-input {
+  position: absolute !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
+  }
+
+  .dh-checkbox-checkmark {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  background-color: white;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.2s ease;
+  }
+
+  .dh-checkbox-checkmark:after {
+  content: '';
+  position: absolute;
+  display: none;
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 10px;
+  border: solid ${primaryColor};
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  }
+
+  .dh-checkbox-input:checked ~ .dh-checkbox-checkmark {
+  background-color: ${primaryColor};
+  border-color: ${primaryColor};
+  }
+
+  .dh-checkbox-input:checked ~ .dh-checkbox-checkmark:after {
+  display: block;
+  border-color: white;
+  }
+
+  .dh-checkbox-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #374151;
+  }
+
+  .dh-link {
+  color: ${primaryColor};
+  text-decoration: underline;
+  cursor: pointer;
+  }
+
+  .dh-link:hover {
+  color: ${primaryDark};
+  }
+
+  .dh-read-more-link {
+  color: ${secondaryColor};
+  cursor: pointer;
+  font-weight: 500;
+  }
+
+  .dh-read-more-link:hover {
+  color: ${secondaryDark};
+  }
+
+  .dh-exit-survey-buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  }
+
+  .dh-exit-survey-buttons .dh-form-btn {
+  min-width: 200px;
+  }
+
+  /* Error states for exit survey */
+  .dh-exit-survey-centered .dh-form-input.error {
+  border-color: #ef4444 !important;
+  }
+
+  .dh-exit-survey-centered .dh-checkbox-container.error .dh-checkbox-checkmark {
+  border-color: #ef4444 !important;
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+  .dh-exit-survey-centered {
+    padding: 20px 16px;
+  }
+  
+  .dh-exit-survey-centered .dh-step-heading {
+    font-size: 32px !important;
+  }
+  
+  .dh-exit-survey-centered .dh-step-instruction {
+    font-size: 18px !important;
+  }
+  
+  .dh-exit-survey-buttons .dh-form-btn {
+    min-width: 160px;
+  }
+  
+  .dh-feedback-options {
+    max-width: 100%;
+    margin: 20px 0;
+  }
+  
+  .dh-feedback-button {
+    padding: 14px 16px;
+    font-size: 15px;
+  }
+  
+  .dh-feedback-emoji {
+    font-size: 20px;
+  }
+  
+  .dh-form-textarea {
+    padding: 14px;
+    font-size: 15px;
+  }
+  }
+
+  /* Contact Step Information Display Sections */
+  .dh-info-section {
+  margin: 32px 0;
+  text-align: center;
+  }
+
+  .dh-info-section-header {
+  font-size: 12px !important;
+  font-style: normal !important;
+  font-weight: 600 !important;
+  line-height: 28px !important;
+  color: ${primaryColor} !important;
+  margin: 0 0 8px 0 !important;
+  }
+
+  .dh-info-section-content {
+  font-size: 18px !important;
+  font-style: normal !important;
+  font-weight: 600 !important;
+  line-height: 28px !important;
+  color: #4E4E4E !important;
+  }
+
+  .dh-info-section-content div {
+  margin-bottom: 4px;
+  }
+
+  .dh-info-section-content div:last-child {
+  margin-bottom: 0;
+  }
+
+  /* Contact step specific adjustments */
+  #dh-step-contact .dh-form-content-area {
+  margin: 0 auto;
+  text-align: center;
+  }
+
+  #dh-step-contact .dh-form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+  }
+
+  #dh-step-contact .dh-form-row .dh-form-group {
+  flex: 1;
+  }
+
+  /* Ensure proper spacing for contact step */
+  #dh-step-contact .dh-step-heading {
+  text-align: center;
+  margin-bottom: 12px;
+  }
+
+  #dh-step-contact .dh-step-instruction {
+  text-align: center;
+  margin-bottom: 32px;
+  }
+
+  #dh-step-contact .dh-form-button-group {
+  margin-top: 40px;
+  }
+
+  /* Complete Step Styles */
+  .dh-complete-section {
+  margin: 32px 0;
+  width: 100%;
+  }
+
+  #dh-step-complete .dh-complete-section-title,  #dh-step-complete .dh-complete-service-date,  #dh-step-complete .dh-complete-section-content   {
+  font-size: 16px;
+  font-weight: 700;
+  color: #4E4E4E;
+  margin: 0 0 8px 0;
+  text-align: center;
+  line-height: 20px;
+  }
+
+  #dh-step-complete .requested-date-time {
+  font-size: 13px;
+  }
+
+  .dh-complete-section-content {
+  font-size: 16px;
+  color: #666;
+  text-align: center;
+  line-height: 1.4;
+  }
+
+  .dh-complete-service-date {
+  background: #f5f5f5;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  text-align: center;
+  margin-top: 8px;
+  }
+
+  /* Mobile responsive for contact step */
+  @media (max-width: 768px) {
+  #dh-step-contact .dh-form-row {
+    flex-direction: column;
+    width: 253px;
+    gap: 0;
+    margin-bottom: 0;
+  }
+  
+  .dh-info-section {
+    margin: 16px 0;
+  }
+  
+  .dh-info-section-content {
+    font-size: 16px !important;
+  }
+  
+  /* Mobile responsive for complete step */
+  .dh-complete-section {
+    margin: 24px 0;
+  }
+  
+  .dh-complete-section-title {
+    font-size: 15px;
+  }
+  
+  .dh-complete-section-content {
+    font-size: 15px;
+  }
+  
+  .dh-complete-service-date {
+    font-size: 15px;
+    padding: 14px 20px;
+  }
+  }
   `;
   document.head.appendChild(styleElement);
   };
@@ -3040,6 +4242,42 @@
     existingStyles.remove();
   }
   createStyles(colors);
+  };
+
+  // Update widget fonts after config is loaded
+  const updateWidgetFonts = () => {
+  const fontName = widgetState.widgetConfig?.fonts?.primary?.name || 'Outfit';
+  const fontUrl =
+    widgetState.widgetConfig?.fonts?.primary?.url ||
+    'https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap';
+
+  console.log('DEBUG updateWidgetFonts: fontName =', fontName);
+  console.log('DEBUG updateWidgetFonts: fontUrl =', fontUrl);
+
+  const existingStyles = document.getElementById('dh-widget-styles');
+  if (existingStyles) {
+    console.log('DEBUG updateWidgetFonts: Found existing styles, updating...');
+    let cssText = existingStyles.textContent;
+
+    // Update font import URL
+    cssText = cssText.replace(
+      /@import url\([^)]+\);/,
+      `@import url('${fontUrl}');`
+    );
+
+    // Update all font-family declarations
+    cssText = cssText.replace(/font-family:\s*[^;]+;/g, match => {
+      if (match.includes('sans-serif')) {
+        return `font-family: '${fontName}', sans-serif;`;
+      } else if (match.includes('"')) {
+        return `font-family: "${fontName}", sans-serif;`;
+      } else {
+        return `font-family: "${fontName}", sans-serif;`;
+      }
+    });
+
+    existingStyles.textContent = cssText;
+  }
   };
 
   // === WIDGET UI ===
@@ -3061,24 +4299,25 @@
 
       // Initialize first step after a brief delay
       setTimeout(() => {
-        showStep('welcome');
+        showStep('pest-issue');
+        setupStepValidation('pest-issue');
       }, 100);
     } else {
       // For subsequent modal opens, just show the current step
       if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
         showStep(widgetState.currentStep);
       } else {
-        showStep('welcome');
+        showStep('pest-issue');
       }
     }
 
     // Show modal with smooth animation
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden'; // Prevent background scroll
-    
+
     // Force reflow to ensure display is set before animation
     modal.offsetHeight;
-    
+
     // Add show class for animation
     modal.classList.add('show');
 
@@ -3101,82 +4340,19 @@
     // Add hide class for animation
     modal.classList.remove('show');
     modal.classList.add('hide');
-    
+
     // Wait for animation before hiding
     setTimeout(() => {
       modal.style.display = 'none';
       modal.classList.remove('hide');
       document.body.style.overflow = ''; // Restore scroll
     }, 300); // Match CSS transition duration
-    
+
     // State is automatically preserved since we're not destroying the widget
   }
   };
 
-  // Update progress bar function
-  const updateProgressBar = stepName => {
-  // Update the current step in widget state
-  widgetState.currentStep = stepName;
-
-  // Find and update the global progress bar
-  const globalProgressBar = document.getElementById('dh-global-progress-bar');
-
-  if (globalProgressBar) {
-    // Replace the global progress bar with a new one reflecting current state
-    const newProgressBar = createCircularProgress();
-    newProgressBar.id = 'dh-global-progress-bar';
-    globalProgressBar.parentNode.replaceChild(
-      newProgressBar,
-      globalProgressBar
-    );
-  }
-  };
-
-  // Reusable circular progress component creator
-  const createCircularProgress = () => {
-  const progressBar = document.createElement('div');
-  progressBar.className = 'dh-progress-bar';
-
-  stepProgressManager.stepFlow.forEach((stepName, index) => {
-    // Create step container
-    const stepContainer = document.createElement('div');
-    stepContainer.className = 'dh-progress-step-container';
-
-    // Create the step circle
-    const step = document.createElement('div');
-    const stepStatus = stepProgressManager.getStepStatus(stepName);
-    step.className = `dh-progress-step ${stepStatus}`;
-
-    // Add checkmark for completed step or empty for others
-    if (stepStatus === 'completed') {
-      step.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="17" height="13" viewBox="0 0 17 13" fill="none"><path d="M5.7 12.025L0 6.325L1.425 4.9L5.7 9.175L14.875 0L16.3 1.425L5.7 12.025Z" fill="white"/></svg>`;
-    } else {
-      step.textContent = '';
-    }
-
-    // Create step label
-    const stepLabel = document.createElement('div');
-    stepLabel.className = `dh-progress-step-label ${stepStatus}`;
-    stepLabel.textContent = stepProgressManager.stepLabels[stepName];
-
-    stepContainer.appendChild(step);
-    stepContainer.appendChild(stepLabel);
-    progressBar.appendChild(stepContainer);
-
-    // Add connecting line between steps (except after last step)
-    if (index < stepProgressManager.stepFlow.length - 1) {
-      const line = document.createElement('div');
-      const lineStatus =
-        stepProgressManager.getStepStatus(stepName) === 'completed'
-          ? 'active'
-          : '';
-      line.className = `dh-progress-line ${lineStatus}`;
-      progressBar.appendChild(line);
-    }
-  });
-
-  return progressBar;
-  };
+  // Progress bar functionality removed - no longer needed
 
   // Create button for modal trigger
   const createButton = () => {
@@ -3245,6 +4421,46 @@
   formWidget.className = 'dh-form-widget';
   formWidget.id = 'dh-form-widget';
 
+  // Create close icon for all steps
+  const closeIcon = document.createElement('div');
+  closeIcon.className = 'dh-widget-close-icon';
+  closeIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 29 29" fill="none">
+    <path d="M14.5 28C21.9558 28 28 21.9558 28 14.5C28 7.04416 21.9558 1 14.5 1C7.04416 1 1 7.04416 1 14.5C1 21.9558 7.04416 28 14.5 28Z" fill="white" stroke="#515151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M18.5492 10.45L10.4492 18.55L18.5492 10.45Z" fill="white"/>
+    <path d="M18.5492 10.45L10.4492 18.55" stroke="#515151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M10.4492 10.45L18.5492 18.55L10.4492 10.45Z" fill="white"/>
+    <path d="M10.4492 10.45L18.5492 18.55" stroke="#515151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  // Add click handler for close functionality
+  closeIcon.addEventListener('click', () => {
+    if (config.displayMode === 'button') {
+      // For button mode, close the modal
+      closeModal();
+    } else {
+      // For inline mode, reset to first step or hide widget
+      showStep('pest-issue');
+      if (typeof resetWidgetState === 'function') {
+        resetWidgetState();
+      }
+    }
+  });
+
+  // Create global back button
+  const globalBackButton = document.createElement('button');
+  globalBackButton.className = 'dh-global-back-button';
+  globalBackButton.id = 'dh-global-back-button';
+  globalBackButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="16" viewBox="0 0 20 16" fill="none">
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M19.0006 7.99993C19.0006 8.41414 18.6648 8.74993 18.2506 8.74993H3.5609L9.03122 14.2193C9.32427 14.5124 9.32427 14.9875 9.03122 15.2806C8.73816 15.5736 8.26302 15.5736 7.96996 15.2806L1.21996 8.53055C1.07913 8.38988 1 8.19899 1 7.99993C1 7.80087 1.07913 7.60998 1.21996 7.4693L7.96996 0.719304C8.26302 0.426248 8.73816 0.426248 9.03122 0.719304C9.32427 1.01236 9.32427 1.4875 9.03122 1.78055L3.5609 7.24993H18.2506C18.6648 7.24993 19.0006 7.58571 19.0006 7.99993Z" fill="#515151" stroke="#515151"/>
+  </svg> BACK`;
+
+  // Add click handler for global back button
+  globalBackButton.addEventListener('click', () => {
+    if (typeof previousStep === 'function') {
+      previousStep();
+    }
+  });
+
   // Create form elements
   const formContainer = document.createElement('div');
   formContainer.id = 'dh-form-container';
@@ -3274,30 +4490,21 @@
   content.className = 'dh-form-content';
   content.id = 'dh-form-content';
 
-  // Create single global progress bar
-  const globalProgressBar = createCircularProgress();
-  globalProgressBar.id = 'dh-global-progress-bar';
-  content.appendChild(globalProgressBar);
-
   // Create form steps
   const steps = createFormSteps();
   steps.forEach(step => content.appendChild(step));
 
   // Assemble form elements into container
   formContainer.appendChild(content);
+  formWidget.appendChild(closeIcon);
+  formWidget.appendChild(globalBackButton);
   formWidget.appendChild(formContainer);
 
   return {
     formWidget: formWidget,
     formContainer: formContainer,
-    content: content
+    content: content,
   };
-  };
-
-  // Helper function to add progress bar to a form step
-  const addProgressBarToStep = stepElement => {
-  const progressBar = createCircularProgress();
-  stepElement.insertBefore(progressBar, stepElement.firstChild);
   };
 
   // Main widget creation function
@@ -3332,110 +4539,12 @@
       modalContent.style.overflow = 'hidden';
     }
     if (formWidget) {
-      formWidget.style.maxHeight = '90vh';
-      formWidget.style.overflow = 'auto';
+      formWidget.style.overflow = 'visible';
     }
   }
   };
 
-  // Create welcome screen content for Step 1 (new design) 
-  const createWelcomeScreenContent = () => {
-  const welcomeContainer = document.createElement('div');
-  welcomeContainer.className = 'dh-welcome-screen';
-
-  // Left content area
-  const welcomeContent = document.createElement('div');
-  welcomeContent.className = 'dh-welcome-content';
-
-  // Welcome title
-  const welcomeTitle = document.createElement('h1');
-  welcomeTitle.className = 'dh-welcome-title';
-  welcomeTitle.textContent =
-    (typeof widgetState !== 'undefined' && widgetState.widgetConfig?.welcomeTitle) || 'Get help now!';
-
-  // Welcome description
-  const welcomeDescription = document.createElement('h2');
-  welcomeDescription.className = 'dh-welcome-description';
-  welcomeDescription.textContent =
-    (typeof widgetState !== 'undefined' && widgetState.widgetConfig?.welcomeDescription) ||
-    'For fast, affordable & professional pest solutions in your area.';
-
-  // Benefits list
-  const benefitsList = document.createElement('ul');
-  benefitsList.className = 'dh-welcome-benefits';
-
-  // Render custom benefits if available
-  if (
-    typeof widgetState !== 'undefined' &&
-    widgetState.widgetConfig?.welcomeBenefits &&
-    widgetState.widgetConfig.welcomeBenefits.length > 0
-  ) {
-    widgetState.widgetConfig.welcomeBenefits.forEach(benefit => {
-      const li = document.createElement('li');
-
-      // Create icon element
-      if (benefit.icon && benefit.icon.trim()) {
-        const iconElement = document.createElement('span');
-        iconElement.className = 'dh-benefit-icon';
-        iconElement.innerHTML = benefit.icon;
-        li.appendChild(iconElement);
-      }
-
-      // Create text element
-      const textElement = document.createElement('span');
-      textElement.className = 'dh-benefit-text';
-      textElement.textContent = benefit.text;
-      li.appendChild(textElement);
-
-      benefitsList.appendChild(li);
-    });
-  }
-
-  // Welcome button
-  const welcomeButton = document.createElement('button');
-  welcomeButton.className = 'dh-welcome-button';
-  welcomeButton.innerHTML = `
-    <span>${widgetState.widgetConfig?.welcomeButtonText || 'Start My Free Estimate'}</span>
-    <span class="dh-button-arrow"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></span>
-  `;
-  welcomeButton.addEventListener('click', () => {
-    nextStep();
-  });
-
-  // Terms disclaimer
-  const termsDisclaimer = document.createElement('p');
-  termsDisclaimer.className = 'dh-terms-disclaimer';
-  termsDisclaimer.textContent =
-    '*terms and conditions apply. See details for more information';
-
-  // Assemble content
-  welcomeContent.appendChild(welcomeTitle);
-  welcomeContent.appendChild(welcomeDescription);
-  welcomeContent.appendChild(benefitsList);
-  welcomeContent.appendChild(welcomeButton);
-  welcomeContent.appendChild(termsDisclaimer);
-
-  // Right hero area
-  const welcomeHero = document.createElement('div');
-  welcomeHero.className = 'dh-welcome-hero';
-
-  // Set hero image if available
-  if (widgetState.widgetConfig?.branding?.hero_image_url) {
-    welcomeHero.style.backgroundImage = `url(${widgetState.widgetConfig.branding.hero_image_url})`;
-  }
-
-  // Set welcome screen background in bottom corner
-  const bgSvg = document.createElement('div');
-  bgSvg.className = 'dh-welcome-svg-background';
-  bgSvg.innerHTML = `<img src="https://cwmckkfkcjxznkpdxgie.supabase.co/storage/v1/object/public/brand-assets/general/background-pests.svg" alt="" />`;
-
-  // Assemble welcome container
-  welcomeContainer.appendChild(welcomeContent);
-  welcomeContainer.appendChild(welcomeHero);
-  welcomeContainer.appendChild(bgSvg);
-
-  return welcomeContainer;
-  };
+  // Welcome screen function removed - widget now starts directly with pest issue selection
 
   // === WIDGET LOGIC ===
   // Step navigation
@@ -3443,27 +4552,35 @@
   // Get current and target steps for animation
   const currentActiveStep = document.querySelector('.dh-form-step.active');
   const targetStep = document.getElementById('dh-step-' + stepName);
-  
+
   if (!targetStep) return;
 
-  // Special handling for welcome screen - no animations
-  if (stepName === 'welcome') {
-    // Just hide all steps and show welcome immediately
-    document.querySelectorAll('.dh-form-step').forEach(step => {
-      step.classList.remove('active', 'fade-in', 'fade-out');
-    });
-    targetStep.classList.add('active');
-    widgetState.currentStep = stepName;
-  } else {
+  // Reset button states when leaving specific steps
+  if (currentActiveStep && currentActiveStep !== targetStep) {
+    // Reset confirm-address button when leaving that step
+    if (currentActiveStep.id === 'dh-step-confirm-address') {
+      const confirmButton = document.getElementById('confirm-address-next');
+      if (confirmButton) {
+        confirmButton.innerHTML =
+          'Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg>';
+        confirmButton.disabled = true; // Will be re-enabled by checkbox validation
+        confirmButton.style.opacity = '0.5';
+        confirmButton.style.cursor = 'not-allowed';
+      }
+    }
+  }
+
+  // Standard step navigation with animations
+  {
     // For non-welcome steps, use fade animations
-    
+
     // If there's a currently active step, animate it out first
     if (currentActiveStep && currentActiveStep !== targetStep) {
       currentActiveStep.classList.add('fade-out');
-      
+
       // Wait for fade out animation
       await new Promise(resolve => setTimeout(resolve, 300));
-      
+
       currentActiveStep.classList.remove('active', 'fade-out');
     } else {
       // Just hide all steps if no current active step
@@ -3475,7 +4592,7 @@
     // Show target step with fade-in animation
     targetStep.classList.add('active', 'fade-in');
     widgetState.currentStep = stepName;
-    
+
     // Clean up animation class after animation completes
     setTimeout(() => {
       targetStep.classList.remove('fade-in');
@@ -3487,18 +4604,14 @@
 
   // Scroll to top of modal content
   setTimeout(() => {
-    const scrollContainer =
-      stepName === 'welcome'
-        ? document.querySelector('.dh-modal-content')
-        : document.querySelector('.dh-form-widget');
+    const scrollContainer = document.querySelector('.dh-form-widget');
 
     if (scrollContainer) {
       scrollContainer.scrollTop = 0;
     }
   }, 50); // Small delay to ensure DOM updates are complete
 
-  // Update progress bar
-  updateProgressBar(stepName);
+  // Progress bar removed - no longer needed
 
   // Update dynamic text based on form data
   await updateDynamicText();
@@ -3519,7 +4632,6 @@
       }
     }, 0);
   }
-
 
   // Initialize floating labels only for new inputs in the current step
   setTimeout(() => {
@@ -3569,14 +4681,86 @@
   }, 100);
   };
 
+  // Geocode address using Google Places API
+  const geocodeAddress = async addressComponents => {
+  const { street, city, state, zip } = addressComponents;
+
+  // Build formatted address
+  const formattedAddress = `${street}, ${city}, ${state} ${zip}`;
+
+  try {
+    // Get API key
+    const apiKeyResponse = await fetch(
+      config.baseUrl + '/api/google-places-key'
+    );
+
+    if (!apiKeyResponse.ok) {
+      throw new Error(`API key request failed: ${apiKeyResponse.status}`);
+    }
+
+    const apiKeyData = await apiKeyResponse.json();
+
+    if (!apiKeyData.apiKey) {
+      throw new Error('Google API key not available');
+    }
+
+    const apiKey = apiKeyData.apiKey;
+
+    // Use Google Geocoding API
+    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(formattedAddress)}&key=${apiKey}`;
+
+    const response = await fetch(geocodeUrl);
+
+    if (!response.ok) {
+      throw new Error(`Geocoding request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+      console.error('Geocoding API response:', data);
+      throw new Error(
+        `Geocoding failed: ${data.status || 'No results found'} for address: ${formattedAddress}`
+      );
+    }
+
+    const result = data.results[0];
+    const location = result.geometry.location;
+
+    console.log(
+      'Geocoding successful for:',
+      formattedAddress,
+      'Result:',
+      result.formatted_address
+    );
+
+    return {
+      success: true,
+      latitude: location.lat,
+      longitude: location.lng,
+      formatted: result.formatted_address,
+    };
+  } catch (error) {
+    console.error(
+      'Geocoding error for address:',
+      formattedAddress,
+      'Error:',
+      error
+    );
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+  };
+
   // Global functions for step navigation (exposed to window for onclick handlers)
   const nextStep = async () => {
   const steps = [
-    'welcome',
     'pest-issue',
     'address',
-    'urgency',
-    'initial-offer',
+    'confirm-address',
+    'how-we-do-it',
     'plans',
     'contact',
     'quote-contact',
@@ -3585,68 +4769,101 @@
   ];
   const currentIndex = steps.indexOf(widgetState.currentStep);
 
-  // Special handling for address step - validate service area
-  if (widgetState.currentStep === 'address') {
-    const addressNext = document.getElementById('address-next');
+  // Special handling for confirm-address step - validate service area before proceeding
+  if (widgetState.currentStep === 'confirm-address') {
+    const continueButton = document.getElementById('confirm-address-next');
 
-    // Validate that an address has been entered
-    if (!widgetState.formData.address) {
-      // Show error message
-      const addressSearchInput = document.getElementById('address-search-input');
-      if (addressSearchInput) {
-        progressiveFormManager.showFieldError(
-          addressSearchInput,
-          'Please enter your address'
-        );
+    // Capture current address form values
+    const streetInput = document.getElementById('confirm-street-input');
+    const cityInput = document.getElementById('confirm-city-input');
+    const stateInput = document.getElementById('confirm-state-input');
+    const zipInput = document.getElementById('confirm-zip-input');
+
+    const currentAddress = {
+      street: streetInput?.value?.trim() || '',
+      city: cityInput?.value?.trim() || '',
+      state: stateInput?.value?.trim() || '',
+      zip: zipInput?.value?.trim() || '',
+    };
+
+    // Check if address has been modified
+    const addressModified =
+      currentAddress.street !== widgetState.formData.addressStreet ||
+      currentAddress.city !== widgetState.formData.addressCity ||
+      currentAddress.state !== widgetState.formData.addressState ||
+      currentAddress.zip !== widgetState.formData.addressZip;
+
+    // Show loading state
+    if (continueButton) {
+      if (addressModified) {
+        continueButton.innerHTML =
+          'Geocoding address... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      } else {
+        continueButton.innerHTML =
+          'Validating area... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       }
-      return;
-    }
-
-    // Continue with address validation
-    if (addressNext) {
-      addressNext.textContent = 'Checking area...';
+      continueButton.disabled = true;
     }
 
     try {
-      const validationResult = await validateServiceArea();
-      
-      if (validationResult.served) {
-        // User is in service area, save partial lead and proceed to urgency step
-        const partialSaveResult = await savePartialLead(
-          validationResult,
-          'address_completed'
-        );
-        
-        if (!partialSaveResult.success) {
-          console.warn(
-            'Failed to save partial lead, but continuing with form flow:',
-            partialSaveResult.error
-          );
+      // If address was modified, geocode the new address first
+      if (addressModified) {
+        const geocodeResult = await geocodeAddress(currentAddress);
+
+        if (!geocodeResult.success) {
+          throw new Error(geocodeResult.error || 'Failed to geocode address');
         }
 
-        // Update step completion tracking
-        const completionStatus = progressiveFormManager.calculateStepCompletion();
-        showStep('urgency');
-        setupStepValidation('urgency');
+        // Update form data with new address and coordinates
+        widgetState.formData.addressStreet = currentAddress.street;
+        widgetState.formData.addressCity = currentAddress.city;
+        widgetState.formData.addressState = currentAddress.state;
+        widgetState.formData.addressZip = currentAddress.zip;
+        widgetState.formData.address = geocodeResult.formatted;
+        widgetState.formData.latitude = geocodeResult.latitude;
+        widgetState.formData.longitude = geocodeResult.longitude;
+      }
+
+      // Update button text for validation phase
+      if (continueButton) {
+        continueButton.innerHTML =
+          'Validating area... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+
+      const validationResult = await validateServiceArea();
+
+      if (validationResult.served) {
+        // User is still in service area, fetch recommended plan and proceed to how-we-do-it step
+        if (typeof getCheapestFullCoveragePlan === 'function') {
+          try {
+            await getCheapestFullCoveragePlan();
+          } catch (error) {
+            console.warn('Could not fetch recommended plan:', error);
+          }
+        }
+        showStep('how-we-do-it');
+        setupStepValidation('how-we-do-it');
       } else {
-        // User is out of service area, do not save partial lead, show end-stop step
+        // User is no longer in service area, redirect to out-of-service step
         showStep('out-of-service');
+        setupStepValidation('out-of-service');
       }
     } catch (error) {
-      console.error('Service area validation error:', error);
-      // On error, allow user to proceed (graceful fallback)
-      // Update step completion tracking even for fallback
-      const completionStatus = progressiveFormManager.calculateStepCompletion();
-      // Address step completed (fallback)
-      showStep('urgency');
-      setupStepValidation('urgency');
-    } finally {
-      // Reset button state
-      if (addressNext) {
-        addressNext.textContent = 'Continue';
+      console.error('Address processing or validation error:', error);
+
+      // Reset button on error and show error message
+      if (continueButton) {
+        continueButton.innerHTML =
+          'Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg>';
+        continueButton.disabled = false;
       }
+
+      alert(
+        'There was an error processing your address. Please check the address and try again.'
+      );
     }
-    return;
+
+    return; // Exit early for confirm-address handling
   }
 
   // Normal step navigation for other steps
@@ -3666,35 +4883,39 @@
 
   switch (currentStep) {
     case 'pest-issue':
-      prevStep = 'welcome';
+      prevStep = null; // First step, no previous
       break;
     case 'address':
       prevStep = 'pest-issue';
       break;
-    case 'urgency':
-      prevStep = 'address';
-      break;
-    case 'initial-offer':
-      prevStep = 'urgency';
+    case 'confirm-address':
+      // When going back from confirm-address to address, reset the form state
+      changeAddress();
+      return; // changeAddress() handles navigation and setup
+    case 'how-we-do-it':
+      prevStep = 'confirm-address';
       break;
     case 'contact':
-      // Contact step should go back to initial-offer since it's for scheduling
-      prevStep = 'initial-offer';
+      // Contact step should go back to how-we-do-it since it's for scheduling
+      prevStep = 'how-we-do-it';
       break;
     case 'quote-contact':
-      prevStep = 'initial-offer';
+      prevStep = 'how-we-do-it';
       break;
     case 'plan-comparison':
       prevStep = 'quote-contact';
       break;
     default:
       // Fallback for any other steps
-      prevStep = 'welcome';
+      prevStep = 'pest-issue';
   }
 
   if (prevStep) {
     showStep(prevStep);
     setupStepValidation(prevStep);
+  } else {
+    // First step - close widget or do nothing
+    console.log('Already at first step, cannot go back further');
   }
   };
 
@@ -3827,7 +5048,6 @@
   }
   };
 
-
   // Function to switch back to address search mode
   const changeAddress = () => {
   // Clear form data related to address
@@ -3868,12 +5088,21 @@
     suggestions.innerHTML = '';
   }
 
-  // Reset the "Next" button state
+  // Reset the "Next" button state (legacy - not used in new flow)
   const addressNext = document.getElementById('address-next');
   if (addressNext) {
     addressNext.disabled = true;
     addressNext.classList.add('disabled');
     addressNext.textContent = 'Continue';
+  }
+
+  // Reset the service area check button state
+  const checkServiceAreaBtn = document.getElementById('check-service-area-btn');
+  if (checkServiceAreaBtn) {
+    checkServiceAreaBtn.disabled = true;
+    checkServiceAreaBtn.classList.add('disabled');
+    checkServiceAreaBtn.innerHTML =
+      'Check Service Area <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
   };
 
@@ -3913,9 +5142,7 @@
         response.status,
         errorText
       );
-      throw new Error(
-        `Service area validation failed: ${response.status}`
-      );
+      throw new Error(`Service area validation failed: ${response.status}`);
     }
 
     const result = await response.json();
@@ -3926,6 +5153,79 @@
   }
   };
 
+  // Service area check button handler
+  const checkServiceAreaButton = async () => {
+  // Validate that an address has been selected
+  if (!widgetState.formData.address) {
+    alert('Please select an address first.');
+    return;
+  }
+
+  const checkBtn = document.getElementById('check-service-area-btn');
+
+  // Show loading state
+  if (checkBtn) {
+    checkBtn.innerHTML =
+      'Checking area... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    checkBtn.disabled = true;
+  }
+
+  try {
+    const validationResult = await validateServiceArea();
+
+    if (validationResult.served) {
+      // User is in service area, navigate to confirm-address step
+      showStep('confirm-address');
+      setupStepValidation('confirm-address');
+    } else {
+      // User is out of service area, navigate to out-of-service step
+      showStep('out-of-service');
+      setupStepValidation('out-of-service');
+    }
+  } catch (error) {
+    console.error('Service area validation error:', error);
+    // Reset button on error
+    if (checkBtn) {
+      checkBtn.innerHTML =
+        'Check Service Area <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      checkBtn.disabled = false;
+    }
+    alert('There was an error checking your service area. Please try again.');
+  }
+  };
+
+  // Function to return to homepage (pest selection step)
+  const returnToHomepage = () => {
+  // Clear form data to reset the widget state
+  widgetState.formData = {
+    pestType: '',
+    pestIcon: '',
+    pestBackgroundImage: '',
+    address: '',
+    addressStreet: '',
+    addressCity: '',
+    addressState: '',
+    addressZip: '',
+    latitude: null,
+    longitude: null,
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    startDate: '',
+    arrivalTime: '',
+    offerPrice: null,
+    recommendedPlan: null,
+  };
+
+  // Navigate to the pest selection step
+  showStep('pest-issue');
+  setupStepValidation('pest-issue');
+  };
+
+  // Make returnToHomepage globally accessible
+  window.returnToHomepage = returnToHomepage;
+
   // Setup calendar icon click functionality
   const setupCalendarIconClick = () => {
   // Setup click handler for calendar icons to open date picker
@@ -3933,10 +5233,23 @@
     const calendarIcon = event.target.closest(
       '.dh-input-icon[data-type="calendar"]'
     );
-    if (calendarIcon) {
+    
+    // Also check if clicking anywhere on a date input container
+    const floatingInput = event.target.closest('.dh-floating-input');
+    const isDateContainer = floatingInput && floatingInput.querySelector('input[type="date"]');
+    const isDateInput = event.target.type === 'date';
+    
+    if (calendarIcon || (isDateContainer && !isDateInput)) {
       // Find the associated date input
-      const container = calendarIcon.closest('.dh-floating-input');
-      const dateInput = container?.querySelector('input[type="date"]');
+      let container, dateInput;
+      
+      if (calendarIcon) {
+        container = calendarIcon.closest('.dh-floating-input');
+        dateInput = container?.querySelector('input[type="date"]');
+      } else if (isDateContainer) {
+        container = floatingInput;
+        dateInput = container.querySelector('input[type="date"]');
+      }
 
       if (dateInput) {
         event.preventDefault();
@@ -3977,25 +5290,303 @@
 
   // Note: selectPlan function is now defined inside plan-comparison setupStepValidation
 
-  // Show specific plan tab in comparison step
-  const showComparisonPlan = (tabIndex) => {
-  // Update tab active states
-  const tabs = document.querySelectorAll('.dh-plan-tab');
-  tabs.forEach((tab, index) => {
-    tab.classList.toggle('active', index === tabIndex);
-  });
+  // Generate FAQ section for a plan
+  const generateFaqSection = plan => {
+  if (!plan.plan_faqs || plan.plan_faqs.length === 0) {
+    return '';
+  }
 
-  // Update panel active states
-  const panels = document.querySelectorAll('.dh-plan-panel');
-  panels.forEach((panel, index) => {
-    panel.classList.toggle('active', index === tabIndex);
+  const faqsHtml = plan.plan_faqs
+    .map(
+      (faq, index) => `
+      <div class="dh-faq-item">
+        <div class="dh-faq-header" onclick="toggleFaqItem(${index})">
+          <h4 class="dh-faq-question">${faq.question}</h4>
+          <span class="dh-faq-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <path d="M6 9L12 15L18 9" stroke="#515151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg></span>
+        </div>
+        <div class="dh-faq-content" id="faq-content-${index}">
+          <div class="dh-faq-answer">
+            <p>${faq.answer}</p>
+          </div>
+        </div>
+      </div>
+    `
+    )
+    .join('');
+
+  return `
+    <div class="dh-plan-faqs">
+      <h3 class="dh-faqs-title">${plan.plan_name} FAQs</h3>
+      <div class="dh-faqs-container">
+        ${faqsHtml}
+      </div>
+    </div>
+  `;
+  };
+
+  // Switch plan option from dropdown in comparison step
+  const switchPlanOption = planIndex => {
+  const index = parseInt(planIndex);
+
+  if (!window.comparisonPlansData || !window.comparisonPlansData[index]) {
+    console.warn('Plan data not available for index:', index);
+    return;
+  }
+
+  const selectedPlan = window.comparisonPlansData[index];
+
+  // Update plan title
+  const titleEl = document.querySelector('.dh-plan-title');
+  if (titleEl) titleEl.textContent = selectedPlan.plan_name;
+
+  // Update plan description
+  const descEl = document.querySelector('.dh-plan-description');
+  if (descEl) descEl.textContent = selectedPlan.plan_description || '';
+
+  // Update features list
+  const featuresListEl = document.querySelector('.dh-plan-features-list');
+  if (featuresListEl && selectedPlan.plan_features) {
+    const featuresHtml = selectedPlan.plan_features
+      .map(
+        feature =>
+          `<li class="dh-plan-feature"><span class="dh-feature-checkmark"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none"><g clip-path="url(#clip0_6146_560)"><path d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916" stroke="#00AE42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 9.16659L10 11.6666L18.3333 3.33325" stroke="#00AE42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g><defs><clipPath d="clip0_6146_560"><rect width="20" height="20" fill="white"/></clipPath></defs></svg></span> ${feature}</li>`
+      )
+      .join('');
+    featuresListEl.innerHTML = featuresHtml;
+  }
+
+  // Update pricing
+  const priceLabelEl = document.querySelector('.dh-plan-price-label');
+  if (
+    priceLabelEl &&
+    selectedPlan.recurring_price &&
+    selectedPlan.billing_frequency
+  ) {
+    priceLabelEl.innerHTML = `Service starts at just $${selectedPlan.recurring_price}${window.formatBillingFrequencyFull ? window.formatBillingFrequencyFull(selectedPlan.billing_frequency) : formatBillingFrequency(selectedPlan.billing_frequency)}.`;
+  }
+
+  const priceDetailEl = document.querySelector('.dh-plan-price-detail');
+  if (priceDetailEl && selectedPlan.initial_price) {
+    priceDetailEl.textContent = `Initial setup fee of $${selectedPlan.initial_price}* to get started.`;
+  }
+
+  // Update recurring price in new pricing structure
+  const recurringPriceEl = document.querySelector('.dh-plan-price-recurring');
+  if (recurringPriceEl && selectedPlan.recurring_price && selectedPlan.billing_frequency) {
+    recurringPriceEl.innerHTML = `<span class="dh-price-dollar">$</span>${selectedPlan.recurring_price}<div class="dh-price-suffix">
+      <span class="dh-price-asterisk">*</span>
+      <div class="dh-price-frequency">${formatBillingFrequency(selectedPlan.billing_frequency)}</div>
+    </div>`;
+  }
+
+  // Update initial only price
+  const initialPriceEl = document.querySelector('.dh-plan-price-initial');
+  if (initialPriceEl && selectedPlan.initial_price) {
+    initialPriceEl.innerHTML = `Initial Only <span class="dh-price-dollar">$</span>${selectedPlan.initial_price}`;
+  }
+
+  // Update normally price
+  const normallyPriceEl = document.querySelector('.dh-plan-price-normally');
+  if (normallyPriceEl && selectedPlan.initial_price) {
+    const normalPrice = (selectedPlan.initial_price + (selectedPlan.initial_discount || 0)).toFixed(0);
+    normallyPriceEl.innerHTML = `Normally <span class="dh-price-dollar">$</span><span class="dh-plan-price-crossed">${normalPrice}</span>`;
+  }
+
+  // Update plan image
+  const imageEl = document.querySelector('.dh-plan-image-actual img');
+  if (imageEl && selectedPlan.plan_image_url) {
+    imageEl.src = selectedPlan.plan_image_url;
+    imageEl.alt = selectedPlan.plan_name;
+  }
+
+  // Update action buttons
+  const scheduleBtn = document.querySelector(
+    '.dh-plan-actions .dh-form-btn-primary'
+  );
+  if (scheduleBtn) {
+    scheduleBtn.setAttribute(
+      'onclick',
+      `selectPlan('${selectedPlan.id || 'selected'}', '${selectedPlan.plan_name}')`
+    );
+  }
+
+  // Update recommendation badge visibility
+  const recommendationBadge = document.getElementById('plan-recommendation-badge');
+  if (recommendationBadge) {
+    if (index === 0) {
+      recommendationBadge.style.display = 'block';
+    } else {
+      recommendationBadge.style.display = 'none';
+    }
+  }
+
+  // Update FAQ section
+  const faqContainer = document.getElementById('comparison-plan-faqs');
+  if (faqContainer) {
+    faqContainer.innerHTML = generateFaqSection(selectedPlan);
+  }
+
+  // Update disclaimer
+  const disclaimerEl = document.querySelector('.dh-plan-price-disclaimer');
+  if (disclaimerEl) {
+    disclaimerEl.innerHTML = selectedPlan.plan_disclaimer || '*Pricing may vary based on initial inspection findings and other factors.';
+  }
+  };
+
+  // Toggle description read more/less functionality
+  window.toggleDescription = function(element) {
+  const container = element.parentElement;
+  const descriptionText = container.querySelector('.dh-description-text');
+  const fullDescription = container.querySelector('.dh-description-full');
+  
+  if (element.textContent === 'Read More') {
+    // Show full description and hide the Read More link
+    descriptionText.style.display = 'none';
+    fullDescription.style.display = 'inline';
+    element.style.display = 'none';
+  }
+  };
+
+  // Legacy function for backward compatibility
+  const showComparisonPlan = tabIndex => {
+  switchPlanOption(tabIndex);
+  };
+
+  // Helper function to populate logo for any step by ID (legacy)
+  const populateStepLogo = logoElementId => {
+  const logoElement = document.getElementById(logoElementId);
+  if (logoElement && widgetState.widgetConfig?.branding?.logo_url) {
+    populateSingleLogo(logoElement);
+  }
+  };
+
+  // Helper function to populate a single logo element
+  const populateSingleLogo = logoElement => {
+  if (logoElement && widgetState.widgetConfig?.branding?.logo_url) {
+    // Create logo image with proper loading support
+    const logoImg = document.createElement('img');
+    logoImg.alt = 'Company Logo';
+    logoImg.style.display = 'none';
+
+    logoImg.onload = function () {
+      logoImg.style.display = 'block';
+    };
+
+    logoImg.onerror = function () {
+      console.warn(
+        'Failed to load logo image:',
+        widgetState.widgetConfig.branding.logo_url
+      );
+      logoImg.style.display = 'none';
+    };
+
+    // Clear existing content and add new image
+    logoElement.innerHTML = '';
+    logoElement.appendChild(logoImg);
+
+    // Set src last to trigger loading
+    logoImg.src = widgetState.widgetConfig.branding.logo_url;
+  }
+  };
+
+  // Global function to populate all logos at once
+  const populateAllLogos = () => {
+  const logoElements = document.querySelectorAll('.dh-pest-logo');
+  logoElements.forEach(logoElement => {
+    populateSingleLogo(logoElement);
   });
   };
 
-  // Setup step-specific event handlers and validation  
-  const setupStepValidation = (stepName) => {
+  // Helper function to populate hero images for any step
+  const populateStepHero = (bgImageId, heroImageId) => {
+  const bgImage = document.getElementById(bgImageId);
+  const heroImage = document.getElementById(heroImageId);
+
+  // Populate background image
+  let backgroundImageUrl;
+
+  // For address and how-we-do-it steps, try to get pest-specific background image first
+  if (
+    (bgImageId === 'address-bg-image' || bgImageId === 'offer-bg-image') &&
+    typeof getPestBackgroundImage === 'function'
+  ) {
+    backgroundImageUrl = getPestBackgroundImage();
+  } else if (bgImageId === 'quote-bg-image') {
+    // For quote-contact step, use the almost done background image
+    backgroundImageUrl =
+      widgetState.widgetConfig?.branding?.almostDoneBackgroundImage;
+  } else {
+    // For other steps, use the default pest background image
+    backgroundImageUrl =
+      widgetState.widgetConfig?.branding?.pestSelectBackgroundImage;
+  }
+
+  if (bgImage && backgroundImageUrl) {
+    // Preload background image to handle large files
+    const bgImg = new Image();
+    bgImg.onload = function () {
+      bgImage.style.backgroundImage = `url(${backgroundImageUrl})`;
+    };
+    bgImg.onerror = function () {
+      console.warn(
+        'Failed to load background image for',
+        bgImageId,
+        ':',
+        backgroundImageUrl
+      );
+    };
+    bgImg.src = backgroundImageUrl;
+  }
+
+  // Populate hero image (only for pest step)
+  if (
+    heroImage &&
+    heroImageId === 'pest-hero-image' &&
+    widgetState.widgetConfig?.branding?.hero_image_url
+  ) {
+    // Hide image initially
+    heroImage.style.display = 'none';
+
+    // Set up load event listener
+    heroImage.onload = function () {
+      heroImage.style.display = 'block';
+    };
+
+    // Set up error event listener
+    heroImage.onerror = function () {
+      console.warn(
+        'Failed to load hero image:',
+        widgetState.widgetConfig.branding.hero_image_url
+      );
+      // Keep image hidden if it fails to load
+      heroImage.style.display = 'none';
+    };
+
+    // Set src last to trigger loading
+    heroImage.src = widgetState.widgetConfig.branding.hero_image_url;
+  }
+  };
+
+  // Setup step-specific event handlers and validation
+  const setupStepValidation = stepName => {
+  // Handle global back button visibility
+  const globalBackButton = document.getElementById('dh-global-back-button');
+  if (globalBackButton) {
+    if (stepName === 'pest-issue') {
+      globalBackButton.classList.add('hidden');
+    } else {
+      globalBackButton.classList.remove('hidden');
+    }
+  }
+
   switch (stepName) {
     case 'pest-issue':
+      // Populate logo, background image, and hero image
+      populateAllLogos();
+      populateStepHero('pest-bg-image', 'pest-hero-image');
+
       const pestOptions = document.querySelectorAll('.dh-pest-option');
 
       // Always clear existing selected states when step loads
@@ -4011,8 +5602,7 @@
           option.addEventListener('click', async e => {
             // Prevent double-clicking if loading overlay is visible
             const pestLoadingEl = document.getElementById('pest-loading');
-            if (pestLoadingEl && pestLoadingEl.style.display === 'flex')
-              return;
+            if (pestLoadingEl && pestLoadingEl.style.display === 'flex') return;
 
             // Remove selected class from all options
             pestOptions.forEach(opt => {
@@ -4036,12 +5626,13 @@
             const pestValue = pestOption.dataset.pest;
             widgetState.formData.pestType = pestValue;
 
-            // Find and store the pest icon
-            const selectedPest =
-              widgetState.widgetConfig?.pestOptions?.find(
-                pest => pest.value === pestValue
-              );
+            // Find and store the pest icon and background image
+            const selectedPest = widgetState.widgetConfig?.pestOptions?.find(
+              pest => pest.value === pestValue
+            );
             widgetState.formData.pestIcon = selectedPest?.icon || '';
+            widgetState.formData.pestBackgroundImage =
+              selectedPest?.widget_background_image || '';
 
             // Save progress immediately
             try {
@@ -4074,7 +5665,6 @@
               // Auto-advance to address validation step
               await showStep('address');
               setupStepValidation('address');
-              updateProgressBar('address');
 
               // Hide loading overlay after everything is complete
               setTimeout(() => {
@@ -4086,7 +5676,6 @@
               hideLoadingOverlay(pestLoadingEl);
               await showStep('address');
               setupStepValidation('address');
-              updateProgressBar('address');
             }
           });
         });
@@ -4094,6 +5683,29 @@
       break;
 
     case 'address':
+      // Populate logo and hero section
+      populateAllLogos();
+      populateStepHero('address-bg-image', 'address-hero-image');
+
+      // Initialize service area check button to disabled state
+      const checkServiceAreaBtn = document.getElementById(
+        'check-service-area-btn'
+      );
+      if (checkServiceAreaBtn) {
+        checkServiceAreaBtn.disabled = true;
+        checkServiceAreaBtn.classList.add('disabled');
+        checkServiceAreaBtn.innerHTML =
+          'Search Now <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+        // If address already exists (user returning to step), enable the button
+        if (widgetState.formData.address) {
+          checkServiceAreaBtn.disabled = false;
+          checkServiceAreaBtn.classList.remove('disabled');
+          checkServiceAreaBtn.innerHTML =
+            'Check Service Area <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        }
+      }
+
       const searchInput = document.getElementById('address-search-input');
       const addressNext = document.getElementById('address-next');
       const addressSuggestions = document.getElementById('address-suggestions');
@@ -4177,56 +5789,36 @@
 
         // Select an address and switch to display mode
         const selectAddress = address => {
-          // Hide search mode, show display mode
-          const searchMode = document.getElementById('address-search-mode');
-          const displayMode = document.getElementById('address-display-mode');
-
-          // Update editable form fields
-          document.getElementById('street-input').value = address.street || '';
-          document.getElementById('city-input').value = address.city || '';
-          document.getElementById('state-input').value = getStateCodeFromName(address.state);
-          document.getElementById('zip-input').value = address.postcode || '';
-
-          // Update form data
+          // Store address data in form state
           widgetState.formData.addressStreet = address.street || '';
           widgetState.formData.addressCity = address.city || '';
-          widgetState.formData.addressState = getStateCodeFromName(address.state);
+          widgetState.formData.addressState = getStateCodeFromName(
+            address.state
+          );
           widgetState.formData.addressZip = address.postcode || '';
           widgetState.formData.address = address.formatted;
           widgetState.formData.latitude = address.lat;
           widgetState.formData.longitude = address.lon;
 
-          // Switch modes
-          if (searchMode && displayMode) {
-            searchMode.style.display = 'none';
-            displayMode.style.display = 'block';
+          // Enable the service area check button
+          const checkServiceAreaBtn = document.getElementById(
+            'check-service-area-btn'
+          );
+          if (checkServiceAreaBtn) {
+            checkServiceAreaBtn.disabled = false;
+            checkServiceAreaBtn.classList.remove('disabled');
           }
 
-          // Load address imagery (Street View with satellite fallback)
-          loadAddressImagery(address);
+          // Update the search input to show selected address
+          const searchInput = document.getElementById('address-search-input');
+          if (searchInput) {
+            searchInput.value = address.formatted;
+          }
 
-          // Update floating labels for pre-filled address fields
-          setTimeout(() => {
-            // Mark address inputs as initialized to prevent step initialization from overriding
-            const streetInput = document.getElementById('street-input');
-            const cityInput = document.getElementById('city-input');
-            const stateInput = document.getElementById('state-input');
-            const zipInput = document.getElementById('zip-input');
-
-            [streetInput, cityInput, stateInput, zipInput].forEach(input => {
-              if (input) {
-                input.setAttribute('data-floating-initialized', 'true');
-              }
-            });
-
-            if (typeof window.updateAllFloatingLabels === 'function') {
-              window.updateAllFloatingLabels();
-            }
-          }, 0);
-
+          // Hide suggestions
           hideSuggestions();
 
-          // Trigger property lookup if available
+          // Trigger property lookup if available (for later use)
           if (typeof lookupPropertyData === 'function') {
             lookupPropertyData(address);
           }
@@ -4301,121 +5893,274 @@
       }
       break;
 
-    case 'urgency':
-      const urgencyOptions = document.querySelectorAll('.dh-urgency-option');
-      
-      if (urgencyOptions) {
-        urgencyOptions.forEach(option => {
-          option.addEventListener('click', async e => {
-            // Prevent double-clicking if loading overlay is visible
-            const urgencyLoadingEl = document.getElementById('urgency-loading');
-            if (urgencyLoadingEl && urgencyLoadingEl.style.display === 'flex') {
-              return;
-            }
+    case 'confirm-address':
+      // Populate logo and hero section
+      populateAllLogos();
+      populateStepHero(
+        'confirm-address-bg-image',
+        'confirm-address-hero-image'
+      );
 
-            // Remove selected class from all options
-            urgencyOptions.forEach(opt => {
-              opt.classList.remove('selected');
-            });
+      // Populate mobile background image with address imagery if available, fallback to pest image
+      const mobileImage = document.getElementById(
+        'confirm-address-mobile-bg-image'
+      );
+      if (mobileImage) {
+        // First try to use address background imagery if address data is available
+        if (
+          widgetState.formData.address &&
+          widgetState.formData.latitude &&
+          widgetState.formData.longitude &&
+          typeof loadAddressBackgroundImagery === 'function'
+        ) {
+          const addressData = {
+            full_address: widgetState.formData.address,
+            street: widgetState.formData.addressStreet,
+            city: widgetState.formData.addressCity,
+            state: widgetState.formData.addressState,
+            postcode: widgetState.formData.addressZip,
+            lat: widgetState.formData.latitude,
+            lon: widgetState.formData.longitude,
+          };
 
-            // Add selected class to clicked option
-            const urgencyOption = e.target.closest('.dh-urgency-option');
-            if (!urgencyOption) {
-              console.error('Could not find urgency option element');
-              return;
-            }
+          // Create a temporary background element to get the image URL
+          const tempBgElement = document.createElement('div');
+          tempBgElement.id = 'temp-mobile-bg';
+          tempBgElement.style.display = 'none';
+          document.body.appendChild(tempBgElement);
 
-            urgencyOption.classList.add('selected');
-
-            // Get the urgency value
-            const urgencyValue = urgencyOption.getAttribute('data-urgency');
-
-            // Save urgency to form data
-            widgetState.formData.urgency = urgencyValue;
-
-            // Show loading state
-            if (urgencyLoadingEl) {
-              urgencyLoadingEl.style.display = 'flex';
-            }
-
-            try {
-              // Fetch pricing data first
-              const pricingData = await fetchPricingData();
-
-              // Save partial lead with urgency selection
-              await savePartialLead({ served: true, areas: ['general'], primaryArea: 'general' }, 'urgency_completed');
-
-              // Wait a brief moment for visual feedback
-              setTimeout(() => {
-                // Hide loading
-                if (urgencyLoadingEl) {
-                  urgencyLoadingEl.style.display = 'none';
+          // Load address imagery and then copy to mobile image
+          loadAddressBackgroundImagery(addressData, 'temp-mobile-bg')
+            .then(() => {
+              const bgStyle = tempBgElement.style.backgroundImage;
+              if (bgStyle && bgStyle !== 'none') {
+                // Extract URL from background-image CSS property
+                const urlMatch = bgStyle.match(/url\(["']?([^"')]+)["']?\)/);
+                if (urlMatch && urlMatch[1]) {
+                  mobileImage.src = urlMatch[1];
                 }
-
-                // Navigate to next step (initial-offer)
-                showStep('initial-offer');
-                setupStepValidation('initial-offer');
-                updateProgressBar('initial-offer');
-              }, 800);
-            } catch (error) {
-              console.error('Error saving urgency selection:', error);
-              // Hide loading and allow retry
-              if (urgencyLoadingEl) {
-                urgencyLoadingEl.style.display = 'none';
               }
+              // Clean up temp element
+              document.body.removeChild(tempBgElement);
+            })
+            .catch(() => {
+              // Clean up temp element on error
+              document.body.removeChild(tempBgElement);
+              // Fallback to pest background image
+              if (typeof getPestBackgroundImage === 'function') {
+                const pestBgUrl = getPestBackgroundImage();
+                if (pestBgUrl) {
+                  mobileImage.src = pestBgUrl;
+                }
+              }
+            });
+        } else {
+          // Fallback to pest background image if no address data
+          if (typeof getPestBackgroundImage === 'function') {
+            const pestBgUrl = getPestBackgroundImage();
+            if (pestBgUrl) {
+              mobileImage.src = pestBgUrl;
             }
-          });
-        });
+          }
+        }
       }
+
+      // Populate address fields with stored data
+      setTimeout(() => {
+        const streetInput = document.getElementById('confirm-street-input');
+        const cityInput = document.getElementById('confirm-city-input');
+        const stateInput = document.getElementById('confirm-state-input');
+        const zipInput = document.getElementById('confirm-zip-input');
+
+        if (streetInput)
+          streetInput.value = widgetState.formData.addressStreet || '';
+        if (cityInput) cityInput.value = widgetState.formData.addressCity || '';
+        if (stateInput)
+          stateInput.value = widgetState.formData.addressState || '';
+        if (zipInput) zipInput.value = widgetState.formData.addressZip || '';
+
+        // Load address background imagery if available
+        if (
+          widgetState.formData.address &&
+          widgetState.formData.latitude &&
+          widgetState.formData.longitude
+        ) {
+          const addressData = {
+            formatted: widgetState.formData.address,
+            street: widgetState.formData.addressStreet,
+            city: widgetState.formData.addressCity,
+            state: widgetState.formData.addressState,
+            postcode: widgetState.formData.addressZip,
+            lat: widgetState.formData.latitude,
+            lon: widgetState.formData.longitude,
+          };
+
+          // Load street view as background image
+          if (typeof loadAddressBackgroundImagery === 'function') {
+            loadAddressBackgroundImagery(
+              addressData,
+              'confirm-address-bg-image'
+            );
+          }
+        }
+
+        // Update floating labels
+        if (typeof window.updateAllFloatingLabels === 'function') {
+          window.updateAllFloatingLabels();
+        }
+
+        // Populate company name in consent checkbox
+        const companyName =
+          widgetState.widgetConfig?.branding?.companyName || 'Company Name';
+        const companyNameElements = [
+          document.getElementById('confirm-address-company-name'),
+          document.getElementById('confirm-address-company-name-2'),
+          document.getElementById('confirm-address-company-name-3'),
+        ];
+        companyNameElements.forEach(element => {
+          if (element) {
+            element.textContent = companyName;
+          }
+        });
+
+        // Setup consent checkbox validation for continue button
+        const consentCheckbox = document.getElementById(
+          'confirm-address-consent-checkbox'
+        );
+        const continueButton = document.getElementById('confirm-address-next');
+
+        if (consentCheckbox && continueButton) {
+          // Disable button initially
+          continueButton.disabled = true;
+          continueButton.style.opacity = '0.5';
+          continueButton.style.cursor = 'not-allowed';
+
+          // Add event listener for checkbox changes
+          const updateButtonState = () => {
+            if (consentCheckbox.checked) {
+              continueButton.disabled = false;
+              continueButton.style.opacity = '1';
+              continueButton.style.cursor = 'pointer';
+            } else {
+              continueButton.disabled = true;
+              continueButton.style.opacity = '0.5';
+              continueButton.style.cursor = 'not-allowed';
+            }
+          };
+
+          consentCheckbox.addEventListener('change', updateButtonState);
+
+          // Set initial state
+          updateButtonState();
+        }
+      }, 100);
+
       break;
 
-    case 'initial-offer':
-      const letsScheduleBtn = document.getElementById('lets-schedule');
-      const detailedQuoteBtn = document.getElementById('detailed-quote');
-      const noThanksBtn = document.getElementById('no-thanks');
+    case 'how-we-do-it':
+      // Populate logo and hero section (keep existing background image functionality)
+      populateAllLogos();
+      populateStepHero('offer-bg-image', 'offer-hero-image');
 
-      // Add click handlers for each button
-      if (letsScheduleBtn) {
-        letsScheduleBtn.addEventListener('click', () => {
-          widgetState.formData.offerChoice = 'schedule';
-          // Navigate directly to contact step for scheduling
-          showStep('contact');
-          setupStepValidation('contact');
-          updateProgressBar('contact');
-        });
-      }
+      // Populate How We Do It content
+      const populateHowWeDoItContent = () => {
+        const pestSlug = widgetState.formData.pestType;
+        const pestConfig = widgetState.widgetConfig?.pestOptions?.find(
+          pest => pest.value === pestSlug
+        );
 
-      if (detailedQuoteBtn) {
-        detailedQuoteBtn.addEventListener('click', () => {
-          widgetState.formData.offerChoice = 'quote';
-          // Navigate to quote-contact step for quote
-          showStep('quote-contact');
-          setupStepValidation('quote-contact');
-          updateProgressBar('quote-contact');
-        });
-      }
+        // Get elements
+        const descriptionEl = document.getElementById(
+          'how-we-do-it-description'
+        );
+        const interiorImageEl = document.getElementById(
+          'how-we-do-it-interior-image'
+        );
+        const subspeciesSectionEl =
+          document.getElementById('subspecies-section');
+        const subspeciesHeadingEl =
+          document.getElementById('subspecies-heading');
+        const subspeciesListEl = document.getElementById('subspecies-list');
+        const safetyTextEl = document.getElementById('safety-message-text');
 
-      if (noThanksBtn) {
-        noThanksBtn.addEventListener('click', () => {
-          widgetState.formData.offerChoice = 'decline';
-          // For now, just show a thank you message or close the widget
-          // TODO: Implement exit-survey step if needed
-          alert('Thank you for your time!');
-        });
+        // Populate description text
+        if (descriptionEl && pestConfig?.how_we_do_it_text) {
+          descriptionEl.textContent = pestConfig.how_we_do_it_text;
+        } else if (descriptionEl) {
+          descriptionEl.textContent =
+            'We use professional-grade treatments tailored to your specific pest problem, ensuring effective elimination and prevention.';
+        }
+
+        // Populate interior image (handle both property name formats)
+        const interiorImageUrl =
+          widgetState.widgetConfig?.branding?.howWeDoItInteriorImage ||
+          widgetState.widgetConfig?.branding?.how_we_do_it_interior_image;
+
+        if (interiorImageEl && interiorImageUrl) {
+          interiorImageEl.src = interiorImageUrl;
+          interiorImageEl.style.display = 'block';
+        }
+
+        // Populate subspecies section
+        if (
+          pestConfig &&
+          pestConfig.subspecies &&
+          pestConfig.subspecies.length > 0
+        ) {
+          // Update heading with pest name
+          if (subspeciesHeadingEl) {
+            subspeciesHeadingEl.textContent = `Some common ${pestConfig.label.toLowerCase()} include:`;
+          }
+
+          // Populate subspecies list
+          if (subspeciesListEl) {
+            subspeciesListEl.innerHTML = pestConfig.subspecies
+              .map(
+                subspecies =>
+                  `<div class="dh-subspecies-item">${subspecies}</div>`
+              )
+              .join('');
+          }
+
+          // Show subspecies section
+          if (subspeciesSectionEl) {
+            subspeciesSectionEl.style.display = 'block';
+          }
+        }
+
+        // Update safety message with pest name
+        if (safetyTextEl && pestConfig) {
+          safetyTextEl.innerHTML = `Oh, and don&apos;t worry. Our ${pestConfig.label.toLowerCase()} treatments are safe for people and pets for your property!`;
+        }
+
+        // Set pet safety image source using config.baseUrl
+        const petSafetyImageEl = document.getElementById('pet-safety-image');
+        if (petSafetyImageEl && config.baseUrl) {
+          petSafetyImageEl.src = config.baseUrl + '/widget-pet-image.png';
+        }
+      };
+
+      // Populate content
+      populateHowWeDoItContent();
+
+      // Update step headings
+      if (typeof updateStepHeadings === 'function') {
+        updateStepHeadings();
       }
       break;
 
     case 'contact':
+      // Populate logo and hero section
+      populateAllLogos();
+      // Use location background image like confirm-address step
+      populateStepHero('confirm-address-bg-image', 'contact-hero-image');
+
       // Contact step (Schedule Service) - setup floating labels and validation
       const contactInputs = [
-        'first-name-input',
-        'last-name-input', 
-        'phone-input',
-        'email-input',
         'start-date-input',
-        'arrival-time-input'
+        'arrival-time-input',
       ];
-      
+
       contactInputs.forEach(inputId => {
         const input = document.getElementById(inputId);
         if (input) {
@@ -4423,16 +6168,85 @@
           input.addEventListener('focus', () => updateFloatingLabel(input));
           input.addEventListener('blur', () => updateFloatingLabel(input));
           input.addEventListener('input', () => updateFloatingLabel(input));
-          
+
           // For select elements, also listen to change event
           if (input.tagName.toLowerCase() === 'select') {
             input.addEventListener('change', () => updateFloatingLabel(input));
           }
-          
+
           // Initial floating label state
           updateFloatingLabel(input);
         }
       });
+
+      // Populate contact details and service address information
+      populateContactDetailsDisplay();
+
+      // Copy the existing address background image from confirm-address step
+      setTimeout(() => {
+        // Try to find the existing background image from confirm-address step
+        const existingAddressBg = document.getElementById('confirm-address-bg-image');
+        const contactBg = document.getElementById('contact-bg-image');
+        
+        if (contactBg) {
+          // First priority: Use stored address background URL if available
+          if (widgetState.addressBackgroundUrl) {
+            contactBg.style.backgroundImage = `url('${widgetState.addressBackgroundUrl}')`;
+            contactBg.style.backgroundSize = 'cover';
+            contactBg.style.backgroundPosition = 'center';
+            contactBg.style.backgroundRepeat = 'no-repeat';
+          } 
+          // Second priority: try to copy from existing address background element
+          else {
+            let backgroundImageUrl = '';
+            
+            // Look for background image in various address step elements
+            const addressElements = [
+              document.querySelector('#dh-step-confirm-address #confirm-address-bg-image'),
+              document.querySelector('#dh-step-address #address-bg-image'),
+              document.querySelector('[id*="confirm-address-bg-image"]'),
+              document.querySelector('[id*="address-bg-image"]')
+            ];
+            
+            for (const element of addressElements) {
+              if (element && element.style.backgroundImage && element.style.backgroundImage !== 'none') {
+                backgroundImageUrl = element.style.backgroundImage;
+                break;
+              }
+            }
+            
+            // If we found an existing background image, use it
+            if (backgroundImageUrl) {
+              contactBg.style.backgroundImage = backgroundImageUrl;
+              contactBg.style.backgroundSize = 'cover';
+              contactBg.style.backgroundPosition = 'center';
+              contactBg.style.backgroundRepeat = 'no-repeat';
+            } 
+            // Last resort: load it fresh if we have address data
+            else if (
+              widgetState.formData.address &&
+              widgetState.formData.latitude &&
+              widgetState.formData.longitude &&
+              typeof loadAddressBackgroundImagery === 'function'
+            ) {
+              const addressData = {
+                formatted: widgetState.formData.address,
+                street: widgetState.formData.addressStreet,
+                city: widgetState.formData.addressCity,
+                state: widgetState.formData.addressState,
+                postcode: widgetState.formData.addressZip,
+                lat: widgetState.formData.latitude,
+                lon: widgetState.formData.longitude,
+              };
+              // Load street view as background image
+              loadAddressBackgroundImagery(
+                addressData,
+                'contact-bg-image'
+              );
+            }
+          }
+        }
+      }, 200);
 
       // Pre-populate form fields with any available contact information
       setTimeout(() => {
@@ -4441,15 +6255,19 @@
       break;
 
     case 'quote-contact':
+      // Populate logo and hero section
+      populateAllLogos();
+      populateStepHero('quote-bg-image', 'quote-hero-image');
+
       // Quote contact form validation setup - form is submitted via proceedToQuoteWithValidation function
       // Set up basic field validation for real-time feedback
       const quoteInputs = [
         'quote-first-name-input',
-        'quote-last-name-input', 
+        'quote-last-name-input',
         'quote-email-input',
-        'quote-phone-input'
+        'quote-phone-input',
       ];
-      
+
       quoteInputs.forEach(inputId => {
         const input = document.getElementById(inputId);
         if (input) {
@@ -4471,6 +6289,13 @@
       break;
 
     case 'plan-comparison':
+      // Populate logo and hero section
+      populateAllLogos();
+      populateStepHero(
+        'plan-comparison-bg-image',
+        'plan-comparison-hero-image'
+      );
+
       const comparisonNoThanksBtn = document.getElementById(
         'comparison-no-thanks'
       );
@@ -4478,9 +6303,6 @@
       // Load service plans for comparison with tabbed interface
       const loadComparisonPlans = async () => {
         try {
-          const comparisonPlanTabs = document.getElementById(
-            'comparison-plan-tabs'
-          );
           const comparisonPlanContent = document.getElementById(
             'comparison-plan-content'
           );
@@ -4488,7 +6310,7 @@
             'comparison-plan-loading'
           );
 
-          if (!comparisonPlanTabs || !comparisonPlanContent) return;
+          if (!comparisonPlanContent) return;
 
           let suggestions = null;
 
@@ -4536,47 +6358,53 @@
             // Limit to first 3 plans (best matches)
             const plans = suggestions.slice(0, 3);
 
-            // Generate tabs HTML
-            const tabsHtml = plans
-              .map((plan, index) => {
-                const isRecommended = index === 0; // First plan is recommended
-                const label = isRecommended ? 'RECOMMENDED' : 'OPTIONAL';
-                const activeClass = index === 0 ? 'active' : '';
-
-                return `
-                <div class="dh-plan-tab ${activeClass}" data-plan-index="${index}" onclick="switchPlanTab(${index})">
-                  <div class="dh-plan-tab-label">${label}</div>
-                  <div class="dh-plan-tab-name">${plan.plan_name}</div>
-                </div>
-              `;
-              })
-              .join('');
-
             // Generate content HTML for first plan (active by default)
             const activeContent = generatePlanContent(plans[0]);
 
             // Update DOM
-            comparisonPlanTabs.innerHTML = tabsHtml;
             comparisonPlanContent.innerHTML = activeContent;
 
-            // Store plans data for tab switching
+            // Store plans data for dropdown switching
             window.comparisonPlansData = plans;
+
+            // Populate dropdown options
+            const dropdown = document.getElementById('plan-selection-dropdown');
+            if (dropdown) {
+              const dropdownOptions = plans
+                .map((plan, index) => {
+                  return `<option value="${index}">${plan.plan_name}</option>`;
+                })
+                .join('');
+              dropdown.innerHTML = dropdownOptions;
+            }
+
+            // Show recommendation badge for the first plan
+            setTimeout(() => {
+              const recommendationBadge = document.getElementById('plan-recommendation-badge');
+              if (recommendationBadge) {
+                recommendationBadge.style.display = 'block';
+              }
+            }, 0);
+
+            // Populate initial FAQ section for the first plan
+            const faqContainer = document.getElementById(
+              'comparison-plan-faqs'
+            );
+            if (faqContainer && plans[0]) {
+              faqContainer.innerHTML = generateFaqSection(plans[0]);
+            }
           } else {
-            comparisonPlanTabs.innerHTML = `
+            comparisonPlanContent.innerHTML = `
               <div class="dh-no-plans">
                 <p>No service plans available at this time.</p>
                 <p>Please contact us directly for a custom quote.</p>
               </div>
             `;
-            comparisonPlanContent.innerHTML = '';
           }
         } catch (error) {
           console.error('Error loading comparison plans:', error);
-          const comparisonPlanTabs = document.getElementById(
-            'comparison-plan-tabs'
-          );
-          if (comparisonPlanTabs) {
-            comparisonPlanTabs.innerHTML = `
+          if (comparisonPlanContent) {
+            comparisonPlanContent.innerHTML = `
               <div class="dh-error-state">
                 <p>Unable to load service plans.</p>
                 <p>Please try again or contact us directly.</p>
@@ -4586,7 +6414,109 @@
         }
       };
 
-      // Generate detailed content for a single plan
+      // Generate detailed content for a single plan (without dropdown to avoid regeneration issues)
+      const generatePlanContentOnly = plan => {
+        const featuresHtml = plan.plan_features
+          .map(
+            feature =>
+              `<li class="dh-plan-feature"><span class="dh-feature-checkmark"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none"><g clip-path="url(#clip0_6146_560)"><path d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916" stroke="#00AE42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 9.16659L10 11.6666L18.3333 3.33325" stroke="#00AE42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g><defs><clipPath d="clip0_6146_560"><rect width="20" height="20" fill="white"/></clipPath></defs></svg></span> ${feature}</li>`
+          )
+          .join('');
+
+        // Truncate description logic - 124 characters max
+        const fullDescription = plan.plan_description || '';
+        const maxLength = 124;
+        const shouldTruncate = fullDescription.length > maxLength;
+        const truncatedDescription = shouldTruncate ? fullDescription.substring(0, maxLength) : fullDescription;
+        
+        const descriptionHtml = shouldTruncate 
+          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription}</span>`
+          : `<span class="dh-description-text">${fullDescription}</span>`;
+
+        return `
+          <div class="dh-plan-details">
+            <div class="dh-plan-content-grid">
+              <div class="dh-plan-info">
+                <h3 class="dh-plan-title">${plan.plan_name}</h3>
+                <p class="dh-plan-description">${descriptionHtml}</p>
+                
+                <div class="dh-plan-included">
+                  <ul class="dh-plan-features-list">
+                    ${featuresHtml}
+                  </ul>
+                </div>
+              </div>
+              ${
+                plan.plan_image_url
+                  ? `
+              <div class="dh-plan-visual">
+                <div class="dh-plan-image-container">
+                  <div class="dh-plan-image-actual">
+                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="width: 100%; object-fit: cover;" />
+                  </div>
+                </div>
+              </div>
+              `
+                  : ''
+              }
+              <div class="dh-plan-pricing">
+                <span class="dh-plan-price-starting">Starting at:</span>
+                <div class="dh-plan-price-container">
+                  <div class="dh-plan-price-left">
+                    <div class="dh-plan-price-recurring">
+                      <span class="dh-price-dollar">$</span>${plan.recurring_price}<div class="dh-price-suffix">
+                        <span class="dh-price-asterisk">*</span>
+                        <div class="dh-price-frequency">${formatBillingFrequency(plan.billing_frequency)}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="dh-plan-price-right">
+                    <div class="dh-plan-price-initial">Initial Only <span class="dh-price-dollar">$</span><span class="dh-price-number">${plan.initial_price}</span></div>
+                    <div class="dh-plan-price-normally">Normally <span class="dh-price-dollar">$</span><span class="dh-plan-price-crossed">${(plan.initial_price + (plan.initial_discount || 0)).toFixed(0)}</span></div>
+                  </div>
+                </div>
+                
+                <div id="plan-selection-placeholder">
+                  <!-- Dropdown will be inserted here -->
+                </div>
+                
+                <div class="dh-plan-price-disclaimer">${plan.plan_disclaimer || '<strong>*Initial required to start service.</strong> Save over 30% on your intial with our internet special pricing. Prices may vary slightly depending on your home layout and service requirements. Your service technician will discuss your specific situation in detail before starting.'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dh-plan-actions">
+            <button class="dh-form-btn dh-form-btn-primary" onclick="selectPlan('${plan.id || 'selected'}', '${plan.plan_name}')">
+              Let&apos;s Schedule! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="dh-form-btn plan-no-thanks" onclick="declinePlanComparison()">
+              No Thank You <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        `;
+      };
+
+      // Generate dropdown HTML separately
+      const generateDropdownHtml = (selectedIndex = 0) => {
+        if (!window.comparisonPlansData) return '';
+
+        const dropdownOptions = window.comparisonPlansData
+          .map((plan, idx) => {
+            return `<option value="${idx}">${plan.plan_name}</option>`;
+          })
+          .join('');
+
+        return `
+          <div class="dh-plan-selection-section">
+            <label class="dh-plan-selection-label">Available Options</label>
+            <select class="dh-plan-selection-dropdown" id="plan-selection-dropdown" onchange="switchPlanOption(this.value)">
+              ${dropdownOptions}
+            </select>
+          </div>
+        `;
+      };
+
+      // Generate detailed content for a single plan (with dropdown for initial load)
       const generatePlanContent = plan => {
         const featuresHtml = plan.plan_features
           .map(
@@ -4595,123 +6525,89 @@
           )
           .join('');
 
+        // Truncate description logic - 124 characters max
+        const fullDescription = plan.plan_description || '';
+        const maxLength = 124;
+        const shouldTruncate = fullDescription.length > maxLength;
+        const truncatedDescription = shouldTruncate ? fullDescription.substring(0, maxLength) : fullDescription;
+        
+        const descriptionHtml = shouldTruncate 
+          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription}</span>`
+          : `<span class="dh-description-text">${fullDescription}</span>`;
+
         return `
           <div class="dh-plan-details">
-            <div class="dh-plan-main">
-              <h3 class="dh-plan-title">${plan.plan_name}</h3>
-              <p class="dh-plan-description">${plan.plan_description || ''}</p>
-              
-              <div class="dh-plan-included">
-                <h4>What&apos;s included:</h4>
-                <ul class="dh-plan-features-list">
-                  ${featuresHtml}
-                </ul>
+            <div class="dh-plan-content-grid">
+              <div class="dh-plan-info">
+                <div class="dh-plan-recommendation-badge" id="plan-recommendation-badge" style="display: none;">
+                  <span class="dh-recommendation-text">Recommended</span>
+                </div>
+                <h3 class="dh-plan-title">${plan.plan_name}</h3>
+                <p class="dh-plan-description">${descriptionHtml}</p>
+                
+                <div class="dh-plan-included">
+                  <ul class="dh-plan-features-list">
+                    ${featuresHtml}
+                  </ul>
+                </div>
               </div>
-              
+              ${
+                plan.plan_image_url
+                  ? `
+              <div class="dh-plan-visual">
+                <div class="dh-plan-image-container">
+                  <div class="dh-plan-image-actual">
+                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="width: 100%; object-fit: cover;" />
+                  </div>
+                </div>
+              </div>
+              `
+                  : ''
+              }
               <div class="dh-plan-pricing">
-                <div class="dh-plan-price">
-                  <span class="dh-plan-price-label">Service starts at just $${plan.recurring_price}${formatBillingFrequency(plan.billing_frequency)}.</span>
+                <span class="dh-plan-price-starting">Starting at:</span>
+                <div class="dh-plan-price-container">
+                  <div class="dh-plan-price-left">
+                    <div class="dh-plan-price-recurring">
+                      <span class="dh-price-dollar">$</span>${plan.recurring_price}<div class="dh-price-suffix">
+                        <span class="dh-price-asterisk">*</span>
+                        <div class="dh-price-frequency">${formatBillingFrequency(plan.billing_frequency)}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="dh-plan-price-right">
+                    <div class="dh-plan-price-initial">Initial Only <span class="dh-price-dollar">$</span><span class="dh-price-number">${plan.initial_price}</span></div>
+                    <div class="dh-plan-price-normally">Normally <span class="dh-price-dollar">$</span><span class="dh-plan-price-crossed">${(plan.initial_price + (plan.initial_discount || 0)).toFixed(0)}</span></div>
+                  </div>
                 </div>
-                <p class="dh-plan-price-detail">Initial setup fee of $${plan.initial_price}* to get started.</p>
-                <p class="dh-plan-price-disclaimer">*Pricing may vary based on initial inspection findings and other factors.</p>
+                
+                <!-- Plan Selection Dropdown -->
+                <div class="dh-plan-selection-section">
+                  <label class="dh-plan-selection-label">Available Options</label>
+                  <select class="dh-plan-selection-dropdown" id="plan-selection-dropdown" onchange="switchPlanOption(this.value)">
+                    <!-- Options will be populated dynamically -->
+                  </select>
+                </div>
+                
+                <div class="dh-plan-price-disclaimer">${plan.plan_disclaimer || '*Pricing may vary based on initial inspection findings and other factors.'}</div>
               </div>
             </div>
-            ${
-              plan.plan_image_url
-                ? `
-            <div class="dh-plan-visual">
-              <div class="dh-plan-image-container">
-                <div class="dh-plan-image-actual">
-                  <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="width: 100%; height: 240px; object-fit: cover; border-radius: 12px;" />
-                </div>
-              </div>
-            </div>
-            `
-                : ''
-            }
-            <div class="dh-plan-coverage-icons">
-                <div class="dh-coverage-icon">
-                  <span class="dh-coverage-checkmark">✓</span>
-                  <span>Covers Ants, Spiders, Wasps &amp; More</span>
-                </div>
-                <div class="dh-coverage-icon">
-                  <span class="dh-coverage-checkmark">✓</span>
-                  <span>Covers Ants, Spiders, Wasps &amp; More</span>
-                </div>
-                <div class="dh-coverage-icon">
-                  <span class="dh-coverage-checkmark">✓</span>
-                  <span>Covers Ants, Spiders, Wasps &amp; More</span>
-                </div>
-                <div class="dh-coverage-icon">
-                  <span class="dh-coverage-checkmark">✓</span>
-                  <span>Covers Ants, Spiders, Wasps &amp; More</span>
-                </div>
-              </div>
           </div>
 
           <div class="dh-plan-actions">
             <button class="dh-form-btn dh-form-btn-primary" onclick="selectPlan('${plan.id || 'selected'}', '${plan.plan_name}')">
-              Let&apos;s Schedule!
+              Let&apos;s Schedule! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button class="dh-form-btn plan-no-thanks" onclick="declinePlanComparison()">
-              No Thank You
+              No Thank You <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
-
-          ${generateFaqSection(plan)}
         `;
       };
 
-      // Generate FAQ section for a plan
-      const generateFaqSection = plan => {
-        if (!plan.plan_faqs || plan.plan_faqs.length === 0) {
-          return '';
-        }
-
-        const faqsHtml = plan.plan_faqs
-          .map(
-            (faq, index) => `
-            <div class="dh-faq-item">
-              <div class="dh-faq-header" onclick="toggleFaqItem(${index})">
-                <h4 class="dh-faq-question">${faq.question}</h4>
-                <span class="dh-faq-icon">+</span>
-              </div>
-              <div class="dh-faq-content" id="faq-content-${index}">
-                <div class="dh-faq-answer">
-                  <p>${faq.answer}</p>
-                </div>
-              </div>
-            </div>
-          `
-          )
-          .join('');
-
-        return `
-          <div class="dh-plan-faqs">
-            <h3 class="dh-faqs-title">${plan.plan_name} FAQs</h3>
-            <div class="dh-faqs-container">
-              ${faqsHtml}
-            </div>
-          </div>
-        `;
-      };
-
-      // Helper function to format billing frequency
-      const formatBillingFrequency = frequency => {
-        switch (frequency) {
-          case 'monthly':
-            return '/month';
-          case 'quarterly':
-            return '/quarter';
-          case 'annually':
-            return '/year';
-          default:
-            return '/month';
-        }
-      };
 
       // Switch plan tab function
-      window.switchPlanTab = (tabIndex) => {
+      window.switchPlanTab = tabIndex => {
         // Update tab active states
         const tabs = document.querySelectorAll('.dh-plan-tab');
         tabs.forEach((tab, index) => {
@@ -4719,7 +6615,9 @@
         });
 
         // Update content
-        const contentContainer = document.getElementById('comparison-plan-content');
+        const contentContainer = document.getElementById(
+          'comparison-plan-content'
+        );
         if (contentContainer && window.comparisonPlansData) {
           const newContent = generatePlanContent(
             window.comparisonPlansData[tabIndex]
@@ -4730,9 +6628,7 @@
 
       // FAQ accordion toggle functionality
       window.toggleFaqItem = faqIndex => {
-        const faqContent = document.getElementById(
-          `faq-content-${faqIndex}`
-        );
+        const faqContent = document.getElementById(`faq-content-${faqIndex}`);
         const faqIcon = document.querySelector(
           `[onclick="toggleFaqItem(${faqIndex})"] .dh-faq-icon`
         );
@@ -4746,13 +6642,11 @@
           // Close the FAQ
           faqItem.classList.remove('active');
           faqContent.style.maxHeight = '0px';
-          faqIcon.textContent = '+';
           faqIcon.style.transform = 'rotate(0deg)';
         } else {
           // Open the FAQ
           faqItem.classList.add('active');
           faqContent.style.maxHeight = faqContent.scrollHeight + 'px';
-          faqIcon.textContent = '×';
           faqIcon.style.transform = 'rotate(180deg)';
         }
       };
@@ -4762,7 +6656,6 @@
         widgetState.formData.offerChoice = 'decline-comparison';
         showStep('exit-survey');
         setupStepValidation('exit-survey');
-        updateProgressBar('exit-survey');
       };
 
       // Select plan function - for plan comparison step
@@ -4775,7 +6668,6 @@
         // Navigate to contact form for final submission
         showStep('contact');
         setupStepValidation('contact');
-        updateProgressBar('contact');
       };
 
       // Load plans when the step is set up
@@ -4790,43 +6682,40 @@
           // Navigate to exit survey
           showStep('exit-survey');
           setupStepValidation('exit-survey');
-          updateProgressBar('exit-survey');
         });
       }
       break;
 
     case 'exit-survey':
-      const surveyOptions = document.querySelectorAll('.dh-survey-option');
+      // Populate logo
+      populateAllLogos();
+      
+      // Get feedback form elements
+      const feedbackRadios = document.querySelectorAll('input[name="exit-feedback"]');
+      const feedbackTextarea = document.getElementById('exit-feedback-text');
       const surveySubmitBtn = document.getElementById('survey-submit');
-      const exitFeedbackInput = document.getElementById('exit-feedback');
-
-      if (surveyOptions) {
-        surveyOptions.forEach(option => {
-          option.addEventListener('click', () => {
-            // Remove selected class from all options
-            surveyOptions.forEach(opt =>
-              opt.classList.remove('selected')
-            );
-            // Add selected class to clicked option
-            option.classList.add('selected');
-            // Store selection
-            widgetState.formData.exitReason = option.dataset.reason;
-            // Survey submit button stays enabled
-          });
-        });
-      }
 
       if (surveySubmitBtn) {
         surveySubmitBtn.addEventListener('click', async () => {
-          // Store optional feedback
-          if (exitFeedbackInput) {
-            widgetState.formData.exitFeedback = exitFeedbackInput.value;
-          }
+          // Get selected feedback option
+          const selectedFeedback = document.querySelector('input[name="exit-feedback"]:checked');
+          const additionalFeedback = feedbackTextarea?.value || '';
+
+          // Store exit survey data
+          widgetState.formData.exitFeedbackReason = selectedFeedback?.value || 'none';
+          widgetState.formData.exitFeedbackText = additionalFeedback;
 
           // Save exit survey data
           try {
             const partialSaveResult = await savePartialLead(
-              { served: false, status: 'declined' },
+              { 
+                served: false, 
+                status: 'declined',
+                feedback_reason: selectedFeedback?.value || 'none',
+                feedback_text: additionalFeedback,
+                email: widgetState.formData.email || '',
+                phone: widgetState.formData.phone || ''
+              },
               'exit_survey_completed'
             );
             if (!partialSaveResult.success) {
@@ -4838,11 +6727,107 @@
           } catch (error) {
             console.warn('Error saving exit survey:', error);
           }
-
+          
           // Show decline completion message
           showStep('decline-complete');
           setupStepValidation('decline-complete');
         });
+      }
+      break;
+
+    case 'complete':
+      // Populate logo
+      populateAllLogos();
+      
+      // Populate logo, background image, and hero image
+      populateStepHero(
+        'complete-bg-image',
+        'complete-hero-image'
+      );
+      
+      // Populate customer name
+      const customerNameEl = document.getElementById('complete-customer-name');
+      if (customerNameEl) {
+        const contactInfo = widgetState.formData.contactInfo || widgetState.formData;
+        const firstName = contactInfo.firstName || widgetState.formData.firstName || '';
+        customerNameEl.textContent = firstName || 'Customer';
+      }
+      
+      // Populate office hours
+      const officeHoursEl = document.getElementById('office-hours-content');
+      if (officeHoursEl) {
+        officeHoursEl.innerHTML = formatBusinessHours(config.businessHours);
+      }
+      
+      // Populate service date and time
+      const serviceDateEl = document.getElementById('service-date-content');
+      if (serviceDateEl) {
+        const serviceDate = widgetState.formData.startDate;
+        const serviceTime = widgetState.formData.arrivalTime;
+        serviceDateEl.textContent = formatServiceDateTime(serviceDate, serviceTime);
+      }
+      
+      // Load address background imagery if available
+      if (widgetState.formData.address && 
+          widgetState.formData.latitude && 
+          widgetState.formData.longitude &&
+          typeof loadAddressBackgroundImagery === 'function') {
+        const addressData = {
+          formatted: widgetState.formData.address,
+          street: widgetState.formData.addressStreet,
+          city: widgetState.formData.addressCity,
+          state: widgetState.formData.addressState,
+          postcode: widgetState.formData.addressZip,
+          lat: widgetState.formData.latitude,
+          lon: widgetState.formData.longitude,
+        };
+        loadAddressBackgroundImagery(addressData, 'complete-bg-image');
+      }
+      
+      // Handle Return to Homepage button
+      const returnHomepageBtn = document.getElementById('return-homepage-btn');
+      if (returnHomepageBtn) {
+        returnHomepageBtn.addEventListener('click', () => {
+          // Redirect to company website or close widget
+          if (config.companyWebsite) {
+            window.open(config.companyWebsite, '_blank');
+          } else {
+            // Close widget if no website specified
+            if (typeof closeModal === 'function') {
+              closeModal();
+            }
+          }
+        });
+      }
+      break;
+
+    case 'out-of-service':
+      // Populate logo for out of service step
+      populateAllLogos();
+
+      // Handle background image specifically for out of service step
+      const outOfServiceBgElement = document.getElementById(
+        'out-of-service-bg-image'
+      );
+      const locationNotServedBgUrl =
+        widgetState.widgetConfig?.branding?.locationNotServedBackgroundImage;
+
+      if (outOfServiceBgElement && locationNotServedBgUrl) {
+        // Preload background image
+        const bgImg = new Image();
+        bgImg.onload = function () {
+          outOfServiceBgElement.style.backgroundImage = `url(${locationNotServedBgUrl})`;
+          outOfServiceBgElement.style.backgroundSize = 'cover';
+          outOfServiceBgElement.style.backgroundPosition = 'center';
+          outOfServiceBgElement.style.backgroundRepeat = 'no-repeat';
+        };
+        bgImg.onerror = function () {
+          console.warn(
+            'Failed to load out of service background image:',
+            locationNotServedBgUrl
+          );
+        };
+        bgImg.src = locationNotServedBgUrl;
       }
       break;
 
@@ -4853,80 +6838,254 @@
   };
 
   // Pre-populate contact fields for both regular and quote forms
-  const populateContactFields = () => {
-    try {
-      const contactInfo = widgetState.formData.contactInfo;
-      if (!contactInfo) return;
+  // Format phone number to (XXX) XXX-XXXX format
+  const formatPhoneNumber = (phone) => {
+  if (!phone) return 'Not provided';
+  
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, '');
+  
+  // Check if we have a valid US phone number (10 digits)
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  } else if (digits.length === 11 && digits[0] === '1') {
+    // Handle numbers with country code
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  
+  // Return original if not standard format
+  return phone;
+  };
 
-      // Populate regular contact form fields (contact step)
-      const firstNameInput = document.getElementById('first-name-input');
-      const lastNameInput = document.getElementById('last-name-input');
-      const phoneInput = document.getElementById('phone-input');
-      const emailInput = document.getElementById('email-input');
-      const startDateInput = document.getElementById('start-date-input');
-      const arrivalTimeInput = document.getElementById('arrival-time-input');
-
-      // Handle name splitting from consolidated name field if individual fields not available
-      let firstName = contactInfo.firstName || '';
-      let lastName = contactInfo.lastName || '';
+  // Populate contact details and service address display sections
+  const populateContactDetailsDisplay = () => {
+  try {
+    const contactInfo = widgetState.formData.contactInfo || widgetState.formData;
+    
+    // Populate contact details
+    const contactName = document.getElementById('contact-name');
+    const contactEmail = document.getElementById('contact-email');
+    const contactPhone = document.getElementById('contact-phone');
+    const serviceAddress = document.getElementById('service-address');
+    
+    if (contactName) {
+      const firstName = contactInfo.firstName || widgetState.formData.firstName || '';
+      const lastName = contactInfo.lastName || widgetState.formData.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim() || contactInfo.name || 'Not provided';
+      contactName.textContent = fullName;
+    }
+    
+    if (contactEmail) {
+      const email = contactInfo.email || widgetState.formData.email || 'Not provided';
+      contactEmail.textContent = email;
+    }
+    
+    if (contactPhone) {
+      const phone = contactInfo.phone || widgetState.formData.phone;
+      contactPhone.textContent = formatPhoneNumber(phone);
+    }
+    
+    if (serviceAddress) {
+      // Format address as 2 lines: Street on first line, City/State/ZIP on second line
+      const street = widgetState.formData.addressStreet || '';
+      const city = widgetState.formData.addressCity || '';
+      const state = widgetState.formData.addressState || '';
+      const zip = widgetState.formData.addressZip || '';
       
-      if (!firstName && !lastName && contactInfo.name) {
-        const nameParts = contactInfo.name.trim().split(' ');
-        firstName = nameParts[0] || '';
-        lastName = nameParts.slice(1).join(' ') || '';
+      if (street || city || state || zip) {
+        // Build the address HTML with 2 lines
+        let addressHtml = '';
+        
+        // First line: Street address
+        if (street) {
+          addressHtml += `<div class="address-line-1">${street}</div>`;
+        }
+        
+        // Second line: City, State ZIP
+        const cityStateZip = [];
+        if (city) cityStateZip.push(city);
+        if (state && zip) {
+          cityStateZip.push(`${state} ${zip}`);
+        } else {
+          if (state) cityStateZip.push(state);
+          if (zip) cityStateZip.push(zip);
+        }
+        
+        if (cityStateZip.length > 0) {
+          addressHtml += `<div class="address-line-2">${cityStateZip.join(', ')}</div>`;
+        }
+        
+        serviceAddress.innerHTML = addressHtml;
+      } else {
+        // Fallback to single formatted address if individual fields not available
+        const formattedAddress = widgetState.formData.address;
+        if (formattedAddress && typeof formattedAddress === 'string') {
+          // Try to split the address by comma and format as 2 lines
+          const parts = formattedAddress.split(',').map(part => part.trim());
+          if (parts.length >= 2) {
+            const street = parts[0];
+            const remainder = parts.slice(1).join(', ');
+            serviceAddress.innerHTML = `<div class="address-line-1">${street}</div><div class="address-line-2">${remainder}</div>`;
+          } else {
+            serviceAddress.innerHTML = `<div class="address-line-1">${formattedAddress}</div>`;
+          }
+        } else {
+          serviceAddress.textContent = 'Address not provided';
+          console.warn('Address data not found:', widgetState.formData);
+        }
       }
+    }
+  } catch (error) {
+    console.error('Error populating contact details display:', error);
+  }
+  };
 
-      if (firstNameInput && firstName) {
-        firstNameInput.value = firstName;
-        updateFloatingLabel(firstNameInput);
-      }
-      if (lastNameInput && lastName) {
-        lastNameInput.value = lastName;
-        updateFloatingLabel(lastNameInput);
-      }
-      if (phoneInput && contactInfo.phone) {
-        phoneInput.value = contactInfo.phone;
-        updateFloatingLabel(phoneInput);
-      }
-      if (emailInput && contactInfo.email) {
-        emailInput.value = contactInfo.email;
-        updateFloatingLabel(emailInput);
-      }
-      if (startDateInput && contactInfo.startDate) {
-        startDateInput.value = contactInfo.startDate;
-        updateFloatingLabel(startDateInput);
-      }
-      if (arrivalTimeInput && contactInfo.arrivalTime) {
-        arrivalTimeInput.value = contactInfo.arrivalTime;
-        updateFloatingLabel(arrivalTimeInput);
-      }
+  const populateContactFields = () => {
+  try {
+    // Populate scheduling fields (contact step)
+    const startDateInput = document.getElementById('start-date-input');
+    const arrivalTimeInput = document.getElementById('arrival-time-input');
 
-      // Populate quote contact form fields (quote-contact step)  
-      const quoteFirstNameInput = document.getElementById('quote-first-name-input');
-      const quoteLastNameInput = document.getElementById('quote-last-name-input');
-      const quotePhoneInput = document.getElementById('quote-phone-input');
-      const quoteEmailInput = document.getElementById('quote-email-input');
+    // Pre-populate with any existing values
+    if (startDateInput && widgetState.formData.startDate) {
+      startDateInput.value = widgetState.formData.startDate;
+      updateFloatingLabel(startDateInput);
+    }
+    if (arrivalTimeInput && widgetState.formData.arrivalTime) {
+      arrivalTimeInput.value = widgetState.formData.arrivalTime;
+      updateFloatingLabel(arrivalTimeInput);
+    }
 
-      if (quoteFirstNameInput && firstName) {
+    // Populate quote contact form fields (quote-contact step) if they exist
+    const contactInfo = widgetState.formData.contactInfo || widgetState.formData;
+    const quoteFirstNameInput = document.getElementById('quote-first-name-input');
+    const quoteLastNameInput = document.getElementById('quote-last-name-input');
+    const quotePhoneInput = document.getElementById('quote-phone-input');
+    const quoteEmailInput = document.getElementById('quote-email-input');
+
+    if (contactInfo && quoteFirstNameInput) {
+      const firstName = contactInfo.firstName || widgetState.formData.firstName || '';
+      if (firstName) {
         quoteFirstNameInput.value = firstName;
         updateFloatingLabel(quoteFirstNameInput);
       }
-      if (quoteLastNameInput && lastName) {
+    }
+    if (contactInfo && quoteLastNameInput) {
+      const lastName = contactInfo.lastName || widgetState.formData.lastName || '';
+      if (lastName) {
         quoteLastNameInput.value = lastName;
         updateFloatingLabel(quoteLastNameInput);
       }
-      if (quotePhoneInput && contactInfo.phone) {
-        quotePhoneInput.value = contactInfo.phone;
+    }
+    if (contactInfo && quotePhoneInput) {
+      const phone = contactInfo.phone || widgetState.formData.phone || '';
+      if (phone) {
+        quotePhoneInput.value = phone;
         updateFloatingLabel(quotePhoneInput);
       }
-      if (quoteEmailInput && contactInfo.email) {
-        quoteEmailInput.value = contactInfo.email;
+    }
+    if (contactInfo && quoteEmailInput) {
+      const email = contactInfo.email || widgetState.formData.email || '';
+      if (email) {
+        quoteEmailInput.value = email;
         updateFloatingLabel(quoteEmailInput);
       }
-
-    } catch (error) {
-      console.error('Error populating contact fields:', error);
     }
+  } catch (error) {
+    console.error('Error populating contact fields:', error);
+  }
+  };
+
+  // Helper function to format business hours
+  const formatBusinessHours = (businessHours) => {
+  if (!businessHours || typeof businessHours !== 'object') {
+    return 'Monday - Friday 8am - 5:30pm'; // Default fallback
+  }
+
+  // Group days with same hours
+  const dayGroups = {};
+  const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const dayNames = {
+    monday: 'Monday',
+    tuesday: 'Tuesday', 
+    wednesday: 'Wednesday',
+    thursday: 'Thursday',
+    friday: 'Friday',
+    saturday: 'Saturday',
+    sunday: 'Sunday'
+  };
+
+  // Group days by their hours
+  dayOrder.forEach(day => {
+    if (businessHours[day]) {
+      const hours = `${formatTime(businessHours[day].open)} - ${formatTime(businessHours[day].close)}`;
+      if (!dayGroups[hours]) {
+        dayGroups[hours] = [];
+      }
+      dayGroups[hours].push(dayNames[day]);
+    }
+  });
+
+  // Format groups
+  const formattedGroups = [];
+  Object.entries(dayGroups).forEach(([hours, days]) => {
+    if (days.length === 1) {
+      formattedGroups.push(`${days[0]} ${hours}`);
+    } else if (days.length > 1) {
+      // Check for consecutive days
+      const firstDay = days[0];
+      const lastDay = days[days.length - 1];
+      formattedGroups.push(`${firstDay} - ${lastDay} ${hours}`);
+    }
+  });
+
+  return formattedGroups.join('<br>') || 'Monday - Friday 8am - 5:30pm';
+  };
+
+  // Helper function to format time (e.g., "08:00" to "8am")
+  const formatTime = (timeString) => {
+  if (!timeString) return '';
+  
+  const [hours, minutes] = timeString.split(':');
+  const hour = parseInt(hours);
+  const min = minutes === '00' ? '' : `:${minutes}`;
+  
+  if (hour === 0) return `12${min}am`;
+  if (hour < 12) return `${hour}${min}am`;
+  if (hour === 12) return `12${min}pm`;
+  return `${hour - 12}${min}pm`;
+  };
+
+  // Helper function to format service date and time
+  const formatServiceDateTime = (dateString, timeString) => {
+  if (!dateString) return 'Date TBD';
+  
+  const date = new Date(dateString);
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = date.toLocaleDateString('en-US', options);
+  
+  // Convert date to "October 7th, 2025" format
+  const day = date.getDate();
+  let suffix = 'th';
+  if (day % 10 === 1 && day !== 11) suffix = 'st';
+  else if (day % 10 === 2 && day !== 12) suffix = 'nd';
+  else if (day % 10 === 3 && day !== 13) suffix = 'rd';
+  
+  const finalDate = formattedDate.replace(day.toString(), day + suffix);
+  
+  // Format time
+  let timeDisplay = '';
+  if (timeString) {
+    const timeMap = {
+      'morning': '8 AM - 12 PM',
+      'afternoon': '12 PM - 5 PM', 
+      'evening': '5 PM - 8 PM',
+      'anytime': 'Anytime'
+    };
+    timeDisplay = timeMap[timeString] || timeString;
+  }
+  
+  return timeDisplay ? `${finalDate} | ${timeDisplay}` : finalDate;
   };
 
   // Expose functions to window for onclick handlers
@@ -4935,8 +7094,10 @@
   window.previousStep = previousStep;
   window.changeAddress = changeAddress;
   window.validateServiceArea = validateServiceArea;
+  window.checkServiceAreaButton = checkServiceAreaButton;
   // selectPlan is now exposed via window.selectPlan inside plan-comparison setupStepValidation
   window.showComparisonPlan = showComparisonPlan;
+  window.switchPlanOption = switchPlanOption;
   window.setupStepValidation = setupStepValidation;
   window.populateContactFields = populateContactFields;
 
@@ -4945,19 +7106,9 @@
   const createFormSteps = () => {
     const steps = [];
 
-    // Step 1: Welcome (redesigned)
-    const welcomeStep = document.createElement('div');
-    welcomeStep.className = 'dh-form-step welcome active';
-    welcomeStep.id = 'dh-step-welcome';
-
-    // Use the new welcome screen design instead of simple HTML
-    const welcomeContent = createWelcomeScreenContent();
-    welcomeStep.appendChild(welcomeContent);
-    steps.push(welcomeStep);
-
-    // Step 2: Pest Issue
+    // Step 1: Pest Issue
     const pestStep = document.createElement('div');
-    pestStep.className = 'dh-form-step';
+    pestStep.className = 'dh-form-step active';
     pestStep.id = 'dh-step-pest-issue';
 
     // Generate pest options dynamically from config
@@ -4999,19 +7150,42 @@
       `;
 
     pestStep.innerHTML = `
-    <div class="dh-form-step-content" style="position: relative;">
-      <h2 class="dh-step-heading">What's your main pest issue?</h2>
-      <p class="dh-step-instruction">What kind of pest issue are you experiencing?</p>
-      <div class="dh-pest-selection">
-        ${pestOptionsHtml}
+    <div class="dh-pest-step-container">
+      <!-- Left Content Area -->
+      <div class="dh-pest-content">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+        <!-- Quick Time Badge -->
+        <div class="dh-pest-time-badge">
+          <span>Takes only 30 seconds!</span>
+        </div>
+        
+        <!-- Main Heading -->
+        <h1 class="dh-pest-heading">Choose the pest that is bugging you.</h1>
+        <p class="dh-pest-instruction">What kind of pest issue are you experiencing at your residence?</p>
+        
+        <!-- Pest Selection Grid -->
+        <div class="dh-pest-selection">
+          ${pestOptionsHtml}
+        </div>
+        
+        <!-- Loading State -->
+        <div class="dh-pest-loading" id="pest-loading" style="display: none;">
+          <div class="dh-loading-spinner"></div>
+        </div>
       </div>
-      <div class="dh-pest-loading" id="pest-loading" style="display: none;">
-        <div class="dh-loading-spinner"></div>
+      
+      <!-- Right Hero Section -->
+      <div class="dh-pest-hero step1" id="pest-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image step1" id="pest-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="pest-hero-image" src="" alt="Hero Image" style="display: none;" />
       </div>
     </div>
-    <div class="dh-form-button-group">
-        <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-      </div>
   `;
     steps.push(pestStep);
 
@@ -5031,9 +7205,6 @@
     <!-- Plans will be populated dynamically -->
   </div>
   </div>
-  <div class="dh-form-button-group">
-    <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-  </div>
   `;
     steps.push(planSelectionStep);
 
@@ -5044,115 +7215,215 @@
     addressStep.id = 'dh-step-address';
     addressStep.innerHTML = `
     <div class="dh-form-step-content">
-    <div class="dh-address-pest-icon" id="address-pest-icon">${addressPestIcon}</div>
-  <h2 class="dh-step-heading">Yuck, <span id="address-pest-type">pests</span>! We hate those. No worries, we got you!</h2>
-  <!-- Address Search Mode (Initial State) -->
-  <div id="address-search-mode">
-    <p class="dh-step-instruction">Dealing with pests is a hassle, but our licensed and trained techs will have you free of <span id="address-pest-type-two">pests</span> in no time!</p>
-    <div class="dh-form-group">
-      <div class="dh-address-autocomplete">
-        <label class="dh-address-form-label" for="address-search-input">Let's make sure you're in our service area.</label>
-        <input type="text" class="dh-form-input dh-address-search-field" id="address-search-input" name="address-search-input" placeholder="Start typing your address..." autocomplete="off">
-        <div class="dh-address-suggestions" id="address-suggestions"></div>
-      </div>
-    </div>
-  </div>
+      <div class="dh-form-content-area">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+       
+        <h2 class="dh-step-heading" id="address-step-heading">Yuck, <span id="address-pest-type">pests</span>! We hate those. No worries, we got you!</h2>
+        <!-- Address Search Mode (Initial State) -->
+        <div id="address-search-mode">
+          <p class="dh-step-instruction">Dealing with pests is a hassle, but our licensed and trained techs will have you free of <span id="address-pest-type-two">pests</span> in no time!</p>
+           <div class="dh-address-pest-icon" id="address-pest-icon">${addressPestIcon}</div>
+          <div class="dh-form-group">
+            <div class="dh-address-autocomplete">
+              <label class="dh-address-form-label" for="address-search-input">Let's make sure you're in our service area.</label>
+              <input type="text" class="dh-form-input dh-address-search-field" id="address-search-input" name="address-search-input" placeholder="Start typing your address..." autocomplete="off">
+              <div class="dh-address-suggestions" id="address-suggestions"></div>
+            </div>
+          </div>
+          
+          <!-- Service Area Check Button -->
+          <div class="dh-form-button-group">
+            <button class="dh-form-btn dh-form-btn-secondary" onclick="checkServiceAreaButton()" id="check-service-area-btn" disabled>Search Now<svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none">
+  <path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg></button>
+          </div>
+        </div>
 
-  <!-- Address Display Mode (After Selection) -->
-  <div id="address-display-mode" style="display: none;">
-    <div class="dh-address-header">
-      <p>Review and/or edit your service address:</p>
-      <button type="button" class="dh-change-address-btn" onclick="changeAddress()">Search Different Address</button>
-    </div>
-    
-    <!-- Address Visual Confirmation -->
-    <div class="dh-address-imagery" id="address-imagery">
-      <div class="dh-image-loading" id="image-loading">
-        <div class="dh-loading-spinner"></div>
-        <p>Loading street view...</p>
+        <!-- Address Display Mode (After Selection) -->
+        <div id="address-display-mode" style="display: none;">
+          <div class="dh-address-header">
+            <p>Review and/or edit your service address:</p>
+            <button type="button" class="dh-change-address-btn" onclick="changeAddress()">Search Different Address</button>
+          </div>
+          
+          <!-- Address Visual Confirmation -->
+          <div class="dh-address-imagery" id="address-imagery">
+            <div class="dh-image-loading" id="image-loading">
+              <div class="dh-loading-spinner"></div>
+              <p>Loading street view...</p>
+            </div>
+            <img class="dh-address-image" id="address-image" alt="Street view of selected address" style="display: none;">
+            <div class="dh-image-error" id="image-error" style="display: none;">
+              <p>📍 Street view not available for this address</p>
+            </div>
+          </div>
+          
+          <!-- Editable address form fields -->
+          <div class="dh-form-group">
+            <div class="dh-floating-input">
+              <input type="text" class="dh-form-input" id="street-input" placeholder=" ">
+              <label class="dh-floating-label" for="street-input">Street Address</label>
+            </div>
+          </div>
+          <div class="dh-form-group">
+            <div class="dh-floating-input">
+              <input type="text" class="dh-form-input" id="city-input" placeholder=" ">
+              <label class="dh-floating-label" for="city-input">City</label>
+            </div>
+          </div>
+          <div class="dh-form-group">
+            <div class="dh-floating-input">
+              <input type="text" class="dh-form-input" id="state-input" placeholder=" ">
+              <label class="dh-floating-label" for="state-input">State</label>
+            </div>
+          </div>
+          <div class="dh-form-group">
+            <div class="dh-floating-input">
+              <input type="text" class="dh-form-input" id="zip-input" placeholder=" ">
+              <label class="dh-floating-label" for="zip-input">ZIP Code</label>
+            </div>
+          </div>
+          
+          <div class="dh-form-button-group">
+            <button class="dh-form-btn dh-form-btn-secondary" onclick="nextStep()" id="address-next">Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+          </div>
+        </div>
       </div>
-      <img class="dh-address-image" id="address-image" alt="Street view of selected address" style="display: none;">
-      <div class="dh-image-error" id="image-error" style="display: none;">
-        <p>📍 Street view not available for this address</p>
+      
+      <!-- Right Hero Section -->
+      <div class="dh-pest-hero" id="address-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image" id="address-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="address-hero-image" src="" alt="Hero Image" style="display: none;" />
       </div>
     </div>
-    
-    <!-- Editable address form fields -->
-    <div class="dh-form-group">
-      <div class="dh-floating-input">
-        <input type="text" class="dh-form-input" id="street-input" placeholder=" ">
-        <label class="dh-floating-label" for="street-input">Street Address</label>
-      </div>
-    </div>
-    <div class="dh-form-group">
-      <div class="dh-floating-input">
-        <input type="text" class="dh-form-input" id="city-input" placeholder=" ">
-        <label class="dh-floating-label" for="city-input">City</label>
-      </div>
-    </div>
-    <div class="dh-form-group">
-      <div class="dh-floating-input">
-        <input type="text" class="dh-form-input" id="state-input" placeholder=" ">
-        <label class="dh-floating-label" for="state-input">State</label>
-      </div>
-    </div>
-    <div class="dh-form-group">
-      <div class="dh-floating-input">
-        <input type="text" class="dh-form-input" id="zip-input" placeholder=" ">
-        <label class="dh-floating-label" for="zip-input">ZIP Code</label>
-      </div>
-    </div>
-  </div>
-  </div>
-  <div class="dh-form-button-group">
-    <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-    <button class="dh-form-btn dh-form-btn-secondary" onclick="nextStep()" id="address-next">Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
-  </div>
   `;
     steps.push(addressStep);
 
-    // Step 4: Urgency
-    const urgencyStep = document.createElement('div');
-    urgencyStep.className = 'dh-form-step';
-    urgencyStep.id = 'dh-step-urgency';
-    urgencyStep.innerHTML = `
-    <div class="dh-form-step-content" style="position: relative;">
-  <h2 class="dh-step-heading">Excellent. How soon are you wanting to get rid of those pesky <span id="urgency-pest-type">pests</span>?</h2>
-  <p class="dh-step-instruction">Select your preferred timeline to continue</p>
-  <div class="dh-urgency-selection">
-    <div class="dh-urgency-option" data-urgency="yesterday">Yesterday! (we hear you)</div>
-    <div class="dh-urgency-option" data-urgency="1-2-days">Within 1-2 days</div>
-    <div class="dh-urgency-option" data-urgency="next-week">Within the next week</div>
-    <div class="dh-urgency-option" data-urgency="no-rush">I&apos;m not in a rush</div>
-  </div>
-  <div class="dh-urgency-loading" id="urgency-loading" style="display: none;">
-    <div class="dh-loading-spinner"></div>
-  </div>
-  </div>
-  <div class="dh-form-button-group">
-    <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-  </div>
+    // Step 4: Confirm Address
+    const confirmAddressStep = document.createElement('div');
+    confirmAddressStep.className = 'dh-form-step';
+    confirmAddressStep.id = 'dh-step-confirm-address';
+    confirmAddressStep.innerHTML = `
+    <div class="dh-form-step-content">
+      <div class="dh-form-content-area">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+        <h2 class="dh-step-heading">Good news! We service your neighborhood.</h2>
+        <p class="dh-step-instruction">Double check the address information below and hit continue to proceed.</p>
+        
+        <!-- Mobile background image (shown only on mobile) -->
+        <img class="dh-mobile-bg-image" id="confirm-address-mobile-bg-image" src="" alt="Background Image" />
+        
+        <!-- Editable address form fields -->
+        <div class="dh-form-group">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="confirm-street-input" placeholder=" ">
+            <label class="dh-floating-label" for="confirm-street-input">Street Address</label>
+          </div>
+        </div>
+        <div class="dh-form-group">
+          <div class="dh-floating-input">
+            <input type="text" class="dh-form-input" id="confirm-city-input" placeholder=" ">
+            <label class="dh-floating-label" for="confirm-city-input">City</label>
+          </div>
+        </div>
+        <div class="dh-form-row">
+          <div class="dh-form-group">
+            <div class="dh-floating-input">
+              <input type="text" class="dh-form-input" id="confirm-state-input" placeholder=" ">
+              <label class="dh-floating-label" for="confirm-state-input">State</label>
+            </div>
+          </div>
+          <div class="dh-form-group">
+            <div class="dh-floating-input">
+              <input type="text" class="dh-form-input" id="confirm-zip-input" placeholder=" ">
+              <label class="dh-floating-label" for="confirm-zip-input">ZIP Code</label>
+            </div>
+          </div>
+        </div>
+        <div class="dh-form-group">
+          <label class="dh-form-checkbox-label">
+            <input type="checkbox" class="dh-form-checkbox" id="confirm-address-consent-checkbox">
+            <span class="dh-form-checkbox-text">Yes, <span id="confirm-address-company-name">Company Name</span> may contact me. By submitting this request, I validate that I am 18 years of age or older. Additionally, I give <span id="confirm-address-company-name-2">Company Name</span> permission to direct mail me, email me, or to call or text me at the number provided regarding services from <span id="confirm-address-company-name-3">Company Name</span> using automated technology. I understand my consent is not a condition of purchase.</span>
+          </label>
+        </div>
+        
+        <div class="dh-form-button-group">
+          <button class="dh-form-btn dh-form-btn-secondary" onclick="nextStep()" id="confirm-address-next">Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+        </div>
+      </div>
+      
+      <!-- Right Hero Section -->
+      <div class="dh-pest-hero" id="confirm-address-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image" id="confirm-address-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="confirm-address-hero-image" src="" alt="Hero Image" style="display: none;" />
+      </div>
+    </div>
   `;
-    steps.push(urgencyStep);
+    steps.push(confirmAddressStep);
 
     // Step 5: Initial Offer
     const initialOfferStep = document.createElement('div');
     initialOfferStep.className = 'dh-form-step';
-    initialOfferStep.id = 'dh-step-initial-offer';
+    initialOfferStep.id = 'dh-step-how-we-do-it';
     initialOfferStep.innerHTML = `
     <div class="dh-form-step-content">
-  <h2 class="dh-step-heading">Great! We can take care of those <span id="offer-pest-type">pests</span>, <span id="urgency-timeline-ref">usually within one business day</span>, starting at just <span id="offer-price">$</span>.</h2>
-  <p class="dh-step-instruction">How would you like to proceed?</p>
-  <div class="dh-offer-options">
-    <button class="dh-offer-btn dh-offer-btn-primary" id="lets-schedule" data-choice="schedule">Schedule Now!</button>
-    <p>OR</p>
-    <button class="dh-offer-btn dh-offer-btn-primary" id="detailed-quote" data-choice="quote">Detailed Quote?</button>
-  </div>
-  </div>
-  <div class="dh-form-button-group">
-    <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-    <button class="dh-form-btn dh-form-btn-back" id="no-thanks" data-choice="decline">No Thanks <svg xmlns="http://www.w3.org/2000/svg" width="16" height="17" viewBox="0 0 16 17" fill="none"><line x1="14.9298" y1="1.49153" x2="0.707292" y2="15.714" stroke="#4E4E4E" stroke-width="2"/><line x1="15.2929" y1="15.7103" x2="1.07042" y2="1.48781" stroke="#4E4E4E" stroke-width="2"/></svg></button>
-  </div>
+      <div class="dh-form-content-area">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+        <h2 class="dh-step-heading" id="how-we-do-it-heading">How We Do It</h2>
+        
+        <div class="dh-how-we-do-it-main">
+          <div class="dh-how-we-do-it-content">
+            <div class="dh-how-we-do-it-text">
+              <h3 class="dh-how-we-do-it-title">How We Do It</h3>
+              <p id="how-we-do-it-description">Loading your personalized treatment plan...</p>
+              
+              <div class="dh-subspecies-section" id="subspecies-section" style="display: none;">
+                <h4 id="subspecies-heading">Some common pests include:</h4>
+                <div class="dh-subspecies-grid" id="subspecies-list">
+                  <!-- Subspecies populated dynamically -->
+                </div>
+              </div>
+            </div>
+            <img id="how-we-do-it-interior-image" class="dh-interior-image" src="" alt="Treatment Process" style="display: none;" />
+          </div>
+          
+          <div class="dh-safety-message" id="safety-message">
+            <img class="dh-pet-safety-image" src="" alt="Pet Safety" id="pet-safety-image" />
+            <div class="dh-safety-text">
+              <p id="safety-message-text">Oh, and don&apos;t worry. Our treatments are safe for people and pets for your property!</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="dh-form-button-group">
+          <button class="dh-form-btn dh-form-btn-secondary" id="view-detailed-quote" onclick="showStep('quote-contact'); setupStepValidation('quote-contact');">View Detailed Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+      
+      <!-- Right Hero Section -->
+      <div class="dh-pest-hero" id="offer-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image" id="offer-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="offer-hero-image" src="" alt="Hero Image" style="display: none;" />
+      </div>
+    </div>
   `;
     steps.push(initialOfferStep);
 
@@ -5162,88 +7433,82 @@
     contactStep.id = 'dh-step-contact';
     contactStep.innerHTML = `
     <div class="dh-form-step-content">
-  <h2 class="dh-step-heading">Let&apos;s schedule your service</h2>
-  <p class="dh-step-instruction">Fill out the details below and we&apos;ll get you taken care of.</p>
-  <div class="dh-form-row">
-    <div class="dh-form-group">
-      <div class="dh-floating-input">
-        <input type="text" class="dh-form-input" id="first-name-input" placeholder=" ">
-        <label class="dh-floating-label" for="first-name-input">First Name</label>
+      <div class="dh-form-content-area">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+        <h2 class="dh-step-heading">Great! When do you want us to get started?</h2>
+        <p class="dh-step-instruction">Complete the following information to secure your spot today!</p>
+        
+        <!-- Scheduling Fields -->
+        <div class="dh-form-row">
+          <div class="dh-form-group">
+            <div class="dh-floating-input dh-input-with-icon">
+              <div class="dh-input-icon" data-type="calendar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <input type="date" class="dh-form-input" id="start-date-input" placeholder="Your Start Date">
+              <label class="dh-floating-label" for="start-date-input">Your Start Date</label>
+            </div>
+          </div>
+          <div class="dh-form-group">
+            <div class="dh-floating-input dh-input-with-icon">
+              <div class="dh-input-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12,6 12,12 16,14"/>
+                </svg>
+              </div>
+              <select class="dh-form-input" id="arrival-time-input">
+                <option value=""></option>
+                <option value="morning">Morning (8 AM - 12 PM)</option>
+                <option value="afternoon">Afternoon (12 PM - 5 PM)</option>
+                <option value="evening">Evening (5 PM - 8 PM)</option>
+                <option value="anytime">Anytime</option>
+              </select>
+              <label class="dh-floating-label" for="arrival-time-input">Preferred Time</label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Contact Details Section -->
+        <div class="dh-info-section">
+          <h3 class="dh-info-section-header">Contact Details</h3>
+          <div class="dh-info-section-content" id="contact-details-content">
+            <div id="contact-name">Loading...</div>
+            <div id="contact-email">Loading...</div>
+            <div id="contact-phone">Loading...</div>
+          </div>
+        </div>
+        
+        <!-- Service Address Section -->
+        <div class="dh-info-section">
+          <h3 class="dh-info-section-header">Service Address</h3>
+          <div class="dh-info-section-content" id="service-address-content">
+            <div id="service-address">Loading...</div>
+          </div>
+        </div>
+        
+        <div class="dh-form-button-group">
+          <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="submit-btn">Schedule It <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+        </div>
+      </div>
+      
+      <!-- Right Hero Section with Location Background -->
+      <div class="dh-pest-hero" id="contact-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image" id="contact-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="contact-hero-image" src="" alt="Hero Image" style="display: none;" />
       </div>
     </div>
-    <div class="dh-form-group">
-      <div class="dh-floating-input">
-        <input type="text" class="dh-form-input" id="last-name-input" placeholder=" ">
-        <label class="dh-floating-label" for="last-name-input">Last Name</label>
-      </div>
-    </div>
-  </div>
-  <div class="dh-form-group">
-    <div class="dh-floating-input dh-input-with-icon">
-      <div class="dh-input-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-          <polyline points="22,6 12,13 2,6"/>
-        </svg>
-      </div>
-      <input type="email" class="dh-form-input" id="email-input" placeholder=" ">
-      <label class="dh-floating-label" for="email-input">Email Address</label>
-    </div>
-  </div>
-  <div class="dh-form-group">
-    <div class="dh-floating-input dh-input-with-icon">
-      <div class="dh-input-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-        </svg>
-      </div>
-      <input type="tel" class="dh-form-input" id="phone-input" placeholder=" ">
-      <label class="dh-floating-label" for="phone-input" data-default-text="(888) 888-8888" data-focused-text="Cell Phone Number">Cell Phone Number</label>
-    </div>
-  </div>
-  <div class="dh-form-group">
-    <div class="dh-floating-input dh-input-with-icon">
-      <div class="dh-input-icon" data-type="calendar">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
-      </div>
-      <input type="date" class="dh-form-input" id="start-date-input" placeholder=" ">
-      <label class="dh-floating-label" for="start-date-input">Preferred Start Date</label>
-    </div>
-  </div>
-  <div class="dh-form-group">
-    <div class="dh-floating-input dh-input-with-icon">
-      <div class="dh-input-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12,6 12,12 16,14"/>
-        </svg>
-      </div>
-      <select class="dh-form-input" id="arrival-time-input">
-        <option value=""></option>
-        <option value="morning">Morning (8 AM - 12 PM)</option>
-        <option value="afternoon">Afternoon (12 PM - 5 PM)</option>
-        <option value="evening">Evening (5 PM - 8 PM)</option>
-        <option value="anytime">Anytime</option>
-      </select>
-      <label class="dh-floating-label" for="arrival-time-input">Select Preferred Arrival Time</label>
-    </div>
-  </div>
-  <div class="dh-form-group">
-    <label class="dh-form-checkbox-label">
-      <input type="checkbox" class="dh-form-checkbox" id="terms-checkbox">
-      <span class="dh-form-checkbox-text">I agree to receive automated promotional messages and calls. Reply STOP to opt out. Message rates apply.</span>
-    </label>
-  </div>
-  </div>
-  <div class="dh-form-button-group">
-    <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-    <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="submit-btn">Schedule Service <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
-  </div>
   `;
     steps.push(contactStep);
 
@@ -5252,54 +7517,69 @@
     quoteContactStep.className = 'dh-form-step';
     quoteContactStep.id = 'dh-step-quote-contact';
     quoteContactStep.innerHTML = `
-    <div class="dh-form-step-content" style="position: relative;">
-      <h2 class="dh-step-heading">Let&apos;s get you a detailed quote</h2>
-      <p class="dh-step-instruction">We just need a few details to prepare your personalized quote.</p>
-      <div class="dh-form-row">
-        <div class="dh-form-group">
-          <div class="dh-floating-input">
-            <input type="text" class="dh-form-input" id="quote-first-name-input" placeholder=" ">
-            <label class="dh-floating-label" for="quote-first-name-input">First Name</label>
+    <div class="dh-form-step-content">
+      <div class="dh-form-content-area">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+        <h2 class="dh-step-heading">Sure thing. Almost done, we just need a little more info from you.</h2>
+        <p class="dh-step-instruction">Complete the following information for your detailed quote.</p>
+        <div class="dh-form-row">
+          <div class="dh-form-group">
+            <div class="dh-floating-input">
+              <input type="text" class="dh-form-input" id="quote-first-name-input" placeholder=" ">
+              <label class="dh-floating-label" for="quote-first-name-input">First Name</label>
+            </div>
+          </div>
+          <div class="dh-form-group">
+            <div class="dh-floating-input">
+              <input type="text" class="dh-form-input" id="quote-last-name-input" placeholder=" ">
+              <label class="dh-floating-label" for="quote-last-name-input">Last Name</label>
+            </div>
           </div>
         </div>
         <div class="dh-form-group">
-          <div class="dh-floating-input">
-            <input type="text" class="dh-form-input" id="quote-last-name-input" placeholder=" ">
-            <label class="dh-floating-label" for="quote-last-name-input">Last Name</label>
+          <div class="dh-floating-input dh-input-with-icon">
+            <div class="dh-input-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </div>
+            <input type="email" class="dh-form-input" id="quote-email-input" placeholder=" ">
+            <label class="dh-floating-label" for="quote-email-input">Email Address</label>
           </div>
         </div>
-      </div>
-      <div class="dh-form-group">
-        <div class="dh-floating-input dh-input-with-icon">
-          <div class="dh-input-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-              <polyline points="22,6 12,13 2,6"/>
-            </svg>
+        <div class="dh-form-group">
+          <div class="dh-floating-input dh-input-with-icon">
+            <div class="dh-input-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </div>
+            <input type="tel" class="dh-form-input" id="quote-phone-input" placeholder=" ">
+            <label class="dh-floating-label" for="quote-phone-input" data-default-text="(888) 888-8888" data-focused-text="Cell Phone Number">Cell Phone Number</label>
           </div>
-          <input type="email" class="dh-form-input" id="quote-email-input" placeholder=" ">
-          <label class="dh-floating-label" for="quote-email-input">Email Address</label>
+        </div>
+        <div class="dh-quote-loading" id="quote-loading" style="display: none;">
+          <div class="dh-loading-spinner"></div>
+        </div>
+        
+        <div class="dh-form-button-group">
+          <button class="dh-form-btn dh-form-btn-secondary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">See My Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
-      <div class="dh-form-group">
-        <div class="dh-floating-input dh-input-with-icon">
-          <div class="dh-input-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-            </svg>
-          </div>
-          <input type="tel" class="dh-form-input" id="quote-phone-input" placeholder=" ">
-          <label class="dh-floating-label" for="quote-phone-input" data-default-text="(888) 888-8888" data-focused-text="Cell Phone Number">Cell Phone Number</label>
-        </div>
+      
+      <!-- Right Hero Section -->
+      <div class="dh-pest-hero" id="quote-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image" id="quote-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="quote-hero-image" src="" alt="Hero Image" style="display: none;" />
       </div>
-      <div class="dh-quote-loading" id="quote-loading" style="display: none;">
-        <div class="dh-loading-spinner"></div>
-      </div>
-      </div>
-      <div class="dh-form-button-group">
-        <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-        <button class="dh-form-btn dh-form-btn-primary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">Get a Quote</button>
-      </div>
+    </div>
     `;
     steps.push(quoteContactStep);
 
@@ -5308,24 +7588,42 @@
     planComparisonStep.className = 'dh-form-step';
     planComparisonStep.id = 'dh-step-plan-comparison';
     planComparisonStep.innerHTML = `
-        <div class="dh-form-step-content">
-      <h2 class="dh-step-heading">Here&apos;s what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">pests</span> - and keep them out!</h2>
-      
-      <!-- Tab Navigation -->
-      <div class="dh-plan-tabs" id="comparison-plan-tabs">
-        <!-- Tabs will be dynamically loaded -->
+    <div class="dh-form-step-content">
+      <div class="dh-form-content-area">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+        <h2 class="dh-step-heading">Here&apos;s what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">pests</span> - and keep them out!</h2>
+        
+        <!-- Loading State -->
         <div class="dh-plan-loading" id="comparison-plan-loading">
           <div class="dh-loading-spinner"></div>
           <p>Loading your personalized recommendations...</p>
         </div>
+        
+        <!-- Plan Content -->
+        <div class="dh-plan-content" id="comparison-plan-content">
+          <!-- Active plan content will be dynamically loaded -->
+        </div>
       </div>
       
-      <!-- Tab Content -->
-      <div class="dh-plan-content" id="comparison-plan-content">
-        <!-- Active plan content will be dynamically loaded -->
+      <!-- Right Hero Section -->
+      <div class="dh-pest-hero" id="plan-comparison-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image" id="plan-comparison-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="plan-comparison-hero-image" src="" alt="Hero Image" style="display: none;" />
+      </div>
+
+      <!-- Full Width FAQ Section -->
+      <div class="dh-plan-faqs-container" id="comparison-plan-faqs">
+        <!-- FAQs will be dynamically loaded here -->
       </div>
       
-      </div>
+    </div>
+    
     `;
     steps.push(planComparisonStep);
 
@@ -5335,12 +7633,24 @@
     outOfServiceStep.id = 'dh-step-out-of-service';
     outOfServiceStep.innerHTML = `
     <div class="dh-form-step-content">
-      <div class="dh-form-out-of-service">
-        <h3>We&apos;re sorry, we don&apos;t currently service your area</h3>
-        <p>Unfortunately, your location is outside our current service area. We&apos;re always expanding, so please check back with us in the future!</p>
+      <div class="dh-form-content-area">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+        <h2 class="dh-step-heading">Dang. It doesn&apos;t look like we service your neighborhood.</h2>
+        <div class="dh-form-button-group">
+          <button class="dh-form-btn dh-form-btn-secondary" onclick="returnToHomepage()">Return to Homepage <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
       </div>
-      <div class="dh-form-button-group">
-        <button class="dh-form-btn dh-form-btn-secondary" onclick="changeAddress()">Try Different Address</button>
+      
+      <!-- Right Hero Section -->
+      <div class="dh-pest-hero" id="out-of-service-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image" id="out-of-service-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="out-of-service-hero-image" src="" alt="Hero Image" style="display: none;" />
       </div>
     </div>
   `;
@@ -5351,38 +7661,51 @@
     exitSurveyStep.className = 'dh-form-step';
     exitSurveyStep.id = 'dh-step-exit-survey';
     exitSurveyStep.innerHTML = `
-        <div class="dh-form-step-content">
-      <h2 class="dh-step-heading">Dang. Was it something we said?</h2>
-      <p class="dh-step-instruction">Mind letting us know?</p>
-      <div class="dh-exit-survey-options">
-        <div class="dh-survey-option" data-reason="not-ready">
-          <span class="dh-survey-emoji">🤔</span>
-          <span class="dh-survey-text">Not ready</span>
+        <div class="dh-form-step-content dh-exit-survey-centered">
+          <!-- Company Logo -->
+          <div class="dh-pest-logo" id="pest-logo">
+            <!-- Logo will be populated from widget config -->
+          </div>
+          
+          <h2 class="dh-step-heading">Dang. Was it something we said?</h2>
+          <p class="dh-step-instruction">Mind letting us know?</p>
+          
+          <div class="dh-feedback-options">
+            <label class="dh-feedback-option">
+              <input type="radio" name="exit-feedback" value="not-ready" class="dh-feedback-radio">
+              <div class="dh-feedback-button">
+                <span class="dh-feedback-emoji">😊</span>
+                <span class="dh-feedback-text">Not ready</span>
+              </div>
+            </label>
+            
+            <label class="dh-feedback-option">
+              <input type="radio" name="exit-feedback" value="just-checking" class="dh-feedback-radio">
+              <div class="dh-feedback-button">
+                <span class="dh-feedback-emoji">😬</span>
+                <span class="dh-feedback-text">Just checking around</span>
+              </div>
+            </label>
+            
+            <label class="dh-feedback-option">
+              <input type="radio" name="exit-feedback" value="out-of-budget" class="dh-feedback-radio">
+              <div class="dh-feedback-button">
+                <span class="dh-feedback-emoji">🤑</span>
+                <span class="dh-feedback-text">Out of my budget</span>
+              </div>
+            </label>
+          </div>
+
+          <div class="dh-form-group">
+            <div class="dh-textarea-container">
+              <textarea class="dh-form-textarea" id="exit-feedback-text" placeholder="Any other feedback?" rows="4"></textarea>
+            </div>
+          </div>
+
+          <div class="dh-form-button-group dh-exit-survey-buttons">
+            <button class="dh-form-btn dh-form-btn-primary" id="survey-submit">Submit <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+          </div>
         </div>
-        <div class="dh-survey-option" data-reason="just-checking">
-          <span class="dh-survey-emoji">👀</span>
-          <span class="dh-survey-text">Just checking around</span>
-        </div>
-        <div class="dh-survey-option" data-reason="out-of-budget">
-          <span class="dh-survey-emoji">🤑</span>
-          <span class="dh-survey-text">Out of my budget</span>
-        </div>
-        <div class="dh-survey-option" data-reason="none-of-business">
-          <span class="dh-survey-emoji">🖐</span>
-          <span class="dh-survey-text">None of your business</span>
-        </div>
-      </div>
-      <div class="dh-form-group">
-        <div class="dh-floating-input">
-          <textarea class="dh-form-input" id="exit-feedback" placeholder=" " rows="3"></textarea>
-          <label class="dh-floating-label" for="exit-feedback">Any other feedback?</label>
-        </div>
-      </div>
-      <div class="dh-form-button-group">
-        <button class="dh-form-btn dh-form-btn-back" onclick="previousStep()"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M8.04004 15.4568C8.02251 15.4567 8.00315 15.4506 7.9834 15.4304L1.03516 8.32007C1.01411 8.29853 1 8.26708 1 8.22827C1.00003 8.1896 1.01422 8.15896 1.03516 8.13745L7.9834 1.02612C8.00316 1.0059 8.02251 0.999842 8.04004 0.999755C8.05768 0.999755 8.07775 1.00575 8.09766 1.02612C8.11852 1.04757 8.13174 1.07844 8.13184 1.11694C8.13184 1.15569 8.11864 1.18721 8.09766 1.20874L3.0127 6.41186L1.35254 8.11108L17.5615 8.11108L17.5615 8.34546L1.35254 8.34546L3.0127 10.0447L8.09766 15.2478C8.11869 15.2693 8.13184 15.3008 8.13184 15.3396C8.13179 15.3781 8.1185 15.4089 8.09766 15.4304C8.07775 15.4508 8.05768 15.4568 8.04004 15.4568Z" fill="white" stroke="#4E4E4E" stroke-width="2"/></svg> Back</button>
-        <button class="dh-form-btn dh-form-btn-primary" id="survey-submit">We&apos;re done here</button>
-      </div>
-      </div>
     `;
     steps.push(exitSurveyStep);
 
@@ -5391,10 +7714,46 @@
     completeStep.className = 'dh-form-step';
     completeStep.id = 'dh-step-complete';
     completeStep.innerHTML = `
-      <div class="dh-form-success">
-        <h3>Thank you for your request!</h3>
-        <p>We&apos;ve received your information and will contact you within 24 hours with your free estimate. Keep an eye on your email and phone for our response.</p>
+    <div class="dh-form-step-content">
+      <div class="dh-form-content-area">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
+        <h2 class="dh-step-heading">Thank you <span id="complete-customer-name">Wesley</span>, here is what you can expect next.</h2>
+        
+        <p class="dh-step-instruction">You should receive a confirmation email shortly. One of our representatives will contact you to confirm your appointment and answer any of your questions during normal business hours.</p>
+        
+        <!-- Office Hours Section -->
+        <div class="dh-complete-section">
+          <h3 class="dh-complete-section-title">Office Hours</h3>
+          <div class="dh-complete-section-content" id="office-hours-content">
+            <!-- Office hours will be populated from widget config -->
+          </div>
+        </div>
+        
+        <!-- Requested Service Date & Time Section -->
+        <div class="dh-complete-section">
+          <h3 class="dh-complete-section-title requested-date-time">Requested Service Date & Time</h3>
+          <div class="dh-complete-service-date" id="service-date-content">
+            October 7th, 2025 | 10 am
+          </div>
+        </div>
+        
+        <div class="dh-form-button-group">
+          <button class="dh-form-btn dh-form-btn-secondary" id="return-homepage-btn">Return to Homepage <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+        </div>
       </div>
+      
+      <!-- Right Hero Section with Location Background -->
+      <div class="dh-pest-hero" id="complete-hero">
+        <!-- Background Image -->
+        <div class="dh-pest-bg-image" id="complete-bg-image"></div>
+        <!-- Actual Hero Image -->
+        <img class="dh-pest-hero-image" id="complete-hero-image" src="" alt="Hero Image" style="display: none;" />
+      </div>
+    </div>
     `;
     steps.push(completeStep);
 
@@ -5404,6 +7763,11 @@
     declineCompleteStep.id = 'dh-step-decline-complete';
     declineCompleteStep.innerHTML = `
       <div class="dh-form-success">
+        <!-- Company Logo -->
+        <div class="dh-pest-logo" id="pest-logo">
+          <!-- Logo will be populated from widget config -->
+        </div>
+        
         <h3>Thanks for your feedback!</h3>
         <p>We appreciate you taking the time to let us know. If you change your mind in the future, we&apos;re always here to help with your pest control needs.</p>
         <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">Have a great day! 👋</p>
@@ -5507,7 +7871,7 @@
     const submitBtn = document.getElementById('contact-submit');
     if (submitBtn) {
       if (isSubmitting) {
-        submitBtn.textContent = 'Submitting...';
+        submitBtn.innerHTML = 'Submitting... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         submitBtn.classList.add('submitting');
       } else {
         // Only re-enable if form is valid
@@ -5521,7 +7885,7 @@
           const email = emailInput.value.trim();
           const isValid = name && phone && email && email.includes('@');
 
-          submitBtn.textContent = 'Get My Free Estimate';
+          submitBtn.innerHTML = 'Schedule Service <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
           submitBtn.classList.remove('submitting');
         }
       }
@@ -5539,23 +7903,11 @@
 
   // Form validation with submission
   window.submitFormWithValidation = () => {
-    const firstNameInput = document.getElementById('first-name-input');
-    const lastNameInput = document.getElementById('last-name-input');
-    const phoneInput = document.getElementById('phone-input');
-    const emailInput = document.getElementById('email-input');
     const startDateInput = document.getElementById('start-date-input');
     const arrivalTimeInput = document.getElementById('arrival-time-input');
-    const termsCheckbox = document.getElementById('terms-checkbox');
 
     // Clear existing errors
-    [
-      firstNameInput,
-      lastNameInput,
-      phoneInput,
-      emailInput,
-      startDateInput,
-      arrivalTimeInput,
-    ].forEach(input => {
+    [startDateInput, arrivalTimeInput].forEach(input => {
       if (input) {
         progressiveFormManager.clearFieldError(input);
       }
@@ -5563,70 +7915,14 @@
 
     let hasErrors = false;
 
-    // Validate required fields
-    if (!firstNameInput?.value.trim()) {
-      progressiveFormManager.showFieldError(
-        firstNameInput,
-        'First name is required'
-      );
-      hasErrors = true;
-    }
-
-    if (!lastNameInput?.value.trim()) {
-      progressiveFormManager.showFieldError(
-        lastNameInput,
-        'Last name is required'
-      );
-      hasErrors = true;
-    }
-
-    if (!phoneInput?.value.trim()) {
-      progressiveFormManager.showFieldError(
-        phoneInput,
-        'Phone number is required'
-      );
-      hasErrors = true;
-    } else {
-      // Validate phone format
-      const cleanPhone = phoneInput.value.replace(/[\s\-\(\)]/g, '');
-      if (!/^[\d\+]+$/.test(cleanPhone)) {
+    // Validate start date
+    if (!startDateInput || !startDateInput.value) {
+      if (startDateInput) {
         progressiveFormManager.showFieldError(
-          phoneInput,
-          'Please enter a valid phone number'
+          startDateInput,
+          'Preferred start date is required'
         );
-        hasErrors = true;
-      } else if (cleanPhone.length < 10) {
-        progressiveFormManager.showFieldError(
-          phoneInput,
-          'Phone number must be at least 10 digits'
-        );
-        hasErrors = true;
       }
-    }
-
-    if (!emailInput?.value.trim()) {
-      progressiveFormManager.showFieldError(
-        emailInput,
-        'Email address is required'
-      );
-      hasErrors = true;
-    } else {
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(emailInput.value)) {
-        progressiveFormManager.showFieldError(
-          emailInput,
-          'Please enter a valid email address'
-        );
-        hasErrors = true;
-      }
-    }
-
-    if (!startDateInput?.value) {
-      progressiveFormManager.showFieldError(
-        startDateInput,
-        'Preferred start date is required'
-      );
       hasErrors = true;
     } else if (!isDateInFuture(startDateInput.value)) {
       progressiveFormManager.showFieldError(
@@ -5636,60 +7932,21 @@
       hasErrors = true;
     }
 
-    if (!arrivalTimeInput?.value) {
-      progressiveFormManager.showFieldError(
-        arrivalTimeInput,
-        'Preferred arrival time is required'
-      );
-      hasErrors = true;
-    }
-
-    if (!termsCheckbox?.checked) {
-      // Use the standard error system for terms checkbox
-      const termsContainer = termsCheckbox.closest('.dh-form-group');
-      if (termsContainer) {
-        // Create a temporary container element to use with showFieldError
-        let termsErrorContainer = termsContainer.querySelector(
-          '.dh-terms-error-container'
-        );
-        if (!termsErrorContainer) {
-          termsErrorContainer = document.createElement('div');
-          termsErrorContainer.className = 'dh-terms-error-container';
-          termsErrorContainer.id = 'terms-checkbox-container';
-          termsContainer.appendChild(termsErrorContainer);
-        }
-
+    // Validate arrival time
+    if (!arrivalTimeInput || !arrivalTimeInput.value) {
+      if (arrivalTimeInput) {
         progressiveFormManager.showFieldError(
-          termsErrorContainer,
-          'You must agree to the terms and conditions'
+          arrivalTimeInput,
+          'Preferred arrival time is required'
         );
-
-        // Add real-time clearing for terms checkbox
-        const clearTermsError = () => {
-          if (termsCheckbox.checked) {
-            progressiveFormManager.clearFieldError(termsErrorContainer);
-          }
-        };
-
-        // Remove existing listeners to prevent duplicates
-        termsCheckbox.removeEventListener('change', clearTermsError);
-        termsCheckbox.addEventListener('change', clearTermsError);
       }
-
       hasErrors = true;
     }
 
     if (!hasErrors) {
-      // Save contact info to widget state before submission
-      widgetState.formData.contactInfo = {
-        firstName: firstNameInput.value.trim(),
-        lastName: lastNameInput.value.trim(),
-        name: `${firstNameInput.value.trim()} ${lastNameInput.value.trim()}`,
-        email: emailInput.value.trim(),
-        phone: phoneInput.value.trim(),
-        startDate: startDateInput.value,
-        arrivalTime: arrivalTimeInput.value,
-      };
+      // Save scheduling info to widget state before submission
+      widgetState.formData.startDate = startDateInput.value;
+      widgetState.formData.arrivalTime = arrivalTimeInput.value;
 
       // All validation passed, proceed with form submission
       submitForm();
@@ -5900,12 +8157,44 @@
       widgetState.formData.offerChoice = 'schedule-from-comparison';
       showStep('contact');
       setupStepValidation('contact');
-      updateProgressBar('contact');
     }, 500);
   };
 
-  // Helper function to format billing frequency to natural language
+  // Helper function to format billing frequency to natural language (abbreviated)
   const formatBillingFrequency = (frequency) => {
+    if (!frequency) return '';
+    
+    const freq = frequency.toLowerCase().trim();
+    
+    switch (freq) {
+      case 'monthly':
+        return '/mo';
+      case 'quarterly':
+        return '/qtr';
+      case 'annually':
+      case 'yearly':
+        return '/yr';
+      case 'weekly':
+        return '/wk';
+      case 'biannually':
+      case 'semi-annually':
+      case 'semiannually':
+        return '/6mo';
+      case 'daily':
+        return '/day';
+      default:
+        // Fallback: try to convert "ly" endings to natural form
+        if (freq.endsWith('ly')) {
+          const base = freq.slice(0, -2);
+          return `/${base}`;
+        }
+        // Final fallback: return as-is with forward slash
+        return `/${frequency}`;
+    }
+  };
+
+  // Helper function to format billing frequency with full words (for How We Do It step)
+  const formatBillingFrequencyFull = (frequency) => {
     if (!frequency) return '';
     
     const freq = frequency.toLowerCase().trim();
@@ -6210,6 +8499,7 @@
         phone: quotePhoneInput.value.trim(),
       };
 
+
       // Fetch plan comparison data and ensure minimum loading time
       await Promise.all([
         fetchPlanComparisonData(),
@@ -6220,7 +8510,6 @@
       // Navigate to plan comparison with pre-loaded data
       await showStep('plan-comparison');
       setupStepValidation('plan-comparison');
-      updateProgressBar('plan-comparison');
 
       // Hide loading overlay after everything is complete
       setTimeout(() => {
@@ -6240,7 +8529,6 @@
       // Fallback: proceed to plan comparison even if data fetch failed
       await showStep('plan-comparison');
       setupStepValidation('plan-comparison');
-      updateProgressBar('plan-comparison');
     }
   };
 
@@ -6285,9 +8573,67 @@
     }
   };
 
+  // Get the cheapest plan with full coverage for the selected pest
+  const getCheapestFullCoveragePlan = async () => {
+    try {
+      const requestBody = {
+        companyId: config.companyId,
+        selectedPests: [widgetState.formData.pestType],
+      };
+      
+      const response = await fetch(
+        config.baseUrl + '/api/widget/suggested-plans',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data.success && data.suggestions && data.suggestions.length > 0) {
+        // Filter for plans with 100% coverage
+        const fullCoveragePlans = data.suggestions.filter(plan => 
+          plan.coverage_match && plan.coverage_match.coverage_percentage === 100
+        );
+        
+        if (fullCoveragePlans.length > 0) {
+          // Sort by initial price (cheapest setup cost) and return the first one
+          const cheapestPlan = fullCoveragePlans.sort((a, b) => 
+            parseFloat(a.initial_price) - parseFloat(b.initial_price)
+          )[0];
+          
+          // Store the recommended plan data
+          widgetState.formData.recommendedPlan = cheapestPlan;
+          widgetState.formData.offerPrice = cheapestPlan.recurring_price;
+          
+          return cheapestPlan;
+        } else {
+          // No full coverage plans, use the best match available
+          const bestPlan = data.suggestions[0];
+          widgetState.formData.recommendedPlan = bestPlan;
+          widgetState.formData.offerPrice = bestPlan.recurring_price;
+          return bestPlan;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting cheapest full coverage plan:', error);
+      widgetState.formData.recommendedPlan = null;
+      widgetState.formData.offerPrice = null;
+      return null;
+    }
+  };
+
   // Expose functions to window for use by other modules
   window.fetchPlanComparisonData = fetchPlanComparisonData;
   window.fetchPricingData = fetchPricingData;
+  window.getCheapestFullCoveragePlan = getCheapestFullCoveragePlan;
+  window.formatBillingFrequencyFull = formatBillingFrequencyFull;
 
   // === CONFIGURATION AND INITIALIZATION ===
   const config = {
@@ -6411,13 +8757,14 @@
         isLoading: false,
         isSubmitting: false,
         widgetConfig: null,
-        currentStep: 'welcome',
+        currentStep: 'pest-issue',
         sessionId: sessionId,
         attributionData: attributionData,
         recoveryData: null,
         formData: {
           pestType: '',
           pestIcon: '',
+          pestBackgroundImage: '',
           urgency: '',
           selectedPlan: '',
           recommendedPlan: '',
@@ -6464,9 +8811,8 @@
 
       // Initialize step progress manager
       stepProgressManager = {
-        stepFlow: ['welcome', 'pest-issue', 'address', 'quote', 'complete'],
+        stepFlow: ['pest-issue', 'address', 'quote', 'complete'],
         stepLabels: {
-          welcome: 'Welcome',
           'pest-issue': 'Pest Issue',
           address: 'Address',
           quote: 'Quote',
@@ -6475,7 +8821,7 @@
         getProgressStep: actualStep => {
           const quoteSteps = [
             'urgency',
-            'initial-offer',
+            'how-we-do-it',
             'plan-comparison',
             'quote-contact',
             'contact',
@@ -6510,6 +8856,17 @@
             widgetState.currentStep
           );
           return stepProgressManager.stepFlow.indexOf(currentProgressStep);
+        },
+        getCompletedSteps: () => {
+          const completed = [];
+          const currentStepIndex = stepProgressManager.getCurrentStepIndex();
+          
+          // Add all steps before current step as completed
+          for (let i = 0; i < currentStepIndex; i++) {
+            completed.push(stepProgressManager.stepFlow[i]);
+          }
+          
+          return completed;
         },
       };
 
@@ -6551,9 +8908,108 @@
             return null;
           }
         },
+        
+        // Save current form state to localStorage
+        saveFormStateToLocalStorage: () => {
+          try {
+            const saveData = {
+              currentStep: widgetState.currentStep,
+              formData: { ...widgetState.formData },
+              completedSteps: stepProgressManager.getCompletedSteps(),
+              timestamp: new Date().toISOString(),
+              sessionId: widgetState.sessionId,
+              expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() // 48 hours
+            };
+            
+            // Remove sensitive or large data that shouldn't be persisted
+            delete saveData.formData.contactInfo;
+            
+            localStorage.setItem('dh_widget_progress_' + config.companyId, JSON.stringify(saveData));
+            widgetState.formState.lastSaved = new Date().toISOString();
+            
+            return true;
+          } catch (error) {
+            console.warn('Failed to save form state:', error);
+            return false;
+          }
+        },
+        
+        // Restore form state from localStorage
+        restoreFormStateFromLocalStorage: () => {
+          try {
+            const saved = localStorage.getItem('dh_widget_progress_' + config.companyId);
+            if (!saved) return null;
+            
+            const saveData = JSON.parse(saved);
+            
+            // Check if saved data has expired
+            if (new Date() > new Date(saveData.expiresAt)) {
+              progressiveFormManager.clearSavedFormState();
+              return null;
+            }
+            
+            return saveData;
+          } catch (error) {
+            console.warn('Failed to restore form state:', error);
+            return null;
+          }
+        },
+        
+        // Clear saved form state
+        clearSavedFormState: () => {
+          try {
+            localStorage.removeItem('dh_widget_progress_' + config.companyId);
+            return true;
+          } catch (error) {
+            console.warn('Failed to clear saved form state:', error);
+            return false;
+          }
+        },
+        
+        // Check if user has significant progress worth restoring
+        shouldPromptToContinue: (savedData) => {
+          if (!savedData) return false;
+          
+          const { formData, currentStep } = savedData;
+          
+          // Check for significant form completion
+          const hasSignificantProgress = !!(
+            formData.pestType ||
+            formData.address ||
+            formData.urgency ||
+            (currentStep !== 'pest-issue' && currentStep !== 'welcome')
+          );
+          
+          return hasSignificantProgress;
+        },
+        
+        // Start auto-save functionality
+        startAutoSave: () => {
+          if (!widgetState.formState.progressiveFeatures.autoSave) return;
+          
+          // Clear any existing timer
+          if (progressiveFormManager.autoSaveTimer) {
+            clearInterval(progressiveFormManager.autoSaveTimer);
+          }
+          
+          // Start new auto-save timer
+          progressiveFormManager.autoSaveTimer = setInterval(() => {
+            if (progressiveFormManager.hasSignificantFormData()) {
+              progressiveFormManager.saveFormStateToLocalStorage();
+            }
+          }, widgetState.formState.autoSaveInterval);
+        },
+        
+        // Stop auto-save functionality
+        stopAutoSave: () => {
+          if (progressiveFormManager.autoSaveTimer) {
+            clearInterval(progressiveFormManager.autoSaveTimer);
+            progressiveFormManager.autoSaveTimer = null;
+          }
+        },
         calculateStepCompletion: () => {
           const steps = {
-            welcome: widgetState.currentStep !== 'welcome' ? 100 : 0, // Completed if we've moved past welcome
+            // Remove welcome step completion tracking
             pest_issue: widgetState.formData.pestType ? 100 : 0, // Fixed field name from pestIssue to pestType
             address:
               (widgetState.formData.address ? 50 : 0) +
@@ -6585,6 +9041,12 @@
         
         // Clear field indicators (errors, warnings, success)
         clearFieldIndicators: field => {
+          // Check if field exists
+          if (!field) {
+            console.warn('clearFieldIndicators called with null field');
+            return;
+          }
+          
           // Reset field styling
           field.style.borderColor = '';
           field.style.boxShadow = '';
@@ -6600,6 +9062,12 @@
         },
         
         clearFieldError: field => {
+          // Check if field exists
+          if (!field) {
+            console.warn('clearFieldError called with null field');
+            return;
+          }
+          
           // Remove from error tracking
           if (field.id) {
             widgetState.formState.fieldsWithErrors.delete(field.id);
@@ -6609,6 +9077,12 @@
         },
         
         showFieldError: (field, message) => {
+          // Check if field exists
+          if (!field) {
+            console.warn('showFieldError called with null field');
+            return;
+          }
+          
           // Remove existing error
           progressiveFormManager.clearFieldError(field);
           
@@ -6670,6 +9144,318 @@
         }
       };
       
+      // Function to show continue prompt to users with saved progress
+      const showContinuePrompt = (savedData) => {
+        // Create overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'dh-continue-prompt-overlay';
+        overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+          backdrop-filter: blur(4px);
+          animation: fadeIn 0.3s ease;
+        `;
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'dh-continue-prompt-modal';
+        modal.style.cssText = `
+          background: white;
+          border-radius: 16px;
+          padding: 32px;
+          max-width: 480px;
+          width: 90%;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+          text-align: center;
+          animation: slideUp 0.3s ease;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        // Get step display name
+        const stepNames = {
+          'pest-issue': 'pest selection',
+          'address': 'address information',
+          'confirm-address': 'address confirmation',
+          'how-we-do-it': 'service information',
+          'quote-contact': 'contact information',
+          'plan-comparison': 'plan selection',
+          'contact': 'scheduling details'
+        };
+        
+        const currentStepName = stepNames[savedData.currentStep] || 'your information';
+        const timeAgo = getTimeAgo(new Date(savedData.timestamp));
+        
+        modal.innerHTML = `
+          <div style="margin-bottom: 24px;">
+            <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M9 11l3 3l8-8"></path>
+                <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9s4.03-9 9-9c1.51 0 2.93 0.37 4.18 1.03"></path>
+              </svg>
+            </div>
+            <h3 style="color: #1f2937; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Welcome back!</h3>
+            <p style="color: #6b7280; font-size: 16px; margin: 0; line-height: 1.5;">
+              We found your progress from ${timeAgo}. You were working on ${currentStepName}.
+            </p>
+          </div>
+          
+          <div style="display: flex; gap: 12px; flex-direction: column;">
+            <button id="continue-btn" style="
+              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+              color: white;
+              border: none;
+              border-radius: 12px;
+              padding: 16px 24px;
+              font-size: 16px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            ">Continue Where I Left Off</button>
+            <button id="start-over-btn" style="
+              background: transparent;
+              color: #6b7280;
+              border: 2px solid #e5e7eb;
+              border-radius: 12px;
+              padding: 14px 24px;
+              font-size: 16px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            ">Start Over</button>
+          </div>
+        `;
+        
+        // Add hover effects
+        const continueBtn = modal.querySelector('#continue-btn');
+        const startOverBtn = modal.querySelector('#start-over-btn');
+        
+        continueBtn.addEventListener('mouseenter', () => {
+          continueBtn.style.transform = 'translateY(-2px)';
+          continueBtn.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.3)';
+        });
+        continueBtn.addEventListener('mouseleave', () => {
+          continueBtn.style.transform = 'translateY(0)';
+          continueBtn.style.boxShadow = 'none';
+        });
+        
+        startOverBtn.addEventListener('mouseenter', () => {
+          startOverBtn.style.borderColor = '#9ca3af';
+          startOverBtn.style.color = '#374151';
+        });
+        startOverBtn.addEventListener('mouseleave', () => {
+          startOverBtn.style.borderColor = '#e5e7eb';
+          startOverBtn.style.color = '#6b7280';
+        });
+        
+        // Event handlers
+        continueBtn.addEventListener('click', () => {
+          overlay.remove();
+          restoreProgress(savedData);
+        });
+        
+        startOverBtn.addEventListener('click', () => {
+          overlay.remove();
+          progressiveFormManager.clearSavedFormState();
+          startFreshWidget();
+        });
+        
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) {
+            overlay.remove();
+            startFreshWidget(); // Default to fresh start if they click outside
+          }
+        });
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { 
+              opacity: 0;
+              transform: translateY(20px) scale(0.95);
+            }
+            to { 
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      };
+      
+      // Function to get human-readable time ago
+      const getTimeAgo = (date) => {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        if (diffDays === 1) return 'yesterday';
+        return `${diffDays} days ago`;
+      };
+      
+      // Function to restore progress from saved data
+      const restoreProgress = (savedData) => {
+        try {
+          // Restore form data
+          widgetState.formData = { ...widgetState.formData, ...savedData.formData };
+          widgetState.currentStep = savedData.currentStep;
+          
+          // Restore completed steps
+          if (savedData.completedSteps) {
+            savedData.completedSteps.forEach(step => {
+              stepProgressManager.markStepComplete(step);
+            });
+          }
+          
+          // Populate form fields with restored data
+          populateFormFields();
+          
+          // Navigate to saved step
+          showStep(savedData.currentStep);
+          setupStepValidation(savedData.currentStep);
+          
+          // Start auto-save
+          progressiveFormManager.startAutoSave();
+          
+          console.log('Progress restored successfully:', savedData);
+        } catch (error) {
+          console.error('Failed to restore progress:', error);
+          // Fallback to fresh start if restoration fails
+          startFreshWidget();
+        }
+      };
+      
+      // Function to populate form fields with restored data
+      const populateFormFields = () => {
+        const data = widgetState.formData;
+        
+        // Populate pest selection
+        if (data.pestType) {
+          const pestOption = document.querySelector(`[data-pest="${data.pestType}"]`);
+          if (pestOption) {
+            pestOption.classList.add('selected');
+          }
+        }
+        
+        // Populate address fields
+        if (data.address) {
+          const addressInput = document.getElementById('address-search-input');
+          if (addressInput) addressInput.value = data.address;
+        }
+        
+        if (data.addressStreet) {
+          const streetInput = document.getElementById('street-input') || document.getElementById('confirm-street-input');
+          if (streetInput) streetInput.value = data.addressStreet;
+        }
+        
+        if (data.addressCity) {
+          const cityInput = document.getElementById('city-input') || document.getElementById('confirm-city-input');
+          if (cityInput) cityInput.value = data.addressCity;
+        }
+        
+        if (data.addressState) {
+          const stateInput = document.getElementById('state-input') || document.getElementById('confirm-state-input');
+          if (stateInput) stateInput.value = data.addressState;
+        }
+        
+        if (data.addressZip) {
+          const zipInput = document.getElementById('zip-input') || document.getElementById('confirm-zip-input');
+          if (zipInput) zipInput.value = data.addressZip;
+        }
+        
+        // Populate contact information
+        if (data.contactInfo) {
+          const { firstName, lastName, email, phone } = data.contactInfo;
+          
+          if (firstName) {
+            const firstNameInput = document.getElementById('quote-first-name-input');
+            if (firstNameInput) {
+              firstNameInput.value = firstName;
+              updateFloatingLabel(firstNameInput);
+            }
+          }
+          
+          if (lastName) {
+            const lastNameInput = document.getElementById('quote-last-name-input');
+            if (lastNameInput) {
+              lastNameInput.value = lastName;
+              updateFloatingLabel(lastNameInput);
+            }
+          }
+          
+          if (email) {
+            const emailInput = document.getElementById('quote-email-input');
+            if (emailInput) {
+              emailInput.value = email;
+              updateFloatingLabel(emailInput);
+            }
+          }
+          
+          if (phone) {
+            const phoneInput = document.getElementById('quote-phone-input');
+            if (phoneInput) {
+              phoneInput.value = phone;
+              updateFloatingLabel(phoneInput);
+            }
+          }
+        }
+        
+        // Populate scheduling information
+        if (data.startDate) {
+          const startDateInput = document.getElementById('start-date-input');
+          if (startDateInput) {
+            startDateInput.value = data.startDate;
+            updateFloatingLabel(startDateInput);
+          }
+        }
+        
+        if (data.arrivalTime) {
+          const arrivalTimeInput = document.getElementById('arrival-time-input');
+          if (arrivalTimeInput) {
+            arrivalTimeInput.value = data.arrivalTime;
+            updateFloatingLabel(arrivalTimeInput);
+          }
+        }
+      };
+      
+      // Function to start fresh widget
+      const startFreshWidget = () => {
+        progressiveFormManager.startAutoSave();
+        showStep('pest-issue');
+        setupStepValidation('pest-issue');
+      };
+      
+      // Function to trigger immediate save after significant form changes
+      const triggerProgressSave = () => {
+        if (progressiveFormManager.hasSignificantFormData()) {
+          progressiveFormManager.saveFormStateToLocalStorage();
+        }
+      };
+      
+      // Make functions available globally for other modules
+      window.triggerProgressSave = triggerProgressSave;
+      
       // Load configuration first
       const configLoaded = await loadConfig();
       if (!configLoaded) {
@@ -6684,6 +9470,20 @@
       // Create styles with initial colors from data attributes
       const initialColors = getInitialColors();
       createStyles(initialColors);
+      
+      // Update styles with configuration-based colors after config is loaded
+      if (widgetState.widgetConfig && widgetState.widgetConfig.colors) {
+        updateWidgetColors(widgetState.widgetConfig.colors);
+      }
+      
+      // Update fonts after config is loaded
+      console.log('DEBUG: Widget config fonts:', widgetState.widgetConfig?.fonts);
+      if (widgetState.widgetConfig && widgetState.widgetConfig.fonts) {
+        console.log('DEBUG: Calling updateWidgetFonts with:', widgetState.widgetConfig.fonts);
+        updateWidgetFonts();
+      } else {
+        console.log('DEBUG: No font config found, using default');
+      }
       
       // Create the widget elements
       const elements = createWidget();
@@ -6740,6 +9540,32 @@
           );
         }
       }
+      
+      // Check for saved progress and handle restoration
+      const savedData = progressiveFormManager.restoreFormStateFromLocalStorage();
+      if (savedData && progressiveFormManager.shouldPromptToContinue(savedData)) {
+        // Store saved data for potential restoration
+        widgetState.recoveryData = savedData;
+        
+        if (config.displayMode !== 'button') {
+          // For inline mode, show continue prompt immediately
+          setTimeout(() => {
+            showContinuePrompt(savedData);
+          }, 100);
+        }
+        // For button mode, continue prompt will be shown when modal opens
+      } else {
+        // No saved progress or not significant, initialize normally
+        if (config.displayMode !== 'button') {
+          setTimeout(() => {
+            console.log('DEBUG: Initializing first step (inline mode)');
+            progressiveFormManager.startAutoSave();
+            showStep('pest-issue');
+            setupStepValidation('pest-issue');
+          }, 100);
+        }
+      }
+      
     } catch (error) {
       console.error('DH Widget initialization failed:', error);
       showErrorState('INITIALIZATION_ERROR', 'Widget failed to initialize', error.message);

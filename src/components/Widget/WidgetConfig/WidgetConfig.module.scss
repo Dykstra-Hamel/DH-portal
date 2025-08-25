@@ -1213,6 +1213,29 @@
   }
 }
 
+.variableButton {
+  padding: 4px 8px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 40px;
+  text-align: center;
+
+  &:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+  }
+
+  &:active {
+    background: #d1d5db;
+  }
+}
+
 // Service Plans Manager Styles
 .servicePlansManager {
   display: flex;
@@ -1928,4 +1951,24 @@
     font-size: 16px;
     color: #374151;
   }
+}
+
+// Saving indicator for debounced inputs
+.savingIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: normal;
+  
+  svg {
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

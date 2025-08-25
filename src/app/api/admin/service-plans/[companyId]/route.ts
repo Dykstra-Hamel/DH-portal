@@ -8,6 +8,7 @@ interface ServicePlan {
   plan_description: string;
   plan_category: string;
   initial_price: number;
+  initial_discount: number;
   recurring_price: number;
   billing_frequency: string;
   treatment_frequency: string;
@@ -19,6 +20,7 @@ interface ServicePlan {
   color_scheme: any;
   requires_quote: boolean;
   plan_image_url: string | null;
+  plan_disclaimer: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -29,6 +31,7 @@ interface CreateServicePlanRequest {
   plan_description?: string;
   plan_category?: string;
   initial_price?: number;
+  initial_discount?: number;
   recurring_price: number;
   billing_frequency: string;
   treatment_frequency?: string;
@@ -40,6 +43,7 @@ interface CreateServicePlanRequest {
   color_scheme?: any;
   requires_quote?: boolean;
   plan_image_url?: string;
+  plan_disclaimer?: string;
   pest_coverage?: Array<{ pest_id: string; coverage_level: string }>;
 }
 
