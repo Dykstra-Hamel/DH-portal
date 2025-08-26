@@ -100,6 +100,13 @@ export async function POST(
       .eq('id', id)
       .single();
 
+    // Fetch company branding information for logo
+    const { data: brandData } = await supabase
+      .from('brands')
+      .select('logo_url')
+      .eq('company_id', id)
+      .single();
+
     // Validate workflow configuration
     const validationResult = await validateWorkflow(workflow, supabase);
     if (!validationResult.valid) {
@@ -111,7 +118,7 @@ export async function POST(
     }
 
     // Execute workflow test
-    const testResult = await executeWorkflowTest(workflow, sampleLead, company, supabase);
+    const testResult = await executeWorkflowTest(workflow, sampleLead, company, brandData, supabase);
     const executionId = `test-${Date.now()}`;
 
     // Optionally trigger actual Inngest events
@@ -234,7 +241,7 @@ async function validateWorkflow(workflow: any, supabase: any) {
   }
 }
 
-async function executeWorkflowTest(workflow: any, sampleLead: any, company: any, supabase: any) {
+async function executeWorkflowTest(workflow: any, sampleLead: any, company: any, brandData: any, supabase: any) {
   const steps: any[] = [];
   const emailPreviews: any[] = [];
   let totalDuration = 0;
@@ -247,6 +254,7 @@ async function executeWorkflowTest(workflow: any, sampleLead: any, company: any,
     company_name: company?.name || 'Your Company',
     company_email: company?.email || 'info@yourcompany.com',
     company_phone: company?.phone || '(555) 000-0000',
+    company_logo: brandData?.logo_url || '/pcocentral-logo.png',
     pest_type: sampleLead.pest_type,
     urgency: sampleLead.urgency,
     lead_source: sampleLead.lead_source,

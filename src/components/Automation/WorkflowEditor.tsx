@@ -67,7 +67,8 @@ const WORKFLOW_TYPES = [
 ];
 
 const TRIGGER_TYPES = [
-  { value: 'lead_created', label: 'New Lead Created' },
+  // { value: 'lead_created', label: 'New Lead Created' }, // Disabled - process not refined yet
+  { value: 'widget_schedule_completed', label: 'Widget Schedule Form Completed' },
   { value: 'lead_updated', label: 'Lead Updated' },
   { value: 'lead_status_changed', label: 'Lead Status Changed' },
   { value: 'email_opened', label: 'Email Opened' },
@@ -81,7 +82,7 @@ const PEST_TYPES = [
 ];
 
 const URGENCY_LEVELS = ['low', 'medium', 'high', 'urgent'];
-const LEAD_SOURCES = ['organic', 'referral', 'google_cpc', 'facebook_ads', 'other'];
+const LEAD_SOURCES = ['organic', 'referral', 'google_cpc', 'facebook_ads', 'widget_submission', 'other'];
 const LEAD_STATUSES = [
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
@@ -97,11 +98,10 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     name: '',
     description: '',
     workflow_type: 'lead_nurturing',
-    trigger_type: 'lead_created',
+    trigger_type: 'widget_schedule_completed',
     trigger_conditions: {},
     workflow_steps: [] as WorkflowStep[],
     is_active: false,
-    business_hours_only: true,
     auto_cancel_on_status: true,
     cancel_on_statuses: ['won', 'closed_won', 'converted'],
   });
@@ -146,11 +146,10 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
           name: workflow.name || '',
           description: workflow.description || '',
           workflow_type: workflow.workflow_type || 'lead_nurturing',
-          trigger_type: workflow.trigger_type || 'lead_created',
+          trigger_type: workflow.trigger_type || 'widget_schedule_completed',
           trigger_conditions: workflow.trigger_conditions || {},
           workflow_steps: workflow.workflow_steps || [],
           is_active: workflow.is_active || false,
-          business_hours_only: workflow.business_hours_only !== false,
           auto_cancel_on_status: workflow.auto_cancel_on_status !== false,
           cancel_on_statuses: workflow.cancel_on_statuses || ['won', 'closed_won', 'converted'],
         });
@@ -160,11 +159,10 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
           name: '',
           description: '',
           workflow_type: 'lead_nurturing',
-          trigger_type: 'lead_created',
+          trigger_type: 'widget_schedule_completed',
           trigger_conditions: {},
           workflow_steps: [],
           is_active: false,
-          business_hours_only: true,
           auto_cancel_on_status: true,
           cancel_on_statuses: ['won', 'closed_won', 'converted'],
         });
@@ -510,7 +508,6 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                     <option value="lead_age_hours">Lead Age (Hours)</option>
                     <option value="call_outcome">Call Outcome</option>
                     <option value="email_opened">Email Opened</option>
-                    <option value="business_hours">Business Hours</option>
                   </select>
                 </div>
                 <div className={styles.formGroup}>
@@ -772,16 +769,6 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 </label>
               </div>
 
-              <div className={styles.formGroup}>
-                <label className={styles.checkbox}>
-                  <input
-                    type="checkbox"
-                    checked={formData.business_hours_only}
-                    onChange={(e) => setFormData(prev => ({ ...prev, business_hours_only: e.target.checked }))}
-                  />
-                  Business hours only
-                </label>
-              </div>
 
               <div className={styles.formGroup}>
                 <label className={styles.checkbox}>

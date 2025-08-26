@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 
@@ -8,28 +9,32 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createAdminClient();
+    
+    // Use regular client for auth, admin client for data
+    const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
-    // Check if user is admin
+    // Check if user is authenticated
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (!session?.user) {
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await adminSupabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (!profile || !isAuthorizedAdmin(profile)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data: template, error } = await supabase
+    const { data: template, error } = await adminSupabase
       .from('email_template_library')
       .select('*')
       .eq('id', id)
@@ -52,21 +57,25 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const supabase = createAdminClient();
+    
+    // Use regular client for auth, admin client for data
+    const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
-    // Check if user is admin
+    // Check if user is authenticated
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (!session?.user) {
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await adminSupabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (!profile || !isAuthorizedAdmin(profile)) {
@@ -87,7 +96,7 @@ export async function PUT(
     } = body;
 
     // Update the template
-    const { data: template, error } = await supabase
+    const { data: template, error } = await adminSupabase
       .from('email_template_library')
       .update({
         name,
@@ -129,21 +138,25 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createAdminClient();
+    
+    // Use regular client for auth, admin client for data
+    const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
-    // Check if user is admin
+    // Check if user is authenticated
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (!session?.user) {
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await adminSupabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (!profile || !isAuthorizedAdmin(profile)) {
@@ -151,7 +164,7 @@ export async function DELETE(
     }
 
     // Check if template is being used by companies
-    const { data: usage, error: usageError } = await supabase
+    const { data: usage, error: usageError } = await adminSupabase
       .from('template_library_usage')
       .select('id')
       .eq('library_template_id', id)
@@ -168,7 +181,7 @@ export async function DELETE(
     }
 
     // Delete the template
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from('email_template_library')
       .delete()
       .eq('id', id);

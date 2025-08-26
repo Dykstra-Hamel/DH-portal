@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createSampleVariables, replaceVariablesWithSample } from '@/lib/email/variables';
 import {
   Search,
   Filter,
@@ -105,28 +106,8 @@ export default function TemplateLibraryBrowser({ companyId, companyName, onTempl
   }, [fetchTemplates, fetchCategories]);
 
 
-  // Sample variables for preview - similar to EmailTemplateEditor
-  const SAMPLE_VARIABLES: Record<string, string> = {
-    customerName: 'John Smith',
-    companyName: companyName || 'Your Company',
-    leadName: 'John Smith',
-    leadEmail: 'john.smith@email.com',
-    leadPhone: '(555) 123-4567',
-    pestType: 'Termites',
-    serviceAddress: '123 Main Street, Anytown, ST 12345',
-    appointmentDate: 'Thursday, March 15th at 2:00 PM',
-    technicianName: 'Mike Johnson',
-    estimateAmount: '$299'
-  };
-
-  const replaceVariablesWithSample = (content: string): string => {
-    let result = content;
-    Object.entries(SAMPLE_VARIABLES).forEach(([key, value]) => {
-      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
-      result = result.replace(regex, value);
-    });
-    return result;
-  };
+  // Use shared sample variables with company name override
+  const sampleVariables = createSampleVariables({ name: companyName });
 
   const handlePreview = async (template: LibraryTemplate) => {
     setPreviewTemplate(template);
@@ -372,22 +353,22 @@ export default function TemplateLibraryBrowser({ companyId, companyName, onTempl
                   ) : fullPreviewTemplate?.html_content ? (
                     <div className={styles.emailContainer}>
                       <div className={styles.emailSubject}>
-                        <strong>Subject:</strong> {replaceVariablesWithSample(fullPreviewTemplate.subject_line)}
+                        <strong>Subject:</strong> {replaceVariablesWithSample(fullPreviewTemplate.subject_line, sampleVariables)}
                       </div>
                       <div 
                         className={styles.emailContent}
                         dangerouslySetInnerHTML={{ 
-                          __html: replaceVariablesWithSample(fullPreviewTemplate.html_content) 
+                          __html: replaceVariablesWithSample(fullPreviewTemplate.html_content, sampleVariables) 
                         }}
                       />
                     </div>
                   ) : fullPreviewTemplate?.text_content ? (
                     <div className={styles.emailContainer}>
                       <div className={styles.emailSubject}>
-                        <strong>Subject:</strong> {replaceVariablesWithSample(fullPreviewTemplate.subject_line)}
+                        <strong>Subject:</strong> {replaceVariablesWithSample(fullPreviewTemplate.subject_line, sampleVariables)}
                       </div>
                       <div className={styles.textContent}>
-                        {replaceVariablesWithSample(fullPreviewTemplate.text_content).split('\n').map((line, i) => (
+                        {replaceVariablesWithSample(fullPreviewTemplate.text_content, sampleVariables).split('\n').map((line, i) => (
                           <p key={i}>{line}</p>
                         ))}
                       </div>

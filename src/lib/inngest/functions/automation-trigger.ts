@@ -270,45 +270,6 @@ async function processSendEmailStep(
     return { success: false, stepId: step.id, error: 'No template ID specified' };
   }
 
-  // Check business hours if required
-  if (workflowConfig.business_hours_only) {
-    const supabase = createAdminClient();
-    const isBusinessHours = await checkBusinessHours(supabase, companyId);
-    
-    if (!isBusinessHours) {
-      // Schedule for next business hour
-      const nextBusinessHour = await getNextBusinessHour(supabase, companyId);
-      
-      await inngest.send({
-        name: 'email/scheduled',
-        data: {
-          companyId,
-          templateId,
-          recipientEmail: leadData.customerEmail,
-          recipientName: leadData.customerName,
-          leadId: triggerData.leadId,
-          customerId: triggerData.customerId,
-          variables: {
-            ...leadData,
-            companyName: workflowConfig.company_name || 'Your Company',
-          },
-          scheduledFor: nextBusinessHour,
-          workflowId: workflowConfig.id,
-          stepId: step.id,
-        },
-      });
-      
-      return { 
-        success: true, 
-        stepId: step.id, 
-        data: { 
-          scheduled: true, 
-          scheduledFor: nextBusinessHour,
-          reason: 'Outside business hours'
-        } 
-      };
-    }
-  }
 
   // Send immediately
   await inngest.send({
@@ -532,39 +493,3 @@ async function processMakeCallStep(
   }
 }
 
-// Helper functions
-async function checkBusinessHours(supabase: any, companyId: string): Promise<boolean> {
-  const now = new Date();
-  const currentHour = now.getHours();
-  const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
-  
-  // Get business hours settings
-  const { data: settings } = await supabase
-    .from('company_settings')
-    .select('setting_key, setting_value')
-    .eq('company_id', companyId)
-    .in('setting_key', ['business_hours_start', 'business_hours_end', 'weekend_calling_enabled']);
-
-  const settingsMap = new Map(settings?.map((s: any) => [s.setting_key, s.setting_value]) || []);
-  
-  const startHour = parseInt((settingsMap.get('business_hours_start') as string)?.split(':')[0] || '9');
-  const endHour = parseInt((settingsMap.get('business_hours_end') as string)?.split(':')[0] || '17');
-  const weekendEnabled = settingsMap.get('weekend_calling_enabled') === 'true';
-  
-  // Check if it's weekend and weekend is disabled
-  if ((currentDay === 0 || currentDay === 6) && !weekendEnabled) {
-    return false;
-  }
-  
-  // Check if current time is within business hours
-  return currentHour >= startHour && currentHour < endHour;
-}
-
-async function getNextBusinessHour(supabase: any, companyId: string): Promise<string> {
-  // Simple implementation - schedule for 9 AM next business day
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0);
-  
-  return tomorrow.toISOString();
-}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { sendEvent } from '@/lib/inngest/client';
 
 export async function GET(
   request: NextRequest,
@@ -138,6 +139,14 @@ export async function PUT(
 
     const body = await request.json();
     const { execution_status, cancellation_reason } = body;
+    
+    console.log('Execution update request:', {
+      executionId,
+      companyId: id,
+      execution_status,
+      cancellation_reason,
+      userId: user.id
+    });
 
     // Validate the request
     if (!execution_status) {
@@ -156,8 +165,14 @@ export async function PUT(
       .single();
 
     if (fetchError || !existingExecution) {
+      console.error('Execution lookup failed:', {
+        executionId,
+        companyId: id,
+        fetchError,
+        userId: user.id
+      });
       return NextResponse.json(
-        { error: 'Execution not found' },
+        { error: 'Execution not found', executionId, companyId: id },
         { status: 404 }
       );
     }
@@ -190,36 +205,123 @@ export async function PUT(
       updateData.completed_at = new Date().toISOString();
       updateData.current_step = 'cancelled_by_user';
       
-      if (cancellation_reason) {
-        updateData.execution_data = {
-          ...existingExecution.execution_data,
-          cancellationReason: cancellation_reason,
-          cancelledBy: user.id,
-          cancelledAt: new Date().toISOString()
-        };
-      }
+      // Safely handle existing execution_data
+      const existingData = existingExecution.execution_data || {};
+      updateData.execution_data = {
+        ...existingData,
+        cancellationReason: cancellation_reason || 'Cancelled by user',
+        cancelledBy: user.id,
+        cancelledAt: new Date().toISOString()
+      };
     }
 
-    // Update the execution
-    const { data: execution, error } = await supabase
+    // Verify execution still exists before update (race condition check)
+    const { data: currentExecution, error: reCheckError } = await supabase
+      .from('automation_executions')
+      .select('id, execution_status, company_id')
+      .eq('id', executionId)
+      .eq('company_id', id)
+      .single();
+
+    if (reCheckError || !currentExecution) {
+      console.error('Execution no longer exists at update time:', {
+        executionId,
+        companyId: id,
+        reCheckError,
+        originalStatus: existingExecution.execution_status
+      });
+      return NextResponse.json(
+        { 
+          error: 'Execution no longer exists or was modified by another process',
+          executionId,
+          details: 'The execution may have been completed, cancelled, or deleted by another operation'
+        },
+        { status: 409 }
+      );
+    }
+
+    console.log('About to update execution:', {
+      executionId,
+      companyId: id,
+      currentStatus: currentExecution.execution_status,
+      targetStatus: execution_status,
+      updateData
+    });
+
+    // Update the execution (remove .single() to handle 0 affected rows gracefully)
+    const { data: execution, error, count } = await supabase
       .from('automation_executions')
       .update(updateData)
       .eq('id', executionId)
       .eq('company_id', id)
-      .select()
-      .single();
+      .select();
 
     if (error) {
-      console.error('Error updating execution:', error);
+      console.error('Error updating execution:', {
+        error,
+        executionId,
+        companyId: id,
+        updateData,
+        userId: user.id,
+        requestBody: body,
+        affectedRows: count
+      });
       return NextResponse.json(
-        { error: 'Failed to update execution' },
+        { 
+          error: 'Failed to update execution',
+          details: error.message || 'Database update failed',
+          executionId,
+          operation: execution_status === 'cancelled' ? 'cancellation' : 'update'
+        },
         { status: 500 }
       );
     }
 
+    // Check if any rows were actually updated
+    if (!execution || execution.length === 0) {
+      console.error('No rows updated - execution may have been modified:', {
+        executionId,
+        companyId: id,
+        affectedRows: count,
+        executionExists: !!currentExecution,
+        currentStatus: currentExecution?.execution_status,
+        targetStatus: execution_status
+      });
+      return NextResponse.json(
+        {
+          error: 'Execution could not be updated',
+          details: 'The execution may have been completed or modified by another process',
+          executionId,
+          currentStatus: currentExecution?.execution_status
+        },
+        { status: 409 }
+      );
+    }
+
+    // If this was a cancellation, send cancellation event to Inngest
+    if (execution_status === 'cancelled' && execution.length > 0) {
+      try {
+        await sendEvent({
+          name: 'workflow/cancel',
+          data: {
+            executionId,
+            workflowId: existingExecution.workflow_id,
+            companyId: id,
+            cancelledBy: user.id,
+            cancellationReason: cancellation_reason || 'Cancelled by user',
+            timestamp: new Date().toISOString()
+          }
+        });
+        console.log(`🚫 CANCELLATION EVENT SENT: ${executionId}`);
+      } catch (eventError) {
+        console.error('Failed to send cancellation event to Inngest:', eventError);
+        // Don't fail the cancellation if event sending fails
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      execution,
+      execution: execution[0], // Take first (and should be only) result
       message: execution_status === 'cancelled' 
         ? 'Execution cancelled successfully'
         : 'Execution updated successfully'
