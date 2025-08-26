@@ -155,8 +155,6 @@ export class ConditionalEngine {
       case 'time_based':
         return this.evaluateTimeCondition(timeContext);
 
-      case 'business_hours':
-        return this.isBusinessHours(timeContext);
 
       case 'previous_step_result':
         return previousStepResult?.status;
@@ -293,20 +291,6 @@ export class ConditionalEngine {
     else return 'night';
   }
 
-  /**
-   * Checks if current time is within business hours
-   */
-  private isBusinessHours(timeContext?: any): boolean {
-    if (!timeContext) return false;
-
-    const now = timeContext.currentTime || new Date();
-    const currentHour = now.getHours();
-    
-    const startHour = parseInt(timeContext.businessHoursStart?.split(':')[0] || '9');
-    const endHour = parseInt(timeContext.businessHoursEnd?.split(':')[0] || '17');
-
-    return currentHour >= startHour && currentHour < endHour;
-  }
 
   /**
    * Gets suggested branches based on lead characteristics

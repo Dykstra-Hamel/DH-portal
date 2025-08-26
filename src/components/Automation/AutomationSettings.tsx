@@ -33,7 +33,6 @@ interface AutomationWorkflow {
   trigger_conditions: any;
   workflow_steps: any[];
   is_active: boolean;
-  business_hours_only: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -71,7 +70,6 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [automationSettings, setAutomationSettings] = useState({
     automation_enabled: true,
-    automation_business_hours_only: true,
     automation_max_emails_per_day: 10,
   });
 
@@ -122,7 +120,6 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
             const settings = settingsData.settings;
             setAutomationSettings({
               automation_enabled: settings.automation_enabled?.value ?? true,
-              automation_business_hours_only: settings.automation_business_hours_only?.value ?? true,
               automation_max_emails_per_day: settings.automation_max_emails_per_day?.value ?? 10,
             });
           }
@@ -186,7 +183,6 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
         body: JSON.stringify({
           settings: {
             automation_enabled: { value: automationSettings.automation_enabled, type: 'boolean' },
-            automation_business_hours_only: { value: automationSettings.automation_business_hours_only, type: 'boolean' },
             automation_max_emails_per_day: { value: automationSettings.automation_max_emails_per_day, type: 'number' },
           },
         }),
@@ -419,27 +415,6 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
               </div>
             </div>
 
-            <div className={styles.setting}>
-              <div className={styles.settingInfo}>
-                <label className={styles.settingLabel}>Business Hours Only</label>
-                <p className={styles.settingDescription}>
-                  Only run automations during your business hours.
-                </p>
-              </div>
-              <div className={styles.settingControl}>
-                <label className={styles.toggle}>
-                  <input
-                    type="checkbox"
-                    checked={automationSettings.automation_business_hours_only}
-                    onChange={e => setAutomationSettings(prev => ({
-                      ...prev,
-                      automation_business_hours_only: e.target.checked
-                    }))}
-                  />
-                  <span className={styles.toggleSlider}></span>
-                </label>
-              </div>
-            </div>
 
             <div className={styles.setting}>
               <div className={styles.settingInfo}>
@@ -589,12 +564,6 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
                       <span className={`${styles.statusBadge} ${workflow.is_active ? styles.active : styles.inactive}`}>
                         {workflow.is_active ? 'Active' : 'Inactive'}
                       </span>
-                      {workflow.business_hours_only && (
-                        <span className={styles.businessHoursBadge}>
-                          <Clock size={12} />
-                          Business Hours Only
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>

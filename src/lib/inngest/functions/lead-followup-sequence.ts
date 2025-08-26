@@ -23,7 +23,6 @@ export const leadFollowUpSequence = inngest.createFunction(
         .eq('company_id', companyId)
         .in('setting_key', [
           'automation_enabled',
-          'automation_business_hours_only',
           'automation_max_emails_per_day'
         ]);
 
@@ -31,7 +30,6 @@ export const leadFollowUpSequence = inngest.createFunction(
       
       return {
         automationEnabled: settingsMap.get('automation_enabled') === 'true',
-        businessHoursOnly: settingsMap.get('automation_business_hours_only') === 'true',
         maxEmailsPerDay: parseInt(settingsMap.get('automation_max_emails_per_day') || '10'),
       };
     });

@@ -157,7 +157,7 @@ export const callOutcomeTracker = inngest.createFunction(
     const branchResult = await step.run('evaluate-call-outcome-branches', async () => {
       // Get the current workflow execution
       const { data: execution } = await supabase
-        .from('workflow_executions')
+        .from('automation_executions')
         .select('*')
         .eq('id', executionId)
         .single();

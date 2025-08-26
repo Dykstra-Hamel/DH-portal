@@ -49,6 +49,37 @@ export interface LeadStatusChangedEvent {
   };
 }
 
+export interface WidgetScheduleCompletedEvent {
+  name: 'widget/schedule-completed';
+  data: {
+    leadId: string;
+    companyId: string;
+    customerId: string;
+    leadData: {
+      customerName: string;
+      customerEmail: string;
+      customerPhone: string;
+      pestType: string;
+      urgency: string;
+      address: string;
+      homeSize?: number;
+      selectedPlan?: string;
+      estimatedPrice?: {
+        min: number;
+        max: number;
+        service_type: string;
+      };
+    };
+    attribution: {
+      leadSource: string;
+      utmSource?: string;
+      utmMedium?: string;
+      utmCampaign?: string;
+    };
+    createdAt: string;
+  };
+}
+
 export interface AutomationTriggerEvent {
   name: 'automation/trigger';
   data: {
@@ -156,8 +187,20 @@ export interface RetellCallEndedEvent {
   };
 }
 
+export interface WorkflowCancellationEvent {
+  name: 'workflow/cancel';
+  data: {
+    executionId: string;
+    workflowId: string;
+    companyId: string;
+    cancelledBy: string;
+    cancellationReason: string;
+    timestamp: string;
+  };
+}
+
 // Union type of all events
-export type InngestEvent = LeadCreatedEvent | LeadStatusChangedEvent | AutomationTriggerEvent | EmailScheduledEvent | WorkflowTestEvent | CallSchedulingEvent | ScheduledCallExecutionEvent | CallCompletedEvent | RetellCallEndedEvent;
+export type InngestEvent = LeadCreatedEvent | LeadStatusChangedEvent | WidgetScheduleCompletedEvent | AutomationTriggerEvent | EmailScheduledEvent | WorkflowTestEvent | CallSchedulingEvent | ScheduledCallExecutionEvent | CallCompletedEvent | RetellCallEndedEvent | WorkflowCancellationEvent;
 
 // Helper function to send events
 export const sendEvent = async (event: InngestEvent) => {
