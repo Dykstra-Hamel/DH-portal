@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 import styles from './PestManager.module.scss';
 
 interface PestCategory {
@@ -20,6 +22,7 @@ interface PestType {
   description: string | null;
   category_id: string;
   icon_svg: string | null;
+  widget_background_image: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -31,6 +34,7 @@ interface PestFormData {
   description: string;
   category_id: string;
   icon_svg: string;
+  widget_background_image: string;
 }
 
 interface CategoryFormData {
@@ -56,7 +60,8 @@ export default function PestManager() {
     slug: '',
     description: '',
     category_id: '',
-    icon_svg: ''
+    icon_svg: '',
+    widget_background_image: ''
   });
   const [categoryFormData, setCategoryFormData] = useState<CategoryFormData>({
     name: '',
@@ -106,7 +111,8 @@ export default function PestManager() {
       slug: '',
       description: '',
       category_id: categories.length > 0 ? categories[0].id : '',
-      icon_svg: ''
+      icon_svg: '',
+      widget_background_image: ''
     });
     setShowModal(true);
   };
@@ -129,7 +135,8 @@ export default function PestManager() {
       slug: pest.slug,
       description: pest.description || '',
       category_id: pest.category_id,
-      icon_svg: pest.icon_svg || ''
+      icon_svg: pest.icon_svg || '',
+      widget_background_image: pest.widget_background_image || ''
     });
     setShowModal(true);
   };
@@ -342,6 +349,142 @@ export default function PestManager() {
       fetchPests(); // Refresh pests in case some were affected
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete category');
+    }
+  };
+
+  // File upload utilities
+  const createAssetPath = (
+    pestName: string,
+    category: string,
+    fileName: string
+  ): string => {
+    const cleanPestName = pestName
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .toLowerCase();
+
+    const cleanFileName = fileName
+      .split('.')
+      .slice(0, -1)
+      .join('.')
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .toLowerCase();
+
+    const fileExt = fileName.split('.').pop()?.toLowerCase() || '';
+    const timestamp = Date.now();
+    const finalFileName = `${cleanFileName}_${timestamp}.${fileExt}`;
+
+    return `pest-types/${cleanPestName}/${category}/${finalFileName}`;
+  };
+
+  const uploadFile = async (
+    file: File,
+    bucket: string,
+    category: string,
+    pestName: string
+  ): Promise<string | null> => {
+    try {
+      const supabase = createClient();
+      const filePath = createAssetPath(pestName, category, file.name);
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        return null;
+      }
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      return null;
+    }
+  };
+
+  const deleteFileFromStorage = async (fileUrl: string): Promise<boolean> => {
+    try {
+      const supabase = createClient();
+      const urlParts = fileUrl.split('/storage/v1/object/public/brand-assets/');
+      if (urlParts.length !== 2) {
+        console.error('Invalid file URL format:', fileUrl);
+        return false;
+      }
+
+      const filePath = urlParts[1];
+      const { error } = await supabase.storage
+        .from('brand-assets')
+        .remove([filePath]);
+
+      if (error) {
+        console.error('Delete error:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      return false;
+    }
+  };
+
+  // Widget Background Image Upload Handler
+  const handleWidgetBackgroundUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // If there's an existing image, delete it first
+      if (formData.widget_background_image) {
+        await deleteFileFromStorage(formData.widget_background_image);
+      }
+
+      const url = await uploadFile(file, 'brand-assets', 'widget-backgrounds', formData.name || 'pest');
+      if (url) {
+        setFormData(prev => ({ ...prev, widget_background_image: url }));
+        // Clear the input so the same file can be selected again if needed
+        event.target.value = '';
+        setSuccess('Background image uploaded successfully');
+      } else {
+        setError('Failed to upload background image');
+      }
+    } catch (error) {
+      console.error('Error uploading background image:', error);
+      setError('Failed to upload background image');
+    }
+  };
+
+  const removeWidgetBackground = async () => {
+    if (!formData.widget_background_image) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this widget background image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const deleted = await deleteFileFromStorage(formData.widget_background_image);
+
+      if (deleted) {
+        setFormData(prev => ({ ...prev, widget_background_image: '' }));
+        setSuccess('Background image deleted successfully');
+      } else {
+        setError('Failed to delete background image');
+      }
+    } catch (error) {
+      console.error('Error deleting background image:', error);
+      setError('Failed to delete background image');
     }
   };
 
@@ -574,6 +717,42 @@ export default function PestManager() {
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Describe this pest type..."
                 />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="widget_background_image">Widget Background Image</label>
+                <p className={styles.fieldNote}>
+                  Upload a background image that will be displayed in the widget for this pest type.
+                </p>
+                <input
+                  id="widget_background_image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleWidgetBackgroundUpload}
+                  className={styles.fileInput}
+                />
+                {formData.widget_background_image && (
+                  <div className={styles.imagePreview}>
+                    <Image
+                      src={formData.widget_background_image}
+                      alt="Widget background preview"
+                      width={300}
+                      height={200}
+                      style={{
+                        maxWidth: '300px',
+                        maxHeight: '200px',
+                        objectFit: 'contain',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={removeWidgetBackground}
+                      className={styles.removeImageButton}
+                    >
+                      Remove Background Image
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className={styles.modalActions}>

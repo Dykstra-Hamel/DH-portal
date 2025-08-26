@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import {
   Save,
@@ -88,6 +88,8 @@ interface CompanyPestOption {
   custom_label: string | null;
   display_order: number;
   is_active: boolean;
+  how_we_do_it_text: string | null;
+  subspecies: string[];
 }
 
 interface ServicePlan {
@@ -97,6 +99,7 @@ interface ServicePlan {
   plan_description: string;
   plan_category: string;
   initial_price: number;
+  initial_discount: number;
   recurring_price: number;
   billing_frequency: string;
   treatment_frequency: string;
@@ -108,6 +111,7 @@ interface ServicePlan {
   color_scheme: any;
   requires_quote: boolean;
   plan_image_url: string | null;
+  plan_disclaimer: string | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;
@@ -125,6 +129,13 @@ interface WidgetConfigData {
   branding: {
     companyName: string;
     hero_image_url?: string;
+    pestSelectBackgroundImage?: string;
+    howWeDoItBackgroundImage?: string;
+    howWeDoItInteriorImage?: string;
+    almostDoneBackgroundImage?: string;
+    detailedQuoteBackgroundImage?: string;
+    detailedQuoteInteriorImage?: string;
+    locationNotServedBackgroundImage?: string;
   };
   headers: {
     headerText: string;
@@ -164,6 +175,10 @@ interface WidgetConfigData {
   emailNotifications: {
     subjectLine: string;
     enabled: boolean;
+  };
+  stepHeadings: {
+    address: string;
+    howWeDoIt: string;
   };
 }
 interface WidgetConfigProps {
@@ -219,6 +234,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     branding: {
       companyName: '',
       hero_image_url: '',
+      pestSelectBackgroundImage: '',
+      howWeDoItBackgroundImage: '',
+      howWeDoItInteriorImage: '',
+      almostDoneBackgroundImage: '',
+      detailedQuoteBackgroundImage: '',
+      detailedQuoteInteriorImage: '',
+      locationNotServedBackgroundImage: '',
     },
     headers: {
       headerText: '',
@@ -233,7 +255,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     submitButtonText: 'Get My Quote',
     welcomeButtonText: 'Start My Free Estimate',
     successMessage:
-      'Thank you! Your information has been submitted successfully. We will contact you soon.',
+      'You should receive a confirmation email shortly. One of our representatives will contact you to confirm your appointment and answer any of your questions during normal business hours.',
     addressApi: {
       enabled: true,
       maxSuggestions: 5,
@@ -250,6 +272,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     emailNotifications: {
       subjectLine: 'New Service Request: {customerName} - {companyName}',
       enabled: true,
+    },
+    stepHeadings: {
+      address: 'Yuck, {pest}! We hate those. No worries, we got you!',
+      howWeDoIt: 'How We Do It',
     },
   });
   const [serviceAreaInput, setServiceAreaInput] = useState('');
@@ -297,6 +323,16 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     emailDomain: false,
     addressApi: false,
     embedCode: true, // Expanded by default
+  });
+
+  // Debouncing refs for improved input handling
+  const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
+  const [localInputValues, setLocalInputValues] = useState<{
+    howWeDoIt: { [optionId: string]: string };
+    subspecies: { [optionId: string]: string };
+  }>({
+    howWeDoIt: {},
+    subspecies: {},
   });
   const [brandColors, setBrandColors] = useState<{
     primary?: string;
@@ -475,6 +511,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       branding: {
         companyName: widgetConfig.branding?.companyName || company.name,
         hero_image_url: widgetConfig.branding?.hero_image_url || '',
+        pestSelectBackgroundImage: widgetConfig.branding?.pestSelectBackgroundImage || '',
+        howWeDoItBackgroundImage: widgetConfig.branding?.howWeDoItBackgroundImage || '',
+        howWeDoItInteriorImage: widgetConfig.branding?.howWeDoItInteriorImage || '',
+        almostDoneBackgroundImage: widgetConfig.branding?.almostDoneBackgroundImage || '',
+        detailedQuoteBackgroundImage: widgetConfig.branding?.detailedQuoteBackgroundImage || '',
+        detailedQuoteInteriorImage: widgetConfig.branding?.detailedQuoteInteriorImage || '',
+        locationNotServedBackgroundImage: widgetConfig.branding?.locationNotServedBackgroundImage || '',
       },
       headers: {
         headerText: widgetConfig.headers?.headerText || '',
@@ -515,6 +558,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         subjectLine:
           widgetConfig.emailNotifications?.subjectLine ||
           'New {pestIssue} Service Request From: {customerName}',
+      },
+      stepHeadings: {
+        address: widgetConfig.stepHeadings?.address || 'Yuck, {pest}! We hate those. No worries, we got you!',
+        howWeDoIt: widgetConfig.stepHeadings?.howWeDoIt || 'How We Do It',
       },
     });
     // Set the notification emails input field
@@ -864,6 +911,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           custom_label: option.custom_label,
           display_order: index + 1,
           is_active: true,
+          how_we_do_it_text: option.how_we_do_it_text,
+          subspecies: option.subspecies,
         })),
       };
 
@@ -904,6 +953,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       custom_label: null,
       display_order: companyPestOptions.length + 1,
       is_active: true,
+      how_we_do_it_text: null,
+      subspecies: [],
     };
     const updatedOptions = [...companyPestOptions, newOption];
     setCompanyPestOptions(updatedOptions);
@@ -924,6 +975,74 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     );
     setCompanyPestOptions(updatedOptions);
     savePestOptions(updatedOptions);
+  };
+
+  // Debounced save function to prevent API calls on every keystroke
+  const debouncedSave = useCallback((optionId: string, field: 'howWeDoIt' | 'subspecies', value: string | string[]) => {
+    const timerKey = `${optionId}-${field}`;
+    
+    // Clear existing timer
+    if (debounceTimers.current[timerKey]) {
+      clearTimeout(debounceTimers.current[timerKey]);
+    }
+    
+    // Set new timer
+    debounceTimers.current[timerKey] = setTimeout(() => {
+      const updatedOptions = companyPestOptions.map(option => {
+        if (option.id === optionId) {
+          if (field === 'howWeDoIt') {
+            return { ...option, how_we_do_it_text: value as string };
+          } else {
+            return { ...option, subspecies: value as string[] };
+          }
+        }
+        return option;
+      });
+      setCompanyPestOptions(updatedOptions);
+      savePestOptions(updatedOptions);
+      
+      // Clear the timer after saving
+      delete debounceTimers.current[timerKey];
+    }, 500); // 500ms delay
+  }, [companyPestOptions]);
+
+  const updatePestOptionHowWeDoIt = (optionId: string, howWeDoItText: string) => {
+    // Update local state immediately for responsive UI
+    setLocalInputValues(prev => ({
+      ...prev,
+      howWeDoIt: { ...prev.howWeDoIt, [optionId]: howWeDoItText }
+    }));
+    
+    // Also update the main state for immediate UI feedback
+    const updatedOptions = companyPestOptions.map(option =>
+      option.id === optionId ? { ...option, how_we_do_it_text: howWeDoItText } : option
+    );
+    setCompanyPestOptions(updatedOptions);
+    
+    // Debounce the API call
+    debouncedSave(optionId, 'howWeDoIt', howWeDoItText);
+  };
+
+  const updatePestOptionSubspecies = (optionId: string, subspeciesText: string) => {
+    // Update local state immediately for responsive UI
+    setLocalInputValues(prev => ({
+      ...prev,
+      subspecies: { ...prev.subspecies, [optionId]: subspeciesText }
+    }));
+    
+    // Process subspecies on the fly for immediate UI feedback, but don't save yet
+    const subspecies = subspeciesText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    
+    const updatedOptions = companyPestOptions.map(option =>
+      option.id === optionId ? { ...option, subspecies } : option
+    );
+    setCompanyPestOptions(updatedOptions);
+    
+    // Debounce the API call
+    debouncedSave(optionId, 'subspecies', subspecies);
   };
 
   const reorderPestOptions = (fromIndex: number, toIndex: number) => {
@@ -1135,6 +1254,27 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       },
     }));
   };
+
+  const insertVariableIntoInput = (inputId: string, variable: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    if (input) {
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const currentValue = input.value;
+      const newValue = currentValue.slice(0, start) + variable + currentValue.slice(end);
+      input.value = newValue;
+      input.focus();
+      input.setSelectionRange(start + variable.length, start + variable.length);
+      
+      // Trigger the onChange handler
+      if (inputId === 'stepHeading-address') {
+        handleConfigChange('stepHeadings', 'address', newValue);
+      } else if (inputId === 'stepHeading-howWeDoIt') {
+        handleConfigChange('stepHeadings', 'howWeDoIt', newValue);
+      }
+    }
+  };
+
   const addServiceArea = () => {
     if (
       serviceAreaInput.trim() &&
@@ -1311,6 +1451,295 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
 
+  const handlePestSelectBackgroundUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // If there's an existing pest select background image, delete it from storage first
+    if (config.branding.pestSelectBackgroundImage) {
+      await deleteFileFromStorage(config.branding.pestSelectBackgroundImage);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'pest-select-backgrounds');
+    if (url) {
+      handleConfigChange('branding', 'pestSelectBackgroundImage', url);
+      // Clear the input so the same file can be selected again if needed
+      event.target.value = '';
+    }
+  };
+
+  const removePestSelectBackground = async () => {
+    if (!config.branding.pestSelectBackgroundImage) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this pest select background image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const deleted = await deleteFileFromStorage(config.branding.pestSelectBackgroundImage);
+
+    if (deleted) {
+      handleConfigChange('branding', 'pestSelectBackgroundImage', '');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
+
+  // How We Do It Background Image handlers
+  const handleHowWeDoItBackgroundUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (config.branding.howWeDoItBackgroundImage) {
+      await deleteFileFromStorage(config.branding.howWeDoItBackgroundImage);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'how-we-do-it-backgrounds');
+    if (url) {
+      handleConfigChange('branding', 'howWeDoItBackgroundImage', url);
+      event.target.value = '';
+    }
+  };
+
+  const removeHowWeDoItBackground = async () => {
+    if (!config.branding.howWeDoItBackgroundImage) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this how we do it background image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const deleted = await deleteFileFromStorage(config.branding.howWeDoItBackgroundImage);
+
+    if (deleted) {
+      handleConfigChange('branding', 'howWeDoItBackgroundImage', '');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
+  // How We Do It Interior Image handlers
+  const handleHowWeDoItInteriorUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (config.branding.howWeDoItInteriorImage) {
+      await deleteFileFromStorage(config.branding.howWeDoItInteriorImage);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'how-we-do-it-interior');
+    if (url) {
+      handleConfigChange('branding', 'howWeDoItInteriorImage', url);
+      event.target.value = '';
+    }
+  };
+
+  const removeHowWeDoItInterior = async () => {
+    if (!config.branding.howWeDoItInteriorImage) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this how we do it interior image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const deleted = await deleteFileFromStorage(config.branding.howWeDoItInteriorImage);
+
+    if (deleted) {
+      handleConfigChange('branding', 'howWeDoItInteriorImage', '');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
+  // Almost Done Background Image handlers
+  const handleAlmostDoneBackgroundUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (config.branding.almostDoneBackgroundImage) {
+      await deleteFileFromStorage(config.branding.almostDoneBackgroundImage);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'almost-done-backgrounds');
+    if (url) {
+      handleConfigChange('branding', 'almostDoneBackgroundImage', url);
+      event.target.value = '';
+    }
+  };
+
+  const removeAlmostDoneBackground = async () => {
+    if (!config.branding.almostDoneBackgroundImage) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this almost done background image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const deleted = await deleteFileFromStorage(config.branding.almostDoneBackgroundImage);
+
+    if (deleted) {
+      handleConfigChange('branding', 'almostDoneBackgroundImage', '');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
+  // Detailed Quote Background Image handlers
+  const handleDetailedQuoteBackgroundUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (config.branding.detailedQuoteBackgroundImage) {
+      await deleteFileFromStorage(config.branding.detailedQuoteBackgroundImage);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'detailed-quote-backgrounds');
+    if (url) {
+      handleConfigChange('branding', 'detailedQuoteBackgroundImage', url);
+      event.target.value = '';
+    }
+  };
+
+  const removeDetailedQuoteBackground = async () => {
+    if (!config.branding.detailedQuoteBackgroundImage) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this detailed quote background image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const deleted = await deleteFileFromStorage(config.branding.detailedQuoteBackgroundImage);
+
+    if (deleted) {
+      handleConfigChange('branding', 'detailedQuoteBackgroundImage', '');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
+  // Detailed Quote Interior Image handlers
+  const handleDetailedQuoteInteriorUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (config.branding.detailedQuoteInteriorImage) {
+      await deleteFileFromStorage(config.branding.detailedQuoteInteriorImage);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'detailed-quote-interior');
+    if (url) {
+      handleConfigChange('branding', 'detailedQuoteInteriorImage', url);
+      event.target.value = '';
+    }
+  };
+
+  const removeDetailedQuoteInterior = async () => {
+    if (!config.branding.detailedQuoteInteriorImage) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this detailed quote interior image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const deleted = await deleteFileFromStorage(config.branding.detailedQuoteInteriorImage);
+
+    if (deleted) {
+      handleConfigChange('branding', 'detailedQuoteInteriorImage', '');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
+  // Location Not Served Background Image handlers
+  const handleLocationNotServedBackgroundUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (config.branding.locationNotServedBackgroundImage) {
+      await deleteFileFromStorage(config.branding.locationNotServedBackgroundImage);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'location-not-served-backgrounds');
+    if (url) {
+      handleConfigChange('branding', 'locationNotServedBackgroundImage', url);
+      event.target.value = '';
+    }
+  };
+
+  const removeLocationNotServedBackground = async () => {
+    if (!config.branding.locationNotServedBackgroundImage) return;
+
+    if (
+      !confirm(
+        'Are you sure you want to delete this location not served background image? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const deleted = await deleteFileFromStorage(config.branding.locationNotServedBackgroundImage);
+
+    if (deleted) {
+      handleConfigChange('branding', 'locationNotServedBackgroundImage', '');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } else {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 5000);
+    }
+  };
+
   const saveConfig = async () => {
     if (!selectedCompany) return;
     setIsSaving(true);
@@ -1375,9 +1804,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     if (config.welcomeButtonText !== 'Start My Free Estimate') {
       embedCode += `\n  data-welcome-button-text="${config.welcomeButtonText}"`;
     }
-    if (config.branding.hero_image_url) {
-      embedCode += `\n  data-hero-image-url="${config.branding.hero_image_url}"`;
-    }
     embedCode += `
 ></script>`;
     return embedCode;
@@ -1416,9 +1842,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
     if (config.welcomeButtonText !== 'Start My Free Estimate') {
       embedCode += `\n  data-welcome-button-text="${config.welcomeButtonText}"`;
-    }
-    if (config.branding.hero_image_url) {
-      embedCode += `\n  data-hero-image-url="${config.branding.hero_image_url}"`;
     }
 
     embedCode += `
@@ -1467,9 +1890,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
     if (config.welcomeButtonText !== 'Start My Free Estimate') {
       embedCode += `\n  data-welcome-button-text="${config.welcomeButtonText}"`;
-    }
-    if (config.branding.hero_image_url) {
-      embedCode += `\n  data-hero-image-url="${config.branding.hero_image_url}"`;
     }
 
     embedCode += `
@@ -1609,7 +2029,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           <CollapsibleSection
             sectionKey="branding"
             title="Branding"
-            description="Configure your company name, headers, and logo for the widget"
+            description="Configure your company name, headers, logo and step background images for the widget"
             isExpanded={expandedSections.branding}
             onToggle={() => toggleSection('branding')}
             styles={styles}
@@ -1712,6 +2132,330 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     className={styles.removeImageButton}
                   >
                     Remove Hero Image
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Step Background Images */}
+            <hr className={styles.sectionDivider} />
+            <h4 className={styles.sectionSubheading}>Step Background Images</h4>
+            
+            <div className={styles.formGroup}>
+              <label>Choose Pest Background Image</label>
+              <p className={styles.fieldNote}>
+                Upload a background image for the pest selection step. Image should be 386px wide and optimized for the widget height.
+              </p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePestSelectBackgroundUpload}
+                className={styles.fileInput}
+              />
+              {config.branding.pestSelectBackgroundImage && (
+                <div className={styles.heroImagePreview}>
+                  <Image
+                    src={config.branding.pestSelectBackgroundImage}
+                    alt="Pest select background preview"
+                    width={300}
+                    height={200}
+                    style={{
+                      maxWidth: '300px',
+                      maxHeight: '200px',
+                      objectFit: 'contain',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={removePestSelectBackground}
+                    className={styles.removeImageButton}
+                  >
+                    Remove Background Image
+                  </button>
+                </div>
+              )}
+            </div>
+
+
+            <div className={styles.formGroup}>
+              <label>How We Do It Images</label>
+              <p className={styles.fieldNote}>
+                Upload background and interior images for the &quot;How We Do It&quot; step.
+              </p>
+              
+              <div className={styles.subFormGroup}>
+                <label>Background Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleHowWeDoItBackgroundUpload}
+                  className={styles.fileInput}
+                />
+                {config.branding.howWeDoItBackgroundImage && (
+                  <div className={styles.heroImagePreview}>
+                    <Image
+                      src={config.branding.howWeDoItBackgroundImage}
+                      alt="How we do it background preview"
+                      width={300}
+                      height={200}
+                      style={{
+                        maxWidth: '300px',
+                        maxHeight: '200px',
+                        objectFit: 'contain',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={removeHowWeDoItBackground}
+                      className={styles.removeImageButton}
+                    >
+                      Remove Background Image
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.subFormGroup}>
+                <label>Interior Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleHowWeDoItInteriorUpload}
+                  className={styles.fileInput}
+                />
+                {config.branding.howWeDoItInteriorImage && (
+                  <div className={styles.heroImagePreview}>
+                    <Image
+                      src={config.branding.howWeDoItInteriorImage}
+                      alt="How we do it interior preview"
+                      width={300}
+                      height={200}
+                      style={{
+                        maxWidth: '300px',
+                        maxHeight: '200px',
+                        objectFit: 'contain',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={removeHowWeDoItInterior}
+                      className={styles.removeImageButton}
+                    >
+                      Remove Interior Image
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Step Headings</label>
+              <p className={styles.fieldNote}>
+                Customize the headings for different steps in your widget. 
+                Use variables: <code>{"{"}pest{"}"}</code>, <code>{"{"}initialPrice{"}"}</code>, <code>{"{"}recurringPrice{"}"}</code>
+              </p>
+              
+              <div className={styles.subFormGroup}>
+                <label>Address Step Heading</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <input
+                    id="stepHeading-address"
+                    type="text"
+                    value={config.stepHeadings.address}
+                    onChange={(e) => handleConfigChange('stepHeadings', 'address', e.target.value)}
+                    placeholder="Yuck, {pest}! We hate those. No worries, we got you!"
+                    style={{ flex: 1 }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => insertVariableIntoInput('stepHeading-address', '{pest}')}
+                      className={styles.variableButton}
+                      title="Insert pest variable"
+                    >
+                      {"{"}pest{"}"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.subFormGroup}>
+                <label>How We Do It Step Heading</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <input
+                    id="stepHeading-howWeDoIt"
+                    type="text"
+                    value={config.stepHeadings.howWeDoIt}
+                    onChange={(e) => handleConfigChange('stepHeadings', 'howWeDoIt', e.target.value)}
+                    placeholder="How We Do It"
+                    style={{ flex: 1 }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => insertVariableIntoInput('stepHeading-howWeDoIt', '{pest}')}
+                      className={styles.variableButton}
+                      title="Insert pest variable"
+                    >
+                      {"{"}pest{"}"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertVariableIntoInput('stepHeading-howWeDoIt', '{initialPrice}')}
+                      className={styles.variableButton}
+                      title="Insert initial price variable"
+                    >
+                      $init
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertVariableIntoInput('stepHeading-howWeDoIt', '{recurringPrice}')}
+                      className={styles.variableButton}
+                      title="Insert recurring price variable"
+                    >
+                      $rec
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Almost Done - More Info Background Image</label>
+              <p className={styles.fieldNote}>
+                Upload a background image for the contact information step.
+              </p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAlmostDoneBackgroundUpload}
+                className={styles.fileInput}
+              />
+              {config.branding.almostDoneBackgroundImage && (
+                <div className={styles.heroImagePreview}>
+                  <Image
+                    src={config.branding.almostDoneBackgroundImage}
+                    alt="Almost done background preview"
+                    width={300}
+                    height={200}
+                    style={{
+                      maxWidth: '300px',
+                      maxHeight: '200px',
+                      objectFit: 'contain',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={removeAlmostDoneBackground}
+                    className={styles.removeImageButton}
+                  >
+                    Remove Background Image
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Detailed Quote Images</label>
+              <p className={styles.fieldNote}>
+                Upload background and interior images for the detailed quote steps.
+              </p>
+              
+              <div className={styles.subFormGroup}>
+                <label>Background Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleDetailedQuoteBackgroundUpload}
+                  className={styles.fileInput}
+                />
+                {config.branding.detailedQuoteBackgroundImage && (
+                  <div className={styles.heroImagePreview}>
+                    <Image
+                      src={config.branding.detailedQuoteBackgroundImage}
+                      alt="Detailed quote background preview"
+                      width={300}
+                      height={200}
+                      style={{
+                        maxWidth: '300px',
+                        maxHeight: '200px',
+                        objectFit: 'contain',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={removeDetailedQuoteBackground}
+                      className={styles.removeImageButton}
+                    >
+                      Remove Background Image
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.subFormGroup}>
+                <label>Interior Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleDetailedQuoteInteriorUpload}
+                  className={styles.fileInput}
+                />
+                {config.branding.detailedQuoteInteriorImage && (
+                  <div className={styles.heroImagePreview}>
+                    <Image
+                      src={config.branding.detailedQuoteInteriorImage}
+                      alt="Detailed quote interior preview"
+                      width={300}
+                      height={200}
+                      style={{
+                        maxWidth: '300px',
+                        maxHeight: '200px',
+                        objectFit: 'contain',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={removeDetailedQuoteInterior}
+                      className={styles.removeImageButton}
+                    >
+                      Remove Interior Image
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Location Not Served Background Image</label>
+              <p className={styles.fieldNote}>
+                Upload a background image for the location not served step.
+              </p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLocationNotServedBackgroundUpload}
+                className={styles.fileInput}
+              />
+              {config.branding.locationNotServedBackgroundImage && (
+                <div className={styles.heroImagePreview}>
+                  <Image
+                    src={config.branding.locationNotServedBackgroundImage}
+                    alt="Location not served background preview"
+                    width={300}
+                    height={200}
+                    style={{
+                      maxWidth: '300px',
+                      maxHeight: '200px',
+                      objectFit: 'contain',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={removeLocationNotServedBackground}
+                    className={styles.removeImageButton}
+                  >
+                    Remove Background Image
                   </button>
                 </div>
               )}
@@ -1989,7 +2733,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                   }))
                 }
                 rows={3}
-                placeholder="Thank you! Your information has been submitted successfully. We will contact you soon."
+                placeholder="You should receive a confirmation email shortly. One of our representatives will contact you to confirm your appointment and answer any of your questions during normal business hours."
               />
             </div>
 
@@ -2119,6 +2863,53 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             >
                               ✕
                             </button>
+                          </div>
+                          
+                          {/* How We Do It Content Section */}
+                          <div className={styles.pestContentSection}>
+                            <div className={styles.pestContentField}>
+                              <label className={styles.fieldLabel}>
+                                How We Do It Description:
+                                {debounceTimers.current[`${option.id}-howWeDoIt`] && (
+                                  <span className={styles.savingIndicator}>
+                                    <Clock size={12} /> Saving...
+                                  </span>
+                                )}
+                              </label>
+                              <textarea
+                                placeholder="Describe how you treat this pest..."
+                                value={localInputValues.howWeDoIt[option.id] !== undefined 
+                                  ? localInputValues.howWeDoIt[option.id] 
+                                  : option.how_we_do_it_text || ''}
+                                onChange={e =>
+                                  updatePestOptionHowWeDoIt(option.id, e.target.value)
+                                }
+                                className={styles.howWeDoItTextarea}
+                                rows={3}
+                              />
+                            </div>
+                            
+                            <div className={styles.pestContentField}>
+                              <label className={styles.fieldLabel}>
+                                Subspecies (one per line):
+                                {debounceTimers.current[`${option.id}-subspecies`] && (
+                                  <span className={styles.savingIndicator}>
+                                    <Clock size={12} /> Saving...
+                                  </span>
+                                )}
+                              </label>
+                              <textarea
+                                placeholder="Enter subspecies, one per line..."
+                                value={localInputValues.subspecies[option.id] !== undefined 
+                                  ? localInputValues.subspecies[option.id] 
+                                  : option.subspecies.join('\n')}
+                                onChange={e => {
+                                  updatePestOptionSubspecies(option.id, e.target.value);
+                                }}
+                                className={styles.subspeciesTextarea}
+                                rows={4}
+                              />
+                            </div>
                           </div>
                         </div>
                       ))}

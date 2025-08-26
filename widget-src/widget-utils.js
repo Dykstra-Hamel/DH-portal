@@ -104,6 +104,13 @@ const getPestIcon = () => {
   return icon || null;
 };
 
+// Helper function to get the pest background image with fallback
+const getPestBackgroundImage = () => {
+  const pestBackgroundImage = widgetState.formData.pestBackgroundImage;
+  const fallbackImage = widgetState.widgetConfig?.branding?.pestSelectBackgroundImage;
+  return pestBackgroundImage || fallbackImage || null;
+};
+
 // Helper function to update dynamic text based on form data
 const updateDynamicText = async () => {
   // Wait for DOM to be ready
@@ -182,47 +189,20 @@ const updateDynamicText = async () => {
         );
       }
 
-      // Update completion step with customer name
+      // Update completion step title to Office Hours
       const completionMessage = document.querySelector(
         '#dh-step-complete h3'
       );
-      if (completionMessage && widgetState.formData.contactInfo) {
-        const { firstName, lastName } = widgetState.formData.contactInfo;
-        if (firstName) {
-          const customerName = lastName
-            ? `${firstName} ${lastName}`
-            : firstName;
-          completionMessage.textContent = `Thank you for your request, ${customerName}!`;
-        }
+      if (completionMessage) {
+        completionMessage.textContent = 'Office Hours';
       }
 
-      // Update completion step with additional personalized info
+      // Update completion step with Success Message
       const completionDescription = document.querySelector(
         '#dh-step-complete p'
       );
-      if (completionDescription && widgetState.formData.contactInfo) {
-        const { firstName } = widgetState.formData.contactInfo;
-        const pestType = getPestTypeDisplay(
-          widgetState.formData.pestType,
-          'default'
-        );
-        const addressCity = widgetState.formData.addressCity;
-
-        let message = "We've received your information";
-        if (firstName) {
-          message = `Hi ${firstName}! We've received your information`;
-        }
-        if (pestType !== 'pests' && addressCity) {
-          message += ` for ${pestType} service in ${addressCity}`;
-        } else if (pestType !== 'pests') {
-          message += ` for ${pestType} service`;
-        } else if (addressCity) {
-          message += ` for service in ${addressCity}`;
-        }
-        message +=
-          ' and will contact you within 24 hours with your free estimate. Keep an eye on your email and phone for our response.';
-
-        completionDescription.textContent = message;
+      if (completionDescription && widgetState.widgetConfig?.successMessage) {
+        completionDescription.textContent = widgetState.widgetConfig.successMessage;
       }
 
       // Update urgency timeline references based on selection
@@ -267,9 +247,52 @@ const updateDynamicText = async () => {
           ref.textContent = widgetState.formData.addressCity;
         });
       }
+      // Update step headings with variable replacement
+      updateStepHeadings();
+
       resolve(); // Resolve the promise when all updates are complete
     }, 100); // Small delay to ensure DOM is ready
   });
+};
+
+
+// Helper function to replace step heading variables
+const replaceStepVariables = (text, pestType, recommendedPlan) => {
+  if (!text) return '';
+  
+  const pestText = getPestTypeDisplay(pestType, 'default');
+  const initialPrice = recommendedPlan?.initial_price ? `$${recommendedPlan.initial_price}` : '$';
+  const recurringPrice = recommendedPlan?.recurring_price && recommendedPlan?.billing_frequency 
+    ? `$${recommendedPlan.recurring_price}<span class="dh-price-frequency">${window.formatBillingFrequencyFull ? window.formatBillingFrequencyFull(recommendedPlan.billing_frequency) : formatBillingFrequency(recommendedPlan.billing_frequency)}</span>`
+    : '$';
+
+  return text
+    .replace(/\{pest\}/g, pestText)
+    .replace(/\{initialPrice\}/g, initialPrice)
+    .replace(/\{recurringPrice\}/g, recurringPrice);
+};
+
+// Function to update step headings with variables
+const updateStepHeadings = () => {
+  const pestType = widgetState.formData.pestType;
+  const recommendedPlan = widgetState.formData.recommendedPlan;
+  const stepHeadings = widgetState.widgetConfig?.stepHeadings;
+  
+  if (!stepHeadings) return;
+  
+  // Update address step heading
+  const addressHeading = document.getElementById('address-step-heading');
+  if (addressHeading && stepHeadings.address) {
+    const processedText = replaceStepVariables(stepHeadings.address, pestType, recommendedPlan);
+    addressHeading.innerHTML = processedText;
+  }
+  
+  // Update how-we-do-it step heading
+  const howWeDoItHeading = document.getElementById('how-we-do-it-heading');
+  if (howWeDoItHeading && stepHeadings.howWeDoIt) {
+    const processedText = replaceStepVariables(stepHeadings.howWeDoIt, pestType, recommendedPlan);
+    howWeDoItHeading.innerHTML = processedText;
+  }
 };
 
 // Function to check if input has value and update label state
@@ -446,6 +469,124 @@ const updateFloatingLabel = input => {
     }
   };
 
+  // Function to load address imagery as background image
+  const loadAddressBackgroundImagery = async (address, backgroundElementId) => {
+    const backgroundEl = document.getElementById(backgroundElementId);
+    
+    if (!backgroundEl) {
+      console.warn(`Background element not found: ${backgroundElementId}`);
+      return;
+    }
+
+    try {
+      // Get API key
+      const apiKeyResponse = await fetch(
+        config.baseUrl + '/api/google-places-key'
+      );
+      const apiKeyData = await apiKeyResponse.json();
+
+      if (!apiKeyData.apiKey) {
+        throw new Error('Google API key not available');
+      }
+
+      const apiKey = apiKeyData.apiKey;
+      const { lat, lon } = address;
+
+      // Check Street View availability using metadata API first
+      const hasStreetView = await checkStreetViewAvailability(
+        lat,
+        lon,
+        apiKey
+      );
+
+      if (hasStreetView) {
+        // Street View is available - set as background
+        try {
+          const streetViewUrl =
+            `https://maps.googleapis.com/maps/api/streetview?` +
+            `size=800x600&location=${lat},${lon}&heading=0&pitch=0&fov=90&key=${apiKey}`;
+
+          // Test if Street View image loads successfully
+          const testImage = new Image();
+          testImage.crossOrigin = 'anonymous';
+
+          await new Promise((resolve, reject) => {
+            testImage.onload = () => {
+              // Street View loaded successfully - set as background
+              backgroundEl.style.backgroundImage = `url('${streetViewUrl}')`;
+              backgroundEl.style.backgroundSize = 'cover';
+              backgroundEl.style.backgroundPosition = 'center';
+              backgroundEl.style.backgroundRepeat = 'no-repeat';
+              
+              // Store the URL in widget state for reuse in other steps
+              if (typeof widgetState !== 'undefined') {
+                widgetState.addressBackgroundUrl = streetViewUrl;
+              }
+              resolve();
+            };
+
+            testImage.onerror = () => {
+              // Street View failed to load, try satellite fallback
+              reject(new Error('Street View image failed to load'));
+            };
+
+            testImage.src = streetViewUrl;
+          });
+
+        } catch (streetViewError) {
+          console.warn('Street View failed, trying satellite:', streetViewError);
+          // Fall back to satellite view
+          await loadSatelliteBackground(lat, lon, apiKey, backgroundEl);
+        }
+      } else {
+        // No Street View available, use satellite
+        await loadSatelliteBackground(lat, lon, apiKey, backgroundEl);
+      }
+    } catch (error) {
+      console.error('Address background imagery failed:', error);
+      // Set a subtle fallback background or leave empty
+      backgroundEl.style.backgroundColor = '#f3f4f6';
+    }
+  };
+
+  // Helper function to load satellite view as background
+  const loadSatelliteBackground = async (lat, lon, apiKey, backgroundEl) => {
+    try {
+      const satelliteUrl = 
+        `https://maps.googleapis.com/maps/api/staticmap?` +
+        `center=${lat},${lon}&zoom=18&size=800x600&maptype=satellite&key=${apiKey}`;
+
+      const testImage = new Image();
+      testImage.crossOrigin = 'anonymous';
+
+      await new Promise((resolve, reject) => {
+        testImage.onload = () => {
+          backgroundEl.style.backgroundImage = `url('${satelliteUrl}')`;
+          backgroundEl.style.backgroundSize = 'cover';
+          backgroundEl.style.backgroundPosition = 'center';
+          backgroundEl.style.backgroundRepeat = 'no-repeat';
+          
+          // Store the URL in widget state for reuse in other steps
+          if (typeof widgetState !== 'undefined') {
+            widgetState.addressBackgroundUrl = satelliteUrl;
+          }
+          resolve();
+        };
+
+        testImage.onerror = () => {
+          reject(new Error('Satellite image failed to load'));
+        };
+
+        testImage.src = satelliteUrl;
+      });
+
+    } catch (error) {
+      console.error('Satellite background failed:', error);
+      // Set fallback background
+      backgroundEl.style.backgroundColor = '#f3f4f6';
+    }
+  };
+
   // Helper function to load satellite view
   const loadSatelliteView = async (lat, lon, formatted, apiKey, imageEl, loadingEl, errorEl) => {
     try {
@@ -583,3 +724,6 @@ const updateFloatingLabel = input => {
     // If no match found, return empty string
     return '';
   };
+
+// Expose functions to window for global access
+window.updateStepHeadings = updateStepHeadings;

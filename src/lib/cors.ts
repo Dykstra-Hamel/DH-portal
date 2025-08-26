@@ -161,7 +161,8 @@ export async function addCorsHeaders(
   configType: CorsConfigType
 ): Promise<NextResponse> {
   if (await isOriginAllowed(origin, configType)) {
-    response.headers.set('Access-Control-Allow-Origin', origin!);
+    // Handle null origin case (for same-origin requests like localhost)
+    response.headers.set('Access-Control-Allow-Origin', origin || '*');
   }
   
   response.headers.set('Access-Control-Allow-Methods', METHOD_CONFIGS[configType]);

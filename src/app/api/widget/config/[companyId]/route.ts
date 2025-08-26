@@ -40,7 +40,7 @@ export async function GET(
         .single(),
       supabase
         .from('brands')
-        .select('primary_color_hex, secondary_color_hex')
+        .select('primary_color_hex, secondary_color_hex, logo_url, font_primary_name, font_primary_url')
         .eq('company_id', companyId)
         .single()
     ]);
@@ -91,12 +91,24 @@ export async function GET(
       branding: {
         companyName: widgetConfig.branding?.companyName || company.name,
         hero_image_url: widgetConfig.branding?.hero_image_url || null,
+        logo_url: brandData?.logo_url || null,
+        pestSelectBackgroundImage: widgetConfig.branding?.pestSelectBackgroundImage || null,
+        locationNotServedBackgroundImage: widgetConfig.branding?.locationNotServedBackgroundImage || null,
+        howWeDoItInteriorImage: widgetConfig.branding?.howWeDoItInteriorImage || null,
+        almostDoneBackgroundImage: widgetConfig.branding?.almostDoneBackgroundImage || null,
+        detailedQuoteInteriorImage: widgetConfig.branding?.detailedQuoteInteriorImage || null,
       },
       headers: {
         headerText: widgetConfig.headers?.headerText || '',
         subHeaderText: widgetConfig.headers?.subHeaderText || '',
       },
       colors: resolvedColors,
+      fonts: {
+        primary: {
+          name: brandData?.font_primary_name || 'Outfit',
+          url: brandData?.font_primary_url || 'https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap'
+        }
+      },
       ai_knowledge: widgetConfig.ai_knowledge || `You are a professional customer service representative for ${company.name}. Provide helpful, accurate information about our services. Be conversational and friendly while gathering information to help customers.`,
       service_areas: widgetConfig.service_areas || [],
       messaging: {
@@ -107,6 +119,10 @@ export async function GET(
       welcomeButtonText: widgetConfig.welcomeButtonText || 'Start My Free Estimate',
       successMessage: widgetConfig.successMessage || 'Thank you! Your information has been submitted successfully. We will contact you soon.',
       welcomeBenefits: widgetConfig.messaging?.welcomeBenefits || [],
+      stepHeadings: {
+        address: widgetConfig.stepHeadings?.address || 'Yuck, {pest}! We hate those. No worries, we got you!',
+        howWeDoIt: widgetConfig.stepHeadings?.howWeDoIt || 'How We Do It'
+      },
     };
 
     // Fetch company's pest options
@@ -116,10 +132,13 @@ export async function GET(
         pest_id,
         custom_label,
         display_order,
+        how_we_do_it_text,
+        subspecies,
         pest_types (
           name,
           slug,
           icon_svg,
+          widget_background_image,
           pest_categories (
             name,
             slug
@@ -136,7 +155,10 @@ export async function GET(
       label: option.custom_label || option.pest_types.name,
       value: option.pest_types.slug,
       icon: option.pest_types.icon_svg,
+      widget_background_image: option.pest_types.widget_background_image,
       category: option.pest_types.pest_categories?.name || 'Unknown',
+      how_we_do_it_text: option.how_we_do_it_text,
+      subspecies: option.subspecies || [],
     }));
 
     // Fetch company's service plans count for widget config
@@ -159,11 +181,13 @@ export async function GET(
       branding: defaultConfig.branding,
       headers: defaultConfig.headers,
       colors: defaultConfig.colors,
+      fonts: defaultConfig.fonts,
       messaging: defaultConfig.messaging,
       submitButtonText: defaultConfig.submitButtonText,
       welcomeButtonText: defaultConfig.welcomeButtonText,
       successMessage: defaultConfig.successMessage,
       welcomeBenefits: defaultConfig.welcomeBenefits,
+      stepHeadings: defaultConfig.stepHeadings,
       addressApi: widgetConfig.addressApi || {
         enabled: false,
         maxSuggestions: 5,
