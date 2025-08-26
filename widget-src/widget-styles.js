@@ -63,6 +63,12 @@ const createStyles = (
   styleElement.id = 'dh-widget-styles';
   styleElement.textContent = `
   @import url('${fontUrl}');
+
+/* Global font family for all widget elements */
+.dh-form-widget, .dh-form-widget * {
+  font-family: "${fontName}", sans-serif !important;
+}
+
 .dh-form-widget { 
   margin: 0 auto; 
   background: ${backgroundColor}; 
@@ -263,7 +269,8 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
 
 .dh-interior-image {
  width: 244px;
- height: 251px;
+ height: auto;
+ object-fit: cover;
  border-radius: 16px;
 }
 
@@ -1133,6 +1140,7 @@ select.dh-form-input {
 
   #how-we-do-it-interior-image {
     width: 100vw;
+    max-width: unset !important;
     object-fit: cover;
     border-radius: 0;
     margin-left: calc(-50vw + 50%);

@@ -352,14 +352,18 @@ const previousStep = () => {
       prevStep = 'confirm-address';
       break;
     case 'contact':
-      // Contact step should go back to how-we-do-it since it's for scheduling
-      prevStep = 'how-we-do-it';
+      // Contact step should go back to plan-comparison
+      prevStep = 'plan-comparison';
       break;
     case 'quote-contact':
       prevStep = 'how-we-do-it';
       break;
     case 'plan-comparison':
       prevStep = 'quote-contact';
+      break;
+    case 'exit-survey':
+      // Exit survey should go back to plan-comparison
+      prevStep = 'plan-comparison';
       break;
     default:
       // Fallback for any other steps

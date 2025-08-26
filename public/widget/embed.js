@@ -1,6 +1,6 @@
 /**
  * DH Widget - Built from Source
- * Generated: 2025-08-25T21:13:14.946Z
+ * Generated: 2025-08-26T12:41:05.117Z
  * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
  */
 
@@ -961,6 +961,12 @@
   styleElement.id = 'dh-widget-styles';
   styleElement.textContent = `
   @import url('${fontUrl}');
+
+  /* Global font family for all widget elements */
+  .dh-form-widget, .dh-form-widget * {
+  font-family: "${fontName}", sans-serif !important;
+  }
+
   .dh-form-widget { 
   margin: 0 auto; 
   background: ${backgroundColor}; 
@@ -1161,7 +1167,8 @@
 
   .dh-interior-image {
    width: 244px;
-   height: 251px;
+   height: auto;
+   object-fit: cover;
    border-radius: 16px;
   }
 
@@ -2031,6 +2038,7 @@
 
   #how-we-do-it-interior-image {
     width: 100vw;
+    max-width: unset !important;
     object-fit: cover;
     border-radius: 0;
     margin-left: calc(-50vw + 50%);
@@ -4896,14 +4904,18 @@
       prevStep = 'confirm-address';
       break;
     case 'contact':
-      // Contact step should go back to how-we-do-it since it's for scheduling
-      prevStep = 'how-we-do-it';
+      // Contact step should go back to plan-comparison
+      prevStep = 'plan-comparison';
       break;
     case 'quote-contact':
       prevStep = 'how-we-do-it';
       break;
     case 'plan-comparison':
       prevStep = 'quote-contact';
+      break;
+    case 'exit-survey':
+      // Exit survey should go back to plan-comparison
+      prevStep = 'plan-comparison';
       break;
     default:
       // Fallback for any other steps
