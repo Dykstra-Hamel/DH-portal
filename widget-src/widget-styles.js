@@ -2246,9 +2246,9 @@ height: 100%;
 .dh-step-heading {
   color: #515151;
   text-align: center;
-  font-size: 45px;
+  font-size: 46px;
   font-weight: 700;
-  line-height: 100%;
+  line-height: 46px;
   margin: 0 0 20px 0;
 }
 
