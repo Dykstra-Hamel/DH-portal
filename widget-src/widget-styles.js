@@ -2021,6 +2021,7 @@ height: 100%;
     max-width: 100%;
     width: unset;
     margin: 0 0 50px 0; 
+    border-radius: 0;
   }
 }
 
