@@ -1,6 +1,6 @@
 /**
  * DH Widget - Built from Source
- * Generated: 2025-08-26T12:41:05.117Z
+ * Generated: 2025-08-27T18:08:42.720Z
  * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
  */
 
@@ -1000,6 +1000,23 @@
   font-family: "${fontName}", sans-serif !important;
   }
 
+  @keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+  }
+
+  img {
+  animation: fadeIn 2s ease forwards;
+  }
+
+  .dh-pest-bg-image {
+  animation: fadeIn 2s ease forwards;
+  }
+
   .dh-form-widget { 
   margin: 0 auto; 
   background: ${backgroundColor}; 
@@ -1016,22 +1033,37 @@
   z-index: 100;
   cursor: pointer;
   pointer-events: auto;
-  width: 29px;
-  height: 29px;
+  width: 35px;
+  height: 35px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: opacity 0.2s ease;
   }
-  .dh-widget-close-icon:hover {
-  opacity: 0.8;
+
+  .dh-widget-close-icon svg, .dh-widget-close-icon svg path {
+  transition: all 0.2s ease;
   }
+  .dh-widget-close-icon:hover svg {
+  scale: 1.08;
+  }
+
+  .dh-widget-close-icon:hover svg path {
+  fill: #515151;
+  }
+
+  .dh-widget-close-icon:hover svg path:not(:first-of-type) {
+  stroke: white;
+  }
+
   .dh-widget-close-icon svg {
-  width: 29px;
-  height: 29px;
+  width: 27px;
+  height: 27px;
   }
   .dh-global-back-button {
   position: absolute;
+  justify-content: center;
+  align-items: center;
   top: 67px;
   left: 0px;
   z-index: 90;
@@ -1046,16 +1078,22 @@
   gap: 8px;
   font-family: '${fontName}', sans-serif;
   font-size: 12px;
+  line-height: 20px;
   font-weight: 700;
   transition: background-color 0.2s ease, transform 0.2s ease;
   opacity: 0.7;
+  transition: all 0.2s ease;
+  }
+
+  .dh-global-back-button:hover {
+  background: #B0B0B0;
   }
 
   .dh-global-back-button svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  transision: all 0.2s ease;
+  transition: all 0.2s ease;
   }
 
   .dh-global-back-button:hover svg {
@@ -1097,7 +1135,6 @@
     display: flex;
     width: 100%;
     height: 100%;
-    min-height: 90vh;
     position: relative;
     overflow: hidden;
     padding: 0;
@@ -1113,6 +1150,89 @@
   flex-shrink: 0;
   }
 
+
+  /* Google Reviews Display Styles */
+  .dh-reviews-container {
+  margin: 0 0 24px 0;
+  font-family: "${fontName}", sans-serif;
+  min-height: 24px; /* Reserve space to prevent layout shift */
+  }
+
+  .dh-reviews-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  }
+
+  .dh-star-rating {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  }
+
+  .dh-star {
+  width: 20px;
+  height: 18px;
+  flex-shrink: 0;
+  }
+
+  .dh-star path {
+  fill: #F68C1A;
+  transition: fill 0.2s ease;
+  }
+
+  .dh-reviews-count {
+  font-size: 16px;
+  font-weight: 500;
+  color: ${secondaryColor};
+  margin-left: 4px;
+  }
+
+  /* Loading States */
+  .dh-reviews-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  }
+
+  .dh-reviews-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.6;
+  }
+
+  .dh-skeleton-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  }
+
+  .dh-skeleton-stars::before {
+  content: '★★★★★';
+  color: #E5E5E5;
+  font-size: 16px;
+  animation: dh-pulse 1.5s ease-in-out infinite;
+  }
+
+  .dh-skeleton-text {
+  background: #E5E5E5;
+  height: 16px;
+  width: 120px;
+  border-radius: 4px;
+  animation: dh-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes dh-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  }
+
   .dh-plan-faqs-container {
   width: 100%;
   margin: 22px;
@@ -1124,7 +1244,7 @@
   .dh-form-content-area {
     flex: 1;
     align-items: center;
-    padding: 37px 32px;
+    padding: 37px 40px;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -1175,12 +1295,15 @@
   margin-top: 20px;
   }
 
+  #subspecies-heading {
+  margin-bottom: 15px;
+  }
+
   .dh-subspecies-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: repeat(3, auto);
-  gap: 8px 20px;
-  margin: 0 0 22px 0;
+  gap: 4px 20px;
   grid-auto-flow: column;
   }
 
@@ -1203,12 +1326,14 @@
    height: auto;
    object-fit: cover;
    border-radius: 16px;
+   opacity: 0;
+   transition: opacity 0.5s ease;
   }
 
   .dh-safety-message {
    display: flex;
    align-items: center;
-   margin-bottom: 53px;
+   margin-bottom: 40px;
   }
 
   .dh-form-group { 
@@ -1660,6 +1785,8 @@
   object-fit: cover;
   border-radius: 8px;
   display: block;
+  opacity: 0;
+  transition: opacity 0.5s ease;
   }
 
   /* Address Search Mode vs Display Mode */
@@ -1963,7 +2090,7 @@
 
   /* Specific styling for out of service step heading */
   #dh-step-out-of-service .dh-step-heading {
-  margin: auto;
+  margin-bottom: 40px;
   }
 
   /* Responsive styling for out-of-service */
@@ -2061,21 +2188,31 @@
 
   @media (max-width: 480px) {
 
+  .dh-pest-logo img {
+    width: 119px !important;
+  }
+
   .dh-safety-message {
     flex-direction: row-reverse;
+    margin-bottom: 0;
   }
 
   .dh-how-we-do-it-text {
    margin-right: 0;
   }
 
-  #how-we-do-it-interior-image {
-    width: 100vw;
+  #how-we-do-it-interior-image, .dh-plan-image-actual img {
+    width: 100vw !important;
+    height: 240px !important;
     max-width: unset !important;
     object-fit: cover;
+    object-position: top;
+    opacity: 0;
+    transition: opacity 0.5s ease;
     border-radius: 0;
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
+    border-radius: 0 !important;
   }
   
   .dh-offer-options {
@@ -2107,7 +2244,12 @@
 
   .dh-form-button-group {
     width: 100%;
-    padding: 0 !important;
+    padding: 40px 0 0 0 !important;
+  }
+
+
+  .dh-form-btn:not(.plan-no-thanks) {
+  width: 100%;
   }
   }
   .dh-form-checkbox-label {
@@ -2118,7 +2260,7 @@
   line-height: 1.5;
   color: ${textColor};
   cursor: pointer;
-  margin-bottom: 80px;
+  margin-bottom: 40px;
   }
   .dh-form-checkbox {
   width: 18px !important;
@@ -2175,7 +2317,7 @@
   margin-top: auto; 
   justify-content: center;
   align-items: center;
-  padding: 0 20px 20px 20px;
+  padding: 24px 20px 20px 20px;
   border-radius: 0 0 26px 26px;
   } 
   #dh-step-exit-survey .dh-form-button-group { 
@@ -2185,9 +2327,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 25px;
   padding: 20px 30px; 
-  border: none; 
+  gap: 25px;
+  border: 2px solid #fff; 
   border-radius: 60px; 
   cursor: pointer; 
   font-size: 18px;
@@ -2195,12 +2337,10 @@
   font-family: "${fontName}", sans-serif;
   font-weight: 700; 
   transition: all 0.2s ease;
-  transform: translateY(0);
   }
-  
-  .dh-form-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  .dh-form-btn:not(.plan-no-thanks) {
+  min-width: 241px;
   }
 
   .dh-form-btn:active {
@@ -2210,22 +2350,19 @@
   .dh-form-btn-primary { 
   background: ${primaryColor}; 
   color: white;
-  border: 1px solid ${primaryColor};
   } 
   .dh-form-btn-primary:hover { 
-  background: ${primaryDark}; 
+  border-color: ${primaryColor};
   } 
   .dh-form-btn-secondary { 
   background: ${secondaryColor}; 
-  color: #fff; 
-  border: 1px solid ${secondaryColor}; 
+  color: #fff;  
   } 
-  .dh-form-btn-secondary svg { 
-  transition: transform 0.2s ease;
-  } 
-  .dh-form-btn-secondary:hover svg { 
-  transform: translateX(2px);
+
+  .dh-form-btn-secondary:hover {
+  border-color: ${secondaryColor};
   }
+
   .dh-form-btn-back { 
   display: flex;
   align-items: center;
@@ -2272,7 +2409,7 @@
   bottom: 0;
   }
   .dh-form-btn.plan-no-thanks {
-    background: #BFBFBF;
+    background: #bfbfbf20;
     color: #515151;
   }
 
@@ -2376,7 +2513,7 @@
   width: 103px;
   height: 103px;
   border-radius: 10px;
-  border: 1px solid #D9D9D9;
+  box-shadow: inset 0 0 0 1px #BFBFBF;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2389,6 +2526,7 @@
   width: 60px;
   height: 60px;
   fill: #4E4E4E;
+  opacity: 0.66;
   }
   .dh-pest-icon svg path {
   fill: #4E4E4E;
@@ -2404,10 +2542,15 @@
   line-height: 18px;
   }
   .dh-pest-option:hover .dh-pest-icon {
-  border-color: ${primaryColor};
+  box-shadow: inset 0 0 0 2px #515151;
   }
+
+  .dh-pest-option:hover .dh-pest-icon svg {
+  opacity: 1;
+  }
+
   .dh-pest-option.selected .dh-pest-icon {
-  border-color: ${primaryColor};
+  box-shadow: inset 0 0 0 2px ${primaryColor};
   color: white;
   }
 
@@ -2536,21 +2679,22 @@
   gap: 32px;
   }
 
-  .dh-pest-option:hover {
-  border-color: ${primaryColor};
+  .dh-pest-option:hover .dh-pest-icon svg path {
+  fill: #515151;
   }
 
-  .dh-pest-option:hover .dh-pest-icon svg path {
+  .dh-pest-option:active .dh-pest-icon svg path {
   fill: ${primaryColor};
   }
 
-  .dh-pest-option:hover .dh-pest-label {
+  .dh-pest-option:active .dh-pest-label {
   color: ${primaryColor};
   }
 
-  .dh-pest-option.selected {
-  border-color: ${primaryColor};
-  background: ${primaryColor};
+  .dh-pest-option:active .dh-pest-icon {
+  box-shadow: inset 0 0 0 2px ${primaryColor};
+  scale: 1.05;
+
   }
 
   .dh-pest-option.selected .dh-pest-icon svg path {
@@ -2583,7 +2727,7 @@
 
   .dh-pest-hero {
   width: 386px;
-  max-height: 90vh;
+  max-height: 889px;;
   position: relative;
   flex-shrink: 0;
   display: flex;
@@ -2645,16 +2789,10 @@
   bottom: 0;
   z-index: 2;
   max-width: 453px;
-  max-height: 100%;
+  max-height: 889px;
   object-fit: contain;
   border-radius: 0 26px 26px 0;
-  }
-
-  @media (max-width: 1280px) {
-   .dh-pest-hero-image {
-   max-width: 380px;
-   right: -70px;
-   }
+  transition: opacity 0.5s ease;
   }
 
   /* Tablet Responsive - 1024px and below */
@@ -2672,10 +2810,6 @@
     max-width: 100vw !important;
   }
 
-  .dh-form-checkbox-label {
-    margin-bottom: 48px;
-  }
-
   .dh-form-step-content {
     flex-direction: column;
     flex-wrap: nowrap !important;;
@@ -2683,6 +2817,7 @@
 
   .dh-pest-hero {
     width: 100%;
+    min-height: unset;
   }
 
   .dh-pest-hero-image {
@@ -2757,6 +2892,10 @@
   #dh-step-plan-comparison .dh-pest-hero {
     display: none;
   }
+
+  .dh-widget-close-icon:not(:hover) svg path {
+  stroke: #B2B2B2;
+  }
   }
 
   /* Mobile Responsive */
@@ -2809,6 +2948,7 @@
   .dh-plan-faqs-container {
     max-width: 100%;
     width: unset;
+    margin: 0 0 50px 0; 
   }
   }
 
@@ -2820,6 +2960,35 @@
   height: auto;
   object-fit: cover;
   border-radius: 12px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  }
+  
+  /* Mobile responsive styles for reviews display */
+  .dh-reviews-container {
+    margin: 0 0 20px 0;
+    min-height: 22px;
+  }
+  
+  .dh-reviews-display {
+    gap: 6px;
+  }
+  
+  .dh-reviews-count {
+    font-size: 14px;
+    margin-left: 3px;
+    position: relative;
+    top: 2px;
+  }
+  
+  .dh-skeleton-stars::before {
+    font-size: 14px;
+  }
+  
+  .dh-skeleton-text {
+    height: 14px;
+    width: 100px;
+  }
   }
 
 
@@ -2842,6 +3011,8 @@
 
   .dh-pet-safety-image {
     width: 144px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
   }
 
   .dh-safety-text {
@@ -2853,7 +3024,7 @@
     gap: 2px 20px;
   }
 
-  .dh-form-btn:not(.plan-no-thanks) {
+  .dh-form-btn {
     width: 100%;
   }
 
@@ -2924,10 +3095,10 @@
   border-radius: 20px;
   }
   .dh-quote-loading .dh-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid ${primaryColor};
+  width: 64px;
+  height: 64px;
+  border: 6px solid #e5e7eb;
+  border-top: 6px solid ${primaryColor};
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0;
@@ -3001,8 +3172,6 @@
   border-radius: 26px;
   margin: auto;
   max-width: 1078px;
-  width: 90%;
-  min-height: 90vh;
   position: relative;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   background: white;
@@ -3168,6 +3337,7 @@
 
   .dh-button-arrow svg, .dh-form-btn svg {
   display: block;
+  position: relative;
   }
 
   .dh-welcome-button:hover .dh-button-arrow {
@@ -3177,9 +3347,9 @@
   .dh-step-heading {
   color: #515151;
   text-align: center;
-  font-size: 45px;
+  font-size: 46px;
   font-weight: 700;
-  line-height: 100%;
+  line-height: 46px;
   margin: 0 0 20px 0;
   }
 
@@ -3276,8 +3446,30 @@
     max-width: 300px;
   }
 
+  .dh-pest-logo {
+    margin-bottom: 24px;
+  }
+
   .dh-step-heading {
-    font-size: 32px;
+    font-size: 30px;
+    line-height: 32px;
+  }
+
+  .dh-step-instruction {
+    margin: 0 0 20px 0;
+  }
+
+  #safety-message-text {
+    font-size: 22px;
+    line-height: 26px;
+  }
+
+  .dh-pet-safety-image {
+    width: 144px;  
+  }
+
+  .dh-subspecies-grid {
+    margin-bottom: 48px;
   }
 
   .dh-welcome-screen {
@@ -3388,7 +3580,7 @@
   .dh-plan-features-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 24px 0;
+  margin: 0;
   }
 
   .dh-plan-feature {
@@ -3421,6 +3613,7 @@
 
   .dh-plan-recommendation-badge {
   margin-bottom: 7px;
+  line-height: 10px;
   }
 
   .dh-plan-pricing {
@@ -3482,8 +3675,6 @@
   .dh-plan-image-container {
   height: 100%;
   border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   .dh-plan-image-actual {
   display: flex;
@@ -3512,14 +3703,14 @@
 
   /* FAQ Accordion Styles */
   .dh-plan-faqs {
-  padding: 40px 0 0 0;
+  padding: 20px 0 0 0;
   }
   .dh-form-step h3.dh-faqs-title {
   color: #515151;
   text-align: center;
   font-family: "${fontName}", sans-serif;
-  font-size: 26px;
-  font-weight: 600;
+  font-size: 30px;
+  font-weight: 700;
   line-height: 103%;
   }
   .dh-faqs-container {
@@ -3527,18 +3718,16 @@
   flex-direction: column;
   gap: 0;
   }
-  .dh-faq-item {
+
+  .dh-faq-item:not(:last-of-type) {
   border-bottom: 1px solid #e5e7eb;
+  }
+
+  .dh-faq-item {
   overflow: hidden;
   transition: all 0.2s ease;
   }
-  .dh-faq-item:hover {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
 
-  .dh-faq-item:last-of-type {
-  border-bottom: none;
-  }
 
   .dh-plan-selection-label {
   color: ${primaryColor};
@@ -3576,23 +3765,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 16px 0;
   cursor: pointer;
   transition: background-color 0.2s ease;
   }
-  .dh-faq-header:hover {
-  background: #f9fafb;
+  .dh-faq-header:hover .dh-faq-question {
+  font-weight: 700;
   }
 
   .dh-faq-question {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: ${textColor};
   margin: 0;
   flex: 1;
   padding-right: 16px;
   text-align: left;
+  transition: all 0.2s ease;
   }
+
   .dh-faq-icon {
   font-size: 20px;
   font-weight: 300;
@@ -3612,10 +3803,10 @@
   background: transparent;
   }
   .dh-faq-answer {
-  padding: 0 20px 16px 20px;
+  padding: 0 0 16px 0;
   }
   .dh-faq-answer p {
-  font-size: 14px;
+  font-size: 16px;
   color: #6b7280;
   line-height: 1.6;
   margin: 0;
@@ -3679,6 +3870,14 @@
 
   #comparison-plan-content {
     padding: 0;
+  }
+  
+  .dh-plan-content {
+    margin: 24px 0;
+  }
+
+  .dh-reviews-container {
+    margin: 0;
   }
 
   .dh-plan-details {
@@ -3835,16 +4034,16 @@
   .dh-plan-content-grid {
   display: grid;
   grid-template-columns: 1fr 247px;
-  gap: 20px;
+  gap: 20px 30px;
   align-items: start;
   }
 
   .dh-recommendation-text {
   color: ${primaryColor};
   font-size: 10px;
+  line-height: 10px;
   font-style: normal;
   font-weight: 600;
-  line-height: 13px; /* 130% */
   letter-spacing: 1.9px;
   margin-bottom: 7px;
   text-transform: uppercase;
@@ -3856,7 +4055,6 @@
   }
 
   .dh-plan-visual {
-  max-width: 247px;
   height: 100%;
   /* Image on the right side */
   }
@@ -3864,6 +4062,8 @@
   .dh-plan-visual .dh-plan-image-actual img {
   width: 100%;
   height: 100%;
+  opacity: 0;
+  transition: opacity 0.5s ease;
   object-fit: cover;
   border-radius: 12px;
   }
@@ -3922,7 +4122,6 @@
   font-family: "${fontName}", sans-serif;
   font-size: 24px;
   font-weight: 400;
-  margin-bottom: 5px;
   }
 
   .dh-plan-price-initial .dh-price-number {
@@ -4074,7 +4273,8 @@
   .dh-read-more-link {
   color: ${secondaryColor};
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 700;
+  font-size: 14px;
   }
 
   .dh-read-more-link:hover {
@@ -4140,7 +4340,7 @@
 
   /* Contact Step Information Display Sections */
   .dh-info-section {
-  margin: 32px 0;
+  margin: 24px 0;
   text-align: center;
   }
 
@@ -4178,7 +4378,6 @@
   #dh-step-contact .dh-form-row {
   display: flex;
   gap: 16px;
-  margin-bottom: 32px;
   }
 
   #dh-step-contact .dh-form-row .dh-form-group {
@@ -4194,10 +4393,6 @@
   #dh-step-contact .dh-step-instruction {
   text-align: center;
   margin-bottom: 32px;
-  }
-
-  #dh-step-contact .dh-form-button-group {
-  margin-top: 40px;
   }
 
   /* Complete Step Styles */
@@ -4617,12 +4812,43 @@
     {
       // For non-welcome steps, use fade animations
 
+
+    // Scroll to top of the page or widget container
+    try {
+      // Try to find the widget container and scroll to it
+      const widgetContainer = document.getElementById('dh-widget-container') || 
+                             document.querySelector('.dh-widget') ||
+                             targetStep.closest('.dh-widget-container') ||
+                             targetStep;
+      
+      if (widgetContainer && widgetContainer.scrollIntoView) {
+        widgetContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        // Fallback to window scroll
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (error) {
+      // Final fallback - instant scroll
+      try {
+        window.scrollTo(0, 0);
+      } catch (e) {
+        // Silently fail if even basic scroll doesn't work
+      }
+    }
+
+    // Clean up animation class after animation completes
+    setTimeout(() => {
+      targetStep.classList.remove('fade-in');
+    }, 400);
+  }
+
       // If there's a currently active step, animate it out first
       if (currentActiveStep && currentActiveStep !== targetStep) {
         currentActiveStep.classList.add('fade-out');
 
         // Wait for fade out animation
         await new Promise(resolve => setTimeout(resolve, 300));
+
 
         currentActiveStep.classList.remove('active', 'fade-out');
       } else {
@@ -5525,6 +5751,7 @@
 
   // Helper function to populate a single logo element
   const populateSingleLogo = logoElement => {
+
     if (logoElement && widgetState.widgetConfig?.branding?.logo_url) {
       // Create logo image with proper loading support
       const logoImg = document.createElement('img');
@@ -5583,6 +5810,7 @@
       backgroundImageUrl =
         widgetState.widgetConfig?.branding?.pestSelectBackgroundImage;
     }
+
 
     if (bgImage && backgroundImageUrl) {
       // Preload background image to handle large files
@@ -6328,6 +6556,89 @@
         }, 50);
         break;
 
+
+      // Load Google Reviews data for the comparison step
+      const loadComparisonReviews = async () => {
+        const reviewsContainer = document.getElementById('comparison-reviews-container');
+        const reviewsLoading = document.getElementById('comparison-reviews-loading');
+        const reviewsDisplay = document.getElementById('comparison-reviews-display');
+        const reviewsCount = document.getElementById('comparison-reviews-count');
+        const starElements = document.querySelectorAll('#comparison-reviews-display .dh-star');
+        
+        if (!reviewsContainer) {
+          return;
+        }
+
+        try {
+          // Start with loading state visible, content hidden
+          if (reviewsLoading) reviewsLoading.style.display = 'flex';
+          if (reviewsDisplay) reviewsDisplay.style.display = 'none';
+
+          // Fetch reviews data from API
+          const response = await fetch(`${config.baseUrl}/api/google-places/reviews/${config.companyId}`);
+          
+          if (!response.ok) {
+            console.warn('Failed to fetch reviews data, hiding reviews section');
+            // Hide entire container on failure
+            reviewsContainer.style.display = 'none';
+            return;
+          }
+
+          const data = await response.json();
+          
+          // Validate response data - hide if no reviews or no listings configured
+          if (!data.rating || !data.reviewCount || data.reviewCount === 0 || data.source === 'no_listings') {
+            console.warn('No reviews data available, hiding reviews section');
+            reviewsContainer.style.display = 'none';
+            return;
+          }
+
+          const rating = data.rating;
+          const reviewCount = data.reviewCount;
+
+          // Update review count text
+          if (reviewsCount) {
+            reviewsCount.textContent = `${reviewCount.toLocaleString()} Google Reviews`;
+          }
+
+          // Update star display based on rating
+          const fullStars = Math.floor(rating);
+          const hasHalfStar = rating % 1 >= 0.5;
+
+          starElements.forEach((star, index) => {
+            const path = star.querySelector('path');
+            if (!path) return;
+
+            if (index < fullStars) {
+              // Full star
+              path.style.fill = '#F68C1A';
+            } else if (index === fullStars && hasHalfStar) {
+              // Half star (for now, show as full - could implement half star SVG later)
+              path.style.fill = '#F68C1A';
+            } else {
+              // Empty star
+              path.style.fill = '#E5E5E5';
+            }
+          });
+
+          // Hide loading state and show content
+          if (reviewsLoading) reviewsLoading.style.display = 'none';
+          if (reviewsDisplay) reviewsDisplay.style.display = 'flex';
+
+        } catch (error) {
+          console.error('Error loading reviews data:', error);
+          // Hide entire container on error
+          reviewsContainer.style.display = 'none';
+        }
+      };
+
+      // Load Google Reviews data
+      loadComparisonReviews();
+
+      const comparisonNoThanksBtn = document.getElementById(
+        'comparison-no-thanks'
+      );
+
       case 'quote-contact':
         // Populate logo and hero section
         populateAllLogos();
@@ -6532,7 +6843,7 @@
               <div class="dh-plan-visual">
                 <div class="dh-plan-image-container">
                   <div class="dh-plan-image-actual">
-                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="width: 100%; object-fit: cover;" />
+                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="object-fit: cover;" />
                   </div>
                 </div>
               </div>
@@ -6570,7 +6881,7 @@
               Let&apos;s Schedule! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button class="dh-form-btn plan-no-thanks" onclick="declinePlanComparison()">
-              No Thank You <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              No Thanks <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
         `;
@@ -6639,7 +6950,7 @@
               <div class="dh-plan-visual">
                 <div class="dh-plan-image-container">
                   <div class="dh-plan-image-actual">
-                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="width: 100%; object-fit: cover;" />
+                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="object-fit: cover;" />
                   </div>
                 </div>
               </div>
@@ -6681,7 +6992,7 @@
               Let&apos;s Schedule! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button class="dh-form-btn plan-no-thanks" onclick="declinePlanComparison()">
-              No Thank You <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              No Thanks <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
         `;
@@ -7613,7 +7924,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="submit-btn">Schedule It <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="submit-btn">Schedule It <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       
@@ -7712,6 +8023,39 @@
         </div>
         
         <h2 class="dh-step-heading">Here&apos;s what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">pests</span> - and keep them out!</h2>
+        
+        <!-- Google Reviews Display -->
+        <div class="dh-reviews-container" id="comparison-reviews-container">
+          <!-- Loading State -->
+          <div class="dh-reviews-loading" id="comparison-reviews-loading">
+            <div class="dh-reviews-skeleton">
+              <div class="dh-skeleton-stars"></div>
+              <div class="dh-skeleton-text"></div>
+            </div>
+          </div>
+          
+          <!-- Loaded Content -->
+          <div class="dh-reviews-display" id="comparison-reviews-display" style="display: none;">
+            <div class="dh-star-rating">
+              <svg class="dh-star" xmlns="http://www.w3.org/2000/svg" width="20" height="18" viewBox="0 0 20 18" fill="none">
+                <path d="M9.52875 0.277158C9.57258 0.193944 9.64027 0.123898 9.72421 0.0749244C9.80814 0.025951 9.90496 0 10.0038 0C10.1025 0 10.1994 0.025951 10.2833 0.0749244C10.3672 0.123898 10.4349 0.193944 10.4788 0.277158L12.7888 4.67476C12.9409 4.9642 13.1656 5.21462 13.4434 5.40451C13.7212 5.59441 14.0439 5.71811 14.3838 5.76499L19.5498 6.47553C19.6476 6.48886 19.7396 6.52766 19.8152 6.58756C19.8909 6.64745 19.9472 6.72604 19.9778 6.81444C20.0084 6.90285 20.012 6.99753 19.9883 7.08778C19.9647 7.17804 19.9146 7.26026 19.8438 7.32516L16.1078 10.7444C15.8614 10.97 15.677 11.2486 15.5706 11.5561C15.4642 11.8635 15.4388 12.1907 15.4968 12.5094L16.3788 17.3403C16.396 17.4322 16.3855 17.5269 16.3483 17.6135C16.311 17.7001 16.2487 17.7751 16.1683 17.83C16.0879 17.8848 15.9927 17.9174 15.8936 17.9238C15.7945 17.9303 15.6954 17.9105 15.6078 17.8666L10.9898 15.5846C10.6855 15.4345 10.3469 15.356 10.0033 15.356C9.65957 15.356 9.32104 15.4345 9.01675 15.5846L4.39975 17.8666C4.31208 17.9102 4.21315 17.9299 4.1142 17.9232C4.01526 17.9166 3.92027 17.8841 3.84005 17.8292C3.75982 17.7744 3.69759 17.6995 3.66041 17.6131C3.62323 17.5266 3.61261 17.4321 3.62975 17.3403L4.51075 12.5104C4.56895 12.1915 4.54374 11.8641 4.43729 11.5564C4.33084 11.2488 4.14636 10.9701 3.89975 10.7444L0.163753 7.3261C0.0923467 7.26128 0.041746 7.17891 0.0177153 7.08838C-0.00631551 6.99785 -0.00281025 6.9028 0.0278316 6.81405C0.0584734 6.72531 0.11502 6.64643 0.19103 6.58641C0.267039 6.5264 0.359456 6.48765 0.457753 6.47459L5.62275 5.76499C5.96301 5.71847 6.28614 5.59493 6.56434 5.40501C6.84253 5.2151 7.06746 4.96449 7.21975 4.67476L9.52875 0.277158Z" fill="#F68C1A"/>
+              </svg>
+              <svg class="dh-star" xmlns="http://www.w3.org/2000/svg" width="20" height="18" viewBox="0 0 20 18" fill="none">
+                <path d="M9.52875 0.277158C9.57258 0.193944 9.64027 0.123898 9.72421 0.0749244C9.80814 0.025951 9.90496 0 10.0038 0C10.1025 0 10.1994 0.025951 10.2833 0.0749244C10.3672 0.123898 10.4349 0.193944 10.4788 0.277158L12.7888 4.67476C12.9409 4.9642 13.1656 5.21462 13.4434 5.40451C13.7212 5.59441 14.0439 5.71811 14.3838 5.76499L19.5498 6.47553C19.6476 6.48886 19.7396 6.52766 19.8152 6.58756C19.8909 6.64745 19.9472 6.72604 19.9778 6.81444C20.0084 6.90285 20.012 6.99753 19.9883 7.08778C19.9647 7.17804 19.9146 7.26026 19.8438 7.32516L16.1078 10.7444C15.8614 10.97 15.677 11.2486 15.5706 11.5561C15.4642 11.8635 15.4388 12.1907 15.4968 12.5094L16.3788 17.3403C16.396 17.4322 16.3855 17.5269 16.3483 17.6135C16.311 17.7001 16.2487 17.7751 16.1683 17.83C16.0879 17.8848 15.9927 17.9174 15.8936 17.9238C15.7945 17.9303 15.6954 17.9105 15.6078 17.8666L10.9898 15.5846C10.6855 15.4345 10.3469 15.356 10.0033 15.356C9.65957 15.356 9.32104 15.4345 9.01675 15.5846L4.39975 17.8666C4.31208 17.9102 4.21315 17.9299 4.1142 17.9232C4.01526 17.9166 3.92027 17.8841 3.84005 17.8292C3.75982 17.7744 3.69759 17.6995 3.66041 17.6131C3.62323 17.5266 3.61261 17.4321 3.62975 17.3403L4.51075 12.5104C4.56895 12.1915 4.54374 11.8641 4.43729 11.5564C4.33084 11.2488 4.14636 10.9701 3.89975 10.7444L0.163753 7.3261C0.0923467 7.26128 0.041746 7.17891 0.0177153 7.08838C-0.00631551 6.99785 -0.00281025 6.9028 0.0278316 6.81405C0.0584734 6.72531 0.11502 6.64643 0.19103 6.58641C0.267039 6.5264 0.359456 6.48765 0.457753 6.47459L5.62275 5.76499C5.96301 5.71847 6.28614 5.59493 6.56434 5.40501C6.84253 5.2151 7.06746 4.96449 7.21975 4.67476L9.52875 0.277158Z" fill="#F68C1A"/>
+              </svg>
+              <svg class="dh-star" xmlns="http://www.w3.org/2000/svg" width="20" height="18" viewBox="0 0 20 18" fill="none">
+                <path d="M9.52875 0.277158C9.57258 0.193944 9.64027 0.123898 9.72421 0.0749244C9.80814 0.025951 9.90496 0 10.0038 0C10.1025 0 10.1994 0.025951 10.2833 0.0749244C10.3672 0.123898 10.4349 0.193944 10.4788 0.277158L12.7888 4.67476C12.9409 4.9642 13.1656 5.21462 13.4434 5.40451C13.7212 5.59441 14.0439 5.71811 14.3838 5.76499L19.5498 6.47553C19.6476 6.48886 19.7396 6.52766 19.8152 6.58756C19.8909 6.64745 19.9472 6.72604 19.9778 6.81444C20.0084 6.90285 20.012 6.99753 19.9883 7.08778C19.9647 7.17804 19.9146 7.26026 19.8438 7.32516L16.1078 10.7444C15.8614 10.97 15.677 11.2486 15.5706 11.5561C15.4642 11.8635 15.4388 12.1907 15.4968 12.5094L16.3788 17.3403C16.396 17.4322 16.3855 17.5269 16.3483 17.6135C16.311 17.7001 16.2487 17.7751 16.1683 17.83C16.0879 17.8848 15.9927 17.9174 15.8936 17.9238C15.7945 17.9303 15.6954 17.9105 15.6078 17.8666L10.9898 15.5846C10.6855 15.4345 10.3469 15.356 10.0033 15.356C9.65957 15.356 9.32104 15.4345 9.01675 15.5846L4.39975 17.8666C4.31208 17.9102 4.21315 17.9299 4.1142 17.9232C4.01526 17.9166 3.92027 17.8841 3.84005 17.8292C3.75982 17.7744 3.69759 17.6995 3.66041 17.6131C3.62323 17.5266 3.61261 17.4321 3.62975 17.3403L4.51075 12.5104C4.56895 12.1915 4.54374 11.8641 4.43729 11.5564C4.33084 11.2488 4.14636 10.9701 3.89975 10.7444L0.163753 7.3261C0.0923467 7.26128 0.041746 7.17891 0.0177153 7.08838C-0.00631551 6.99785 -0.00281025 6.9028 0.0278316 6.81405C0.0584734 6.72531 0.11502 6.64643 0.19103 6.58641C0.267039 6.5264 0.359456 6.48765 0.457753 6.47459L5.62275 5.76499C5.96301 5.71847 6.28614 5.59493 6.56434 5.40501C6.84253 5.2151 7.06746 4.96449 7.21975 4.67476L9.52875 0.277158Z" fill="#F68C1A"/>
+              </svg>
+              <svg class="dh-star" xmlns="http://www.w3.org/2000/svg" width="20" height="18" viewBox="0 0 20 18" fill="none">
+                <path d="M9.52875 0.277158C9.57258 0.193944 9.64027 0.123898 9.72421 0.0749244C9.80814 0.025951 9.90496 0 10.0038 0C10.1025 0 10.1994 0.025951 10.2833 0.0749244C10.3672 0.123898 10.4349 0.193944 10.4788 0.277158L12.7888 4.67476C12.9409 4.9642 13.1656 5.21462 13.4434 5.40451C13.7212 5.59441 14.0439 5.71811 14.3838 5.76499L19.5498 6.47553C19.6476 6.48886 19.7396 6.52766 19.8152 6.58756C19.8909 6.64745 19.9472 6.72604 19.9778 6.81444C20.0084 6.90285 20.012 6.99753 19.9883 7.08778C19.9647 7.17804 19.9146 7.26026 19.8438 7.32516L16.1078 10.7444C15.8614 10.97 15.677 11.2486 15.5706 11.5561C15.4642 11.8635 15.4388 12.1907 15.4968 12.5094L16.3788 17.3403C16.396 17.4322 16.3855 17.5269 16.3483 17.6135C16.311 17.7001 16.2487 17.7751 16.1683 17.83C16.0879 17.8848 15.9927 17.9174 15.8936 17.9238C15.7945 17.9303 15.6954 17.9105 15.6078 17.8666L10.9898 15.5846C10.6855 15.4345 10.3469 15.356 10.0033 15.356C9.65957 15.356 9.32104 15.4345 9.01675 15.5846L4.39975 17.8666C4.31208 17.9102 4.21315 17.9299 4.1142 17.9232C4.01526 17.9166 3.92027 17.8841 3.84005 17.8292C3.75982 17.7744 3.69759 17.6995 3.66041 17.6131C3.62323 17.5266 3.61261 17.4321 3.62975 17.3403L4.51075 12.5104C4.56895 12.1915 4.54374 11.8641 4.43729 11.5564C4.33084 11.2488 4.14636 10.9701 3.89975 10.7444L0.163753 7.3261C0.0923467 7.26128 0.041746 7.17891 0.0177153 7.08838C-0.00631551 6.99785 -0.00281025 6.9028 0.0278316 6.81405C0.0584734 6.72531 0.11502 6.64643 0.19103 6.58641C0.267039 6.5264 0.359456 6.48765 0.457753 6.47459L5.62275 5.76499C5.96301 5.71847 6.28614 5.59493 6.56434 5.40501C6.84253 5.2151 7.06746 4.96449 7.21975 4.67476L9.52875 0.277158Z" fill="#F68C1A"/>
+              </svg>
+              <svg class="dh-star" xmlns="http://www.w3.org/2000/svg" width="20" height="18" viewBox="0 0 20 18" fill="none">
+                <path d="M9.52875 0.277158C9.57258 0.193944 9.64027 0.123898 9.72421 0.0749244C9.80814 0.025951 9.90496 0 10.0038 0C10.1025 0 10.1994 0.025951 10.2833 0.0749244C10.3672 0.123898 10.4349 0.193944 10.4788 0.277158L12.7888 4.67476C12.9409 4.9642 13.1656 5.21462 13.4434 5.40451C13.7212 5.59441 14.0439 5.71811 14.3838 5.76499L19.5498 6.47553C19.6476 6.48886 19.7396 6.52766 19.8152 6.58756C19.8909 6.64745 19.9472 6.72604 19.9778 6.81444C20.0084 6.90285 20.012 6.99753 19.9883 7.08778C19.9647 7.17804 19.9146 7.26026 19.8438 7.32516L16.1078 10.7444C15.8614 10.97 15.677 11.2486 15.5706 11.5561C15.4642 11.8635 15.4388 12.1907 15.4968 12.5094L16.3788 17.3403C16.396 17.4322 16.3855 17.5269 16.3483 17.6135C16.311 17.7001 16.2487 17.7751 16.1683 17.83C16.0879 17.8848 15.9927 17.9174 15.8936 17.9238C15.7945 17.9303 15.6954 17.9105 15.6078 17.8666L10.9898 15.5846C10.6855 15.4345 10.3469 15.356 10.0033 15.356C9.65957 15.356 9.32104 15.4345 9.01675 15.5846L4.39975 17.8666C4.31208 17.9102 4.21315 17.9299 4.1142 17.9232C4.01526 17.9166 3.92027 17.8841 3.84005 17.8292C3.75982 17.7744 3.69759 17.6995 3.66041 17.6131C3.62323 17.5266 3.61261 17.4321 3.62975 17.3403L4.51075 12.5104C4.56895 12.1915 4.54374 11.8641 4.43729 11.5564C4.33084 11.2488 4.14636 10.9701 3.89975 10.7444L0.163753 7.3261C0.0923467 7.26128 0.041746 7.17891 0.0177153 7.08838C-0.00631551 6.99785 -0.00281025 6.9028 0.0278316 6.81405C0.0584734 6.72531 0.11502 6.64643 0.19103 6.58641C0.267039 6.5264 0.359456 6.48765 0.457753 6.47459L5.62275 5.76499C5.96301 5.71847 6.28614 5.59493 6.56434 5.40501C6.84253 5.2151 7.06746 4.96449 7.21975 4.67476L9.52875 0.277158Z" fill="#F68C1A"/>
+              </svg>
+            </div>
+            <span class="dh-reviews-count" id="comparison-reviews-count"></span>
+          </div>
+        </div>
         
         <!-- Loading State -->
         <div class="dh-plan-loading" id="comparison-plan-loading">
@@ -7858,7 +8202,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-secondary" id="return-homepage-btn">Return to Homepage <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-secondary" id="return-homepage-btn">Return to Homepage <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       
