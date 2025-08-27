@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createSampleVariables, replaceVariablesWithSample, extractVariables } from '@/lib/email/variables';
 import {
   Plus,
   Edit,
@@ -14,7 +15,10 @@ import {
   CheckCircle,
   Users,
   Activity,
-  BarChart3
+  BarChart3,
+  Code,
+  Type,
+  Mail,
 } from 'lucide-react';
 import styles from './TemplateLibraryManager.module.scss';
 
@@ -35,14 +39,15 @@ interface LibraryTemplate {
   updated_at: string;
 }
 
-
 export default function TemplateLibraryManager() {
   const [templates, setTemplates] = useState<LibraryTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<LibraryTemplate | null>(null);
+  const [editingTemplate, setEditingTemplate] =
+    useState<LibraryTemplate | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [previewTemplate, setPreviewTemplate] = useState<LibraryTemplate | null>(null);
+  const [previewTemplate, setPreviewTemplate] =
+    useState<LibraryTemplate | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [featuredFilter, setFeaturedFilter] = useState('all');
@@ -50,6 +55,8 @@ export default function TemplateLibraryManager() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<'html' | 'text' | 'preview'>('html');
+  const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -61,18 +68,11 @@ export default function TemplateLibraryManager() {
     text_content: '',
     variables: [] as string[],
     is_featured: false,
-    is_active: true
+    is_active: true,
   });
 
-  // Sample variables for preview
-  const SAMPLE_VARIABLES = {
-    customerName: 'John Smith',
-    companyName: 'Acme Pest Control',
-    pestType: 'ants',
-    urgency: 'high',
-    address: '123 Main St, Anytown ST 12345',
-    companyPhone: '(555) 123-4567'
-  };
+  // Use shared sample variables
+  const sampleVariables = createSampleVariables();
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -83,7 +83,7 @@ export default function TemplateLibraryManager() {
       if (featuredFilter !== 'all') params.set('featured', featuredFilter);
 
       const response = await fetch(`/api/admin/template-library?${params}`);
-      
+
       if (response.ok) {
         const data = await response.json();
         setTemplates(data.templates);
@@ -99,13 +99,17 @@ export default function TemplateLibraryManager() {
     }
   }, [searchTerm, categoryFilter, featuredFilter]);
 
-
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
 
-
-
+  useEffect(() => {
+    // Detect variables whenever content changes
+    const variables = extractVariables(
+      formData.html_content + ' ' + formData.text_content + ' ' + formData.subject_line
+    );
+    setDetectedVariables(variables);
+  }, [formData.html_content, formData.text_content, formData.subject_line]);
 
   const handleCreate = () => {
     setEditingTemplate(null);
@@ -118,8 +122,9 @@ export default function TemplateLibraryManager() {
       text_content: '',
       variables: [],
       is_featured: false,
-      is_active: true
+      is_active: true,
     });
+    setActiveTab('html');
     setShowEditor(true);
   };
 
@@ -134,8 +139,9 @@ export default function TemplateLibraryManager() {
       text_content: template.text_content,
       variables: template.variables,
       is_featured: template.is_featured,
-      is_active: template.is_active
+      is_active: template.is_active,
     });
+    setActiveTab('html');
     setShowEditor(true);
   };
 
@@ -144,7 +150,7 @@ export default function TemplateLibraryManager() {
       const url = editingTemplate
         ? `/api/admin/template-library/${editingTemplate.id}`
         : '/api/admin/template-library';
-      
+
       const method = editingTemplate ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -170,7 +176,11 @@ export default function TemplateLibraryManager() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${name}"? This action cannot be undone.`
+      )
+    ) {
       return;
     }
 
@@ -192,45 +202,81 @@ export default function TemplateLibraryManager() {
     }
   };
 
-  const extractVariables = (content: string) => {
-    const regex = /\{\{(\w+)\}\}/g;
-    const variables = new Set<string>();
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-      variables.add(match[1]);
-    }
-    return Array.from(variables);
-  };
-
-  const replaceVariablesWithSample = (content: string): string => {
-    let result = content;
-    Object.entries(SAMPLE_VARIABLES).forEach(([key, value]) => {
-      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
-      result = result.replace(regex, value);
-    });
-    return result;
-  };
 
   const handlePreview = (template: LibraryTemplate) => {
     setPreviewTemplate(template);
     setShowPreview(true);
   };
 
-  const handleContentChange = (field: 'html_content' | 'text_content' | 'subject_line', value: string) => {
+  const insertVariable = (variable: string) => {
+    const placeholder = `{{${variable}}}`;
+
+    if (activeTab === 'html') {
+      const textarea = document.getElementById('html-content') as HTMLTextAreaElement;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newContent =
+          formData.html_content.substring(0, start) +
+          placeholder +
+          formData.html_content.substring(end);
+        handleContentChange('html_content', newContent);
+
+        // Restore cursor position
+        setTimeout(() => {
+          textarea.setSelectionRange(
+            start + placeholder.length,
+            start + placeholder.length
+          );
+          textarea.focus();
+        }, 0);
+      }
+    } else if (activeTab === 'text') {
+      const textarea = document.getElementById('text-content') as HTMLTextAreaElement;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newContent =
+          formData.text_content.substring(0, start) +
+          placeholder +
+          formData.text_content.substring(end);
+        handleContentChange('text_content', newContent);
+
+        // Restore cursor position
+        setTimeout(() => {
+          textarea.setSelectionRange(
+            start + placeholder.length,
+            start + placeholder.length
+          );
+          textarea.focus();
+        }, 0);
+      }
+    }
+  };
+
+  const handleContentChange = (
+    field: 'html_content' | 'text_content' | 'subject_line',
+    value: string
+  ) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,
-      variables: extractVariables(value + (prev.html_content || '') + (prev.subject_line || ''))
+      variables: extractVariables(
+        value + (prev.html_content || '') + (prev.subject_line || '')
+      ),
     }));
   };
 
   const filteredTemplates = templates.filter(template => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch =
+      !searchTerm ||
       template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       template.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = categoryFilter === 'all' || template.template_category === categoryFilter;
-    const matchesFeatured = featuredFilter === 'all' || 
+
+    const matchesCategory =
+      categoryFilter === 'all' || template.template_category === categoryFilter;
+    const matchesFeatured =
+      featuredFilter === 'all' ||
       (featuredFilter === 'true' && template.is_featured) ||
       (featuredFilter === 'false' && !template.is_featured);
 
@@ -256,7 +302,11 @@ export default function TemplateLibraryManager() {
 
       {message && (
         <div className={`${styles.message} ${styles[message.type]}`}>
-          {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+          {message.type === 'success' ? (
+            <CheckCircle size={16} />
+          ) : (
+            <AlertCircle size={16} />
+          )}
           {message.text}
         </div>
       )}
@@ -269,20 +319,27 @@ export default function TemplateLibraryManager() {
             type="text"
             placeholder="Search templates..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+        <select
+          value={categoryFilter}
+          onChange={e => setCategoryFilter(e.target.value)}
+        >
           <option value="all">All Categories</option>
           <option value="welcome">Welcome</option>
+          <option value="welcome">Service Request</option>
           <option value="followup">Follow-up</option>
           <option value="quote">Quote</option>
           <option value="reminder">Reminder</option>
           <option value="general">General</option>
         </select>
 
-        <select value={featuredFilter} onChange={(e) => setFeaturedFilter(e.target.value)}>
+        <select
+          value={featuredFilter}
+          onChange={e => setFeaturedFilter(e.target.value)}
+        >
           <option value="all">All Templates</option>
           <option value="true">Featured Only</option>
           <option value="false">Regular Templates</option>
@@ -296,12 +353,14 @@ export default function TemplateLibraryManager() {
 
       {/* Templates Grid */}
       <div className={styles.templatesGrid}>
-        {filteredTemplates.map((template) => (
+        {filteredTemplates.map(template => (
           <div key={template.id} className={styles.templateCard}>
             <div className={styles.templateHeader}>
               <div className={styles.templateMeta}>
                 <h3>{template.name}</h3>
-                <span className={styles.category}>{template.template_category}</span>
+                <span className={styles.category}>
+                  {template.template_category}
+                </span>
                 {template.is_featured && (
                   <Star size={14} className={styles.featuredIcon} />
                 )}
@@ -310,7 +369,7 @@ export default function TemplateLibraryManager() {
                 <button onClick={() => handleEdit(template)} title="Edit">
                   <Edit size={14} />
                 </button>
-                <button 
+                <button
                   onClick={() => handleDelete(template.id, template.name)}
                   className={styles.deleteButton}
                   title="Delete"
@@ -321,7 +380,7 @@ export default function TemplateLibraryManager() {
             </div>
 
             <p className={styles.description}>{template.description}</p>
-            
+
             <div className={styles.subject}>
               <strong>Subject:</strong> {template.subject_line}
             </div>
@@ -339,10 +398,14 @@ export default function TemplateLibraryManager() {
               </div>
               <div className={styles.stat}>
                 <Activity size={14} />
-                <span>{(template.performance_score * 100).toFixed(0)}% score</span>
+                <span>
+                  {(template.performance_score * 100).toFixed(0)}% score
+                </span>
               </div>
               <div className={styles.status}>
-                <span className={`${styles.statusBadge} ${template.is_active ? styles.active : styles.inactive}`}>
+                <span
+                  className={`${styles.statusBadge} ${template.is_active ? styles.active : styles.inactive}`}
+                >
                   {template.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -374,22 +437,29 @@ export default function TemplateLibraryManager() {
               <div className={styles.previewContainer}>
                 <div className={styles.previewHeader}>
                   <div className={styles.previewSubject}>
-                    <strong>Subject:</strong> {replaceVariablesWithSample(previewTemplate.subject_line) || 'No subject line'}
+                    <strong>Subject:</strong>{' '}
+                    {replaceVariablesWithSample(previewTemplate.subject_line, sampleVariables) ||
+                      'No subject line'}
                   </div>
                 </div>
                 <div className={styles.previewContent}>
                   {previewTemplate.html_content ? (
-                    <div 
+                    <div
                       className={styles.htmlPreview}
-                      dangerouslySetInnerHTML={{ 
-                        __html: replaceVariablesWithSample(previewTemplate.html_content) 
+                      dangerouslySetInnerHTML={{
+                        __html: replaceVariablesWithSample(
+                          previewTemplate.html_content,
+                          sampleVariables
+                        ),
                       }}
                     />
                   ) : previewTemplate.text_content ? (
                     <div className={styles.textPreview}>
-                      {replaceVariablesWithSample(previewTemplate.text_content).split('\n').map((line, i) => (
-                        <p key={i}>{line}</p>
-                      ))}
+                      {replaceVariablesWithSample(previewTemplate.text_content, sampleVariables)
+                        .split('\n')
+                        .map((line, i) => (
+                          <p key={i}>{line}</p>
+                        ))}
                     </div>
                   ) : (
                     <div className={styles.emptyPreview}>
@@ -402,7 +472,10 @@ export default function TemplateLibraryManager() {
             </div>
 
             <div className={styles.modalFooter}>
-              <button onClick={() => setShowPreview(false)} className={styles.cancelButton}>
+              <button
+                onClick={() => setShowPreview(false)}
+                className={styles.cancelButton}
+              >
                 Close
               </button>
             </div>
@@ -422,115 +495,247 @@ export default function TemplateLibraryManager() {
             </div>
 
             <div className={styles.modalBody}>
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label>Template Name</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="Enter template name"
-                  />
-                </div>
+              <div className={styles.editorLayout}>
+                {/* Left Panel - Form and Variables */}
+                <div className={styles.leftPanel}>
+                  <div className={styles.formSection}>
+                    <h4>Basic Information</h4>
+                    
+                    <div className={styles.formGroup}>
+                      <label>Template Name *</label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={e =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        placeholder="Enter template name"
+                      />
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <label>Category</label>
-                  <select
-                    value={formData.template_category}
-                    onChange={(e) => setFormData({...formData, template_category: e.target.value})}
-                  >
-                    <option value="welcome">Welcome</option>
-                    <option value="followup">Follow-up</option>
-                    <option value="quote">Quote</option>
-                    <option value="reminder">Reminder</option>
-                    <option value="general">General</option>
-                  </select>
-                </div>
+                    <div className={styles.formGroup}>
+                      <label>Category</label>
+                      <select
+                        value={formData.template_category}
+                        onChange={e =>
+                          setFormData({
+                            ...formData,
+                            template_category: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="welcome">Welcome</option>
+                        <option value="service_request">Service Request</option>
+                        <option value="followup">Follow-up</option>
+                        <option value="quote">Quote</option>
+                        <option value="reminder">Reminder</option>
+                        <option value="general">General</option>
+                      </select>
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <label>Description</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    placeholder="Describe this template..."
-                    rows={3}
-                  />
-                </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.checkbox}>
+                        <input
+                          type="checkbox"
+                          checked={formData.is_featured}
+                          onChange={e =>
+                            setFormData({
+                              ...formData,
+                              is_featured: e.target.checked,
+                            })
+                          }
+                        />
+                        Featured Template
+                      </label>
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <label>Subject Line</label>
-                  <input
-                    type="text"
-                    value={formData.subject_line}
-                    onChange={(e) => handleContentChange('subject_line', e.target.value)}
-                    placeholder="Email subject line with {{variables}}"
-                  />
-                </div>
+                    <div className={styles.formGroup}>
+                      <label>Description</label>
+                      <textarea
+                        value={formData.description}
+                        onChange={e =>
+                          setFormData({ ...formData, description: e.target.value })
+                        }
+                        placeholder="Describe this template..."
+                        rows={2}
+                      />
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <label>HTML Content</label>
-                  <textarea
-                    value={formData.html_content}
-                    onChange={(e) => handleContentChange('html_content', e.target.value)}
-                    placeholder="HTML email content with {{variables}}"
-                    rows={8}
-                  />
-                </div>
+                    <div className={styles.formGroup}>
+                      <label>Subject Line *</label>
+                      <input
+                        type="text"
+                        value={formData.subject_line}
+                        onChange={e =>
+                          handleContentChange('subject_line', e.target.value)
+                        }
+                        placeholder="Email subject line with {{variables}}"
+                      />
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <label>Text Content</label>
-                  <textarea
-                    value={formData.text_content}
-                    onChange={(e) => handleContentChange('text_content', e.target.value)}
-                    placeholder="Plain text version"
-                    rows={6}
-                  />
-                </div>
-
-
-                <div className={styles.checkboxes}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={formData.is_featured}
-                      onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
-                    />
-                    Featured Template
-                  </label>
-
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                    />
-                    Active
-                  </label>
-                </div>
-
-                {formData.variables.length > 0 && (
-                  <div className={styles.variablesPreview}>
-                    <label>Detected Variables:</label>
-                    <div className={styles.variablesList}>
-                      {formData.variables.map(variable => (
-                        <span key={variable} className={styles.variableTag}>
-                          {`{{${variable}}}`}
-                        </span>
-                      ))}
+                    <div className={styles.checkboxSection}>
+                      <div className={styles.formGroup}>
+                        <label className={styles.checkbox}>
+                          <input
+                            type="checkbox"
+                            checked={formData.is_active}
+                            onChange={e =>
+                              setFormData({
+                                ...formData,
+                                is_active: e.target.checked,
+                              })
+                            }
+                          />
+                          Active (template can be used)
+                        </label>
+                      </div>
                     </div>
                   </div>
-                )}
+
+                  {/* Variables Sidebar */}
+                  <div className={styles.variablesSection}>
+                    <h4>Variables</h4>
+                    <div className={styles.variableGroup}>
+                      <h5>Available Variables</h5>
+                      {Object.keys(sampleVariables).map(variable => (
+                        <button
+                          key={variable}
+                          className={styles.variableButton}
+                          onClick={() => insertVariable(variable)}
+                          title={`Insert ${'{{'}${variable}${'}}'}`}
+                        >
+                          {variable}
+                        </button>
+                      ))}
+                    </div>
+
+                    {detectedVariables.length > 0 && (
+                      <div className={styles.variableGroup}>
+                        <h5>Detected Variables</h5>
+                        {detectedVariables.map(variable => (
+                          <div key={variable} className={styles.detectedVariable}>
+                            {`{{${variable}}}`}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Panel - Content Editor and Preview */}
+                <div className={styles.rightPanel}>
+                  <div className={styles.contentHeader}>
+                    <h4>Email Content</h4>
+                    <div className={styles.contentTabs}>
+                      <button
+                        className={`${styles.tab} ${activeTab === 'html' ? styles.active : ''}`}
+                        onClick={() => setActiveTab('html')}
+                      >
+                        <Code size={16} />
+                        HTML
+                      </button>
+                      <button
+                        className={`${styles.tab} ${activeTab === 'text' ? styles.active : ''}`}
+                        onClick={() => setActiveTab('text')}
+                      >
+                        <Type size={16} />
+                        Text
+                      </button>
+                      <button
+                        className={`${styles.tab} ${activeTab === 'preview' ? styles.active : ''}`}
+                        onClick={() => setActiveTab('preview')}
+                      >
+                        <Eye size={16} />
+                        Preview
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className={styles.contentEditor}>
+                    {activeTab === 'html' && (
+                      <textarea
+                        id="html-content"
+                        className={styles.contentTextarea}
+                        value={formData.html_content}
+                        onChange={e =>
+                          handleContentChange('html_content', e.target.value)
+                        }
+                        placeholder="Enter HTML content here... Use {{variable_name}} for dynamic content."
+                        rows={20}
+                      />
+                    )}
+
+                    {activeTab === 'text' && (
+                      <textarea
+                        id="text-content"
+                        className={styles.contentTextarea}
+                        value={formData.text_content}
+                        onChange={e =>
+                          handleContentChange('text_content', e.target.value)
+                        }
+                        placeholder="Enter plain text content here... Use {{variable_name}} for dynamic content."
+                        rows={20}
+                      />
+                    )}
+
+                    {activeTab === 'preview' && (
+                      <div className={styles.previewContainer}>
+                        <div className={styles.previewHeader}>
+                          <div className={styles.previewSubject}>
+                            <Mail size={16} />
+                            <strong>Subject:</strong>{' '}
+                            {replaceVariablesWithSample(formData.subject_line, sampleVariables) ||
+                              'No subject line'}
+                          </div>
+                        </div>
+                        <div className={styles.previewContent}>
+                          {formData.html_content ? (
+                            <div
+                              className={styles.htmlPreview}
+                              dangerouslySetInnerHTML={{
+                                __html: replaceVariablesWithSample(
+                                  formData.html_content,
+                                  sampleVariables
+                                ),
+                              }}
+                            />
+                          ) : formData.text_content ? (
+                            <div className={styles.textPreview}>
+                              {replaceVariablesWithSample(formData.text_content, sampleVariables)
+                                .split('\n')
+                                .map((line, i) => (
+                                  <p key={i}>{line}</p>
+                                ))}
+                            </div>
+                          ) : (
+                            <div className={styles.emptyPreview}>
+                              <Mail size={48} />
+                              <p>Add content to see preview</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className={styles.modalFooter}>
-              <button onClick={() => setShowEditor(false)} className={styles.cancelButton}>
+              <button
+                onClick={() => setShowEditor(false)}
+                className={styles.cancelButton}
+              >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleSave}
                 className={styles.saveButton}
-                disabled={!formData.name || !formData.subject_line || !formData.html_content}
+                disabled={
+                  !formData.name ||
+                  !formData.subject_line ||
+                  (!formData.html_content && !formData.text_content)
+                }
               >
                 <Save size={16} />
                 {editingTemplate ? 'Update' : 'Create'} Template

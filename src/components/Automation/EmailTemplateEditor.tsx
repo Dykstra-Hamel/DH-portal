@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { createSampleVariables, replaceVariablesWithSample, extractVariables } from '@/lib/email/variables';
 import {
   Save,
   X,
@@ -44,18 +45,13 @@ const TEMPLATE_TYPES = [
   { value: 'custom', label: 'Custom Email' },
 ];
 
-const SAMPLE_VARIABLES = {
-  lead_name: 'John Smith',
-  lead_email: 'john.smith@email.com',
-  lead_phone: '(555) 123-4567',
-  company_name: 'Acme Pest Control',
-  pest_type: 'ants',
-  urgency: 'high',
-  lead_source: 'website',
-  created_date: '2024-01-15',
-};
-
-export default function EmailTemplateEditor({ isOpen, onClose, companyId, template, onSave }: EmailTemplateEditorProps) {
+export default function EmailTemplateEditor({
+  isOpen,
+  onClose,
+  companyId,
+  template,
+  onSave,
+}: EmailTemplateEditorProps) {
   const [formData, setFormData] = useState<EmailTemplate>({
     name: '',
     description: '',
@@ -66,9 +62,23 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
     is_active: true,
   });
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'html' | 'text' | 'preview'>('html');
+  const [message, setMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+  const [activeTab, setActiveTab] = useState<'html' | 'text' | 'preview'>(
+    'html'
+  );
   const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
+  const [companyData, setCompanyData] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    website: string;
+  } | null>(null);
+  const [brandData, setBrandData] = useState<{
+    logo_url: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -101,32 +111,51 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
 
   useEffect(() => {
     // Detect variables whenever content changes
-    const variables = extractVariables(formData.html_content, formData.text_content, formData.subject_line);
+    const variables = extractVariables(
+      `${formData.html_content} ${formData.text_content} ${formData.subject_line}`
+    );
     setDetectedVariables(variables);
   }, [formData.html_content, formData.text_content, formData.subject_line]);
 
-  const extractVariables = (htmlContent: string, textContent: string, subjectLine: string): string[] => {
-    const variableRegex = /\{\{\s*(\w+)\s*\}\}/g;
-    const variables = new Set<string>();
-    
-    // Extract from all content
-    const allContent = `${htmlContent} ${textContent} ${subjectLine}`;
-    let match;
-    while ((match = variableRegex.exec(allContent)) !== null) {
-      variables.add(match[1]);
-    }
-    
-    return Array.from(variables);
-  };
+  useEffect(() => {
+    // Fetch company and brand data when component opens
+    if (isOpen && companyId) {
+      const fetchCompanyData = async () => {
+        try {
+          const supabase = createClient();
 
-  const replaceVariablesWithSample = (content: string): string => {
-    let result = content;
-    Object.entries(SAMPLE_VARIABLES).forEach(([key, value]) => {
-      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
-      result = result.replace(regex, value);
-    });
-    return result;
-  };
+          // Fetch company data
+          const { data: company } = await supabase
+            .from('companies')
+            .select('name, email, phone, website')
+            .eq('id', companyId)
+            .single();
+
+          if (company) {
+            setCompanyData(company);
+          }
+
+          // Fetch brand data
+          const { data: brand } = await supabase
+            .from('brands')
+            .select('logo_url')
+            .eq('company_id', companyId)
+            .single();
+
+          if (brand) {
+            setBrandData(brand);
+          }
+        } catch (error) {
+          console.error('Error fetching company/brand data:', error);
+        }
+      };
+
+      fetchCompanyData();
+    }
+  }, [isOpen, companyId]);
+
+  // Use shared variable functions
+  const sampleVariables = createSampleVariables(companyData, brandData);
 
   const handleSave = async () => {
     try {
@@ -145,15 +174,18 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
       }
 
       if (!formData.html_content.trim() && !formData.text_content.trim()) {
-        setMessage({ type: 'error', text: 'Either HTML content or text content is required' });
+        setMessage({
+          type: 'error',
+          text: 'Either HTML content or text content is required',
+        });
         return;
       }
 
       // API call
-      const url = template 
+      const url = template
         ? `/api/companies/${companyId}/email-templates/${template.id}`
         : `/api/companies/${companyId}/email-templates`;
-      
+
       const method = template ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -183,32 +215,48 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
 
   const insertVariable = (variable: string) => {
     const placeholder = `{{${variable}}}`;
-    
+
     if (activeTab === 'html') {
-      const textarea = document.getElementById('html-content') as HTMLTextAreaElement;
+      const textarea = document.getElementById(
+        'html-content'
+      ) as HTMLTextAreaElement;
       if (textarea) {
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
-        const newContent = formData.html_content.substring(0, start) + placeholder + formData.html_content.substring(end);
+        const newContent =
+          formData.html_content.substring(0, start) +
+          placeholder +
+          formData.html_content.substring(end);
         setFormData(prev => ({ ...prev, html_content: newContent }));
-        
+
         // Restore cursor position
         setTimeout(() => {
-          textarea.setSelectionRange(start + placeholder.length, start + placeholder.length);
+          textarea.setSelectionRange(
+            start + placeholder.length,
+            start + placeholder.length
+          );
           textarea.focus();
         }, 0);
       }
     } else if (activeTab === 'text') {
-      const textarea = document.getElementById('text-content') as HTMLTextAreaElement;
+      const textarea = document.getElementById(
+        'text-content'
+      ) as HTMLTextAreaElement;
       if (textarea) {
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
-        const newContent = formData.text_content.substring(0, start) + placeholder + formData.text_content.substring(end);
+        const newContent =
+          formData.text_content.substring(0, start) +
+          placeholder +
+          formData.text_content.substring(end);
         setFormData(prev => ({ ...prev, text_content: newContent }));
-        
+
         // Restore cursor position
         setTimeout(() => {
-          textarea.setSelectionRange(start + placeholder.length, start + placeholder.length);
+          textarea.setSelectionRange(
+            start + placeholder.length,
+            start + placeholder.length
+          );
           textarea.focus();
         }, 0);
       }
@@ -221,7 +269,9 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
     <div className={styles.modal}>
       <div className={styles.modalContent}>
         <div className={styles.modalHeader}>
-          <h2>{template ? 'Edit Email Template' : 'Create New Email Template'}</h2>
+          <h2>
+            {template ? 'Edit Email Template' : 'Create New Email Template'}
+          </h2>
           <button onClick={onClose} className={styles.closeButton}>
             <X size={20} />
           </button>
@@ -229,7 +279,11 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
 
         {message && (
           <div className={`${styles.message} ${styles[message.type]}`}>
-            {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            {message.type === 'success' ? (
+              <CheckCircle size={16} />
+            ) : (
+              <AlertCircle size={16} />
+            )}
             {message.text}
           </div>
         )}
@@ -237,13 +291,15 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
         <div className={styles.modalBody}>
           <div className={styles.formSection}>
             <h3>Basic Information</h3>
-            
+
             <div className={styles.formGroup}>
               <label>Template Name *</label>
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={e =>
+                  setFormData(prev => ({ ...prev, name: e.target.value }))
+                }
                 placeholder="e.g., Welcome New Lead"
               />
             </div>
@@ -252,7 +308,12 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
               <label>Description</label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 placeholder="Describe what this template is used for..."
                 rows={2}
               />
@@ -263,10 +324,17 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
                 <label>Template Type *</label>
                 <select
                   value={formData.template_type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, template_type: e.target.value }))}
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      template_type: e.target.value,
+                    }))
+                  }
                 >
                   {TEMPLATE_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -276,7 +344,12 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
                   <input
                     type="checkbox"
                     checked={formData.is_active}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        is_active: e.target.checked,
+                      }))
+                    }
                   />
                   Active (template can be used in workflows)
                 </label>
@@ -288,10 +361,17 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
               <input
                 type="text"
                 value={formData.subject_line}
-                onChange={(e) => setFormData(prev => ({ ...prev, subject_line: e.target.value }))}
-                placeholder="e.g., Welcome to {{company_name}}, {{lead_name}}!"
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    subject_line: e.target.value,
+                  }))
+                }
+                placeholder="e.g., Welcome to {{companyName}}, {{customerName}}!"
               />
-              <small>Use variables like {'{{lead_name}}'} to personalize the subject</small>
+              <small>
+                Use variables like {'{{customerName}}'} to personalize the subject
+              </small>
             </div>
           </div>
 
@@ -328,7 +408,7 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
                 <h4>Variables</h4>
                 <div className={styles.variableSection}>
                   <h5>Common Variables</h5>
-                  {Object.keys(SAMPLE_VARIABLES).map(variable => (
+                  {Object.keys(createSampleVariables(companyData, brandData)).map(variable => (
                     <button
                       key={variable}
                       className={styles.variableButton}
@@ -339,7 +419,7 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
                     </button>
                   ))}
                 </div>
-                
+
                 {detectedVariables.length > 0 && (
                   <div className={styles.variableSection}>
                     <h5>Detected Variables</h5>
@@ -358,7 +438,12 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
                     id="html-content"
                     className={styles.contentTextarea}
                     value={formData.html_content}
-                    onChange={(e) => setFormData(prev => ({ ...prev, html_content: e.target.value }))}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        html_content: e.target.value,
+                      }))
+                    }
                     placeholder="Enter HTML content here... Use {{variable_name}} for dynamic content."
                     rows={15}
                   />
@@ -369,7 +454,12 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
                     id="text-content"
                     className={styles.contentTextarea}
                     value={formData.text_content}
-                    onChange={(e) => setFormData(prev => ({ ...prev, text_content: e.target.value }))}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        text_content: e.target.value,
+                      }))
+                    }
                     placeholder="Enter plain text content here... Use {{variable_name}} for dynamic content."
                     rows={15}
                   />
@@ -380,22 +470,29 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
                     <div className={styles.previewHeader}>
                       <div className={styles.previewSubject}>
                         <Mail size={16} />
-                        <strong>Subject:</strong> {replaceVariablesWithSample(formData.subject_line) || 'No subject line'}
+                        <strong>Subject:</strong>{' '}
+                        {replaceVariablesWithSample(formData.subject_line, sampleVariables) ||
+                          'No subject line'}
                       </div>
                     </div>
                     <div className={styles.previewContent}>
                       {formData.html_content ? (
-                        <div 
+                        <div
                           className={styles.htmlPreview}
-                          dangerouslySetInnerHTML={{ 
-                            __html: replaceVariablesWithSample(formData.html_content) 
+                          dangerouslySetInnerHTML={{
+                            __html: replaceVariablesWithSample(
+                              formData.html_content,
+                              sampleVariables
+                            ),
                           }}
                         />
                       ) : formData.text_content ? (
                         <div className={styles.textPreview}>
-                          {replaceVariablesWithSample(formData.text_content).split('\n').map((line, i) => (
-                            <p key={i}>{line}</p>
-                          ))}
+                          {replaceVariablesWithSample(formData.text_content, sampleVariables)
+                            .split('\n')
+                            .map((line, i) => (
+                              <p key={i}>{line}</p>
+                            ))}
                         </div>
                       ) : (
                         <div className={styles.emptyPreview}>
@@ -415,8 +512,8 @@ export default function EmailTemplateEditor({ isOpen, onClose, companyId, templa
           <button onClick={onClose} className={styles.cancelButton}>
             Cancel
           </button>
-          <button 
-            onClick={handleSave} 
+          <button
+            onClick={handleSave}
             disabled={saving}
             className={styles.saveButton}
           >

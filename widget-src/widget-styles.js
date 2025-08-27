@@ -2823,6 +2823,7 @@ line-height: 28px;
   border: 1px solid #BFBFBF;
   font-weight: 700;
   font-size: 16px;
+  color: #515151;
 }
 
 .dh-plan-selection-section {

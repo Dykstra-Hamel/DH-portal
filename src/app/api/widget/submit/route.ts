@@ -535,8 +535,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Determine lead source from attribution data
-    const leadSource = determineLeadSourceFromAttribution(finalAttributionData);
+    // Set lead source as widget_submission for widget form submissions
+    const leadSource = 'widget_submission';
 
     // Create lead with enhanced attribution data
     const { data: lead, error: leadError } = await supabase
@@ -710,7 +710,7 @@ export async function POST(request: NextRequest) {
     // Trigger Inngest automation workflows (don't fail lead creation if this fails)
     try {
       await sendEvent({
-        name: 'lead/created',
+        name: 'widget/schedule-completed',
         data: {
           leadId: lead.id,
           companyId: submission.companyId,
@@ -727,7 +727,7 @@ export async function POST(request: NextRequest) {
             estimatedPrice: submission.estimatedPrice,
           },
           attribution: {
-            leadSource,
+            leadSource: 'widget_submission',
             utmSource: finalAttributionData.utm_source,
             utmMedium: finalAttributionData.utm_medium,
             utmCampaign: finalAttributionData.utm_campaign,
@@ -858,7 +858,7 @@ export async function POST(request: NextRequest) {
             }
           : null,
         attribution: {
-          leadSource: leadSource,
+          leadSource: 'widget_submission',
           hasAttribution: !!(
             finalAttributionData.utm_source || finalAttributionData.gclid
           ),

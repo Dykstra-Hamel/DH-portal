@@ -33,7 +33,29 @@ export const leadCreatedHandler = inngest.createFunction(
       return { success: true, message: 'Automation disabled' };
     }
 
-    // Step 2: Find active workflows triggered by lead creation
+    // Step 2: Check if this is a widget submission (should be handled by widget handler)
+    const isWidgetSubmission = await step.run('check-widget-submission', async () => {
+      if (leadData?.leadSource === 'widget_submission' || attribution?.leadSource === 'widget_submission') {
+        return true;
+      }
+      
+      // Also check the database for lead_source
+      const supabase = createAdminClient();
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('lead_source')
+        .eq('id', leadId)
+        .single();
+        
+      return lead?.lead_source === 'widget_submission';
+    });
+
+    if (isWidgetSubmission) {
+      console.log(`Skipping lead_created handler for widget submission: ${leadId}`);
+      return { success: true, message: 'Widget submission - handled by widget handler' };
+    }
+
+    // Step 3: Find active workflows triggered by lead creation
     const activeWorkflows = await step.run('find-active-workflows', async () => {
       const supabase = createAdminClient();
       
@@ -52,7 +74,7 @@ export const leadCreatedHandler = inngest.createFunction(
       return { success: true, message: 'No active workflows' };
     }
 
-    // Step 3: Process each workflow
+    // Step 4: Process each workflow
     const workflowResults = await Promise.all(
       activeWorkflows.map(async (workflow) => {
         return step.run(`process-workflow-${workflow.id}`, async () => {
