@@ -989,11 +989,14 @@ const populateStepHero = (bgImageId, heroImageId) => {
   // Populate background image
   let backgroundImageUrl;
 
-  // For address and how-we-do-it steps, try to get pest-specific background image first
-  if (
+  // Skip background image for confirm-address step - it will be loaded with address imagery
+  if (bgImageId === 'confirm-address-bg-image') {
+    backgroundImageUrl = null;
+  } else if (
     (bgImageId === 'address-bg-image' || bgImageId === 'offer-bg-image') &&
     typeof getPestBackgroundImage === 'function'
   ) {
+    // For address and how-we-do-it steps, try to get pest-specific background image first
     backgroundImageUrl = getPestBackgroundImage();
   } else if (bgImageId === 'quote-bg-image') {
     // For quote-contact step, use the almost done background image

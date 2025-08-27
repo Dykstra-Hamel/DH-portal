@@ -402,7 +402,11 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
 .dh-safety-message {
  display: flex;
  align-items: center;
- margin-bottom: 40px;
+ margin: 20px 0 40px 0;
+}
+
+#safety-message-text {
+  margin: 0;
 }
 
 .dh-form-group { 
@@ -1263,7 +1267,7 @@ select.dh-form-input {
 
   .dh-safety-message {
     flex-direction: row-reverse;
-    margin-bottom: 0;
+    margin: 0;
   }
 
   .dh-how-we-do-it-text {
@@ -1846,7 +1850,6 @@ select.dh-form-input {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  transition: background-image 0.3s ease;
 }
 
 .dh-pest-bg-image:not(.step1) {
