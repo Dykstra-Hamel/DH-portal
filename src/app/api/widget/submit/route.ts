@@ -858,15 +858,17 @@ export async function POST(request: NextRequest) {
       // Don't fail the lead creation due to SMS issues
     }
 
+    // NOW HANDLED BY AUTOMATION WORKFLOWS
+
     // Schedule automatic quote email (10 seconds after submission)
-    setTimeout(async () => {
-      try {
-        await sendDelayedQuoteEmail(submission, company);
-      } catch (error) {
-        console.error('Error sending delayed quote email:', error);
-        // Don't affect the main submission flow
-      }
-    }, 10 * 1000); // 10 seconds in milliseconds
+    // setTimeout(async () => {
+    //   try {
+    //     await sendDelayedQuoteEmail(submission, company);
+    //   } catch (error) {
+    //     console.error('Error sending delayed quote email:', error);
+    //     // Don't affect the main submission flow
+    //   }
+    // }, 10 * 1000); // 10 seconds in milliseconds
 
     // Return success response
     return createCorsResponse(
