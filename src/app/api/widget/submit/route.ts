@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 // Auto-calling functions - implemented inline below
 import { normalizePhoneNumber } from '@/lib/utils';
-import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
+import {
+  handleCorsPrelight,
+  createCorsResponse,
+  createCorsErrorResponse,
+  validateOrigin,
+} from '@/lib/cors';
 
 // ServicePlan interface for typing
 interface ServicePlan {
@@ -282,7 +287,10 @@ interface WidgetSubmission {
 export async function POST(request: NextRequest) {
   try {
     // Validate origin first
-    const { isValid, origin, response } = await validateOrigin(request, 'widget');
+    const { isValid, origin, response } = await validateOrigin(
+      request,
+      'widget'
+    );
     if (!isValid && response) {
       return response;
     }
@@ -315,9 +323,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate field lengths to prevent abuse
-    if (submission.contactInfo.name.length > 100 || 
-        submission.contactInfo.email.length > 254 ||
-        (submission.contactInfo.phone && submission.contactInfo.phone.length > 20)) {
+    if (
+      submission.contactInfo.name.length > 100 ||
+      submission.contactInfo.email.length > 254 ||
+      (submission.contactInfo.phone && submission.contactInfo.phone.length > 20)
+    ) {
       return createCorsErrorResponse(
         'Input field too long',
         origin,
@@ -353,7 +363,7 @@ export async function POST(request: NextRequest) {
         if (existingPartialLead && !partialLeadError) {
           partialLead = existingPartialLead;
           partialLeadAttribution = existingPartialLead.attribution_data;
-          }
+        }
       } catch (error) {
         console.warn('Error checking for partial lead:', error);
         // Continue processing - don't fail submission if partial lead lookup fails
@@ -524,7 +534,10 @@ export async function POST(request: NextRequest) {
     if (submission.estimatedPrice) {
       notes += `Estimated Price: $${submission.estimatedPrice.min} - $${submission.estimatedPrice.max} (${submission.estimatedPrice.service_type})\n`;
     }
-    if (submission.contactInfo.comments && submission.contactInfo.comments.trim()) {
+    if (
+      submission.contactInfo.comments &&
+      submission.contactInfo.comments.trim()
+    ) {
       notes += `Customer Comments: ${submission.contactInfo.comments.trim()}\n`;
     }
 
@@ -597,7 +610,6 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', partialLead.id);
-
       } catch (error) {
         console.warn('Error updating partial lead conversion status:', error);
         // Don't fail the lead creation if this update fails
@@ -616,7 +628,7 @@ export async function POST(request: NextRequest) {
     try {
       // Auto-calling disabled
       autoCallEnabled = false;
-      
+
       // autoCallEnabled = await shouldAutoCall(submission.companyId);
 
       if (autoCallEnabled) {
@@ -674,7 +686,10 @@ export async function POST(request: NextRequest) {
         if (submission.address) {
           customerComments += `Address: ${submission.address}\n`;
         }
-        if (submission.contactInfo.comments && submission.contactInfo.comments.trim()) {
+        if (
+          submission.contactInfo.comments &&
+          submission.contactInfo.comments.trim()
+        ) {
           customerComments += `Customer Comments: ${submission.contactInfo.comments.trim()}\n`;
         }
 
@@ -788,15 +803,17 @@ export async function POST(request: NextRequest) {
           // Get email notification configuration from company widget config
           const emailConfig = company?.widget_config?.emailNotifications || {
             enabled: true,
-            subjectLine: 'New Service Request: {customerName} - {companyName}'
+            subjectLine: 'New Service Request: {customerName} - {companyName}',
           };
 
           const emailResult = await sendLeadCreatedNotifications(
             validEmails,
             leadNotificationData,
-            emailConfig.enabled ? {
-              subjectLine: emailConfig.subjectLine
-            } : undefined,
+            emailConfig.enabled
+              ? {
+                  subjectLine: emailConfig.subjectLine,
+                }
+              : undefined,
             submission.companyId // Pass company ID for custom domain lookup
           );
 
@@ -815,17 +832,20 @@ export async function POST(request: NextRequest) {
 
     // Send SMS confirmation (immediate)
     try {
-      const smsResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/widget/send-sms`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customerPhone: submission.contactInfo.phone,
-          customerName: submission.contactInfo.name,
-          pestType: submission.pestType
-        }),
-      });
+      const smsResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/widget/send-sms`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            customerPhone: submission.contactInfo.phone,
+            customerName: submission.contactInfo.name,
+            pestType: submission.pestType,
+          }),
+        }
+      );
 
       if (smsResponse.ok) {
         const smsResult = await smsResponse.json();
@@ -837,7 +857,6 @@ export async function POST(request: NextRequest) {
       console.error('Error sending SMS confirmation:', error);
       // Don't fail the lead creation due to SMS issues
     }
-
 
     // Schedule automatic quote email (10 seconds after submission)
     setTimeout(async () => {
@@ -895,46 +914,48 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// THIS IS NOW HANDLED BY AUTOMATION WORKFLOWS. SHOULD BE SAFE TO REMOVE BUT SAVING FOR NOW JUST IN CASE
+
 // Function to send delayed quote email
-async function sendDelayedQuoteEmail(submission: WidgetSubmission, company: any) {
-  try {
-    // Generate pricing estimate based on pest type and submission data
-    const estimatedPrice = generatePricingEstimate(submission);
-    
-    // Prepare quote data for the existing quote API
-    const quoteData = {
-      companyId: submission.companyId,
-      customerEmail: submission.contactInfo.email,
-      customerName: submission.contactInfo.name,
-      pestType: submission.pestType,
-      homeSize: submission.homeSize || undefined,
-      address: submission.address || undefined,
-      estimatedPrice: estimatedPrice,
-      urgency: submission.urgency,
-      selectedPlan: submission.selectedPlan
-    };
+// async function sendDelayedQuoteEmail(submission: WidgetSubmission, company: any) {
+//   try {
+//     // Generate pricing estimate based on pest type and submission data
+//     const estimatedPrice = generatePricingEstimate(submission);
 
-    // Make internal API call to send quote email
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/widget/send-quote`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(quoteData)
-    });
+//     // Prepare quote data for the existing quote API
+//     const quoteData = {
+//       companyId: submission.companyId,
+//       customerEmail: submission.contactInfo.email,
+//       customerName: submission.contactInfo.name,
+//       pestType: submission.pestType,
+//       homeSize: submission.homeSize || undefined,
+//       address: submission.address || undefined,
+//       estimatedPrice: estimatedPrice,
+//       urgency: submission.urgency,
+//       selectedPlan: submission.selectedPlan
+//     };
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Quote API failed: ${errorData.error || 'Unknown error'}`);
-    }
+//     // Make internal API call to send quote email
+//     const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/widget/send-quote`, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify(quoteData)
+//     });
 
-    const result = await response.json();
-    
-  } catch (error) {
-    console.error('Failed to send delayed quote email:', error);
-    throw error;
-  }
-}
+//     if (!response.ok) {
+//       const errorData = await response.json();
+//       throw new Error(`Quote API failed: ${errorData.error || 'Unknown error'}`);
+//     }
+
+//     const result = await response.json();
+
+//   } catch (error) {
+//     console.error('Failed to send delayed quote email:', error);
+//     throw error;
+//   }
+// }
 
 // Function to generate pricing estimates based on submission data
 function generatePricingEstimate(submission: WidgetSubmission) {
@@ -946,13 +967,13 @@ function generatePricingEstimate(submission: WidgetSubmission) {
     'Comprehensive inspection',
     'Targeted treatment plan',
     'Professional grade products',
-    'Follow-up service included'
+    'Follow-up service included',
   ];
 
   return {
     min: baseMin,
     max: baseMax,
     service_type: serviceType,
-    factors: factors
+    factors: factors,
   };
 }
