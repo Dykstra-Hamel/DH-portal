@@ -12,7 +12,10 @@ interface TestLeadData {
   urgency: 'low' | 'medium' | 'high' | 'urgent';
   address: string;
   homeSize?: number;
-  selectedPlan?: string;
+  selectedPlan?: string; // Keep for backwards compatibility
+  selectedPlanId?: string; // New UUID reference to service plan
+  startDate?: string; // For scheduling variables
+  arrivalTime?: string; // For scheduling variables
   leadSource: string;
   comments?: string;
 }
@@ -240,6 +243,15 @@ export async function POST(request: NextRequest) {
     if (testData.selectedPlan) {
       notes += `Selected Plan: ${testData.selectedPlan}\n`;
     }
+    if (testData.selectedPlanId) {
+      notes += `Selected Plan ID: ${testData.selectedPlanId}\n`;
+    }
+    if (testData.startDate) {
+      notes += `Requested Start Date: ${testData.startDate}\n`;
+    }
+    if (testData.arrivalTime) {
+      notes += `Requested Arrival Time: ${testData.arrivalTime}\n`;
+    }
     if (testData.homeSize) {
       notes += `Home Size: ${testData.homeSize} sq ft\n`;
     }
@@ -268,6 +280,10 @@ export async function POST(request: NextRequest) {
           priority: testData.urgency, // Use urgency directly since it's already validated
           comments: notes,
           estimated_value: testData.homeSize ? Math.round(testData.homeSize * 0.15) : null, // Rough estimate
+          // New scheduling and plan fields
+          requested_date: testData.startDate || null,
+          requested_time: testData.arrivalTime || null,
+          selected_plan_id: testData.selectedPlanId || null,
           // Attribution fields to work with the database trigger
           attribution_data: attributionData,
           utm_source: (attributionData as any).utm_source,
@@ -344,6 +360,9 @@ export async function POST(request: NextRequest) {
         address: testData.address,
         homeSize: testData.homeSize,
         selectedPlan: testData.selectedPlan,
+        selectedPlanId: testData.selectedPlanId,
+        startDate: testData.startDate,
+        arrivalTime: testData.arrivalTime,
       },
       attribution: {
         leadSource: testData.leadSource,

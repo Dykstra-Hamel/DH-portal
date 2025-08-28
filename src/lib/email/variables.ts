@@ -13,6 +13,8 @@
 export interface EmailVariables {
   // Customer/Lead variables
   customerName: string;
+  firstName: string;
+  lastName: string;
   customerEmail: string;
   customerPhone: string;
   
@@ -23,6 +25,10 @@ export interface EmailVariables {
   companyWebsite: string;
   companyLogo: string;
   
+  // Brand colors
+  brandPrimaryColor: string;
+  brandSecondaryColor: string;
+  
   // Service/Lead details
   pestType: string;
   urgency: string;
@@ -30,6 +36,27 @@ export interface EmailVariables {
   homeSize: string;
   leadSource: string;
   createdDate: string;
+  
+  // Scheduling information
+  requestedDate: string;
+  requestedTime: string;
+  
+  // Selected Plan Details (when available)
+  selectedPlanName: string;
+  selectedPlanDescription: string;
+  selectedPlanCategory: string;
+  selectedPlanInitialPrice: string;
+  selectedPlanRecurringPrice: string;
+  selectedPlanBillingFrequency: string;
+  selectedPlanFeatures: string;
+  selectedPlanFaqs: string;
+  selectedPlanImageUrl: string;
+  selectedPlanHighlightBadge: string;
+  selectedPlanTreatmentFrequency: string;
+  selectedPlanDisclaimer: string;
+  
+  // Recommended Plan
+  recommendedPlanName: string;
 }
 
 /**
@@ -45,6 +72,8 @@ export function createSampleVariables(
   return {
     // Customer/Lead variables (always use sample data)
     customerName: 'John Smith',
+    firstName: 'John',
+    lastName: 'Smith',
     customerEmail: 'john.smith@email.com', 
     customerPhone: '(555) 123-4567',
     
@@ -55,6 +84,10 @@ export function createSampleVariables(
     companyWebsite: companyData?.website || 'https://yourcompany.com',
     companyLogo: brandData?.logo_url || '/pcocentral-logo.png',
     
+    // Brand colors (sample data)
+    brandPrimaryColor: '#FF5733',
+    brandSecondaryColor: '#33A1FF',
+    
     // Service/Lead details (always use sample data)
     pestType: 'ants',
     urgency: 'high', 
@@ -62,6 +95,27 @@ export function createSampleVariables(
     homeSize: '2000',
     leadSource: 'website',
     createdDate: '2024-01-15',
+    
+    // Scheduling information (sample data)
+    requestedDate: 'October 15, 2024',
+    requestedTime: 'morning',
+    
+    // Selected Plan Details (sample data)
+    selectedPlanName: 'Basic Pest Plan',
+    selectedPlanDescription: 'We&apos;ll start with a full inspection to provide you with the best possible plan, then complete your service during the same visit.',
+    selectedPlanCategory: 'standard',
+    selectedPlanInitialPrice: '119',
+    selectedPlanRecurringPrice: '79',
+    selectedPlanBillingFrequency: 'mo',
+    selectedPlanFeatures: '<ul><li>Covers Ants, Spiders, Wasps &amp; More</li><li>No Hassle Scheduling</li><li>FREE Re-Treatments</li><li>FREE Web Sweeps</li><li>100% Guaranteed visit</li></ul>',
+    selectedPlanFaqs: '<div class="faq-section"><div class="faq-item"><h3 class="faq-question">What pests are covered?</h3><p class="faq-answer">This plan covers ants, spiders, wasps, and other common pests.</p></div><div class="faq-item"><h3 class="faq-question">How often do you treat?</h3><p class="faq-answer">We provide monthly treatments for continuous protection.</p></div></div>',
+    selectedPlanImageUrl: '/plan-images/smartdefense.jpg',
+    selectedPlanHighlightBadge: 'Most Popular',
+    selectedPlanTreatmentFrequency: 'monthly',
+    selectedPlanDisclaimer: 'Initial service of $119 to get started. Prices may vary slightly depending on your home layout and service requirements.',
+    
+    // Recommended Plan (sample data)
+    recommendedPlanName: 'Premium Protection Plan',
   };
 }
 

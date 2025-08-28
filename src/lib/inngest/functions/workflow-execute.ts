@@ -1,5 +1,6 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { formatDateOnly } from '@/lib/utils';
 
 interface StepResult {
   stepIndex: number;
@@ -314,6 +315,36 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     throw new Error(`Email template ${templateId} not found`);
   }
 
+  // Get comprehensive lead data with plan and customer information
+  const { data: fullLeadData } = await supabase
+    .from('leads')
+    .select(`
+      *,
+      customer:customers(
+        id,
+        first_name,
+        last_name,
+        email,
+        phone
+      ),
+      service_plans:selected_plan_id (
+        plan_name,
+        plan_description,
+        plan_category,
+        initial_price,
+        recurring_price,
+        billing_frequency,
+        plan_features,
+        plan_faqs,
+        plan_image_url,
+        highlight_badge,
+        treatment_frequency,
+        plan_disclaimer
+      )
+    `)
+    .eq('id', leadId)
+    .single();
+
   // Get company information for email sending
   const { data: company } = await supabase
     .from('companies')
@@ -321,10 +352,10 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     .eq('id', companyId)
     .single();
     
-  // Get brand data for company logo
+  // Get brand data for company logo and colors
   const { data: brandData } = await supabase
     .from('brands')
-    .select('logo_url')
+    .select('logo_url, primary_color_hex, secondary_color_hex')
     .eq('company_id', companyId)
     .single();
     
@@ -333,18 +364,103 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
   const logoUrl = brandData?.logo_url || '/pcocentral-logo.png';
   
   
+  // Helper function to format date (using timezone-safe formatter)
+  const formatDate = (dateString: string) => {
+    return formatDateOnly(dateString);
+  };
+
+  // Helper function to format plan features
+  const formatPlanFeatures = (features: any) => {
+    if (!features) return '';
+    if (Array.isArray(features)) {
+      const listItems = features.map(feature => `<li>${feature}</li>`).join('');
+      return `<ul>${listItems}</ul>`;
+    }
+    return String(features);
+  };
+
+  // Helper function to format price
+  const formatPrice = (price: number) => {
+    if (!price) return '';
+    return String(price);
+  };
+
+  // Helper function to format billing frequency to short form
+  const formatBillingFrequency = (frequency: string) => {
+    if (!frequency) return '';
+    const frequencyMap = {
+      'monthly': 'mo',
+      'quarterly': 'qtr', 
+      'semi-annually': '6mo',
+      'annually': 'yr'
+    };
+    return frequencyMap[frequency as keyof typeof frequencyMap] || frequency;
+  };
+
+  // Helper function to format plan FAQs
+  const formatPlanFaqs = (faqs: any) => {
+    if (!faqs || !Array.isArray(faqs)) return '';
+    const faqItems = faqs.map(faq => 
+      `<div class="faq-item">
+        <h3 class="faq-question">${faq.question}</h3>
+        <p class="faq-answer">${faq.answer}</p>
+      </div>`
+    ).join('');
+    return `<div class="faq-section">${faqItems}</div>`;
+  };
+
+  // Extract plan data
+  const planData = fullLeadData?.service_plans;
+  
   const emailVariables = {
+    // Customer/Lead variables
     customerName: leadData.customerName,
+    firstName: fullLeadData?.customer?.first_name || leadData.customerName?.split(' ')[0] || '',
+    lastName: fullLeadData?.customer?.last_name || leadData.customerName?.split(' ').slice(1).join(' ') || '',
     customerEmail: leadData.customerEmail,
+    customerPhone: leadData.customerPhone || '',
+    
+    // Company variables
     companyName: company?.name || 'Your Company',
     companyEmail: company?.email || '',
     companyPhone: company?.phone || '',
     companyWebsite: company?.website || '',
-    companyLogo: logoUrl, // Keep original URL for now
+    companyLogo: logoUrl,
+    
+    // Brand colors
+    brandPrimaryColor: brandData?.primary_color_hex || '',
+    brandSecondaryColor: brandData?.secondary_color_hex || '',
+    
+    // Service/Lead details
     pestType: leadData.pestType,
     urgency: leadData.urgency,
     address: leadData.address,
     homeSize: leadData.homeSize,
+    leadSource: fullLeadData?.lead_source || '',
+    createdDate: formatDate(fullLeadData?.created_at),
+    
+    // Scheduling information
+    requestedDate: formatDate(fullLeadData?.requested_date),
+    requestedTime: fullLeadData?.requested_time || '',
+    
+    // Selected Plan Details (when available)
+    selectedPlanName: planData?.plan_name || '',
+    selectedPlanDescription: planData?.plan_description || '',
+    selectedPlanCategory: planData?.plan_category || '',
+    selectedPlanInitialPrice: formatPrice(planData?.initial_price),
+    selectedPlanRecurringPrice: formatPrice(planData?.recurring_price),
+    selectedPlanBillingFrequency: formatBillingFrequency(planData?.billing_frequency),
+    selectedPlanFeatures: formatPlanFeatures(planData?.plan_features),
+    selectedPlanFaqs: formatPlanFaqs(planData?.plan_faqs),
+    selectedPlanImageUrl: planData?.plan_image_url || '',
+    selectedPlanHighlightBadge: planData?.highlight_badge || '',
+    selectedPlanTreatmentFrequency: planData?.treatment_frequency || '',
+    selectedPlanDisclaimer: planData?.plan_disclaimer || '',
+    
+    // Recommended Plan
+    recommendedPlanName: fullLeadData?.recommended_plan_name || '',
+    
+    // Legacy variables for backward compatibility
     leadId,
     customerId,
     ...step.email_variables, // Any additional variables from step config
