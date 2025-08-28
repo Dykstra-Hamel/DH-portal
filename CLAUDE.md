@@ -65,6 +65,28 @@ This is a Next.js application with Supabase authentication supporting Google OAu
 - Auth providers configured: Google, Facebook
 - Email templates configured for magic links
 
+## Supabase Migration Files
+
+When creating a new migration file, ALWAYS use the following naming convention:
+
+- The file MUST be named in the format `YYYYMMDDHHmmss_short_description.sql` with proper casing for months, minutes, and seconds in UTC time:
+
+1. `YYYY` - Four digits for the year (e.g., `2024`).
+2. `MM` - Two digits for the month (01 to 12).
+3. `DD` - Two digits for the day of the month (01 to 31).
+4. `HH` - Two digits for the hour in 24-hour format (00 to 23).
+5. `mm` - Two digits for the minute (00 to 59).
+6. `ss` - Two digits for the second (00 to 59).
+7. Add an appropriate description for the migration.
+
+- **Example**
+
+```
+20240906123045_create_profiles.sql
+```
+
+- The current time should be used to generate the timestamp to prevent duplicated filenames from different users.
+
 ## Widget Configuration
 
 - **Address Autocomplete**: Uses Google Places API for address suggestions

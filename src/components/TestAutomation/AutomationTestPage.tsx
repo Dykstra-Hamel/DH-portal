@@ -25,6 +25,16 @@ interface Company {
   website?: string;
 }
 
+interface ServicePlan {
+  id: string;
+  plan_name: string;
+  plan_description?: string;
+  initial_price?: number;
+  recurring_price: number;
+  billing_frequency: string;
+  highlight_badge?: string;
+}
+
 interface TestScenario {
   id: string;
   name: string;
@@ -40,7 +50,10 @@ interface TestLeadData {
   urgency: 'low' | 'medium' | 'high' | 'urgent';
   address: string;
   homeSize?: number;
-  selectedPlan?: string;
+  selectedPlan?: string; // Keep for backwards compatibility
+  selectedPlanId?: string; // New UUID reference to service plan
+  startDate?: string; // For scheduling variables
+  arrivalTime?: string; // For scheduling variables
   leadSource: string;
   comments?: string;
 }
@@ -76,6 +89,9 @@ const TEST_SCENARIOS: TestScenario[] = [
       urgency: 'urgent',
       address: '1234 Oak Street, Austin, TX 78701',
       homeSize: 3500,
+      selectedPlanId: undefined, // Will be populated from service plan dropdown
+      startDate: '2024-10-15',
+      arrivalTime: 'morning',
       leadSource: 'widget_submission',
       comments: 'Found termite damage in the basement. Need immediate inspection.',
     },
@@ -92,6 +108,9 @@ const TEST_SCENARIOS: TestScenario[] = [
       urgency: 'medium',
       address: '5678 Pine Avenue, Austin, TX 78702',
       homeSize: 2100,
+      selectedPlanId: undefined, // Will be populated from service plan dropdown
+      startDate: '2024-10-18',
+      arrivalTime: 'afternoon',
       leadSource: 'widget_submission',
       comments: 'Ants in kitchen and dining room areas.',
     },
@@ -108,6 +127,9 @@ const TEST_SCENARIOS: TestScenario[] = [
       urgency: 'high',
       address: '9876 Business Blvd, Austin, TX 78703',
       homeSize: 8000,
+      selectedPlanId: undefined, // Will be populated from service plan dropdown
+      startDate: '2024-10-16',
+      arrivalTime: 'anytime',
       leadSource: 'widget_submission',
       comments: 'Commercial hotel property with guest complaints.',
     },
@@ -124,6 +146,9 @@ const TEST_SCENARIOS: TestScenario[] = [
       urgency: 'medium',
       address: '2468 Elm Street, Austin, TX 78704',
       homeSize: 2800,
+      selectedPlanId: undefined, // Will be populated from service plan dropdown
+      startDate: '2024-10-20',
+      arrivalTime: 'evening',
       leadSource: 'referral',
       comments: 'Referred by John Smith (existing customer). Mice in garage and attic.',
     },
@@ -150,6 +175,7 @@ const TRIGGER_TYPES = [
 
 export default function AutomationTestPage({ user, profile }: AutomationTestPageProps) {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [selectedScenario, setSelectedScenario] = useState<string>(TEST_SCENARIOS[0].id);
   const [selectedTrigger, setSelectedTrigger] = useState<string>('widget/schedule-completed');
@@ -167,6 +193,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
     fetchCompanies();
     loadTestResults();
   }, []);
+
+  useEffect(() => {
+    if (selectedCompany) {
+      fetchServicePlans();
+    }
+  }, [selectedCompany]);
 
   const fetchCompanies = async () => {
     try {
@@ -189,6 +221,28 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
       setMessage({ type: 'error', text: 'Failed to load companies' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchServicePlans = async () => {
+    if (!selectedCompany) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('service_plans')
+        .select('id, plan_name, plan_description, initial_price, recurring_price, billing_frequency, highlight_badge')
+        .eq('company_id', selectedCompany)
+        .eq('is_active', true)
+        .order('display_order');
+
+      if (error) {
+        throw error;
+      }
+
+      setServicePlans(data || []);
+    } catch (error) {
+      console.error('Error fetching service plans:', error);
+      setMessage({ type: 'error', text: 'Failed to load service plans' });
     }
   };
 
@@ -392,6 +446,34 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
             </div>
 
             <div className={styles.formGroup}>
+              <label>Service Plan (Optional)</label>
+              <select
+                value={useCustomData ? (customData?.selectedPlanId || '') : (getCurrentTestData().selectedPlanId || '')}
+                onChange={(e) => {
+                  if (useCustomData && customData) {
+                    setCustomData({...customData, selectedPlanId: e.target.value || undefined});
+                  } else {
+                    // Update the scenario data for non-custom data
+                    const scenario = TEST_SCENARIOS.find(s => s.id === selectedScenario);
+                    if (scenario) {
+                      scenario.data.selectedPlanId = e.target.value || undefined;
+                    }
+                  }
+                }}
+                disabled={testing || !selectedCompany || servicePlans.length === 0}
+              >
+                <option value="">No plan selected</option>
+                {servicePlans.map(plan => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.plan_name} (${plan.recurring_price}/{plan.billing_frequency === 'monthly' ? 'mo' : plan.billing_frequency})
+                    {plan.highlight_badge && ` - ${plan.highlight_badge}`}
+                  </option>
+                ))}
+              </select>
+              <small>Select a service plan to test plan-related email variables</small>
+            </div>
+
+            <div className={styles.formGroup}>
               <label className={styles.checkbox}>
                 <input
                   type="checkbox"
@@ -519,6 +601,32 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                     />
                   </div>
 
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>Start Date</label>
+                      <input
+                        type="date"
+                        value={customData.startDate || ''}
+                        onChange={(e) => setCustomData({...customData, startDate: e.target.value || undefined})}
+                        disabled={testing}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Arrival Time</label>
+                      <select
+                        value={customData.arrivalTime || ''}
+                        onChange={(e) => setCustomData({...customData, arrivalTime: e.target.value || undefined})}
+                        disabled={testing}
+                      >
+                        <option value="">Not specified</option>
+                        <option value="morning">Morning</option>
+                        <option value="afternoon">Afternoon</option>
+                        <option value="evening">Evening</option>
+                        <option value="anytime">Anytime</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div className={styles.formGroup}>
                     <label>Comments</label>
                     <textarea
@@ -556,6 +664,21 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                         {data.homeSize && (
                           <div className={styles.dataItem}>
                             <strong>Home Size:</strong> {data.homeSize} sq ft
+                          </div>
+                        )}
+                        {data.startDate && (
+                          <div className={styles.dataItem}>
+                            <strong>Start Date:</strong> {data.startDate}
+                          </div>
+                        )}
+                        {data.arrivalTime && (
+                          <div className={styles.dataItem}>
+                            <strong>Arrival Time:</strong> {data.arrivalTime}
+                          </div>
+                        )}
+                        {data.selectedPlanId && servicePlans.find(p => p.id === data.selectedPlanId) && (
+                          <div className={styles.dataItem}>
+                            <strong>Selected Plan:</strong> {servicePlans.find(p => p.id === data.selectedPlanId)?.plan_name}
                           </div>
                         )}
                         {data.comments && (

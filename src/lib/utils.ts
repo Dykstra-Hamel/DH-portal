@@ -127,3 +127,40 @@ export const formatDateForDisplay = (date: string | Date | number): string => {
     minute: '2-digit',
   });
 };
+
+/**
+ * Formats a date-only string (YYYY-MM-DD) without timezone conversion issues
+ * Specifically handles database DATE fields that should not shift due to timezone
+ * @param dateString - Date string in YYYY-MM-DD format
+ * @returns Formatted date string (e.g., "January 15, 2025")
+ */
+export const formatDateOnly = (dateString: string | null | undefined): string => {
+  if (!dateString) return '';
+  
+  // Parse date components manually to avoid timezone conversion
+  const parts = dateString.split('-');
+  if (parts.length !== 3) return dateString;
+  
+  const year = parseInt(parts[0]);
+  const month = parseInt(parts[1]) - 1; // Month is 0-indexed in Date constructor
+  const day = parseInt(parts[2]);
+  
+  // Validate parsed components
+  if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    return dateString;
+  }
+  
+  // Create date in local timezone without UTC conversion
+  const date = new Date(year, month, day);
+  
+  // Verify the date is valid
+  if (isNaN(date.getTime())) {
+    return dateString;
+  }
+  
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};

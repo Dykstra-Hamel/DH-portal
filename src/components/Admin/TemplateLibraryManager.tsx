@@ -595,9 +595,114 @@ export default function TemplateLibraryManager() {
                   {/* Variables Sidebar */}
                   <div className={styles.variablesSection}>
                     <h4>Variables</h4>
+                    
+                    {/* Customer Variables */}
                     <div className={styles.variableGroup}>
-                      <h5>Available Variables</h5>
-                      {Object.keys(sampleVariables).map(variable => (
+                      <h5>Customer Info</h5>
+                      {['customerName', 'firstName', 'lastName', 'customerEmail', 'customerPhone'].map(variable => (
+                        <button
+                          key={variable}
+                          className={styles.variableButton}
+                          onClick={() => insertVariable(variable)}
+                          title={`Insert ${'{{'}${variable}${'}}'}`}
+                        >
+                          {variable}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Company Variables */}
+                    <div className={styles.variableGroup}>
+                      <h5>Company Info</h5>
+                      {['companyName', 'companyEmail', 'companyPhone', 'companyWebsite', 'companyLogo', 'googleRating', 'googleReviewCount'].map(variable => (
+                        <button
+                          key={variable}
+                          className={styles.variableButton}
+                          onClick={() => insertVariable(variable)}
+                          title={`Insert ${'{{'}${variable}${'}}'}`}
+                        >
+                          {variable}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Brand Colors Variables */}
+                    <div className={styles.variableGroup}>
+                      <h5>Brand Colors</h5>
+                      {['brandPrimaryColor', 'brandSecondaryColor'].map(variable => (
+                        <button
+                          key={variable}
+                          className={styles.variableButton}
+                          onClick={() => insertVariable(variable)}
+                          title={`Insert ${'{{'}${variable}${'}}'}`}
+                        >
+                          {variable}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Service Details Variables */}
+                    <div className={styles.variableGroup}>
+                      <h5>Service Details</h5>
+                      {['pestType', 'urgency', 'address', 'streetAddress', 'city', 'state', 'zipCode', 'homeSize', 'leadSource', 'createdDate'].map(variable => (
+                        <button
+                          key={variable}
+                          className={styles.variableButton}
+                          onClick={() => insertVariable(variable)}
+                          title={`Insert ${'{{'}${variable}${'}}'}`}
+                        >
+                          {variable}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Scheduling Variables */}
+                    <div className={styles.variableGroup}>
+                      <h5>Scheduling</h5>
+                      {['requestedDate', 'requestedTime'].map(variable => (
+                        <button
+                          key={variable}
+                          className={styles.variableButton}
+                          onClick={() => insertVariable(variable)}
+                          title={`Insert ${'{{'}${variable}${'}}'}`}
+                        >
+                          {variable}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Selected Plan Variables */}
+                    <div className={styles.variableGroup}>
+                      <h5>Selected Plan</h5>
+                      {[
+                        'selectedPlanName', 
+                        'selectedPlanDescription', 
+                        'selectedPlanCategory',
+                        'selectedPlanInitialPrice',
+                        'selectedPlanRecurringPrice',
+                        'selectedPlanBillingFrequency',
+                        'selectedPlanFeatures',
+                        'selectedPlanFaqs',
+                        'selectedPlanImageUrl',
+                        'selectedPlanHighlightBadge',
+                        'selectedPlanTreatmentFrequency',
+                        'selectedPlanDisclaimer'
+                      ].map(variable => (
+                        <button
+                          key={variable}
+                          className={styles.variableButton}
+                          onClick={() => insertVariable(variable)}
+                          title={`Insert ${'{{'}${variable}${'}}'}`}
+                        >
+                          {variable}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Recommended Plan Variables */}
+                    <div className={styles.variableGroup}>
+                      <h5>Recommendation</h5>
+                      {['recommendedPlanName'].map(variable => (
                         <button
                           key={variable}
                           className={styles.variableButton}

@@ -238,6 +238,9 @@ interface WidgetSubmission {
     zip: string;
   };
   homeSize: number;
+  // Scheduling information from widget form
+  startDate?: string;
+  arrivalTime?: string;
   contactInfo: {
     name: string;
     phone: string;
@@ -555,6 +558,12 @@ export async function POST(request: NextRequest) {
             ? (submission.estimatedPrice.min + submission.estimatedPrice.max) /
               2
             : null,
+          // Scheduling fields
+          requested_date: submission.startDate || null,
+          requested_time: submission.arrivalTime || null,
+          // Plan references
+          selected_plan_id: submission.selectedPlan?.id || null,
+          recommended_plan_name: submission.recommendedPlan || null,
           // Attribution fields
           utm_source: finalAttributionData.utm_source || null,
           utm_medium: finalAttributionData.utm_medium || null,

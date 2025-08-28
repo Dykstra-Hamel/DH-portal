@@ -539,15 +539,27 @@
   padding: 1rem;
   background: white;
   overflow-y: auto;
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
   
   // Style the rendered email content
-  p {
-    margin: 0 0 1rem 0;
-    line-height: 1.6;
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #1a202c;
   }
   
-  h1, h2, h3, h4, h5, h6 {
-    margin: 0 0 0.5rem 0;
+  p {
+    margin-bottom: 1rem;
+  }
+  
+  a {
+    color: #3b82f6;
+    text-decoration: none;
+    
+    &:hover {
+      text-decoration: underline;
+    }
   }
   
   img {
@@ -556,13 +568,37 @@
   }
   
   table {
-    border-collapse: collapse;
     width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    
+    th, td {
+      padding: 0.5rem;
+      border: 1px solid #e2e8f0;
+      text-align: left;
+    }
+    
+    th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+    }
   }
   
-  td, th {
-    padding: 0.5rem;
-    border: 1px solid #e2e8f0;
+  ul, ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+    
+    li {
+      margin-bottom: 0.25rem;
+    }
+  }
+  
+  blockquote {
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    border-left: 4px solid #e2e8f0;
+    background-color: #f8f9fa;
+    font-style: italic;
   }
 }
 
