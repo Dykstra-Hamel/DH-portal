@@ -644,7 +644,7 @@ export default function TemplateLibraryManager() {
                     {/* Service Details Variables */}
                     <div className={styles.variableGroup}>
                       <h5>Service Details</h5>
-                      {['pestType', 'urgency', 'address', 'homeSize', 'leadSource', 'createdDate'].map(variable => (
+                      {['pestType', 'urgency', 'address', 'streetAddress', 'city', 'state', 'zipCode', 'homeSize', 'leadSource', 'createdDate'].map(variable => (
                         <button
                           key={variable}
                           className={styles.variableButton}

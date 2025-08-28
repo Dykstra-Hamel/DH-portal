@@ -37,6 +37,10 @@ export interface EmailVariables {
   pestType: string;
   urgency: string;
   address: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
   homeSize: string;
   leadSource: string;
   createdDate: string;
@@ -102,6 +106,10 @@ export function createSampleVariables(
     pestType: 'ants',
     urgency: 'high', 
     address: '123 Main St, Anytown ST 12345',
+    streetAddress: '123 Main St',
+    city: 'Anytown',
+    state: 'ST',
+    zipCode: '12345',
     homeSize: '2000',
     leadSource: 'website',
     createdDate: '2024-01-15',

@@ -325,7 +325,11 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
         first_name,
         last_name,
         email,
-        phone
+        phone,
+        address,
+        city,
+        state,
+        zip_code
       ),
       service_plans:selected_plan_id (
         plan_name,
@@ -456,6 +460,10 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     pestType: leadData.pestType,
     urgency: leadData.urgency,
     address: leadData.address,
+    streetAddress: fullLeadData?.customer?.address || '',
+    city: fullLeadData?.customer?.city || '',
+    state: fullLeadData?.customer?.state || '',
+    zipCode: fullLeadData?.customer?.zip_code || '',
     homeSize: leadData.homeSize,
     leadSource: fullLeadData?.lead_source || '',
     createdDate: formatDate(fullLeadData?.created_at),
