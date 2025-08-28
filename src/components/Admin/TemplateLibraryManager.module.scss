@@ -665,11 +665,19 @@
   
   ul, ol {
     margin-bottom: 1rem;
-    padding-left: 2rem;
+    padding-left: 1.5rem;
+    
+    li {
+      margin-bottom: 0.25rem;
+    }
   }
   
-  li {
-    margin-bottom: 0.5rem;
+  blockquote {
+    margin: 1rem 0;
+    padding: 0.5rem 1rem;
+    border-left: 4px solid #e2e8f0;
+    background-color: #f8f9fa;
+    font-style: italic;
   }
 }
 

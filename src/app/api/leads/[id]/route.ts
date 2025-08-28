@@ -1,23 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { sendEvent } from '@/lib/inngest/client';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    // Try Bearer token authentication first (for API client calls)
+    const authHeader = request.headers.get('authorization');
+    let user = null;
+    let supabase;
 
-    // Get the current user from the session
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Bearer token authentication - use admin client
+      const { user: authUser, error: authError } = await verifyAuth(request);
+      if (authError || !authUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = authUser;
+      supabase = createAdminClient();
+    } else {
+      // Session-based authentication - use regular client
+      supabase = await createClient();
+      const {
+        data: { user: sessionUser },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      if (authError || !sessionUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = sessionUser;
     }
 
     const { id } = await params;
@@ -56,19 +72,22 @@ export async function GET(
       );
     }
 
-    // Verify user has access to this lead's company
-    const { data: userCompany, error: userCompanyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', lead.company_id)
-      .single();
+    // For session-based auth, verify user has access to this lead's company
+    // Bearer token auth relies on RLS policies for access control
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const { data: userCompany, error: userCompanyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', lead.company_id)
+        .single();
 
-    if (userCompanyError || !userCompany) {
-      return NextResponse.json(
-        { error: 'Access denied to this lead' },
-        { status: 403 }
-      );
+      if (userCompanyError || !userCompany) {
+        return NextResponse.json(
+          { error: 'Access denied to this lead' },
+          { status: 403 }
+        );
+      }
     }
 
     // Get assigned user profile if lead has one
@@ -106,16 +125,31 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    // Try Bearer token authentication first (for API client calls)
+    const authHeader = request.headers.get('authorization');
+    let user = null;
+    let supabase;
 
-    // Get the current user from the session
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Bearer token authentication - use admin client
+      const { user: authUser, error: authError } = await verifyAuth(request);
+      if (authError || !authUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = authUser;
+      supabase = createAdminClient();
+    } else {
+      // Session-based authentication - use regular client
+      supabase = await createClient();
+      const {
+        data: { user: sessionUser },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      if (authError || !sessionUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = sessionUser;
     }
 
     const { id } = await params;
@@ -139,20 +173,31 @@ export async function PUT(
       );
     }
 
-    // Verify user has access to this lead's company
-    const { data: userCompany, error: userCompanyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', existingLead.company_id)
-      .single();
+    // For session-based auth, verify user has access to this lead's company
+    // Bearer token auth relies on RLS policies for access control
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const { data: userCompany, error: userCompanyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', existingLead.company_id)
+        .single();
 
-    if (userCompanyError || !userCompany) {
-      return NextResponse.json(
-        { error: 'Access denied to this lead' },
-        { status: 403 }
-      );
+      if (userCompanyError || !userCompany) {
+        return NextResponse.json(
+          { error: 'Access denied to this lead' },
+          { status: 403 }
+        );
+      }
     }
+
+    // Log the update attempt for debugging
+    console.log('Attempting to update lead:', {
+      leadId: id,
+      updateData: body,
+      userId: user.id,
+      companyId: existingLead.company_id
+    });
 
     // Update the lead
     const { data: lead, error } = await supabase
@@ -179,12 +224,32 @@ export async function PUT(
       .single();
 
     if (error) {
-      console.error('Error updating lead:', error);
+      console.error('Error updating lead:', {
+        error,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        errorHint: error.hint,
+        leadId: id,
+        updateData: body,
+        userId: user.id
+      });
+      
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       }
+      
+      // Return more specific error message
+      const errorMessage = error.message || 'Failed to update lead';
+      const errorDetails = error.details ? ` Details: ${error.details}` : '';
+      const errorHint = error.hint ? ` Hint: ${error.hint}` : '';
+      
       return NextResponse.json(
-        { error: 'Failed to update lead' },
+        { 
+          error: `${errorMessage}${errorDetails}${errorHint}`,
+          errorCode: error.code,
+          originalError: error.message
+        },
         { status: 500 }
       );
     }
@@ -252,16 +317,31 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    // Try Bearer token authentication first (for API client calls)
+    const authHeader = request.headers.get('authorization');
+    let user = null;
+    let supabase;
 
-    // Get the current user from the session
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Bearer token authentication - use admin client
+      const { user: authUser, error: authError } = await verifyAuth(request);
+      if (authError || !authUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = authUser;
+      supabase = createAdminClient();
+    } else {
+      // Session-based authentication - use regular client
+      supabase = await createClient();
+      const {
+        data: { user: sessionUser },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      if (authError || !sessionUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = sessionUser;
     }
 
     const { id } = await params;

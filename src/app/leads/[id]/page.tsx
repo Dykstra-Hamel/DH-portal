@@ -136,13 +136,44 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     }
   }, [leadId, loading, fetchLead]);
 
+  // Define handleEdit before the useEffect that uses it
+  const handleEdit = useCallback(() => {
+    if (lead) {
+      setEditFormData({
+        lead_source: lead.lead_source,
+        lead_type: lead.lead_type,
+        service_type: lead.service_type || '',
+        lead_status: lead.lead_status,
+        priority: lead.priority,
+        estimated_value: lead.estimated_value || 0,
+        comments: lead.comments || '',
+        assigned_to: lead.assigned_to || '',
+        last_contacted_at: lead.last_contacted_at || '',
+        next_follow_up_at: lead.next_follow_up_at || '',
+        utm_source: lead.utm_source || '',
+        utm_medium: lead.utm_medium || '',
+        utm_campaign: lead.utm_campaign || '',
+        utm_term: lead.utm_term || '',
+        utm_content: lead.utm_content || '',
+      });
+      setIsEditing(true);
+      
+      // Clear the edit URL parameter to prevent edit mode loop
+      if (searchParams.get('edit') === 'true') {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('edit');
+        router.replace(url.pathname + url.search);
+      }
+    }
+  }, [lead, searchParams, router]);
+
   // Auto-trigger edit mode when edit=true parameter is present
   useEffect(() => {
     const shouldAutoEdit = searchParams.get('edit') === 'true';
     if (shouldAutoEdit && lead && !isEditing && !leadLoading) {
       handleEdit();
     }
-  }, [lead, isEditing, leadLoading, searchParams]);
+  }, [lead, isEditing, leadLoading, handleEdit, searchParams]);
 
   const handleBack = () => {
     router.push('/leads');
@@ -237,29 +268,6 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     }
   };
 
-  const handleEdit = () => {
-    if (lead) {
-      setEditFormData({
-        lead_source: lead.lead_source,
-        lead_type: lead.lead_type,
-        service_type: lead.service_type || '',
-        lead_status: lead.lead_status,
-        priority: lead.priority,
-        estimated_value: lead.estimated_value || 0,
-        comments: lead.comments || '',
-        assigned_to: lead.assigned_to || '',
-        last_contacted_at: lead.last_contacted_at || '',
-        next_follow_up_at: lead.next_follow_up_at || '',
-        utm_source: lead.utm_source || '',
-        utm_medium: lead.utm_medium || '',
-        utm_campaign: lead.utm_campaign || '',
-        utm_term: lead.utm_term || '',
-        utm_content: lead.utm_content || '',
-      });
-      setIsEditing(true);
-    }
-  };
-
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditFormData(null);
@@ -288,20 +296,52 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         estimated_value: parseFloat(editFormData.estimated_value) || 0,
       };
 
+      // Log the save attempt for debugging
+      console.log('Attempting to save lead:', {
+        leadId,
+        originalData: editFormData,
+        cleanedData: cleanFormData,
+        isAdmin,
+        currentUser: user?.id
+      });
+
       let updatedLead;
       if (isAdmin) {
         updatedLead = await adminAPI.updateLead(leadId, cleanFormData);
       } else {
         updatedLead = await adminAPI.updateUserLead(leadId, cleanFormData);
       }
+      
+      console.log('Lead save successful:', updatedLead);
       setLead(updatedLead);
       setIsEditing(false);
       setEditFormData(null);
       // Trigger call history refresh in case customer phone number changed
       setCallHistoryRefresh(prev => prev + 1);
-    } catch (error) {
-      console.error('Error updating lead:', error);
-      alert('Failed to update lead. Please try again.');
+    } catch (error: any) {
+      console.error('Error updating lead:', {
+        error,
+        leadId,
+        formData: editFormData,
+        errorMessage: error.message,
+        errorResponse: error.response?.data
+      });
+      
+      // Display more specific error message
+      let errorMessage = 'Failed to update lead. Please try again.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = `Failed to update lead: ${error.response.data.error}`;
+      } else if (error.message) {
+        errorMessage = `Failed to update lead: ${error.message}`;
+      }
+      
+      // Show error with additional details if available
+      if (error.response?.data?.errorCode) {
+        errorMessage += `\n\nError Code: ${error.response.data.errorCode}`;
+      }
+      
+      alert(errorMessage);
     } finally {
       setSaving(false);
     }

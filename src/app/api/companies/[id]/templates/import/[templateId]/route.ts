@@ -12,18 +12,19 @@ export async function POST(
     const supabase = await createClient();
     const adminSupabase = createAdminClient();
 
-    // Check if user has access to this company
+    // Check if user has access to this company (using secure auth method)
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (!session?.user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Verify user has access to this company (either global admin or company admin)
-    const isGlobalAdmin = await isAuthorizedAdmin(session.user);
-    const hasCompanyAccess = await isCompanyAdmin(session.user.id, companyId);
+    const isGlobalAdmin = await isAuthorizedAdmin(user);
+    const hasCompanyAccess = await isCompanyAdmin(user.id, companyId);
 
     if (!isGlobalAdmin && !hasCompanyAccess) {
       return NextResponse.json({ 
@@ -65,14 +66,28 @@ export async function POST(
 
 
     if (error) {
+      console.error('Template import database error:', {
+        templateId,
+        companyId,
+        error: error.message,
+        hint: error.hint,
+        code: error.code,
+        details: error.details
+      });
+      
       if (error.message.includes('not found')) {
         return NextResponse.json({ error: 'Template not found or inactive' }, { status: 404 });
       }
+      
+      // Enhanced error response for debugging
       return NextResponse.json({ 
         error: 'Failed to import template', 
         details: error.message,
         hint: error.hint,
-        code: error.code
+        code: error.code,
+        templateId,
+        companyId,
+        timestamp: new Date().toISOString()
       }, { status: 500 });
     }
 
@@ -99,9 +114,19 @@ export async function POST(
     });
 
   } catch (error) {
+    console.error('Template import API error:', {
+      templateId: await params.then(p => p.templateId),
+      companyId: await params.then(p => p.id),
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      templateId: await params.then(p => p.templateId),
+      companyId: await params.then(p => p.id),
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { sendEvent } from '@/lib/inngest/client';
 
 export async function GET(
   request: NextRequest,
@@ -99,6 +100,33 @@ export async function PUT(
     // Use admin client to update lead
     const supabase = createAdminClient();
 
+    // Get the existing lead to capture old status before update
+    const { data: existingLead, error: existingLeadError } = await supabase
+      .from('leads')
+      .select('lead_status, company_id')
+      .eq('id', id)
+      .single();
+
+    if (existingLeadError) {
+      console.error('Admin Lead Detail API: Error fetching existing lead:', existingLeadError);
+      if (existingLeadError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+      }
+      return NextResponse.json(
+        { error: 'Failed to fetch lead' },
+        { status: 500 }
+      );
+    }
+
+    // Log the admin update attempt for debugging
+    console.log('Admin attempting to update lead:', {
+      leadId: id,
+      updateData: body,
+      adminUserId: user.id,
+      oldStatus: existingLead.lead_status,
+      newStatus: body.lead_status
+    });
+
     const { data: lead, error } = await supabase
       .from('leads')
       .update(body)
@@ -123,14 +151,63 @@ export async function PUT(
       .single();
 
     if (error) {
-      console.error('Admin Lead Detail API: Error updating lead:', error);
+      console.error('Admin Lead Detail API: Error updating lead:', {
+        error,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        errorHint: error.hint,
+        leadId: id,
+        updateData: body,
+        adminUserId: user.id
+      });
+      
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       }
+      
+      // Return more specific error message
+      const errorMessage = error.message || 'Failed to update lead';
+      const errorDetails = error.details ? ` Details: ${error.details}` : '';
+      const errorHint = error.hint ? ` Hint: ${error.hint}` : '';
+      
       return NextResponse.json(
-        { error: 'Failed to update lead' },
+        { 
+          error: `${errorMessage}${errorDetails}${errorHint}`,
+          errorCode: error.code,
+          originalError: error.message
+        },
         { status: 500 }
       );
+    }
+
+    // Check if lead status changed and trigger automation
+    const oldStatus = existingLead.lead_status;
+    const newStatus = body.lead_status;
+    
+    if (newStatus && oldStatus !== newStatus) {
+      try {
+        await sendEvent({
+          name: 'lead/status-changed',
+          data: {
+            leadId: id,
+            companyId: existingLead.company_id,
+            fromStatus: oldStatus,
+            toStatus: newStatus,
+            leadData: {
+              ...lead,
+              oldStatus,
+              newStatus,
+            },
+            userId: user.id,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        console.log(`Admin Lead Status Change Event: ${oldStatus} → ${newStatus} for lead ${id}`);
+      } catch (eventError) {
+        console.error('Error sending lead status changed event:', eventError);
+        // Don't fail the API call if event sending fails
+      }
     }
 
     // Get assigned user profile if lead has one

@@ -69,11 +69,11 @@ const WORKFLOW_TYPES = [
 const TRIGGER_TYPES = [
   // { value: 'lead_created', label: 'New Lead Created' }, // Disabled - process not refined yet
   { value: 'widget_schedule_completed', label: 'Widget Schedule Form Completed' },
-  { value: 'lead_updated', label: 'Lead Updated' },
+  // { value: 'lead_updated', label: 'Lead Updated' }, // Disabled temporarily
   { value: 'lead_status_changed', label: 'Lead Status Changed' },
-  { value: 'email_opened', label: 'Email Opened' },
-  { value: 'email_clicked', label: 'Email Clicked' },
-  { value: 'scheduled', label: 'Scheduled' },
+  // { value: 'email_opened', label: 'Email Opened' }, // Disabled temporarily
+  // { value: 'email_clicked', label: 'Email Clicked' }, // Disabled temporarily
+  // { value: 'scheduled', label: 'Scheduled' }, // Disabled temporarily
 ];
 
 const PEST_TYPES = [
