@@ -65,14 +65,28 @@ export async function POST(
 
 
     if (error) {
+      console.error('Template import database error:', {
+        templateId,
+        companyId,
+        error: error.message,
+        hint: error.hint,
+        code: error.code,
+        details: error.details
+      });
+      
       if (error.message.includes('not found')) {
         return NextResponse.json({ error: 'Template not found or inactive' }, { status: 404 });
       }
+      
+      // Enhanced error response for debugging
       return NextResponse.json({ 
         error: 'Failed to import template', 
         details: error.message,
         hint: error.hint,
-        code: error.code
+        code: error.code,
+        templateId,
+        companyId,
+        timestamp: new Date().toISOString()
       }, { status: 500 });
     }
 
@@ -99,9 +113,19 @@ export async function POST(
     });
 
   } catch (error) {
+    console.error('Template import API error:', {
+      templateId: await params.then(p => p.templateId),
+      companyId: await params.then(p => p.id),
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      templateId: await params.then(p => p.templateId),
+      companyId: await params.then(p => p.id),
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 }
