@@ -28,7 +28,6 @@
     const formData = {
       companyId: config.companyId,
       pestType: widgetState.formData.pestType,
-      urgency: widgetState.formData.urgency,
       selectedPlan: widgetState.formData.selectedPlan,
       recommendedPlan: widgetState.formData.recommendedPlan,
       address: widgetState.formData.address, // Formatted address for backward compatibility
@@ -39,7 +38,6 @@
         zip: widgetState.formData.addressZip,
       },
       homeSize: parseInt(widgetState.formData.homeSize),
-      urgency: widgetState.formData.urgency,
       contactInfo: widgetState.formData.contactInfo,
       coordinates: {
         latitude: widgetState.formData.latitude,
@@ -373,7 +371,7 @@
 
     // Save partial lead with plan selection
     try {
-      savePartialLead('plan_selected');
+      savePartialLead(null, 'contact'); // Next step user will go to
     } catch (error) {
       console.error('Error saving plan selection:', error);
     }
@@ -453,10 +451,25 @@
     }
   };
 
+  // Map widget step names to partial lead step names
+  const mapStepToPartialLeadStep = (widgetStep) => {
+    const stepMap = {
+      'pest-issue': 'pest_issue_completed',
+      'address': 'address_validated',
+      'confirm-address': 'address_confirmed',
+      'how-we-do-it': 'how_we_do_it_viewed',
+      'offer': 'offer_viewed',
+      'contact': 'contact_started',
+      'quote': 'quote_started',
+      'plan-comparison': 'plan_selected'
+    };
+    return stepMap[widgetStep] || widgetStep;
+  };
+
   // Partial lead save function
   const savePartialLead = async (
     validationResult,
-    stepCompleted = 'address_completed'
+    stepCompleted = 'address'
   ) => {
     if (!widgetState.sessionId || !widgetState.attributionData) {
       console.warn(
@@ -468,8 +481,7 @@
     // Only require coordinates for steps after address entry
     const { latitude, longitude } = widgetState.formData;
     const requiresCoordinates = ![
-      'pest_issue_completed',
-      'urgency_completed',
+      'address', // Address step doesn't need coordinates yet
     ].includes(stepCompleted);
 
     if (requiresCoordinates && (!latitude || !longitude)) {
@@ -488,9 +500,10 @@
         formData: {
           pestType: widgetState.formData.pestType || null,
           pestIcon: widgetState.formData.pestIcon || null,
-          urgency: widgetState.formData.urgency || null,
+          pestBackgroundImage: widgetState.formData.pestBackgroundImage || null,
           selectedPlan: widgetState.formData.selectedPlan || null,
           recommendedPlan: widgetState.formData.recommendedPlan || null,
+          offerPrice: widgetState.formData.offerPrice || null,
           address: widgetState.formData.address,
           addressDetails: {
             street: widgetState.formData.addressStreet,
@@ -501,7 +514,7 @@
           latitude: latitude ? parseFloat(latitude) : null,
           longitude: longitude ? parseFloat(longitude) : null,
           contactInfo:
-            stepCompleted === 'contact_started'
+            stepCompleted === 'contact'
               ? {
                   name: widgetState.formData.contactInfo.name || null,
                   phone: widgetState.formData.contactInfo.phone || null,
@@ -511,12 +524,11 @@
                 }
               : null,
         },
-        serviceAreaData: validationResult || {
-          served: false,
-          areas: [],
-          primaryArea: null,
+        serviceAreaData: validationResult,
+        attributionData: {
+          ...widgetState.attributionData,
+          consent_status: widgetState.attributionData.consent_status || null
         },
-        attributionData: widgetState.attributionData,
       };
 
       const response = await fetch(
@@ -541,6 +553,12 @@
       }
 
       const result = await response.json();
+      
+      // Store partial lead ID in widget state for future updates
+      if (result.success && result.partialLeadId) {
+        widgetState.partialLeadId = result.partialLeadId;
+      }
+      
       return result;
     } catch (error) {
       console.error('Error saving partial lead:', error);
@@ -726,6 +744,21 @@
         phone: quotePhoneInput.value.trim(),
       };
 
+      // Save partial lead immediately with contact information
+      try {
+        const partialSaveResult = await savePartialLead(
+          null, // Service area validation not applicable for contact step
+          'contact' // Current step user is on
+        );
+        if (!partialSaveResult.success) {
+          console.warn(
+            'Failed to save contact information:',
+            partialSaveResult.error
+          );
+        }
+      } catch (error) {
+        console.warn('Error saving contact information:', error);
+      }
 
       // Fetch plan comparison data and ensure minimum loading time
       await Promise.all([
@@ -857,9 +890,38 @@
   };
 
   // Expose functions to window for use by other modules
+  // Recover partial lead from server
+  const recoverPartialLead = async (companyId, sessionId) => {
+    try {
+      const response = await fetch(config.baseUrl + '/api/widget/recover-form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyId: companyId,
+          sessionId: sessionId,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to recover form data' };
+      }
+
+      return data; // Return the full response object since it already has success/hasPartialLead structure
+    } catch (error) {
+      console.error('Error recovering partial lead:', error);
+      return { success: false, error: 'Network error recovering form data' };
+    }
+  };
+
   window.fetchPlanComparisonData = fetchPlanComparisonData;
   window.fetchPricingData = fetchPricingData;
   window.getCheapestFullCoveragePlan = getCheapestFullCoveragePlan;
   window.formatBillingFrequencyFull = formatBillingFrequencyFull;
+  window.recoverPartialLead = recoverPartialLead;
+  window.mapStepToPartialLeadStep = mapStepToPartialLeadStep;
 
 })();

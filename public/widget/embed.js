@@ -1,6 +1,6 @@
 /**
  * DH Widget - Built from Source
- * Generated: 2025-08-27T19:52:00.908Z
+ * Generated: 2025-08-28T20:04:34.226Z
  * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
  */
 
@@ -2919,6 +2919,7 @@
     max-width: 100%;
     width: unset;
     margin: 0 0 50px 0; 
+    border-radius: 0;
   }
   }
 
@@ -4504,17 +4505,72 @@
       modalBody.appendChild(widget.formWidget);
       modalWidgetCreated = true;
 
-      // Initialize first step after a brief delay
-      setTimeout(() => {
-        showStep('pest-issue');
-        setupStepValidation('pest-issue');
-      }, 100);
-    } else {
-      // For subsequent modal opens, just show the current step
-      if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
-        showStep(widgetState.currentStep);
+      // Check for recovery data and show continue prompt if available
+      if (typeof widgetState !== 'undefined' && widgetState.recoveryData && 
+          typeof window.progressiveFormManager !== 'undefined' && 
+          window.progressiveFormManager.shouldPromptToContinue(widgetState.recoveryData)) {
+        
+        // Check if this is cross-device recovery (auto-restore without prompt)
+        if (widgetState.recoveryData.source === 'cross-device') {
+          // Wait for modal DOM to be fully ready with polling
+          const waitForModalReady = () => {
+            // Check if all required elements exist
+            const requiredElements = [
+              '.dh-form-content',
+              '.dh-form-step',
+              '#dh-step-' + widgetState.recoveryData.currentStep
+            ];
+            
+            const allElementsReady = requiredElements.every(selector => {
+              return document.querySelector(selector) !== null;
+            });
+            
+            if (allElementsReady) {
+              if (typeof window.restoreProgress === 'function') {
+                window.restoreProgress(widgetState.recoveryData);
+              }
+            } else {
+              setTimeout(waitForModalReady, 100);
+            }
+          };
+          
+          setTimeout(waitForModalReady, 200);
+        } else {
+          // Show continue prompt for normal recovery (localStorage/server)
+          setTimeout(() => {
+            if (window.progressiveFormManager && typeof window.progressiveFormManager.showContinuePrompt === 'function') {
+              window.progressiveFormManager.showContinuePrompt(widgetState.recoveryData);
+            }
+          }, 300); // Slight delay to let modal finish opening
+        }
       } else {
-        showStep('pest-issue');
+        // Initialize first step after a brief delay if no recovery data
+        setTimeout(() => {
+          if (window.progressiveFormManager) {
+            window.progressiveFormManager.startAutoSave();
+          }
+          showStep('pest-issue');
+          setupStepValidation('pest-issue');
+        }, 100);
+      }
+    } else {
+      // For subsequent modal opens, check if we should show continue prompt
+      if (typeof widgetState !== 'undefined' && widgetState.recoveryData && 
+          typeof window.progressiveFormManager !== 'undefined' && 
+          window.progressiveFormManager.shouldPromptToContinue(widgetState.recoveryData)) {
+        
+        setTimeout(() => {
+          if (window.progressiveFormManager && typeof window.progressiveFormManager.showContinuePrompt === 'function') {
+            window.progressiveFormManager.showContinuePrompt(widgetState.recoveryData);
+          }
+        }, 300);
+      } else {
+        // Show current step or default to first step
+        if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
+          showStep(widgetState.currentStep);
+        } else {
+          showStep('pest-issue');
+        }
       }
     }
 
@@ -4523,7 +4579,7 @@
     document.body.style.overflow = 'hidden'; // Prevent background scroll
 
     // Force reflow to ensure display is set before animation
-    modal.offsetHeight;
+    void modal.offsetHeight;
 
     // Add show class for animation
     modal.classList.add('show');
@@ -4769,7 +4825,7 @@
       const confirmButton = document.getElementById('confirm-address-next');
       if (confirmButton) {
         confirmButton.innerHTML =
-          'Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg>';
+          'Continue <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         confirmButton.disabled = true; // Will be re-enabled by checkbox validation
         confirmButton.style.opacity = '0.5';
         confirmButton.style.cursor = 'not-allowed';
@@ -4846,8 +4902,31 @@
   // Update dynamic text based on form data
   await updateDynamicText();
 
+  // Ensure consent status is preserved if user has already completed confirm-address step
+  const stepOrder = ['pest-issue', 'address', 'confirm-address', 'how-we-do-it', 'offer', 'quote-contact', 'plan-comparison', 'contact', 'complete'];
+  const confirmAddressIndex = stepOrder.indexOf('confirm-address');
+  const currentStepIndex = stepOrder.indexOf(stepName);
+  
+  // If current step is after confirm-address and consent was already confirmed, maintain it
+  if (currentStepIndex > confirmAddressIndex && widgetState.attributionData?.consent_status === 'confirmed') {
+    // Consent status is already confirmed, no action needed - it will be preserved in partial saves
+  }
+
   // Setup step-specific validation and event handlers
   setupStepValidation(stepName);
+
+  // Note: Partial leads are now saved immediately when users interact with forms
+  // (pest selection, address validation, contact info entry, plan selection)
+  // rather than on step navigation to capture data in real-time
+
+  // Save form progress to local storage
+  if (typeof window.progressiveFormManager !== 'undefined' && window.progressiveFormManager.saveFormStateToLocalStorage) {
+    try {
+      window.progressiveFormManager.saveFormStateToLocalStorage();
+    } catch (error) {
+      console.warn('Failed to save form state to localStorage:', error);
+    }
+  }
 
   // Load plans when reaching plan selection step
   if (stepName === 'plan-selection') {
@@ -5061,6 +5140,29 @@
       }
 
       const validationResult = await validateServiceArea();
+
+      // Capture consent status since user can't continue without checking the checkbox
+      const consentCheckbox = document.getElementById('confirm-address-consent-checkbox');
+      const consentStatus = consentCheckbox && consentCheckbox.checked ? 'confirmed' : 'not_provided';
+      
+      // Store consent in attribution data
+      widgetState.attributionData.consent_status = consentStatus;
+
+      // Save partial lead with consent status and final address confirmation
+      try {
+        const partialSaveResult = await savePartialLead(
+          validationResult,
+          'how-we-do-it' // Next step user will go to
+        );
+        if (!partialSaveResult.success) {
+          console.warn(
+            'Failed to save address confirmation with consent:',
+            partialSaveResult.error
+          );
+        }
+      } catch (error) {
+        console.warn('Error saving address confirmation:', error);
+      }
 
       if (validationResult.served) {
         // User is still in service area, fetch recommended plan and proceed to how-we-do-it step
@@ -5406,6 +5508,22 @@
 
   try {
     const validationResult = await validateServiceArea();
+
+    // Save partial lead immediately after address validation with actual service area results
+    try {
+      const partialSaveResult = await savePartialLead(
+        validationResult,
+        'confirm-address' // Next step user will go to
+      );
+      if (!partialSaveResult.success) {
+        console.warn(
+          'Failed to save address validation:',
+          partialSaveResult.error
+        );
+      }
+    } catch (error) {
+      console.warn('Error saving address validation:', error);
+    }
 
     if (validationResult.served) {
       // User is in service area, navigate to confirm-address step
@@ -5875,7 +5993,7 @@
             try {
               const partialSaveResult = await savePartialLead(
                 { served: false, status: 'unknown' }, // Service area unknown until address validated
-                'pest_issue_completed'
+                'address' // Next step user will go to
               );
               if (!partialSaveResult.success) {
                 console.warn(
@@ -7673,7 +7791,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-secondary" onclick="nextStep()" id="confirm-address-next">Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-secondary" onclick="nextStep()" id="confirm-address-next">Continue <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       
@@ -8149,7 +8267,6 @@
     const formData = {
       companyId: config.companyId,
       pestType: widgetState.formData.pestType,
-      urgency: widgetState.formData.urgency,
       selectedPlan: widgetState.formData.selectedPlan,
       recommendedPlan: widgetState.formData.recommendedPlan,
       address: widgetState.formData.address, // Formatted address for backward compatibility
@@ -8160,7 +8277,6 @@
         zip: widgetState.formData.addressZip,
       },
       homeSize: parseInt(widgetState.formData.homeSize),
-      urgency: widgetState.formData.urgency,
       contactInfo: widgetState.formData.contactInfo,
       coordinates: {
         latitude: widgetState.formData.latitude,
@@ -8494,7 +8610,7 @@
 
     // Save partial lead with plan selection
     try {
-      savePartialLead('plan_selected');
+      savePartialLead(null, 'contact'); // Next step user will go to
     } catch (error) {
       console.error('Error saving plan selection:', error);
     }
@@ -8574,10 +8690,25 @@
     }
   };
 
+  // Map widget step names to partial lead step names
+  const mapStepToPartialLeadStep = (widgetStep) => {
+    const stepMap = {
+      'pest-issue': 'pest_issue_completed',
+      'address': 'address_validated',
+      'confirm-address': 'address_confirmed',
+      'how-we-do-it': 'how_we_do_it_viewed',
+      'offer': 'offer_viewed',
+      'contact': 'contact_started',
+      'quote': 'quote_started',
+      'plan-comparison': 'plan_selected'
+    };
+    return stepMap[widgetStep] || widgetStep;
+  };
+
   // Partial lead save function
   const savePartialLead = async (
     validationResult,
-    stepCompleted = 'address_completed'
+    stepCompleted = 'address'
   ) => {
     if (!widgetState.sessionId || !widgetState.attributionData) {
       console.warn(
@@ -8589,8 +8720,7 @@
     // Only require coordinates for steps after address entry
     const { latitude, longitude } = widgetState.formData;
     const requiresCoordinates = ![
-      'pest_issue_completed',
-      'urgency_completed',
+      'address', // Address step doesn't need coordinates yet
     ].includes(stepCompleted);
 
     if (requiresCoordinates && (!latitude || !longitude)) {
@@ -8609,9 +8739,10 @@
         formData: {
           pestType: widgetState.formData.pestType || null,
           pestIcon: widgetState.formData.pestIcon || null,
-          urgency: widgetState.formData.urgency || null,
+          pestBackgroundImage: widgetState.formData.pestBackgroundImage || null,
           selectedPlan: widgetState.formData.selectedPlan || null,
           recommendedPlan: widgetState.formData.recommendedPlan || null,
+          offerPrice: widgetState.formData.offerPrice || null,
           address: widgetState.formData.address,
           addressDetails: {
             street: widgetState.formData.addressStreet,
@@ -8622,7 +8753,7 @@
           latitude: latitude ? parseFloat(latitude) : null,
           longitude: longitude ? parseFloat(longitude) : null,
           contactInfo:
-            stepCompleted === 'contact_started'
+            stepCompleted === 'contact'
               ? {
                   name: widgetState.formData.contactInfo.name || null,
                   phone: widgetState.formData.contactInfo.phone || null,
@@ -8632,12 +8763,11 @@
                 }
               : null,
         },
-        serviceAreaData: validationResult || {
-          served: false,
-          areas: [],
-          primaryArea: null,
+        serviceAreaData: validationResult,
+        attributionData: {
+          ...widgetState.attributionData,
+          consent_status: widgetState.attributionData.consent_status || null
         },
-        attributionData: widgetState.attributionData,
       };
 
       const response = await fetch(
@@ -8662,6 +8792,12 @@
       }
 
       const result = await response.json();
+      
+      // Store partial lead ID in widget state for future updates
+      if (result.success && result.partialLeadId) {
+        widgetState.partialLeadId = result.partialLeadId;
+      }
+      
       return result;
     } catch (error) {
       console.error('Error saving partial lead:', error);
@@ -8847,6 +8983,21 @@
         phone: quotePhoneInput.value.trim(),
       };
 
+      // Save partial lead immediately with contact information
+      try {
+        const partialSaveResult = await savePartialLead(
+          null, // Service area validation not applicable for contact step
+          'contact' // Current step user is on
+        );
+        if (!partialSaveResult.success) {
+          console.warn(
+            'Failed to save contact information:',
+            partialSaveResult.error
+          );
+        }
+      } catch (error) {
+        console.warn('Error saving contact information:', error);
+      }
 
       // Fetch plan comparison data and ensure minimum loading time
       await Promise.all([
@@ -8978,10 +9129,39 @@
   };
 
   // Expose functions to window for use by other modules
+  // Recover partial lead from server
+  const recoverPartialLead = async (companyId, sessionId) => {
+    try {
+      const response = await fetch(config.baseUrl + '/api/widget/recover-form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyId: companyId,
+          sessionId: sessionId,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to recover form data' };
+      }
+
+      return data; // Return the full response object since it already has success/hasPartialLead structure
+    } catch (error) {
+      console.error('Error recovering partial lead:', error);
+      return { success: false, error: 'Network error recovering form data' };
+    }
+  };
+
   window.fetchPlanComparisonData = fetchPlanComparisonData;
   window.fetchPricingData = fetchPricingData;
   window.getCheapestFullCoveragePlan = getCheapestFullCoveragePlan;
   window.formatBillingFrequencyFull = formatBillingFrequencyFull;
+  window.recoverPartialLead = recoverPartialLead;
+  window.mapStepToPartialLeadStep = mapStepToPartialLeadStep;
 
   // === CONFIGURATION AND INITIALIZATION ===
   const config = {
@@ -9054,6 +9234,10 @@
     const gclid = urlObj.searchParams.get('gclid');
     if (gclid) params.gclid = gclid;
 
+    // Extract continue_session for cross-device recovery
+    const continueSession = urlObj.searchParams.get('continue_session');
+    if (continueSession) params.continue_session = continueSession;
+
     return params;
   };
 
@@ -9087,17 +9271,68 @@
     try {
       
       // Initialize session and URL parameters
-      const sessionId = generateSessionId();
       const urlParams = parseUrlParameters();
+      const sessionId = urlParams.continue_session || generateSessionId();
       
+      // Determine traffic source based on available data
+      const determineTrafficSource = (params, referrer) => {
+        // Check for paid search indicators
+        if (params.gclid) return 'google_ads';
+        if (params.utm_source === 'google' && params.utm_medium === 'cpc') return 'google_ads';
+        if (params.utm_medium === 'cpc' || params.utm_medium === 'ppc') return 'paid_search';
+        
+        // Check for organic search
+        if (referrer && (
+          referrer.includes('google.com') || 
+          referrer.includes('bing.com') || 
+          referrer.includes('yahoo.com') ||
+          referrer.includes('duckduckgo.com')
+        )) return 'organic_search';
+        
+        // Check for social media
+        if (referrer && (
+          referrer.includes('facebook.com') || 
+          referrer.includes('instagram.com') ||
+          referrer.includes('twitter.com') || 
+          referrer.includes('linkedin.com') ||
+          referrer.includes('youtube.com')
+        )) return 'social';
+        
+        // Check for UTM source
+        if (params.utm_source) {
+          if (params.utm_medium === 'email') return 'email';
+          if (params.utm_medium === 'social') return 'social';
+          return `utm_${params.utm_source}`;
+        }
+        
+        // Check if there's a referrer
+        if (referrer) return 'referral';
+        
+        // Default to direct
+        return 'direct';
+      };
+
       // Create attribution data with required page_url field
       const attributionData = {
         ...urlParams,
         page_url: window.location.href,
+        referrer_url: document.referrer || null,
+        referrer_domain: document.referrer ? new URL(document.referrer).hostname : null,
+        traffic_source: determineTrafficSource(urlParams, document.referrer),
         user_agent: navigator.userAgent,
         timestamp: new Date().toISOString(),
         collected_at: 'widget_load',
       };
+
+      // Debug logging for URL capture
+      console.log('DH Widget URL Capture:', {
+        page_url: attributionData.page_url,
+        referrer_url: attributionData.referrer_url,
+        referrer_domain: attributionData.referrer_domain,
+        traffic_source: attributionData.traffic_source,
+        document_referrer: document.referrer,
+        utm_params: urlParams
+      });
       
       // Initialize widget state objects (already declared globally)
       widgetState = {
@@ -9113,7 +9348,6 @@
           pestType: '',
           pestIcon: '',
           pestBackgroundImage: '',
-          urgency: '',
           selectedPlan: '',
           recommendedPlan: '',
           address: '',
@@ -9124,8 +9358,11 @@
           latitude: '',
           longitude: '',
           homeSize: '',
+          consentStatus: '',
           contactInfo: {
             name: '',
+            firstName: '',
+            lastName: '',
             phone: '',
             email: '',
             comments: '',
@@ -9159,29 +9396,19 @@
 
       // Initialize step progress manager
       stepProgressManager = {
-        stepFlow: ['pest-issue', 'address', 'quote', 'complete'],
+        stepFlow: ['pest-issue', 'address', 'confirm-address', 'how-we-do-it', 'quote-contact', 'plan-comparison', 'contact', 'complete'],
         stepLabels: {
           'pest-issue': 'Pest Issue',
-          address: 'Address',
-          quote: 'Quote',
-          complete: 'Complete',
+          'address': 'Address',
+          'confirm-address': 'Confirm Address',
+          'how-we-do-it': 'How We Do It',
+          'quote-contact': 'Quote Contact',
+          'plan-comparison': 'Plan Comparison',
+          'contact': 'Contact',
+          'complete': 'Complete',
         },
         getProgressStep: actualStep => {
-          const quoteSteps = [
-            'urgency',
-            'how-we-do-it',
-            'plan-comparison',
-            'quote-contact',
-            'contact',
-            'plan-selection',
-            'plans',
-          ];
-          if (quoteSteps.includes(actualStep)) {
-            return 'quote';
-          }
-          if (actualStep === 'complete') {
-            return 'complete';
-          }
+          // Simply return the actual step name - no mapping needed
           return actualStep;
         },
         getStepStatus: stepName => {
@@ -9275,6 +9502,7 @@
             localStorage.setItem('dh_widget_progress_' + config.companyId, JSON.stringify(saveData));
             widgetState.formState.lastSaved = new Date().toISOString();
             
+            console.log('DH Widget: Saved form state to localStorage', saveData);
             return true;
           } catch (error) {
             console.warn('Failed to save form state:', error);
@@ -9316,7 +9544,10 @@
         
         // Check if user has significant progress worth restoring
         shouldPromptToContinue: (savedData) => {
-          if (!savedData) return false;
+          if (!savedData) {
+            console.log('DH Widget: No saved data for continue prompt');
+            return false;
+          }
           
           const { formData, currentStep } = savedData;
           
@@ -9324,25 +9555,38 @@
           const hasSignificantProgress = !!(
             formData.pestType ||
             formData.address ||
-            formData.urgency ||
             (currentStep !== 'pest-issue' && currentStep !== 'welcome')
           );
+          
+          console.log('DH Widget: Checking if should prompt to continue', {
+            hasSignificantProgress,
+            pestType: formData.pestType,
+            address: formData.address,
+            currentStep: currentStep,
+            formData: formData
+          });
           
           return hasSignificantProgress;
         },
         
         // Start auto-save functionality
         startAutoSave: () => {
-          if (!widgetState.formState.progressiveFeatures.autoSave) return;
+          if (!widgetState.formState.progressiveFeatures.autoSave) {
+            console.log('DH Widget: Auto-save is disabled');
+            return;
+          }
           
           // Clear any existing timer
           if (progressiveFormManager.autoSaveTimer) {
             clearInterval(progressiveFormManager.autoSaveTimer);
           }
           
+          console.log('DH Widget: Starting auto-save with interval:', widgetState.formState.autoSaveInterval);
+          
           // Start new auto-save timer
           progressiveFormManager.autoSaveTimer = setInterval(() => {
             if (progressiveFormManager.hasSignificantFormData()) {
+              console.log('DH Widget: Auto-save triggered - has significant data');
               progressiveFormManager.saveFormStateToLocalStorage();
             }
           }, widgetState.formState.autoSaveInterval);
@@ -9362,7 +9606,6 @@
             address:
               (widgetState.formData.address ? 50 : 0) +
               (widgetState.formData.latitude ? 50 : 0), // Address entered + validated
-            urgency: widgetState.formData.urgency ? 100 : 0, // Added urgency step
             plans:
               widgetState.currentStep === 'contact' ||
               widgetState.currentStep === 'complete'
@@ -9489,162 +9732,162 @@
           if (container) {
             container.appendChild(warningEl);
           }
-        }
-      };
-      
-      // Function to show continue prompt to users with saved progress
-      const showContinuePrompt = (savedData) => {
-        // Create overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'dh-continue-prompt-overlay';
-        overlay.style.cssText = `
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.6);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 10000;
-          backdrop-filter: blur(4px);
-          animation: fadeIn 0.3s ease;
-        `;
+        },
         
-        // Create modal
-        const modal = document.createElement('div');
-        modal.className = 'dh-continue-prompt-modal';
-        modal.style.cssText = `
-          background: white;
-          border-radius: 16px;
-          padding: 32px;
-          max-width: 480px;
-          width: 90%;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-          text-align: center;
-          animation: slideUp 0.3s ease;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `;
-        
-        // Get step display name
-        const stepNames = {
-          'pest-issue': 'pest selection',
-          'address': 'address information',
-          'confirm-address': 'address confirmation',
-          'how-we-do-it': 'service information',
-          'quote-contact': 'contact information',
-          'plan-comparison': 'plan selection',
-          'contact': 'scheduling details'
-        };
-        
-        const currentStepName = stepNames[savedData.currentStep] || 'your information';
-        const timeAgo = getTimeAgo(new Date(savedData.timestamp));
-        
-        modal.innerHTML = `
-          <div style="margin-bottom: 24px;">
-            <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                <path d="M9 11l3 3l8-8"></path>
-                <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9s4.03-9 9-9c1.51 0 2.93 0.37 4.18 1.03"></path>
-              </svg>
-            </div>
-            <h3 style="color: #1f2937; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Welcome back!</h3>
-            <p style="color: #6b7280; font-size: 16px; margin: 0; line-height: 1.5;">
-              We found your progress from ${timeAgo}. You were working on ${currentStepName}.
-            </p>
-          </div>
+        // Function to show continue prompt to users with saved progress
+        showContinuePrompt: (savedData) => {
+          console.log('DH Widget: showContinuePrompt called with data:', savedData);
           
-          <div style="display: flex; gap: 12px; flex-direction: column;">
-            <button id="continue-btn" style="
-              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-              color: white;
-              border: none;
-              border-radius: 12px;
-              padding: 16px 24px;
-              font-size: 16px;
-              font-weight: 600;
-              cursor: pointer;
-              transition: all 0.2s ease;
-            ">Continue Where I Left Off</button>
-            <button id="start-over-btn" style="
-              background: transparent;
-              color: #6b7280;
-              border: 2px solid #e5e7eb;
-              border-radius: 12px;
-              padding: 14px 24px;
-              font-size: 16px;
-              font-weight: 500;
-              cursor: pointer;
-              transition: all 0.2s ease;
-            ">Start Over</button>
-          </div>
-        `;
-        
-        // Add hover effects
-        const continueBtn = modal.querySelector('#continue-btn');
-        const startOverBtn = modal.querySelector('#start-over-btn');
-        
-        continueBtn.addEventListener('mouseenter', () => {
-          continueBtn.style.transform = 'translateY(-2px)';
-          continueBtn.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.3)';
-        });
-        continueBtn.addEventListener('mouseleave', () => {
-          continueBtn.style.transform = 'translateY(0)';
-          continueBtn.style.boxShadow = 'none';
-        });
-        
-        startOverBtn.addEventListener('mouseenter', () => {
-          startOverBtn.style.borderColor = '#9ca3af';
-          startOverBtn.style.color = '#374151';
-        });
-        startOverBtn.addEventListener('mouseleave', () => {
-          startOverBtn.style.borderColor = '#e5e7eb';
-          startOverBtn.style.color = '#6b7280';
-        });
-        
-        // Event handlers
-        continueBtn.addEventListener('click', () => {
-          overlay.remove();
-          restoreProgress(savedData);
-        });
-        
-        startOverBtn.addEventListener('click', () => {
-          overlay.remove();
-          progressiveFormManager.clearSavedFormState();
-          startFreshWidget();
-        });
-        
-        // Close on overlay click
-        overlay.addEventListener('click', (e) => {
-          if (e.target === overlay) {
+          // Create overlay
+          const overlay = document.createElement('div');
+          overlay.className = 'dh-continue-prompt-overlay';
+          overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000000;
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.3s ease;
+          `;
+          
+          // Create modal
+          const modal = document.createElement('div');
+          modal.className = 'dh-continue-prompt-modal';
+          modal.style.cssText = `
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            animation: slideUp 0.3s ease;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          `;
+          
+          // Get step display name
+          const stepNames = {
+            'pest-issue': 'pest selection',
+            'address': 'address information',
+            'confirm-address': 'address confirmation',
+            'how-we-do-it': 'service information',
+            'quote-contact': 'contact information',
+            'plan-comparison': 'plan selection',
+            'contact': 'scheduling details'
+          };
+          
+          const currentStepName = stepNames[savedData.currentStep] || 'your information';
+          const timeAgo = getTimeAgo(new Date(savedData.timestamp));
+          
+          modal.innerHTML = `
+            <div style="margin-bottom: 24px;">
+              <div style="width: 64px; height: 64px; background: ${config.primaryColor}; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                  <path d="M9 11l3 3l8-8"></path>
+                  <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9s4.03-9 9-9c1.51 0 2.93 0.37 4.18 1.03"></path>
+                </svg>
+              </div>
+              <h3 style="color: #1f2937; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Welcome back!</h3>
+              <p style="color: #6b7280; font-size: 16px; margin: 0; line-height: 1.5;">
+                We noticed you have unsaved progress. Do you want to continue or start fresh?
+              </p>
+            </div>
+            
+            <div style="display: flex; gap: 12px; flex-direction: column;">
+              <button id="continue-btn" style="
+                background: ${config.primaryColor};
+                color: white;
+                border: none;
+                border-radius: 12px;
+                padding: 16px 24px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s ease;
+              ">Continue Where I Left Off</button>
+              <button id="start-over-btn" style="
+                background: transparent;
+                color: #6b7280;
+                border: 2px solid #e5e7eb;
+                border-radius: 12px;
+                padding: 14px 24px;
+                font-size: 16px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+              ">Start Over</button>
+            </div>
+          `;
+          
+          // Add hover effects
+          const continueBtn = modal.querySelector('#continue-btn');
+          const startOverBtn = modal.querySelector('#start-over-btn');
+          
+          continueBtn.addEventListener('mouseenter', () => {
+            continueBtn.style.transform = 'translateY(-2px)';
+          });
+          continueBtn.addEventListener('mouseleave', () => {
+            continueBtn.style.transform = 'translateY(0)';
+          });
+          
+          startOverBtn.addEventListener('mouseenter', () => {
+            startOverBtn.style.borderColor = '#9ca3af';
+            startOverBtn.style.color = '#374151';
+          });
+          startOverBtn.addEventListener('mouseleave', () => {
+            startOverBtn.style.borderColor = '#e5e7eb';
+            startOverBtn.style.color = '#6b7280';
+          });
+          
+          // Event handlers
+          continueBtn.addEventListener('click', () => {
             overlay.remove();
-            startFreshWidget(); // Default to fresh start if they click outside
-          }
-        });
-        
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
-        
-        // Add CSS animations
-        const style = document.createElement('style');
-        style.textContent = `
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-          @keyframes slideUp {
-            from { 
-              opacity: 0;
-              transform: translateY(20px) scale(0.95);
+            restoreProgress(savedData);
+          });
+          
+          startOverBtn.addEventListener('click', () => {
+            overlay.remove();
+            progressiveFormManager.clearSavedFormState();
+            startFreshWidget();
+          });
+          
+          // Close on overlay click
+          overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+              overlay.remove();
+              startFreshWidget(); // Default to fresh start if they click outside
             }
-            to { 
-              opacity: 1;
-              transform: translateY(0) scale(1);
+          });
+          
+          overlay.appendChild(modal);
+          document.body.appendChild(overlay);
+          
+          // Add CSS animations
+          const style = document.createElement('style');
+          style.textContent = `
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
             }
-          }
-        `;
-        document.head.appendChild(style);
+            @keyframes slideUp {
+              from { 
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              to { 
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+          `;
+          document.head.appendChild(style);
+        }
       };
       
       // Function to get human-readable time ago
@@ -9669,126 +9912,146 @@
           widgetState.formData = { ...widgetState.formData, ...savedData.formData };
           widgetState.currentStep = savedData.currentStep;
           
-          // Restore completed steps
-          if (savedData.completedSteps) {
-            savedData.completedSteps.forEach(step => {
-              stepProgressManager.markStepComplete(step);
-            });
-          }
-          
-          // Populate form fields with restored data
-          populateFormFields();
-          
-          // Navigate to saved step
+          // Navigate to saved step first
           showStep(savedData.currentStep);
           setupStepValidation(savedData.currentStep);
           
+          // Then populate form fields after a delay to ensure DOM is ready
+          setTimeout(() => {
+            populateFormFields();
+          }, 300);
+          
           // Start auto-save
           progressiveFormManager.startAutoSave();
-          
-          console.log('Progress restored successfully:', savedData);
         } catch (error) {
-          console.error('Failed to restore progress:', error);
+          console.error('DH Widget: Failed to restore progress', error);
           // Fallback to fresh start if restoration fails
           startFreshWidget();
         }
       };
       
+      // Make restoreProgress available globally for cross-device recovery
+      window.restoreProgress = restoreProgress;
+      
       // Function to populate form fields with restored data
       const populateFormFields = () => {
         const data = widgetState.formData;
         
-        // Populate pest selection
-        if (data.pestType) {
-          const pestOption = document.querySelector(`[data-pest="${data.pestType}"]`);
-          if (pestOption) {
-            pestOption.classList.add('selected');
-          }
-        }
-        
-        // Populate address fields
-        if (data.address) {
-          const addressInput = document.getElementById('address-search-input');
-          if (addressInput) addressInput.value = data.address;
-        }
-        
-        if (data.addressStreet) {
-          const streetInput = document.getElementById('street-input') || document.getElementById('confirm-street-input');
-          if (streetInput) streetInput.value = data.addressStreet;
-        }
-        
-        if (data.addressCity) {
-          const cityInput = document.getElementById('city-input') || document.getElementById('confirm-city-input');
-          if (cityInput) cityInput.value = data.addressCity;
-        }
-        
-        if (data.addressState) {
-          const stateInput = document.getElementById('state-input') || document.getElementById('confirm-state-input');
-          if (stateInput) stateInput.value = data.addressState;
-        }
-        
-        if (data.addressZip) {
-          const zipInput = document.getElementById('zip-input') || document.getElementById('confirm-zip-input');
-          if (zipInput) zipInput.value = data.addressZip;
-        }
-        
-        // Populate contact information
-        if (data.contactInfo) {
-          const { firstName, lastName, email, phone } = data.contactInfo;
-          
-          if (firstName) {
-            const firstNameInput = document.getElementById('quote-first-name-input');
-            if (firstNameInput) {
-              firstNameInput.value = firstName;
-              updateFloatingLabel(firstNameInput);
+        try {
+          // Populate address fields
+          if (data.address) {
+            const addressInput = document.getElementById('address-search-input');
+            if (addressInput) {
+              addressInput.value = data.address;
             }
           }
           
-          if (lastName) {
-            const lastNameInput = document.getElementById('quote-last-name-input');
-            if (lastNameInput) {
-              lastNameInput.value = lastName;
-              updateFloatingLabel(lastNameInput);
+          if (data.addressStreet) {
+            const streetInput = document.getElementById('street-input') || document.getElementById('confirm-street-input');
+            if (streetInput) {
+              streetInput.value = data.addressStreet;
             }
           }
           
-          if (email) {
-            const emailInput = document.getElementById('quote-email-input');
-            if (emailInput) {
-              emailInput.value = email;
-              updateFloatingLabel(emailInput);
+          if (data.addressCity) {
+            const cityInput = document.getElementById('city-input') || document.getElementById('confirm-city-input');
+            if (cityInput) {
+              cityInput.value = data.addressCity;
             }
           }
           
-          if (phone) {
-            const phoneInput = document.getElementById('quote-phone-input');
-            if (phoneInput) {
-              phoneInput.value = phone;
-              updateFloatingLabel(phoneInput);
+          if (data.addressState) {
+            const stateInput = document.getElementById('state-input') || document.getElementById('confirm-state-input');
+            if (stateInput) {
+              stateInput.value = data.addressState;
             }
           }
-        }
-        
-        // Populate scheduling information
-        if (data.startDate) {
-          const startDateInput = document.getElementById('start-date-input');
-          if (startDateInput) {
-            startDateInput.value = data.startDate;
-            updateFloatingLabel(startDateInput);
+          
+          if (data.addressZip) {
+            const zipInput = document.getElementById('zip-input') || document.getElementById('confirm-zip-input');
+            if (zipInput) {
+              zipInput.value = data.addressZip;
+            }
           }
-        }
-        
-        if (data.arrivalTime) {
-          const arrivalTimeInput = document.getElementById('arrival-time-input');
-          if (arrivalTimeInput) {
-            arrivalTimeInput.value = data.arrivalTime;
-            updateFloatingLabel(arrivalTimeInput);
+          
+          // Populate contact information with improved field detection
+          if (data.contactInfo) {
+            const { firstName, lastName, email, phone } = data.contactInfo;
+            
+            if (firstName) {
+              const firstNameInput = document.getElementById('quote-first-name-input') || 
+                                   document.getElementById('first-name-input');
+              if (firstNameInput) {
+                firstNameInput.value = firstName;
+                if (typeof updateFloatingLabel === 'function') {
+                  updateFloatingLabel(firstNameInput);
+                }
+              }
+            }
+            
+            if (lastName) {
+              const lastNameInput = document.getElementById('quote-last-name-input') || 
+                                   document.getElementById('last-name-input');
+              if (lastNameInput) {
+                lastNameInput.value = lastName;
+                if (typeof updateFloatingLabel === 'function') {
+                  updateFloatingLabel(lastNameInput);
+                }
+              }
+            }
+            
+            if (email) {
+              const emailInput = document.getElementById('quote-email-input') || 
+                                document.getElementById('email-input');
+              if (emailInput) {
+                emailInput.value = email;
+                if (typeof updateFloatingLabel === 'function') {
+                  updateFloatingLabel(emailInput);
+                }
+              }
+            }
+            
+            if (phone) {
+              const phoneInput = document.getElementById('quote-phone-input') || 
+                                document.getElementById('phone-input');
+              if (phoneInput) {
+                phoneInput.value = phone;
+                if (typeof updateFloatingLabel === 'function') {
+                  updateFloatingLabel(phoneInput);
+                }
+              }
+            }
           }
+          
+          // Populate scheduling information
+          if (data.startDate) {
+            const startDateInput = document.getElementById('start-date-input');
+            if (startDateInput) {
+              startDateInput.value = data.startDate;
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(startDateInput);
+              }
+            }
+          }
+          
+          if (data.arrivalTime) {
+            const arrivalTimeInput = document.getElementById('arrival-time-input');
+            if (arrivalTimeInput) {
+              arrivalTimeInput.value = data.arrivalTime;
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(arrivalTimeInput);
+              }
+            }
+          }
+          
+        } catch (error) {
+          console.error('DH Widget: Error populating form fields', error);
         }
       };
       
       // Function to start fresh widget
       const startFreshWidget = () => {
+        console.log('DH Widget: Starting fresh widget');
         progressiveFormManager.startAutoSave();
         showStep('pest-issue');
         setupStepValidation('pest-issue');
@@ -9803,6 +10066,7 @@
       
       // Make functions available globally for other modules
       window.triggerProgressSave = triggerProgressSave;
+      window.progressiveFormManager = progressiveFormManager;
       
       // Load configuration first
       const configLoaded = await loadConfig();
@@ -9889,16 +10153,124 @@
         }
       }
       
-      // Check for saved progress and handle restoration
+      // Cross-device recovery mode (URL parameter present)
+      if (urlParams.continue_session) {
+        
+        // Query server with the session ID from URL
+        let serverRecoveryData = null;
+        if (typeof recoverPartialLead === 'function') {
+          try {
+            serverRecoveryData = await recoverPartialLead(config.companyId, urlParams.continue_session);
+          } catch (error) {
+            console.warn('Failed to recover cross-device partial lead from server:', error);
+          }
+        }
+        
+        // If server data found, auto-restore immediately (skip prompt)
+        if (serverRecoveryData && serverRecoveryData.success && serverRecoveryData.hasPartialLead) {
+          // Use the server data directly - no mapping needed
+          const recoveryData = {
+            formData: serverRecoveryData.formData,
+            currentStep: serverRecoveryData.stepCompleted, // Use stepCompleted as currentStep
+            timestamp: serverRecoveryData.timestamps.updated,
+            source: 'cross-device'
+          };
+          
+          // Store recovery data for automatic restoration
+          widgetState.recoveryData = recoveryData;
+          
+          if (config.displayMode === 'button') {
+            // For button mode with cross-device recovery, auto-open the modal
+            setTimeout(() => {
+              const widgetButton = document.querySelector('.dh-widget-button');
+              if (widgetButton) {
+                widgetButton.click();
+              }
+            }, 100);
+          } else {
+            // For inline mode, initialize form first then restore progress
+            progressiveFormManager.startAutoSave();
+            showStep('pest-issue');
+            setupStepValidation('pest-issue');
+            
+            // Wait for inline DOM to be fully ready with polling
+            const waitForInlineReady = () => {
+              const requiredElements = [
+                '.dh-form-content',
+                '.dh-form-step',
+                '#dh-step-' + recoveryData.currentStep
+              ];
+              
+              const allElementsReady = requiredElements.every(selector => {
+                return document.querySelector(selector) !== null;
+              });
+              
+              if (allElementsReady) {
+                if (typeof window.restoreProgress === 'function') {
+                  window.restoreProgress(recoveryData);
+                }
+              } else {
+                setTimeout(waitForInlineReady, 100);
+              }
+            };
+            
+            // Start checking after a brief delay to let initial form render
+            setTimeout(waitForInlineReady, 200);
+          }
+          
+          return; // Skip normal initialization
+        } else {
+          // Fallback to normal initialization if no server data found
+        }
+      }
+      
+      // Normal recovery flow (no URL parameter)
       const savedData = progressiveFormManager.restoreFormStateFromLocalStorage();
-      if (savedData && progressiveFormManager.shouldPromptToContinue(savedData)) {
-        // Store saved data for potential restoration
-        widgetState.recoveryData = savedData;
+      
+      // Use existing sessionId if available in localStorage to maintain session continuity
+      if (savedData?.sessionId && !urlParams.continue_session) {
+        widgetState.sessionId = savedData.sessionId;
+      }
+      
+      // Also attempt to recover partial lead data from server using the correct sessionId
+      let serverRecoveryData = null;
+      const sessionIdToQuery = widgetState.sessionId; // Now uses the restored sessionId if it existed
+      
+      if (sessionIdToQuery && typeof recoverPartialLead === 'function') {
+        try {
+          console.log('DH Widget: Querying server with sessionId:', sessionIdToQuery);
+          serverRecoveryData = await recoverPartialLead(config.companyId, sessionIdToQuery);
+          console.log('DH Widget: Server recovery data check', serverRecoveryData);
+        } catch (error) {
+          console.warn('Failed to recover partial lead from server:', error);
+        }
+      }
+      
+      // Use server data if available and more recent, otherwise use local storage
+      let recoveryData = savedData;
+      if (serverRecoveryData && serverRecoveryData.success && serverRecoveryData.hasPartialLead) {
+        const serverTimestamp = new Date(serverRecoveryData.timestamps.updated);
+        const localTimestamp = savedData ? new Date(savedData.timestamp) : new Date(0);
+        
+        if (serverTimestamp > localTimestamp) {
+          // Use server data directly - no mapping needed
+          recoveryData = {
+            formData: serverRecoveryData.formData,
+            currentStep: serverRecoveryData.stepCompleted, // Use stepCompleted as currentStep
+            timestamp: serverRecoveryData.timestamps.updated,
+            source: 'server'
+          };
+        }
+      }
+      
+      if (recoveryData && progressiveFormManager.shouldPromptToContinue(recoveryData)) {
+        // Store recovery data for potential restoration
+        widgetState.recoveryData = recoveryData;
         
         if (config.displayMode !== 'button') {
           // For inline mode, show continue prompt immediately
           setTimeout(() => {
-            showContinuePrompt(savedData);
+            showContinuePrompt(recoveryData);
           }, 100);
         }
         // For button mode, continue prompt will be shown when modal opens

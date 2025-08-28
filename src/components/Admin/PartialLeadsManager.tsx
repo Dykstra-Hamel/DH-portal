@@ -418,8 +418,9 @@ export default function PartialLeadsManager() {
                   {selectedLead.attribution_data.gclid && (
                     <p><strong>GCLID:</strong> {selectedLead.attribution_data.gclid}</p>
                   )}
-                  {selectedLead.attribution_data.referrer_url && (
-                    <p><strong>Referrer:</strong> {selectedLead.attribution_data.referrer_url}</p>
+                  <p><strong>Referrer:</strong> {selectedLead.attribution_data.referrer_url || 'Direct/No Referrer'}</p>
+                  {selectedLead.attribution_data.page_url && (
+                    <p><strong>Page URL:</strong> {selectedLead.attribution_data.page_url}</p>
                   )}
                   <p><strong>Traffic Source:</strong> {selectedLead.attribution_data.traffic_source}</p>
                   <p><strong>Consent Status:</strong> {selectedLead.attribution_data.consent_status || 'Unknown'}</p>
