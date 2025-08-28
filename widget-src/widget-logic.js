@@ -2286,7 +2286,26 @@ const setupStepValidation = stepName => {
 
       // Select plan function - for plan comparison step
       window.selectPlan = (planId, planName) => {
-        // Store selected plan
+        // Find the full plan object from available plan data
+        let fullPlan = null;
+        
+        // Try to find plan from plan comparison data
+        if (window.comparisonPlansData) {
+          fullPlan = window.comparisonPlansData.find(plan => plan.id === planId);
+        }
+        
+        // Fallback: try from suggestions in widget state
+        if (!fullPlan && widgetState.planComparisonData?.suggestions) {
+          fullPlan = widgetState.planComparisonData.suggestions.find(plan => plan.id === planId);
+        }
+        
+        // Store selected plan (prefer full plan object, fallback to basic structure)
+        widgetState.formData.selectedPlan = fullPlan || {
+          id: planId,
+          plan_name: planName,
+        };
+        
+        // Keep legacy fields for backward compatibility (if needed elsewhere)
         widgetState.formData.selectedPlanId = planId;
         widgetState.formData.selectedPlanName = planName;
         widgetState.formData.offerChoice = 'schedule-from-comparison';
