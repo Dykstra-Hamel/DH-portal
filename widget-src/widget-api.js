@@ -351,10 +351,23 @@
 
   // Select a plan and proceed to next step
   window.selectPlan = (planId, planName) => {
-    // Save selected plan to form data
-    widgetState.formData.selectedPlan = {
+    // Find the full plan object from available plan data
+    let fullPlan = null;
+    
+    // Try to find plan from plan comparison data
+    if (window.comparisonPlansData) {
+      fullPlan = window.comparisonPlansData.find(plan => plan.id === planId);
+    }
+    
+    // Fallback: try from suggestions in widget state
+    if (!fullPlan && widgetState.planComparisonData?.suggestions) {
+      fullPlan = widgetState.planComparisonData.suggestions.find(plan => plan.id === planId);
+    }
+    
+    // Save selected plan to form data (prefer full plan object, fallback to basic structure)
+    widgetState.formData.selectedPlan = fullPlan || {
       id: planId,
-      name: planName,
+      plan_name: planName, // Use plan_name to match backend expectations
     };
 
     // Visual feedback
@@ -868,6 +881,8 @@
           
           // Store the recommended plan data
           widgetState.formData.recommendedPlan = cheapestPlan;
+          // Initialize selectedPlan to match recommendedPlan (user can override by actively selecting)
+          widgetState.formData.selectedPlan = cheapestPlan;
           widgetState.formData.offerPrice = cheapestPlan.recurring_price;
           
           return cheapestPlan;
@@ -875,6 +890,8 @@
           // No full coverage plans, use the best match available
           const bestPlan = data.suggestions[0];
           widgetState.formData.recommendedPlan = bestPlan;
+          // Initialize selectedPlan to match recommendedPlan (user can override by actively selecting)
+          widgetState.formData.selectedPlan = bestPlan;
           widgetState.formData.offerPrice = bestPlan.recurring_price;
           return bestPlan;
         }
@@ -884,6 +901,8 @@
     } catch (error) {
       console.error('Error getting cheapest full coverage plan:', error);
       widgetState.formData.recommendedPlan = null;
+      // Reset selectedPlan when recommendation fails
+      widgetState.formData.selectedPlan = null;
       widgetState.formData.offerPrice = null;
       return null;
     }
