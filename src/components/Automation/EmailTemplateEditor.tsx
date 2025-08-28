@@ -79,6 +79,10 @@ export default function EmailTemplateEditor({
   const [brandData, setBrandData] = useState<{
     logo_url: string;
   } | null>(null);
+  const [reviewsData, setReviewsData] = useState<{
+    rating: number;
+    reviewCount: number;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -145,6 +149,23 @@ export default function EmailTemplateEditor({
           if (brand) {
             setBrandData(brand);
           }
+
+          // Fetch Google reviews data
+          const { data: reviewsSetting } = await supabase
+            .from('company_settings')
+            .select('setting_value')
+            .eq('company_id', companyId)
+            .eq('setting_key', 'google_reviews_data')
+            .single();
+
+          if (reviewsSetting?.setting_value && reviewsSetting.setting_value !== '{}') {
+            try {
+              const parsedReviews = JSON.parse(reviewsSetting.setting_value);
+              setReviewsData(parsedReviews);
+            } catch (parseError) {
+              console.error('Error parsing Google reviews data:', parseError);
+            }
+          }
         } catch (error) {
           console.error('Error fetching company/brand data:', error);
         }
@@ -155,7 +176,7 @@ export default function EmailTemplateEditor({
   }, [isOpen, companyId]);
 
   // Use shared variable functions
-  const sampleVariables = createSampleVariables(companyData, brandData);
+  const sampleVariables = createSampleVariables(companyData, brandData, reviewsData);
 
   const handleSave = async () => {
     try {

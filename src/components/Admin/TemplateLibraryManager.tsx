@@ -614,7 +614,7 @@ export default function TemplateLibraryManager() {
                     {/* Company Variables */}
                     <div className={styles.variableGroup}>
                       <h5>Company Info</h5>
-                      {['companyName', 'companyEmail', 'companyPhone', 'companyWebsite', 'companyLogo'].map(variable => (
+                      {['companyName', 'companyEmail', 'companyPhone', 'companyWebsite', 'companyLogo', 'googleRating', 'googleReviewCount'].map(variable => (
                         <button
                           key={variable}
                           className={styles.variableButton}

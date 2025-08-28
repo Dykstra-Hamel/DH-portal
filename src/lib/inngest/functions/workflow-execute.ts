@@ -359,6 +359,23 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     .eq('company_id', companyId)
     .single();
     
+  // Get Google reviews data from company settings
+  const { data: reviewsSetting } = await supabase
+    .from('company_settings')
+    .select('setting_value')
+    .eq('company_id', companyId)
+    .eq('setting_key', 'google_reviews_data')
+    .single();
+    
+  let reviewsData = null;
+  try {
+    if (reviewsSetting?.setting_value && reviewsSetting.setting_value !== '{}') {
+      reviewsData = JSON.parse(reviewsSetting.setting_value);
+    }
+  } catch (parseError) {
+    console.error('Error parsing Google reviews data:', parseError);
+  }
+    
 
   // Prepare email variables with proper URL handling
   const logoUrl = brandData?.logo_url || '/pcocentral-logo.png';
@@ -430,6 +447,10 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     // Brand colors
     brandPrimaryColor: brandData?.primary_color_hex || '',
     brandSecondaryColor: brandData?.secondary_color_hex || '',
+    
+    // Google Reviews
+    googleRating: reviewsData?.rating ? reviewsData.rating.toString() : '',
+    googleReviewCount: reviewsData?.reviewCount ? reviewsData.reviewCount.toString() : '',
     
     // Service/Lead details
     pestType: leadData.pestType,

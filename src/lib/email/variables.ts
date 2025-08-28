@@ -25,6 +25,10 @@ export interface EmailVariables {
   companyWebsite: string;
   companyLogo: string;
   
+  // Google Reviews variables
+  googleRating: string;
+  googleReviewCount: string;
+  
   // Brand colors
   brandPrimaryColor: string;
   brandSecondaryColor: string;
@@ -62,12 +66,14 @@ export interface EmailVariables {
 /**
  * Creates sample variable values for template previews
  * @param companyData - Real company data from database
- * @param brandData - Real brand data from database  
+ * @param brandData - Real brand data from database
+ * @param reviewsData - Real Google reviews data from database
  * @returns Sample variables object with realistic values
  */
 export function createSampleVariables(
   companyData?: { name?: string; email?: string; phone?: string; website?: string } | null,
-  brandData?: { logo_url?: string } | null
+  brandData?: { logo_url?: string } | null,
+  reviewsData?: { rating?: number; reviewCount?: number } | null
 ): EmailVariables {
   return {
     // Customer/Lead variables (always use sample data)
@@ -83,6 +89,10 @@ export function createSampleVariables(
     companyPhone: companyData?.phone || '(555) 000-0000',
     companyWebsite: companyData?.website || 'https://yourcompany.com',
     companyLogo: brandData?.logo_url || '/pcocentral-logo.png',
+    
+    // Google Reviews (use real data when available)
+    googleRating: reviewsData?.rating ? reviewsData.rating.toString() : '4.8',
+    googleReviewCount: reviewsData?.reviewCount ? reviewsData.reviewCount.toString() : '127',
     
     // Brand colors (sample data)
     brandPrimaryColor: '#FF5733',
