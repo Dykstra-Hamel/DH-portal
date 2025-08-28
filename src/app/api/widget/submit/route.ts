@@ -92,7 +92,7 @@ async function handleAutoLeadCall(
     pestType: string;
     urgency: string;
     selectedPlan?: ServicePlan;
-    recommendedPlan?: string;
+    recommendedPlan?: ServicePlan;
   }
 ): Promise<{
   success: boolean;
@@ -111,8 +111,8 @@ async function handleAutoLeadCall(
       message: notes, // Use the formatted customer comments
       pestType: pestData?.pestType || '',
       urgency: pestData?.urgency || '',
-      selectedPlan: pestData?.selectedPlan || '',
-      recommendedPlan: pestData?.recommendedPlan || '',
+      selectedPlan: pestData?.selectedPlan?.plan_name || '',
+      recommendedPlan: pestData?.recommendedPlan?.plan_name || '',
       streetAddress: addressComponents?.street || '',
       city: addressComponents?.city || '',
       state: addressComponents?.state || '',
@@ -228,7 +228,7 @@ interface WidgetSubmission {
   pestType: string;
   urgency: string;
   selectedPlan?: ServicePlan;
-  recommendedPlan?: string;
+  recommendedPlan?: ServicePlan;
   address: string; // Formatted address for backward compatibility
   addressDetails?: {
     // New structured address data
@@ -516,7 +516,7 @@ export async function POST(request: NextRequest) {
       notes += `Selected Plan: ${submission.selectedPlan.plan_name}\n`;
     }
     if (submission.recommendedPlan) {
-      notes += `Recommended Plan: ${submission.recommendedPlan}\n`;
+      notes += `Recommended Plan: ${submission.recommendedPlan.plan_name}\n`;
     }
     if (submission.homeSize)
       notes += `Home Size: ${submission.homeSize} sq ft\n`;
@@ -563,7 +563,7 @@ export async function POST(request: NextRequest) {
           requested_time: submission.arrivalTime || null,
           // Plan references
           selected_plan_id: submission.selectedPlan?.id || null,
-          recommended_plan_name: submission.recommendedPlan || null,
+          recommended_plan_name: submission.recommendedPlan?.plan_name || null,
           // Attribution fields
           utm_source: finalAttributionData.utm_source || null,
           utm_medium: finalAttributionData.utm_medium || null,
@@ -663,7 +663,7 @@ export async function POST(request: NextRequest) {
           customerComments += `Selected Plan: ${submission.selectedPlan.plan_name}\n`;
         }
         if (submission.recommendedPlan) {
-          customerComments += `Recommended Plan: ${submission.recommendedPlan}\n`;
+          customerComments += `Recommended Plan: ${submission.recommendedPlan.plan_name}\n`;
         }
         if (submission.homeSize) {
           customerComments += `Home Size: ${submission.homeSize} sq ft\n`;
@@ -776,7 +776,7 @@ export async function POST(request: NextRequest) {
             pestType: submission.pestType,
             urgency: submission.urgency,
             selectedPlan: submission.selectedPlan?.plan_name,
-            recommendedPlan: submission.recommendedPlan,
+            recommendedPlan: submission.recommendedPlan?.plan_name,
             address: submission.address,
             homeSize: submission.homeSize,
             estimatedPrice: submission.estimatedPrice,
