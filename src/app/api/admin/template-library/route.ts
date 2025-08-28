@@ -8,13 +8,13 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const adminSupabase = createAdminClient();
 
-    // Check if user is authenticated
+    // Check if user is authenticated (using secure method)
     const {
-      data: { session },
-      error: sessionError
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: authError
+    } = await supabase.auth.getUser();
 
-    if (!session?.user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (!profile || !isAuthorizedAdmin(profile)) {
@@ -77,13 +77,13 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const adminSupabase = createAdminClient();
 
-    // Check if user is authenticated
+    // Check if user is authenticated (using secure method)
     const {
-      data: { session },
-      error: sessionError
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: authError
+    } = await supabase.auth.getUser();
 
-    if (!session?.user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (!profile || !isAuthorizedAdmin(profile)) {
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         variables: variables || [],
         is_featured: is_featured || false,
         is_active: is_active !== false, // Default to true
-        created_by: session.user.id
+        created_by: user.id
       })
       .select()
       .single();

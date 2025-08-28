@@ -43,9 +43,7 @@ BEGIN
             html_content,
             text_content,
             variables,
-            is_active,
-            library_template_id,
-            customizations
+            is_active
         ) VALUES (
             p_company_id,
             COALESCE(p_custom_name, library_template.name),
@@ -55,9 +53,7 @@ BEGIN
             library_template.html_content,
             library_template.text_content,
             library_template.variables,
-            false, -- Start inactive
-            p_library_template_id,
-            COALESCE(p_customizations, '{}'::jsonb)
+            false -- Start inactive
         ) RETURNING id INTO new_template_id;
     EXCEPTION WHEN undefined_table THEN
         -- Fall back to email_automation table if email_templates doesn't exist
