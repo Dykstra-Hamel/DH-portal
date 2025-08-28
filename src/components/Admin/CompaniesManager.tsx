@@ -4,6 +4,13 @@ import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api-client';
 import styles from './AdminManager.module.scss';
 
+interface GooglePlaceListing {
+  id?: string;
+  place_id: string;
+  place_name?: string;
+  is_primary: boolean;
+}
+
 interface Company {
   id: string;
   name: string;
@@ -21,6 +28,8 @@ interface Company {
   ga_property_id: string | null;
   callrail_api_token: string | null;
   callrail_account_id: string | null;
+  google_place_id: string | null; // Keep for backward compatibility
+  google_places_listings?: GooglePlaceListing[];
   created_at: string;
 }
 
@@ -29,6 +38,7 @@ export default function CompaniesManager() {
   const [loading, setLoading] = useState(true);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [googlePlacesListings, setGooglePlacesListings] = useState<GooglePlaceListing[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -45,6 +55,7 @@ export default function CompaniesManager() {
     ga_property_id: '',
     callrail_api_token: '',
     callrail_account_id: '',
+    google_place_id: '',
   });
 
   useEffect(() => {
@@ -66,13 +77,14 @@ export default function CompaniesManager() {
                 ...company,
                 ga_property_id: settings.ga_property_id?.value || null,
                 callrail_api_token: settings.callrail_api_token?.value || null,
-                callrail_account_id: settings.callrail_account_id?.value || null
+                callrail_account_id: settings.callrail_account_id?.value || null,
+                google_place_id: settings.google_place_id?.value || null
               };
             }
           } catch (error) {
             console.error(`Error loading settings for company ${company.id}:`, error);
           }
-          return { ...company, ga_property_id: null, callrail_api_token: null, callrail_account_id: null };
+          return { ...company, ga_property_id: null, callrail_api_token: null, callrail_account_id: null, google_place_id: null };
         })
       );
       
@@ -88,7 +100,7 @@ export default function CompaniesManager() {
     e.preventDefault();
 
     try {
-      const { ga_property_id, callrail_api_token, callrail_account_id, ...companyData } = formData;
+      const { ga_property_id, callrail_api_token, callrail_account_id, google_place_id, ...companyData } = formData;
       const newCompany = await adminAPI.createCompany(companyData);
       
       // Save settings to company_settings if provided
@@ -111,6 +123,13 @@ export default function CompaniesManager() {
       if (callrail_account_id && callrail_account_id.trim()) {
         settingsToSave.callrail_account_id = {
           value: callrail_account_id.trim(),
+          type: 'string'
+        };
+      }
+      
+      if (google_place_id && google_place_id.trim()) {
+        settingsToSave.google_place_id = {
+          value: google_place_id.trim(),
           type: 'string'
         };
       }
@@ -143,6 +162,7 @@ export default function CompaniesManager() {
         ga_property_id: '',
         callrail_api_token: '',
         callrail_account_id: '',
+        google_place_id: '',
       });
       setShowCreateForm(false);
       loadCompanies();
@@ -156,7 +176,7 @@ export default function CompaniesManager() {
     if (!editingCompany) return;
 
     try {
-      const { ga_property_id, callrail_api_token, callrail_account_id, ...companyData } = editingCompany;
+      const { ga_property_id, callrail_api_token, callrail_account_id, google_place_id, ...companyData } = editingCompany;
       
       // Update company data (without settings fields)
       await adminAPI.updateCompany(editingCompany.id, {
@@ -192,6 +212,10 @@ export default function CompaniesManager() {
               callrail_account_id: {
                 value: callrail_account_id?.trim() || '',
                 type: 'string'
+              },
+              google_place_id: {
+                value: google_place_id?.trim() || '',
+                type: 'string'
               }
             }
           }),
@@ -200,7 +224,15 @@ export default function CompaniesManager() {
         console.error('Error updating company settings:', error);
       }
 
+      // Save Google Places listings
+      try {
+        await saveGooglePlacesListings(editingCompany.id);
+      } catch (error) {
+        console.error('Error saving Google Places listings:', error);
+      }
+
       setEditingCompany(null);
+      setGooglePlacesListings([]); // Clear listings
       loadCompanies();
     } catch (error) {
       console.error('Error updating company:', error);
@@ -221,6 +253,75 @@ export default function CompaniesManager() {
       loadCompanies();
     } catch (error) {
       console.error('Error deleting company:', error);
+    }
+  };
+
+  // Google Places listings management functions
+  const addGooglePlaceListing = () => {
+    const newListing: GooglePlaceListing = {
+      place_id: '',
+      place_name: '',
+      is_primary: googlePlacesListings.length === 0 // First listing is primary by default
+    };
+    setGooglePlacesListings([...googlePlacesListings, newListing]);
+  };
+
+  const removeGooglePlaceListing = (index: number) => {
+    const updatedListings = googlePlacesListings.filter((_, i) => i !== index);
+    // If we removed the primary listing, make the first remaining listing primary
+    if (googlePlacesListings[index]?.is_primary && updatedListings.length > 0) {
+      updatedListings[0].is_primary = true;
+    }
+    setGooglePlacesListings(updatedListings);
+  };
+
+  const updateGooglePlaceListing = (index: number, field: keyof GooglePlaceListing, value: any) => {
+    const updatedListings = [...googlePlacesListings];
+    
+    // If setting is_primary to true, make sure all others are false
+    if (field === 'is_primary' && value === true) {
+      updatedListings.forEach((listing, i) => {
+        if (i !== index) {
+          listing.is_primary = false;
+        }
+      });
+    }
+    
+    (updatedListings[index] as any)[field] = value;
+    setGooglePlacesListings(updatedListings);
+  };
+
+  // Load Google Places listings when editing a company
+  const loadGooglePlacesListings = async (companyId: string) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/google-places`);
+      if (response.ok) {
+        const { listings } = await response.json();
+        setGooglePlacesListings(listings || []);
+      }
+    } catch (error) {
+      console.error('Error loading Google Places listings:', error);
+      setGooglePlacesListings([]);
+    }
+  };
+
+  // Save Google Places listings
+  const saveGooglePlacesListings = async (companyId: string) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/google-places`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ listings: googlePlacesListings }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save Google Places listings');
+      }
+    } catch (error) {
+      console.error('Error saving Google Places listings:', error);
+      throw error;
     }
   };
 
@@ -462,6 +563,87 @@ export default function CompaniesManager() {
         </small>
       </div>
 
+      <div className={styles.formGroup}>
+        <label>Google Places Listings:</label>
+        <div style={{ marginBottom: '12px' }}>
+          {googlePlacesListings.length === 0 ? (
+            <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
+              No Google Places listings added yet.
+            </p>
+          ) : (
+            googlePlacesListings.map((listing, index) => (
+              <div key={index} style={{ 
+                border: '1px solid #ddd', 
+                borderRadius: '4px', 
+                padding: '12px', 
+                marginBottom: '8px',
+                backgroundColor: listing.is_primary ? '#f0f9ff' : '#f9f9f9'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Google Place ID (e.g., ChIJN1t_tDeuEmsRUsoyG83frY4)"
+                    value={listing.place_id}
+                    onChange={e => updateGooglePlaceListing(index, 'place_id', e.target.value)}
+                    style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeGooglePlaceListing(index)}
+                    style={{ 
+                      padding: '6px 12px', 
+                      backgroundColor: '#dc2626', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <input
+                    type="text"
+                    placeholder="Business name (optional)"
+                    value={listing.place_name || ''}
+                    onChange={e => updateGooglePlaceListing(index, 'place_name', e.target.value)}
+                    style={{ flex: 1, padding: '6px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px' }}
+                  />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                    <input
+                      type="checkbox"
+                      checked={listing.is_primary}
+                      onChange={e => updateGooglePlaceListing(index, 'is_primary', e.target.checked)}
+                    />
+                    Primary Location
+                  </label>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={addGooglePlaceListing}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#059669',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            marginBottom: '8px'
+          }}
+        >
+          + Add Google Places Listing
+        </button>
+        <small style={{ color: '#666', fontSize: '12px', display: 'block' }}>
+          Add multiple Google Places listings to aggregate review counts. Reviews from all listings will be combined and displayed on your widget. Find Place IDs using <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener noreferrer" style={{ color: '#1d4ed8', textDecoration: 'underline' }}>Google&apos;s Place ID Finder</a>
+        </small>
+      </div>
 
       <div className={styles.formActions}>
         <button type="submit" className={styles.saveButton}>
@@ -548,7 +730,10 @@ export default function CompaniesManager() {
                   <div className={styles.actions}>
                     <button
                       className={styles.editButton}
-                      onClick={() => setEditingCompany(company)}
+                      onClick={() => {
+                        setEditingCompany(company);
+                        loadGooglePlacesListings(company.id);
+                      }}
                     >
                       Edit
                     </button>

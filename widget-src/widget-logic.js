@@ -18,7 +18,7 @@ const showStep = async stepName => {
       const confirmButton = document.getElementById('confirm-address-next');
       if (confirmButton) {
         confirmButton.innerHTML =
-          'Continue <svg xmlns="http://www.w3.org/2000/svg" width="19" height="17" viewBox="0 0 19 17" fill="none"><path d="M10.5215 1C10.539 1.00009 10.5584 1.00615 10.5781 1.02637L17.5264 8.13672C17.5474 8.15825 17.5615 8.1897 17.5615 8.22852C17.5615 8.26719 17.5473 8.29783 17.5264 8.31934L10.5781 15.4307C10.5584 15.4509 10.539 15.4569 10.5215 15.457C10.5038 15.457 10.4838 15.451 10.4639 15.4307C10.443 15.4092 10.4298 15.3783 10.4297 15.3398C10.4297 15.3011 10.4429 15.2696 10.4639 15.248L15.5488 10.0449L17.209 8.3457H1V8.11133H17.209L15.5488 6.41211L10.4639 1.20898C10.4428 1.18745 10.4297 1.15599 10.4297 1.11719C10.4297 1.07865 10.443 1.04785 10.4639 1.02637C10.4838 1.00599 10.5038 1 10.5215 1Z" fill="white" stroke="white" stroke-width="2"/></svg>';
+          'Continue <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         confirmButton.disabled = true; // Will be re-enabled by checkbox validation
         confirmButton.style.opacity = '0.5';
         confirmButton.style.cursor = 'not-allowed';
@@ -48,6 +48,29 @@ const showStep = async stepName => {
     // Show target step with fade-in animation
     targetStep.classList.add('active', 'fade-in');
     widgetState.currentStep = stepName;
+
+    // Scroll to top of the page or widget container
+    try {
+      // Try to find the widget container and scroll to it
+      const widgetContainer = document.getElementById('dh-widget-container') || 
+                             document.querySelector('.dh-widget') ||
+                             targetStep.closest('.dh-widget-container') ||
+                             targetStep;
+      
+      if (widgetContainer && widgetContainer.scrollIntoView) {
+        widgetContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        // Fallback to window scroll
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (error) {
+      // Final fallback - instant scroll
+      try {
+        window.scrollTo(0, 0);
+      } catch (e) {
+        // Silently fail if even basic scroll doesn't work
+      }
+    }
 
     // Clean up animation class after animation completes
     setTimeout(() => {
@@ -929,7 +952,6 @@ const populateSingleLogo = logoElement => {
     const logoImg = document.createElement('img');
     logoImg.alt = 'Company Logo';
     logoImg.style.display = 'none';
-
     logoImg.onload = function () {
       logoImg.style.display = 'block';
     };
@@ -967,11 +989,14 @@ const populateStepHero = (bgImageId, heroImageId) => {
   // Populate background image
   let backgroundImageUrl;
 
-  // For address and how-we-do-it steps, try to get pest-specific background image first
-  if (
+  // Skip background image for confirm-address step - it will be loaded with address imagery
+  if (bgImageId === 'confirm-address-bg-image') {
+    backgroundImageUrl = null;
+  } else if (
     (bgImageId === 'address-bg-image' || bgImageId === 'offer-bg-image') &&
     typeof getPestBackgroundImage === 'function'
   ) {
+    // For address and how-we-do-it steps, try to get pest-specific background image first
     backgroundImageUrl = getPestBackgroundImage();
   } else if (bgImageId === 'quote-bg-image') {
     // For quote-contact step, use the almost done background image
@@ -1012,6 +1037,7 @@ const populateStepHero = (bgImageId, heroImageId) => {
     // Set up load event listener
     heroImage.onload = function () {
       heroImage.style.display = 'block';
+      heroImage.classList.add('dh-fade-in-loaded');
     };
 
     // Set up error event listener
@@ -1756,6 +1782,84 @@ const setupStepValidation = stepName => {
         'plan-comparison-hero-image'
       );
 
+      // Load Google Reviews data for the comparison step
+      const loadComparisonReviews = async () => {
+        const reviewsContainer = document.getElementById('comparison-reviews-container');
+        const reviewsLoading = document.getElementById('comparison-reviews-loading');
+        const reviewsDisplay = document.getElementById('comparison-reviews-display');
+        const reviewsCount = document.getElementById('comparison-reviews-count');
+        const starElements = document.querySelectorAll('#comparison-reviews-display .dh-star');
+        
+        if (!reviewsContainer) {
+          return;
+        }
+
+        try {
+          // Start with loading state visible, content hidden
+          if (reviewsLoading) reviewsLoading.style.display = 'flex';
+          if (reviewsDisplay) reviewsDisplay.style.display = 'none';
+
+          // Fetch reviews data from API
+          const response = await fetch(`${config.baseUrl}/api/google-places/reviews/${config.companyId}`);
+          
+          if (!response.ok) {
+            console.warn('Failed to fetch reviews data, hiding reviews section');
+            // Hide entire container on failure
+            reviewsContainer.style.display = 'none';
+            return;
+          }
+
+          const data = await response.json();
+          
+          // Validate response data - hide if no reviews or no listings configured
+          if (!data.rating || !data.reviewCount || data.reviewCount === 0 || data.source === 'no_listings') {
+            console.warn('No reviews data available, hiding reviews section');
+            reviewsContainer.style.display = 'none';
+            return;
+          }
+
+          const rating = data.rating;
+          const reviewCount = data.reviewCount;
+
+          // Update review count text
+          if (reviewsCount) {
+            reviewsCount.textContent = `${reviewCount.toLocaleString()} Google Reviews`;
+          }
+
+          // Update star display based on rating
+          const fullStars = Math.floor(rating);
+          const hasHalfStar = rating % 1 >= 0.5;
+
+          starElements.forEach((star, index) => {
+            const path = star.querySelector('path');
+            if (!path) return;
+
+            if (index < fullStars) {
+              // Full star
+              path.style.fill = '#F68C1A';
+            } else if (index === fullStars && hasHalfStar) {
+              // Half star (for now, show as full - could implement half star SVG later)
+              path.style.fill = '#F68C1A';
+            } else {
+              // Empty star
+              path.style.fill = '#E5E5E5';
+            }
+          });
+
+          // Hide loading state and show content
+          if (reviewsLoading) reviewsLoading.style.display = 'none';
+          if (reviewsDisplay) reviewsDisplay.style.display = 'flex';
+
+        } catch (error) {
+          console.error('Error loading reviews data:', error);
+          // Hide entire container on error
+          reviewsContainer.style.display = 'none';
+        }
+      };
+
+      // Load Google Reviews data
+      loadComparisonReviews();
+
       const comparisonNoThanksBtn = document.getElementById(
         'comparison-no-thanks'
       );
@@ -1912,7 +2016,7 @@ const setupStepValidation = stepName => {
               <div class="dh-plan-visual">
                 <div class="dh-plan-image-container">
                   <div class="dh-plan-image-actual">
-                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="width: 100%; object-fit: cover;" />
+                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="object-fit: cover;" />
                   </div>
                 </div>
               </div>
@@ -1950,7 +2054,7 @@ const setupStepValidation = stepName => {
               Let&apos;s Schedule! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button class="dh-form-btn plan-no-thanks" onclick="declinePlanComparison()">
-              No Thank You <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              No Thanks <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
         `;
@@ -2017,7 +2121,7 @@ const setupStepValidation = stepName => {
               <div class="dh-plan-visual">
                 <div class="dh-plan-image-container">
                   <div class="dh-plan-image-actual">
-                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="width: 100%; object-fit: cover;" />
+                    <img src="${plan.plan_image_url}" alt="${plan.plan_name}" style="object-fit: cover;" />
                   </div>
                 </div>
               </div>
@@ -2059,7 +2163,7 @@ const setupStepValidation = stepName => {
               Let&apos;s Schedule! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button class="dh-form-btn plan-no-thanks" onclick="declinePlanComparison()">
-              No Thank You <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              No Thanks <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
         `;

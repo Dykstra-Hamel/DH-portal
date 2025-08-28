@@ -69,6 +69,23 @@ const createStyles = (
   font-family: "${fontName}", sans-serif !important;
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+img {
+  animation: fadeIn 2s ease forwards;
+}
+
+.dh-pest-bg-image {
+  animation: fadeIn 2s ease forwards;
+}
+
 .dh-form-widget { 
   margin: 0 auto; 
   background: ${backgroundColor}; 
@@ -85,22 +102,37 @@ const createStyles = (
   z-index: 100;
   cursor: pointer;
   pointer-events: auto;
-  width: 29px;
-  height: 29px;
+  width: 35px;
+  height: 35px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: opacity 0.2s ease;
 }
-.dh-widget-close-icon:hover {
-  opacity: 0.8;
+
+.dh-widget-close-icon svg, .dh-widget-close-icon svg path {
+  transition: all 0.2s ease;
 }
+.dh-widget-close-icon:hover svg {
+  scale: 1.08;
+}
+
+.dh-widget-close-icon:hover svg path {
+  fill: #515151;
+}
+
+.dh-widget-close-icon:hover svg path:not(:first-of-type) {
+  stroke: white;
+}
+
 .dh-widget-close-icon svg {
-  width: 29px;
-  height: 29px;
+  width: 27px;
+  height: 27px;
 }
 .dh-global-back-button {
   position: absolute;
+  justify-content: center;
+  align-items: center;
   top: 67px;
   left: 0px;
   z-index: 90;
@@ -115,16 +147,22 @@ const createStyles = (
   gap: 8px;
   font-family: '${fontName}', sans-serif;
   font-size: 12px;
+  line-height: 20px;
   font-weight: 700;
   transition: background-color 0.2s ease, transform 0.2s ease;
   opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.dh-global-back-button:hover {
+  background: #B0B0B0;
 }
 
 .dh-global-back-button svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  transision: all 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .dh-global-back-button:hover svg {
@@ -166,7 +204,6 @@ const createStyles = (
     display: flex;
     width: 100%;
     height: 100%;
-    min-height: 90vh;
     position: relative;
     overflow: hidden;
     padding: 0;
@@ -182,6 +219,89 @@ const createStyles = (
   flex-shrink: 0;
 }
 
+
+/* Google Reviews Display Styles */
+.dh-reviews-container {
+  margin: 0 0 24px 0;
+  font-family: "${fontName}", sans-serif;
+  min-height: 24px; /* Reserve space to prevent layout shift */
+}
+
+.dh-reviews-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dh-star-rating {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dh-star {
+  width: 20px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.dh-star path {
+  fill: #F68C1A;
+  transition: fill 0.2s ease;
+}
+
+.dh-reviews-count {
+  font-size: 16px;
+  font-weight: 500;
+  color: ${secondaryColor};
+  margin-left: 4px;
+}
+
+/* Loading States */
+.dh-reviews-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dh-reviews-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.6;
+}
+
+.dh-skeleton-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dh-skeleton-stars::before {
+  content: '★★★★★';
+  color: #E5E5E5;
+  font-size: 16px;
+  animation: dh-pulse 1.5s ease-in-out infinite;
+}
+
+.dh-skeleton-text {
+  background: #E5E5E5;
+  height: 16px;
+  width: 120px;
+  border-radius: 4px;
+  animation: dh-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dh-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
 .dh-plan-faqs-container {
   width: 100%;
   margin: 22px;
@@ -193,7 +313,7 @@ const createStyles = (
 .dh-form-content-area {
     flex: 1;
     align-items: center;
-    padding: 37px 32px;
+    padding: 37px 40px;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -244,12 +364,15 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
   margin-top: 20px;
 }
 
+#subspecies-heading {
+  margin-bottom: 15px;
+}
+
 .dh-subspecies-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: repeat(3, auto);
-  gap: 8px 20px;
-  margin: 0 0 22px 0;
+  gap: 4px 20px;
   grid-auto-flow: column;
 }
 
@@ -272,12 +395,18 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
  height: auto;
  object-fit: cover;
  border-radius: 16px;
+ opacity: 0;
+ transition: opacity 0.5s ease;
 }
 
 .dh-safety-message {
  display: flex;
  align-items: center;
- margin-bottom: 53px;
+ margin: 20px 0 40px 0;
+}
+
+#safety-message-text {
+  margin: 0;
 }
 
 .dh-form-group { 
@@ -729,6 +858,8 @@ select.dh-form-input {
   object-fit: cover;
   border-radius: 8px;
   display: block;
+  opacity: 0;
+  transition: opacity 0.5s ease;
 }
 
 /* Address Search Mode vs Display Mode */
@@ -1032,7 +1163,7 @@ select.dh-form-input {
 
 /* Specific styling for out of service step heading */
 #dh-step-out-of-service .dh-step-heading {
-  margin: auto;
+  margin-bottom: 40px;
 }
 
 /* Responsive styling for out-of-service */
@@ -1130,21 +1261,31 @@ select.dh-form-input {
 
 @media (max-width: 480px) {
 
+  .dh-pest-logo img {
+    width: 119px !important;
+  }
+
   .dh-safety-message {
     flex-direction: row-reverse;
+    margin: 0;
   }
 
   .dh-how-we-do-it-text {
    margin-right: 0;
   }
 
-  #how-we-do-it-interior-image {
-    width: 100vw;
+  #how-we-do-it-interior-image, .dh-plan-image-actual img {
+    width: 100vw !important;
+    height: 240px !important;
     max-width: unset !important;
     object-fit: cover;
+    object-position: top;
+    opacity: 0;
+    transition: opacity 0.5s ease;
     border-radius: 0;
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
+    border-radius: 0 !important;
   }
   
   .dh-offer-options {
@@ -1176,7 +1317,12 @@ select.dh-form-input {
 
   .dh-form-button-group {
     width: 100%;
-    padding: 0 !important;
+    padding: 40px 0 0 0 !important;
+  }
+
+
+  .dh-form-btn:not(.plan-no-thanks) {
+  width: 100%;
   }
 }
 .dh-form-checkbox-label {
@@ -1187,7 +1333,7 @@ select.dh-form-input {
   line-height: 1.5;
   color: ${textColor};
   cursor: pointer;
-  margin-bottom: 80px;
+  margin-bottom: 40px;
 }
 .dh-form-checkbox {
   width: 18px !important;
@@ -1244,7 +1390,7 @@ select.dh-form-input {
   margin-top: auto; 
   justify-content: center;
   align-items: center;
-  padding: 0 20px 20px 20px;
+  padding: 24px 20px 20px 20px;
   border-radius: 0 0 26px 26px;
 } 
 #dh-step-exit-survey .dh-form-button-group { 
@@ -1254,9 +1400,9 @@ select.dh-form-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 25px;
   padding: 20px 30px; 
-  border: none; 
+  gap: 25px;
+  border: 2px solid #fff; 
   border-radius: 60px; 
   cursor: pointer; 
   font-size: 18px;
@@ -1264,12 +1410,10 @@ select.dh-form-input {
   font-family: "${fontName}", sans-serif;
   font-weight: 700; 
   transition: all 0.2s ease;
-  transform: translateY(0);
   }
-  
-.dh-form-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+.dh-form-btn:not(.plan-no-thanks) {
+  min-width: 241px;
 }
 
 .dh-form-btn:active {
@@ -1279,22 +1423,19 @@ select.dh-form-input {
 .dh-form-btn-primary { 
   background: ${primaryColor}; 
   color: white;
-  border: 1px solid ${primaryColor};
 } 
 .dh-form-btn-primary:hover { 
-  background: ${primaryDark}; 
+  border-color: ${primaryColor};
 } 
 .dh-form-btn-secondary { 
   background: ${secondaryColor}; 
-  color: #fff; 
-  border: 1px solid ${secondaryColor}; 
+  color: #fff;  
 } 
-.dh-form-btn-secondary svg { 
-  transition: transform 0.2s ease;
-} 
-.dh-form-btn-secondary:hover svg { 
-  transform: translateX(2px);
+
+.dh-form-btn-secondary:hover {
+  border-color: ${secondaryColor};
 }
+
 .dh-form-btn-back { 
   display: flex;
   align-items: center;
@@ -1341,7 +1482,7 @@ select.dh-form-input {
   bottom: 0;
 }
   .dh-form-btn.plan-no-thanks {
-    background: #BFBFBF;
+    background: #bfbfbf20;
     color: #515151;
   }
 
@@ -1445,7 +1586,7 @@ select.dh-form-input {
   width: 103px;
   height: 103px;
   border-radius: 10px;
-  border: 1px solid #D9D9D9;
+  box-shadow: inset 0 0 0 1px #BFBFBF;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1458,6 +1599,7 @@ select.dh-form-input {
   width: 60px;
   height: 60px;
   fill: #4E4E4E;
+  opacity: 0.66;
 }
 .dh-pest-icon svg path {
   fill: #4E4E4E;
@@ -1473,10 +1615,15 @@ select.dh-form-input {
   line-height: 18px;
 }
 .dh-pest-option:hover .dh-pest-icon {
-  border-color: ${primaryColor};
+  box-shadow: inset 0 0 0 2px #515151;
 }
+
+.dh-pest-option:hover .dh-pest-icon svg {
+  opacity: 1;
+}
+
 .dh-pest-option.selected .dh-pest-icon {
-  border-color: ${primaryColor};
+  box-shadow: inset 0 0 0 2px ${primaryColor};
   color: white;
 }
 
@@ -1605,21 +1752,22 @@ select.dh-form-input {
   gap: 32px;
 }
 
-.dh-pest-option:hover {
-  border-color: ${primaryColor};
+.dh-pest-option:hover .dh-pest-icon svg path {
+  fill: #515151;
 }
 
-.dh-pest-option:hover .dh-pest-icon svg path {
+.dh-pest-option:active .dh-pest-icon svg path {
   fill: ${primaryColor};
 }
 
-.dh-pest-option:hover .dh-pest-label {
+.dh-pest-option:active .dh-pest-label {
   color: ${primaryColor};
 }
 
-.dh-pest-option.selected {
-  border-color: ${primaryColor};
-  background: ${primaryColor};
+.dh-pest-option:active .dh-pest-icon {
+  box-shadow: inset 0 0 0 2px ${primaryColor};
+  scale: 1.05;
+
 }
 
 .dh-pest-option.selected .dh-pest-icon svg path {
@@ -1652,7 +1800,7 @@ select.dh-form-input {
 
 .dh-pest-hero {
   width: 386px;
-  max-height: 90vh;
+  max-height: 889px;;
   position: relative;
   flex-shrink: 0;
   display: flex;
@@ -1702,7 +1850,6 @@ select.dh-form-input {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  transition: background-image 0.3s ease;
 }
 
 .dh-pest-bg-image:not(.step1) {
@@ -1714,16 +1861,10 @@ height: 100%;
   bottom: 0;
   z-index: 2;
   max-width: 453px;
-  max-height: 100%;
+  max-height: 889px;
   object-fit: contain;
   border-radius: 0 26px 26px 0;
-}
-
-@media (max-width: 1280px) {
- .dh-pest-hero-image {
-   max-width: 380px;
-   right: -70px;
- }
+  transition: opacity 0.5s ease;
 }
 
 /* Tablet Responsive - 1024px and below */
@@ -1741,10 +1882,6 @@ height: 100%;
     max-width: 100vw !important;
   }
 
-  .dh-form-checkbox-label {
-    margin-bottom: 48px;
-  }
-
   .dh-form-step-content {
     flex-direction: column;
     flex-wrap: nowrap !important;;
@@ -1752,6 +1889,7 @@ height: 100%;
 
   .dh-pest-hero {
     width: 100%;
+    min-height: unset;
   }
 
   .dh-pest-hero-image {
@@ -1826,6 +1964,10 @@ height: 100%;
   #dh-step-plan-comparison .dh-pest-hero {
     display: none;
   }
+
+  .dh-widget-close-icon:not(:hover) svg path {
+  stroke: #B2B2B2;
+  }
 }
 
 /* Mobile Responsive */
@@ -1878,6 +2020,8 @@ height: 100%;
   .dh-plan-faqs-container {
     max-width: 100%;
     width: unset;
+    margin: 0 0 50px 0; 
+    border-radius: 0;
   }
 }
 
@@ -1889,6 +2033,35 @@ height: 100%;
   height: auto;
   object-fit: cover;
   border-radius: 12px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+  
+  /* Mobile responsive styles for reviews display */
+  .dh-reviews-container {
+    margin: 0 0 20px 0;
+    min-height: 22px;
+  }
+  
+  .dh-reviews-display {
+    gap: 6px;
+  }
+  
+  .dh-reviews-count {
+    font-size: 14px;
+    margin-left: 3px;
+    position: relative;
+    top: 2px;
+  }
+  
+  .dh-skeleton-stars::before {
+    font-size: 14px;
+  }
+  
+  .dh-skeleton-text {
+    height: 14px;
+    width: 100px;
+  }
 }
 
 
@@ -1911,6 +2084,8 @@ height: 100%;
 
   .dh-pet-safety-image {
     width: 144px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
   }
 
   .dh-safety-text {
@@ -1922,7 +2097,7 @@ height: 100%;
     gap: 2px 20px;
   }
 
-  .dh-form-btn:not(.plan-no-thanks) {
+  .dh-form-btn {
     width: 100%;
   }
 
@@ -1993,10 +2168,10 @@ height: 100%;
   border-radius: 20px;
 }
 .dh-quote-loading .dh-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid ${primaryColor};
+  width: 64px;
+  height: 64px;
+  border: 6px solid #e5e7eb;
+  border-top: 6px solid ${primaryColor};
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0;
@@ -2070,8 +2245,6 @@ height: 100%;
   border-radius: 26px;
   margin: auto;
   max-width: 1078px;
-  width: 90%;
-  min-height: 90vh;
   position: relative;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   background: white;
@@ -2237,6 +2410,7 @@ height: 100%;
 
 .dh-button-arrow svg, .dh-form-btn svg {
   display: block;
+  position: relative;
 }
 
 .dh-welcome-button:hover .dh-button-arrow {
@@ -2345,8 +2519,30 @@ height: 100%;
     max-width: 300px;
   }
 
+  .dh-pest-logo {
+    margin-bottom: 24px;
+  }
+
   .dh-step-heading {
-    font-size: 32px;
+    font-size: 30px;
+    line-height: 32px;
+  }
+
+  .dh-step-instruction {
+    margin: 0 0 20px 0;
+  }
+
+  #safety-message-text {
+    font-size: 22px;
+    line-height: 26px;
+  }
+
+  .dh-pet-safety-image {
+    width: 144px;  
+  }
+
+  .dh-subspecies-grid {
+    margin-bottom: 48px;
   }
 
   .dh-welcome-screen {
@@ -2457,7 +2653,7 @@ height: 100%;
 .dh-plan-features-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 24px 0;
+  margin: 0;
 }
 
 .dh-plan-feature {
@@ -2490,6 +2686,7 @@ height: 100%;
 
 .dh-plan-recommendation-badge {
   margin-bottom: 7px;
+  line-height: 10px;
 }
 
 .dh-plan-pricing {
@@ -2551,8 +2748,6 @@ height: 100%;
 .dh-plan-image-container {
   height: 100%;
   border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 .dh-plan-image-actual {
   display: flex;
@@ -2581,14 +2776,14 @@ height: 100%;
 
 /* FAQ Accordion Styles */
 .dh-plan-faqs {
-  padding: 40px 0 0 0;
+  padding: 20px 0 0 0;
 }
 .dh-form-step h3.dh-faqs-title {
   color: #515151;
   text-align: center;
   font-family: "${fontName}", sans-serif;
-  font-size: 26px;
-  font-weight: 600;
+  font-size: 30px;
+  font-weight: 700;
   line-height: 103%;
 }
 .dh-faqs-container {
@@ -2596,18 +2791,16 @@ height: 100%;
   flex-direction: column;
   gap: 0;
 }
-.dh-faq-item {
+
+.dh-faq-item:not(:last-of-type) {
   border-bottom: 1px solid #e5e7eb;
+}
+
+.dh-faq-item {
   overflow: hidden;
   transition: all 0.2s ease;
 }
-.dh-faq-item:hover {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
 
-.dh-faq-item:last-of-type {
-  border-bottom: none;
-}
 
 .dh-plan-selection-label {
 color: ${primaryColor};
@@ -2646,23 +2839,25 @@ line-height: 28px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 16px 0;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
-.dh-faq-header:hover {
-  background: #f9fafb;
+.dh-faq-header:hover .dh-faq-question {
+  font-weight: 700;
 }
 
 .dh-faq-question {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: ${textColor};
   margin: 0;
   flex: 1;
   padding-right: 16px;
   text-align: left;
+  transition: all 0.2s ease;
 }
+
 .dh-faq-icon {
   font-size: 20px;
   font-weight: 300;
@@ -2682,10 +2877,10 @@ line-height: 28px;
   background: transparent;
 }
 .dh-faq-answer {
-  padding: 0 20px 16px 20px;
+  padding: 0 0 16px 0;
 }
 .dh-faq-answer p {
-  font-size: 14px;
+  font-size: 16px;
   color: #6b7280;
   line-height: 1.6;
   margin: 0;
@@ -2749,6 +2944,14 @@ line-height: 28px;
 
   #comparison-plan-content {
     padding: 0;
+  }
+  
+  .dh-plan-content {
+    margin: 24px 0;
+  }
+
+  .dh-reviews-container {
+    margin: 0;
   }
 
   .dh-plan-details {
@@ -2905,16 +3108,16 @@ line-height: 28px;
 .dh-plan-content-grid {
   display: grid;
   grid-template-columns: 1fr 247px;
-  gap: 20px;
+  gap: 20px 30px;
   align-items: start;
 }
 
 .dh-recommendation-text {
   color: ${primaryColor};
   font-size: 10px;
+  line-height: 10px;
   font-style: normal;
   font-weight: 600;
-  line-height: 13px; /* 130% */
   letter-spacing: 1.9px;
   margin-bottom: 7px;
   text-transform: uppercase;
@@ -2926,7 +3129,6 @@ line-height: 28px;
 }
 
 .dh-plan-visual {
-  max-width: 247px;
   height: 100%;
   /* Image on the right side */
 }
@@ -2934,6 +3136,8 @@ line-height: 28px;
 .dh-plan-visual .dh-plan-image-actual img {
   width: 100%;
   height: 100%;
+  opacity: 0;
+  transition: opacity 0.5s ease;
   object-fit: cover;
   border-radius: 12px;
 }
@@ -2992,7 +3196,6 @@ line-height: 28px;
   font-family: "${fontName}", sans-serif;
   font-size: 24px;
   font-weight: 400;
-  margin-bottom: 5px;
 }
 
 .dh-plan-price-initial .dh-price-number {
@@ -3144,7 +3347,8 @@ line-height: 28px;
 .dh-read-more-link {
   color: ${secondaryColor};
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .dh-read-more-link:hover {
@@ -3210,7 +3414,7 @@ line-height: 28px;
 
 /* Contact Step Information Display Sections */
 .dh-info-section {
-  margin: 32px 0;
+  margin: 24px 0;
   text-align: center;
 }
 
@@ -3248,7 +3452,6 @@ line-height: 28px;
 #dh-step-contact .dh-form-row {
   display: flex;
   gap: 16px;
-  margin-bottom: 32px;
 }
 
 #dh-step-contact .dh-form-row .dh-form-group {
@@ -3264,10 +3467,6 @@ line-height: 28px;
 #dh-step-contact .dh-step-instruction {
   text-align: center;
   margin-bottom: 32px;
-}
-
-#dh-step-contact .dh-form-button-group {
-  margin-top: 40px;
 }
 
 /* Complete Step Styles */
