@@ -12,18 +12,19 @@ export async function POST(
     const supabase = await createClient();
     const adminSupabase = createAdminClient();
 
-    // Check if user has access to this company
+    // Check if user has access to this company (using secure auth method)
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (!session?.user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Verify user has access to this company (either global admin or company admin)
-    const isGlobalAdmin = await isAuthorizedAdmin(session.user);
-    const hasCompanyAccess = await isCompanyAdmin(session.user.id, companyId);
+    const isGlobalAdmin = await isAuthorizedAdmin(user);
+    const hasCompanyAccess = await isCompanyAdmin(user.id, companyId);
 
     if (!isGlobalAdmin && !hasCompanyAccess) {
       return NextResponse.json({ 
