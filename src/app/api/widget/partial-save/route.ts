@@ -5,7 +5,7 @@ import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, valida
 interface PartialSaveRequest {
   companyId: string;
   sessionId: string;
-  stepCompleted: 'pest_issue_completed' | 'urgency_completed' | 'address_validated' | 'contact_started';
+  stepCompleted: 'address' | 'confirm-address' | 'how-we-do-it' | 'quote-contact' | 'contact';
   formData: {
     pestType?: string;
     urgency?: string;
@@ -24,11 +24,11 @@ interface PartialSaveRequest {
       email?: string;
     };
   };
-  serviceAreaData: {
+  serviceAreaData?: {
     served: boolean;
     areas: any[];
     primaryArea?: any;
-  };
+  } | null;
   attributionData: {
     utm_source?: string;
     utm_medium?: string;
@@ -109,22 +109,47 @@ export async function POST(request: NextRequest) {
                request.headers.get('x-real-ip') || 
                'unknown';
 
-    // First, create or update widget session
-    const { data: sessionData, error: sessionError } = await supabase
+    // First, try to find existing session, then insert or update accordingly
+    const { data: existingSession } = await supabase
       .from('widget_sessions')
-      .upsert({
-        session_id: sessionId,
-        company_id: companyId,
-        user_agent: attributionData.user_agent,
-        ip_address: ip !== 'unknown' ? ip : null,
-        referrer_url: attributionData.referrer_url || null,
-        page_url: attributionData.page_url,
-        last_activity_at: new Date().toISOString()
-      }, {
-        onConflict: 'session_id'
-      })
-      .select()
+      .select('session_id')
+      .eq('session_id', sessionId)
       .single();
+
+    let sessionData, sessionError;
+    
+    if (existingSession) {
+      // Session exists, update it (triggers will handle last_activity_at)
+      const result = await supabase
+        .from('widget_sessions')
+        .update({
+          user_agent: attributionData.user_agent,
+          ip_address: ip !== 'unknown' ? ip : null,
+          referrer_url: attributionData.referrer_url || null,
+          page_url: attributionData.page_url
+        })
+        .eq('session_id', sessionId)
+        .select()
+        .single();
+      sessionData = result.data;
+      sessionError = result.error;
+    } else {
+      // Session doesn't exist, create it
+      const result = await supabase
+        .from('widget_sessions')
+        .insert({
+          session_id: sessionId,
+          company_id: companyId,
+          user_agent: attributionData.user_agent,
+          ip_address: ip !== 'unknown' ? ip : null,
+          referrer_url: attributionData.referrer_url || null,
+          page_url: attributionData.page_url
+        })
+        .select()
+        .single();
+      sessionData = result.data;
+      sessionError = result.error;
+    }
 
     if (sessionError) {
       console.error('Error creating/updating widget session:', sessionError);
@@ -136,24 +161,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create or update partial lead
+    // Create or update partial lead (updated_at is handled by database trigger)
+    const upsertData: any = {
+      company_id: companyId,
+      session_id: sessionId,
+      form_data: formData,
+      step_completed: stepCompleted,
+      attribution_data: {
+        ...attributionData,
+        ip_address: ip !== 'unknown' ? ip : null,
+        saved_at: new Date().toISOString(),
+        // Include progressive state in attribution data for comprehensive tracking
+        progressive_state: progressiveState || null
+      }
+    };
+
+    // Only include service_area_data if it's provided (don't overwrite existing data with null)
+    if (serviceAreaData) {
+      upsertData.service_area_data = serviceAreaData;
+    }
+
     const { data: partialLead, error: partialLeadError } = await supabase
       .from('partial_leads')
-      .upsert({
-        company_id: companyId,
-        session_id: sessionId,
-        form_data: formData,
-        step_completed: stepCompleted,
-        service_area_data: serviceAreaData,
-        attribution_data: {
-          ...attributionData,
-          ip_address: ip !== 'unknown' ? ip : null,
-          saved_at: new Date().toISOString(),
-          // Include progressive state in attribution data for comprehensive tracking
-          progressive_state: progressiveState || null
-        },
-        updated_at: new Date().toISOString()
-      }, {
+      .upsert(upsertData, {
         onConflict: 'session_id'
       })
       .select()
@@ -175,7 +205,7 @@ export async function POST(request: NextRequest) {
       partialLeadId: partialLead.id,
       sessionId: sessionId,
       stepCompleted: stepCompleted,
-      serviceAreaServed: serviceAreaData.served
+      serviceAreaServed: serviceAreaData?.served || null
     }, origin, 'widget');
 
   } catch (error) {

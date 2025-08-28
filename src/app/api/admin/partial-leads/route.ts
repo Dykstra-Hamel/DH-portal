@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       ...lead,
       status: lead.converted_to_lead_id ? 'converted' : 
               new Date(lead.expires_at) < new Date() ? 'expired' : 'active',
-      completionPercentage: calculateCompletionPercentage(lead.form_data),
+      completionPercentage: calculateCompletionPercentage(lead.form_data, lead.step_completed),
       daysActive: Math.ceil((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24)),
       progressiveState: lead.attribution_data?.progressive_state || null,
       engagementMetrics: extractEngagementMetrics(lead.attribution_data),
@@ -151,22 +151,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Helper function to calculate completion percentage
-function calculateCompletionPercentage(formData: any): number {
-  if (!formData) return 0;
-  
-  const fields = {
-    pestIssue: formData.pestIssue ? 25 : 0,
-    address: formData.address && formData.latitude ? 25 : 0,
-    homeSize: formData.homeSize ? 25 : 0,
-    contact: (
-      (formData.contactInfo?.name ? 8 : 0) +
-      (formData.contactInfo?.email ? 8 : 0) +
-      (formData.contactInfo?.phone ? 9 : 0)
-    )
+// Helper function to calculate completion percentage based on widget steps
+function calculateCompletionPercentage(formData: any, stepCompleted?: string): number {
+  const stepPercentages: { [key: string]: number } = {
+    'pest_issue_completed': 15,
+    'address_validated': 30,
+    'address_confirmed': 45,
+    'how_we_do_it_viewed': 60,
+    'offer_viewed': 75,
+    'plan_selected': 85,
+    'contact_started': 95,
+    'contact_completed': 100
   };
   
-  return Math.round(Object.values(fields).reduce((sum, val) => sum + val, 0));
+  return stepCompleted ? (stepPercentages[stepCompleted] || 0) : 0;
 }
 
 // Helper function to extract engagement metrics
@@ -186,7 +184,7 @@ function extractEngagementMetrics(attributionData: any) {
 
 // Helper function to determine lead source
 function determineLeadSource(attributionData: any): string {
-  if (!attributionData) return 'unknown';
+  if (!attributionData) return 'Unknown';
   
   const { utm_source, utm_medium, gclid, traffic_source } = attributionData;
   
@@ -196,17 +194,25 @@ function determineLeadSource(attributionData: any): string {
     return 'Facebook Ads';
   } else if (utm_source === 'linkedin') {
     return 'LinkedIn';
-  } else if (traffic_source === 'organic') {
+  } else if (traffic_source === 'google_ads') {
+    return 'Google Ads';
+  } else if (traffic_source === 'paid_search') {
+    return 'Paid Search';
+  } else if (traffic_source === 'organic_search') {
     return 'Organic Search';
   } else if (traffic_source === 'social') {
     return 'Social Media';
+  } else if (traffic_source === 'email') {
+    return 'Email';
   } else if (traffic_source === 'referral') {
     return 'Referral';
   } else if (traffic_source === 'direct') {
     return 'Direct';
+  } else if (traffic_source && traffic_source.startsWith('utm_')) {
+    return `UTM: ${traffic_source.replace('utm_', '').toUpperCase()}`;
   }
   
-  return 'Other';
+  return 'Widget';
 }
 
 export async function DELETE(request: NextRequest) {

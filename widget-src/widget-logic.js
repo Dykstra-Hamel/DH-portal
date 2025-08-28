@@ -95,8 +95,31 @@ const showStep = async stepName => {
   // Update dynamic text based on form data
   await updateDynamicText();
 
+  // Ensure consent status is preserved if user has already completed confirm-address step
+  const stepOrder = ['pest-issue', 'address', 'confirm-address', 'how-we-do-it', 'offer', 'quote-contact', 'plan-comparison', 'contact', 'complete'];
+  const confirmAddressIndex = stepOrder.indexOf('confirm-address');
+  const currentStepIndex = stepOrder.indexOf(stepName);
+  
+  // If current step is after confirm-address and consent was already confirmed, maintain it
+  if (currentStepIndex > confirmAddressIndex && widgetState.attributionData?.consent_status === 'confirmed') {
+    // Consent status is already confirmed, no action needed - it will be preserved in partial saves
+  }
+
   // Setup step-specific validation and event handlers
   setupStepValidation(stepName);
+
+  // Note: Partial leads are now saved immediately when users interact with forms
+  // (pest selection, address validation, contact info entry, plan selection)
+  // rather than on step navigation to capture data in real-time
+
+  // Save form progress to local storage
+  if (typeof window.progressiveFormManager !== 'undefined' && window.progressiveFormManager.saveFormStateToLocalStorage) {
+    try {
+      window.progressiveFormManager.saveFormStateToLocalStorage();
+    } catch (error) {
+      console.warn('Failed to save form state to localStorage:', error);
+    }
+  }
 
   // Load plans when reaching plan selection step
   if (stepName === 'plan-selection') {
@@ -310,6 +333,29 @@ const nextStep = async () => {
       }
 
       const validationResult = await validateServiceArea();
+
+      // Capture consent status since user can't continue without checking the checkbox
+      const consentCheckbox = document.getElementById('confirm-address-consent-checkbox');
+      const consentStatus = consentCheckbox && consentCheckbox.checked ? 'confirmed' : 'not_provided';
+      
+      // Store consent in attribution data
+      widgetState.attributionData.consent_status = consentStatus;
+
+      // Save partial lead with consent status and final address confirmation
+      try {
+        const partialSaveResult = await savePartialLead(
+          validationResult,
+          'how-we-do-it' // Next step user will go to
+        );
+        if (!partialSaveResult.success) {
+          console.warn(
+            'Failed to save address confirmation with consent:',
+            partialSaveResult.error
+          );
+        }
+      } catch (error) {
+        console.warn('Error saving address confirmation:', error);
+      }
 
       if (validationResult.served) {
         // User is still in service area, fetch recommended plan and proceed to how-we-do-it step
@@ -655,6 +701,22 @@ const checkServiceAreaButton = async () => {
 
   try {
     const validationResult = await validateServiceArea();
+
+    // Save partial lead immediately after address validation with actual service area results
+    try {
+      const partialSaveResult = await savePartialLead(
+        validationResult,
+        'confirm-address' // Next step user will go to
+      );
+      if (!partialSaveResult.success) {
+        console.warn(
+          'Failed to save address validation:',
+          partialSaveResult.error
+        );
+      }
+    } catch (error) {
+      console.warn('Error saving address validation:', error);
+    }
 
     if (validationResult.served) {
       // User is in service area, navigate to confirm-address step
@@ -1124,7 +1186,7 @@ const setupStepValidation = stepName => {
             try {
               const partialSaveResult = await savePartialLead(
                 { served: false, status: 'unknown' }, // Service area unknown until address validated
-                'pest_issue_completed'
+                'address' // Next step user will go to
               );
               if (!partialSaveResult.success) {
                 console.warn(
