@@ -19,17 +19,72 @@ const openModal = () => {
       modalBody.appendChild(widget.formWidget);
       modalWidgetCreated = true;
 
-      // Initialize first step after a brief delay
-      setTimeout(() => {
-        showStep('pest-issue');
-        setupStepValidation('pest-issue');
-      }, 100);
-    } else {
-      // For subsequent modal opens, just show the current step
-      if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
-        showStep(widgetState.currentStep);
+      // Check for recovery data and show continue prompt if available
+      if (typeof widgetState !== 'undefined' && widgetState.recoveryData && 
+          typeof window.progressiveFormManager !== 'undefined' && 
+          window.progressiveFormManager.shouldPromptToContinue(widgetState.recoveryData)) {
+        
+        // Check if this is cross-device recovery (auto-restore without prompt)
+        if (widgetState.recoveryData.source === 'cross-device') {
+          // Wait for modal DOM to be fully ready with polling
+          const waitForModalReady = () => {
+            // Check if all required elements exist
+            const requiredElements = [
+              '.dh-form-content',
+              '.dh-form-step',
+              '#dh-step-' + widgetState.recoveryData.currentStep
+            ];
+            
+            const allElementsReady = requiredElements.every(selector => {
+              return document.querySelector(selector) !== null;
+            });
+            
+            if (allElementsReady) {
+              if (typeof window.restoreProgress === 'function') {
+                window.restoreProgress(widgetState.recoveryData);
+              }
+            } else {
+              setTimeout(waitForModalReady, 100);
+            }
+          };
+          
+          setTimeout(waitForModalReady, 200);
+        } else {
+          // Show continue prompt for normal recovery (localStorage/server)
+          setTimeout(() => {
+            if (window.progressiveFormManager && typeof window.progressiveFormManager.showContinuePrompt === 'function') {
+              window.progressiveFormManager.showContinuePrompt(widgetState.recoveryData);
+            }
+          }, 300); // Slight delay to let modal finish opening
+        }
       } else {
-        showStep('pest-issue');
+        // Initialize first step after a brief delay if no recovery data
+        setTimeout(() => {
+          if (window.progressiveFormManager) {
+            window.progressiveFormManager.startAutoSave();
+          }
+          showStep('pest-issue');
+          setupStepValidation('pest-issue');
+        }, 100);
+      }
+    } else {
+      // For subsequent modal opens, check if we should show continue prompt
+      if (typeof widgetState !== 'undefined' && widgetState.recoveryData && 
+          typeof window.progressiveFormManager !== 'undefined' && 
+          window.progressiveFormManager.shouldPromptToContinue(widgetState.recoveryData)) {
+        
+        setTimeout(() => {
+          if (window.progressiveFormManager && typeof window.progressiveFormManager.showContinuePrompt === 'function') {
+            window.progressiveFormManager.showContinuePrompt(widgetState.recoveryData);
+          }
+        }, 300);
+      } else {
+        // Show current step or default to first step
+        if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
+          showStep(widgetState.currentStep);
+        } else {
+          showStep('pest-issue');
+        }
       }
     }
 
@@ -38,7 +93,7 @@ const openModal = () => {
     document.body.style.overflow = 'hidden'; // Prevent background scroll
 
     // Force reflow to ensure display is set before animation
-    modal.offsetHeight;
+    void modal.offsetHeight;
 
     // Add show class for animation
     modal.classList.add('show');
