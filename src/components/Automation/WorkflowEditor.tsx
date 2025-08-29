@@ -24,7 +24,7 @@ import styles from './WorkflowEditor.module.scss';
 
 interface WorkflowStep {
   id: string;
-  type: 'send_email' | 'wait' | 'update_lead_status' | 'assign_lead' | 'conditional' | 'make_call';
+  type: 'send_email' | 'wait' | 'update_lead_status' | 'assign_lead' | 'conditional' | 'make_call' | 'archive_call';
   template_id?: string;
   delay_minutes?: number;
   new_status?: string;
@@ -33,6 +33,7 @@ interface WorkflowStep {
   branches?: WorkflowBranch[];
   call_variables?: any;
   call_type?: 'immediate' | 'follow_up' | 'urgent';
+  archive_reason?: string;
   required?: boolean;
 }
 
