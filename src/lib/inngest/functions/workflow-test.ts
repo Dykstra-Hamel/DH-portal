@@ -105,6 +105,13 @@ export const workflowTestHandler = inngest.createFunction(
         if (workflowStep.type === 'update_lead_status' && !workflowStep.new_status) {
           errors.push(`Step ${stepNumber}: No new status specified`);
         }
+
+        if (workflowStep.type === 'archive_call') {
+          // Archive call step validation - no specific config needed, just ensure it's properly configured
+          if (!workflowStep.id) {
+            errors.push(`Step ${stepNumber}: Archive call step missing ID`);
+          }
+        }
       }
 
       return { valid: errors.length === 0, errors };
@@ -199,6 +206,11 @@ export const workflowTestHandler = inngest.createFunction(
             case 'assign_lead':
               stepResult.assignedTo = workflowStep.assign_to_user_id || 'unassigned';
               stepResult.message = `Lead assigned to user ${workflowStep.assign_to_user_id || 'system'}`;
+              break;
+
+            case 'archive_call':
+              stepResult.action = 'archive';
+              stepResult.message = `Call record would be archived (TEST MODE)`;
               break;
 
             default:

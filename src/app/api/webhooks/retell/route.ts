@@ -518,6 +518,75 @@ async function handleCallEnded(supabase: any, callData: any) {
     // Don't fail the webhook if event sending fails
   }
 
+  // Check for inbound call transfers and send transfer event
+  try {
+    if (disconnection_reason === 'call_transfer' && callRecord?.leads) {
+      const isFollowUp = retell_llm_dynamic_variables?.is_follow_up === 'true';
+      const callDuration = duration_ms ? Math.round(duration_ms / 1000) : 0;
+      
+      // Get company ID from lead data
+      const { data: leadWithCompany } = await supabase
+        .from('leads')
+        .select('id, company_id, lead_status, lead_source, comments, pest_type, customers(id, name, email, phone)')
+        .eq('id', callRecord.leads.id)
+        .single();
+      
+      if (leadWithCompany) {
+        console.log(`🔄 Detected inbound call transfer: ${call_id} for company ${leadWithCompany.company_id}`);
+        
+        await sendEvent({
+          name: 'inbound-call/transfer',
+          data: {
+            callId: call_id,
+            companyId: leadWithCompany.company_id,
+            leadId: callRecord.leads.id,
+            customerId: callRecord.leads.customer_id,
+            callRecord: {
+              id: callRecord.id,
+              call_id,
+              phone_number: callRecord.phone_number || '',
+              from_number: callRecord.from_number,
+              call_status: call_status || 'completed',
+              disconnect_reason: disconnection_reason,
+              duration_seconds: callDuration,
+              start_timestamp: callRecord.start_timestamp,
+              end_timestamp: callRecord.end_timestamp,
+              transcript: callRecord.transcript,
+              sentiment: callRecord.sentiment
+            },
+            leadData: {
+              id: leadWithCompany.id,
+              lead_status: leadWithCompany.lead_status || 'new',
+              lead_source: leadWithCompany.lead_source || 'cold_call',
+              comments: leadWithCompany.comments,
+              pest_type: leadWithCompany.pest_type
+            },
+            customerData: leadWithCompany.customers ? {
+              id: leadWithCompany.customers.id,
+              name: leadWithCompany.customers.name,
+              email: leadWithCompany.customers.email,
+              phone: leadWithCompany.customers.phone
+            } : undefined,
+            transferContext: {
+              isFollowUp,
+              callDuration,
+              transferReason: disconnection_reason,
+              agentId: retell_llm_dynamic_variables?.agent_id || callData.agent_id || callData.retell_llm_id
+            },
+            createdAt: new Date().toISOString()
+          }
+        });
+
+        console.log(`✅ Inbound call transfer event sent for call ${call_id}`);
+      } else {
+        console.warn(`Could not find lead data for call transfer ${call_id}`);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to send inbound call transfer event:', error);
+    // Don't fail the webhook if event sending fails
+  }
+
   return NextResponse.json({
     success: true,
     call_record_id: callRecord.id,

@@ -18,6 +18,7 @@ import {
   ChevronUp,
   Play,
   PhoneCall,
+  Archive,
 } from 'lucide-react';
 import styles from './WorkflowEditor.module.scss';
 
@@ -69,6 +70,8 @@ const WORKFLOW_TYPES = [
 const TRIGGER_TYPES = [
   // { value: 'lead_created', label: 'New Lead Created' }, // Disabled - process not refined yet
   { value: 'widget_schedule_completed', label: 'Widget Schedule Form Completed' },
+  { value: 'partial_lead_created', label: 'Partial Lead Created' },
+  { value: 'inbound_call_transfer', label: 'Inbound Call Transferred' },
   // { value: 'lead_updated', label: 'Lead Updated' }, // Disabled temporarily
   { value: 'lead_status_changed', label: 'Lead Status Changed' },
   // { value: 'email_opened', label: 'Email Opened' }, // Disabled temporarily
@@ -757,6 +760,95 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
               </div>
             )}
 
+            {/* Partial Lead Created Conditions */}
+            {formData.trigger_type === 'partial_lead_created' && (
+              <div className={styles.formSection}>
+                <h4>Partial Lead Step Conditions</h4>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label>Trigger on Steps *</label>
+                    <div className={styles.checkboxGroup}>
+                      {[
+                        { value: 'address', label: 'Address Entry' },
+                        { value: 'confirm-address', label: 'Address Confirmation' },
+                        { value: 'how-we-do-it', label: 'Service Information' },
+                        { value: 'quote-contact', label: 'Contact Information' },
+                        { value: 'plan-comparison', label: 'Plan Comparison' },
+                        { value: 'contact', label: 'Scheduling Details' }
+                      ].map(step => (
+                        <label key={step.value} className={styles.checkboxLabel}>
+                          <input
+                            type="checkbox"
+                            checked={((formData.trigger_conditions as any)?.steps || []).includes(step.value)}
+                            onChange={(e) => {
+                              const currentSteps = (formData.trigger_conditions as any)?.steps || [];
+                              const newSteps = e.target.checked
+                                ? [...currentSteps, step.value]
+                                : currentSteps.filter((s: string) => s !== step.value);
+                              setFormData(prev => ({
+                                ...prev,
+                                trigger_conditions: {
+                                  ...prev.trigger_conditions,
+                                  steps: newSteps
+                                }
+                              }));
+                            }}
+                          />
+                          {step.label}
+                        </label>
+                      ))}
+                    </div>
+                    <small>Select which widget steps should trigger this workflow</small>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inbound Call Transfer Conditions */}
+            {formData.trigger_type === 'inbound_call_transfer' && (
+              <div className={styles.formSection}>
+                <h4>Call Transfer Conditions</h4>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label>Minimum Call Duration (seconds)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="3600"
+                      value={(formData.trigger_conditions as any)?.min_duration_seconds || ''}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        trigger_conditions: {
+                          ...prev.trigger_conditions,
+                          min_duration_seconds: e.target.value ? parseInt(e.target.value) : undefined
+                        }
+                      }))}
+                      placeholder="Optional minimum duration"
+                    />
+                    <small>Leave empty to trigger on any call duration</small>
+                  </div>
+                  
+                  <div className={styles.formGroup}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={(formData.trigger_conditions as any)?.include_follow_ups || false}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          trigger_conditions: {
+                            ...prev.trigger_conditions,
+                            include_follow_ups: e.target.checked
+                          }
+                        }))}
+                      />
+                      Include follow-up calls
+                    </label>
+                    <small>Check to trigger on both initial and follow-up call transfers</small>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
                 <label className={styles.checkbox}>
@@ -855,6 +947,13 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 <Settings size={16} />
                 Update Status
               </button>
+              <button 
+                onClick={() => addStep('archive_call')} 
+                className={styles.addStepButton}
+              >
+                <Archive size={16} />
+                Archive Call
+              </button>
             </div>
 
             <div className={styles.workflowSteps}>
@@ -905,6 +1004,7 @@ function getStepTypeName(type: string): string {
     conditional: 'Conditional Branch',
     update_lead_status: 'Update Lead Status',
     assign_lead: 'Assign Lead',
+    archive_call: 'Archive Call',
   };
   return names[type as keyof typeof names] || type;
 }
@@ -930,6 +1030,10 @@ function getStepDescription(step: WorkflowStep, templates: EmailTemplate[]): str
       return `Update status to "${step.new_status || 'not set'}"`;
     case 'assign_lead':
       return 'Assign lead to user';
+    case 'archive_call':
+      return step.archive_reason 
+        ? `Archive call record - Reason: ${step.archive_reason}`
+        : 'Archive call record from active views';
     default:
       return 'Step configuration needed';
   }

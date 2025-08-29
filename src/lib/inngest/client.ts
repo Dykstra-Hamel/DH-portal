@@ -85,7 +85,7 @@ export interface AutomationTriggerEvent {
     companyId: string;
     leadId?: string;
     customerId?: string;
-    triggerType: 'lead_created' | 'lead_updated' | 'lead_status_changed' | 'email_opened' | 'email_clicked' | 'scheduled';
+    triggerType: 'lead_created' | 'lead_updated' | 'lead_status_changed' | 'email_opened' | 'email_clicked' | 'scheduled' | 'partial_lead_created' | 'inbound_call_transfer';
     triggerData: Record<string, any>;
   };
 }
@@ -197,8 +197,100 @@ export interface WorkflowCancellationEvent {
   };
 }
 
+export interface PartialLeadCreatedEvent {
+  name: 'partial-lead/created';
+  data: {
+    partialLeadId: string;
+    companyId: string;
+    sessionId: string;
+    stepCompleted: 'address' | 'confirm-address' | 'how-we-do-it' | 'quote-contact' | 'plan-comparison' | 'contact';
+    formData: {
+      pestType?: string;
+      address?: string;
+      addressDetails?: {
+        street?: string;
+        city?: string;
+        state?: string;
+        zip?: string;
+      };
+      contactInfo?: {
+        name?: string;
+        phone?: string;
+        email?: string;
+      };
+      selectedPlan?: string;
+      estimatedPrice?: {
+        min: number;
+        max: number;
+        service_type: string;
+      };
+    };
+    serviceAreaData?: {
+      served: boolean;
+      areas: any[];
+      primaryArea?: any;
+    } | null;
+    attribution: {
+      utm_source?: string;
+      utm_medium?: string;
+      utm_campaign?: string;
+      utm_term?: string;
+      utm_content?: string;
+      gclid?: string;
+      referrer_url?: string;
+      referrer_domain?: string;
+      traffic_source: string;
+      page_url: string;
+    };
+    createdAt: string;
+  };
+}
+
+export interface InboundCallTransferEvent {
+  name: 'inbound-call/transfer';
+  data: {
+    callId: string;
+    companyId: string;
+    leadId?: string;
+    customerId?: string;
+    callRecord: {
+      id: string;
+      call_id: string;
+      phone_number: string;
+      from_number?: string;
+      call_status: string;
+      disconnect_reason: string;
+      duration_seconds?: number;
+      start_timestamp?: string;
+      end_timestamp?: string;
+      transcript?: string;
+      sentiment?: string;
+    };
+    leadData?: {
+      id: string;
+      lead_status: string;
+      lead_source: string;
+      comments?: string;
+      pest_type?: string;
+    };
+    customerData?: {
+      id: string;
+      name?: string;
+      email?: string;
+      phone?: string;
+    };
+    transferContext: {
+      isFollowUp: boolean;
+      callDuration: number;
+      transferReason: string;
+      agentId?: string;
+    };
+    createdAt: string;
+  };
+}
+
 // Union type of all events
-export type InngestEvent = LeadCreatedEvent | LeadStatusChangedEvent | WidgetScheduleCompletedEvent | AutomationTriggerEvent | EmailScheduledEvent | WorkflowTestEvent | CallSchedulingEvent | ScheduledCallExecutionEvent | CallCompletedEvent | RetellCallEndedEvent | WorkflowCancellationEvent;
+export type InngestEvent = LeadCreatedEvent | LeadStatusChangedEvent | WidgetScheduleCompletedEvent | AutomationTriggerEvent | EmailScheduledEvent | WorkflowTestEvent | CallSchedulingEvent | ScheduledCallExecutionEvent | CallCompletedEvent | RetellCallEndedEvent | WorkflowCancellationEvent | PartialLeadCreatedEvent | InboundCallTransferEvent;
 
 // Helper function to send events
 export const sendEvent = async (event: InngestEvent) => {
