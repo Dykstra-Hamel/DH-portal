@@ -487,8 +487,8 @@
               expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() // 48 hours
             };
             
-            // Remove sensitive or large data that shouldn't be persisted
-            delete saveData.formData.contactInfo;
+            // Note: Keeping contactInfo for session restore functionality
+            // Previous version deleted contactInfo for privacy, but this prevents proper session restoration
             
             localStorage.setItem('dh_widget_progress_' + config.companyId, JSON.stringify(saveData));
             widgetState.formState.lastSaved = new Date().toISOString();
@@ -899,6 +899,9 @@
       // Function to restore progress from saved data
       const restoreProgress = (savedData) => {
         try {
+          // Set flag to indicate we're restoring
+          widgetState.isRestoring = true;
+          
           // Restore form data
           widgetState.formData = { ...widgetState.formData, ...savedData.formData };
           widgetState.currentStep = savedData.currentStep;
@@ -909,8 +912,11 @@
           
           // Then populate form fields after a delay to ensure DOM is ready
           setTimeout(() => {
+            console.log('DH Widget: Session restoration - calling populateFormFields');
             populateFormFields();
-          }, 300);
+            // Clear restoration flag after population is complete
+            widgetState.isRestoring = false;
+          }, 500);
           
           // Start auto-save
           progressiveFormManager.startAutoSave();
@@ -921,54 +927,108 @@
         }
       };
       
-      // Make restoreProgress available globally for cross-device recovery
-      window.restoreProgress = restoreProgress;
-      
       // Function to populate form fields with restored data
       const populateFormFields = () => {
         const data = widgetState.formData;
+        console.log('DH Widget: populateFormFields called with data:', data);
         
         try {
+          // Restore pest selection if available
+          if (data.pestType) {
+            const pestOptions = document.querySelectorAll('.dh-pest-option');
+            pestOptions.forEach(option => {
+              option.classList.remove('selected');
+              if (option.dataset.pest === data.pestType) {
+                option.classList.add('selected');
+                console.log('DH Widget: Restored pest selection:', data.pestType);
+              }
+            });
+          }
+          
           // Populate address fields
           if (data.address) {
             const addressInput = document.getElementById('address-search-input');
             if (addressInput) {
               addressInput.value = data.address;
+              console.log('DH Widget: Populated address search input:', data.address);
             }
           }
           
-          if (data.addressStreet) {
-            const streetInput = document.getElementById('street-input') || document.getElementById('confirm-street-input');
+          // Populate confirm-address step fields (separate fields)
+          // Handle both old flat structure and new nested addressDetails structure
+          const addressStreet = data.addressStreet || data.addressDetails?.street || '';
+          const addressCity = data.addressCity || data.addressDetails?.city || '';
+          const addressState = data.addressState || data.addressDetails?.state || '';
+          const addressZip = data.addressZip || data.addressDetails?.zip || '';
+          
+          if (addressStreet) {
+            const streetInput = document.getElementById('confirm-street-input');
             if (streetInput) {
-              streetInput.value = data.addressStreet;
+              streetInput.value = addressStreet;
+              console.log('DH Widget: Populated confirm-street-input with value:', addressStreet);
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(streetInput);
+              }
             }
           }
           
-          if (data.addressCity) {
-            const cityInput = document.getElementById('city-input') || document.getElementById('confirm-city-input');
+          if (addressCity) {
+            const cityInput = document.getElementById('confirm-city-input');
             if (cityInput) {
-              cityInput.value = data.addressCity;
+              cityInput.value = addressCity;
+              console.log('DH Widget: Populated confirm-city-input with value:', addressCity);
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(cityInput);
+              }
             }
           }
           
-          if (data.addressState) {
-            const stateInput = document.getElementById('state-input') || document.getElementById('confirm-state-input');
+          if (addressState) {
+            const stateInput = document.getElementById('confirm-state-input');
             if (stateInput) {
-              stateInput.value = data.addressState;
+              stateInput.value = addressState;
+              console.log('DH Widget: Populated confirm-state-input with value:', addressState);
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(stateInput);
+              }
             }
           }
           
-          if (data.addressZip) {
-            const zipInput = document.getElementById('zip-input') || document.getElementById('confirm-zip-input');
+          if (addressZip) {
+            const zipInput = document.getElementById('confirm-zip-input');
             if (zipInput) {
-              zipInput.value = data.addressZip;
+              zipInput.value = addressZip;
+              console.log('DH Widget: Populated confirm-zip-input with value:', addressZip);
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(zipInput);
+              }
+            }
+          }
+          
+          // Restore consent status if available
+          if (data.consentStatus === 'granted') {
+            const consentCheckbox = document.getElementById('confirm-address-consent-checkbox');
+            if (consentCheckbox) {
+              consentCheckbox.checked = true;
             }
           }
           
           // Populate contact information with improved field detection
           if (data.contactInfo) {
-            const { firstName, lastName, email, phone } = data.contactInfo;
+            const { name, firstName, lastName, email, phone } = data.contactInfo;
             
+            // Handle full name field (used in contact step)
+            if (name) {
+              const fullNameInput = document.getElementById('name-input');
+              if (fullNameInput) {
+                fullNameInput.value = name;
+                if (typeof updateFloatingLabel === 'function') {
+                  updateFloatingLabel(fullNameInput);
+                }
+              }
+            }
+            
+            // Handle separate first/last name fields (used in quote path)
             if (firstName) {
               const firstNameInput = document.getElementById('quote-first-name-input') || 
                                    document.getElementById('first-name-input');
@@ -1039,6 +1099,10 @@
           console.error('DH Widget: Error populating form fields', error);
         }
       };
+      
+      // Make restoreProgress and populateFormFields available globally
+      window.restoreProgress = restoreProgress;
+      window.populateFormFields = populateFormFields;
       
       // Function to start fresh widget
       const startFreshWidget = () => {

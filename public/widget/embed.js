@@ -1,6 +1,5 @@
 /**
  * DH Widget - Built from Source
- * Generated: 2025-08-28T21:25:06.825Z
  * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
  */
 
@@ -2172,6 +2171,7 @@
    margin-right: 0;
   }
 
+  /* iOS-compatible full-width image solution */
   #how-we-do-it-interior-image, .dh-plan-image-actual img {
     width: 100vw !important;
     height: 240px !important;
@@ -2181,8 +2181,8 @@
     opacity: 0;
     transition: opacity 0.5s ease;
     border-radius: 0;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
+    margin-left: -50vw;
+    margin-right: -50vw;
     border-radius: 0 !important;
   }
   
@@ -4859,11 +4859,12 @@
     // Scroll to top of the page or widget container
     try {
       // Try to find the widget container and scroll to it
-      const widgetContainer = document.getElementById('dh-widget-container') || 
-                             document.querySelector('.dh-widget') ||
-                             targetStep.closest('.dh-widget-container') ||
-                             targetStep;
-      
+      const widgetContainer =
+        document.getElementById('dh-widget-container') ||
+        document.querySelector('.dh-widget') ||
+        targetStep.closest('.dh-widget-container') ||
+        targetStep;
+
       if (widgetContainer && widgetContainer.scrollIntoView) {
         widgetContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
@@ -4903,12 +4904,25 @@
   await updateDynamicText();
 
   // Ensure consent status is preserved if user has already completed confirm-address step
-  const stepOrder = ['pest-issue', 'address', 'confirm-address', 'how-we-do-it', 'offer', 'quote-contact', 'plan-comparison', 'contact', 'complete'];
+  const stepOrder = [
+    'pest-issue',
+    'address',
+    'confirm-address',
+    'how-we-do-it',
+    'offer',
+    'quote-contact',
+    'plan-comparison',
+    'contact',
+    'complete',
+  ];
   const confirmAddressIndex = stepOrder.indexOf('confirm-address');
   const currentStepIndex = stepOrder.indexOf(stepName);
-  
+
   // If current step is after confirm-address and consent was already confirmed, maintain it
-  if (currentStepIndex > confirmAddressIndex && widgetState.attributionData?.consent_status === 'confirmed') {
+  if (
+    currentStepIndex > confirmAddressIndex &&
+    widgetState.attributionData?.consent_status === 'confirmed'
+  ) {
     // Consent status is already confirmed, no action needed - it will be preserved in partial saves
   }
 
@@ -4920,7 +4934,10 @@
   // rather than on step navigation to capture data in real-time
 
   // Save form progress to local storage
-  if (typeof window.progressiveFormManager !== 'undefined' && window.progressiveFormManager.saveFormStateToLocalStorage) {
+  if (
+    typeof window.progressiveFormManager !== 'undefined' &&
+    window.progressiveFormManager.saveFormStateToLocalStorage
+  ) {
     try {
       window.progressiveFormManager.saveFormStateToLocalStorage();
     } catch (error) {
@@ -5142,9 +5159,14 @@
       const validationResult = await validateServiceArea();
 
       // Capture consent status since user can't continue without checking the checkbox
-      const consentCheckbox = document.getElementById('confirm-address-consent-checkbox');
-      const consentStatus = consentCheckbox && consentCheckbox.checked ? 'confirmed' : 'not_provided';
-      
+      const consentCheckbox = document.getElementById(
+        'confirm-address-consent-checkbox'
+      );
+      const consentStatus =
+        consentCheckbox && consentCheckbox.checked
+          ? 'confirmed'
+          : 'not_provided';
+
       // Store consent in attribution data
       widgetState.attributionData.consent_status = consentStatus;
 
@@ -5152,7 +5174,7 @@
       try {
         const partialSaveResult = await savePartialLead(
           validationResult,
-          'how-we-do-it' // Next step user will go to
+          'how-we-do-it' // Step user will navigate to
         );
         if (!partialSaveResult.success) {
           console.warn(
@@ -5513,7 +5535,7 @@
     try {
       const partialSaveResult = await savePartialLead(
         validationResult,
-        'confirm-address' // Next step user will go to
+        'confirm-address' // Step user will navigate to
       );
       if (!partialSaveResult.success) {
         console.warn(
@@ -5585,16 +5607,17 @@
     const calendarIcon = event.target.closest(
       '.dh-input-icon[data-type="calendar"]'
     );
-    
+
     // Also check if clicking anywhere on a date input container
     const floatingInput = event.target.closest('.dh-floating-input');
-    const isDateContainer = floatingInput && floatingInput.querySelector('input[type="date"]');
+    const isDateContainer =
+      floatingInput && floatingInput.querySelector('input[type="date"]');
     const isDateInput = event.target.type === 'date';
-    
+
     if (calendarIcon || (isDateContainer && !isDateInput)) {
       // Find the associated date input
       let container, dateInput;
-      
+
       if (calendarIcon) {
         container = calendarIcon.closest('.dh-floating-input');
         dateInput = container?.querySelector('input[type="date"]');
@@ -5639,6 +5662,27 @@
   } else {
   setupCalendarIconClick();
   }
+
+  // Function to navigate to detailed quote with proper step tracking
+  const navigateToDetailedQuote = () => {
+  console.log('DH Widget: Navigating to detailed quote from:', widgetState.currentStep);
+  
+  // Navigate to quote-contact step
+  showStep('quote-contact');
+  setupStepValidation('quote-contact');
+  
+  // Update current step tracking
+  widgetState.currentStep = 'quote-contact';
+  console.log('DH Widget: Updated current step to:', widgetState.currentStep);
+  
+  // Trigger auto-save to persist the step change
+  if (typeof triggerProgressSave === 'function') {
+    triggerProgressSave();
+  }
+  };
+
+  // Make function globally available
+  window.navigateToDetailedQuote = navigateToDetailedQuote;
 
   // Note: selectPlan function is now defined inside plan-comparison setupStepValidation
 
@@ -5726,7 +5770,11 @@
 
   // Update recurring price in new pricing structure
   const recurringPriceEl = document.querySelector('.dh-plan-price-recurring');
-  if (recurringPriceEl && selectedPlan.recurring_price && selectedPlan.billing_frequency) {
+  if (
+    recurringPriceEl &&
+    selectedPlan.recurring_price &&
+    selectedPlan.billing_frequency
+  ) {
     recurringPriceEl.innerHTML = `<span class="dh-price-dollar">$</span>${selectedPlan.recurring_price}<div class="dh-price-suffix">
       <span class="dh-price-asterisk">*</span>
       <div class="dh-price-frequency">${formatBillingFrequency(selectedPlan.billing_frequency)}</div>
@@ -5742,7 +5790,9 @@
   // Update normally price
   const normallyPriceEl = document.querySelector('.dh-plan-price-normally');
   if (normallyPriceEl && selectedPlan.initial_price) {
-    const normalPrice = (selectedPlan.initial_price + (selectedPlan.initial_discount || 0)).toFixed(0);
+    const normalPrice = (
+      selectedPlan.initial_price + (selectedPlan.initial_discount || 0)
+    ).toFixed(0);
     normallyPriceEl.innerHTML = `Normally <span class="dh-price-dollar">$</span><span class="dh-plan-price-crossed">${normalPrice}</span>`;
   }
 
@@ -5765,7 +5815,9 @@
   }
 
   // Update recommendation badge visibility
-  const recommendationBadge = document.getElementById('plan-recommendation-badge');
+  const recommendationBadge = document.getElementById(
+    'plan-recommendation-badge'
+  );
   if (recommendationBadge) {
     if (index === 0) {
       recommendationBadge.style.display = 'block';
@@ -5783,16 +5835,18 @@
   // Update disclaimer
   const disclaimerEl = document.querySelector('.dh-plan-price-disclaimer');
   if (disclaimerEl) {
-    disclaimerEl.innerHTML = selectedPlan.plan_disclaimer || '*Pricing may vary based on initial inspection findings and other factors.';
+    disclaimerEl.innerHTML =
+      selectedPlan.plan_disclaimer ||
+      '*Pricing may vary based on initial inspection findings and other factors.';
   }
   };
 
   // Toggle description read more/less functionality
-  window.toggleDescription = function(element) {
+  window.toggleDescription = function (element) {
   const container = element.parentElement;
   const descriptionText = container.querySelector('.dh-description-text');
   const fullDescription = container.querySelector('.dh-description-full');
-  
+
   if (element.textContent === 'Read More') {
     // Show full description and hide the Read More link
     descriptionText.style.display = 'none';
@@ -5989,11 +6043,30 @@
             widgetState.formData.pestBackgroundImage =
               selectedPest?.widget_background_image || '';
 
-            // Save progress immediately
+            // Fetch and store recommended plan immediately after pest selection
+            try {
+              const recommendedPlan = await getCheapestFullCoveragePlan(config.companyId, pestValue);
+              if (recommendedPlan) {
+                widgetState.formData.recommendedPlan = recommendedPlan;
+                widgetState.formData.selectedPlan = recommendedPlan; // Default to recommended
+                widgetState.formData.offerPrice = recommendedPlan.recurring_price;
+                
+                console.log('DH Widget: Stored recommended plan after pest selection:', {
+                  pestType: pestValue,
+                  planName: recommendedPlan.plan_name,
+                  recurringPrice: recommendedPlan.recurring_price,
+                  initialPrice: recommendedPlan.initial_price
+                });
+              }
+            } catch (error) {
+              console.warn('Error fetching recommended plan for pest selection:', error);
+            }
+
+            // Save progress immediately with plan data
             try {
               const partialSaveResult = await savePartialLead(
                 { served: false, status: 'unknown' }, // Service area unknown until address validated
-                'address' // Next step user will go to
+                'address' // Step user will navigate to
               );
               if (!partialSaveResult.success) {
                 console.warn(
@@ -6052,12 +6125,22 @@
         checkServiceAreaBtn.innerHTML =
           'Search Now <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-        // If address already exists (user returning to step), enable the button
+        // If address already exists (user returning to step), enable the button and populate fields
         if (widgetState.formData.address) {
           checkServiceAreaBtn.disabled = false;
           checkServiceAreaBtn.classList.remove('disabled');
           checkServiceAreaBtn.innerHTML =
             'Check Service Area <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          
+          // Populate form fields when returning to address step
+          setTimeout(() => {
+            if (!widgetState.isRestoring && typeof window.populateFormFields === 'function') {
+              console.log('DH Widget: Address step calling populateFormFields');
+              window.populateFormFields();
+            } else if (widgetState.isRestoring) {
+              console.log('DH Widget: Skipping address field population - restoration in progress');
+            }
+          }, 100);
         }
       }
 
@@ -6320,25 +6403,31 @@
         }
       }
 
-      // Populate address fields with stored data
+      // Populate all form fields and setup confirm-address step
       setTimeout(() => {
-        const streetInput = document.getElementById('confirm-street-input');
-        const cityInput = document.getElementById('confirm-city-input');
-        const stateInput = document.getElementById('confirm-state-input');
-        const zipInput = document.getElementById('confirm-zip-input');
-
-        if (streetInput)
-          streetInput.value = widgetState.formData.addressStreet || '';
-        if (cityInput) cityInput.value = widgetState.formData.addressCity || '';
-        if (stateInput)
-          stateInput.value = widgetState.formData.addressState || '';
-        if (zipInput) zipInput.value = widgetState.formData.addressZip || '';
+        console.log('DH Widget: Confirm-address step - populating fields with data:', {
+          addressStreet: widgetState.formData.addressStreet,
+          addressCity: widgetState.formData.addressCity,
+          addressState: widgetState.formData.addressState,
+          addressZip: widgetState.formData.addressZip,
+          address: widgetState.formData.address,
+          isRestoring: widgetState.isRestoring
+        });
+        
+        // Skip field population if we're in restoration mode (will be handled by session restoration)
+        if (!widgetState.isRestoring && typeof window.populateFormFields === 'function') {
+          console.log('DH Widget: Confirm-address step calling populateFormFields');
+          window.populateFormFields();
+        } else if (widgetState.isRestoring) {
+          console.log('DH Widget: Skipping confirm-address field population - restoration in progress');
+        }
 
         // Load address background imagery if available
         if (
           widgetState.formData.address &&
           widgetState.formData.latitude &&
-          widgetState.formData.longitude
+          widgetState.formData.longitude &&
+          typeof loadAddressBackgroundImagery === 'function'
         ) {
           const addressData = {
             formatted: widgetState.formData.address,
@@ -6349,24 +6438,11 @@
             lat: widgetState.formData.latitude,
             lon: widgetState.formData.longitude,
           };
-
-          // Load street view as background image
-          if (typeof loadAddressBackgroundImagery === 'function') {
-            loadAddressBackgroundImagery(
-              addressData,
-              'confirm-address-bg-image'
-            );
-          }
-        }
-
-        // Update floating labels
-        if (typeof window.updateAllFloatingLabels === 'function') {
-          window.updateAllFloatingLabels();
+          loadAddressBackgroundImagery(addressData, 'confirm-address-bg-image');
         }
 
         // Populate company name in consent checkbox
-        const companyName =
-          widgetState.widgetConfig?.branding?.companyName || 'Company Name';
+        const companyName = widgetState.widgetConfig?.branding?.companyName || 'Company Name';
         const companyNameElements = [
           document.getElementById('confirm-address-company-name'),
           document.getElementById('confirm-address-company-name-2'),
@@ -6379,18 +6455,14 @@
         });
 
         // Setup consent checkbox validation for continue button
-        const consentCheckbox = document.getElementById(
-          'confirm-address-consent-checkbox'
-        );
+        const consentCheckbox = document.getElementById('confirm-address-consent-checkbox');
         const continueButton = document.getElementById('confirm-address-next');
 
         if (consentCheckbox && continueButton) {
-          // Disable button initially
           continueButton.disabled = true;
           continueButton.style.opacity = '0.5';
           continueButton.style.cursor = 'not-allowed';
 
-          // Add event listener for checkbox changes
           const updateButtonState = () => {
             if (consentCheckbox.checked) {
               continueButton.disabled = false;
@@ -6404,11 +6476,9 @@
           };
 
           consentCheckbox.addEventListener('change', updateButtonState);
-
-          // Set initial state
           updateButtonState();
         }
-      }, 100);
+      }, 150);
 
       break;
 
@@ -6511,10 +6581,7 @@
       populateStepHero('confirm-address-bg-image', 'contact-hero-image');
 
       // Contact step (Schedule Service) - setup floating labels and validation
-      const contactInputs = [
-        'start-date-input',
-        'arrival-time-input',
-      ];
+      const contactInputs = ['start-date-input', 'arrival-time-input'];
 
       contactInputs.forEach(inputId => {
         const input = document.getElementById(inputId);
@@ -6540,9 +6607,11 @@
       // Copy the existing address background image from confirm-address step
       setTimeout(() => {
         // Try to find the existing background image from confirm-address step
-        const existingAddressBg = document.getElementById('confirm-address-bg-image');
+        const existingAddressBg = document.getElementById(
+          'confirm-address-bg-image'
+        );
         const contactBg = document.getElementById('contact-bg-image');
-        
+
         if (contactBg) {
           // First priority: Use stored address background URL if available
           if (widgetState.addressBackgroundUrl) {
@@ -6550,33 +6619,39 @@
             contactBg.style.backgroundSize = 'cover';
             contactBg.style.backgroundPosition = 'center';
             contactBg.style.backgroundRepeat = 'no-repeat';
-          } 
+          }
           // Second priority: try to copy from existing address background element
           else {
             let backgroundImageUrl = '';
-            
+
             // Look for background image in various address step elements
             const addressElements = [
-              document.querySelector('#dh-step-confirm-address #confirm-address-bg-image'),
+              document.querySelector(
+                '#dh-step-confirm-address #confirm-address-bg-image'
+              ),
               document.querySelector('#dh-step-address #address-bg-image'),
               document.querySelector('[id*="confirm-address-bg-image"]'),
-              document.querySelector('[id*="address-bg-image"]')
+              document.querySelector('[id*="address-bg-image"]'),
             ];
-            
+
             for (const element of addressElements) {
-              if (element && element.style.backgroundImage && element.style.backgroundImage !== 'none') {
+              if (
+                element &&
+                element.style.backgroundImage &&
+                element.style.backgroundImage !== 'none'
+              ) {
                 backgroundImageUrl = element.style.backgroundImage;
                 break;
               }
             }
-            
+
             // If we found an existing background image, use it
             if (backgroundImageUrl) {
               contactBg.style.backgroundImage = backgroundImageUrl;
               contactBg.style.backgroundSize = 'cover';
               contactBg.style.backgroundPosition = 'center';
               contactBg.style.backgroundRepeat = 'no-repeat';
-            } 
+            }
             // Last resort: load it fresh if we have address data
             else if (
               widgetState.formData.address &&
@@ -6594,10 +6669,7 @@
                 lon: widgetState.formData.longitude,
               };
               // Load street view as background image
-              loadAddressBackgroundImagery(
-                addressData,
-                'contact-bg-image'
-              );
+              loadAddressBackgroundImagery(addressData, 'contact-bg-image');
             }
           }
         }
@@ -6606,6 +6678,10 @@
       // Pre-populate form fields with any available contact information
       setTimeout(() => {
         populateContactFields();
+        // Use global populateFormFields function to ensure all fields are populated
+        if (typeof window.populateFormFields === 'function') {
+          window.populateFormFields();
+        }
       }, 50);
       break;
 
@@ -6613,6 +6689,13 @@
       // Populate logo and hero section
       populateAllLogos();
       populateStepHero('quote-bg-image', 'quote-hero-image');
+
+      // Populate form fields with any existing data
+      setTimeout(() => {
+        if (typeof window.populateFormFields === 'function') {
+          window.populateFormFields();
+        }
+      }, 100);
 
       // Quote contact form validation setup - form is submitted via proceedToQuoteWithValidation function
       // Set up basic field validation for real-time feedback
@@ -6653,12 +6736,22 @@
 
       // Load Google Reviews data for the comparison step
       const loadComparisonReviews = async () => {
-        const reviewsContainer = document.getElementById('comparison-reviews-container');
-        const reviewsLoading = document.getElementById('comparison-reviews-loading');
-        const reviewsDisplay = document.getElementById('comparison-reviews-display');
-        const reviewsCount = document.getElementById('comparison-reviews-count');
-        const starElements = document.querySelectorAll('#comparison-reviews-display .dh-star');
-        
+        const reviewsContainer = document.getElementById(
+          'comparison-reviews-container'
+        );
+        const reviewsLoading = document.getElementById(
+          'comparison-reviews-loading'
+        );
+        const reviewsDisplay = document.getElementById(
+          'comparison-reviews-display'
+        );
+        const reviewsCount = document.getElementById(
+          'comparison-reviews-count'
+        );
+        const starElements = document.querySelectorAll(
+          '#comparison-reviews-display .dh-star'
+        );
+
         if (!reviewsContainer) {
           return;
         }
@@ -6669,19 +6762,28 @@
           if (reviewsDisplay) reviewsDisplay.style.display = 'none';
 
           // Fetch reviews data from API
-          const response = await fetch(`${config.baseUrl}/api/google-places/reviews/${config.companyId}`);
-          
+          const response = await fetch(
+            `${config.baseUrl}/api/google-places/reviews/${config.companyId}`
+          );
+
           if (!response.ok) {
-            console.warn('Failed to fetch reviews data, hiding reviews section');
+            console.warn(
+              'Failed to fetch reviews data, hiding reviews section'
+            );
             // Hide entire container on failure
             reviewsContainer.style.display = 'none';
             return;
           }
 
           const data = await response.json();
-          
+
           // Validate response data - hide if no reviews or no listings configured
-          if (!data.rating || !data.reviewCount || data.reviewCount === 0 || data.source === 'no_listings') {
+          if (
+            !data.rating ||
+            !data.reviewCount ||
+            data.reviewCount === 0 ||
+            data.source === 'no_listings'
+          ) {
             console.warn('No reviews data available, hiding reviews section');
             reviewsContainer.style.display = 'none';
             return;
@@ -6718,7 +6820,6 @@
           // Hide loading state and show content
           if (reviewsLoading) reviewsLoading.style.display = 'none';
           if (reviewsDisplay) reviewsDisplay.style.display = 'flex';
-
         } catch (error) {
           console.error('Error loading reviews data:', error);
           // Hide entire container on error
@@ -6813,7 +6914,9 @@
 
             // Show recommendation badge for the first plan
             setTimeout(() => {
-              const recommendationBadge = document.getElementById('plan-recommendation-badge');
+              const recommendationBadge = document.getElementById(
+                'plan-recommendation-badge'
+              );
               if (recommendationBadge) {
                 recommendationBadge.style.display = 'block';
               }
@@ -6860,9 +6963,11 @@
         const fullDescription = plan.plan_description || '';
         const maxLength = 124;
         const shouldTruncate = fullDescription.length > maxLength;
-        const truncatedDescription = shouldTruncate ? fullDescription.substring(0, maxLength) : fullDescription;
-        
-        const descriptionHtml = shouldTruncate 
+        const truncatedDescription = shouldTruncate
+          ? fullDescription.substring(0, maxLength)
+          : fullDescription;
+
+        const descriptionHtml = shouldTruncate
           ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription}</span>`
           : `<span class="dh-description-text">${fullDescription}</span>`;
 
@@ -6920,7 +7025,7 @@
 
           <div class="dh-plan-actions">
             <button class="dh-form-btn dh-form-btn-primary" onclick="selectPlan('${plan.id || 'selected'}', '${plan.plan_name}')">
-              Let&apos;s Schedule! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Book Now! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button class="dh-form-btn plan-no-thanks" onclick="declinePlanComparison()">
               No Thanks <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -6962,9 +7067,11 @@
         const fullDescription = plan.plan_description || '';
         const maxLength = 124;
         const shouldTruncate = fullDescription.length > maxLength;
-        const truncatedDescription = shouldTruncate ? fullDescription.substring(0, maxLength) : fullDescription;
-        
-        const descriptionHtml = shouldTruncate 
+        const truncatedDescription = shouldTruncate
+          ? fullDescription.substring(0, maxLength)
+          : fullDescription;
+
+        const descriptionHtml = shouldTruncate
           ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription}</span>`
           : `<span class="dh-description-text">${fullDescription}</span>`;
 
@@ -7029,7 +7136,7 @@
 
           <div class="dh-plan-actions">
             <button class="dh-form-btn dh-form-btn-primary" onclick="selectPlan('${plan.id || 'selected'}', '${plan.plan_name}')">
-              Let&apos;s Schedule! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Book Now! <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button class="dh-form-btn plan-no-thanks" onclick="declinePlanComparison()">
               No Thanks <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -7037,7 +7144,6 @@
           </div>
         `;
       };
-
 
       // Switch plan tab function
       window.switchPlanTab = tabIndex => {
@@ -7095,23 +7201,27 @@
       window.selectPlan = (planId, planName) => {
         // Find the full plan object from available plan data
         let fullPlan = null;
-        
+
         // Try to find plan from plan comparison data
         if (window.comparisonPlansData) {
-          fullPlan = window.comparisonPlansData.find(plan => plan.id === planId);
+          fullPlan = window.comparisonPlansData.find(
+            plan => plan.id === planId
+          );
         }
-        
+
         // Fallback: try from suggestions in widget state
         if (!fullPlan && widgetState.planComparisonData?.suggestions) {
-          fullPlan = widgetState.planComparisonData.suggestions.find(plan => plan.id === planId);
+          fullPlan = widgetState.planComparisonData.suggestions.find(
+            plan => plan.id === planId
+          );
         }
-        
+
         // Store selected plan (prefer full plan object, fallback to basic structure)
         widgetState.formData.selectedPlan = fullPlan || {
           id: planId,
           plan_name: planName,
         };
-        
+
         // Keep legacy fields for backward compatibility (if needed elsewhere)
         widgetState.formData.selectedPlanId = planId;
         widgetState.formData.selectedPlanName = planName;
@@ -7141,34 +7251,39 @@
     case 'exit-survey':
       // Populate logo
       populateAllLogos();
-      
+
       // Get feedback form elements
-      const feedbackRadios = document.querySelectorAll('input[name="exit-feedback"]');
+      const feedbackRadios = document.querySelectorAll(
+        'input[name="exit-feedback"]'
+      );
       const feedbackTextarea = document.getElementById('exit-feedback-text');
       const surveySubmitBtn = document.getElementById('survey-submit');
 
       if (surveySubmitBtn) {
         surveySubmitBtn.addEventListener('click', async () => {
           // Get selected feedback option
-          const selectedFeedback = document.querySelector('input[name="exit-feedback"]:checked');
+          const selectedFeedback = document.querySelector(
+            'input[name="exit-feedback"]:checked'
+          );
           const additionalFeedback = feedbackTextarea?.value || '';
 
           // Store exit survey data
-          widgetState.formData.exitFeedbackReason = selectedFeedback?.value || 'none';
+          widgetState.formData.exitFeedbackReason =
+            selectedFeedback?.value || 'none';
           widgetState.formData.exitFeedbackText = additionalFeedback;
 
           // Save exit survey data
           try {
             const partialSaveResult = await savePartialLead(
-              { 
-                served: false, 
+              {
+                served: false,
                 status: 'declined',
                 feedback_reason: selectedFeedback?.value || 'none',
                 feedback_text: additionalFeedback,
                 email: widgetState.formData.email || '',
-                phone: widgetState.formData.phone || ''
+                phone: widgetState.formData.phone || '',
               },
-              'exit_survey_completed'
+              'decline-complete' // Step user will navigate to
             );
             if (!partialSaveResult.success) {
               console.warn(
@@ -7179,7 +7294,7 @@
           } catch (error) {
             console.warn('Error saving exit survey:', error);
           }
-          
+
           // Show decline completion message
           showStep('decline-complete');
           setupStepValidation('decline-complete');
@@ -7190,40 +7305,44 @@
     case 'complete':
       // Populate logo
       populateAllLogos();
-      
+
       // Populate logo, background image, and hero image
-      populateStepHero(
-        'complete-bg-image',
-        'complete-hero-image'
-      );
-      
+      populateStepHero('complete-bg-image', 'complete-hero-image');
+
       // Populate customer name
       const customerNameEl = document.getElementById('complete-customer-name');
       if (customerNameEl) {
-        const contactInfo = widgetState.formData.contactInfo || widgetState.formData;
-        const firstName = contactInfo.firstName || widgetState.formData.firstName || '';
+        const contactInfo =
+          widgetState.formData.contactInfo || widgetState.formData;
+        const firstName =
+          contactInfo.firstName || widgetState.formData.firstName || '';
         customerNameEl.textContent = firstName || 'Customer';
       }
-      
+
       // Populate office hours
       const officeHoursEl = document.getElementById('office-hours-content');
       if (officeHoursEl) {
         officeHoursEl.innerHTML = formatBusinessHours(config.businessHours);
       }
-      
+
       // Populate service date and time
       const serviceDateEl = document.getElementById('service-date-content');
       if (serviceDateEl) {
         const serviceDate = widgetState.formData.startDate;
         const serviceTime = widgetState.formData.arrivalTime;
-        serviceDateEl.textContent = formatServiceDateTime(serviceDate, serviceTime);
+        serviceDateEl.textContent = formatServiceDateTime(
+          serviceDate,
+          serviceTime
+        );
       }
-      
+
       // Load address background imagery if available
-      if (widgetState.formData.address && 
-          widgetState.formData.latitude && 
-          widgetState.formData.longitude &&
-          typeof loadAddressBackgroundImagery === 'function') {
+      if (
+        widgetState.formData.address &&
+        widgetState.formData.latitude &&
+        widgetState.formData.longitude &&
+        typeof loadAddressBackgroundImagery === 'function'
+      ) {
         const addressData = {
           formatted: widgetState.formData.address,
           street: widgetState.formData.addressStreet,
@@ -7235,7 +7354,7 @@
         };
         loadAddressBackgroundImagery(addressData, 'complete-bg-image');
       }
-      
+
       // Handle Return to Homepage button
       const returnHomepageBtn = document.getElementById('return-homepage-btn');
       if (returnHomepageBtn) {
@@ -7291,12 +7410,12 @@
 
   // Pre-populate contact fields for both regular and quote forms
   // Format phone number to (XXX) XXX-XXXX format
-  const formatPhoneNumber = (phone) => {
+  const formatPhoneNumber = phone => {
   if (!phone) return 'Not provided';
-  
+
   // Remove all non-digits
   const digits = phone.replace(/\D/g, '');
-  
+
   // Check if we have a valid US phone number (10 digits)
   if (digits.length === 10) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
@@ -7304,7 +7423,7 @@
     // Handle numbers with country code
     return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
   }
-  
+
   // Return original if not standard format
   return phone;
   };
@@ -7312,47 +7431,52 @@
   // Populate contact details and service address display sections
   const populateContactDetailsDisplay = () => {
   try {
-    const contactInfo = widgetState.formData.contactInfo || widgetState.formData;
-    
+    const contactInfo =
+      widgetState.formData.contactInfo || widgetState.formData;
+
     // Populate contact details
     const contactName = document.getElementById('contact-name');
     const contactEmail = document.getElementById('contact-email');
     const contactPhone = document.getElementById('contact-phone');
     const serviceAddress = document.getElementById('service-address');
-    
+
     if (contactName) {
-      const firstName = contactInfo.firstName || widgetState.formData.firstName || '';
-      const lastName = contactInfo.lastName || widgetState.formData.lastName || '';
-      const fullName = `${firstName} ${lastName}`.trim() || contactInfo.name || 'Not provided';
+      const firstName =
+        contactInfo.firstName || widgetState.formData.firstName || '';
+      const lastName =
+        contactInfo.lastName || widgetState.formData.lastName || '';
+      const fullName =
+        `${firstName} ${lastName}`.trim() || contactInfo.name || 'Not provided';
       contactName.textContent = fullName;
     }
-    
+
     if (contactEmail) {
-      const email = contactInfo.email || widgetState.formData.email || 'Not provided';
+      const email =
+        contactInfo.email || widgetState.formData.email || 'Not provided';
       contactEmail.textContent = email;
     }
-    
+
     if (contactPhone) {
       const phone = contactInfo.phone || widgetState.formData.phone;
       contactPhone.textContent = formatPhoneNumber(phone);
     }
-    
+
     if (serviceAddress) {
       // Format address as 2 lines: Street on first line, City/State/ZIP on second line
       const street = widgetState.formData.addressStreet || '';
       const city = widgetState.formData.addressCity || '';
       const state = widgetState.formData.addressState || '';
       const zip = widgetState.formData.addressZip || '';
-      
+
       if (street || city || state || zip) {
         // Build the address HTML with 2 lines
         let addressHtml = '';
-        
+
         // First line: Street address
         if (street) {
           addressHtml += `<div class="address-line-1">${street}</div>`;
         }
-        
+
         // Second line: City, State ZIP
         const cityStateZip = [];
         if (city) cityStateZip.push(city);
@@ -7362,11 +7486,11 @@
           if (state) cityStateZip.push(state);
           if (zip) cityStateZip.push(zip);
         }
-        
+
         if (cityStateZip.length > 0) {
           addressHtml += `<div class="address-line-2">${cityStateZip.join(', ')}</div>`;
         }
-        
+
         serviceAddress.innerHTML = addressHtml;
       } else {
         // Fallback to single formatted address if individual fields not available
@@ -7409,21 +7533,26 @@
     }
 
     // Populate quote contact form fields (quote-contact step) if they exist
-    const contactInfo = widgetState.formData.contactInfo || widgetState.formData;
-    const quoteFirstNameInput = document.getElementById('quote-first-name-input');
+    const contactInfo =
+      widgetState.formData.contactInfo || widgetState.formData;
+    const quoteFirstNameInput = document.getElementById(
+      'quote-first-name-input'
+    );
     const quoteLastNameInput = document.getElementById('quote-last-name-input');
     const quotePhoneInput = document.getElementById('quote-phone-input');
     const quoteEmailInput = document.getElementById('quote-email-input');
 
     if (contactInfo && quoteFirstNameInput) {
-      const firstName = contactInfo.firstName || widgetState.formData.firstName || '';
+      const firstName =
+        contactInfo.firstName || widgetState.formData.firstName || '';
       if (firstName) {
         quoteFirstNameInput.value = firstName;
         updateFloatingLabel(quoteFirstNameInput);
       }
     }
     if (contactInfo && quoteLastNameInput) {
-      const lastName = contactInfo.lastName || widgetState.formData.lastName || '';
+      const lastName =
+        contactInfo.lastName || widgetState.formData.lastName || '';
       if (lastName) {
         quoteLastNameInput.value = lastName;
         updateFloatingLabel(quoteLastNameInput);
@@ -7449,22 +7578,30 @@
   };
 
   // Helper function to format business hours
-  const formatBusinessHours = (businessHours) => {
+  const formatBusinessHours = businessHours => {
   if (!businessHours || typeof businessHours !== 'object') {
     return 'Monday - Friday 8am - 5:30pm'; // Default fallback
   }
 
   // Group days with same hours
   const dayGroups = {};
-  const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const dayOrder = [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ];
   const dayNames = {
     monday: 'Monday',
-    tuesday: 'Tuesday', 
+    tuesday: 'Tuesday',
     wednesday: 'Wednesday',
     thursday: 'Thursday',
     friday: 'Friday',
     saturday: 'Saturday',
-    sunday: 'Sunday'
+    sunday: 'Sunday',
   };
 
   // Group days by their hours
@@ -7495,13 +7632,13 @@
   };
 
   // Helper function to format time (e.g., "08:00" to "8am")
-  const formatTime = (timeString) => {
+  const formatTime = timeString => {
   if (!timeString) return '';
-  
+
   const [hours, minutes] = timeString.split(':');
   const hour = parseInt(hours);
   const min = minutes === '00' ? '' : `:${minutes}`;
-  
+
   if (hour === 0) return `12${min}am`;
   if (hour < 12) return `${hour}${min}am`;
   if (hour === 12) return `12${min}pm`;
@@ -7511,32 +7648,32 @@
   // Helper function to format service date and time
   const formatServiceDateTime = (dateString, timeString) => {
   if (!dateString) return 'Date TBD';
-  
+
   const date = new Date(dateString);
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   const formattedDate = date.toLocaleDateString('en-US', options);
-  
+
   // Convert date to "October 7th, 2025" format
   const day = date.getDate();
   let suffix = 'th';
   if (day % 10 === 1 && day !== 11) suffix = 'st';
   else if (day % 10 === 2 && day !== 12) suffix = 'nd';
   else if (day % 10 === 3 && day !== 13) suffix = 'rd';
-  
+
   const finalDate = formattedDate.replace(day.toString(), day + suffix);
-  
+
   // Format time
   let timeDisplay = '';
   if (timeString) {
     const timeMap = {
-      'morning': '8 AM - 12 PM',
-      'afternoon': '12 PM - 5 PM', 
-      'evening': '5 PM - 8 PM',
-      'anytime': 'Anytime'
+      morning: '8 AM - 12 PM',
+      afternoon: '12 PM - 5 PM',
+      evening: '5 PM - 8 PM',
+      anytime: 'Anytime',
     };
     timeDisplay = timeMap[timeString] || timeString;
   }
-  
+
   return timeDisplay ? `${finalDate} | ${timeDisplay}` : finalDate;
   };
 
@@ -7864,7 +8001,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-secondary" id="view-detailed-quote" onclick="showStep('quote-contact'); setupStepValidation('quote-contact');">View Detailed Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-secondary" id="view-detailed-quote" onclick="navigateToDetailedQuote();">View Detailed Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       
@@ -7892,7 +8029,7 @@
         </div>
         
         <h2 class="dh-step-heading">Great! When do you want us to get started?</h2>
-        <p class="dh-step-instruction">Complete the following information to secure your spot today!</p>
+        <p class="dh-step-instruction">Select the your preferred date and time for your appointment.</p>
         
         <!-- Scheduling Fields -->
         <div class="dh-form-row">
@@ -7949,7 +8086,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="submit-btn">Schedule It <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="submit-btn">Book It <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       
@@ -8020,7 +8157,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-secondary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">See My Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-secondary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">See Your Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       
@@ -8642,7 +8779,7 @@
 
     // Save partial lead with plan selection
     try {
-      savePartialLead(null, 'contact'); // Next step user will go to
+      savePartialLead(null, 'contact'); // Step user will navigate to
     } catch (error) {
       console.error('Error saving plan selection:', error);
     }
@@ -8784,16 +8921,18 @@
           },
           latitude: latitude ? parseFloat(latitude) : null,
           longitude: longitude ? parseFloat(longitude) : null,
-          contactInfo:
-            stepCompleted === 'contact'
-              ? {
-                  name: widgetState.formData.contactInfo.name || null,
-                  phone: widgetState.formData.contactInfo.phone || null,
-                  email: widgetState.formData.contactInfo.email || null,
-                  comments:
-                    widgetState.formData.contactInfo.comments || null,
-                }
-              : null,
+          consentStatus: widgetState.formData.consentStatus || null,
+          startDate: widgetState.formData.startDate || null,
+          arrivalTime: widgetState.formData.arrivalTime || null,
+          contactInfo: {
+            // Save any contact info that's available, regardless of step
+            name: widgetState.formData.contactInfo.name || null,
+            firstName: widgetState.formData.contactInfo.firstName || null,
+            lastName: widgetState.formData.contactInfo.lastName || null,
+            phone: widgetState.formData.contactInfo.phone || null,
+            email: widgetState.formData.contactInfo.email || null,
+            comments: widgetState.formData.contactInfo.comments || null,
+          },
         },
         serviceAreaData: validationResult,
         attributionData: {
@@ -9015,22 +9154,6 @@
         phone: quotePhoneInput.value.trim(),
       };
 
-      // Save partial lead immediately with contact information
-      try {
-        const partialSaveResult = await savePartialLead(
-          null, // Service area validation not applicable for contact step
-          'contact' // Current step user is on
-        );
-        if (!partialSaveResult.success) {
-          console.warn(
-            'Failed to save contact information:',
-            partialSaveResult.error
-          );
-        }
-      } catch (error) {
-        console.warn('Error saving contact information:', error);
-      }
-
       // Fetch plan comparison data and ensure minimum loading time
       await Promise.all([
         fetchPlanComparisonData(),
@@ -9041,6 +9164,22 @@
       // Navigate to plan comparison with pre-loaded data
       await showStep('plan-comparison');
       setupStepValidation('plan-comparison');
+      
+      // Save partial lead AFTER navigation is complete so currentStep is correct
+      try {
+        const partialSaveResult = await savePartialLead(
+          null, // Service area validation not applicable for contact step
+          widgetState.currentStep // Now correctly set to 'plan-comparison'
+        );
+        if (!partialSaveResult.success) {
+          console.warn(
+            'Failed to save contact information:',
+            partialSaveResult.error
+          );
+        }
+      } catch (error) {
+        console.warn('Error saving contact information:', error);
+      }
 
       // Hide loading overlay after everything is complete
       setTimeout(() => {
@@ -9534,8 +9673,8 @@
               expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() // 48 hours
             };
             
-            // Remove sensitive or large data that shouldn't be persisted
-            delete saveData.formData.contactInfo;
+            // Note: Keeping contactInfo for session restore functionality
+            // Previous version deleted contactInfo for privacy, but this prevents proper session restoration
             
             localStorage.setItem('dh_widget_progress_' + config.companyId, JSON.stringify(saveData));
             widgetState.formState.lastSaved = new Date().toISOString();
@@ -9946,6 +10085,9 @@
       // Function to restore progress from saved data
       const restoreProgress = (savedData) => {
         try {
+          // Set flag to indicate we're restoring
+          widgetState.isRestoring = true;
+          
           // Restore form data
           widgetState.formData = { ...widgetState.formData, ...savedData.formData };
           widgetState.currentStep = savedData.currentStep;
@@ -9956,8 +10098,11 @@
           
           // Then populate form fields after a delay to ensure DOM is ready
           setTimeout(() => {
+            console.log('DH Widget: Session restoration - calling populateFormFields');
             populateFormFields();
-          }, 300);
+            // Clear restoration flag after population is complete
+            widgetState.isRestoring = false;
+          }, 500);
           
           // Start auto-save
           progressiveFormManager.startAutoSave();
@@ -9968,54 +10113,108 @@
         }
       };
       
-      // Make restoreProgress available globally for cross-device recovery
-      window.restoreProgress = restoreProgress;
-      
       // Function to populate form fields with restored data
       const populateFormFields = () => {
         const data = widgetState.formData;
+        console.log('DH Widget: populateFormFields called with data:', data);
         
         try {
+          // Restore pest selection if available
+          if (data.pestType) {
+            const pestOptions = document.querySelectorAll('.dh-pest-option');
+            pestOptions.forEach(option => {
+              option.classList.remove('selected');
+              if (option.dataset.pest === data.pestType) {
+                option.classList.add('selected');
+                console.log('DH Widget: Restored pest selection:', data.pestType);
+              }
+            });
+          }
+          
           // Populate address fields
           if (data.address) {
             const addressInput = document.getElementById('address-search-input');
             if (addressInput) {
               addressInput.value = data.address;
+              console.log('DH Widget: Populated address search input:', data.address);
             }
           }
           
-          if (data.addressStreet) {
-            const streetInput = document.getElementById('street-input') || document.getElementById('confirm-street-input');
+          // Populate confirm-address step fields (separate fields)
+          // Handle both old flat structure and new nested addressDetails structure
+          const addressStreet = data.addressStreet || data.addressDetails?.street || '';
+          const addressCity = data.addressCity || data.addressDetails?.city || '';
+          const addressState = data.addressState || data.addressDetails?.state || '';
+          const addressZip = data.addressZip || data.addressDetails?.zip || '';
+          
+          if (addressStreet) {
+            const streetInput = document.getElementById('confirm-street-input');
             if (streetInput) {
-              streetInput.value = data.addressStreet;
+              streetInput.value = addressStreet;
+              console.log('DH Widget: Populated confirm-street-input with value:', addressStreet);
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(streetInput);
+              }
             }
           }
           
-          if (data.addressCity) {
-            const cityInput = document.getElementById('city-input') || document.getElementById('confirm-city-input');
+          if (addressCity) {
+            const cityInput = document.getElementById('confirm-city-input');
             if (cityInput) {
-              cityInput.value = data.addressCity;
+              cityInput.value = addressCity;
+              console.log('DH Widget: Populated confirm-city-input with value:', addressCity);
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(cityInput);
+              }
             }
           }
           
-          if (data.addressState) {
-            const stateInput = document.getElementById('state-input') || document.getElementById('confirm-state-input');
+          if (addressState) {
+            const stateInput = document.getElementById('confirm-state-input');
             if (stateInput) {
-              stateInput.value = data.addressState;
+              stateInput.value = addressState;
+              console.log('DH Widget: Populated confirm-state-input with value:', addressState);
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(stateInput);
+              }
             }
           }
           
-          if (data.addressZip) {
-            const zipInput = document.getElementById('zip-input') || document.getElementById('confirm-zip-input');
+          if (addressZip) {
+            const zipInput = document.getElementById('confirm-zip-input');
             if (zipInput) {
-              zipInput.value = data.addressZip;
+              zipInput.value = addressZip;
+              console.log('DH Widget: Populated confirm-zip-input with value:', addressZip);
+              if (typeof updateFloatingLabel === 'function') {
+                updateFloatingLabel(zipInput);
+              }
+            }
+          }
+          
+          // Restore consent status if available
+          if (data.consentStatus === 'granted') {
+            const consentCheckbox = document.getElementById('confirm-address-consent-checkbox');
+            if (consentCheckbox) {
+              consentCheckbox.checked = true;
             }
           }
           
           // Populate contact information with improved field detection
           if (data.contactInfo) {
-            const { firstName, lastName, email, phone } = data.contactInfo;
+            const { name, firstName, lastName, email, phone } = data.contactInfo;
             
+            // Handle full name field (used in contact step)
+            if (name) {
+              const fullNameInput = document.getElementById('name-input');
+              if (fullNameInput) {
+                fullNameInput.value = name;
+                if (typeof updateFloatingLabel === 'function') {
+                  updateFloatingLabel(fullNameInput);
+                }
+              }
+            }
+            
+            // Handle separate first/last name fields (used in quote path)
             if (firstName) {
               const firstNameInput = document.getElementById('quote-first-name-input') || 
                                    document.getElementById('first-name-input');
@@ -10086,6 +10285,10 @@
           console.error('DH Widget: Error populating form fields', error);
         }
       };
+      
+      // Make restoreProgress and populateFormFields available globally
+      window.restoreProgress = restoreProgress;
+      window.populateFormFields = populateFormFields;
       
       // Function to start fresh widget
       const startFreshWidget = () => {

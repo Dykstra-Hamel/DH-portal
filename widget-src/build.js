@@ -86,7 +86,7 @@ function build() {
     let mainFileContent = '';
     
     // Add build header
-    combinedContent += `/**\n * DH Widget - Built from Source\n * Generated: ${new Date().toISOString()}\n * Source files: ${SOURCE_FILES.join(', ')}\n */\n\n`;
+    combinedContent += `/**\n * DH Widget - Built from Source\n * Source files: ${SOURCE_FILES.join(', ')}\n */\n\n`;
     
     // Read and combine all files
     const moduleContents = [];
