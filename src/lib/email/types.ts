@@ -23,7 +23,6 @@ export interface LeadNotificationData {
   customerEmail: string;
   customerPhone: string;
   pestType: string;
-  urgency: string;
   selectedPlan?: string;
   recommendedPlan?: string;
   address: string;
@@ -47,7 +46,6 @@ export interface QuoteEmailData {
   firstName: string;
   pestType: string;
   address: string;
-  urgency: string;
   companyName?: string;
   customerEmail: string;
   selectedPlan?: {

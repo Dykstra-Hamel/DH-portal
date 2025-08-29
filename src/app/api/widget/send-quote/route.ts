@@ -91,7 +91,6 @@ export async function POST(request: NextRequest) {
       firstName,
       pestType: quoteData.pestType,
       address: quoteData.address || 'your location',
-      urgency: quoteData.urgency || '1-2-days',
       companyName: company.name,
       customerEmail: quoteData.customerEmail,
       selectedPlan: servicePlan

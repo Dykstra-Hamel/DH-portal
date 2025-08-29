@@ -127,7 +127,7 @@ export function createSampleVariables(
     selectedPlanBillingFrequency: 'mo',
     selectedPlanFeatures: '<ul><li>Covers Ants, Spiders, Wasps &amp; More</li><li>No Hassle Scheduling</li><li>FREE Re-Treatments</li><li>FREE Web Sweeps</li><li>100% Guaranteed visit</li></ul>',
     selectedPlanFaqs: '<div class="faq-section"><div class="faq-item"><h3 class="faq-question">What pests are covered?</h3><p class="faq-answer">This plan covers ants, spiders, wasps, and other common pests.</p></div><div class="faq-item"><h3 class="faq-question">How often do you treat?</h3><p class="faq-answer">We provide monthly treatments for continuous protection.</p></div></div>',
-    selectedPlanImageUrl: '/plan-images/smartdefense.jpg',
+    selectedPlanImageUrl: 'https://cwmckkfkcjxznkpdxgie.supabase.co/storage/v1/object/public/brand-assets/general/placeholder.jpg',
     selectedPlanHighlightBadge: 'Most Popular',
     selectedPlanTreatmentFrequency: 'monthly',
     selectedPlanDisclaimer: 'Initial service of $119 to get started. Prices may vary slightly depending on your home layout and service requirements.',
