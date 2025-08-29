@@ -31,43 +31,10 @@ function getSingularPestType(pestType: string): string {
   }
 }
 
-// Function to format urgency for human-readable display
-function formatUrgencyDisplay(urgency: string): string {
-  switch (urgency) {
-    case 'yesterday':
-      return 'Yesterday';
-    case '1-2-days':
-      return '1 Or 2 Days';
-    case 'next-week':
-      return 'Next Week';
-    case 'no-rush':
-      return 'No Rush';
-    default:
-      return urgency.charAt(0).toUpperCase() + urgency.slice(1);
-  }
-}
-
-// Function to generate urgency-specific messaging
-function getUrgencyMessage(urgency: string): string {
-  switch (urgency) {
-    case 'yesterday':
-      return 'We&apos;ll prioritize your urgent request and can be at your home within hours to start your initial treatment';
-    case '1-2-days':
-      return 'Based on our schedule we can be at your home as soon a couple of days to start your initial treatment';
-    case 'next-week':
-      return 'We&apos;ll schedule your service at your convenience within the week for your initial treatment';
-    case 'no-rush':
-      return 'We&apos;ll contact you to schedule your service at a time that works best for you';
-    default:
-      return 'Based on our schedule we can be at your home as soon a couple of days to start your initial treatment';
-  }
-}
 
 export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
-  const { firstName, pestType, address, urgency, selectedPlan } = quoteData;
+  const { firstName, pestType, address, selectedPlan } = quoteData;
   const singularPestType = getSingularPestType(pestType);
-  const formattedUrgency = formatUrgencyDisplay(urgency);
-  const urgencyMessage = getUrgencyMessage(urgency);
 
   // Use selectedPlan pricing if available, otherwise fallback to defaults
   const recurringPrice = selectedPlan?.recurring_price
@@ -1106,7 +1073,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                     <span
                                       class="tinyMce-placeholder"
                                       style="word-break: break-word"
-                                      >${formattedUrgency}</span
+                                      >Professional ${singularPestType} Control</span
                                     >
                                   </h1>
                                 </td>
@@ -1151,7 +1118,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                     "
                                   >
                                     <p align="center" style="margin: 0">
-                                      ${urgencyMessage}
+                                      Our team is ready to protect your property with professional pest control service.
                                     </p>
                                   </div>
                                 </td>

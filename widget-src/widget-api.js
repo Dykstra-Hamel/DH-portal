@@ -39,6 +39,15 @@
       },
       homeSize: parseInt(widgetState.formData.homeSize),
       contactInfo: widgetState.formData.contactInfo,
+      // Scheduling information
+      startDate: widgetState.formData.startDate,
+      arrivalTime: widgetState.formData.arrivalTime,
+      // Estimated pricing from selected plan
+      estimatedPrice: widgetState.formData.selectedPlan ? {
+        min: widgetState.formData.selectedPlan.initial_price || 0,
+        max: widgetState.formData.selectedPlan.recurring_price || widgetState.formData.selectedPlan.initial_price || 0,
+        service_type: widgetState.formData.selectedPlan.plan_name || 'Professional pest control service'
+      } : undefined,
       coordinates: {
         latitude: widgetState.formData.latitude,
         longitude: widgetState.formData.longitude,

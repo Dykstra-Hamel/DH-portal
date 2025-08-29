@@ -1,5 +1,6 @@
 /**
  * DH Widget - Built from Source
+
  * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
  */
 
@@ -287,16 +288,6 @@
   // Wait for DOM to be ready
   return new Promise(resolve => {
     setTimeout(() => {
-      // Update urgency step pest type
-      const urgencyPestType =
-        document.getElementById('urgency-pest-type');
-      if (urgencyPestType) {
-        const pestText = getPestTypeDisplay(
-          widgetState.formData.pestType,
-          'default'
-        );
-        urgencyPestType.textContent = pestText;
-      }
 
       // Update address step pest type
       const addressPestType =
@@ -376,21 +367,6 @@
         completionDescription.textContent = widgetState.widgetConfig.successMessage;
       }
 
-      // Update urgency timeline references based on selection
-      const urgencyTimelineRef = document.getElementById(
-        'urgency-timeline-ref'
-      );
-      if (urgencyTimelineRef && widgetState.formData.urgency) {
-        const timelineMap = {
-          yesterday: 'as soon as possible',
-          '1-2-days': 'within 1-2 days',
-          'next-week': 'within the next week',
-          'next-month': 'within the next month',
-          'no-rush': 'when convenient',
-        };
-        urgencyTimelineRef.textContent =
-          timelineMap[widgetState.formData.urgency] || 'soon';
-      }
 
       // Update service address references
       const serviceAddressRefs = document.querySelectorAll(
@@ -1944,94 +1920,6 @@
   font-family: "${fontName}", sans-serif;
   }
 
-  /* Urgency Step Styling */
-  .dh-urgency-selection {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin: 24px 0;
-  max-width: 500px;
-  margin-left: auto;
-  margin-right: auto;
-  }
-
-  .dh-urgency-option {
-  padding: 20px 24px;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  cursor: pointer;
-  font-family: "${fontName}", sans-serif;
-  font-size: 16px;
-  font-weight: 500;
-  text-align: center;
-  background: ${backgroundColor};
-  color: ${textColor};
-  transition: all 0.3s ease;
-  position: relative;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
-
-  .dh-urgency-option:hover {
-  border-color: ${primaryColor};
-  background: ${primaryLight};
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-
-  .dh-urgency-option.selected {
-  border-color: ${primaryColor};
-  background: ${primaryColor};
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-
-  .dh-urgency-option.selected::after {
-  content: '✓';
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 20px;
-  font-weight: bold;
-  }
-
-  /* Enhanced Urgency Loading */
-  .dh-urgency-loading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  z-index: 10;
-  }
-
-  .dh-urgency-loading .dh-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid ${primaryColor};
-  border-radius: 50%;
-  animation: dh-spin 1s linear infinite;
-  }
-
-  /* Responsive Urgency Options */
-  @media (max-width: 600px) {
-  .dh-urgency-selection {
-    gap: 12px;
-    margin: 20px 0;
-  }
-  
-  .dh-urgency-option {
-    padding: 16px 20px;
-    font-size: 15px;
-  }
-  }
 
   /* Out of Service Step Styling */
   .dh-form-out-of-service {
@@ -8434,6 +8322,15 @@
       },
       homeSize: parseInt(widgetState.formData.homeSize),
       contactInfo: widgetState.formData.contactInfo,
+      // Scheduling information
+      startDate: widgetState.formData.startDate,
+      arrivalTime: widgetState.formData.arrivalTime,
+      // Estimated pricing from selected plan
+      estimatedPrice: widgetState.formData.selectedPlan ? {
+        min: widgetState.formData.selectedPlan.initial_price || 0,
+        max: widgetState.formData.selectedPlan.recurring_price || widgetState.formData.selectedPlan.initial_price || 0,
+        service_type: widgetState.formData.selectedPlan.plan_name || 'Professional pest control service'
+      } : undefined,
       coordinates: {
         latitude: widgetState.formData.latitude,
         longitude: widgetState.formData.longitude,
