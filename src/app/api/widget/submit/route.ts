@@ -95,7 +95,6 @@ async function handleAutoLeadCall(
   },
   pestData?: {
     pestType: string;
-    urgency: string;
     selectedPlan?: ServicePlan;
     recommendedPlan?: ServicePlan;
   }
@@ -115,7 +114,6 @@ async function handleAutoLeadCall(
       phone: customerData.phone,
       message: notes, // Use the formatted customer comments
       pestType: pestData?.pestType || '',
-      urgency: pestData?.urgency || '',
       selectedPlan: pestData?.selectedPlan?.plan_name || '',
       recommendedPlan: pestData?.recommendedPlan?.plan_name || '',
       streetAddress: addressComponents?.street || '',
@@ -231,7 +229,6 @@ export async function OPTIONS(request: NextRequest) {
 interface WidgetSubmission {
   companyId: string;
   pestType: string;
-  urgency: string;
   selectedPlan?: ServicePlan;
   recommendedPlan?: ServicePlan;
   address: string; // Formatted address for backward compatibility
@@ -521,7 +518,6 @@ export async function POST(request: NextRequest) {
     // Create lead notes
     let notes = `Widget Submission:\n`;
     notes += `Pest Type: ${submission.pestType}\n`;
-    notes += `Urgency: ${submission.urgency}\n`;
     if (submission.selectedPlan) {
       notes += `Selected Plan: ${submission.selectedPlan.plan_name}\n`;
     }
@@ -574,7 +570,8 @@ export async function POST(request: NextRequest) {
           // Scheduling fields
           requested_date: submission.startDate || null,
           requested_time: submission.arrivalTime || null,
-          // Plan references
+          // Pest and plan information
+          pest_type: submission.pestType || null,
           selected_plan_id: submission.selectedPlan?.id || null,
           recommended_plan_name: submission.recommendedPlan?.plan_name || null,
           // Attribution fields
@@ -670,7 +667,6 @@ export async function POST(request: NextRequest) {
         // Format customer comments with widget-specific details
         let customerComments = `Widget Submission Details:\n`;
         customerComments += `Pest Type: ${submission.pestType}\n`;
-        customerComments += `Urgency: ${submission.urgency}\n`;
         if (submission.selectedPlan) {
           customerComments += `Selected Plan: ${submission.selectedPlan.plan_name}\n`;
         }
@@ -711,7 +707,6 @@ export async function POST(request: NextRequest) {
           addressComponents, // Pass address components
           {
             pestType: submission.pestType,
-            urgency: submission.urgency,
             selectedPlan: submission.selectedPlan,
             recommendedPlan: submission.recommendedPlan,
           }
@@ -744,7 +739,6 @@ export async function POST(request: NextRequest) {
             customerEmail: submission.contactInfo.email,
             customerPhone: submission.contactInfo.phone,
             pestType: submission.pestType,
-            urgency: submission.urgency,
             address: submission.address,
             homeSize: submission.homeSize,
             selectedPlan: submission.selectedPlan?.plan_name,
@@ -789,7 +783,6 @@ export async function POST(request: NextRequest) {
             customerEmail: submission.contactInfo.email,
             customerPhone: submission.contactInfo.phone,
             pestType: submission.pestType,
-            urgency: submission.urgency,
             selectedPlan: submission.selectedPlan?.plan_name,
             recommendedPlan: submission.recommendedPlan?.plan_name,
             address: submission.address,

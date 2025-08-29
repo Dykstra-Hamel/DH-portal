@@ -16,7 +16,6 @@ export interface LeadCreatedEvent {
       customerEmail: string;
       customerPhone: string;
       pestType: string;
-      urgency: string;
       address: string;
       homeSize?: number;
       selectedPlan?: string;
@@ -60,7 +59,6 @@ export interface WidgetScheduleCompletedEvent {
       customerEmail: string;
       customerPhone: string;
       pestType: string;
-      urgency: string;
       address: string;
       homeSize?: number;
       selectedPlan?: string;

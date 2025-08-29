@@ -116,16 +116,6 @@ const updateDynamicText = async () => {
   // Wait for DOM to be ready
   return new Promise(resolve => {
     setTimeout(() => {
-      // Update urgency step pest type
-      const urgencyPestType =
-        document.getElementById('urgency-pest-type');
-      if (urgencyPestType) {
-        const pestText = getPestTypeDisplay(
-          widgetState.formData.pestType,
-          'default'
-        );
-        urgencyPestType.textContent = pestText;
-      }
 
       // Update address step pest type
       const addressPestType =
@@ -205,21 +195,6 @@ const updateDynamicText = async () => {
         completionDescription.textContent = widgetState.widgetConfig.successMessage;
       }
 
-      // Update urgency timeline references based on selection
-      const urgencyTimelineRef = document.getElementById(
-        'urgency-timeline-ref'
-      );
-      if (urgencyTimelineRef && widgetState.formData.urgency) {
-        const timelineMap = {
-          yesterday: 'as soon as possible',
-          '1-2-days': 'within 1-2 days',
-          'next-week': 'within the next week',
-          'next-month': 'within the next month',
-          'no-rush': 'when convenient',
-        };
-        urgencyTimelineRef.textContent =
-          timelineMap[widgetState.formData.urgency] || 'soon';
-      }
 
       // Update service address references
       const serviceAddressRefs = document.querySelectorAll(
