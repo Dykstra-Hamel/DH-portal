@@ -1007,6 +1007,12 @@ async function sendCallSummaryEmailsIfEnabled(
   const callId = callData.call_id;
   
   try {
+    // Skip sending emails for call transfers - these are successfully handed off to human agents
+    const callStatus = callRecord.call_status || callData.call_status;
+    if (callStatus === 'ended(call_transfer)') {
+      console.log(`[Call Summary Emails] Skipping email notifications for call ${callId} - call was successfully transferred`);
+      return;
+    }
     // Determine company ID from the call record
     let companyId = null;
     
