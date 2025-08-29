@@ -393,7 +393,7 @@
 
     // Save partial lead with plan selection
     try {
-      savePartialLead(null, 'contact'); // Next step user will go to
+      savePartialLead(null, 'contact'); // Step user will navigate to
     } catch (error) {
       console.error('Error saving plan selection:', error);
     }
@@ -535,16 +535,18 @@
           },
           latitude: latitude ? parseFloat(latitude) : null,
           longitude: longitude ? parseFloat(longitude) : null,
-          contactInfo:
-            stepCompleted === 'contact'
-              ? {
-                  name: widgetState.formData.contactInfo.name || null,
-                  phone: widgetState.formData.contactInfo.phone || null,
-                  email: widgetState.formData.contactInfo.email || null,
-                  comments:
-                    widgetState.formData.contactInfo.comments || null,
-                }
-              : null,
+          consentStatus: widgetState.formData.consentStatus || null,
+          startDate: widgetState.formData.startDate || null,
+          arrivalTime: widgetState.formData.arrivalTime || null,
+          contactInfo: {
+            // Save any contact info that's available, regardless of step
+            name: widgetState.formData.contactInfo.name || null,
+            firstName: widgetState.formData.contactInfo.firstName || null,
+            lastName: widgetState.formData.contactInfo.lastName || null,
+            phone: widgetState.formData.contactInfo.phone || null,
+            email: widgetState.formData.contactInfo.email || null,
+            comments: widgetState.formData.contactInfo.comments || null,
+          },
         },
         serviceAreaData: validationResult,
         attributionData: {
@@ -766,22 +768,6 @@
         phone: quotePhoneInput.value.trim(),
       };
 
-      // Save partial lead immediately with contact information
-      try {
-        const partialSaveResult = await savePartialLead(
-          null, // Service area validation not applicable for contact step
-          'contact' // Current step user is on
-        );
-        if (!partialSaveResult.success) {
-          console.warn(
-            'Failed to save contact information:',
-            partialSaveResult.error
-          );
-        }
-      } catch (error) {
-        console.warn('Error saving contact information:', error);
-      }
-
       // Fetch plan comparison data and ensure minimum loading time
       await Promise.all([
         fetchPlanComparisonData(),
@@ -792,6 +778,22 @@
       // Navigate to plan comparison with pre-loaded data
       await showStep('plan-comparison');
       setupStepValidation('plan-comparison');
+      
+      // Save partial lead AFTER navigation is complete so currentStep is correct
+      try {
+        const partialSaveResult = await savePartialLead(
+          null, // Service area validation not applicable for contact step
+          widgetState.currentStep // Now correctly set to 'plan-comparison'
+        );
+        if (!partialSaveResult.success) {
+          console.warn(
+            'Failed to save contact information:',
+            partialSaveResult.error
+          );
+        }
+      } catch (error) {
+        console.warn('Error saving contact information:', error);
+      }
 
       // Hide loading overlay after everything is complete
       setTimeout(() => {

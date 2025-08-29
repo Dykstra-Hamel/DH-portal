@@ -316,7 +316,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-secondary" id="view-detailed-quote" onclick="showStep('quote-contact'); setupStepValidation('quote-contact');">View Detailed Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-secondary" id="view-detailed-quote" onclick="navigateToDetailedQuote();">View Detailed Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       
@@ -344,7 +344,7 @@
         </div>
         
         <h2 class="dh-step-heading">Great! When do you want us to get started?</h2>
-        <p class="dh-step-instruction">Complete the following information to secure your spot today!</p>
+        <p class="dh-step-instruction">Select the your preferred date and time for your appointment.</p>
         
         <!-- Scheduling Fields -->
         <div class="dh-form-row">
@@ -401,7 +401,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="submit-btn">Schedule It <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-primary" onclick="submitFormWithValidation()" id="submit-btn">Book It <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       
@@ -472,7 +472,7 @@
         </div>
         
         <div class="dh-form-button-group">
-          <button class="dh-form-btn dh-form-btn-secondary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">See My Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="dh-form-btn dh-form-btn-secondary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">See Your Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       

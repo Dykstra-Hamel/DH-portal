@@ -1186,6 +1186,7 @@ select.dh-form-input {
    margin-right: 0;
   }
 
+  /* iOS-compatible full-width image solution */
   #how-we-do-it-interior-image, .dh-plan-image-actual img {
     width: 100vw !important;
     height: 240px !important;
@@ -1195,8 +1196,8 @@ select.dh-form-input {
     opacity: 0;
     transition: opacity 0.5s ease;
     border-radius: 0;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
+    margin-left: -50vw;
+    margin-right: -50vw;
     border-radius: 0 !important;
   }
   
