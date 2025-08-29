@@ -241,6 +241,9 @@ async function processWorkflowStep(
       case 'make_call':
         return await processMakeCallStep(step, workflowConfig, triggerData, companyId);
       
+      case 'archive_call':
+        return await processArchiveCallStep(step, triggerData, companyId);
+      
       default:
         console.warn(`Unknown step type: ${step.type}`);
         return { success: false, stepId: step.id, error: `Unknown step type: ${step.type}` };
@@ -489,6 +492,62 @@ async function processMakeCallStep(
       success: false, 
       stepId: step.id, 
       error: error instanceof Error ? error.message : 'Unknown error occurred during call initiation' 
+    };
+  }
+}
+
+// Archive call step processor
+async function processArchiveCallStep(
+  step: any,
+  triggerData: any,
+  companyId: string
+): Promise<{ success: boolean; stepId: string; error?: string; data?: any }> {
+  const callId = triggerData.callRecord?.call_id;
+  
+  if (!callId) {
+    return { 
+      success: false, 
+      stepId: step.id, 
+      error: 'Call ID is required for archive_call step' 
+    };
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from('call_records')
+      .update({ 
+        archived: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('call_id', callId)
+      .eq('company_id', companyId);
+
+    if (error) {
+      console.error(`Error archiving call ${callId}:`, error);
+      return { 
+        success: false, 
+        stepId: step.id, 
+        error: error.message 
+      };
+    }
+
+    console.log(`Successfully archived call ${callId} for company ${companyId}`);
+    return { 
+      success: true, 
+      stepId: step.id, 
+      data: { 
+        archivedCallId: callId,
+        archivedAt: new Date().toISOString() 
+      } 
+    };
+
+  } catch (error) {
+    console.error(`Error in archive call step ${step.id}:`, error);
+    return { 
+      success: false, 
+      stepId: step.id, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred during call archival' 
     };
   }
 }

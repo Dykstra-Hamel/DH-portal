@@ -14,6 +14,8 @@ import { workflowExecuteHandler } from '@/lib/inngest/functions/workflow-execute
 import { callSchedulingHandler, scheduledCallExecutor } from '@/lib/inngest/functions/call-scheduling-handler';
 import { callOutcomeTracker, retellCallWebhookHandler } from '@/lib/inngest/functions/call-outcome-tracker';
 import { workflowCancellationHandler } from '@/lib/inngest/functions/workflow-cancel';
+import { partialLeadCreated } from '@/lib/inngest/functions/partial-lead-created';
+import { inboundCallTransfer } from '@/lib/inngest/functions/inbound-call-transfer';
 
 // Create the handler
 export const { GET, POST, PUT } = serve({
@@ -22,6 +24,8 @@ export const { GET, POST, PUT } = serve({
     leadCreatedHandler,
     leadStatusChangedHandler,
     widgetScheduleCompletedHandler,
+    partialLeadCreated,
+    inboundCallTransfer,
     automationTriggerHandler,
     emailScheduledHandler,
     leadFollowUpSequence,

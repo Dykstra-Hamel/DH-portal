@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
+import { sendEvent } from '@/lib/inngest/client';
 
 interface PartialSaveRequest {
   companyId: string;
   sessionId: string;
-  stepCompleted: 'address' | 'confirm-address' | 'how-we-do-it' | 'quote-contact' | 'contact';
+  stepCompleted: 'address' | 'confirm-address' | 'how-we-do-it' | 'quote-contact' | 'plan-comparison' | 'contact';
   formData: {
     pestType?: string;
     urgency?: string;
@@ -199,6 +200,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Send Inngest event for partial lead created
+    try {
+      await sendEvent({
+        name: 'partial-lead/created',
+        data: {
+          partialLeadId: partialLead.id,
+          companyId,
+          sessionId,
+          stepCompleted,
+          formData,
+          serviceAreaData,
+          attribution: {
+            utm_source: attributionData.utm_source,
+            utm_medium: attributionData.utm_medium,
+            utm_campaign: attributionData.utm_campaign,
+            utm_term: attributionData.utm_term,
+            utm_content: attributionData.utm_content,
+            gclid: attributionData.gclid,
+            referrer_url: attributionData.referrer_url,
+            referrer_domain: attributionData.referrer_domain,
+            traffic_source: attributionData.traffic_source,
+            page_url: attributionData.page_url
+          },
+          createdAt: new Date().toISOString()
+        }
+      });
+      console.log(`✅ Partial lead created event sent for ${partialLead.id} at step ${stepCompleted}`);
+    } catch (eventError) {
+      // Don't fail the API call if event emission fails, but log it
+      console.error('Failed to send partial lead created event:', eventError);
+    }
 
     return createCorsResponse({
       success: true,

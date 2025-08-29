@@ -1,6 +1,5 @@
 /**
  * DH Widget - Built from Source
-
  * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
  */
 
@@ -5075,14 +5074,8 @@
       }
 
       if (validationResult.served) {
-        // User is still in service area, fetch recommended plan and proceed to how-we-do-it step
-        if (typeof getCheapestFullCoveragePlan === 'function') {
-          try {
-            await getCheapestFullCoveragePlan();
-          } catch (error) {
-            console.warn('Could not fetch recommended plan:', error);
-          }
-        }
+        // User is still in service area, proceed to how-we-do-it step
+        // Note: recommendedPlan was already set during pest selection and should not be changed
         showStep('how-we-do-it');
         setupStepValidation('how-we-do-it');
       } else {
