@@ -605,6 +605,14 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
     opt_out_sensitive_data_storage,
   } = callData;
 
+  // Debug logging to see if call_analyzed is called for transfers
+  console.log(`[Call Analyzed DEBUG] Processing call ${call_id}:`, {
+    disconnection_reason: callData.disconnection_reason,
+    call_status: callData.call_status,
+    has_transcript: !!transcript,
+    has_analysis: !!call_analysis
+  });
+
   // Extract data from both dynamic variables and call analysis
   const extractedData = extractCallData(
     retell_llm_dynamic_variables,
@@ -1077,9 +1085,26 @@ async function sendCallSummaryEmailsIfEnabled(
   
   try {
     // Skip sending emails for call transfers - these are successfully handed off to human agents
-    const callStatus = callRecord.call_status || callData.call_status;
-    if (callStatus === 'ended(call_transfer)') {
-      console.log(`[Call Summary Emails] Skipping email notifications for call ${callId} - call was successfully transferred`);
+    const disconnectionReason = callData.disconnection_reason || callRecord.disconnect_reason;
+    
+    // Debug logging to understand what values we're getting
+    console.log(`[Call Summary Emails DEBUG] Call ${callId}:`, {
+      callData_disconnection_reason: callData.disconnection_reason,
+      callRecord_disconnect_reason: callRecord.disconnect_reason,
+      final_disconnectionReason: disconnectionReason,
+      callData_call_status: callData.call_status,
+      callRecord_call_status: callRecord.call_status,
+      disconnectionReasonType: typeof disconnectionReason,
+      disconnectionReasonLength: disconnectionReason?.length,
+      exactMatch: disconnectionReason === 'call_transfer',
+      caseInsensitiveMatch: disconnectionReason?.toLowerCase() === 'call_transfer'
+    });
+    
+    // Check for call transfer with multiple possible values
+    if (disconnectionReason === 'call_transfer' || 
+        disconnectionReason === 'call_transferred' ||
+        disconnectionReason?.toLowerCase().includes('transfer')) {
+      console.log(`[Call Summary Emails] Skipping email notifications for call ${callId} - call was successfully transferred (reason: ${disconnectionReason})`);
       return;
     }
     // Determine company ID from the call record
