@@ -1077,8 +1077,8 @@ async function sendCallSummaryEmailsIfEnabled(
   
   try {
     // Skip sending emails for call transfers - these are successfully handed off to human agents
-    const callStatus = callRecord.call_status || callData.call_status;
-    if (callStatus === 'ended(call_transfer)') {
+    const disconnectionReason = callData.disconnection_reason || callRecord.disconnect_reason;
+    if (disconnectionReason === 'call_transfer') {
       console.log(`[Call Summary Emails] Skipping email notifications for call ${callId} - call was successfully transferred`);
       return;
     }
