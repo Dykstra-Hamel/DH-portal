@@ -5,6 +5,8 @@
 
 // Track if modal widget has been created
 let modalWidgetCreated = false;
+// Track if modal has been opened in this session (to distinguish from cross-session recovery)
+let modalOpenedInSession = false;
 
 // Open modal function
 const openModal = () => {
@@ -68,22 +70,32 @@ const openModal = () => {
         }, 100);
       }
     } else {
-      // For subsequent modal opens, check if we should show continue prompt
-      if (typeof widgetState !== 'undefined' && widgetState.recoveryData && 
-          typeof window.progressiveFormManager !== 'undefined' && 
-          window.progressiveFormManager.shouldPromptToContinue(widgetState.recoveryData)) {
-        
-        setTimeout(() => {
-          if (window.progressiveFormManager && typeof window.progressiveFormManager.showContinuePrompt === 'function') {
-            window.progressiveFormManager.showContinuePrompt(widgetState.recoveryData);
-          }
-        }, 300);
-      } else {
+      // For subsequent modal opens in same session, just show current step
+      if (modalOpenedInSession) {
         // Show current step or default to first step
         if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
           showStep(widgetState.currentStep);
         } else {
           showStep('pest-issue');
+        }
+      } else {
+        // This is first open in session, check if we should show continue prompt
+        if (typeof widgetState !== 'undefined' && widgetState.recoveryData && 
+            typeof window.progressiveFormManager !== 'undefined' && 
+            window.progressiveFormManager.shouldPromptToContinue(widgetState.recoveryData)) {
+          
+          setTimeout(() => {
+            if (window.progressiveFormManager && typeof window.progressiveFormManager.showContinuePrompt === 'function') {
+              window.progressiveFormManager.showContinuePrompt(widgetState.recoveryData);
+            }
+          }, 300);
+        } else {
+          // Show current step or default to first step
+          if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
+            showStep(widgetState.currentStep);
+          } else {
+            showStep('pest-issue');
+          }
         }
       }
     }
@@ -97,6 +109,9 @@ const openModal = () => {
 
     // Add show class for animation
     modal.classList.add('show');
+    
+    // Mark that modal has been opened in this session
+    modalOpenedInSession = true;
 
     // Focus management after animation starts
     setTimeout(() => {
@@ -129,6 +144,97 @@ const closeModal = () => {
   }
 };
 
+// Create confirmation popup
+const createConfirmationPopup = () => {
+  // Check if popup already exists
+  if (document.getElementById('dh-confirmation-popup')) {
+    return;
+  }
+
+  const popup = document.createElement('div');
+  popup.className = 'dh-confirmation-popup';
+  popup.id = 'dh-confirmation-popup';
+
+  const content = document.createElement('div');
+  content.className = 'dh-confirmation-content';
+
+  const title = document.createElement('h3');
+  title.className = 'dh-confirmation-title';
+  title.textContent = 'Are you sure you want to leave?';
+
+  const message = document.createElement('p');
+  message.className = 'dh-confirmation-message';
+  message.textContent = 'Your progress will be saved, but you&apos;ll need to start over if you leave now.';
+
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.className = 'dh-confirmation-buttons';
+
+  const cancelButton = document.createElement('button');
+  cancelButton.className = 'dh-confirmation-button cancel';
+  cancelButton.textContent = 'Stay';
+  cancelButton.type = 'button';
+
+  const confirmButton = document.createElement('button');
+  confirmButton.className = 'dh-confirmation-button confirm';
+  confirmButton.textContent = 'Leave';
+  confirmButton.type = 'button';
+
+  buttonsContainer.appendChild(cancelButton);
+  buttonsContainer.appendChild(confirmButton);
+
+  content.appendChild(title);
+  content.appendChild(message);
+  content.appendChild(buttonsContainer);
+  popup.appendChild(content);
+
+  document.body.appendChild(popup);
+
+  return { popup, cancelButton, confirmButton };
+};
+
+// Show confirmation popup
+const showConfirmationPopup = () => {
+  const existingPopup = document.getElementById('dh-confirmation-popup');
+  
+  if (existingPopup) {
+    existingPopup.classList.add('show');
+    return;
+  }
+
+  const { popup, cancelButton, confirmButton } = createConfirmationPopup();
+
+  // Add event listeners
+  cancelButton.addEventListener('click', hideConfirmationPopup);
+  
+  confirmButton.addEventListener('click', () => {
+    hideConfirmationPopup();
+    closeModal();
+  });
+
+  // Also close on backdrop click
+  popup.addEventListener('click', (e) => {
+    if (e.target === popup) {
+      hideConfirmationPopup();
+    }
+  });
+
+  // Show popup
+  popup.classList.add('show');
+
+  // Focus the cancel button by default
+  setTimeout(() => {
+    cancelButton.focus();
+  }, 100);
+};
+
+// Hide confirmation popup
+const hideConfirmationPopup = () => {
+  const popup = document.getElementById('dh-confirmation-popup');
+  if (popup) {
+    popup.classList.remove('show');
+  }
+};
+
 // Progress bar functionality removed - no longer needed
 
 // Create button for modal trigger
@@ -136,7 +242,7 @@ const createButton = () => {
   const button = document.createElement('button');
   button.className = 'dh-widget-button';
   button.id = 'dh-widget-button';
-  button.textContent = config.buttonText;
+  button.textContent = config.buttonText || (widgetState.widgetConfig && widgetState.widgetConfig.welcomeButtonText) || 'Get Started';
   button.type = 'button';
 
   // Add click handler to open modal
@@ -166,7 +272,7 @@ const createModal = () => {
   closeButton.className = 'dh-modal-close';
   closeButton.innerHTML = '&times;';
   closeButton.type = 'button';
-  closeButton.addEventListener('click', closeModal);
+  closeButton.addEventListener('click', showConfirmationPopup);
 
   modalContent.appendChild(closeButton);
   modal.appendChild(modalContent);
@@ -175,7 +281,7 @@ const createModal = () => {
   if (config.modalCloseOnBackdrop) {
     modal.addEventListener('click', e => {
       if (e.target === modal) {
-        closeModal();
+        showConfirmationPopup();
       }
     });
   }
@@ -183,7 +289,13 @@ const createModal = () => {
   // Add ESC key handler
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && modal.style.display !== 'none') {
-      closeModal();
+      // Check if confirmation popup is already showing
+      const confirmationPopup = document.getElementById('dh-confirmation-popup');
+      if (confirmationPopup && confirmationPopup.classList.contains('show')) {
+        hideConfirmationPopup();
+      } else {
+        showConfirmationPopup();
+      }
     }
   });
 
@@ -212,8 +324,8 @@ const createInlineWidget = () => {
   // Add click handler for close functionality
   closeIcon.addEventListener('click', () => {
     if (config.displayMode === 'button') {
-      // For button mode, close the modal
-      closeModal();
+      // For button mode, show confirmation popup
+      showConfirmationPopup();
     } else {
       // For inline mode, reset to first step or hide widget
       showStep('pest-issue');
@@ -227,8 +339,9 @@ const createInlineWidget = () => {
   const globalBackButton = document.createElement('button');
   globalBackButton.className = 'dh-global-back-button';
   globalBackButton.id = 'dh-global-back-button';
-  globalBackButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="16" viewBox="0 0 20 16" fill="none">
-  <path fill-rule="evenodd" clip-rule="evenodd" d="M19.0006 7.99993C19.0006 8.41414 18.6648 8.74993 18.2506 8.74993H3.5609L9.03122 14.2193C9.32427 14.5124 9.32427 14.9875 9.03122 15.2806C8.73816 15.5736 8.26302 15.5736 7.96996 15.2806L1.21996 8.53055C1.07913 8.38988 1 8.19899 1 7.99993C1 7.80087 1.07913 7.60998 1.21996 7.4693L7.96996 0.719304C8.26302 0.426248 8.73816 0.426248 9.03122 0.719304C9.32427 1.01236 9.32427 1.4875 9.03122 1.78055L3.5609 7.24993H18.2506C18.6648 7.24993 19.0006 7.58571 19.0006 7.99993Z" fill="#515151" stroke="#515151"/>
+  globalBackButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="none">
+  <path d="M14 27C21.1797 27 27 21.1797 27 14C27 6.8203 21.1797 1 14 1C6.8203 1 1 6.8203 1 14C1 21.1797 6.8203 27 14 27Z" stroke="#B2B2B2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M20 14.0001C20 14.2762 19.7761 14.5001 19.5 14.5001H9.70721L13.354 18.1462C13.5493 18.3416 13.5493 18.6583 13.354 18.8537C13.1586 19.0491 12.8419 19.0491 12.6465 18.8537L8.14664 14.3539C8.05275 14.2601 8 14.1328 8 14.0001C8 13.8674 8.05275 13.7402 8.14664 13.6464L12.6465 9.14652C12.8419 8.95116 13.1586 8.95116 13.354 9.14652C13.5493 9.34189 13.5493 9.65864 13.354 9.854L9.70721 13.5001H19.5C19.7761 13.5001 20 13.724 20 14.0001Z" fill="#515151" stroke="#B2B2B2"/>
 </svg> BACK`;
 
   // Add click handler for global back button
@@ -311,9 +424,9 @@ const updateModalOverflow = stepName => {
       formWidget.style.overflow = '';
     }
   } else {
-    // Past welcome screen - hide overflow and constrain form
+    // Past welcome screen - keep overflow as set by CSS
     if (modalContent) {
-      modalContent.style.overflow = 'hidden';
+      modalContent.style.overflow = '';
     }
     if (formWidget) {
       formWidget.style.overflow = 'visible';

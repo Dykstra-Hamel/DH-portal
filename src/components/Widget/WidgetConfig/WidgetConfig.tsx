@@ -1811,41 +1811,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const generateMinimalEmbedCode = () => {
     if (!selectedCompany) return '';
 
-    let embedCode = `<script 
-  src="${window.location.origin}/widget.js"
-  data-company-id="${selectedCompany.id}"
-  data-base-url="${window.location.origin}"`;
-
-    // Add essential color data attributes to prevent style flash
-    if (config.colors.primary !== '#3b82f6') {
-      embedCode += `\n  data-primary-color="${config.colors.primary}"`;
-    }
-    if (config.colors.secondary !== '#1e293b') {
-      embedCode += `\n  data-secondary-color="${config.colors.secondary}"`;
-    }
-    if (config.colors.background !== '#ffffff') {
-      embedCode += `\n  data-background-color="${config.colors.background}"`;
-    }
-    if (config.colors.text !== '#374151') {
-      embedCode += `\n  data-text-color="${config.colors.text}"`;
-    }
-
-    // Add essential messaging attributes if customized
-    if (config.messaging.welcome !== 'Get Started') {
-      embedCode += `\n  data-welcome-title="${config.messaging.welcome}"`;
-    }
-    if (
-      config.messaging.fallback !==
-      'Get your free pest control estimate in just a few steps.'
-    ) {
-      embedCode += `\n  data-welcome-description="${config.messaging.fallback}"`;
-    }
-    if (config.welcomeButtonText !== 'Start My Free Estimate') {
-      embedCode += `\n  data-welcome-button-text="${config.welcomeButtonText}"`;
-    }
-
-    embedCode += `
-></script>`;
+    // New minimal embed code without company-id or base-url
+    // Widget will automatically detect company from domain
+    const embedCode = `<script src="${window.location.origin}/widget.js"></script>`;
 
     return embedCode;
   };
@@ -3579,11 +3547,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           >
             {/* Minimal Embed Code */}
             <div className={styles.embedCodeGroup}>
-              <h4>Minimal Configuration (Recommended)</h4>
+              <h4>Simple Embed Code (Recommended)</h4>
               <p className={styles.embedDescription}>
-                Optimized embed code with essential styling to prevent flash of
-                default styles. Additional customizations will be loaded from
-                your saved configuration.
+                Minimal embed code that automatically detects your company from the domain. 
+                All customizations will be loaded from your saved configuration. 
+                Perfect for most use cases.
               </p>
               <div className={styles.embedCode}>
                 <code>{generateMinimalEmbedCode()}</code>
@@ -3636,8 +3604,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.embedCodeGroup}>
               <h4>Full Configuration</h4>
               <p className={styles.embedDescription}>
-                Includes all your customizations as data attributes for maximum
-                portability.
+                Includes all your customizations as data attributes. Use this if you need
+                to override settings per page or want maximum portability without relying
+                on server configuration.
               </p>
               <div className={styles.embedCode}>
                 <code>{generateFullEmbedCode()}</code>

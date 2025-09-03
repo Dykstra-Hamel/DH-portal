@@ -2,11 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { createClient } from '@/lib/supabase/server';
 
-interface UpdateDomainsRequest {
-  domains: string[];
+interface AddDomainRequest {
+  domain: string;
+  company_id: string;
 }
 
-// Get current global widget domains
+interface UpdateDomainRequest {
+  id: string;
+  domain?: string;
+  company_id?: string;
+  is_active?: boolean;
+}
+
+interface WidgetDomainWithCompany {
+  id: string;
+  domain: string;
+  company_id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+  companies: {
+    id: string;
+    name: string;
+  };
+}
+
+// Get all widget domains with company associations
 export async function GET() {
   try {
     // Check authentication first
@@ -23,27 +44,21 @@ export async function GET() {
     // Use admin client for database operations
     const adminSupabase = createAdminClient();
 
-    // Ensure the setting exists first - only insert if it doesn't exist
-    const { error: insertError } = await adminSupabase
-      .from('system_settings')
-      .insert({
-        key: 'widget_allowed_domains',
-        value: [],
-        description: 'Global whitelist of domains allowed to embed widgets. Any domain in this list can embed widgets for any company.'
-      })
-      .select()
-      .single();
-    
-    // Ignore duplicate key error - that means the row already exists
-    if (insertError && !insertError.message.includes('duplicate key')) {
-      console.error('Failed to ensure widget_allowed_domains exists:', insertError);
-    }
-
-    const { data: settings, error } = await adminSupabase
-      .from('system_settings')
-      .select('value, updated_at')
-      .eq('key', 'widget_allowed_domains')
-      .single();
+    const { data: domains, error } = await adminSupabase
+      .from('widget_domains')
+      .select(`
+        id,
+        domain,
+        company_id,
+        is_active,
+        created_at,
+        updated_at,
+        companies (
+          id,
+          name
+        )
+      `)
+      .order('created_at', { ascending: false }) as { data: WidgetDomainWithCompany[] | null; error: any };
 
     if (error) {
       console.error('Error fetching widget domains:', error);
@@ -53,12 +68,24 @@ export async function GET() {
       );
     }
 
-    const domains = settings?.value ? (Array.isArray(settings.value) ? settings.value : JSON.parse(settings.value)) : [];
+    // Also get companies for the dropdown
+    const { data: companies, error: companiesError } = await adminSupabase
+      .from('companies')
+      .select('id, name')
+      .order('name');
+
+    if (companiesError) {
+      console.error('Error fetching companies:', companiesError);
+      return NextResponse.json(
+        { error: 'Failed to fetch companies' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      domains: domains.filter(Boolean),
-      lastUpdated: settings?.updated_at
+      domains: domains || [],
+      companies: companies || []
     });
   } catch (error) {
     console.error('Error in widget domains GET:', error);
@@ -69,7 +96,7 @@ export async function GET() {
   }
 }
 
-// Update global widget domains
+// Add new widget domain
 export async function POST(request: NextRequest) {
   try {
     // Check authentication first
@@ -83,84 +110,273 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const { domains }: UpdateDomainsRequest = await request.json();
+    const { domain, company_id }: AddDomainRequest = await request.json();
 
-    if (!Array.isArray(domains)) {
+    if (!domain || !company_id) {
       return NextResponse.json(
-        { error: 'Domains must be an array' },
+        { error: 'Domain and company_id are required' },
         { status: 400 }
       );
     }
 
-    // Validate each domain
-    const validatedDomains: string[] = [];
-    const errors: string[] = [];
+    // Validate domain format
+    const trimmed = domain.trim();
+    let validatedDomain: string;
 
-    for (const domain of domains) {
-      const trimmed = domain.trim();
-      if (!trimmed) continue;
-
-      // Basic URL validation
-      try {
-        const url = new URL(trimmed);
-        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-          errors.push(`Invalid protocol for ${trimmed} - must be http or https`);
-          continue;
-        }
-        validatedDomains.push(trimmed.toLowerCase());
-      } catch (e) {
-        errors.push(`Invalid URL format: ${trimmed}`);
+    try {
+      const url = new URL(trimmed);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return NextResponse.json(
+          { error: 'Invalid protocol - must be http or https' },
+          { status: 400 }
+        );
       }
-    }
-
-    if (errors.length > 0) {
+      validatedDomain = trimmed.toLowerCase().replace(/\/+$/, ''); // Remove trailing slashes
+    } catch (e) {
       return NextResponse.json(
-        { error: 'Validation errors', details: errors },
+        { error: 'Invalid URL format. Please enter a full URL like https://example.com' },
         { status: 400 }
       );
     }
-
-    // Remove duplicates
-    const uniqueDomains = [...new Set(validatedDomains)];
 
     const adminSupabase = createAdminClient();
     
-    const { data, error } = await adminSupabase
-      .from('system_settings')
-      .update({
-        value: uniqueDomains,
-        updated_at: new Date().toISOString()
-      })
-      .eq('key', 'widget_allowed_domains')
-      .select();
+    // Check if company exists
+    const { data: companyExists } = await adminSupabase
+      .from('companies')
+      .select('id')
+      .eq('id', company_id)
+      .single();
 
+    if (!companyExists) {
+      return NextResponse.json(
+        { error: 'Company not found' },
+        { status: 404 }
+      );
+    }
+
+    // Insert the domain
+    const { data, error } = await adminSupabase
+      .from('widget_domains')
+      .insert({
+        domain: validatedDomain,
+        company_id,
+        created_by: user.id,
+        is_active: true
+      })
+      .select(`
+        id,
+        domain,
+        company_id,
+        is_active,
+        created_at,
+        companies (
+          id,
+          name
+        )
+      `)
+      .single() as { data: WidgetDomainWithCompany | null; error: any };
 
     if (error) {
-      console.error('Error updating widget domains:', error);
+      if (error.code === '23505') { // Unique constraint violation
+        return NextResponse.json(
+          { error: 'Domain already exists' },
+          { status: 409 }
+        );
+      }
+      console.error('Error adding widget domain:', error);
       return NextResponse.json(
-        { error: 'Failed to update domains' },
+        { error: 'Failed to add domain' },
         { status: 500 }
       );
     }
 
-    // No caching - changes take effect immediately
-
     return NextResponse.json({
       success: true,
-      domains: uniqueDomains,
-      message: `Updated widget domain whitelist with ${uniqueDomains.length} domains`
+      domain: data,
+      message: `Added domain ${validatedDomain} for ${data?.companies?.name || 'Unknown Company'}`
     });
   } catch (error) {
     console.error('Error in widget domains POST:', error);
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace'
-    });
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// Update or delete widget domain
+export async function PUT(request: NextRequest) {
+  try {
+    // Check authentication first
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    const { id, domain, company_id, is_active }: UpdateDomainRequest = await request.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Domain ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const adminSupabase = createAdminClient();
+    
+    // Build update object
+    const updateData: any = {
+      updated_by: user.id
+    };
+
+    if (domain !== undefined) {
+      // Validate domain if provided
+      try {
+        const url = new URL(domain.trim());
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+          return NextResponse.json(
+            { error: 'Invalid protocol - must be http or https' },
+            { status: 400 }
+          );
+        }
+        updateData.domain = domain.trim().toLowerCase().replace(/\/+$/, '');
+      } catch (e) {
+        return NextResponse.json(
+          { error: 'Invalid URL format' },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (company_id !== undefined) {
+      // Check if company exists
+      const { data: companyExists } = await adminSupabase
+        .from('companies')
+        .select('id')
+        .eq('id', company_id)
+        .single();
+
+      if (!companyExists) {
+        return NextResponse.json(
+          { error: 'Company not found' },
+          { status: 404 }
+        );
+      }
+      updateData.company_id = company_id;
+    }
+
+    if (is_active !== undefined) {
+      updateData.is_active = is_active;
+    }
+
+    // Update the domain
+    const { data, error } = await adminSupabase
+      .from('widget_domains')
+      .update(updateData)
+      .eq('id', id)
+      .select(`
+        id,
+        domain,
+        company_id,
+        is_active,
+        created_at,
+        updated_at,
+        companies (
+          id,
+          name
+        )
+      `)
+      .single() as { data: WidgetDomainWithCompany | null; error: any };
+
+    if (error) {
+      if (error.code === '23505') { // Unique constraint violation
+        return NextResponse.json(
+          { error: 'Domain already exists' },
+          { status: 409 }
+        );
+      }
+      console.error('Error updating widget domain:', error);
+      return NextResponse.json(
+        { error: 'Failed to update domain' },
+        { status: 500 }
+      );
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        { error: 'Domain not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      domain: data,
+      message: 'Domain updated successfully'
+    });
+  } catch (error) {
+    console.error('Error in widget domains PUT:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// Delete widget domain
+export async function DELETE(request: NextRequest) {
+  try {
+    // Check authentication first
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Domain ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const adminSupabase = createAdminClient();
+    
+    // Delete the domain
+    const { error } = await adminSupabase
+      .from('widget_domains')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting widget domain:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete domain' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Domain deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error in widget domains DELETE:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

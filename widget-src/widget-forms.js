@@ -16,42 +16,70 @@
     pestStep.id = 'dh-step-pest-issue';
 
     // Generate pest options dynamically from config
-    const pestOptionsHtml =
-      widgetState.widgetConfig?.pestOptions &&
-      widgetState.widgetConfig.pestOptions.length > 0
-        ? widgetState.widgetConfig.pestOptions
-            .map(
-              pest => `
+    let pestOptionsHtml = '';
+    let viewAllButtonHtml = '';
+    
+    if (widgetState.widgetConfig?.pestOptions && widgetState.widgetConfig.pestOptions.length > 0) {
+      const pestOptions = widgetState.widgetConfig.pestOptions;
+      const initialPests = pestOptions.slice(0, 8);
+      const additionalPests = pestOptions.slice(8);
+      
+      // Generate initial 8 pests (always visible)
+      pestOptionsHtml = initialPests
+        .map(
+          pest => `
           <div class="dh-pest-option" data-pest="${pest.value}" data-category="${pest.category}">
             <div class="dh-pest-icon">${pest.icon}</div>
             <div class="dh-pest-label">${pest.label}</div>
           </div>
         `
-            )
-            .join('')
-        : `
-        <div class="dh-pest-option" data-pest="ants">
-          <div class="dh-pest-label">Ants</div>
+        )
+        .join('');
+      
+      // Generate additional pests (initially hidden)
+      if (additionalPests.length > 0) {
+        pestOptionsHtml += additionalPests
+          .map(
+            pest => `
+          <div class="dh-pest-option dh-pest-option-hidden" data-pest="${pest.value}" data-category="${pest.category}">
+            <div class="dh-pest-icon">${pest.icon}</div>
+            <div class="dh-pest-label">${pest.label}</div>
+          </div>
+        `
+          )
+          .join('');
+        
+        // Add "View All Pests" button
+        viewAllButtonHtml = `
+          <div class="dh-view-all-container">
+            <button type="button" class="dh-form-btn dh-form-btn-secondary" id="view-all-pests-button">
+              View All Pests <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        `;
+      }
+    } else {
+      // Default pest options (fallback)
+      const defaultPests = [
+        { value: 'ants', label: 'Ants' },
+        { value: 'spiders', label: 'Spiders' },
+        { value: 'cockroaches', label: 'Cockroaches' },
+        { value: 'rodents', label: 'Rodents (mice &amp; rats)' },
+        { value: 'termites', label: 'Termites' },
+        { value: 'wasps', label: 'Wasps' },
+        { value: 'others', label: 'Others (earwigs, boxelders, ect.)' }
+      ];
+      
+      pestOptionsHtml = defaultPests
+        .map(
+          pest => `
+        <div class="dh-pest-option" data-pest="${pest.value}">
+          <div class="dh-pest-label">${pest.label}</div>
         </div>
-        <div class="dh-pest-option" data-pest="spiders">
-          <div class="dh-pest-label">Spiders</div>
-        </div>
-        <div class="dh-pest-option" data-pest="cockroaches">
-          <div class="dh-pest-label">Cockroaches</div>
-        </div>
-        <div class="dh-pest-option" data-pest="rodents">
-          <div class="dh-pest-label">Rodents (mice &amp; rats)</div>
-        </div>
-        <div class="dh-pest-option" data-pest="termites">
-          <div class="dh-pest-label">Termites</div>
-        </div>
-        <div class="dh-pest-option" data-pest="wasps">
-          <div class="dh-pest-label">Wasps</div>
-        </div>
-        <div class="dh-pest-option" data-pest="others">
-          <div class="dh-pest-label">Others (earwigs, boxelders, ect.)</div>
-        </div>
-      `;
+      `
+        )
+        .join('');
+    }
 
     pestStep.innerHTML = `
     <div class="dh-pest-step-container">
@@ -76,6 +104,9 @@
           ${pestOptionsHtml}
         </div>
         
+        <!-- View All Pests Button -->
+        ${viewAllButtonHtml}
+        
         <!-- Loading State -->
         <div class="dh-pest-loading" id="pest-loading" style="display: none;">
           <div class="dh-loading-spinner"></div>
@@ -93,26 +124,8 @@
 `;
     steps.push(pestStep);
 
-    // Step 3: Plan Selection
-    const planSelectionStep = document.createElement('div');
-    planSelectionStep.className = 'dh-form-step';
-    planSelectionStep.id = 'dh-step-plan-selection';
-    planSelectionStep.innerHTML = `
-    <div class="dh-form-step-content">
-  <h3>Choose your protection plan</h3>
-  <p class="dh-step-instruction">Based on your pest issue, here are our recommended plans</p>
-  <div class="dh-plan-loading" id="plan-loading">
-    <div class="dh-loading-spinner"></div>
-    <p>Finding the best plans for your needs...</p>
-  </div>
-  <div class="dh-plan-selection" id="plan-selection" style="display: none;">
-    <!-- Plans will be populated dynamically -->
-  </div>
-</div>
-`;
-    steps.push(planSelectionStep);
 
-    // Step 4: Address
+    // Step 2: Address
     const addressPestIcon = getPestIcon();
     const addressStep = document.createElement('div');
     addressStep.className = 'dh-form-step';
@@ -209,7 +222,7 @@
 `;
     steps.push(addressStep);
 
-    // Step 4: Confirm Address
+    // Step 3: Confirm Address
     const confirmAddressStep = document.createElement('div');
     confirmAddressStep.className = 'dh-form-step';
     confirmAddressStep.id = 'dh-step-confirm-address';
@@ -277,7 +290,7 @@
 `;
     steps.push(confirmAddressStep);
 
-    // Step 5: Initial Offer
+    // Step 4: How We Do It
     const initialOfferStep = document.createElement('div');
     initialOfferStep.className = 'dh-form-step';
     initialOfferStep.id = 'dh-step-how-we-do-it';
@@ -331,7 +344,7 @@
 `;
     steps.push(initialOfferStep);
 
-    // Step 6: Contact Info (Schedule Service Form)
+    // Step 7: Contact Info (Schedule Service Form)
     const contactStep = document.createElement('div');
     contactStep.className = 'dh-form-step';
     contactStep.id = 'dh-step-contact';
@@ -416,7 +429,7 @@
 `;
     steps.push(contactStep);
 
-    // Step 7: Quote Contact (Simple form for quote path)
+    // Step 5: Quote Contact (Simple form for quote path)
     const quoteContactStep = document.createElement('div');
     quoteContactStep.className = 'dh-form-step';
     quoteContactStep.id = 'dh-step-quote-contact';
@@ -467,9 +480,6 @@
             <label class="dh-floating-label" for="quote-phone-input" data-default-text="(888) 888-8888" data-focused-text="Cell Phone Number">Cell Phone Number</label>
           </div>
         </div>
-        <div class="dh-quote-loading" id="quote-loading" style="display: none;">
-          <div class="dh-loading-spinner"></div>
-        </div>
         
         <div class="dh-form-button-group">
           <button class="dh-form-btn dh-form-btn-secondary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">See Your Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -487,7 +497,7 @@
     `;
     steps.push(quoteContactStep);
 
-    // Step 8: Plan Comparison (for detailed quote path)
+    // Step 6: Plan Comparison (for detailed quote path)
     const planComparisonStep = document.createElement('div');
     planComparisonStep.className = 'dh-form-step';
     planComparisonStep.id = 'dh-step-plan-comparison';
@@ -564,7 +574,7 @@
     `;
     steps.push(planComparisonStep);
 
-    // Step 9: Out of Service Area
+    // Step 8: Complete (Thank You)
     const outOfServiceStep = document.createElement('div');
     outOfServiceStep.className = 'dh-form-step';
     outOfServiceStep.id = 'dh-step-out-of-service';
@@ -646,7 +656,7 @@
     `;
     steps.push(exitSurveyStep);
 
-    // Step 10: Complete (Thank You)
+    // Alternative: Out of Service Area
     const completeStep = document.createElement('div');
     completeStep.className = 'dh-form-step';
     completeStep.id = 'dh-step-complete';
@@ -694,7 +704,7 @@
     `;
     steps.push(completeStep);
 
-    // Step 11: Decline Complete (for exit survey submissions)
+    // Alternative: Exit Survey & Decline Complete
     const declineCompleteStep = document.createElement('div');
     declineCompleteStep.className = 'dh-form-step';
     declineCompleteStep.id = 'dh-step-decline-complete';

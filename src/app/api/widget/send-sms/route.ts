@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizePhoneNumber, toE164PhoneNumber } from '@/lib/utils';
 import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
+import { getCompanyCaptchaConfig, verifyTurnstile } from '@/lib/captcha';
 
 // Handle preflight OPTIONS request
 export async function OPTIONS(request: NextRequest) {
@@ -11,6 +12,8 @@ interface SMSRequest {
   customerPhone: string;
   customerName: string;
   pestType: string;
+  companyId?: string; // pass-through for captcha lookup
+  captcha?: { provider?: string; token?: string; action?: string };
 }
 
 export async function POST(request: NextRequest) {
@@ -31,6 +34,31 @@ export async function POST(request: NextRequest) {
         'widget',
         400
       );
+    }
+
+    // Optional: verify captcha if configured/required for company
+    try {
+      const companyId = smsData.companyId || '';
+      if (companyId) {
+        const captchaConfig = await getCompanyCaptchaConfig(companyId);
+        const shouldVerify = captchaConfig.enabled && captchaConfig.required && captchaConfig.provider === 'turnstile';
+        if (shouldVerify) {
+          if (!smsData.captcha?.token) {
+            return createCorsErrorResponse('Captcha token missing', origin, 'widget', 403);
+          }
+          if (!captchaConfig.secretKey) {
+            console.error('Captcha required but secret key not configured for company', companyId);
+            return createCorsErrorResponse('Captcha not configured', origin, 'widget', 500);
+          }
+          const result = await verifyTurnstile(smsData.captcha.token, captchaConfig.secretKey, origin, request);
+          if (!result.success) {
+            return createCorsErrorResponse(`Captcha verification failed: ${result.reason || 'invalid token'}`, origin, 'widget', 403);
+          }
+        }
+      }
+    } catch (captchaError) {
+      console.error('Captcha verification error (SMS):', captchaError);
+      return createCorsErrorResponse('Captcha verification error', origin, 'widget', 500);
     }
 
     // Validate and format phone number

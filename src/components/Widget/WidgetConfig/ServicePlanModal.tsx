@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import RichTextEditor from '@/components/UI/RichTextEditor/RichTextEditor';
 import styles from './WidgetConfig.module.scss';
 
 interface ServicePlan {
@@ -527,15 +528,12 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
 
               <div className={styles.formGroup}>
                 <label>Plan Disclaimer</label>
-                <textarea
-                  value={formData.plan_disclaimer}
-                  onChange={(e) => handleInputChange('plan_disclaimer', e.target.value)}
-                  placeholder="Enter disclaimer text for this plan (supports HTML)"
+                <RichTextEditor
+                  value={formData.plan_disclaimer || ''}
+                  onChange={(value) => handleInputChange('plan_disclaimer', value)}
+                  placeholder="Enter disclaimer text for this plan..."
                   rows={4}
                 />
-                <small style={{color: '#666', fontSize: '12px', marginTop: '4px', display: 'block'}}>
-                  Supports basic HTML formatting (bold, italic, links, etc.)
-                </small>
               </div>
 
               <div className={styles.checkboxGroup}>

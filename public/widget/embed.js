@@ -1,6 +1,6 @@
 /**
  * DH Widget - Built from Source
- * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-forms.js, widget-api.js, embed-main.js
+ * Source files: widget-state.js, widget-utils.js, widget-styles.js, widget-ui.js, widget-logic.js, widget-captcha.js, widget-forms.js, widget-api.js, embed-main.js
  */
 
 /**
@@ -158,6 +158,20 @@
   if (!scriptTag) {
     showErrorState('Initialization Error', 'Could not determine script tag reference');
     return;
+  }
+
+  // Auto-detect base URL from script source or use current origin
+  let baseUrl = scriptTag.getAttribute('data-base-url');
+  if (!baseUrl) {
+    // Try to extract from script src
+    const scriptSrc = scriptTag.src;
+    if (scriptSrc) {
+      const url = new URL(scriptSrc);
+      baseUrl = `${url.protocol}//${url.host}`;
+    } else {
+      // Fallback to current origin
+      baseUrl = window.location.origin;
+    }
   }
 
 
@@ -936,20 +950,88 @@
   styleElement.textContent = `
   @import url('${fontUrl}');
 
+  /* ===================================================================
+   GLOBAL STYLES & BASE CONFIGURATION
+   =================================================================== */
+
   /* Global font family for all widget elements */
   .dh-form-widget, .dh-form-widget * {
   font-family: "${fontName}", sans-serif !important;
   }
 
+  /* ===================================================================
+   ANIMATIONS & KEYFRAMES
+   =================================================================== */
+
   @keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+  }
+
+  @keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+  }
+
+  @keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+  }
+
+  @keyframes slideInUp {
   from {
     opacity: 0;
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
   }
 
+  @keyframes slideOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  }
+
+  @keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+  }
+
+  @keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  }
+
+  @keyframes dh-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  }
+
+  /* Animation applications */
   img {
   animation: fadeIn 2s ease forwards;
   }
@@ -1005,34 +1087,33 @@
   position: absolute;
   justify-content: center;
   align-items: center;
-  top: 67px;
-  left: 0px;
+  top: 18px;
+  left: 18px;
   z-index: 90;
-  background: #E3E3E3;
+  background: transparent;
   color: #4A4A4A;
   border: none;
-  padding: 10px 16px;
-  border-radius: 0 60px 60px 0;
+  padding: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: '${fontName}', sans-serif;
-  font-size: 12px;
+  font-size: 0;
   line-height: 20px;
   font-weight: 700;
-  transition: background-color 0.2s ease, transform 0.2s ease;
-  opacity: 0.7;
   transition: all 0.2s ease;
+  width: 35px;
+  height: 35px;
   }
 
   .dh-global-back-button:hover {
-  background: #B0B0B0;
+  background: transparent;
   }
 
   .dh-global-back-button svg {
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
   transition: all 0.2s ease;
   }
@@ -1054,11 +1135,7 @@
   opacity: 0;
   transition: opacity 0.3s ease;
   } 
-  .dh-form-step.welcome { 
-  display: none;
-  padding: 0;
-  opacity: 1;
-  } 
+ 
   .dh-form-step.active { 
   display: flex; 
   opacity: 1;
@@ -1081,6 +1158,10 @@
     padding: 0;
     border-bottom: none;
   }
+
+  /* ===================================================================
+   STEP-SPECIFIC STYLING
+   =================================================================== */
 
   #dh-step-plan-comparison .dh-form-step-content {
    flex-wrap: wrap;
@@ -1130,7 +1211,10 @@
   margin-left: 4px;
   }
 
-  /* Loading States */
+  /* ===================================================================
+   LOADING STATES & SPINNERS
+   =================================================================== */
+
   .dh-reviews-loading {
   display: flex;
   align-items: center;
@@ -1165,14 +1249,7 @@
   animation: dh-pulse 1.5s ease-in-out infinite;
   }
 
-  @keyframes dh-pulse {
-  0%, 100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 0.9;
-  }
-  }
+  /* dh-pulse keyframes moved to consolidated animations section */
 
   .dh-plan-faqs-container {
   width: 100%;
@@ -1216,7 +1293,7 @@
   } 
 
   h3.dh-how-we-do-it-title, .dh-safety-text {
-  font-size: 28px;
+  font-size: 26px;
   line-height: 30px;
   font-weight: 700;
   color: #4E4E4E;
@@ -1281,6 +1358,10 @@
   margin: 0;
   }
 
+  /* ===================================================================
+   FORM CONTROLS & INPUT STYLING
+   =================================================================== */
+
   .dh-form-group { 
   max-width: 515px;
   width: 100%;
@@ -1297,12 +1378,13 @@
   } 
   .dh-address-form-label {
   display: block;
-  margin-bottom: 24px;
+  margin: 0 auto 24px;
   color: #4E4E4E;
   text-align: center;
   font-size: 20px;
   font-weight: 600;
   line-height: 30px;
+  width: 80%;
   }
   .dh-form-input { 
   width: 100%; 
@@ -1510,7 +1592,7 @@
 
   /* Focused input border */
   .dh-floating-input .dh-form-input:focus {
-  border-color: ${primaryColor};
+  border: 2px solid ${primaryColor};
   box-shadow: 0 0 0 2px ${primaryFocus};
   }
 
@@ -1595,6 +1677,10 @@
   gap: 13px;
   margin: 0 auto;
   }
+
+  #dh-step-contact .dh-form-row {
+  width: 95%;
+  }
   .dh-form-row .dh-form-group {
   width: 100%;
   }
@@ -1663,7 +1749,9 @@
   border-bottom: none;
   }
 
-  /* Removed duplicate address components - using improved versions below */
+  /* ===================================================================
+   BUTTONS & INTERACTIVE ELEMENTS
+   =================================================================== */
 
   /* Change Address Button */
   .dh-change-address-btn {
@@ -1698,9 +1786,9 @@
   }
 
   .dh-image-loading .dh-loading-spinner {
-  width: 24px;
-  height: 24px;
-  margin-bottom: 8px;
+  --spinner-size: 24px;
+  --spinner-border: 2px;
+  --spinner-margin: 0 0 8px 0;
   }
 
   .dh-image-loading p {
@@ -1765,6 +1853,8 @@
   #check-service-area-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  background: rgb(156, 163, 175);
+  border: 1px solid rgb(156, 163, 175);
   }
 
   /* Selected Address Card Styling */
@@ -1811,15 +1901,8 @@
   width: 100%;
   }
 
-  .dh-image-loading .dh-loading-spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #e2e8f0;
-  border-top: 2px solid ${primaryColor};
-  border-radius: 50%;
-  animation: dh-spin 1s linear infinite;
-  margin-bottom: 8px;
-  }
+  /* Note: This duplicate .dh-image-loading .dh-loading-spinner definition removed - 
+   consolidated with the one above */
 
   .dh-image-loading p {
   margin: 8px 0 0 0;
@@ -1950,26 +2033,14 @@
   margin-bottom: 40px;
   }
 
-  /* Responsive styling for out-of-service */
-  @media (max-width: 600px) {
-  .dh-form-out-of-service {
-    padding: 30px 20px;
-  }
-  
-  .dh-form-out-of-service h3 {
-    font-size: 20px;
-  }
-  
-  .dh-form-out-of-service p {
-    font-size: 15px;
-  }
-  }
+  /* ===================================================================
+   RESPONSIVE & MOBILE STYLES
+   =================================================================== */
+
+  /* Responsive styling moved to consolidated responsive section below */
 
   /* Spinning Animation for Loading */
-  @keyframes dh-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-  }
+  /* dh-spin keyframes removed - consolidated with spin animation below */
 
   /* Initial Offer Step Styling */
   .dh-offer-options {
@@ -2043,73 +2114,7 @@
   border-color: #9ca3af;
   }
 
-  @media (max-width: 480px) {
-
-  .dh-pest-logo img {
-    width: 119px !important;
-  }
-
-  .dh-safety-message {
-    flex-direction: row-reverse;
-    margin: 0;
-  }
-
-  .dh-how-we-do-it-text {
-   margin-right: 0;
-  }
-
-  /* iOS-compatible full-width image solution */
-  #how-we-do-it-interior-image, .dh-plan-image-actual img {
-    width: 100vw !important;
-    height: 240px !important;
-    max-width: unset !important;
-    object-fit: cover;
-    object-position: top;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-    border-radius: 0;
-    margin-left: -50vw;
-    margin-right: -50vw;
-    border-radius: 0 !important;
-  }
-  
-  .dh-offer-options {
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-  }
-  
-  .dh-offer-btn {
-    width: 100%;
-    max-width: 280px;
-  }
-  
-  .dh-address-imagery {
-    width: 100%;
-    height: 160px;
-    margin: 12px auto 16px;
-  }
-  
-  .dh-address-search-field {
-    padding: 14px;
-    font-size: 16px;
-  }
-  
-  .dh-selected-address-card {
-    padding: 16px;
-    margin: 12px 0;
-  }
-
-  .dh-form-button-group {
-    width: 100%;
-    padding: 40px 0 0 0 !important;
-  }
-
-
-  .dh-form-btn:not(.plan-no-thanks) {
-  width: 100%;
-  }
-  }
+  /* 480px media query styles moved to consolidated responsive section */
   .dh-form-checkbox-label {
   display: flex;
   align-items: flex-start;
@@ -2118,7 +2123,6 @@
   line-height: 1.5;
   color: ${textColor};
   cursor: pointer;
-  margin-bottom: 40px;
   }
   .dh-form-checkbox {
   width: 18px !important;
@@ -2194,11 +2198,12 @@
   line-height: 18px;
   font-family: "${fontName}", sans-serif;
   font-weight: 700; 
-  transition: all 0.2s ease;
+  transition: all 0.2s linear;
+  position: relative
   }
 
   .dh-form-btn:not(.plan-no-thanks) {
-  min-width: 241px;
+  min-width: 260px;
   }
 
   .dh-form-btn:active {
@@ -2217,7 +2222,7 @@
   color: #fff;  
   } 
 
-  .dh-form-btn-secondary:hover {
+  .dh-form-btn-secondary:hover:not(:disabled) {
   border-color: ${secondaryColor};
   }
 
@@ -2277,82 +2282,7 @@
   .dh-form-btn.plan-no-thanks:hover {
     opacity: 0.8;
   }
-  @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-  }
-
-  /* Animation keyframes for smooth transitions */
-  @keyframes fadeIn {
-  from { 
-    opacity: 0; 
-  }
-  to { 
-    opacity: 1; 
-  }
-  }
-
-  @keyframes fadeOut {
-  from { 
-    opacity: 1; 
-  }
-  to { 
-    opacity: 0; 
-  }
-  }
-
-  @keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  }
-
-  @keyframes slideOutDown {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  }
-
-  @keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-  }
-
-  @keyframes scaleOut {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  }
-
-  /* Respect user's motion preferences */
-  @media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-  }
+  /* All duplicate keyframes and scattered media queries moved to consolidated sections */
 
   .dh-pest-selection {
   gap: 32px;
@@ -2457,16 +2387,10 @@
   .dh-pest-loading.show {
   opacity: 1;
   }
-  border-radius: 20px;
-  }
   .dh-pest-loading .dh-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid ${primaryColor};
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0;
+  --spinner-size: 48px;
+  --spinner-border: 4px;
+  --spinner-margin: 0;
   }
 
   /* New Pest Step Layout with Hero Image */
@@ -2556,11 +2480,74 @@
   }
 
   .dh-pest-option.selected .dh-pest-icon svg path {
-  fill: white;
+  fill: ${primaryColor};
   }
 
   .dh-pest-option.selected .dh-pest-label {
-  color: white;
+  color: ${primaryColor};
+  }
+
+  /* Hidden pest options - will be visible but clipped by parent container */
+  .dh-pest-option-hidden {
+  /* These pests are still in the grid but will be clipped by the parent container's max-height */
+  opacity: 1;
+  transform: translateY(0);
+  }
+
+  /* Pest options transition for smooth reveal effect */
+  .dh-pest-option {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  /* Staggered reveal animation for pests */
+  .dh-pest-option-revealing {
+  animation: slideInFromBottom 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  @keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  }
+
+  /* View All Pests button container */
+  .dh-view-all-container {
+  display: none; /* Hidden by default on mobile */
+  justify-content: center;
+  margin-top: 24px;
+  width: 100%;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  /* Show button only on desktop */
+  @media (min-width: 1024px) {
+  .dh-view-all-container {
+    display: flex;
+  }
+  }
+
+  #view-all-pests-button {
+  min-width: 197px;
+  color: ${secondaryColor};
+  background: #fff;
+  border: 2px solid ${secondaryColor};
+  transition: all 0.2s ease;
+  }
+
+  #view-all-pests-button svg {
+  display: none;
+  }
+
+  #view-all-pests-button:hover {
+  color: ${secondaryDark};
+  border-color: ${secondaryDark};
   }
 
 
@@ -2585,7 +2572,7 @@
 
   .dh-pest-hero {
   width: 386px;
-  max-height: 889px;;
+  height: 889px;
   position: relative;
   flex-shrink: 0;
   display: flex;
@@ -2606,6 +2593,7 @@
     rgba(255, 255, 255, 1) 80%
   );
   z-index: 2;
+  border-radius: 0 26px 26px 0;
   }
 
   .dh-pest-hero:not(.step1):before {
@@ -2652,6 +2640,19 @@
   transition: opacity 0.5s ease;
   }
 
+  /* Desktop - 2-row pest limitation (1024px and wider) */
+  @media (min-width: 1024px) {
+  .dh-pest-selection {
+    overflow: hidden;
+    max-height: 300px; /* Approximate height for 2 rows */
+    transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dh-pest-selection.expanded {
+    max-height: 1000px; /* Large enough to show all pests */
+  }
+  }
+
   /* Tablet Responsive - 1024px and below */
   @media (max-width: 1024px) {
   .dh-modal-overlay {
@@ -2675,6 +2676,10 @@
   .dh-pest-hero {
     width: 100%;
     min-height: unset;
+    height: unset;
+    top: -50px;
+    margin-bottom: -50px;
+    z-index: 1;
   }
 
   .dh-pest-hero-image {
@@ -2691,6 +2696,7 @@
     rgba(255, 255, 255, 0.4) 0%,
     rgba(255, 255, 255, 1) 100%
   ) !important;
+   border-radius: unset;
   }
 
   #dh-form-container {
@@ -2719,7 +2725,7 @@
     min-height: 240px;
     border-radius: 0 0 26px 26px;
     z-index: 1;
-    background-position: top;
+    background-position: center;
   }
   
   .dh-pest-bg-image:not(.step1) {
@@ -2755,60 +2761,7 @@
   }
   }
 
-  /* Mobile Responsive */
-  @media (max-width: 768px) {
-  .dh-pest-step-container,
-  .dh-form-step-content {
-    flex-direction: column;
-    min-height: auto;
-  }
-  
-  .dh-pest-content,
-  .dh-form-content-area {
-    padding: 20px;
-  }
-  
-  .dh-pest-heading {
-    font-size: 30px;
-    line-height: 32px;
-  }
-  
-  .dh-pest-selection {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-  }
-  
-  /* Global elements mobile responsive */
-  .dh-global-back-button {
-    top: 20px;
-    padding: 12px 18px;
-    font-size: 0;
-  }
-  
-  .dh-global-back-button svg {
-    width: 16px;
-    height: 14px;
-  }
-  
-  .dh-widget-close-icon {
-    top: 24px;
-    right: 20px;
-    width: 26px;
-    height: 26px;
-  }
-  
-  .dh-widget-close-icon svg {
-    width: 26px;
-    height: 26px;
-  }
-
-  .dh-plan-faqs-container {
-    max-width: 100%;
-    width: unset;
-    margin: 0 0 50px 0; 
-    border-radius: 0;
-  }
-  }
+  /* First 768px media query styles moved to consolidated responsive section */
 
   /* Mobile background image for confirm address step */
   .dh-mobile-bg-image {
@@ -2850,88 +2803,9 @@
   }
 
 
-  @media (max-width: 480px) {
-
-  .dh-pest-logo {
-    margin-bottom: 24px;
-  }
-
-  .dh-pest-logo img {
-    max-height: 53px;
-    max-width: 119px;
-  }
-  
-  .dh-pest-heading {
-    font-size: 32px;
-    line-height: 32px;
-    letter-spacing: -0.3px;
-  }
-
-  .dh-pet-safety-image {
-    width: 144px;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-  }
-
-  .dh-safety-text {
-    font-size: 22px;
-    line-height: 26px;
-  }
-
-  .dh-subspecies-grid {
-    gap: 2px 20px;
-  }
-
-  .dh-form-btn {
-    width: 100%;
-  }
-
-  .dh-plan-visual {
-    width: 100vw;
-    max-width: unset !important;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-  }
-
-  .dh-plan-visual img {
-    border-radius: 0 !important;
-  }
-
-  .dh-plan-image-container {
-    border-radius: 0 !important;
-  }
-  }
+  /* Second 480px media query styles moved to consolidated responsive section */
 
 
-  .dh-urgency-loading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  }
-
-  .dh-urgency-loading.show {
-  opacity: 1;
-  }
-  border-radius: 20px;
-  }
-  .dh-urgency-loading .dh-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid ${primaryColor};
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0;
-  }
   .dh-quote-loading {
   position: absolute;
   top: 0;
@@ -2950,25 +2824,24 @@
   .dh-quote-loading.show {
   opacity: 1;
   }
-  border-radius: 20px;
-  }
   .dh-quote-loading .dh-loading-spinner {
-  width: 64px;
-  height: 64px;
-  border: 6px solid #e5e7eb;
-  border-top: 6px solid ${primaryColor};
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0;
+  --spinner-size: 64px;
+  --spinner-border: 6px;
+  --spinner-margin: 0;
   }
+  /* Base loading spinner - can be customized with CSS custom properties */
   .dh-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e5e7eb;
-  border-top: 3px solid ${primaryColor};
+  --spinner-size: 32px;
+  --spinner-border: 3px;
+  --spinner-margin: 0 auto 16px auto;
+  
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  border: var(--spinner-border) solid #e5e7eb;
+  border-top: var(--spinner-border) solid ${primaryColor};
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 16px auto;
+  margin: var(--spinner-margin);
   }
 
   /* Button widget styles */
@@ -3050,6 +2923,95 @@
   .dh-modal-overlay.hide .dh-modal-content {
   transform: scale(0.95);
   opacity: 0;
+  }
+
+  /* Confirmation Popup Styles */
+  .dh-confirmation-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  }
+
+  .dh-confirmation-popup.show {
+  display: flex;
+  opacity: 1;
+  }
+
+  .dh-confirmation-content {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  transform: scale(0.95);
+  transition: transform 0.3s ease;
+  text-align: center;
+  font-family: "${fontName}", sans-serif;
+  }
+
+  .dh-confirmation-popup.show .dh-confirmation-content {
+  transform: scale(1);
+  }
+
+  .dh-confirmation-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: ${textColor};
+  margin: 0 0 12px 0;
+  }
+
+  .dh-confirmation-message {
+  font-size: 16px;
+  color: #6b7280;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+  }
+
+  .dh-confirmation-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  }
+
+  .dh-confirmation-button {
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: "${fontName}", sans-serif;
+  min-width: 80px;
+  }
+
+  .dh-confirmation-button.cancel {
+  background: ${primaryColor};
+  color: white;
+  }
+
+  .dh-confirmation-button.cancel:hover {
+  background: ${primaryDark};
+  }
+
+  .dh-confirmation-button.confirm {
+  background: #f3f4f6;
+  color: #374151;
+  }
+
+  .dh-confirmation-button.confirm:hover {
+  background: #e5e7eb;
   }
 
   /* Welcome Screen Styles */
@@ -3195,7 +3157,8 @@
 
   .dh-button-arrow svg, .dh-form-btn svg {
   display: block;
-  position: relative;
+  position: absolute;
+  right: 21px;
   }
 
   .dh-welcome-button:hover .dh-button-arrow {
@@ -3209,6 +3172,7 @@
   font-weight: 700;
   line-height: 46px;
   margin: 0 0 20px 0;
+  letter-spacing: -0.46px;
   }
 
   .dh-terms-disclaimer {
@@ -3343,6 +3307,19 @@
   .dh-welcome-title {
     font-size: 28px;
   }
+
+  h3.dh-how-we-do-it-title, .dh-safety-text {
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 700;
+  }
+
+  #dh-step-plan-comparison h2.dh-step-heading {
+    font-size: 26px;
+    line-height: 28px;
+    letter-spacing: -0.26px;
+  }
+
   /* Progress styles removed */
   }
 
@@ -3680,14 +3657,14 @@
     margin: 0 0 20px 0;
   }
   .dh-faq-header {
-    padding: 14px 16px;
+    padding: 14px 0;
   }
   .dh-faq-question {
     font-size: 15px;
     padding-right: 12px;
   }
   .dh-faq-answer {
-    padding: 0 16px 14px 16px;
+    padding: 14px 0;
   }
 
   .dh-plan-pricing {
@@ -3744,7 +3721,8 @@
   }
 
   .dh-form-step h3.dh-plan-title {
-    font-size: 30px;
+    font-size: 22px;
+    line-height: 26px;
   }
   }
 
@@ -4295,7 +4273,7 @@
   @media (max-width: 768px) {
   #dh-step-contact .dh-form-row {
     flex-direction: column;
-    width: 253px;
+    width: 100%;
     gap: 0;
     margin-bottom: 0;
   }
@@ -4326,6 +4304,344 @@
     padding: 14px 20px;
   }
   }
+
+  /* ===================================================================
+   CONSOLIDATED RESPONSIVE & MOBILE STYLES
+   =================================================================== */
+
+  /* Mobile First - 480px and below */
+  @media (max-width: 480px) {
+  .dh-pest-logo {
+    margin-bottom: 24px;
+  }
+  
+  .dh-pest-logo img {
+    width: 119px !important;
+    max-width: 140px;
+    max-height: 53px;
+    height: auto;
+  }
+  
+  .dh-safety-message {
+    flex-direction: row-reverse;
+    margin: 0;
+  }
+  
+  .dh-how-we-do-it-text {
+    margin-right: 0;
+  }
+  
+  /* iOS-compatible full-width image solution */
+  #how-we-do-it-interior-image, .dh-plan-image-actual img {
+    width: 100vw !important;
+    height: 240px !important;
+    max-width: unset !important;
+    object-fit: cover;
+    object-position: top;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    border-radius: 0 !important;
+    margin-left: -50vw;
+    margin-right: -50vw;
+  }
+  
+  .dh-offer-options {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  
+  .dh-offer-btn {
+    width: 100%;
+    max-width: 280px;
+    margin-bottom: 12px;
+    padding: 16px;
+    font-size: 16px;
+  }
+  
+  .dh-address-imagery {
+    width: 100%;
+    height: 160px;
+    margin: 12px auto 16px;
+  }
+  
+  .dh-address-search-field {
+    padding: 14px;
+    font-size: 16px;
+  }
+  
+  .dh-selected-address-card {
+    padding: 16px;
+    margin: 12px 0;
+  }
+  
+  .dh-form-button-group {
+    width: 100%;
+    padding: 40px 0 0 0 !important;
+  }
+  
+  .dh-form-btn:not(.plan-no-thanks) {
+    width: 100%;
+  }
+  
+  .dh-plan-title {
+    font-size: 26px;
+  }
+  
+  .dh-plan-description {
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .dh-plan-price-starting {
+    font-size: 14px;
+    line-height: 24px;
+    margin-left: 5px;
+  }
+
+  .dh-plan-price-recurring {
+    font-size: 46px;
+  }
+
+  .dh-plan-price-normally {
+    font-size: 16px;
+  }
+
+  .dh-plan-price-initial {
+    font-size: 20px;
+  }
+
+  .dh-plan-price-recurring {
+    align-items: flex-end;
+  }
+
+  .dh-plan-price-recurring .dh-price-dollar {
+    position: relative;
+    top: 5px;
+    font-size: 28px;
+  }
+
+  .dh-price-asterisk {
+  top: 10px;
+  }
+
+  .dh-plan-price-container {
+    margin: 0 0 20px 10px
+  }
+  
+  .dh-plan-included h4 {
+    font-size: 16px;
+  }
+  
+  .dh-pest-heading {
+    font-size: 32px;
+    line-height: 32px;
+    letter-spacing: -0.3px;
+  }
+  
+  .dh-pet-safety-image {
+    width: 144px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  
+  .dh-safety-text {
+    font-size: 22px;
+    line-height: 26px;
+  }
+  
+  .dh-subspecies-grid {
+    gap: 2px 20px;
+  }
+  
+  .dh-form-btn {
+    width: 100%;
+  }
+  
+  .dh-plan-visual {
+    width: 100vw;
+    max-width: unset !important;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    margin-bottom: 20px;
+  }
+  
+  .dh-plan-visual img {
+    border-radius: 0 !important;
+  }
+  
+  .dh-plan-image-container {
+    border-radius: 0 !important;
+  }
+  }
+
+  /* Tablet - 768px and below */
+  @media (max-width: 768px) {
+  .dh-pest-step-container,
+  .dh-form-step-content {
+    flex-direction: column;
+    overflow-y: auto;
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    padding: 0;
+  }
+  
+  .dh-pest-content,
+  .dh-form-content-area {
+    padding: 20px;
+  }
+  
+  .dh-pest-heading {
+    font-size: 30px;
+    line-height: 32px;
+  }
+  
+  .dh-pest-selection {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  
+  .dh-global-back-button svg {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .dh-widget-close-icon {
+    top: 24px;
+    right: 20px;
+    width: 26px;
+    height: 26px;
+  }
+  
+  .dh-widget-close-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .dh-modal-overlay {
+    padding: 10px;
+  }
+  
+  .dh-plan-details {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .dh-plan-actions {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    align-items: stretch;
+  }
+  
+  .dh-plan-faqs {
+    margin: 32px 0 0 0;
+  }
+  
+  .dh-plan-faqs-container {
+    max-width: 100%;
+    width: unset;
+    margin: 0; 
+    padding: 30px 20px 50px 20px;
+    border-radius: 0;
+  }
+  
+  .dh-exit-survey-centered {
+    padding: 20px 16px;
+  }
+  
+  .dh-exit-survey-centered .dh-step-heading {
+    font-size: 24px;
+  }
+  
+  .dh-exit-survey-centered .dh-step-instruction {
+    font-size: 16px;
+  }
+  }
+
+  /* Small tablets and large phones - 650px and below */
+  @media (max-width: 650px) {
+  .dh-plan-main {
+    padding: 24px 16px;
+  }
+  }
+
+  /* Small screens - 600px and below */
+  @media (max-width: 600px) {
+  .dh-form-out-of-service {
+    padding: 30px 20px;
+  }
+  
+  .dh-form-out-of-service h3 {
+    font-size: 20px;
+  }
+  
+  .dh-form-out-of-service p {
+    font-size: 15px;
+  }
+  
+  .dh-offer-options {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .dh-step-instruction {
+    font-size: 16px;
+  }
+  }
+
+  /* Large screens - 1024px and below */
+  @media (max-width: 1024px) {
+  .dh-modal-overlay {
+    padding: 0 !important;
+  }
+  
+  .dh-pest-step-container {
+    height: auto;
+    min-height: calc(100vh - 80px);
+  }
+  
+  #dh-step-confirm-address .dh-pest-hero {
+    height: 300px;
+  }
+  
+  #dh-step-confirm-address .dh-mobile-bg-image {
+    display: block;
+    height: 259px;
+    object-fit: cover;
+    border-radius: 12px;
+  }
+  
+  #dh-step-plan-comparison .dh-pest-hero {
+    height: auto;
+    min-height: 200px;
+    max-height: 300px;
+  }
+
+  .dh-interior-image {
+    width: 390px;
+  }
+
+  .dh-global-back-button {
+    top: 24px;
+    left: 20px;
+    padding: 0;
+    font-size: 0;
+    width: 26px;
+    height: 26px;
+  }
+  }
+
+  /* Accessibility - Motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  }
+
   `;
   document.head.appendChild(styleElement);
   };
@@ -4346,12 +4662,8 @@
     widgetState.widgetConfig?.fonts?.primary?.url ||
     'https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap';
 
-  console.log('DEBUG updateWidgetFonts: fontName =', fontName);
-  console.log('DEBUG updateWidgetFonts: fontUrl =', fontUrl);
-
   const existingStyles = document.getElementById('dh-widget-styles');
   if (existingStyles) {
-    console.log('DEBUG updateWidgetFonts: Found existing styles, updating...');
     let cssText = existingStyles.textContent;
 
     // Update font import URL
@@ -4378,6 +4690,8 @@
   // === WIDGET UI ===
   // Track if modal widget has been created
   let modalWidgetCreated = false;
+  // Track if modal has been opened in this session (to distinguish from cross-session recovery)
+  let modalOpenedInSession = false;
 
   // Open modal function
   const openModal = () => {
@@ -4441,22 +4755,32 @@
         }, 100);
       }
     } else {
-      // For subsequent modal opens, check if we should show continue prompt
-      if (typeof widgetState !== 'undefined' && widgetState.recoveryData && 
-          typeof window.progressiveFormManager !== 'undefined' && 
-          window.progressiveFormManager.shouldPromptToContinue(widgetState.recoveryData)) {
-        
-        setTimeout(() => {
-          if (window.progressiveFormManager && typeof window.progressiveFormManager.showContinuePrompt === 'function') {
-            window.progressiveFormManager.showContinuePrompt(widgetState.recoveryData);
-          }
-        }, 300);
-      } else {
+      // For subsequent modal opens in same session, just show current step
+      if (modalOpenedInSession) {
         // Show current step or default to first step
         if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
           showStep(widgetState.currentStep);
         } else {
           showStep('pest-issue');
+        }
+      } else {
+        // This is first open in session, check if we should show continue prompt
+        if (typeof widgetState !== 'undefined' && widgetState.recoveryData && 
+            typeof window.progressiveFormManager !== 'undefined' && 
+            window.progressiveFormManager.shouldPromptToContinue(widgetState.recoveryData)) {
+          
+          setTimeout(() => {
+            if (window.progressiveFormManager && typeof window.progressiveFormManager.showContinuePrompt === 'function') {
+              window.progressiveFormManager.showContinuePrompt(widgetState.recoveryData);
+            }
+          }, 300);
+        } else {
+          // Show current step or default to first step
+          if (typeof widgetState !== 'undefined' && widgetState.currentStep) {
+            showStep(widgetState.currentStep);
+          } else {
+            showStep('pest-issue');
+          }
         }
       }
     }
@@ -4470,6 +4794,9 @@
 
     // Add show class for animation
     modal.classList.add('show');
+    
+    // Mark that modal has been opened in this session
+    modalOpenedInSession = true;
 
     // Focus management after animation starts
     setTimeout(() => {
@@ -4502,6 +4829,97 @@
   }
   };
 
+  // Create confirmation popup
+  const createConfirmationPopup = () => {
+  // Check if popup already exists
+  if (document.getElementById('dh-confirmation-popup')) {
+    return;
+  }
+
+  const popup = document.createElement('div');
+  popup.className = 'dh-confirmation-popup';
+  popup.id = 'dh-confirmation-popup';
+
+  const content = document.createElement('div');
+  content.className = 'dh-confirmation-content';
+
+  const title = document.createElement('h3');
+  title.className = 'dh-confirmation-title';
+  title.textContent = 'Are you sure you want to leave?';
+
+  const message = document.createElement('p');
+  message.className = 'dh-confirmation-message';
+  message.textContent = 'Your progress will be saved, but you&apos;ll need to start over if you leave now.';
+
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.className = 'dh-confirmation-buttons';
+
+  const cancelButton = document.createElement('button');
+  cancelButton.className = 'dh-confirmation-button cancel';
+  cancelButton.textContent = 'Stay';
+  cancelButton.type = 'button';
+
+  const confirmButton = document.createElement('button');
+  confirmButton.className = 'dh-confirmation-button confirm';
+  confirmButton.textContent = 'Leave';
+  confirmButton.type = 'button';
+
+  buttonsContainer.appendChild(cancelButton);
+  buttonsContainer.appendChild(confirmButton);
+
+  content.appendChild(title);
+  content.appendChild(message);
+  content.appendChild(buttonsContainer);
+  popup.appendChild(content);
+
+  document.body.appendChild(popup);
+
+  return { popup, cancelButton, confirmButton };
+  };
+
+  // Show confirmation popup
+  const showConfirmationPopup = () => {
+  const existingPopup = document.getElementById('dh-confirmation-popup');
+  
+  if (existingPopup) {
+    existingPopup.classList.add('show');
+    return;
+  }
+
+  const { popup, cancelButton, confirmButton } = createConfirmationPopup();
+
+  // Add event listeners
+  cancelButton.addEventListener('click', hideConfirmationPopup);
+  
+  confirmButton.addEventListener('click', () => {
+    hideConfirmationPopup();
+    closeModal();
+  });
+
+  // Also close on backdrop click
+  popup.addEventListener('click', (e) => {
+    if (e.target === popup) {
+      hideConfirmationPopup();
+    }
+  });
+
+  // Show popup
+  popup.classList.add('show');
+
+  // Focus the cancel button by default
+  setTimeout(() => {
+    cancelButton.focus();
+  }, 100);
+  };
+
+  // Hide confirmation popup
+  const hideConfirmationPopup = () => {
+  const popup = document.getElementById('dh-confirmation-popup');
+  if (popup) {
+    popup.classList.remove('show');
+  }
+  };
+
   // Progress bar functionality removed - no longer needed
 
   // Create button for modal trigger
@@ -4509,7 +4927,7 @@
   const button = document.createElement('button');
   button.className = 'dh-widget-button';
   button.id = 'dh-widget-button';
-  button.textContent = config.buttonText;
+  button.textContent = config.buttonText || (widgetState.widgetConfig && widgetState.widgetConfig.welcomeButtonText) || 'Get Started';
   button.type = 'button';
 
   // Add click handler to open modal
@@ -4539,7 +4957,7 @@
   closeButton.className = 'dh-modal-close';
   closeButton.innerHTML = '&times;';
   closeButton.type = 'button';
-  closeButton.addEventListener('click', closeModal);
+  closeButton.addEventListener('click', showConfirmationPopup);
 
   modalContent.appendChild(closeButton);
   modal.appendChild(modalContent);
@@ -4548,7 +4966,7 @@
   if (config.modalCloseOnBackdrop) {
     modal.addEventListener('click', e => {
       if (e.target === modal) {
-        closeModal();
+        showConfirmationPopup();
       }
     });
   }
@@ -4556,7 +4974,13 @@
   // Add ESC key handler
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && modal.style.display !== 'none') {
-      closeModal();
+      // Check if confirmation popup is already showing
+      const confirmationPopup = document.getElementById('dh-confirmation-popup');
+      if (confirmationPopup && confirmationPopup.classList.contains('show')) {
+        hideConfirmationPopup();
+      } else {
+        showConfirmationPopup();
+      }
     }
   });
 
@@ -4585,8 +5009,8 @@
   // Add click handler for close functionality
   closeIcon.addEventListener('click', () => {
     if (config.displayMode === 'button') {
-      // For button mode, close the modal
-      closeModal();
+      // For button mode, show confirmation popup
+      showConfirmationPopup();
     } else {
       // For inline mode, reset to first step or hide widget
       showStep('pest-issue');
@@ -4600,8 +5024,9 @@
   const globalBackButton = document.createElement('button');
   globalBackButton.className = 'dh-global-back-button';
   globalBackButton.id = 'dh-global-back-button';
-  globalBackButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="16" viewBox="0 0 20 16" fill="none">
-  <path fill-rule="evenodd" clip-rule="evenodd" d="M19.0006 7.99993C19.0006 8.41414 18.6648 8.74993 18.2506 8.74993H3.5609L9.03122 14.2193C9.32427 14.5124 9.32427 14.9875 9.03122 15.2806C8.73816 15.5736 8.26302 15.5736 7.96996 15.2806L1.21996 8.53055C1.07913 8.38988 1 8.19899 1 7.99993C1 7.80087 1.07913 7.60998 1.21996 7.4693L7.96996 0.719304C8.26302 0.426248 8.73816 0.426248 9.03122 0.719304C9.32427 1.01236 9.32427 1.4875 9.03122 1.78055L3.5609 7.24993H18.2506C18.6648 7.24993 19.0006 7.58571 19.0006 7.99993Z" fill="#515151" stroke="#515151"/>
+  globalBackButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="none">
+  <path d="M14 27C21.1797 27 27 21.1797 27 14C27 6.8203 21.1797 1 14 1C6.8203 1 1 6.8203 1 14C1 21.1797 6.8203 27 14 27Z" stroke="#B2B2B2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M20 14.0001C20 14.2762 19.7761 14.5001 19.5 14.5001H9.70721L13.354 18.1462C13.5493 18.3416 13.5493 18.6583 13.354 18.8537C13.1586 19.0491 12.8419 19.0491 12.6465 18.8537L8.14664 14.3539C8.05275 14.2601 8 14.1328 8 14.0001C8 13.8674 8.05275 13.7402 8.14664 13.6464L12.6465 9.14652C12.8419 8.95116 13.1586 8.95116 13.354 9.14652C13.5493 9.34189 13.5493 9.65864 13.354 9.854L9.70721 13.5001H19.5C19.7761 13.5001 20 13.724 20 14.0001Z" fill="#515151" stroke="#B2B2B2"/>
   </svg> BACK`;
 
   // Add click handler for global back button
@@ -4684,9 +5109,9 @@
       formWidget.style.overflow = '';
     }
   } else {
-    // Past welcome screen - hide overflow and constrain form
+    // Past welcome screen - keep overflow as set by CSS
     if (modalContent) {
-      modalContent.style.overflow = 'hidden';
+      modalContent.style.overflow = '';
     }
     if (formWidget) {
       formWidget.style.overflow = 'visible';
@@ -4796,7 +5221,6 @@
     'address',
     'confirm-address',
     'how-we-do-it',
-    'offer',
     'quote-contact',
     'plan-comparison',
     'contact',
@@ -4832,10 +5256,6 @@
     }
   }
 
-  // Load plans when reaching plan selection step
-  if (stepName === 'plan-selection') {
-    loadSuggestedPlans();
-  }
 
   // Populate address fields when reaching address step
   if (stepName === 'address') {
@@ -4940,12 +5360,6 @@
     const result = data.results[0];
     const location = result.geometry.location;
 
-    console.log(
-      'Geocoding successful for:',
-      formattedAddress,
-      'Result:',
-      result.formatted_address
-    );
 
     return {
       success: true,
@@ -4974,11 +5388,10 @@
     'address',
     'confirm-address',
     'how-we-do-it',
-    'plans',
-    'contact',
     'quote-contact',
     'plan-comparison',
-    'out-of-service',
+    'contact',
+    'complete',
   ];
   const currentIndex = steps.indexOf(widgetState.currentStep);
 
@@ -5154,7 +5567,6 @@
     setupStepValidation(prevStep);
   } else {
     // First step - close widget or do nothing
-    console.log('Already at first step, cannot go back further');
   }
   };
 
@@ -5546,7 +5958,6 @@
 
   // Function to navigate to detailed quote with proper step tracking
   const navigateToDetailedQuote = () => {
-  console.log('DH Widget: Navigating to detailed quote from:', widgetState.currentStep);
   
   // Navigate to quote-contact step
   showStep('quote-contact');
@@ -5554,7 +5965,6 @@
   
   // Update current step tracking
   widgetState.currentStep = 'quote-contact';
-  console.log('DH Widget: Updated current step to:', widgetState.currentStep);
   
   // Trigger auto-save to persist the step change
   if (typeof triggerProgressSave === 'function') {
@@ -5864,7 +6274,7 @@
   // Handle global back button visibility
   const globalBackButton = document.getElementById('dh-global-back-button');
   if (globalBackButton) {
-    if (stepName === 'pest-issue') {
+    if (stepName === 'pest-issue' || stepName === 'complete') {
       globalBackButton.classList.add('hidden');
     } else {
       globalBackButton.classList.remove('hidden');
@@ -5889,6 +6299,7 @@
 
       if (pestOptions) {
         pestOptions.forEach(option => {
+          option.setAttribute('data-listener-attached', 'true');
           option.addEventListener('click', async e => {
             // Prevent double-clicking if loading overlay is visible
             const pestLoadingEl = document.getElementById('pest-loading');
@@ -5932,12 +6343,6 @@
                 widgetState.formData.selectedPlan = recommendedPlan; // Default to recommended
                 widgetState.formData.offerPrice = recommendedPlan.recurring_price;
                 
-                console.log('DH Widget: Stored recommended plan after pest selection:', {
-                  pestType: pestValue,
-                  planName: recommendedPlan.plan_name,
-                  recurringPrice: recommendedPlan.recurring_price,
-                  initialPrice: recommendedPlan.initial_price
-                });
               }
             } catch (error) {
               console.warn('Error fetching recommended plan for pest selection:', error);
@@ -5947,7 +6352,7 @@
             try {
               const partialSaveResult = await savePartialLead(
                 { served: false, status: 'unknown' }, // Service area unknown until address validated
-                'address' // Step user will navigate to
+                'pest-issue' // Step completed (pest selection)
               );
               if (!partialSaveResult.success) {
                 console.warn(
@@ -5989,6 +6394,126 @@
           });
         });
       }
+
+      // Handle "View All Pests" button
+      const viewAllPestsButton = document.getElementById('view-all-pests-button');
+      if (viewAllPestsButton) {
+        viewAllPestsButton.addEventListener('click', () => {
+          const hiddenPests = document.querySelectorAll('.dh-pest-option-hidden');
+          const pestSelection = document.querySelector('.dh-pest-selection');
+          const viewAllContainer = document.querySelector('.dh-view-all-container');
+          
+          if (hiddenPests.length > 0) {
+            // Fade out the "View All Pests" button first
+            if (viewAllContainer) {
+              viewAllContainer.style.opacity = '0';
+              viewAllContainer.style.transform = 'translateY(-10px)';
+              viewAllContainer.style.transition = 'all 0.3s ease';
+              
+              setTimeout(() => {
+                viewAllContainer.style.display = 'none';
+              }, 300);
+            }
+            
+            // Expand the pest selection container
+            if (pestSelection) {
+              setTimeout(() => {
+                pestSelection.classList.add('expanded');
+              }, 200);
+            }
+            
+            // Animate the newly visible pests with staggered animation
+            hiddenPests.forEach((pest, index) => {
+              setTimeout(() => {
+                pest.classList.remove('dh-pest-option-hidden');
+                pest.classList.add('dh-pest-option-revealing');
+                
+                // Clean up the revealing class after animation completes
+                setTimeout(() => {
+                  pest.classList.remove('dh-pest-option-revealing');
+                }, 400);
+              }, 300 + (index * 80)); // Start after container begins expanding, stagger by 80ms
+            });
+            
+            // Re-attach event listeners to newly visible pest options
+            const newPestOptions = document.querySelectorAll('.dh-pest-option:not([data-listener-attached])');
+            newPestOptions.forEach(option => {
+              option.setAttribute('data-listener-attached', 'true');
+              option.addEventListener('click', async e => {
+                // Prevent double-clicking if loading overlay is visible
+                const pestLoadingEl = document.getElementById('pest-loading');
+                if (pestLoadingEl && pestLoadingEl.style.display === 'flex') return;
+
+                // Remove selected class from all options
+                const allPestOptions = document.querySelectorAll('.dh-pest-option');
+                allPestOptions.forEach(opt => {
+                  opt.classList.remove('selected');
+                });
+
+                // Find the parent pest option element
+                const pestOption = e.target.closest('.dh-pest-option');
+                if (!pestOption) {
+                  console.error('Could not find pest option element');
+                  return;
+                }
+
+                // Add selected class and processing state
+                pestOption.classList.add('selected', 'processing');
+
+                // Get pest type from data attribute
+                const pestType = pestOption.dataset.pest;
+
+                // Store the pest type in form data
+                widgetState.formData.pestType = pestType;
+
+                // Show loading overlay
+                showLoadingOverlay(pestLoadingEl);
+
+                // Save progress immediately with plan data
+                try {
+                  const partialSaveResult = await savePartialLead(
+                    { served: false, status: 'unknown' }, // Service area unknown until address validated
+                    'pest-issue' // Step completed (pest selection)
+                  );
+                  if (!partialSaveResult.success) {
+                    console.warn(
+                      'Failed to save pest selection:',
+                      partialSaveResult.error
+                    );
+                  }
+                } catch (error) {
+                  console.warn('Error saving pest selection:', error);
+                }
+
+                // Update dynamic text in background before step transition
+                try {
+                  // Wait for both content updates AND minimum loading time
+                  await Promise.all([
+                    updateDynamicText(),
+                    createMinimumLoadingTime(1000), // Ensure loading shows for at least 1 second
+                  ]);
+
+                  // Update step completion tracking
+                  const completionStatus =
+                    progressiveFormManager.calculateStepCompletion();
+
+                  // Auto-advance to address validation step
+                  hideLoadingOverlay(pestLoadingEl);
+                  await showStep('address');
+                  setupStepValidation('address');
+                } catch (error) {
+                  console.error('Error updating dynamic content:', error);
+                  // Still advance to next step even if dynamic content fails
+                  hideLoadingOverlay(pestLoadingEl);
+                  await showStep('address');
+                  setupStepValidation('address');
+                }
+              });
+            });
+          }
+        });
+      }
+
       break;
 
     case 'address':
@@ -6016,10 +6541,8 @@
           // Populate form fields when returning to address step
           setTimeout(() => {
             if (!widgetState.isRestoring && typeof window.populateFormFields === 'function') {
-              console.log('DH Widget: Address step calling populateFormFields');
               window.populateFormFields();
             } else if (widgetState.isRestoring) {
-              console.log('DH Widget: Skipping address field population - restoration in progress');
             }
           }, 100);
         }
@@ -6286,21 +6809,11 @@
 
       // Populate all form fields and setup confirm-address step
       setTimeout(() => {
-        console.log('DH Widget: Confirm-address step - populating fields with data:', {
-          addressStreet: widgetState.formData.addressStreet,
-          addressCity: widgetState.formData.addressCity,
-          addressState: widgetState.formData.addressState,
-          addressZip: widgetState.formData.addressZip,
-          address: widgetState.formData.address,
-          isRestoring: widgetState.isRestoring
-        });
         
         // Skip field population if we're in restoration mode (will be handled by session restoration)
         if (!widgetState.isRestoring && typeof window.populateFormFields === 'function') {
-          console.log('DH Widget: Confirm-address step calling populateFormFields');
           window.populateFormFields();
         } else if (widgetState.isRestoring) {
-          console.log('DH Widget: Skipping confirm-address field population - restoration in progress');
         }
 
         // Load address background imagery if available
@@ -6343,16 +6856,19 @@
           continueButton.disabled = true;
           continueButton.style.opacity = '0.5';
           continueButton.style.cursor = 'not-allowed';
+          continueButton.style.backgroundColor = '#9ca3af';
 
           const updateButtonState = () => {
             if (consentCheckbox.checked) {
               continueButton.disabled = false;
               continueButton.style.opacity = '1';
               continueButton.style.cursor = 'pointer';
+              continueButton.style.backgroundColor = '';
             } else {
               continueButton.disabled = true;
               continueButton.style.opacity = '0.5';
               continueButton.style.cursor = 'not-allowed';
+              continueButton.style.backgroundColor = '#9ca3af';
             }
           };
 
@@ -6733,6 +7249,12 @@
           if (widgetState.formData.planComparisonData) {
             suggestions = widgetState.formData.planComparisonData;
           } else {
+            // Guard: Don't call API if no pest is selected
+            if (!widgetState.formData.pestType) {
+              console.warn('Skipping comparison plans: no pest selected yet');
+              return;
+            }
+
             // Show loading state for fallback API call
             if (comparisonPlanLoading) {
               comparisonPlanLoading.style.display = 'block';
@@ -7571,6 +8093,173 @@
   window.setupStepValidation = setupStepValidation;
   window.populateContactFields = populateContactFields;
 
+  // === WIDGET CAPTCHA ===
+  // Minimal state - only what we need
+  let scriptLoaded = false;
+  let scriptLoadPromise = null;
+  let siteKey = null;
+  let widgetId = null;
+  let isExecuting = false;
+
+  function loadScriptOnce() {
+    console.log('Turnstile: loadScriptOnce called, scriptLoaded:', scriptLoaded);
+    if (scriptLoaded) return Promise.resolve();
+    if (scriptLoadPromise) return scriptLoadPromise;
+
+    console.log('Turnstile: Loading script from Cloudflare...');
+    scriptLoadPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        console.log('Turnstile: Script loaded successfully');
+        scriptLoaded = true;
+        resolve();
+      };
+      script.onerror = () => {
+        console.error('Turnstile: Failed to load script');
+        reject(new Error('Failed to load Turnstile script'));
+      };
+      document.head.appendChild(script);
+      console.log('Turnstile: Script element added to head');
+    });
+
+    return scriptLoadPromise;
+  }
+
+  function ensureContainer() {
+    console.log('Turnstile: ensureContainer called');
+    let el = document.getElementById('dh-turnstile-container');
+    if (!el) {
+      console.log('Turnstile: Creating container element');
+      el = document.createElement('div');
+      el.id = 'dh-turnstile-container';
+      el.style.cssText = 'position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden;';
+      document.body.appendChild(el);
+      console.log('Turnstile: Container added to DOM');
+    } else {
+      console.log('Turnstile: Container already exists');
+    }
+    return el;
+  }
+
+  async function renderWidget() {
+    console.log('Turnstile: renderWidget called with siteKey:', siteKey?.substring(0, 20) + '...');
+    await loadScriptOnce();
+    const container = ensureContainer();
+    
+    if (widgetId) {
+      console.log('Turnstile: Widget already exists, returning existing ID:', widgetId);
+      return widgetId;
+    }
+    
+    if (!window.turnstile || typeof window.turnstile.render !== 'function') {
+      console.error('Turnstile: window.turnstile not available or render function missing');
+      throw new Error('Turnstile not available');
+    }
+    
+    console.log('Turnstile: Rendering widget...');
+    widgetId = window.turnstile.render(container, {
+      sitekey: siteKey,
+      size: 'invisible',
+      retry: 'auto',
+      'error-callback': () => {
+        console.error('Turnstile: Widget error callback triggered');
+      },
+    });
+    
+    console.log('Turnstile: Widget rendered with ID:', widgetId);
+    return widgetId;
+  }
+
+  async function getToken() {
+    console.log('Turnstile: getToken called, isExecuting:', isExecuting);
+    
+    // Prevent multiple simultaneous executions
+    if (isExecuting) {
+      console.log('Turnstile: Already executing, rejecting duplicate call');
+      throw new Error('Turnstile already executing');
+    }
+    
+    if (!siteKey) {
+      throw new Error('Captcha not initialized');
+    }
+    
+    isExecuting = true;
+    
+    try {
+      // Widget should already be rendered from init
+      if (!widgetId) {
+        throw new Error('Widget not initialized - call dhCaptcha.init() first');
+      }
+      
+      // Execute pre-rendered widget immediately
+      console.log('Turnstile: Executing pre-rendered widget for token');
+      window.turnstile.execute(widgetId, { async: true });
+      
+      // Poll for token
+      return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 30; // 15 seconds max
+        
+        const checkForToken = () => {
+          attempts++;
+          try {
+            const token = window.turnstile.getResponse(widgetId);
+            if (token) {
+              console.log('Turnstile: Token received via polling');
+              isExecuting = false;
+              resolve(token);
+              return;
+            }
+          } catch (e) {
+            // getResponse may not be available, continue polling
+          }
+          
+          if (attempts >= maxAttempts) {
+            console.error('Turnstile: Token timeout after', attempts, 'attempts');
+            isExecuting = false;
+            reject(new Error('Turnstile token timeout'));
+            return;
+          }
+          
+          setTimeout(checkForToken, 500);
+        };
+        
+        // Start polling after brief delay
+        setTimeout(checkForToken, 500);
+      });
+      
+    } catch (error) {
+      isExecuting = false;
+      throw error;
+    }
+  }
+
+  window.dhCaptcha = {
+    init: async (provider, inputSiteKey) => {
+      console.log('Turnstile: dhCaptcha.init called with provider:', provider, 'siteKey:', inputSiteKey?.substring(0, 20) + '...');
+      
+      if (provider !== 'turnstile' || !inputSiteKey) {
+        console.log('Turnstile: Not initializing - provider:', provider, 'siteKey present:', !!inputSiteKey);
+        return;
+      }
+      
+      siteKey = inputSiteKey;
+      console.log('Turnstile: Initializing with siteKey...');
+      
+      try {
+        await loadScriptOnce(); // Load script first
+        await renderWidget(); // Pre-render widget for instant execution
+        console.log('Turnstile: Initialization complete (widget pre-rendered)');
+      } catch (error) {
+        console.error('Turnstile: Init failed:', error);
+      }
+    },
+    getToken,
+  };
+
   // === WIDGET FORMS ===
   // Create form steps
   const createFormSteps = () => {
@@ -7582,42 +8271,70 @@
     pestStep.id = 'dh-step-pest-issue';
 
     // Generate pest options dynamically from config
-    const pestOptionsHtml =
-      widgetState.widgetConfig?.pestOptions &&
-      widgetState.widgetConfig.pestOptions.length > 0
-        ? widgetState.widgetConfig.pestOptions
-            .map(
-              pest => `
+    let pestOptionsHtml = '';
+    let viewAllButtonHtml = '';
+    
+    if (widgetState.widgetConfig?.pestOptions && widgetState.widgetConfig.pestOptions.length > 0) {
+      const pestOptions = widgetState.widgetConfig.pestOptions;
+      const initialPests = pestOptions.slice(0, 8);
+      const additionalPests = pestOptions.slice(8);
+      
+      // Generate initial 8 pests (always visible)
+      pestOptionsHtml = initialPests
+        .map(
+          pest => `
           <div class="dh-pest-option" data-pest="${pest.value}" data-category="${pest.category}">
             <div class="dh-pest-icon">${pest.icon}</div>
             <div class="dh-pest-label">${pest.label}</div>
           </div>
         `
-            )
-            .join('')
-        : `
-        <div class="dh-pest-option" data-pest="ants">
-          <div class="dh-pest-label">Ants</div>
+        )
+        .join('');
+      
+      // Generate additional pests (initially hidden)
+      if (additionalPests.length > 0) {
+        pestOptionsHtml += additionalPests
+          .map(
+            pest => `
+          <div class="dh-pest-option dh-pest-option-hidden" data-pest="${pest.value}" data-category="${pest.category}">
+            <div class="dh-pest-icon">${pest.icon}</div>
+            <div class="dh-pest-label">${pest.label}</div>
+          </div>
+        `
+          )
+          .join('');
+        
+        // Add "View All Pests" button
+        viewAllButtonHtml = `
+          <div class="dh-view-all-container">
+            <button type="button" class="dh-form-btn dh-form-btn-secondary" id="view-all-pests-button">
+              View All Pests <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        `;
+      }
+    } else {
+      // Default pest options (fallback)
+      const defaultPests = [
+        { value: 'ants', label: 'Ants' },
+        { value: 'spiders', label: 'Spiders' },
+        { value: 'cockroaches', label: 'Cockroaches' },
+        { value: 'rodents', label: 'Rodents (mice &amp; rats)' },
+        { value: 'termites', label: 'Termites' },
+        { value: 'wasps', label: 'Wasps' },
+        { value: 'others', label: 'Others (earwigs, boxelders, ect.)' }
+      ];
+      
+      pestOptionsHtml = defaultPests
+        .map(
+          pest => `
+        <div class="dh-pest-option" data-pest="${pest.value}">
+          <div class="dh-pest-label">${pest.label}</div>
         </div>
-        <div class="dh-pest-option" data-pest="spiders">
-          <div class="dh-pest-label">Spiders</div>
-        </div>
-        <div class="dh-pest-option" data-pest="cockroaches">
-          <div class="dh-pest-label">Cockroaches</div>
-        </div>
-        <div class="dh-pest-option" data-pest="rodents">
-          <div class="dh-pest-label">Rodents (mice &amp; rats)</div>
-        </div>
-        <div class="dh-pest-option" data-pest="termites">
-          <div class="dh-pest-label">Termites</div>
-        </div>
-        <div class="dh-pest-option" data-pest="wasps">
-          <div class="dh-pest-label">Wasps</div>
-        </div>
-        <div class="dh-pest-option" data-pest="others">
-          <div class="dh-pest-label">Others (earwigs, boxelders, ect.)</div>
-        </div>
-      `;
+      `
+        )
+        .join('');
+    }
 
     pestStep.innerHTML = `
     <div class="dh-pest-step-container">
@@ -7642,6 +8359,9 @@
           ${pestOptionsHtml}
         </div>
         
+        <!-- View All Pests Button -->
+        ${viewAllButtonHtml}
+        
         <!-- Loading State -->
         <div class="dh-pest-loading" id="pest-loading" style="display: none;">
           <div class="dh-loading-spinner"></div>
@@ -7659,26 +8379,8 @@
   `;
     steps.push(pestStep);
 
-    // Step 3: Plan Selection
-    const planSelectionStep = document.createElement('div');
-    planSelectionStep.className = 'dh-form-step';
-    planSelectionStep.id = 'dh-step-plan-selection';
-    planSelectionStep.innerHTML = `
-    <div class="dh-form-step-content">
-  <h3>Choose your protection plan</h3>
-  <p class="dh-step-instruction">Based on your pest issue, here are our recommended plans</p>
-  <div class="dh-plan-loading" id="plan-loading">
-    <div class="dh-loading-spinner"></div>
-    <p>Finding the best plans for your needs...</p>
-  </div>
-  <div class="dh-plan-selection" id="plan-selection" style="display: none;">
-    <!-- Plans will be populated dynamically -->
-  </div>
-  </div>
-  `;
-    steps.push(planSelectionStep);
 
-    // Step 4: Address
+    // Step 2: Address
     const addressPestIcon = getPestIcon();
     const addressStep = document.createElement('div');
     addressStep.className = 'dh-form-step';
@@ -7775,7 +8477,7 @@
   `;
     steps.push(addressStep);
 
-    // Step 4: Confirm Address
+    // Step 3: Confirm Address
     const confirmAddressStep = document.createElement('div');
     confirmAddressStep.className = 'dh-form-step';
     confirmAddressStep.id = 'dh-step-confirm-address';
@@ -7843,7 +8545,7 @@
   `;
     steps.push(confirmAddressStep);
 
-    // Step 5: Initial Offer
+    // Step 4: How We Do It
     const initialOfferStep = document.createElement('div');
     initialOfferStep.className = 'dh-form-step';
     initialOfferStep.id = 'dh-step-how-we-do-it';
@@ -7897,7 +8599,7 @@
   `;
     steps.push(initialOfferStep);
 
-    // Step 6: Contact Info (Schedule Service Form)
+    // Step 7: Contact Info (Schedule Service Form)
     const contactStep = document.createElement('div');
     contactStep.className = 'dh-form-step';
     contactStep.id = 'dh-step-contact';
@@ -7982,7 +8684,7 @@
   `;
     steps.push(contactStep);
 
-    // Step 7: Quote Contact (Simple form for quote path)
+    // Step 5: Quote Contact (Simple form for quote path)
     const quoteContactStep = document.createElement('div');
     quoteContactStep.className = 'dh-form-step';
     quoteContactStep.id = 'dh-step-quote-contact';
@@ -8033,9 +8735,6 @@
             <label class="dh-floating-label" for="quote-phone-input" data-default-text="(888) 888-8888" data-focused-text="Cell Phone Number">Cell Phone Number</label>
           </div>
         </div>
-        <div class="dh-quote-loading" id="quote-loading" style="display: none;">
-          <div class="dh-loading-spinner"></div>
-        </div>
         
         <div class="dh-form-button-group">
           <button class="dh-form-btn dh-form-btn-secondary" onclick="proceedToQuoteWithValidation()" id="quote-contact-submit">See Your Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -8053,7 +8752,7 @@
     `;
     steps.push(quoteContactStep);
 
-    // Step 8: Plan Comparison (for detailed quote path)
+    // Step 6: Plan Comparison (for detailed quote path)
     const planComparisonStep = document.createElement('div');
     planComparisonStep.className = 'dh-form-step';
     planComparisonStep.id = 'dh-step-plan-comparison';
@@ -8130,7 +8829,7 @@
     `;
     steps.push(planComparisonStep);
 
-    // Step 9: Out of Service Area
+    // Step 8: Complete (Thank You)
     const outOfServiceStep = document.createElement('div');
     outOfServiceStep.className = 'dh-form-step';
     outOfServiceStep.id = 'dh-step-out-of-service';
@@ -8212,7 +8911,7 @@
     `;
     steps.push(exitSurveyStep);
 
-    // Step 10: Complete (Thank You)
+    // Alternative: Out of Service Area
     const completeStep = document.createElement('div');
     completeStep.className = 'dh-form-step';
     completeStep.id = 'dh-step-complete';
@@ -8260,7 +8959,7 @@
     `;
     steps.push(completeStep);
 
-    // Step 11: Decline Complete (for exit survey submissions)
+    // Alternative: Exit Survey & Decline Complete
     const declineCompleteStep = document.createElement('div');
     declineCompleteStep.className = 'dh-form-step';
     declineCompleteStep.id = 'dh-step-decline-complete';
@@ -8338,6 +9037,39 @@
     };
 
     try {
+      // Acquire captcha token if configured
+      try {
+        const cfg = widgetState.widgetConfig && widgetState.widgetConfig.captcha;
+        if (cfg && cfg.provider === 'turnstile' && cfg.siteKey) {
+          // Update button to show verification step
+          const submitBtn = document.getElementById('contact-submit');
+          if (submitBtn) {
+            submitBtn.innerHTML = 'Verifying... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          }
+          
+          // Ensure captcha initialized
+          if (window.dhCaptcha && typeof window.dhCaptcha.init === 'function') {
+            await window.dhCaptcha.init('turnstile', cfg.siteKey);
+          }
+          const token = window.dhCaptcha && typeof window.dhCaptcha.getToken === 'function'
+            ? await window.dhCaptcha.getToken()
+            : null;
+          
+          // Update button to show submitting
+          if (submitBtn) {
+            submitBtn.innerHTML = 'Submitting... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          }
+          
+          formData.captcha = {
+            provider: 'turnstile',
+            token: token || '',
+            action: 'widget_submit',
+          };
+        }
+      } catch (captchaError) {
+        console.warn('DH Widget: Captcha token acquisition failed', captchaError);
+      }
+
       // Submit to API
       const response = await fetch(config.baseUrl + '/api/widget/submit', {
         method: 'POST',
@@ -8466,6 +9198,12 @@
   // Fetch plan comparison data for selected pest
   const fetchPlanComparisonData = async () => {
     try {
+      // Guard: Don't call API if no pest is selected
+      if (!widgetState.formData.pestType) {
+        console.warn('Skipping plan comparison: no pest selected yet');
+        return { plans: [] };
+      }
+
       const requestBody = {
         companyId: config.companyId,
         selectedPests: [widgetState.formData.pestType],
@@ -8516,172 +9254,6 @@
   };
 
 
-  // Load suggested plans based on selected pest
-  const loadSuggestedPlans = async () => {
-    const planLoadingEl = document.getElementById('plan-loading');
-    const planSelectionEl = document.getElementById('plan-selection');
-
-    // Show loading state
-    if (planLoadingEl) planLoadingEl.style.display = 'block';
-    if (planSelectionEl) planSelectionEl.style.display = 'none';
-
-    try {
-      // Get selected pest from form data
-      const selectedPest = widgetState.formData.pestType;
-      if (!selectedPest) {
-        throw new Error('No pest selected');
-      }
-
-      // Call suggested plans API
-      const response = await fetch(
-        config.baseUrl + '/api/widget/suggested-plans',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            companyId: config.companyId,
-            selectedPests: [selectedPest],
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch suggested plans');
-      }
-
-      const data = await response.json();
-
-      if (!data.success || !data.suggestions) {
-        throw new Error('Invalid response from plans API');
-      }
-
-      // Render plans
-      renderSuggestedPlans(data.suggestions);
-
-      // Hide loading, show plans
-      if (planLoadingEl) planLoadingEl.style.display = 'none';
-      if (planSelectionEl) planSelectionEl.style.display = 'block';
-    } catch (error) {
-      console.error('Error loading suggested plans:', error);
-
-      // Hide loading and show error state
-      if (planLoadingEl) planLoadingEl.style.display = 'none';
-      if (planSelectionEl) {
-        planSelectionEl.style.display = 'block';
-        planSelectionEl.innerHTML = `
-          <div class="dh-error-state">
-            <p>Unable to load service plans at this time.</p>
-            <p>Please continue to the next step.</p>
-          </div>
-        `;
-      }
-    }
-  };
-
-  // Render suggested plans in the UI
-  const renderSuggestedPlans = plans => {
-    const planSelectionEl = document.getElementById('plan-selection');
-    if (!planSelectionEl) return;
-
-    if (plans.length === 0) {
-      planSelectionEl.innerHTML = `
-        <div class="dh-no-plans">
-          <p>No service plans are currently available.</p>
-          <p>Please contact us directly for assistance.</p>
-        </div>
-      `;
-      return;
-    }
-
-    const plansHtml = plans
-      .map(plan => {
-        const coverageClass =
-          plan.coverage_match.coverage_percentage === 100
-            ? 'full-coverage'
-            : 'partial-coverage';
-        const badgeHtml = plan.highlight_badge
-          ? `<div class="dh-plan-badge">${plan.highlight_badge}</div>`
-          : '';
-        const featuresHtml = plan.plan_features
-          .slice(0, 4)
-          .map(feature => `<li class="dh-plan-feature">${feature}</li>`)
-          .join('');
-
-        return `
-        <div class="dh-plan-card" data-plan-id="${plan.id}" onclick="selectPlan('${plan.id}', '${plan.plan_name}')">
-          <div class="dh-coverage-indicator ${coverageClass}">
-            ${plan.coverage_match.coverage_percentage}% match
-          </div>
-          <div class="dh-plan-header">
-            <h4 class="dh-plan-title">${plan.plan_name}</h4>
-            ${badgeHtml}
-          </div>
-          <div class="dh-plan-price">
-            <span class="dh-plan-price-main">$${plan.recurring_price}</span>
-            <span class="dh-plan-price-frequency">${formatBillingFrequency(plan.billing_frequency)}</span>
-          </div>
-          <p class="dh-plan-description">${plan.plan_description || ''}</p>
-          <ul class="dh-plan-features">
-            ${featuresHtml}
-          </ul>
-        </div>
-      `;
-      })
-      .join('');
-
-    planSelectionEl.innerHTML = plansHtml;
-  };
-
-  // Select a plan and proceed to next step
-  window.selectPlan = (planId, planName) => {
-    // Find the full plan object from available plan data
-    let fullPlan = null;
-    
-    // Try to find plan from plan comparison data
-    if (window.comparisonPlansData) {
-      fullPlan = window.comparisonPlansData.find(plan => plan.id === planId);
-    }
-    
-    // Fallback: try from suggestions in widget state
-    if (!fullPlan && widgetState.planComparisonData?.suggestions) {
-      fullPlan = widgetState.planComparisonData.suggestions.find(plan => plan.id === planId);
-    }
-    
-    // Save selected plan to form data (prefer full plan object, fallback to basic structure)
-    widgetState.formData.selectedPlan = fullPlan || {
-      id: planId,
-      plan_name: planName, // Use plan_name to match backend expectations
-    };
-
-    // Visual feedback
-    document.querySelectorAll('.dh-plan-card').forEach(card => {
-      card.classList.remove('selected', 'processing');
-    });
-
-    const selectedCard = document.querySelector(
-      `[data-plan-id="${planId}"]`
-    );
-    if (selectedCard) {
-      selectedCard.classList.add('processing');
-    }
-
-    // Save partial lead with plan selection
-    try {
-      savePartialLead(null, 'contact'); // Step user will navigate to
-    } catch (error) {
-      console.error('Error saving plan selection:', error);
-    }
-
-    // Navigate directly to contact step for scheduling after brief delay
-    setTimeout(() => {
-      // Set flow identifier to track that user came from plan comparison
-      widgetState.formData.offerChoice = 'schedule-from-comparison';
-      showStep('contact');
-      setupStepValidation('contact');
-    }, 500);
-  };
 
   // Helper function to format billing frequency to natural language (abbreviated)
   const formatBillingFrequency = (frequency) => {
@@ -8901,8 +9473,46 @@
 
   // Apply cached configuration without API call
   const applyCachedConfig = cachedConfig => {
-    // Configuration applied - this function can be expanded if needed
-    // For now, just ensure the config is loaded into widgetState
+    // Merge server config with client overrides
+    if (cachedConfig) {
+      // Override server defaults with client-provided attributes (if any)
+      const mergedConfig = { ...cachedConfig };
+      
+      // Client overrides take precedence over server defaults
+      if (config.primaryColor && cachedConfig.colors) {
+        mergedConfig.colors.primary = config.primaryColor;
+      }
+      if (config.secondaryColor && cachedConfig.colors) {
+        mergedConfig.colors.secondary = config.secondaryColor;
+      }
+      if (config.backgroundColor && cachedConfig.colors) {
+        mergedConfig.colors.background = config.backgroundColor;
+      }
+      if (config.textColor && cachedConfig.colors) {
+        mergedConfig.colors.text = config.textColor;
+      }
+      if (config.buttonText) {
+        mergedConfig.submitButtonText = config.buttonText;
+        mergedConfig.welcomeButtonText = config.buttonText;
+      }
+      if (config.headerText && cachedConfig.headers) {
+        mergedConfig.headers.headerText = config.headerText;
+      }
+      if (config.subHeaderText && cachedConfig.headers) {
+        mergedConfig.headers.subHeaderText = config.subHeaderText;
+      }
+      
+      // Update the widget state with merged config
+      widgetState.widgetConfig = mergedConfig;
+    }
+    
+    // Initialize captcha early if configured
+    try {
+      const cfg = cachedConfig && cachedConfig.captcha;
+      if (cfg && cfg.provider === 'turnstile' && cfg.siteKey && window.dhCaptcha && typeof window.dhCaptcha.init === 'function') {
+        window.dhCaptcha.init('turnstile', cfg.siteKey);
+      }
+    } catch (_) {}
   };
 
   // Load widget configuration
@@ -8917,12 +9527,20 @@
         return true;
       }
 
-      const url = config.baseUrl + '/api/widget/config/' + config.companyId;
+      // Use domain-based lookup if no company ID provided
+      const url = config.companyId 
+        ? config.baseUrl + '/api/widget/config/' + config.companyId
+        : config.baseUrl + '/api/widget/config';
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.success) {
         widgetState.widgetConfig = data.config;
+        
+        // Bootstrap company ID from domain-based config if not already set
+        if (!config.companyId && data.config.companyId) {
+          config.companyId = data.config.companyId;
+        }
 
         // Cache the configuration for future use
         setCachedConfig(data.config);
@@ -8950,7 +9568,6 @@
     const quoteLastNameInput = document.getElementById('quote-last-name-input');
     const quoteEmailInput = document.getElementById('quote-email-input');
     const quotePhoneInput = document.getElementById('quote-phone-input');
-    const quoteLoadingEl = document.getElementById('quote-loading');
 
     // Clear existing errors
     [
@@ -9030,9 +9647,13 @@
     }
 
     try {
-      // Show loading state
-      if (quoteLoadingEl) {
-        quoteLoadingEl.style.display = 'flex';
+      
+      // Update button to loading state
+      const submitBtn = document.getElementById('quote-contact-submit');
+      if (submitBtn) {
+        submitBtn.innerHTML = 'Loading... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        submitBtn.classList.add('submitting');
+        submitBtn.disabled = true;
       }
 
       // Store quote contact information
@@ -9071,19 +9692,28 @@
         console.warn('Error saving contact information:', error);
       }
 
-      // Hide loading overlay after everything is complete
+      // Reset button state after everything is complete
       setTimeout(() => {
-        if (quoteLoadingEl) {
-          quoteLoadingEl.style.display = 'none';
+        
+        // Reset button state (though user won't see this since we navigated away)
+        const submitBtn = document.getElementById('quote-contact-submit');
+        if (submitBtn) {
+          submitBtn.innerHTML = 'See Your Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          submitBtn.classList.remove('submitting');
+          submitBtn.disabled = false;
         }
       }, 100); // Brief delay to ensure step transition is visible
       
     } catch (error) {
       console.error('Error during quote processing:', error);
       
-      // Hide loading on error and fallback to plan comparison step anyway
-      if (quoteLoadingEl) {
-        quoteLoadingEl.style.display = 'none';
+      
+      // Reset button state on error
+      const submitBtn = document.getElementById('quote-contact-submit');
+      if (submitBtn) {
+        submitBtn.innerHTML = 'See Your Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        submitBtn.classList.remove('submitting');
+        submitBtn.disabled = false;
       }
       
       // Fallback: proceed to plan comparison even if data fetch failed
@@ -9097,6 +9727,12 @@
   const fetchPricingData = async () => {
     
     try {
+      // Guard: Don't call API if no pest is selected
+      if (!widgetState.formData.pestType) {
+        console.warn('Skipping pricing data: no pest selected yet');
+        return { plans: [] };
+      }
+
       const requestBody = {
         companyId: config.companyId,
         selectedPests: [widgetState.formData.pestType],
@@ -9136,6 +9772,12 @@
   // Get the cheapest plan with full coverage for the selected pest
   const getCheapestFullCoveragePlan = async () => {
     try {
+      // Guard: Don't call API if no pest is selected
+      if (!widgetState.formData.pestType) {
+        console.warn('Skipping cheapest plan lookup: no pest selected yet');
+        return null;
+      }
+
       const requestBody = {
         companyId: config.companyId,
         selectedPests: [widgetState.formData.pestType],
@@ -9232,34 +9874,26 @@
 
   // === CONFIGURATION AND INITIALIZATION ===
   const config = {
-    companyId: scriptTag.getAttribute('data-company-id'),
-    baseUrl: scriptTag.getAttribute('data-base-url'),
+    // Optional: Legacy support for company-id
+    companyId: scriptTag.getAttribute('data-company-id'), // Will be null for domain-based lookup
+    baseUrl: baseUrl,
     containerId: scriptTag.getAttribute('data-container-id'),
-    displayMode: scriptTag.getAttribute('data-display-mode') || 'inline',
-    primaryColor: scriptTag.getAttribute('data-primary-color') || '#007bff',
-    secondaryColor: scriptTag.getAttribute('data-secondary-color') || '#6c757d',
-    backgroundColor: scriptTag.getAttribute('data-background-color') || '#ffffff',
-    textColor: scriptTag.getAttribute('data-text-color') || '#333333',
-    buttonText: scriptTag.getAttribute('data-button-text') || 'Get Started',
-    headerText: scriptTag.getAttribute('data-header-text'),
-    subHeaderText: scriptTag.getAttribute('data-sub-header-text'),
+    displayMode: scriptTag.getAttribute('data-display-mode') || 'button', // Default to button mode
+    primaryColor: scriptTag.getAttribute('data-primary-color'), // Let server provide defaults
+    secondaryColor: scriptTag.getAttribute('data-secondary-color'), // Let server provide defaults
+    backgroundColor: scriptTag.getAttribute('data-background-color'), // Let server provide defaults
+    textColor: scriptTag.getAttribute('data-text-color'), // Let server provide defaults
+    buttonText: scriptTag.getAttribute('data-button-text'), // Let server provide defaults
+    headerText: scriptTag.getAttribute('data-header-text'), // Let server provide defaults
+    subHeaderText: scriptTag.getAttribute('data-sub-header-text'), // Let server provide defaults
     modalCloseOnBackdrop: scriptTag.getAttribute('data-modal-close-on-backdrop') !== 'false',
   };
 
-  // Validate required configuration
-  if (!config.companyId) {
-    showErrorState(
-      'Configuration Error',
-      'Missing required attribute: data-company-id',
-      'Please add data-company-id="your-company-id" to the script tag'
-    );
-    return;
-  }
-
+  // Validate that we have a base URL (should always be auto-detected)
   if (!config.baseUrl) {
     showErrorState(
       'Configuration Error',
-      'Missing required attribute: data-base-url',
+      'Could not determine base URL',
       'Please add data-base-url="https://your-domain.com" to the script tag'
     );
     return;
@@ -9852,9 +10486,11 @@
           const currentStepName = stepNames[savedData.currentStep] || 'your information';
           const timeAgo = getTimeAgo(new Date(savedData.timestamp));
           
+          const primaryColor = (widgetState.widgetConfig && widgetState.widgetConfig.colors && widgetState.widgetConfig.colors.primary) || '#3b82f6';
+          
           modal.innerHTML = `
             <div style="margin-bottom: 24px;">
-              <div style="width: 64px; height: 64px; background: ${config.primaryColor}; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+              <div style="width: 64px; height: 64px; background: ${primaryColor}; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                   <path d="M9 11l3 3l8-8"></path>
                   <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9s4.03-9 9-9c1.51 0 2.93 0.37 4.18 1.03"></path>
@@ -9868,7 +10504,7 @@
             
             <div style="display: flex; gap: 12px; flex-direction: column;">
               <button id="continue-btn" style="
-                background: ${config.primaryColor};
+                background: ${primaryColor};
                 color: white;
                 border: none;
                 border-radius: 12px;
@@ -10220,12 +10856,8 @@
       }
       
       // Update fonts after config is loaded
-      console.log('DEBUG: Widget config fonts:', widgetState.widgetConfig?.fonts);
       if (widgetState.widgetConfig && widgetState.widgetConfig.fonts) {
-        console.log('DEBUG: Calling updateWidgetFonts with:', widgetState.widgetConfig.fonts);
         updateWidgetFonts();
-      } else {
-        console.log('DEBUG: No font config found, using default');
       }
       
       // Create the widget elements
@@ -10409,7 +11041,6 @@
         // No saved progress or not significant, initialize normally
         if (config.displayMode !== 'button') {
           setTimeout(() => {
-            console.log('DEBUG: Initializing first step (inline mode)');
             progressiveFormManager.startAutoSave();
             showStep('pest-issue');
             setupStepValidation('pest-issue');

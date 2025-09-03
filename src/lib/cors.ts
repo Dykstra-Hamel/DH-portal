@@ -31,10 +31,10 @@ const BASE_WIDGET_ORIGINS = [
   process.env.NEXT_PUBLIC_SITE_URL,
 ].filter(Boolean) as string[];
 
-// Removed caching for immediate updates when domains are added/removed
+// Widget domains are now managed through the widget_domains table with company associations
 
 /**
- * Get global whitelisted domains from environment variable or database
+ * Get global whitelisted domains from environment variable as fallback
  */
 function getGlobalWhitelistedDomains(): string[] {
   // Try environment variable first (comma-separated list)
@@ -48,56 +48,31 @@ function getGlobalWhitelistedDomains(): string[] {
 }
 
 /**
- * Ensure the widget_allowed_domains setting exists in the database
- */
-async function ensureWidgetDomainsSettingExists(supabase: any): Promise<void> {
-  try {
-    // Try to insert the setting if it doesn't exist
-    await supabase
-      .from('system_settings')
-      .upsert({
-        key: 'widget_allowed_domains',
-        value: [],
-        description: 'Global whitelist of domains allowed to embed widgets. Any domain in this list can embed widgets for any company.'
-      }, {
-        onConflict: 'key',
-        ignoreDuplicates: true
-      });
-  } catch (error) {
-    console.error('Failed to ensure widget domains setting exists:', error);
-  }
-}
-
-/**
- * Get allowed widget origins (base + global whitelist)
+ * Get allowed widget origins (base + all active widget domains)
  */
 async function getWidgetOrigins(): Promise<string[]> {
   try {
-    // Get from database settings (no caching for immediate updates)
+    // Get from new widget_domains table
     const supabase = createAdminClient();
     
-    // Ensure the setting exists first
-    await ensureWidgetDomainsSettingExists(supabase);
-    
-    const { data: settings, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'widget_allowed_domains')
-      .single();
+    const { data: domains, error } = await supabase
+      .from('widget_domains')
+      .select('domain')
+      .eq('is_active', true);
 
-    let globalDomains: string[] = [];
+    let widgetDomains: string[] = [];
     
-    if (!error && settings?.value) {
-      const domains = Array.isArray(settings.value) ? settings.value : JSON.parse(settings.value);
-      globalDomains = domains.filter(Boolean);
+    if (!error && domains) {
+      widgetDomains = domains.map(d => d.domain).filter(Boolean);
     } else {
+      console.error('Failed to fetch widget domains:', error);
       // Fall back to environment variable
-      globalDomains = getGlobalWhitelistedDomains();
+      widgetDomains = getGlobalWhitelistedDomains();
     }
 
-    return [...BASE_WIDGET_ORIGINS, ...globalDomains];
+    return [...BASE_WIDGET_ORIGINS, ...widgetDomains];
   } catch (error) {
-    console.error('Failed to fetch global widget domains:', error);
+    console.error('Failed to fetch widget domains:', error);
     // Fall back to environment variable only
     return [...BASE_WIDGET_ORIGINS, ...getGlobalWhitelistedDomains()];
   }
