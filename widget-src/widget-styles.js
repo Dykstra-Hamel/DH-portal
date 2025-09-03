@@ -273,6 +273,10 @@ img {
     border-bottom: none;
   }
 
+  button:focus {
+  outline: none !important;
+  }
+
 /* ===================================================================
    STEP-SPECIFIC STYLING
    =================================================================== */
@@ -429,6 +433,7 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
 
 #subspecies-heading {
   margin-bottom: 15px;
+  font-size: 16px;
 }
 
 .dh-subspecies-grid {
@@ -3007,6 +3012,7 @@ line-height: 28px;
 
 .dh-plan-visual {
   height: 100%;
+  max-height: 272px;
   /* Image on the right side */
 }
 
