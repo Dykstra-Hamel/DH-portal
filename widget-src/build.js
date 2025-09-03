@@ -20,6 +20,7 @@ const SOURCE_FILES = [
   'widget-styles.js',   // CSS injection and styling
   'widget-ui.js',       // UI components  
   'widget-logic.js',    // Logic and validation
+  'widget-captcha.js',  // Captcha loader and token helper
   'widget-forms.js',    // Form creation and management
   'widget-api.js',      // API communication and form submission
   'embed-main.js'       // Main entry point and configuration (must come last)

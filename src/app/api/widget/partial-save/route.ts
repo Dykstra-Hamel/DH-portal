@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate coordinate data - only required for steps after address entry
-    const requiresCoordinates = !['pest_issue_completed', 'urgency_completed'].includes(stepCompleted);
+    // Validate coordinate data - only required for steps that have location data
+    const requiresCoordinates = ['address', 'confirm-address'].includes(stepCompleted);
     if (requiresCoordinates && (typeof formData.latitude !== 'number' || typeof formData.longitude !== 'number')) {
       return createCorsErrorResponse(
         'Invalid coordinate data: latitude and longitude must be numbers for this step',

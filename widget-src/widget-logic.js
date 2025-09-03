@@ -102,7 +102,6 @@ const showStep = async stepName => {
     'address',
     'confirm-address',
     'how-we-do-it',
-    'offer',
     'quote-contact',
     'plan-comparison',
     'contact',
@@ -138,10 +137,6 @@ const showStep = async stepName => {
     }
   }
 
-  // Load plans when reaching plan selection step
-  if (stepName === 'plan-selection') {
-    loadSuggestedPlans();
-  }
 
   // Populate address fields when reaching address step
   if (stepName === 'address') {
@@ -246,12 +241,6 @@ const geocodeAddress = async addressComponents => {
     const result = data.results[0];
     const location = result.geometry.location;
 
-    console.log(
-      'Geocoding successful for:',
-      formattedAddress,
-      'Result:',
-      result.formatted_address
-    );
 
     return {
       success: true,
@@ -280,11 +269,10 @@ const nextStep = async () => {
     'address',
     'confirm-address',
     'how-we-do-it',
-    'plans',
-    'contact',
     'quote-contact',
     'plan-comparison',
-    'out-of-service',
+    'contact',
+    'complete',
   ];
   const currentIndex = steps.indexOf(widgetState.currentStep);
 
@@ -460,7 +448,6 @@ const previousStep = () => {
     setupStepValidation(prevStep);
   } else {
     // First step - close widget or do nothing
-    console.log('Already at first step, cannot go back further');
   }
 };
 
@@ -852,7 +839,6 @@ if (document.readyState === 'loading') {
 
 // Function to navigate to detailed quote with proper step tracking
 const navigateToDetailedQuote = () => {
-  console.log('DH Widget: Navigating to detailed quote from:', widgetState.currentStep);
   
   // Navigate to quote-contact step
   showStep('quote-contact');
@@ -860,7 +846,6 @@ const navigateToDetailedQuote = () => {
   
   // Update current step tracking
   widgetState.currentStep = 'quote-contact';
-  console.log('DH Widget: Updated current step to:', widgetState.currentStep);
   
   // Trigger auto-save to persist the step change
   if (typeof triggerProgressSave === 'function') {
@@ -1170,7 +1155,7 @@ const setupStepValidation = stepName => {
   // Handle global back button visibility
   const globalBackButton = document.getElementById('dh-global-back-button');
   if (globalBackButton) {
-    if (stepName === 'pest-issue') {
+    if (stepName === 'pest-issue' || stepName === 'complete') {
       globalBackButton.classList.add('hidden');
     } else {
       globalBackButton.classList.remove('hidden');
@@ -1195,6 +1180,7 @@ const setupStepValidation = stepName => {
 
       if (pestOptions) {
         pestOptions.forEach(option => {
+          option.setAttribute('data-listener-attached', 'true');
           option.addEventListener('click', async e => {
             // Prevent double-clicking if loading overlay is visible
             const pestLoadingEl = document.getElementById('pest-loading');
@@ -1238,12 +1224,6 @@ const setupStepValidation = stepName => {
                 widgetState.formData.selectedPlan = recommendedPlan; // Default to recommended
                 widgetState.formData.offerPrice = recommendedPlan.recurring_price;
                 
-                console.log('DH Widget: Stored recommended plan after pest selection:', {
-                  pestType: pestValue,
-                  planName: recommendedPlan.plan_name,
-                  recurringPrice: recommendedPlan.recurring_price,
-                  initialPrice: recommendedPlan.initial_price
-                });
               }
             } catch (error) {
               console.warn('Error fetching recommended plan for pest selection:', error);
@@ -1253,7 +1233,7 @@ const setupStepValidation = stepName => {
             try {
               const partialSaveResult = await savePartialLead(
                 { served: false, status: 'unknown' }, // Service area unknown until address validated
-                'address' // Step user will navigate to
+                'pest-issue' // Step completed (pest selection)
               );
               if (!partialSaveResult.success) {
                 console.warn(
@@ -1295,6 +1275,126 @@ const setupStepValidation = stepName => {
           });
         });
       }
+
+      // Handle "View All Pests" button
+      const viewAllPestsButton = document.getElementById('view-all-pests-button');
+      if (viewAllPestsButton) {
+        viewAllPestsButton.addEventListener('click', () => {
+          const hiddenPests = document.querySelectorAll('.dh-pest-option-hidden');
+          const pestSelection = document.querySelector('.dh-pest-selection');
+          const viewAllContainer = document.querySelector('.dh-view-all-container');
+          
+          if (hiddenPests.length > 0) {
+            // Fade out the "View All Pests" button first
+            if (viewAllContainer) {
+              viewAllContainer.style.opacity = '0';
+              viewAllContainer.style.transform = 'translateY(-10px)';
+              viewAllContainer.style.transition = 'all 0.3s ease';
+              
+              setTimeout(() => {
+                viewAllContainer.style.display = 'none';
+              }, 300);
+            }
+            
+            // Expand the pest selection container
+            if (pestSelection) {
+              setTimeout(() => {
+                pestSelection.classList.add('expanded');
+              }, 200);
+            }
+            
+            // Animate the newly visible pests with staggered animation
+            hiddenPests.forEach((pest, index) => {
+              setTimeout(() => {
+                pest.classList.remove('dh-pest-option-hidden');
+                pest.classList.add('dh-pest-option-revealing');
+                
+                // Clean up the revealing class after animation completes
+                setTimeout(() => {
+                  pest.classList.remove('dh-pest-option-revealing');
+                }, 400);
+              }, 300 + (index * 80)); // Start after container begins expanding, stagger by 80ms
+            });
+            
+            // Re-attach event listeners to newly visible pest options
+            const newPestOptions = document.querySelectorAll('.dh-pest-option:not([data-listener-attached])');
+            newPestOptions.forEach(option => {
+              option.setAttribute('data-listener-attached', 'true');
+              option.addEventListener('click', async e => {
+                // Prevent double-clicking if loading overlay is visible
+                const pestLoadingEl = document.getElementById('pest-loading');
+                if (pestLoadingEl && pestLoadingEl.style.display === 'flex') return;
+
+                // Remove selected class from all options
+                const allPestOptions = document.querySelectorAll('.dh-pest-option');
+                allPestOptions.forEach(opt => {
+                  opt.classList.remove('selected');
+                });
+
+                // Find the parent pest option element
+                const pestOption = e.target.closest('.dh-pest-option');
+                if (!pestOption) {
+                  console.error('Could not find pest option element');
+                  return;
+                }
+
+                // Add selected class and processing state
+                pestOption.classList.add('selected', 'processing');
+
+                // Get pest type from data attribute
+                const pestType = pestOption.dataset.pest;
+
+                // Store the pest type in form data
+                widgetState.formData.pestType = pestType;
+
+                // Show loading overlay
+                showLoadingOverlay(pestLoadingEl);
+
+                // Save progress immediately with plan data
+                try {
+                  const partialSaveResult = await savePartialLead(
+                    { served: false, status: 'unknown' }, // Service area unknown until address validated
+                    'pest-issue' // Step completed (pest selection)
+                  );
+                  if (!partialSaveResult.success) {
+                    console.warn(
+                      'Failed to save pest selection:',
+                      partialSaveResult.error
+                    );
+                  }
+                } catch (error) {
+                  console.warn('Error saving pest selection:', error);
+                }
+
+                // Update dynamic text in background before step transition
+                try {
+                  // Wait for both content updates AND minimum loading time
+                  await Promise.all([
+                    updateDynamicText(),
+                    createMinimumLoadingTime(1000), // Ensure loading shows for at least 1 second
+                  ]);
+
+                  // Update step completion tracking
+                  const completionStatus =
+                    progressiveFormManager.calculateStepCompletion();
+
+                  // Auto-advance to address validation step
+                  hideLoadingOverlay(pestLoadingEl);
+                  await showStep('address');
+                  setupStepValidation('address');
+                } catch (error) {
+                  console.error('Error updating dynamic content:', error);
+                  // Still advance to next step even if dynamic content fails
+                  hideLoadingOverlay(pestLoadingEl);
+                  await showStep('address');
+                  setupStepValidation('address');
+                }
+              });
+            });
+          }
+        });
+      }
+
       break;
 
     case 'address':
@@ -1322,10 +1422,8 @@ const setupStepValidation = stepName => {
           // Populate form fields when returning to address step
           setTimeout(() => {
             if (!widgetState.isRestoring && typeof window.populateFormFields === 'function') {
-              console.log('DH Widget: Address step calling populateFormFields');
               window.populateFormFields();
             } else if (widgetState.isRestoring) {
-              console.log('DH Widget: Skipping address field population - restoration in progress');
             }
           }, 100);
         }
@@ -1592,21 +1690,11 @@ const setupStepValidation = stepName => {
 
       // Populate all form fields and setup confirm-address step
       setTimeout(() => {
-        console.log('DH Widget: Confirm-address step - populating fields with data:', {
-          addressStreet: widgetState.formData.addressStreet,
-          addressCity: widgetState.formData.addressCity,
-          addressState: widgetState.formData.addressState,
-          addressZip: widgetState.formData.addressZip,
-          address: widgetState.formData.address,
-          isRestoring: widgetState.isRestoring
-        });
         
         // Skip field population if we're in restoration mode (will be handled by session restoration)
         if (!widgetState.isRestoring && typeof window.populateFormFields === 'function') {
-          console.log('DH Widget: Confirm-address step calling populateFormFields');
           window.populateFormFields();
         } else if (widgetState.isRestoring) {
-          console.log('DH Widget: Skipping confirm-address field population - restoration in progress');
         }
 
         // Load address background imagery if available
@@ -1649,16 +1737,19 @@ const setupStepValidation = stepName => {
           continueButton.disabled = true;
           continueButton.style.opacity = '0.5';
           continueButton.style.cursor = 'not-allowed';
+          continueButton.style.backgroundColor = '#9ca3af';
 
           const updateButtonState = () => {
             if (consentCheckbox.checked) {
               continueButton.disabled = false;
               continueButton.style.opacity = '1';
               continueButton.style.cursor = 'pointer';
+              continueButton.style.backgroundColor = '';
             } else {
               continueButton.disabled = true;
               continueButton.style.opacity = '0.5';
               continueButton.style.cursor = 'not-allowed';
+              continueButton.style.backgroundColor = '#9ca3af';
             }
           };
 
@@ -2039,6 +2130,12 @@ const setupStepValidation = stepName => {
           if (widgetState.formData.planComparisonData) {
             suggestions = widgetState.formData.planComparisonData;
           } else {
+            // Guard: Don't call API if no pest is selected
+            if (!widgetState.formData.pestType) {
+              console.warn('Skipping comparison plans: no pest selected yet');
+              return;
+            }
+
             // Show loading state for fallback API call
             if (comparisonPlanLoading) {
               comparisonPlanLoading.style.display = 'block';

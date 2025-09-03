@@ -155,35 +155,41 @@
     return;
   }
 
+  // Auto-detect base URL from script source or use current origin
+  let baseUrl = scriptTag.getAttribute('data-base-url');
+  if (!baseUrl) {
+    // Try to extract from script src
+    const scriptSrc = scriptTag.src;
+    if (scriptSrc) {
+      const url = new URL(scriptSrc);
+      baseUrl = `${url.protocol}//${url.host}`;
+    } else {
+      // Fallback to current origin
+      baseUrl = window.location.origin;
+    }
+  }
+
   const config = {
-    companyId: scriptTag.getAttribute('data-company-id'),
-    baseUrl: scriptTag.getAttribute('data-base-url'),
+    // Optional: Legacy support for company-id
+    companyId: scriptTag.getAttribute('data-company-id'), // Will be null for domain-based lookup
+    baseUrl: baseUrl,
     containerId: scriptTag.getAttribute('data-container-id'),
-    displayMode: scriptTag.getAttribute('data-display-mode') || 'inline',
-    primaryColor: scriptTag.getAttribute('data-primary-color') || '#007bff',
-    secondaryColor: scriptTag.getAttribute('data-secondary-color') || '#6c757d',
-    backgroundColor: scriptTag.getAttribute('data-background-color') || '#ffffff',
-    textColor: scriptTag.getAttribute('data-text-color') || '#333333',
-    buttonText: scriptTag.getAttribute('data-button-text') || 'Get Started',
-    headerText: scriptTag.getAttribute('data-header-text'),
-    subHeaderText: scriptTag.getAttribute('data-sub-header-text'),
+    displayMode: scriptTag.getAttribute('data-display-mode') || 'button', // Default to button mode
+    primaryColor: scriptTag.getAttribute('data-primary-color'), // Let server provide defaults
+    secondaryColor: scriptTag.getAttribute('data-secondary-color'), // Let server provide defaults
+    backgroundColor: scriptTag.getAttribute('data-background-color'), // Let server provide defaults
+    textColor: scriptTag.getAttribute('data-text-color'), // Let server provide defaults
+    buttonText: scriptTag.getAttribute('data-button-text'), // Let server provide defaults
+    headerText: scriptTag.getAttribute('data-header-text'), // Let server provide defaults
+    subHeaderText: scriptTag.getAttribute('data-sub-header-text'), // Let server provide defaults
     modalCloseOnBackdrop: scriptTag.getAttribute('data-modal-close-on-backdrop') !== 'false',
   };
 
-  // Validate required configuration
-  if (!config.companyId) {
-    showErrorState(
-      'Configuration Error',
-      'Missing required attribute: data-company-id',
-      'Please add data-company-id="your-company-id" to the script tag'
-    );
-    return;
-  }
-
+  // Validate that we have a base URL (should always be auto-detected)
   if (!config.baseUrl) {
     showErrorState(
       'Configuration Error',
-      'Missing required attribute: data-base-url',
+      'Could not determine base URL',
       'Please add data-base-url="https://your-domain.com" to the script tag'
     );
     return;
@@ -776,9 +782,11 @@
           const currentStepName = stepNames[savedData.currentStep] || 'your information';
           const timeAgo = getTimeAgo(new Date(savedData.timestamp));
           
+          const primaryColor = (widgetState.widgetConfig && widgetState.widgetConfig.colors && widgetState.widgetConfig.colors.primary) || '#3b82f6';
+          
           modal.innerHTML = `
             <div style="margin-bottom: 24px;">
-              <div style="width: 64px; height: 64px; background: ${config.primaryColor}; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+              <div style="width: 64px; height: 64px; background: ${primaryColor}; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                   <path d="M9 11l3 3l8-8"></path>
                   <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9s4.03-9 9-9c1.51 0 2.93 0.37 4.18 1.03"></path>
@@ -792,7 +800,7 @@
             
             <div style="display: flex; gap: 12px; flex-direction: column;">
               <button id="continue-btn" style="
-                background: ${config.primaryColor};
+                background: ${primaryColor};
                 color: white;
                 border: none;
                 border-radius: 12px;
@@ -1144,12 +1152,8 @@
       }
       
       // Update fonts after config is loaded
-      console.log('DEBUG: Widget config fonts:', widgetState.widgetConfig?.fonts);
       if (widgetState.widgetConfig && widgetState.widgetConfig.fonts) {
-        console.log('DEBUG: Calling updateWidgetFonts with:', widgetState.widgetConfig.fonts);
         updateWidgetFonts();
-      } else {
-        console.log('DEBUG: No font config found, using default');
       }
       
       // Create the widget elements
@@ -1333,7 +1337,6 @@
         // No saved progress or not significant, initialize normally
         if (config.displayMode !== 'button') {
           setTimeout(() => {
-            console.log('DEBUG: Initializing first step (inline mode)');
             progressiveFormManager.startAutoSave();
             showStep('pest-issue');
             setupStepValidation('pest-issue');

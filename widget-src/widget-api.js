@@ -62,6 +62,39 @@
     };
 
     try {
+      // Acquire captcha token if configured
+      try {
+        const cfg = widgetState.widgetConfig && widgetState.widgetConfig.captcha;
+        if (cfg && cfg.provider === 'turnstile' && cfg.siteKey) {
+          // Update button to show verification step
+          const submitBtn = document.getElementById('contact-submit');
+          if (submitBtn) {
+            submitBtn.innerHTML = 'Verifying... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          }
+          
+          // Ensure captcha initialized
+          if (window.dhCaptcha && typeof window.dhCaptcha.init === 'function') {
+            await window.dhCaptcha.init('turnstile', cfg.siteKey);
+          }
+          const token = window.dhCaptcha && typeof window.dhCaptcha.getToken === 'function'
+            ? await window.dhCaptcha.getToken()
+            : null;
+          
+          // Update button to show submitting
+          if (submitBtn) {
+            submitBtn.innerHTML = 'Submitting... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          }
+          
+          formData.captcha = {
+            provider: 'turnstile',
+            token: token || '',
+            action: 'widget_submit',
+          };
+        }
+      } catch (captchaError) {
+        console.warn('DH Widget: Captcha token acquisition failed', captchaError);
+      }
+
       // Submit to API
       const response = await fetch(config.baseUrl + '/api/widget/submit', {
         method: 'POST',
@@ -190,6 +223,12 @@
   // Fetch plan comparison data for selected pest
   const fetchPlanComparisonData = async () => {
     try {
+      // Guard: Don't call API if no pest is selected
+      if (!widgetState.formData.pestType) {
+        console.warn('Skipping plan comparison: no pest selected yet');
+        return { plans: [] };
+      }
+
       const requestBody = {
         companyId: config.companyId,
         selectedPests: [widgetState.formData.pestType],
@@ -240,172 +279,6 @@
   };
 
 
-  // Load suggested plans based on selected pest
-  const loadSuggestedPlans = async () => {
-    const planLoadingEl = document.getElementById('plan-loading');
-    const planSelectionEl = document.getElementById('plan-selection');
-
-    // Show loading state
-    if (planLoadingEl) planLoadingEl.style.display = 'block';
-    if (planSelectionEl) planSelectionEl.style.display = 'none';
-
-    try {
-      // Get selected pest from form data
-      const selectedPest = widgetState.formData.pestType;
-      if (!selectedPest) {
-        throw new Error('No pest selected');
-      }
-
-      // Call suggested plans API
-      const response = await fetch(
-        config.baseUrl + '/api/widget/suggested-plans',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            companyId: config.companyId,
-            selectedPests: [selectedPest],
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch suggested plans');
-      }
-
-      const data = await response.json();
-
-      if (!data.success || !data.suggestions) {
-        throw new Error('Invalid response from plans API');
-      }
-
-      // Render plans
-      renderSuggestedPlans(data.suggestions);
-
-      // Hide loading, show plans
-      if (planLoadingEl) planLoadingEl.style.display = 'none';
-      if (planSelectionEl) planSelectionEl.style.display = 'block';
-    } catch (error) {
-      console.error('Error loading suggested plans:', error);
-
-      // Hide loading and show error state
-      if (planLoadingEl) planLoadingEl.style.display = 'none';
-      if (planSelectionEl) {
-        planSelectionEl.style.display = 'block';
-        planSelectionEl.innerHTML = `
-          <div class="dh-error-state">
-            <p>Unable to load service plans at this time.</p>
-            <p>Please continue to the next step.</p>
-          </div>
-        `;
-      }
-    }
-  };
-
-  // Render suggested plans in the UI
-  const renderSuggestedPlans = plans => {
-    const planSelectionEl = document.getElementById('plan-selection');
-    if (!planSelectionEl) return;
-
-    if (plans.length === 0) {
-      planSelectionEl.innerHTML = `
-        <div class="dh-no-plans">
-          <p>No service plans are currently available.</p>
-          <p>Please contact us directly for assistance.</p>
-        </div>
-      `;
-      return;
-    }
-
-    const plansHtml = plans
-      .map(plan => {
-        const coverageClass =
-          plan.coverage_match.coverage_percentage === 100
-            ? 'full-coverage'
-            : 'partial-coverage';
-        const badgeHtml = plan.highlight_badge
-          ? `<div class="dh-plan-badge">${plan.highlight_badge}</div>`
-          : '';
-        const featuresHtml = plan.plan_features
-          .slice(0, 4)
-          .map(feature => `<li class="dh-plan-feature">${feature}</li>`)
-          .join('');
-
-        return `
-        <div class="dh-plan-card" data-plan-id="${plan.id}" onclick="selectPlan('${plan.id}', '${plan.plan_name}')">
-          <div class="dh-coverage-indicator ${coverageClass}">
-            ${plan.coverage_match.coverage_percentage}% match
-          </div>
-          <div class="dh-plan-header">
-            <h4 class="dh-plan-title">${plan.plan_name}</h4>
-            ${badgeHtml}
-          </div>
-          <div class="dh-plan-price">
-            <span class="dh-plan-price-main">$${plan.recurring_price}</span>
-            <span class="dh-plan-price-frequency">${formatBillingFrequency(plan.billing_frequency)}</span>
-          </div>
-          <p class="dh-plan-description">${plan.plan_description || ''}</p>
-          <ul class="dh-plan-features">
-            ${featuresHtml}
-          </ul>
-        </div>
-      `;
-      })
-      .join('');
-
-    planSelectionEl.innerHTML = plansHtml;
-  };
-
-  // Select a plan and proceed to next step
-  window.selectPlan = (planId, planName) => {
-    // Find the full plan object from available plan data
-    let fullPlan = null;
-    
-    // Try to find plan from plan comparison data
-    if (window.comparisonPlansData) {
-      fullPlan = window.comparisonPlansData.find(plan => plan.id === planId);
-    }
-    
-    // Fallback: try from suggestions in widget state
-    if (!fullPlan && widgetState.planComparisonData?.suggestions) {
-      fullPlan = widgetState.planComparisonData.suggestions.find(plan => plan.id === planId);
-    }
-    
-    // Save selected plan to form data (prefer full plan object, fallback to basic structure)
-    widgetState.formData.selectedPlan = fullPlan || {
-      id: planId,
-      plan_name: planName, // Use plan_name to match backend expectations
-    };
-
-    // Visual feedback
-    document.querySelectorAll('.dh-plan-card').forEach(card => {
-      card.classList.remove('selected', 'processing');
-    });
-
-    const selectedCard = document.querySelector(
-      `[data-plan-id="${planId}"]`
-    );
-    if (selectedCard) {
-      selectedCard.classList.add('processing');
-    }
-
-    // Save partial lead with plan selection
-    try {
-      savePartialLead(null, 'contact'); // Step user will navigate to
-    } catch (error) {
-      console.error('Error saving plan selection:', error);
-    }
-
-    // Navigate directly to contact step for scheduling after brief delay
-    setTimeout(() => {
-      // Set flow identifier to track that user came from plan comparison
-      widgetState.formData.offerChoice = 'schedule-from-comparison';
-      showStep('contact');
-      setupStepValidation('contact');
-    }, 500);
-  };
 
   // Helper function to format billing frequency to natural language (abbreviated)
   const formatBillingFrequency = (frequency) => {
@@ -625,8 +498,46 @@
 
   // Apply cached configuration without API call
   const applyCachedConfig = cachedConfig => {
-    // Configuration applied - this function can be expanded if needed
-    // For now, just ensure the config is loaded into widgetState
+    // Merge server config with client overrides
+    if (cachedConfig) {
+      // Override server defaults with client-provided attributes (if any)
+      const mergedConfig = { ...cachedConfig };
+      
+      // Client overrides take precedence over server defaults
+      if (config.primaryColor && cachedConfig.colors) {
+        mergedConfig.colors.primary = config.primaryColor;
+      }
+      if (config.secondaryColor && cachedConfig.colors) {
+        mergedConfig.colors.secondary = config.secondaryColor;
+      }
+      if (config.backgroundColor && cachedConfig.colors) {
+        mergedConfig.colors.background = config.backgroundColor;
+      }
+      if (config.textColor && cachedConfig.colors) {
+        mergedConfig.colors.text = config.textColor;
+      }
+      if (config.buttonText) {
+        mergedConfig.submitButtonText = config.buttonText;
+        mergedConfig.welcomeButtonText = config.buttonText;
+      }
+      if (config.headerText && cachedConfig.headers) {
+        mergedConfig.headers.headerText = config.headerText;
+      }
+      if (config.subHeaderText && cachedConfig.headers) {
+        mergedConfig.headers.subHeaderText = config.subHeaderText;
+      }
+      
+      // Update the widget state with merged config
+      widgetState.widgetConfig = mergedConfig;
+    }
+    
+    // Initialize captcha early if configured
+    try {
+      const cfg = cachedConfig && cachedConfig.captcha;
+      if (cfg && cfg.provider === 'turnstile' && cfg.siteKey && window.dhCaptcha && typeof window.dhCaptcha.init === 'function') {
+        window.dhCaptcha.init('turnstile', cfg.siteKey);
+      }
+    } catch (_) {}
   };
 
   // Load widget configuration
@@ -641,12 +552,20 @@
         return true;
       }
 
-      const url = config.baseUrl + '/api/widget/config/' + config.companyId;
+      // Use domain-based lookup if no company ID provided
+      const url = config.companyId 
+        ? config.baseUrl + '/api/widget/config/' + config.companyId
+        : config.baseUrl + '/api/widget/config';
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.success) {
         widgetState.widgetConfig = data.config;
+        
+        // Bootstrap company ID from domain-based config if not already set
+        if (!config.companyId && data.config.companyId) {
+          config.companyId = data.config.companyId;
+        }
 
         // Cache the configuration for future use
         setCachedConfig(data.config);
@@ -674,7 +593,6 @@
     const quoteLastNameInput = document.getElementById('quote-last-name-input');
     const quoteEmailInput = document.getElementById('quote-email-input');
     const quotePhoneInput = document.getElementById('quote-phone-input');
-    const quoteLoadingEl = document.getElementById('quote-loading');
 
     // Clear existing errors
     [
@@ -754,9 +672,13 @@
     }
 
     try {
-      // Show loading state
-      if (quoteLoadingEl) {
-        quoteLoadingEl.style.display = 'flex';
+      
+      // Update button to loading state
+      const submitBtn = document.getElementById('quote-contact-submit');
+      if (submitBtn) {
+        submitBtn.innerHTML = 'Loading... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        submitBtn.classList.add('submitting');
+        submitBtn.disabled = true;
       }
 
       // Store quote contact information
@@ -795,19 +717,28 @@
         console.warn('Error saving contact information:', error);
       }
 
-      // Hide loading overlay after everything is complete
+      // Reset button state after everything is complete
       setTimeout(() => {
-        if (quoteLoadingEl) {
-          quoteLoadingEl.style.display = 'none';
+        
+        // Reset button state (though user won't see this since we navigated away)
+        const submitBtn = document.getElementById('quote-contact-submit');
+        if (submitBtn) {
+          submitBtn.innerHTML = 'See Your Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          submitBtn.classList.remove('submitting');
+          submitBtn.disabled = false;
         }
       }, 100); // Brief delay to ensure step transition is visible
       
     } catch (error) {
       console.error('Error during quote processing:', error);
       
-      // Hide loading on error and fallback to plan comparison step anyway
-      if (quoteLoadingEl) {
-        quoteLoadingEl.style.display = 'none';
+      
+      // Reset button state on error
+      const submitBtn = document.getElementById('quote-contact-submit');
+      if (submitBtn) {
+        submitBtn.innerHTML = 'See Your Quote <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        submitBtn.classList.remove('submitting');
+        submitBtn.disabled = false;
       }
       
       // Fallback: proceed to plan comparison even if data fetch failed
@@ -821,6 +752,12 @@
   const fetchPricingData = async () => {
     
     try {
+      // Guard: Don't call API if no pest is selected
+      if (!widgetState.formData.pestType) {
+        console.warn('Skipping pricing data: no pest selected yet');
+        return { plans: [] };
+      }
+
       const requestBody = {
         companyId: config.companyId,
         selectedPests: [widgetState.formData.pestType],
@@ -860,6 +797,12 @@
   // Get the cheapest plan with full coverage for the selected pest
   const getCheapestFullCoveragePlan = async () => {
     try {
+      // Guard: Don't call API if no pest is selected
+      if (!widgetState.formData.pestType) {
+        console.warn('Skipping cheapest plan lookup: no pest selected yet');
+        return null;
+      }
+
       const requestBody = {
         companyId: config.companyId,
         selectedPests: [widgetState.formData.pestType],

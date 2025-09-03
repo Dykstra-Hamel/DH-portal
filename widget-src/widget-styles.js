@@ -64,20 +64,88 @@ const createStyles = (
   styleElement.textContent = `
   @import url('${fontUrl}');
 
+/* ===================================================================
+   GLOBAL STYLES & BASE CONFIGURATION
+   =================================================================== */
+
 /* Global font family for all widget elements */
 .dh-form-widget, .dh-form-widget * {
   font-family: "${fontName}", sans-serif !important;
 }
 
+/* ===================================================================
+   ANIMATIONS & KEYFRAMES
+   =================================================================== */
+
 @keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes slideInUp {
   from {
     opacity: 0;
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
+@keyframes slideOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes dh-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* Animation applications */
 img {
   animation: fadeIn 2s ease forwards;
 }
@@ -133,34 +201,33 @@ img {
   position: absolute;
   justify-content: center;
   align-items: center;
-  top: 67px;
-  left: 0px;
+  top: 18px;
+  left: 18px;
   z-index: 90;
-  background: #E3E3E3;
+  background: transparent;
   color: #4A4A4A;
   border: none;
-  padding: 10px 16px;
-  border-radius: 0 60px 60px 0;
+  padding: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: '${fontName}', sans-serif;
-  font-size: 12px;
+  font-size: 0;
   line-height: 20px;
   font-weight: 700;
-  transition: background-color 0.2s ease, transform 0.2s ease;
-  opacity: 0.7;
   transition: all 0.2s ease;
+  width: 35px;
+  height: 35px;
 }
 
 .dh-global-back-button:hover {
-  background: #B0B0B0;
+  background: transparent;
 }
 
 .dh-global-back-button svg {
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
   transition: all 0.2s ease;
 }
@@ -182,11 +249,7 @@ img {
   opacity: 0;
   transition: opacity 0.3s ease;
 } 
-.dh-form-step.welcome { 
-  display: none;
-  padding: 0;
-  opacity: 1;
-} 
+ 
 .dh-form-step.active { 
   display: flex; 
   opacity: 1;
@@ -209,6 +272,10 @@ img {
     padding: 0;
     border-bottom: none;
   }
+
+/* ===================================================================
+   STEP-SPECIFIC STYLING
+   =================================================================== */
 
 #dh-step-plan-comparison .dh-form-step-content {
  flex-wrap: wrap;
@@ -258,7 +325,10 @@ img {
   margin-left: 4px;
 }
 
-/* Loading States */
+/* ===================================================================
+   LOADING STATES & SPINNERS
+   =================================================================== */
+
 .dh-reviews-loading {
   display: flex;
   align-items: center;
@@ -293,14 +363,7 @@ img {
   animation: dh-pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes dh-pulse {
-  0%, 100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 0.9;
-  }
-}
+/* dh-pulse keyframes moved to consolidated animations section */
 
 .dh-plan-faqs-container {
   width: 100%;
@@ -344,7 +407,7 @@ img {
 } 
 
 h3.dh-how-we-do-it-title, .dh-safety-text {
-  font-size: 28px;
+  font-size: 26px;
   line-height: 30px;
   font-weight: 700;
   color: #4E4E4E;
@@ -409,6 +472,10 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
   margin: 0;
 }
 
+/* ===================================================================
+   FORM CONTROLS & INPUT STYLING
+   =================================================================== */
+
 .dh-form-group { 
   max-width: 515px;
   width: 100%;
@@ -425,12 +492,13 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
 } 
 .dh-address-form-label {
   display: block;
-  margin-bottom: 24px;
+  margin: 0 auto 24px;
   color: #4E4E4E;
   text-align: center;
   font-size: 20px;
   font-weight: 600;
   line-height: 30px;
+  width: 80%;
 }
 .dh-form-input { 
   width: 100%; 
@@ -638,7 +706,7 @@ select.dh-form-input {
 
 /* Focused input border */
 .dh-floating-input .dh-form-input:focus {
-  border-color: ${primaryColor};
+  border: 2px solid ${primaryColor};
   box-shadow: 0 0 0 2px ${primaryFocus};
 }
 
@@ -723,6 +791,10 @@ select.dh-form-input {
   gap: 13px;
   margin: 0 auto;
 }
+
+#dh-step-contact .dh-form-row {
+  width: 95%;
+}
 .dh-form-row .dh-form-group {
   width: 100%;
 }
@@ -791,7 +863,9 @@ select.dh-form-input {
   border-bottom: none;
 }
 
-/* Removed duplicate address components - using improved versions below */
+/* ===================================================================
+   BUTTONS & INTERACTIVE ELEMENTS
+   =================================================================== */
 
 /* Change Address Button */
 .dh-change-address-btn {
@@ -826,9 +900,9 @@ select.dh-form-input {
 }
 
 .dh-image-loading .dh-loading-spinner {
-  width: 24px;
-  height: 24px;
-  margin-bottom: 8px;
+  --spinner-size: 24px;
+  --spinner-border: 2px;
+  --spinner-margin: 0 0 8px 0;
 }
 
 .dh-image-loading p {
@@ -893,6 +967,8 @@ select.dh-form-input {
 #check-service-area-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  background: rgb(156, 163, 175);
+  border: 1px solid rgb(156, 163, 175);
 }
 
 /* Selected Address Card Styling */
@@ -939,15 +1015,8 @@ select.dh-form-input {
   width: 100%;
 }
 
-.dh-image-loading .dh-loading-spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #e2e8f0;
-  border-top: 2px solid ${primaryColor};
-  border-radius: 50%;
-  animation: dh-spin 1s linear infinite;
-  margin-bottom: 8px;
-}
+/* Note: This duplicate .dh-image-loading .dh-loading-spinner definition removed - 
+   consolidated with the one above */
 
 .dh-image-loading p {
   margin: 8px 0 0 0;
@@ -1078,26 +1147,14 @@ select.dh-form-input {
   margin-bottom: 40px;
 }
 
-/* Responsive styling for out-of-service */
-@media (max-width: 600px) {
-  .dh-form-out-of-service {
-    padding: 30px 20px;
-  }
-  
-  .dh-form-out-of-service h3 {
-    font-size: 20px;
-  }
-  
-  .dh-form-out-of-service p {
-    font-size: 15px;
-  }
-}
+/* ===================================================================
+   RESPONSIVE & MOBILE STYLES
+   =================================================================== */
+
+/* Responsive styling moved to consolidated responsive section below */
 
 /* Spinning Animation for Loading */
-@keyframes dh-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+/* dh-spin keyframes removed - consolidated with spin animation below */
 
 /* Initial Offer Step Styling */
 .dh-offer-options {
@@ -1171,73 +1228,7 @@ select.dh-form-input {
   border-color: #9ca3af;
 }
 
-@media (max-width: 480px) {
-
-  .dh-pest-logo img {
-    width: 119px !important;
-  }
-
-  .dh-safety-message {
-    flex-direction: row-reverse;
-    margin: 0;
-  }
-
-  .dh-how-we-do-it-text {
-   margin-right: 0;
-  }
-
-  /* iOS-compatible full-width image solution */
-  #how-we-do-it-interior-image, .dh-plan-image-actual img {
-    width: 100vw !important;
-    height: 240px !important;
-    max-width: unset !important;
-    object-fit: cover;
-    object-position: top;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-    border-radius: 0;
-    margin-left: -50vw;
-    margin-right: -50vw;
-    border-radius: 0 !important;
-  }
-  
-  .dh-offer-options {
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-  }
-  
-  .dh-offer-btn {
-    width: 100%;
-    max-width: 280px;
-  }
-  
-  .dh-address-imagery {
-    width: 100%;
-    height: 160px;
-    margin: 12px auto 16px;
-  }
-  
-  .dh-address-search-field {
-    padding: 14px;
-    font-size: 16px;
-  }
-  
-  .dh-selected-address-card {
-    padding: 16px;
-    margin: 12px 0;
-  }
-
-  .dh-form-button-group {
-    width: 100%;
-    padding: 40px 0 0 0 !important;
-  }
-
-
-  .dh-form-btn:not(.plan-no-thanks) {
-  width: 100%;
-  }
-}
+/* 480px media query styles moved to consolidated responsive section */
 .dh-form-checkbox-label {
   display: flex;
   align-items: flex-start;
@@ -1246,7 +1237,6 @@ select.dh-form-input {
   line-height: 1.5;
   color: ${textColor};
   cursor: pointer;
-  margin-bottom: 40px;
 }
 .dh-form-checkbox {
   width: 18px !important;
@@ -1322,11 +1312,12 @@ select.dh-form-input {
   line-height: 18px;
   font-family: "${fontName}", sans-serif;
   font-weight: 700; 
-  transition: all 0.2s ease;
+  transition: all 0.2s linear;
+  position: relative
   }
 
 .dh-form-btn:not(.plan-no-thanks) {
-  min-width: 241px;
+  min-width: 260px;
 }
 
 .dh-form-btn:active {
@@ -1345,7 +1336,7 @@ select.dh-form-input {
   color: #fff;  
 } 
 
-.dh-form-btn-secondary:hover {
+.dh-form-btn-secondary:hover:not(:disabled) {
   border-color: ${secondaryColor};
 }
 
@@ -1405,82 +1396,7 @@ select.dh-form-input {
   .dh-form-btn.plan-no-thanks:hover {
     opacity: 0.8;
   }
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Animation keyframes for smooth transitions */
-@keyframes fadeIn {
-  from { 
-    opacity: 0; 
-  }
-  to { 
-    opacity: 1; 
-  }
-}
-
-@keyframes fadeOut {
-  from { 
-    opacity: 1; 
-  }
-  to { 
-    opacity: 0; 
-  }
-}
-
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideOutDown {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes scaleOut {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-}
-
-/* Respect user's motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+/* All duplicate keyframes and scattered media queries moved to consolidated sections */
 
 .dh-pest-selection {
   gap: 32px;
@@ -1585,16 +1501,10 @@ select.dh-form-input {
 .dh-pest-loading.show {
   opacity: 1;
 }
-  border-radius: 20px;
-}
 .dh-pest-loading .dh-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid ${primaryColor};
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0;
+  --spinner-size: 48px;
+  --spinner-border: 4px;
+  --spinner-margin: 0;
 }
 
 /* New Pest Step Layout with Hero Image */
@@ -1684,11 +1594,74 @@ select.dh-form-input {
 }
 
 .dh-pest-option.selected .dh-pest-icon svg path {
-  fill: white;
+  fill: ${primaryColor};
 }
 
 .dh-pest-option.selected .dh-pest-label {
-  color: white;
+  color: ${primaryColor};
+}
+
+/* Hidden pest options - will be visible but clipped by parent container */
+.dh-pest-option-hidden {
+  /* These pests are still in the grid but will be clipped by the parent container's max-height */
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Pest options transition for smooth reveal effect */
+.dh-pest-option {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Staggered reveal animation for pests */
+.dh-pest-option-revealing {
+  animation: slideInFromBottom 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* View All Pests button container */
+.dh-view-all-container {
+  display: none; /* Hidden by default on mobile */
+  justify-content: center;
+  margin-top: 24px;
+  width: 100%;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Show button only on desktop */
+@media (min-width: 1024px) {
+  .dh-view-all-container {
+    display: flex;
+  }
+}
+
+#view-all-pests-button {
+  min-width: 197px;
+  color: ${secondaryColor};
+  background: #fff;
+  border: 2px solid ${secondaryColor};
+  transition: all 0.2s ease;
+}
+
+#view-all-pests-button svg {
+  display: none;
+}
+
+#view-all-pests-button:hover {
+  color: ${secondaryDark};
+  border-color: ${secondaryDark};
 }
 
 
@@ -1713,7 +1686,7 @@ select.dh-form-input {
 
 .dh-pest-hero {
   width: 386px;
-  max-height: 889px;;
+  height: 889px;
   position: relative;
   flex-shrink: 0;
   display: flex;
@@ -1734,6 +1707,7 @@ select.dh-form-input {
     rgba(255, 255, 255, 1) 80%
   );
   z-index: 2;
+  border-radius: 0 26px 26px 0;
 }
 
 .dh-pest-hero:not(.step1):before {
@@ -1780,6 +1754,19 @@ height: 100%;
   transition: opacity 0.5s ease;
 }
 
+/* Desktop - 2-row pest limitation (1024px and wider) */
+@media (min-width: 1024px) {
+  .dh-pest-selection {
+    overflow: hidden;
+    max-height: 300px; /* Approximate height for 2 rows */
+    transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dh-pest-selection.expanded {
+    max-height: 1000px; /* Large enough to show all pests */
+  }
+}
+
 /* Tablet Responsive - 1024px and below */
 @media (max-width: 1024px) {
   .dh-modal-overlay {
@@ -1803,6 +1790,10 @@ height: 100%;
   .dh-pest-hero {
     width: 100%;
     min-height: unset;
+    height: unset;
+    top: -50px;
+    margin-bottom: -50px;
+    z-index: 1;
   }
 
   .dh-pest-hero-image {
@@ -1819,6 +1810,7 @@ height: 100%;
     rgba(255, 255, 255, 0.4) 0%,
     rgba(255, 255, 255, 1) 100%
   ) !important;
+   border-radius: unset;
   }
 
   #dh-form-container {
@@ -1847,7 +1839,7 @@ height: 100%;
     min-height: 240px;
     border-radius: 0 0 26px 26px;
     z-index: 1;
-    background-position: top;
+    background-position: center;
   }
   
   .dh-pest-bg-image:not(.step1) {
@@ -1883,60 +1875,7 @@ height: 100%;
   }
 }
 
-/* Mobile Responsive */
-@media (max-width: 768px) {
-  .dh-pest-step-container,
-  .dh-form-step-content {
-    flex-direction: column;
-    min-height: auto;
-  }
-  
-  .dh-pest-content,
-  .dh-form-content-area {
-    padding: 20px;
-  }
-  
-  .dh-pest-heading {
-    font-size: 30px;
-    line-height: 32px;
-  }
-  
-  .dh-pest-selection {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-  }
-  
-  /* Global elements mobile responsive */
-  .dh-global-back-button {
-    top: 20px;
-    padding: 12px 18px;
-    font-size: 0;
-  }
-  
-  .dh-global-back-button svg {
-    width: 16px;
-    height: 14px;
-  }
-  
-  .dh-widget-close-icon {
-    top: 24px;
-    right: 20px;
-    width: 26px;
-    height: 26px;
-  }
-  
-  .dh-widget-close-icon svg {
-    width: 26px;
-    height: 26px;
-  }
-
-  .dh-plan-faqs-container {
-    max-width: 100%;
-    width: unset;
-    margin: 0 0 50px 0; 
-    border-radius: 0;
-  }
-}
+/* First 768px media query styles moved to consolidated responsive section */
 
 /* Mobile background image for confirm address step */
 .dh-mobile-bg-image {
@@ -1978,88 +1917,9 @@ height: 100%;
 }
 
 
-@media (max-width: 480px) {
-
-  .dh-pest-logo {
-    margin-bottom: 24px;
-  }
-
-  .dh-pest-logo img {
-    max-height: 53px;
-    max-width: 119px;
-  }
-  
-  .dh-pest-heading {
-    font-size: 32px;
-    line-height: 32px;
-    letter-spacing: -0.3px;
-  }
-
-  .dh-pet-safety-image {
-    width: 144px;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-  }
-
-  .dh-safety-text {
-    font-size: 22px;
-    line-height: 26px;
-  }
-
-  .dh-subspecies-grid {
-    gap: 2px 20px;
-  }
-
-  .dh-form-btn {
-    width: 100%;
-  }
-
-  .dh-plan-visual {
-    width: 100vw;
-    max-width: unset !important;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
-  }
-
-  .dh-plan-visual img {
-    border-radius: 0 !important;
-  }
-
-  .dh-plan-image-container {
-    border-radius: 0 !important;
-  }
-}
+/* Second 480px media query styles moved to consolidated responsive section */
 
 
-.dh-urgency-loading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.dh-urgency-loading.show {
-  opacity: 1;
-}
-  border-radius: 20px;
-}
-.dh-urgency-loading .dh-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid ${primaryColor};
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0;
-}
 .dh-quote-loading {
   position: absolute;
   top: 0;
@@ -2078,25 +1938,24 @@ height: 100%;
 .dh-quote-loading.show {
   opacity: 1;
 }
-  border-radius: 20px;
-}
 .dh-quote-loading .dh-loading-spinner {
-  width: 64px;
-  height: 64px;
-  border: 6px solid #e5e7eb;
-  border-top: 6px solid ${primaryColor};
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0;
+  --spinner-size: 64px;
+  --spinner-border: 6px;
+  --spinner-margin: 0;
 }
+/* Base loading spinner - can be customized with CSS custom properties */
 .dh-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e5e7eb;
-  border-top: 3px solid ${primaryColor};
+  --spinner-size: 32px;
+  --spinner-border: 3px;
+  --spinner-margin: 0 auto 16px auto;
+  
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  border: var(--spinner-border) solid #e5e7eb;
+  border-top: var(--spinner-border) solid ${primaryColor};
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 16px auto;
+  margin: var(--spinner-margin);
 }
 
 /* Button widget styles */
@@ -2178,6 +2037,95 @@ height: 100%;
 .dh-modal-overlay.hide .dh-modal-content {
   transform: scale(0.95);
   opacity: 0;
+}
+
+/* Confirmation Popup Styles */
+.dh-confirmation-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.dh-confirmation-popup.show {
+  display: flex;
+  opacity: 1;
+}
+
+.dh-confirmation-content {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  transform: scale(0.95);
+  transition: transform 0.3s ease;
+  text-align: center;
+  font-family: "${fontName}", sans-serif;
+}
+
+.dh-confirmation-popup.show .dh-confirmation-content {
+  transform: scale(1);
+}
+
+.dh-confirmation-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: ${textColor};
+  margin: 0 0 12px 0;
+}
+
+.dh-confirmation-message {
+  font-size: 16px;
+  color: #6b7280;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.dh-confirmation-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.dh-confirmation-button {
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: "${fontName}", sans-serif;
+  min-width: 80px;
+}
+
+.dh-confirmation-button.cancel {
+  background: ${primaryColor};
+  color: white;
+}
+
+.dh-confirmation-button.cancel:hover {
+  background: ${primaryDark};
+}
+
+.dh-confirmation-button.confirm {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.dh-confirmation-button.confirm:hover {
+  background: #e5e7eb;
 }
 
 /* Welcome Screen Styles */
@@ -2323,7 +2271,8 @@ height: 100%;
 
 .dh-button-arrow svg, .dh-form-btn svg {
   display: block;
-  position: relative;
+  position: absolute;
+  right: 21px;
 }
 
 .dh-welcome-button:hover .dh-button-arrow {
@@ -2337,6 +2286,7 @@ height: 100%;
   font-weight: 700;
   line-height: 46px;
   margin: 0 0 20px 0;
+  letter-spacing: -0.46px;
 }
 
 .dh-terms-disclaimer {
@@ -2471,6 +2421,19 @@ height: 100%;
   .dh-welcome-title {
     font-size: 28px;
   }
+
+  h3.dh-how-we-do-it-title, .dh-safety-text {
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 700;
+  }
+
+  #dh-step-plan-comparison h2.dh-step-heading {
+    font-size: 26px;
+    line-height: 28px;
+    letter-spacing: -0.26px;
+  }
+
   /* Progress styles removed */
 }
 
@@ -2808,14 +2771,14 @@ line-height: 28px;
     margin: 0 0 20px 0;
   }
   .dh-faq-header {
-    padding: 14px 16px;
+    padding: 14px 0;
   }
   .dh-faq-question {
     font-size: 15px;
     padding-right: 12px;
   }
   .dh-faq-answer {
-    padding: 0 16px 14px 16px;
+    padding: 14px 0;
   }
 
   .dh-plan-pricing {
@@ -2872,7 +2835,8 @@ line-height: 28px;
   }
 
   .dh-form-step h3.dh-plan-title {
-    font-size: 30px;
+    font-size: 22px;
+    line-height: 26px;
   }
 }
 
@@ -3423,7 +3387,7 @@ line-height: 28px;
 @media (max-width: 768px) {
   #dh-step-contact .dh-form-row {
     flex-direction: column;
-    width: 253px;
+    width: 100%;
     gap: 0;
     margin-bottom: 0;
   }
@@ -3454,6 +3418,344 @@ line-height: 28px;
     padding: 14px 20px;
   }
 }
+
+/* ===================================================================
+   CONSOLIDATED RESPONSIVE & MOBILE STYLES
+   =================================================================== */
+
+/* Mobile First - 480px and below */
+@media (max-width: 480px) {
+  .dh-pest-logo {
+    margin-bottom: 24px;
+  }
+  
+  .dh-pest-logo img {
+    width: 119px !important;
+    max-width: 140px;
+    max-height: 53px;
+    height: auto;
+  }
+  
+  .dh-safety-message {
+    flex-direction: row-reverse;
+    margin: 0;
+  }
+  
+  .dh-how-we-do-it-text {
+    margin-right: 0;
+  }
+  
+  /* iOS-compatible full-width image solution */
+  #how-we-do-it-interior-image, .dh-plan-image-actual img {
+    width: 100vw !important;
+    height: 240px !important;
+    max-width: unset !important;
+    object-fit: cover;
+    object-position: top;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    border-radius: 0 !important;
+    margin-left: -50vw;
+    margin-right: -50vw;
+  }
+  
+  .dh-offer-options {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  
+  .dh-offer-btn {
+    width: 100%;
+    max-width: 280px;
+    margin-bottom: 12px;
+    padding: 16px;
+    font-size: 16px;
+  }
+  
+  .dh-address-imagery {
+    width: 100%;
+    height: 160px;
+    margin: 12px auto 16px;
+  }
+  
+  .dh-address-search-field {
+    padding: 14px;
+    font-size: 16px;
+  }
+  
+  .dh-selected-address-card {
+    padding: 16px;
+    margin: 12px 0;
+  }
+  
+  .dh-form-button-group {
+    width: 100%;
+    padding: 40px 0 0 0 !important;
+  }
+  
+  .dh-form-btn:not(.plan-no-thanks) {
+    width: 100%;
+  }
+  
+  .dh-plan-title {
+    font-size: 26px;
+  }
+  
+  .dh-plan-description {
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .dh-plan-price-starting {
+    font-size: 14px;
+    line-height: 24px;
+    margin-left: 5px;
+  }
+
+  .dh-plan-price-recurring {
+    font-size: 46px;
+  }
+
+  .dh-plan-price-normally {
+    font-size: 16px;
+  }
+
+  .dh-plan-price-initial {
+    font-size: 20px;
+  }
+
+  .dh-plan-price-recurring {
+    align-items: flex-end;
+  }
+
+  .dh-plan-price-recurring .dh-price-dollar {
+    position: relative;
+    top: 5px;
+    font-size: 28px;
+  }
+
+  .dh-price-asterisk {
+  top: 10px;
+  }
+
+  .dh-plan-price-container {
+    margin: 0 0 20px 10px
+  }
+  
+  .dh-plan-included h4 {
+    font-size: 16px;
+  }
+  
+  .dh-pest-heading {
+    font-size: 32px;
+    line-height: 32px;
+    letter-spacing: -0.3px;
+  }
+  
+  .dh-pet-safety-image {
+    width: 144px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  
+  .dh-safety-text {
+    font-size: 22px;
+    line-height: 26px;
+  }
+  
+  .dh-subspecies-grid {
+    gap: 2px 20px;
+  }
+  
+  .dh-form-btn {
+    width: 100%;
+  }
+  
+  .dh-plan-visual {
+    width: 100vw;
+    max-width: unset !important;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    margin-bottom: 20px;
+  }
+  
+  .dh-plan-visual img {
+    border-radius: 0 !important;
+  }
+  
+  .dh-plan-image-container {
+    border-radius: 0 !important;
+  }
+}
+
+/* Tablet - 768px and below */
+@media (max-width: 768px) {
+  .dh-pest-step-container,
+  .dh-form-step-content {
+    flex-direction: column;
+    overflow-y: auto;
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    padding: 0;
+  }
+  
+  .dh-pest-content,
+  .dh-form-content-area {
+    padding: 20px;
+  }
+  
+  .dh-pest-heading {
+    font-size: 30px;
+    line-height: 32px;
+  }
+  
+  .dh-pest-selection {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  
+  .dh-global-back-button svg {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .dh-widget-close-icon {
+    top: 24px;
+    right: 20px;
+    width: 26px;
+    height: 26px;
+  }
+  
+  .dh-widget-close-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .dh-modal-overlay {
+    padding: 10px;
+  }
+  
+  .dh-plan-details {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .dh-plan-actions {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    align-items: stretch;
+  }
+  
+  .dh-plan-faqs {
+    margin: 32px 0 0 0;
+  }
+  
+  .dh-plan-faqs-container {
+    max-width: 100%;
+    width: unset;
+    margin: 0; 
+    padding: 30px 20px 50px 20px;
+    border-radius: 0;
+  }
+  
+  .dh-exit-survey-centered {
+    padding: 20px 16px;
+  }
+  
+  .dh-exit-survey-centered .dh-step-heading {
+    font-size: 24px;
+  }
+  
+  .dh-exit-survey-centered .dh-step-instruction {
+    font-size: 16px;
+  }
+}
+
+/* Small tablets and large phones - 650px and below */
+@media (max-width: 650px) {
+  .dh-plan-main {
+    padding: 24px 16px;
+  }
+}
+
+/* Small screens - 600px and below */
+@media (max-width: 600px) {
+  .dh-form-out-of-service {
+    padding: 30px 20px;
+  }
+  
+  .dh-form-out-of-service h3 {
+    font-size: 20px;
+  }
+  
+  .dh-form-out-of-service p {
+    font-size: 15px;
+  }
+  
+  .dh-offer-options {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .dh-step-instruction {
+    font-size: 16px;
+  }
+}
+
+/* Large screens - 1024px and below */
+@media (max-width: 1024px) {
+  .dh-modal-overlay {
+    padding: 0 !important;
+  }
+  
+  .dh-pest-step-container {
+    height: auto;
+    min-height: calc(100vh - 80px);
+  }
+  
+  #dh-step-confirm-address .dh-pest-hero {
+    height: 300px;
+  }
+  
+  #dh-step-confirm-address .dh-mobile-bg-image {
+    display: block;
+    height: 259px;
+    object-fit: cover;
+    border-radius: 12px;
+  }
+  
+  #dh-step-plan-comparison .dh-pest-hero {
+    height: auto;
+    min-height: 200px;
+    max-height: 300px;
+  }
+
+  .dh-interior-image {
+    width: 390px;
+  }
+
+  .dh-global-back-button {
+    top: 24px;
+    left: 20px;
+    padding: 0;
+    font-size: 0;
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* Accessibility - Motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
   `;
   document.head.appendChild(styleElement);
 };
@@ -3474,12 +3776,8 @@ const updateWidgetFonts = () => {
     widgetState.widgetConfig?.fonts?.primary?.url ||
     'https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap';
 
-  console.log('DEBUG updateWidgetFonts: fontName =', fontName);
-  console.log('DEBUG updateWidgetFonts: fontUrl =', fontUrl);
-
   const existingStyles = document.getElementById('dh-widget-styles');
   if (existingStyles) {
-    console.log('DEBUG updateWidgetFonts: Found existing styles, updating...');
     let cssText = existingStyles.textContent;
 
     // Update font import URL

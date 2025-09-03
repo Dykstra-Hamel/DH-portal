@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCompanyCaptchaConfig, verifyTurnstile } from '@/lib/captcha';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 // Auto-calling functions - implemented inline below
 import { normalizePhoneNumber } from '@/lib/utils';
@@ -292,7 +293,30 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    const submission: WidgetSubmission = await request.json();
+    const submission: WidgetSubmission & { captcha?: { provider?: string; token?: string; action?: string } } = await request.json();
+
+    // Verify CAPTCHA (Turnstile) if configured/required
+    try {
+      const captchaConfig = await getCompanyCaptchaConfig(submission.companyId);
+      const shouldVerify = captchaConfig.enabled && captchaConfig.required && captchaConfig.provider === 'turnstile';
+
+      if (shouldVerify) {
+        if (!submission.captcha?.token) {
+          return createCorsErrorResponse('Captcha token missing', origin, 'widget', 403);
+        }
+        if (!captchaConfig.secretKey) {
+          console.error('Captcha required but secret key not configured for company', submission.companyId);
+          return createCorsErrorResponse('Captcha not configured', origin, 'widget', 500);
+        }
+        const result = await verifyTurnstile(submission.captcha.token, captchaConfig.secretKey, origin, request);
+        if (!result.success) {
+          return createCorsErrorResponse(`Captcha verification failed: ${result.reason || 'invalid token'}`, origin, 'widget', 403);
+        }
+      }
+    } catch (captchaError) {
+      console.error('Captcha verification error:', captchaError);
+      return createCorsErrorResponse('Captcha verification error', origin, 'widget', 500);
+    }
 
     // Validate required fields
     if (
@@ -758,7 +782,7 @@ export async function POST(request: NextRequest) {
       // Don't fail the lead creation due to automation trigger issues
     }
 
-    // Send email notifications (don't fail lead creation if this fails)
+    // Trigger email notifications via Inngest (non-blocking)
     try {
       const widgetConfig = company?.widget_config || {};
       const notificationEmails = widgetConfig.notifications?.emails || [];
@@ -776,7 +800,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (validEmails.length > 0) {
-          const leadNotificationData: LeadNotificationData = {
+          const leadNotificationData = {
             leadId: lead.id,
             companyName: company?.name || 'Unknown Company',
             customerName: submission.contactInfo.name,
@@ -788,68 +812,34 @@ export async function POST(request: NextRequest) {
             address: submission.address,
             homeSize: submission.homeSize,
             estimatedPrice: submission.estimatedPrice,
-            priority,
+            priority: priority as 'medium' | 'low' | 'high' | 'urgent',
             autoCallEnabled,
             submittedAt: new Date().toISOString(),
           };
 
-          // Get email notification configuration from company widget config
+          // Get email notification configuration
           const emailConfig = company?.widget_config?.emailNotifications || {
             enabled: true,
             subjectLine: 'New Service Request: {customerName} - {companyName}',
           };
 
-          const emailResult = await sendLeadCreatedNotifications(
+          // Send email notification (non-blocking - fire and forget)
+          sendLeadCreatedNotifications(
             validEmails,
             leadNotificationData,
-            emailConfig.enabled
-              ? {
-                  subjectLine: emailConfig.subjectLine,
-                }
-              : undefined,
-            submission.companyId // Pass company ID for custom domain lookup
-          );
-
-          if (emailResult.success) {
-          } else {
-            console.error(
-              `All lead notification emails failed for lead ${lead.id}`
-            );
-          }
+            emailConfig.enabled ? { subjectLine: emailConfig.subjectLine } : undefined,
+            submission.companyId
+          ).catch(error => {
+            console.error('Error sending email notifications:', error);
+          });
         }
       }
     } catch (error) {
-      console.error('Error sending lead notification emails:', error);
-      // Don't fail the lead creation due to email issues
+      console.error('Error setting up email notifications:', error);
+      // Don't fail the lead creation due to email setup issues
     }
 
-    // Send SMS confirmation (immediate)
-    try {
-      const smsResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/widget/send-sms`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            customerPhone: submission.contactInfo.phone,
-            customerName: submission.contactInfo.name,
-            pestType: submission.pestType,
-          }),
-        }
-      );
-
-      if (smsResponse.ok) {
-        const smsResult = await smsResponse.json();
-      } else {
-        const smsError = await smsResponse.json();
-        console.error('SMS sending failed:', smsError);
-      }
-    } catch (error) {
-      console.error('Error sending SMS confirmation:', error);
-      // Don't fail the lead creation due to SMS issues
-    }
+    // SMS functionality disabled for now - will be implemented with different system later
 
     // NOW HANDLED BY AUTOMATION WORKFLOWS
 
