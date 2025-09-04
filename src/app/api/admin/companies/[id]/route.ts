@@ -18,9 +18,27 @@ export async function PUT(
     const resolvedParams = await params;
     const companyId = resolvedParams.id;
 
+    // Sanitize and prepare data - handle website array format
+    const sanitizedData = {
+      ...companyData
+    };
+    
+    // Handle website as either array (new format) or string (backward compatibility)
+    if (sanitizedData.website !== undefined) {
+      if (Array.isArray(sanitizedData.website)) {
+        sanitizedData.website = sanitizedData.website
+          .filter((url: string) => url && typeof url === 'string' && url.trim().length > 0)
+          .map((url: string) => url.trim());
+      } else if (typeof sanitizedData.website === 'string') {
+        sanitizedData.website = sanitizedData.website.trim() ? [sanitizedData.website.trim()] : [];
+      } else {
+        sanitizedData.website = [];
+      }
+    }
+
     const { error } = await supabase
       .from('companies')
-      .update(companyData)
+      .update(sanitizedData)
       .eq('id', companyId);
 
     if (error) {
