@@ -1159,6 +1159,10 @@
     border-bottom: none;
   }
 
+  button:focus {
+  outline: none !important;
+  }
+
   /* ===================================================================
    STEP-SPECIFIC STYLING
    =================================================================== */
@@ -1315,6 +1319,7 @@
 
   #subspecies-heading {
   margin-bottom: 15px;
+  font-size: 16px;
   }
 
   .dh-subspecies-grid {
@@ -3893,6 +3898,7 @@
 
   .dh-plan-visual {
   height: 100%;
+  max-height: 272px;
   /* Image on the right side */
   }
 
@@ -8094,12 +8100,13 @@
   window.populateContactFields = populateContactFields;
 
   // === WIDGET CAPTCHA ===
-  // Minimal state - only what we need
+  // Minimal state
   let scriptLoaded = false;
   let scriptLoadPromise = null;
   let siteKey = null;
-  let widgetId = null;
   let isExecuting = false;
+  let retryCount = 0;
+  const MAX_RETRIES = 3;
 
   function loadScriptOnce() {
     console.log('Turnstile: loadScriptOnce called, scriptLoaded:', scriptLoaded);
@@ -8122,55 +8129,142 @@
         reject(new Error('Failed to load Turnstile script'));
       };
       document.head.appendChild(script);
-      console.log('Turnstile: Script element added to head');
     });
 
     return scriptLoadPromise;
   }
 
-  function ensureContainer() {
-    console.log('Turnstile: ensureContainer called');
-    let el = document.getElementById('dh-turnstile-container');
-    if (!el) {
-      console.log('Turnstile: Creating container element');
-      el = document.createElement('div');
-      el.id = 'dh-turnstile-container';
-      el.style.cssText = 'position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden;';
-      document.body.appendChild(el);
-      console.log('Turnstile: Container added to DOM');
-    } else {
-      console.log('Turnstile: Container already exists');
+  function createFreshContainer() {
+    // Remove any existing containers
+    const existingContainer = document.getElementById('dh-turnstile-container');
+    if (existingContainer) {
+      existingContainer.remove();
     }
-    return el;
+
+    // Create fresh container
+    const container = document.createElement('div');
+    container.id = 'dh-turnstile-container';
+    container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden;';
+    document.body.appendChild(container);
+    
+    console.log('Turnstile: Fresh container created');
+    return container;
   }
 
-  async function renderWidget() {
-    console.log('Turnstile: renderWidget called with siteKey:', siteKey?.substring(0, 20) + '...');
-    await loadScriptOnce();
-    const container = ensureContainer();
-    
-    if (widgetId) {
-      console.log('Turnstile: Widget already exists, returning existing ID:', widgetId);
-      return widgetId;
+  function cleanupWidget(widgetId, container) {
+    try {
+      if (widgetId && window.turnstile && typeof window.turnstile.remove === 'function') {
+        window.turnstile.remove(widgetId);
+        console.log('Turnstile: Widget removed:', widgetId);
+      }
+    } catch (error) {
+      console.warn('Turnstile: Error removing widget:', error);
     }
-    
+
+    try {
+      if (container && container.parentNode) {
+        container.remove();
+        console.log('Turnstile: Container removed');
+      }
+    } catch (error) {
+      console.warn('Turnstile: Error removing container:', error);
+    }
+  }
+
+  async function getTokenWithRetry() {
+    if (retryCount >= MAX_RETRIES) {
+      console.error('Turnstile: Max retries exceeded');
+      throw new Error('Turnstile max retries exceeded');
+    }
+
+    try {
+      return await getTokenInternal();
+    } catch (error) {
+      retryCount++;
+      console.warn(`Turnstile: Attempt ${retryCount} failed:`, error.message);
+      
+      // Wait before retry with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000);
+      console.log(`Turnstile: Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      return getTokenWithRetry();
+    }
+  }
+
+  async function getTokenInternal() {
+    if (!siteKey) {
+      throw new Error('Captcha not initialized');
+    }
+
+    await loadScriptOnce();
+
     if (!window.turnstile || typeof window.turnstile.render !== 'function') {
-      console.error('Turnstile: window.turnstile not available or render function missing');
       throw new Error('Turnstile not available');
     }
-    
-    console.log('Turnstile: Rendering widget...');
-    widgetId = window.turnstile.render(container, {
-      sitekey: siteKey,
-      size: 'invisible',
-      retry: 'auto',
-      'error-callback': () => {
-        console.error('Turnstile: Widget error callback triggered');
-      },
+
+    // Create fresh container and widget for this token request
+    const container = createFreshContainer();
+    let widgetId = null;
+
+    return new Promise((resolve, reject) => {
+      try {
+        console.log('Turnstile: Creating fresh widget for token generation');
+        
+        // Create widget with callback-based approach
+        widgetId = window.turnstile.render(container, {
+          sitekey: siteKey,
+          size: 'invisible',
+          callback: (token) => {
+            console.log('Turnstile: Token received via callback');
+            retryCount = 0; // Reset retry count on success
+            
+            // Clean up immediately after getting token
+            cleanupWidget(widgetId, container);
+            resolve(token);
+          },
+          'error-callback': (error) => {
+            console.error('Turnstile: Widget error callback:', error);
+            cleanupWidget(widgetId, container);
+            
+            // Check for specific error types
+            if (error && error.includes && error.includes('rate-limited')) {
+              reject(new Error('Rate limited - will retry'));
+            } else {
+              reject(new Error(`Turnstile error: ${error || 'Unknown error'}`));
+            }
+          },
+          'expired-callback': () => {
+            console.warn('Turnstile: Token expired');
+            cleanupWidget(widgetId, container);
+            reject(new Error('Turnstile token expired'));
+          },
+          'timeout-callback': () => {
+            console.warn('Turnstile: Token timeout');
+            cleanupWidget(widgetId, container);
+            reject(new Error('Turnstile timeout'));
+          },
+        });
+
+        if (!widgetId) {
+          cleanupWidget(widgetId, container);
+          reject(new Error('Failed to create Turnstile widget'));
+          return;
+        }
+
+        console.log('Turnstile: Widget created with ID:', widgetId);
+
+        // Set timeout for the entire process
+        setTimeout(() => {
+          cleanupWidget(widgetId, container);
+          reject(new Error('Turnstile token generation timeout'));
+        }, 30000); // 30 second timeout
+
+      } catch (error) {
+        cleanupWidget(widgetId, container);
+        reject(error);
+      }
     });
-    
-    console.log('Turnstile: Widget rendered with ID:', widgetId);
-    return widgetId;
   }
 
   async function getToken() {
@@ -8182,55 +8276,12 @@
       throw new Error('Turnstile already executing');
     }
     
-    if (!siteKey) {
-      throw new Error('Captcha not initialized');
-    }
-    
     isExecuting = true;
     
     try {
-      // Widget should already be rendered from init
-      if (!widgetId) {
-        throw new Error('Widget not initialized - call dhCaptcha.init() first');
-      }
-      
-      // Execute pre-rendered widget immediately
-      console.log('Turnstile: Executing pre-rendered widget for token');
-      window.turnstile.execute(widgetId, { async: true });
-      
-      // Poll for token
-      return new Promise((resolve, reject) => {
-        let attempts = 0;
-        const maxAttempts = 30; // 15 seconds max
-        
-        const checkForToken = () => {
-          attempts++;
-          try {
-            const token = window.turnstile.getResponse(widgetId);
-            if (token) {
-              console.log('Turnstile: Token received via polling');
-              isExecuting = false;
-              resolve(token);
-              return;
-            }
-          } catch (e) {
-            // getResponse may not be available, continue polling
-          }
-          
-          if (attempts >= maxAttempts) {
-            console.error('Turnstile: Token timeout after', attempts, 'attempts');
-            isExecuting = false;
-            reject(new Error('Turnstile token timeout'));
-            return;
-          }
-          
-          setTimeout(checkForToken, 500);
-        };
-        
-        // Start polling after brief delay
-        setTimeout(checkForToken, 500);
-      });
-      
+      const token = await getTokenWithRetry();
+      isExecuting = false;
+      return token;
     } catch (error) {
       isExecuting = false;
       throw error;
@@ -8247,12 +8298,12 @@
       }
       
       siteKey = inputSiteKey;
-      console.log('Turnstile: Initializing with siteKey...');
+      retryCount = 0; // Reset retry count
       
       try {
-        await loadScriptOnce(); // Load script first
-        await renderWidget(); // Pre-render widget for instant execution
-        console.log('Turnstile: Initialization complete (widget pre-rendered)');
+        // Only load script, don't pre-render widgets
+        await loadScriptOnce();
+        console.log('Turnstile: Initialization complete (script loaded, ready for on-demand tokens)');
       } catch (error) {
         console.error('Turnstile: Init failed:', error);
       }
@@ -9041,19 +9092,25 @@
       try {
         const cfg = widgetState.widgetConfig && widgetState.widgetConfig.captcha;
         if (cfg && cfg.provider === 'turnstile' && cfg.siteKey) {
-          // Update button to show verification step
           const submitBtn = document.getElementById('contact-submit');
+          
+          // Update button to show verification step
           if (submitBtn) {
-            submitBtn.innerHTML = 'Verifying... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            submitBtn.innerHTML = 'Verifying security... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
           }
           
-          // Ensure captcha initialized
+          // Ensure captcha initialized (lightweight - just loads script)
           if (window.dhCaptcha && typeof window.dhCaptcha.init === 'function') {
             await window.dhCaptcha.init('turnstile', cfg.siteKey);
           }
+          
+          // Generate fresh token (creates widget on-demand)
+          console.log('DH Widget: Requesting fresh Turnstile token...');
           const token = window.dhCaptcha && typeof window.dhCaptcha.getToken === 'function'
             ? await window.dhCaptcha.getToken()
             : null;
+          
+          console.log('DH Widget: Turnstile token acquired successfully');
           
           // Update button to show submitting
           if (submitBtn) {
@@ -9068,6 +9125,24 @@
         }
       } catch (captchaError) {
         console.warn('DH Widget: Captcha token acquisition failed', captchaError);
+        
+        // Show more specific error message
+        const submitBtn = document.getElementById('contact-submit');
+        if (submitBtn) {
+          if (captchaError.message && captchaError.message.includes('rate limit')) {
+            submitBtn.innerHTML = 'Rate limited - retrying... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          } else if (captchaError.message && captchaError.message.includes('max retries')) {
+            submitBtn.innerHTML = 'Security check failed <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            // Don't proceed with submission if captcha completely failed
+            widgetState.isSubmitting = false;
+            updateSubmitButtonState(false);
+            alert('Security verification failed. Please try again in a few minutes.');
+            return;
+          }
+        }
+        
+        // Continue without captcha token if it's not required or if it's a temporary issue
+        console.log('DH Widget: Continuing submission without captcha token');
       }
 
       // Submit to API
@@ -9088,6 +9163,9 @@
         // Navigate to complete step to show thank you message
         showStep('complete');
         setupStepValidation('complete');
+        
+        // Reset button state (though user won't see it since we navigated away)
+        resetBookItButton();
       } else {
         console.error('Form submission failed:', data.error);
         alert(
@@ -9096,6 +9174,7 @@
         // Reset submission state on error to allow retry
         widgetState.isSubmitting = false;
         updateSubmitButtonState(false);
+        resetBookItButton();
       }
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -9105,6 +9184,7 @@
       // Reset submission state on error to allow retry
       widgetState.isSubmitting = false;
       updateSubmitButtonState(false);
+      resetBookItButton();
     }
   };
 
@@ -9131,6 +9211,15 @@
           submitBtn.classList.remove('submitting');
         }
       }
+    }
+  };
+
+  // Reset Book It button state
+  const resetBookItButton = () => {
+    const submitBtn = document.getElementById('submit-btn');
+    if (submitBtn) {
+      submitBtn.innerHTML = 'Book It <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      submitBtn.disabled = false;
     }
   };
 
@@ -9185,7 +9274,20 @@
       hasErrors = true;
     }
 
+    if (hasErrors) {
+      // Reset button if validation fails
+      resetBookItButton();
+      return;
+    }
+
     if (!hasErrors) {
+      // Update button to show booking state
+      const submitBtn = document.getElementById('submit-btn');
+      if (submitBtn) {
+        submitBtn.innerHTML = 'Booking... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        submitBtn.disabled = true;
+      }
+
       // Save scheduling info to widget state before submission
       widgetState.formData.startDate = startDateInput.value;
       widgetState.formData.arrivalTime = arrivalTimeInput.value;
@@ -9651,7 +9753,7 @@
       // Update button to loading state
       const submitBtn = document.getElementById('quote-contact-submit');
       if (submitBtn) {
-        submitBtn.innerHTML = 'Loading... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        submitBtn.innerHTML = 'Loading...';
         submitBtn.classList.add('submitting');
         submitBtn.disabled = true;
       }
