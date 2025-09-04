@@ -379,10 +379,20 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
   } catch (parseError) {
     console.error('Error parsing Google reviews data:', parseError);
   }
-    
+
+  // Get company logo override from company settings
+  const { data: logoOverrideSetting } = await supabase
+    .from('company_settings')
+    .select('setting_value')
+    .eq('company_id', companyId)
+    .eq('setting_key', 'logo_override_url')
+    .single();
+
+  const logoOverrideUrl = logoOverrideSetting?.setting_value || '';
 
   // Prepare email variables with proper URL handling
-  const logoUrl = brandData?.logo_url || '/pcocentral-logo.png';
+  // Prioritize company logo override, then brand logo, then default
+  const logoUrl = logoOverrideUrl || brandData?.logo_url || '/pcocentral-logo.png';
   
   
   // Helper function to format date (using timezone-safe formatter)

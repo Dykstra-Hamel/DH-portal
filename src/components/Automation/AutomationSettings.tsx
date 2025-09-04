@@ -17,6 +17,8 @@ import {
   BarChart3,
   Settings,
   BookOpen,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import WorkflowEditor from './WorkflowEditor';
 import EmailTemplateEditor from './EmailTemplateEditor';
@@ -46,6 +48,7 @@ interface EmailTemplate {
   html_content: string;
   text_content: string;
   variables?: string[];
+  logo_override_url?: string;
   is_active: boolean;
 }
 
@@ -72,6 +75,8 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
     automation_enabled: true,
     automation_max_emails_per_day: 10,
   });
+  const [logoOverrideUrl, setLogoOverrideUrl] = useState<string>('');
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const fetchAutomationData = useCallback(async () => {
     if (!companyId) return;
@@ -116,12 +121,13 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
         const settingsResponse = await fetch(`/api/companies/${companyId}/settings`);
         if (settingsResponse.ok) {
           const settingsData = await settingsResponse.json();
-          if (settingsData.success && settingsData.settings) {
+          if (settingsData.settings) {
             const settings = settingsData.settings;
             setAutomationSettings({
-              automation_enabled: settings.automation_enabled?.value ?? true,
-              automation_max_emails_per_day: settings.automation_max_emails_per_day?.value ?? 10,
+              automation_enabled: settings.automation_enabled?.value === 'true',
+              automation_max_emails_per_day: parseInt(settings.automation_max_emails_per_day?.value || '10'),
             });
+            setLogoOverrideUrl(settings.logo_override_url?.value || '');
           }
         }
       } catch (settingsError) {
@@ -326,6 +332,105 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
     
     // Switch to templates view to show the imported template
     setActiveView('templates');
+  };
+
+  // Logo override handling functions
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Please select an image file' });
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'File size must be less than 10MB' });
+      return;
+    }
+
+    setLogoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`/api/companies/${companyId}/logo-override`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Update the logo override URL in company settings
+        await updateLogoOverrideSetting(result.url);
+        setLogoOverrideUrl(result.url);
+        setMessage({ type: 'success', text: 'Logo override uploaded successfully' });
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Failed to upload logo' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error uploading logo' });
+    } finally {
+      setLogoUploading(false);
+      // Reset the file input
+      event.target.value = '';
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    if (!logoOverrideUrl) return;
+
+    try {
+      const response = await fetch(`/api/companies/${companyId}/logo-override`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ logoUrl: logoOverrideUrl }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Remove the logo override URL from company settings
+        await updateLogoOverrideSetting('');
+        setLogoOverrideUrl('');
+        setMessage({ type: 'success', text: 'Logo override removed successfully' });
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Failed to remove logo' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error removing logo' });
+    }
+  };
+
+  const updateLogoOverrideSetting = async (logoUrl: string) => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            logo_override_url: {
+              value: logoUrl,
+              type: 'string'
+            }
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update logo override setting');
+      }
+    } catch (error) {
+      console.error('Error updating logo override setting:', error);
+      throw error;
+    }
   };
 
   if (loading) {
@@ -579,6 +684,63 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
           <div className={styles.sectionHeader}>
             <h3>Email Templates</h3>
             <p>Manage email templates used in your automation workflows.</p>
+          </div>
+
+          {/* Company Logo Override Section */}
+          <div className={styles.logoOverrideSection}>
+            <div className={styles.logoOverrideHeader}>
+              <h4>Logo Override</h4>
+              <p>Upload a custom logo to use in all email templates instead of your brand logo.</p>
+            </div>
+            
+            {logoOverrideUrl ? (
+              <div className={styles.logoPreview}>
+                <img 
+                  src={logoOverrideUrl} 
+                  alt="Logo override preview" 
+                  className={styles.logoImage}
+                />
+                <div className={styles.logoActions}>
+                  <button 
+                    type="button"
+                    onClick={handleLogoRemove}
+                    className={styles.removeLogo}
+                  >
+                    <Trash2 size={14} />
+                    Remove Override
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.logoUpload}>
+                <input
+                  type="file"
+                  id="logo-override-upload"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className={styles.logoInput}
+                  disabled={logoUploading}
+                />
+                <label htmlFor="logo-override-upload" className={styles.logoUploadLabel}>
+                  <div className={styles.logoUploadContent}>
+                    {logoUploading ? (
+                      <>
+                        <div className={styles.spinner} />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={24} />
+                        <span>Click to upload logo override</span>
+                        <span className={styles.logoUploadHint}>
+                          PNG, JPG, SVG up to 10MB
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </label>
+              </div>
+            )}
           </div>
 
           {templates.length === 0 ? (
