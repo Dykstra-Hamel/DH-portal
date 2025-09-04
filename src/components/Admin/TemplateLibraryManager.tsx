@@ -267,6 +267,7 @@ export default function TemplateLibraryManager() {
     }));
   };
 
+
   const filteredTemplates = templates.filter(template => {
     const matchesSearch =
       !searchTerm ||
@@ -590,6 +591,7 @@ export default function TemplateLibraryManager() {
                         </label>
                       </div>
                     </div>
+
                   </div>
 
                   {/* Variables Sidebar */}
