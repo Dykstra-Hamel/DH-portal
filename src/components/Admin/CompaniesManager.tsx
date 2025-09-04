@@ -15,7 +15,7 @@ interface Company {
   id: string;
   name: string;
   description: string | null;
-  website: string | null;
+  website: string[] | null; // Now an array of website domains
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -39,10 +39,12 @@ export default function CompaniesManager() {
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [googlePlacesListings, setGooglePlacesListings] = useState<GooglePlaceListing[]>([]);
+  const [websites, setWebsites] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    website: '',
+    website: [] as string[], // Now an array
     email: '',
     phone: '',
     address: '',
@@ -98,10 +100,33 @@ export default function CompaniesManager() {
 
   const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     try {
       const { ga_property_id, callrail_api_token, callrail_account_id, google_place_id, ...companyData } = formData;
-      const newCompany = await adminAPI.createCompany(companyData);
+      
+      // Client-side validation
+      if (!companyData.name || companyData.name.trim().length === 0) {
+        setError('Company name is required');
+        return;
+      }
+      
+      // Validate websites
+      const websiteErrors = validateWebsites();
+      if (websiteErrors.length > 0) {
+        setError(websiteErrors.join('; '));
+        return;
+      }
+      
+      // Use websites from state (for create form) or from formData (for edit)
+      const websitesToSubmit = (websites.length > 0 ? websites : companyData.website)
+        .filter((url: string) => url && url.trim().length > 0);
+      const companyDataWithWebsites = {
+        ...companyData,
+        website: websitesToSubmit
+      };
+      
+      const newCompany = await adminAPI.createCompany(companyDataWithWebsites);
       
       // Save settings to company_settings if provided
       const settingsToSave: any = {};
@@ -141,15 +166,16 @@ export default function CompaniesManager() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ settings: settingsToSave }),
           });
-        } catch (error) {
-          console.error('Error saving company settings:', error);
+        } catch (settingsError) {
+          console.error('Error saving company settings:', settingsError);
+          setError('Company created but failed to save some settings. You can edit the company to add them.');
         }
       }
 
       setFormData({
         name: '',
         description: '',
-        website: '',
+        website: [],
         email: '',
         phone: '',
         address: '',
@@ -164,10 +190,22 @@ export default function CompaniesManager() {
         callrail_account_id: '',
         google_place_id: '',
       });
+      setWebsites([]);
       setShowCreateForm(false);
+      setError(null);
       loadCompanies();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating company:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to create company';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      setError(errorMessage);
     }
   };
 
@@ -178,11 +216,20 @@ export default function CompaniesManager() {
     try {
       const { ga_property_id, callrail_api_token, callrail_account_id, google_place_id, ...companyData } = editingCompany;
       
+      // Validate websites
+      const websiteErrors = validateWebsites();
+      if (websiteErrors.length > 0) {
+        setError(websiteErrors.join('; '));
+        return;
+      }
+      
       // Update company data (without settings fields)
+      const websitesToSubmit = (websites.length > 0 ? websites : (companyData.website || []))
+        .filter((url: string) => url && url.trim().length > 0);
       await adminAPI.updateCompany(editingCompany.id, {
         name: companyData.name,
         description: companyData.description,
-        website: companyData.website,
+        website: websitesToSubmit,
         email: companyData.email,
         phone: companyData.phone,
         address: companyData.address,
@@ -233,6 +280,7 @@ export default function CompaniesManager() {
 
       setEditingCompany(null);
       setGooglePlacesListings([]); // Clear listings
+      setWebsites([]); // Clear websites
       loadCompanies();
     } catch (error) {
       console.error('Error updating company:', error);
@@ -305,6 +353,50 @@ export default function CompaniesManager() {
     }
   };
 
+  // Website management functions
+  const addWebsite = () => {
+    setWebsites([...websites, '']);
+  };
+
+  const removeWebsite = (index: number) => {
+    const updatedWebsites = websites.filter((_, i) => i !== index);
+    setWebsites(updatedWebsites);
+  };
+
+  const updateWebsite = (index: number, value: string) => {
+    const updatedWebsites = [...websites];
+    updatedWebsites[index] = value;
+    setWebsites(updatedWebsites);
+  };
+
+  // Validate websites
+  const validateWebsites = () => {
+    const errors: string[] = [];
+    const seenWebsites = new Set();
+    
+    websites.forEach((website, index) => {
+      if (website.trim()) {
+        // Check for duplicates
+        const normalizedWebsite = website.toLowerCase().trim();
+        if (seenWebsites.has(normalizedWebsite)) {
+          errors.push(`Website ${index + 1}: Duplicate website detected`);
+        } else {
+          seenWebsites.add(normalizedWebsite);
+        }
+        
+        // Basic URL validation
+        try {
+          const url = website.startsWith('http') ? website : `https://${website}`;
+          new URL(url);
+        } catch {
+          errors.push(`Website ${index + 1}: Invalid URL format`);
+        }
+      }
+    });
+    
+    return errors;
+  };
+
   // Save Google Places listings
   const saveGooglePlacesListings = async (companyId: string) => {
     try {
@@ -334,6 +426,19 @@ export default function CompaniesManager() {
     onSubmit: (e: React.FormEvent) => void
   ) => (
     <form onSubmit={onSubmit}>
+      {error && (
+        <div style={{
+          backgroundColor: '#fee2e2',
+          border: '1px solid #fecaca',
+          color: '#dc2626',
+          padding: '12px',
+          borderRadius: '4px',
+          marginBottom: '16px',
+          fontSize: '14px'
+        }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
       <div className={styles.formGroup}>
         <label>Name *:</label>
         <input
@@ -365,18 +470,68 @@ export default function CompaniesManager() {
       </div>
 
       <div className={styles.formGroup}>
-        <label>Website:</label>
-        <input
-          type="url"
-          value={company ? company.website || '' : formData.website}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, website: e.target.value });
-            } else {
-              setFormData({ ...formData, website: e.target.value });
-            }
+        <label>Websites:</label>
+        <div style={{ marginBottom: '12px' }}>
+          {websites.length === 0 ? (
+            <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
+              No websites added yet.
+            </p>
+          ) : (
+            websites.map((website, index) => (
+              <div key={index} style={{ 
+                border: '1px solid #ddd', 
+                borderRadius: '4px', 
+                padding: '12px', 
+                marginBottom: '8px',
+                backgroundColor: '#f9f9f9'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <input
+                    type="url"
+                    placeholder="https://example.com"
+                    value={website}
+                    onChange={e => updateWebsite(index, e.target.value)}
+                    style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeWebsite(index)}
+                    style={{ 
+                      padding: '6px 12px', 
+                      backgroundColor: '#dc2626', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={addWebsite}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#059669',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            marginBottom: '8px'
           }}
-        />
+        >
+          + Add Website
+        </button>
+        <small style={{ color: '#666', fontSize: '12px', display: 'block' }}>
+          Add multiple websites/domains for this company. The first website will be considered the primary domain.
+        </small>
       </div>
 
       <div className={styles.formGroup}>
@@ -658,6 +813,8 @@ export default function CompaniesManager() {
             } else {
               setShowCreateForm(false);
             }
+            setError(null);
+            setWebsites([]);
           }}
         >
           Cancel
@@ -672,7 +829,11 @@ export default function CompaniesManager() {
         <h2>Companies Management</h2>
         <button
           className={styles.createButton}
-          onClick={() => setShowCreateForm(true)}
+          onClick={() => {
+            setShowCreateForm(true);
+            setError(null);
+            setWebsites([]);
+          }}
         >
           Create Company
         </button>
@@ -701,6 +862,7 @@ export default function CompaniesManager() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Website</th>
               <th>Industry</th>
               <th>Size</th>
               <th>Email</th>
@@ -713,6 +875,27 @@ export default function CompaniesManager() {
             {companies.map(company => (
               <tr key={company.id}>
                 <td>{company.name}</td>
+                <td>
+                  {company.website && company.website.length > 0 ? (
+                    <span>
+                      <a 
+                        href={company.website[0].startsWith('http') ? company.website[0] : `https://${company.website[0]}`}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: '#1d4ed8', textDecoration: 'underline' }}
+                      >
+                        {company.website[0]}
+                      </a>
+                      {company.website.length > 1 && (
+                        <small style={{ color: '#6b7280', marginLeft: '4px' }}>
+                          (+{company.website.length - 1} more)
+                        </small>
+                      )}
+                    </span>
+                  ) : (
+                    <span style={{ color: '#6b7280' }}>-</span>
+                  )}
+                </td>
                 <td>{company.industry || '-'}</td>
                 <td>{company.size || '-'}</td>
                 <td>{company.email || '-'}</td>
@@ -733,6 +916,8 @@ export default function CompaniesManager() {
                       onClick={() => {
                         setEditingCompany(company);
                         loadGooglePlacesListings(company.id);
+                        // Load websites for editing
+                        setWebsites(company.website || []);
                       }}
                     >
                       Edit
