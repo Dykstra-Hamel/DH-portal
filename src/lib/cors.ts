@@ -70,7 +70,15 @@ async function getWidgetOrigins(): Promise<string[]> {
       widgetDomains = getGlobalWhitelistedDomains();
     }
 
-    return [...BASE_WIDGET_ORIGINS, ...widgetDomains];
+    const allOrigins = [...BASE_WIDGET_ORIGINS, ...widgetDomains];
+    
+    // Debug logging
+    console.log('CORS Debug - Base Origins:', BASE_WIDGET_ORIGINS);
+    console.log('CORS Debug - Widget Domains:', widgetDomains);
+    console.log('CORS Debug - All Allowed Origins:', allOrigins);
+    console.log('CORS Debug - NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
+
+    return allOrigins;
   } catch (error) {
     console.error('Failed to fetch widget domains:', error);
     // Fall back to environment variable only
@@ -109,6 +117,7 @@ export async function isOriginAllowed(origin: string | null, configType: CorsCon
   const isAllowed = allowedOrigins.some(allowedOrigin => {
     // Exact match
     if (allowedOrigin === origin) {
+      console.log(`CORS Debug - EXACT MATCH: ${origin} === ${allowedOrigin}`);
       return true;
     }
     
@@ -117,12 +126,17 @@ export async function isOriginAllowed(origin: string | null, configType: CorsCon
       const domain = allowedOrigin.replace(/^https?:\/\//, '');
       const subdomainMatch = origin.endsWith(`.${domain}`) || origin.includes(domain);
       if (subdomainMatch) {
+        console.log(`CORS Debug - SUBDOMAIN MATCH: ${origin} matches ${domain}`);
         return true;
       }
     }
     
     return false;
   });
+  
+  console.log(`CORS Debug - Origin ${origin} allowed: ${isAllowed}`);
+  console.log(`CORS Debug - Config type: ${configType}`);
+  console.log(`CORS Debug - Allowed origins:`, allowedOrigins);
   
   return isAllowed;
 }
