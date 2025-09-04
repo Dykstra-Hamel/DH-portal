@@ -129,16 +129,25 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has access to this company using admin client to bypass RLS
-    const adminSupabase = createAdminClient();
-    const { data: userCompany, error: accessError } = await adminSupabase
+    // Check if user has access to this company
+    const { data: userCompany, error: accessError } = await supabase
       .from('user_companies')
       .select('company_id')
       .eq('user_id', user.id)
       .eq('company_id', companyId)
       .single();
 
-    if (accessError || !userCompany) {
+    // Also check if user is global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const isGlobalAdmin = profile?.role === 'admin';
+    const hasCompanyAccess = userCompany && !accessError;
+
+    if (!isGlobalAdmin && !hasCompanyAccess) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -158,7 +167,7 @@ export async function DELETE(
     const filePath = urlParts[1];
 
     // Verify it&apos;s an email logo for this company (security check)
-    const cleanCompanyName = await adminSupabase
+    const cleanCompanyName = await supabase
       .from('companies')
       .select('name')
       .eq('id', companyId)
