@@ -66,19 +66,25 @@
       try {
         const cfg = widgetState.widgetConfig && widgetState.widgetConfig.captcha;
         if (cfg && cfg.provider === 'turnstile' && cfg.siteKey) {
-          // Update button to show verification step
           const submitBtn = document.getElementById('contact-submit');
+          
+          // Update button to show verification step
           if (submitBtn) {
-            submitBtn.innerHTML = 'Verifying... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            submitBtn.innerHTML = 'Verifying security... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
           }
           
-          // Ensure captcha initialized
+          // Ensure captcha initialized (lightweight - just loads script)
           if (window.dhCaptcha && typeof window.dhCaptcha.init === 'function') {
             await window.dhCaptcha.init('turnstile', cfg.siteKey);
           }
+          
+          // Generate fresh token (creates widget on-demand)
+          console.log('DH Widget: Requesting fresh Turnstile token...');
           const token = window.dhCaptcha && typeof window.dhCaptcha.getToken === 'function'
             ? await window.dhCaptcha.getToken()
             : null;
+          
+          console.log('DH Widget: Turnstile token acquired successfully');
           
           // Update button to show submitting
           if (submitBtn) {
@@ -93,6 +99,24 @@
         }
       } catch (captchaError) {
         console.warn('DH Widget: Captcha token acquisition failed', captchaError);
+        
+        // Show more specific error message
+        const submitBtn = document.getElementById('contact-submit');
+        if (submitBtn) {
+          if (captchaError.message && captchaError.message.includes('rate limit')) {
+            submitBtn.innerHTML = 'Rate limited - retrying... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          } else if (captchaError.message && captchaError.message.includes('max retries')) {
+            submitBtn.innerHTML = 'Security check failed <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            // Don't proceed with submission if captcha completely failed
+            widgetState.isSubmitting = false;
+            updateSubmitButtonState(false);
+            alert('Security verification failed. Please try again in a few minutes.');
+            return;
+          }
+        }
+        
+        // Continue without captcha token if it's not required or if it's a temporary issue
+        console.log('DH Widget: Continuing submission without captcha token');
       }
 
       // Submit to API
@@ -113,6 +137,9 @@
         // Navigate to complete step to show thank you message
         showStep('complete');
         setupStepValidation('complete');
+        
+        // Reset button state (though user won't see it since we navigated away)
+        resetBookItButton();
       } else {
         console.error('Form submission failed:', data.error);
         alert(
@@ -121,6 +148,7 @@
         // Reset submission state on error to allow retry
         widgetState.isSubmitting = false;
         updateSubmitButtonState(false);
+        resetBookItButton();
       }
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -130,6 +158,7 @@
       // Reset submission state on error to allow retry
       widgetState.isSubmitting = false;
       updateSubmitButtonState(false);
+      resetBookItButton();
     }
   };
 
@@ -156,6 +185,15 @@
           submitBtn.classList.remove('submitting');
         }
       }
+    }
+  };
+
+  // Reset Book It button state
+  const resetBookItButton = () => {
+    const submitBtn = document.getElementById('submit-btn');
+    if (submitBtn) {
+      submitBtn.innerHTML = 'Book It <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      submitBtn.disabled = false;
     }
   };
 
@@ -210,7 +248,20 @@
       hasErrors = true;
     }
 
+    if (hasErrors) {
+      // Reset button if validation fails
+      resetBookItButton();
+      return;
+    }
+
     if (!hasErrors) {
+      // Update button to show booking state
+      const submitBtn = document.getElementById('submit-btn');
+      if (submitBtn) {
+        submitBtn.innerHTML = 'Booking... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        submitBtn.disabled = true;
+      }
+
       // Save scheduling info to widget state before submission
       widgetState.formData.startDate = startDateInput.value;
       widgetState.formData.arrivalTime = arrivalTimeInput.value;
@@ -676,7 +727,7 @@
       // Update button to loading state
       const submitBtn = document.getElementById('quote-contact-submit');
       if (submitBtn) {
-        submitBtn.innerHTML = 'Loading... <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        submitBtn.innerHTML = 'Loading...';
         submitBtn.classList.add('submitting');
         submitBtn.disabled = true;
       }
