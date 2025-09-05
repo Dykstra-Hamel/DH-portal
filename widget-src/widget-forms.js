@@ -323,7 +323,7 @@
           <div class="dh-safety-message" id="safety-message">
             <img class="dh-pet-safety-image" src="" alt="Pet Safety" id="pet-safety-image" />
             <div class="dh-safety-text">
-              <p id="safety-message-text">Oh, and don&apos;t worry. Our treatments are safe for people and pets for your property!</p>
+              <p id="safety-message-text">Oh, and don&apos;t worry, our treatments are people and pet-friendly!</p>
             </div>
           </div>
         </div>
@@ -509,7 +509,7 @@
           <!-- Logo will be populated from widget config -->
         </div>
         
-        <h2 class="dh-step-heading">Here&apos;s what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">pests</span> - and keep them out!</h2>
+        <h2 class="dh-step-heading" id="plan-comparison-header">Here&apos;s what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">pests</span> - and keep them out!</h2>
         
         <!-- Google Reviews Display -->
         <div class="dh-reviews-container" id="comparison-reviews-container">

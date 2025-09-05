@@ -321,15 +321,6 @@
         collected_at: 'widget_load',
       };
 
-      // Debug logging for URL capture
-      console.log('DH Widget URL Capture:', {
-        page_url: attributionData.page_url,
-        referrer_url: attributionData.referrer_url,
-        referrer_domain: attributionData.referrer_domain,
-        traffic_source: attributionData.traffic_source,
-        document_referrer: document.referrer,
-        utm_params: urlParams
-      });
       
       // Initialize widget state objects (already declared globally)
       widgetState = {
@@ -499,7 +490,6 @@
             localStorage.setItem('dh_widget_progress_' + config.companyId, JSON.stringify(saveData));
             widgetState.formState.lastSaved = new Date().toISOString();
             
-            console.log('DH Widget: Saved form state to localStorage', saveData);
             return true;
           } catch (error) {
             console.warn('Failed to save form state:', error);
@@ -542,7 +532,6 @@
         // Check if user has significant progress worth restoring
         shouldPromptToContinue: (savedData) => {
           if (!savedData) {
-            console.log('DH Widget: No saved data for continue prompt');
             return false;
           }
           
@@ -555,13 +544,6 @@
             (currentStep !== 'pest-issue' && currentStep !== 'welcome')
           );
           
-          console.log('DH Widget: Checking if should prompt to continue', {
-            hasSignificantProgress,
-            pestType: formData.pestType,
-            address: formData.address,
-            currentStep: currentStep,
-            formData: formData
-          });
           
           return hasSignificantProgress;
         },
@@ -569,7 +551,6 @@
         // Start auto-save functionality
         startAutoSave: () => {
           if (!widgetState.formState.progressiveFeatures.autoSave) {
-            console.log('DH Widget: Auto-save is disabled');
             return;
           }
           
@@ -578,12 +559,10 @@
             clearInterval(progressiveFormManager.autoSaveTimer);
           }
           
-          console.log('DH Widget: Starting auto-save with interval:', widgetState.formState.autoSaveInterval);
           
           // Start new auto-save timer
           progressiveFormManager.autoSaveTimer = setInterval(() => {
             if (progressiveFormManager.hasSignificantFormData()) {
-              console.log('DH Widget: Auto-save triggered - has significant data');
               progressiveFormManager.saveFormStateToLocalStorage();
             }
           }, widgetState.formState.autoSaveInterval);
@@ -733,7 +712,6 @@
         
         // Function to show continue prompt to users with saved progress
         showContinuePrompt: (savedData) => {
-          console.log('DH Widget: showContinuePrompt called with data:', savedData);
           
           // Create overlay
           const overlay = document.createElement('div');
@@ -920,7 +898,6 @@
           
           // Then populate form fields after a delay to ensure DOM is ready
           setTimeout(() => {
-            console.log('DH Widget: Session restoration - calling populateFormFields');
             populateFormFields();
             // Clear restoration flag after population is complete
             widgetState.isRestoring = false;
@@ -938,7 +915,6 @@
       // Function to populate form fields with restored data
       const populateFormFields = () => {
         const data = widgetState.formData;
-        console.log('DH Widget: populateFormFields called with data:', data);
         
         try {
           // Restore pest selection if available
@@ -948,7 +924,6 @@
               option.classList.remove('selected');
               if (option.dataset.pest === data.pestType) {
                 option.classList.add('selected');
-                console.log('DH Widget: Restored pest selection:', data.pestType);
               }
             });
           }
@@ -958,7 +933,6 @@
             const addressInput = document.getElementById('address-search-input');
             if (addressInput) {
               addressInput.value = data.address;
-              console.log('DH Widget: Populated address search input:', data.address);
             }
           }
           
@@ -973,7 +947,6 @@
             const streetInput = document.getElementById('confirm-street-input');
             if (streetInput) {
               streetInput.value = addressStreet;
-              console.log('DH Widget: Populated confirm-street-input with value:', addressStreet);
               if (typeof updateFloatingLabel === 'function') {
                 updateFloatingLabel(streetInput);
               }
@@ -984,7 +957,6 @@
             const cityInput = document.getElementById('confirm-city-input');
             if (cityInput) {
               cityInput.value = addressCity;
-              console.log('DH Widget: Populated confirm-city-input with value:', addressCity);
               if (typeof updateFloatingLabel === 'function') {
                 updateFloatingLabel(cityInput);
               }
@@ -995,7 +967,6 @@
             const stateInput = document.getElementById('confirm-state-input');
             if (stateInput) {
               stateInput.value = addressState;
-              console.log('DH Widget: Populated confirm-state-input with value:', addressState);
               if (typeof updateFloatingLabel === 'function') {
                 updateFloatingLabel(stateInput);
               }
@@ -1006,7 +977,6 @@
             const zipInput = document.getElementById('confirm-zip-input');
             if (zipInput) {
               zipInput.value = addressZip;
-              console.log('DH Widget: Populated confirm-zip-input with value:', addressZip);
               if (typeof updateFloatingLabel === 'function') {
                 updateFloatingLabel(zipInput);
               }
@@ -1114,7 +1084,6 @@
       
       // Function to start fresh widget
       const startFreshWidget = () => {
-        console.log('DH Widget: Starting fresh widget');
         progressiveFormManager.startAutoSave();
         showStep('pest-issue');
         setupStepValidation('pest-issue');
@@ -1297,9 +1266,7 @@
       
       if (sessionIdToQuery && typeof recoverPartialLead === 'function') {
         try {
-          console.log('DH Widget: Querying server with sessionId:', sessionIdToQuery);
           serverRecoveryData = await recoverPartialLead(config.companyId, sessionIdToQuery);
-          console.log('DH Widget: Server recovery data check', serverRecoveryData);
         } catch (error) {
           console.warn('Failed to recover partial lead from server:', error);
         }

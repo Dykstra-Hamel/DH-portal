@@ -470,17 +470,17 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     pestType: leadData.pestType,
     urgency: leadData.urgency,
     address: leadData.address,
-    streetAddress: fullLeadData?.customer?.address || '',
-    city: fullLeadData?.customer?.city || '',
-    state: fullLeadData?.customer?.state || '',
-    zipCode: fullLeadData?.customer?.zip_code || '',
+    streetAddress: leadData.streetAddress || '',
+    city: leadData.city || '',
+    state: leadData.state || '',
+    zipCode: leadData.zipCode || '',
     homeSize: leadData.homeSize,
     leadSource: fullLeadData?.lead_source || '',
     createdDate: formatDate(fullLeadData?.created_at),
     
     // Scheduling information
-    requestedDate: formatDate(fullLeadData?.requested_date),
-    requestedTime: fullLeadData?.requested_time || '',
+    requestedDate: formatDate(leadData.requestedDate || fullLeadData?.requested_date),
+    requestedTime: leadData.requestedTime || fullLeadData?.requested_time || '',
     
     // Selected Plan Details (when available)
     selectedPlanName: planData?.plan_name || '',

@@ -179,6 +179,26 @@ const updateDynamicText = async () => {
         );
       }
 
+      // Update plan comparison header with custom text if available
+      const planComparisonHeader = document.getElementById('plan-comparison-header');
+      if (planComparisonHeader && widgetState.formData.pestType) {
+        // Find the pest option that matches the selected pest type
+        const pestOptions = widgetState.widgetConfig?.pestOptions || [];
+        const selectedPestOption = pestOptions.find(option => option.value === widgetState.formData.pestType);
+        
+        
+        if (selectedPestOption && selectedPestOption.plan_comparison_header_text) {
+          // Use custom header text and replace [pest type] placeholder
+          const customHeaderText = selectedPestOption.plan_comparison_header_text
+            .replace(/\[pest type\]/g, getPestTypeDisplay(widgetState.formData.pestType, 'comparison'));
+          planComparisonHeader.innerHTML = customHeaderText;
+        } else {
+          // Fall back to default behavior - update the pest type in the default text
+          const defaultText = `Here's what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">${getPestTypeDisplay(widgetState.formData.pestType, 'comparison')}</span> - and keep them out!`;
+          planComparisonHeader.innerHTML = defaultText;
+        }
+      }
+
       // Update completion step title to Office Hours
       const completionMessage = document.querySelector(
         '#dh-step-complete h3'

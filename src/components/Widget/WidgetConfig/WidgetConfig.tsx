@@ -90,6 +90,7 @@ interface CompanyPestOption {
   is_active: boolean;
   how_we_do_it_text: string | null;
   subspecies: string[];
+  plan_comparison_header_text: string | null;
 }
 
 interface ServicePlan {
@@ -330,9 +331,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const [localInputValues, setLocalInputValues] = useState<{
     howWeDoIt: { [optionId: string]: string };
     subspecies: { [optionId: string]: string };
+    planComparisonHeader: { [optionId: string]: string };
   }>({
     howWeDoIt: {},
     subspecies: {},
+    planComparisonHeader: {},
   });
   const [brandColors, setBrandColors] = useState<{
     primary?: string;
@@ -913,6 +916,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           is_active: true,
           how_we_do_it_text: option.how_we_do_it_text,
           subspecies: option.subspecies,
+          plan_comparison_header_text: option.plan_comparison_header_text,
         })),
       };
 
@@ -955,6 +959,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       is_active: true,
       how_we_do_it_text: null,
       subspecies: [],
+      plan_comparison_header_text: null,
     };
     const updatedOptions = [...companyPestOptions, newOption];
     setCompanyPestOptions(updatedOptions);
@@ -978,7 +983,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   // Debounced save function to prevent API calls on every keystroke
-  const debouncedSave = useCallback((optionId: string, field: 'howWeDoIt' | 'subspecies', value: string | string[]) => {
+  const debouncedSave = useCallback((optionId: string, field: 'howWeDoIt' | 'subspecies' | 'planComparisonHeader', value: string | string[]) => {
     const timerKey = `${optionId}-${field}`;
     
     // Clear existing timer
@@ -992,8 +997,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         if (option.id === optionId) {
           if (field === 'howWeDoIt') {
             return { ...option, how_we_do_it_text: value as string };
-          } else {
+          } else if (field === 'subspecies') {
             return { ...option, subspecies: value as string[] };
+          } else if (field === 'planComparisonHeader') {
+            return { ...option, plan_comparison_header_text: value as string };
           }
         }
         return option;
@@ -1021,6 +1028,23 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     
     // Debounce the API call
     debouncedSave(optionId, 'howWeDoIt', howWeDoItText);
+  };
+
+  const updatePestOptionPlanComparisonHeader = (optionId: string, headerText: string) => {
+    // Update local state immediately for responsive UI
+    setLocalInputValues(prev => ({
+      ...prev,
+      planComparisonHeader: { ...prev.planComparisonHeader, [optionId]: headerText }
+    }));
+    
+    // Also update the main state for immediate UI feedback
+    const updatedOptions = companyPestOptions.map(option =>
+      option.id === optionId ? { ...option, plan_comparison_header_text: headerText } : option
+    );
+    setCompanyPestOptions(updatedOptions);
+    
+    // Debounce the API call
+    debouncedSave(optionId, 'planComparisonHeader', headerText);
   };
 
   const updatePestOptionSubspecies = (optionId: string, subspeciesText: string) => {
@@ -2851,6 +2875,28 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                                   : option.how_we_do_it_text || ''}
                                 onChange={e =>
                                   updatePestOptionHowWeDoIt(option.id, e.target.value)
+                                }
+                                className={styles.howWeDoItTextarea}
+                                rows={3}
+                              />
+                            </div>
+                            
+                            <div className={styles.pestContentField}>
+                              <label className={styles.fieldLabel}>
+                                Plan Comparison Header Text:
+                                {debounceTimers.current[`${option.id}-planComparisonHeader`] && (
+                                  <span className={styles.savingIndicator}>
+                                    <Clock size={12} /> Saving...
+                                  </span>
+                                )}
+                              </label>
+                              <textarea
+                                placeholder="Leave blank to use default: Here's what we recommend for your home to get rid of those pesky [pest type] - and keep them out!"
+                                value={localInputValues.planComparisonHeader[option.id] !== undefined 
+                                  ? localInputValues.planComparisonHeader[option.id] 
+                                  : option.plan_comparison_header_text || ''}
+                                onChange={e =>
+                                  updatePestOptionPlanComparisonHeader(option.id, e.target.value)
                                 }
                                 className={styles.howWeDoItTextarea}
                                 rows={3}

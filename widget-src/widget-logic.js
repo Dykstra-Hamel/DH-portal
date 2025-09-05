@@ -1015,15 +1015,33 @@ const switchPlanOption = planIndex => {
 
 // Toggle description read more/less functionality
 window.toggleDescription = function (element) {
-  const container = element.parentElement;
+  // Find the container by traversing up the DOM tree
+  let container = element.parentElement;
+  
+  // If we're inside .dh-description-full (for Read Less), go up one more level
+  if (container && container.classList.contains('dh-description-full')) {
+    container = container.parentElement;
+  }
+  
+  if (!container) return; // Safety check
+  
   const descriptionText = container.querySelector('.dh-description-text');
   const fullDescription = container.querySelector('.dh-description-full');
+  const readMoreLink = container.querySelector('.dh-read-more-link');
+  const readLessLink = container.querySelector('.dh-read-less-link');
 
   if (element.textContent === 'Read More') {
-    // Show full description and hide the Read More link
-    descriptionText.style.display = 'none';
-    fullDescription.style.display = 'inline';
-    element.style.display = 'none';
+    // Show full description and switch to Read Less
+    if (descriptionText) descriptionText.style.display = 'none';
+    if (fullDescription) fullDescription.style.display = 'inline';
+    if (readMoreLink) readMoreLink.style.display = 'none';
+    if (readLessLink) readLessLink.style.display = 'inline';
+  } else if (element.textContent === 'Read Less') {
+    // Show truncated description and switch to Read More
+    if (descriptionText) descriptionText.style.display = 'inline';
+    if (fullDescription) fullDescription.style.display = 'none';
+    if (readMoreLink) readMoreLink.style.display = 'inline';
+    if (readLessLink) readLessLink.style.display = 'none';
   }
 };
 
@@ -1276,31 +1294,29 @@ const setupStepValidation = stepName => {
         });
       }
 
-      // Handle "View All Pests" button
+      // Handle "View All Pests" button toggle
       const viewAllPestsButton = document.getElementById('view-all-pests-button');
       if (viewAllPestsButton) {
+        let isExpanded = false;
+        
         viewAllPestsButton.addEventListener('click', () => {
           const hiddenPests = document.querySelectorAll('.dh-pest-option-hidden');
+          const visiblePests = document.querySelectorAll('.dh-pest-option:not(.dh-pest-option-hidden)');
           const pestSelection = document.querySelector('.dh-pest-selection');
           const viewAllContainer = document.querySelector('.dh-view-all-container');
           
-          if (hiddenPests.length > 0) {
-            // Fade out the "View All Pests" button first
-            if (viewAllContainer) {
-              viewAllContainer.style.opacity = '0';
-              viewAllContainer.style.transform = 'translateY(-10px)';
-              viewAllContainer.style.transition = 'all 0.3s ease';
-              
-              setTimeout(() => {
-                viewAllContainer.style.display = 'none';
-              }, 300);
-            }
+          if (!isExpanded && hiddenPests.length > 0) {
+            // Expanding: Show all pests
+            isExpanded = true;
+            
+            // Update button text and icon
+            viewAllPestsButton.innerHTML = `
+              Show Less Pests <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M8 1.0769L1.52239 8.00002L8 14.9231" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            `;
             
             // Expand the pest selection container
             if (pestSelection) {
-              setTimeout(() => {
-                pestSelection.classList.add('expanded');
-              }, 200);
+              pestSelection.classList.add('expanded');
             }
             
             // Animate the newly visible pests with staggered animation
@@ -1313,10 +1329,34 @@ const setupStepValidation = stepName => {
                 setTimeout(() => {
                   pest.classList.remove('dh-pest-option-revealing');
                 }, 400);
-              }, 300 + (index * 80)); // Start after container begins expanding, stagger by 80ms
+              }, index * 80); // Stagger by 80ms
             });
+          } else if (isExpanded) {
+            // Collapsing: Hide pests beyond the first 8
+            isExpanded = false;
             
-            // Re-attach event listeners to newly visible pest options
+            // Update button text and icon back to original
+            viewAllPestsButton.innerHTML = `
+              View All Pests <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            `;
+            
+            // Collapse the pest selection container
+            if (pestSelection) {
+              pestSelection.classList.remove('expanded');
+            }
+            
+            // Hide pests beyond the first 8 with staggered animation
+            const allPestOptions = document.querySelectorAll('.dh-pest-option');
+            for (let i = 8; i < allPestOptions.length; i++) {
+              const pest = allPestOptions[i];
+              setTimeout(() => {
+                pest.classList.add('dh-pest-option-hidden');
+              }, (i - 8) * 50); // Stagger the hiding animation
+            }
+          }
+          
+          // Re-attach event listeners to newly visible pest options after expand/collapse
+          setTimeout(() => {
             const newPestOptions = document.querySelectorAll('.dh-pest-option:not([data-listener-attached])');
             newPestOptions.forEach(option => {
               option.setAttribute('data-listener-attached', 'true');
@@ -1391,7 +1431,7 @@ const setupStepValidation = stepName => {
                 }
               });
             });
-          }
+          }, 300); // Wait for animations to complete
         });
       }
 
@@ -1833,7 +1873,7 @@ const setupStepValidation = stepName => {
 
         // Update safety message with pest name
         if (safetyTextEl && pestConfig) {
-          safetyTextEl.innerHTML = `Oh, and don&apos;t worry. Our ${pestConfig.label.toLowerCase()} treatments are safe for people and pets for your property!`;
+          safetyTextEl.innerHTML = `Oh, and don&apos;t worry, our ${pestConfig.label.toLowerCase()} treatments are people and pet-friendly!`;
         }
 
         // Set pet safety image source using config.baseUrl
@@ -2252,7 +2292,7 @@ const setupStepValidation = stepName => {
           : fullDescription;
 
         const descriptionHtml = shouldTruncate
-          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription}</span>`
+          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription} <span class="dh-read-less-link" onclick="toggleDescription(this)" style="display: none;">Read Less</span></span>`
           : `<span class="dh-description-text">${fullDescription}</span>`;
 
         return `
@@ -2356,7 +2396,7 @@ const setupStepValidation = stepName => {
           : fullDescription;
 
         const descriptionHtml = shouldTruncate
-          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription}</span>`
+          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription} <span class="dh-read-less-link" onclick="toggleDescription(this)" style="display: none;">Read Less</span></span>`
           : `<span class="dh-description-text">${fullDescription}</span>`;
 
         return `
