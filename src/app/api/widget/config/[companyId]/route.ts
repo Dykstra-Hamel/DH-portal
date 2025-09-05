@@ -144,6 +144,7 @@ export async function GET(
         display_order,
         how_we_do_it_text,
         subspecies,
+        plan_comparison_header_text,
         pest_types (
           name,
           slug,

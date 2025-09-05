@@ -1,5 +1,11 @@
 'use client';
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import Image from 'next/image';
 import {
   Save,
@@ -90,6 +96,7 @@ interface CompanyPestOption {
   is_active: boolean;
   how_we_do_it_text: string | null;
   subspecies: string[];
+  plan_comparison_header_text: string | null;
 }
 
 interface ServicePlan {
@@ -330,10 +337,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const [localInputValues, setLocalInputValues] = useState<{
     howWeDoIt: { [optionId: string]: string };
     subspecies: { [optionId: string]: string };
+    planComparisonHeader: { [optionId: string]: string };
     customLabel: { [optionId: string]: string };
   }>({
     howWeDoIt: {},
     subspecies: {},
+    planComparisonHeader: {},
     customLabel: {},
   });
   const [brandColors, setBrandColors] = useState<{
@@ -373,12 +382,15 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const [domainLoading, setDomainLoading] = useState(false);
   const [domainError, setDomainError] = useState<string | null>(null);
   // Default color values - memoized to prevent re-creation on every render
-  const defaultColors = useMemo(() => ({
-    primary: '#3b82f6',
-    secondary: '#1e293b',
-    background: '#ffffff',
-    text: '#374151',
-  }), []);
+  const defaultColors = useMemo(
+    () => ({
+      primary: '#3b82f6',
+      secondary: '#1e293b',
+      background: '#ffffff',
+      text: '#374151',
+    }),
+    []
+  );
 
   // Toggle section expansion
   const toggleSection = (sectionKey: keyof typeof expandedSections) => {
@@ -388,52 +400,55 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }));
   };
   // Color resolution function
-  const resolveColors = useCallback((
-    brandColors: { primary?: string; secondary?: string },
-    overrides?: {
-      primary?: string;
-      secondary?: string;
-      background?: string;
-      text?: string;
-    }
-  ) => {
-    const resolved: {
-      primary: ColorState;
-      secondary: ColorState;
-      background: ColorState;
-      text: ColorState;
-    } = {
-      primary: {
-        value:
-          overrides?.primary || brandColors.primary || defaultColors.primary,
-        source: overrides?.primary
-          ? 'override'
-          : brandColors.primary
-            ? 'brand'
-            : 'default',
-      },
-      secondary: {
-        value:
-          overrides?.secondary ||
-          brandColors.secondary ||
-          defaultColors.secondary,
-        source: overrides?.secondary
-          ? 'override'
-          : brandColors.secondary
-            ? 'brand'
-            : 'default',
-      },
-      background: {
-        value: overrides?.background || defaultColors.background,
-        source: overrides?.background ? 'override' : 'default',
-      },
-      text: {
-        value: overrides?.text || defaultColors.text,
-        source: overrides?.text ? 'override' : 'default',
-      },
-    };
-    return resolved;
-  }, [defaultColors]);
+  const resolveColors = useCallback(
+    (
+      brandColors: { primary?: string; secondary?: string },
+      overrides?: {
+        primary?: string;
+        secondary?: string;
+        background?: string;
+        text?: string;
+      }
+    ) => {
+      const resolved: {
+        primary: ColorState;
+        secondary: ColorState;
+        background: ColorState;
+        text: ColorState;
+      } = {
+        primary: {
+          value:
+            overrides?.primary || brandColors.primary || defaultColors.primary,
+          source: overrides?.primary
+            ? 'override'
+            : brandColors.primary
+              ? 'brand'
+              : 'default',
+        },
+        secondary: {
+          value:
+            overrides?.secondary ||
+            brandColors.secondary ||
+            defaultColors.secondary,
+          source: overrides?.secondary
+            ? 'override'
+            : brandColors.secondary
+              ? 'brand'
+              : 'default',
+        },
+        background: {
+          value: overrides?.background || defaultColors.background,
+          source: overrides?.background ? 'override' : 'default',
+        },
+        text: {
+          value: overrides?.text || defaultColors.text,
+          source: overrides?.text ? 'override' : 'default',
+        },
+      };
+      return resolved;
+    },
+    [defaultColors]
+  );
   // Handle color changes with override tracking
   const handleColorChange = (
     colorType: 'primary' | 'secondary' | 'background' | 'text',
@@ -507,69 +522,87 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     fetchGoogleApiKey();
   }, []);
 
-  const loadCompanyConfig = useCallback((company: Company) => {
-    const widgetConfig = company.widget_config || {};
-    setConfig({
-      branding: {
-        companyName: widgetConfig.branding?.companyName || company.name,
-        hero_image_url: widgetConfig.branding?.hero_image_url || '',
-        pestSelectBackgroundImage: widgetConfig.branding?.pestSelectBackgroundImage || '',
-        howWeDoItBackgroundImage: widgetConfig.branding?.howWeDoItBackgroundImage || '',
-        howWeDoItInteriorImage: widgetConfig.branding?.howWeDoItInteriorImage || '',
-        almostDoneBackgroundImage: widgetConfig.branding?.almostDoneBackgroundImage || '',
-        detailedQuoteBackgroundImage: widgetConfig.branding?.detailedQuoteBackgroundImage || '',
-        detailedQuoteInteriorImage: widgetConfig.branding?.detailedQuoteInteriorImage || '',
-        locationNotServedBackgroundImage: widgetConfig.branding?.locationNotServedBackgroundImage || '',
-      },
-      headers: {
-        headerText: widgetConfig.headers?.headerText || '',
-        subHeaderText: widgetConfig.headers?.subHeaderText || '',
-      },
-      colors: {
-        primary: widgetConfig.colors?.primary || defaultColors.primary,
-        secondary: widgetConfig.colors?.secondary || defaultColors.secondary,
-        background: widgetConfig.colors?.background || defaultColors.background,
-        text: widgetConfig.colors?.text || defaultColors.text,
-      },
-      colorOverrides: widgetConfig.colorOverrides || {},
-      submitButtonText: widgetConfig.submitButtonText || 'Get My Quote',
-      welcomeButtonText:
-        widgetConfig.welcomeButtonText || 'Start My Free Estimate',
-      successMessage:
-        widgetConfig.successMessage ||
-        'Thank you! Your information has been submitted successfully. We will contact you soon.',
-      addressApi: {
-        enabled: widgetConfig.addressApi?.hasOwnProperty('enabled')
-          ? widgetConfig.addressApi.enabled
-          : true,
-        maxSuggestions: widgetConfig.addressApi?.maxSuggestions || 5,
-      },
-      service_areas: widgetConfig.service_areas || [],
-      messaging: {
-        welcome: widgetConfig.messaging?.welcome || 'Get Started',
-        fallback:
-          widgetConfig.messaging?.fallback ||
-          'Get your free pest control estimate in just a few steps.',
-        welcomeBenefits: widgetConfig.messaging?.welcomeBenefits || [],
-      },
-      notifications: {
-        emails: widgetConfig.notifications?.emails || [],
-      },
-      emailNotifications: {
-        enabled: widgetConfig.emailNotifications?.enabled ?? true,
-        subjectLine:
-          widgetConfig.emailNotifications?.subjectLine ||
-          'New {pestIssue} Service Request From: {customerName}',
-      },
-      stepHeadings: {
-        address: widgetConfig.stepHeadings?.address || 'Yuck, {pest}! We hate those. No worries, we got you!',
-        howWeDoIt: widgetConfig.stepHeadings?.howWeDoIt || 'How We Do It',
-      },
-    });
-    // Set the notification emails input field
-    const emails = widgetConfig.notifications?.emails || [];
-    setNotificationEmailsInput(emails.join('\n'));
-  }, [defaultColors.background, defaultColors.primary, defaultColors.secondary, defaultColors.text]);
+  const loadCompanyConfig = useCallback(
+    (company: Company) => {
+      const widgetConfig = company.widget_config || {};
+      setConfig({
+        branding: {
+          companyName: widgetConfig.branding?.companyName || company.name,
+          hero_image_url: widgetConfig.branding?.hero_image_url || '',
+          pestSelectBackgroundImage:
+            widgetConfig.branding?.pestSelectBackgroundImage || '',
+          howWeDoItBackgroundImage:
+            widgetConfig.branding?.howWeDoItBackgroundImage || '',
+          howWeDoItInteriorImage:
+            widgetConfig.branding?.howWeDoItInteriorImage || '',
+          almostDoneBackgroundImage:
+            widgetConfig.branding?.almostDoneBackgroundImage || '',
+          detailedQuoteBackgroundImage:
+            widgetConfig.branding?.detailedQuoteBackgroundImage || '',
+          detailedQuoteInteriorImage:
+            widgetConfig.branding?.detailedQuoteInteriorImage || '',
+          locationNotServedBackgroundImage:
+            widgetConfig.branding?.locationNotServedBackgroundImage || '',
+        },
+        headers: {
+          headerText: widgetConfig.headers?.headerText || '',
+          subHeaderText: widgetConfig.headers?.subHeaderText || '',
+        },
+        colors: {
+          primary: widgetConfig.colors?.primary || defaultColors.primary,
+          secondary: widgetConfig.colors?.secondary || defaultColors.secondary,
+          background:
+            widgetConfig.colors?.background || defaultColors.background,
+          text: widgetConfig.colors?.text || defaultColors.text,
+        },
+        colorOverrides: widgetConfig.colorOverrides || {},
+        submitButtonText: widgetConfig.submitButtonText || 'Get My Quote',
+        welcomeButtonText:
+          widgetConfig.welcomeButtonText || 'Start My Free Estimate',
+        successMessage:
+          widgetConfig.successMessage ||
+          'Thank you! Your information has been submitted successfully. We will contact you soon.',
+        addressApi: {
+          enabled: widgetConfig.addressApi?.hasOwnProperty('enabled')
+            ? widgetConfig.addressApi.enabled
+            : true,
+          maxSuggestions: widgetConfig.addressApi?.maxSuggestions || 5,
+        },
+        service_areas: widgetConfig.service_areas || [],
+        messaging: {
+          welcome: widgetConfig.messaging?.welcome || 'Get Started',
+          fallback:
+            widgetConfig.messaging?.fallback ||
+            'Get your free pest control estimate in just a few steps.',
+          welcomeBenefits: widgetConfig.messaging?.welcomeBenefits || [],
+        },
+        notifications: {
+          emails: widgetConfig.notifications?.emails || [],
+        },
+        emailNotifications: {
+          enabled: widgetConfig.emailNotifications?.enabled ?? true,
+          subjectLine:
+            widgetConfig.emailNotifications?.subjectLine ||
+            'New {pestIssue} Service Request From: {customerName}',
+        },
+        stepHeadings: {
+          address:
+            widgetConfig.stepHeadings?.address ||
+            'Yuck, {pest}! We hate those. No worries, we got you!',
+          howWeDoIt: widgetConfig.stepHeadings?.howWeDoIt || 'How We Do It',
+        },
+      });
+      // Set the notification emails input field
+      const emails = widgetConfig.notifications?.emails || [];
+      setNotificationEmailsInput(emails.join('\n'));
+    },
+    [
+      defaultColors.background,
+      defaultColors.primary,
+      defaultColors.secondary,
+      defaultColors.text,
+    ]
+  );
 
   const geocodeCompanyAddress = useCallback(async (company: Company) => {
     try {
@@ -732,7 +765,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         loadDomainConfiguration(selectedCompanyId);
       }
     }
-  }, [selectedCompanyId, companies, loadCompanyConfig, fetchBrandColors, loadServiceAreas, loadPestOptions, loadServicePlans, geocodeCompanyAddress, loadDomainConfiguration]);
+  }, [
+    selectedCompanyId,
+    companies,
+    loadCompanyConfig,
+    fetchBrandColors,
+    loadServiceAreas,
+    loadPestOptions,
+    loadServicePlans,
+    geocodeCompanyAddress,
+    loadDomainConfiguration,
+  ]);
 
   // Create or update domain
   const handleDomainSubmit = async () => {
@@ -904,44 +947,48 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
 
-  const savePestOptions = useCallback(async (pestOptions: CompanyPestOption[]) => {
-    if (!selectedCompany) return;
-    try {
-      const updateData = {
-        pestOptions: pestOptions.map((option, index) => ({
-          pest_id: option.pest_id,
-          custom_label: option.custom_label,
-          display_order: index + 1,
-          is_active: true,
-          how_we_do_it_text: option.how_we_do_it_text,
-          subspecies: option.subspecies,
-        })),
-      };
+  const savePestOptions = useCallback(
+    async (pestOptions: CompanyPestOption[]) => {
+      if (!selectedCompany) return;
+      try {
+        const updateData = {
+          pestOptions: pestOptions.map((option, index) => ({
+            pest_id: option.pest_id,
+            custom_label: option.custom_label,
+            display_order: index + 1,
+            is_active: true,
+            how_we_do_it_text: option.how_we_do_it_text,
+            subspecies: option.subspecies,
+            plan_comparison_header_text: option.plan_comparison_header_text,
+          })),
+        };
 
-      const response = await fetch(
-        `/api/admin/pest-options/${selectedCompany.id}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updateData),
+        const response = await fetch(
+          `/api/admin/pest-options/${selectedCompany.id}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData),
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          setCompanyPestOptions(pestOptions);
+          setSaveStatus('success');
+          setTimeout(() => setSaveStatus('idle'), 2000);
         }
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        setCompanyPestOptions(pestOptions);
-        setSaveStatus('success');
+      } catch (error) {
+        console.error('Error saving pest options:', error);
+        setSaveStatus('error');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }
-    } catch (error) {
-      console.error('Error saving pest options:', error);
-      setSaveStatus('error');
-      setTimeout(() => setSaveStatus('idle'), 2000);
-    }
-  }, [selectedCompany, setSaveStatus, setCompanyPestOptions]);
+    },
+    [selectedCompany, setSaveStatus, setCompanyPestOptions]
+  );
 
   const addPestOption = (pestType: PestType) => {
     const newOption: CompanyPestOption = {
@@ -957,6 +1004,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       is_active: true,
       how_we_do_it_text: null,
       subspecies: [],
+      plan_comparison_header_text: null,
     };
     const updatedOptions = [...companyPestOptions, newOption];
     setCompanyPestOptions(updatedOptions);
@@ -971,90 +1019,141 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     savePestOptions(updatedOptions);
   };
 
-
   // Debounced save function to prevent API calls on every keystroke
-  const debouncedSave = useCallback((optionId: string, field: 'howWeDoIt' | 'subspecies' | 'customLabel', value: string | string[]) => {
-    const timerKey = `${optionId}-${field}`;
-    
-    // Clear existing timer
-    if (debounceTimers.current[timerKey]) {
-      clearTimeout(debounceTimers.current[timerKey]);
-    }
-    
-    // Set new timer
-    debounceTimers.current[timerKey] = setTimeout(() => {
-      const updatedOptions = companyPestOptions.map(option => {
-        if (option.id === optionId) {
-          if (field === 'howWeDoIt') {
-            return { ...option, how_we_do_it_text: value as string };
-          } else if (field === 'subspecies') {
-            return { ...option, subspecies: value as string[] };
-          } else if (field === 'customLabel') {
-            return { ...option, custom_label: value as string };
-          }
-        }
-        return option;
-      });
-      setCompanyPestOptions(updatedOptions);
-      savePestOptions(updatedOptions);
-      
-      // Clear the timer after saving
-      delete debounceTimers.current[timerKey];
-    }, 500); // 500ms delay
-  }, [companyPestOptions, savePestOptions]);
+  const debouncedSave = useCallback(
+    (
+      optionId: string,
+      field:
+        | 'howWeDoIt'
+        | 'subspecies'
+        | 'planComparisonHeader'
+        | 'customLabel',
+      value: string | string[]
+    ) => {
+      const timerKey = `${optionId}-${field}`;
 
-  const updatePestOptionHowWeDoIt = (optionId: string, howWeDoItText: string) => {
+      // Clear existing timer
+      if (debounceTimers.current[timerKey]) {
+        clearTimeout(debounceTimers.current[timerKey]);
+      }
+
+      // Set new timer
+      debounceTimers.current[timerKey] = setTimeout(() => {
+        const updatedOptions = companyPestOptions.map(option => {
+          if (option.id === optionId) {
+            if (field === 'howWeDoIt') {
+              return { ...option, how_we_do_it_text: value as string };
+            } else if (field === 'subspecies') {
+              return { ...option, subspecies: value as string[] };
+            } else if (field === 'planComparisonHeader') {
+              return {
+                ...option,
+                plan_comparison_header_text: value as string,
+              };
+            } else if (field === 'customLabel') {
+              return { ...option, custom_label: value as string };
+            }
+          }
+          return option;
+        });
+        setCompanyPestOptions(updatedOptions);
+        savePestOptions(updatedOptions);
+
+        // Clear the timer after saving
+        delete debounceTimers.current[timerKey];
+      }, 500); // 500ms delay
+    },
+    [companyPestOptions, savePestOptions]
+  );
+
+  const updatePestOptionHowWeDoIt = (
+    optionId: string,
+    howWeDoItText: string
+  ) => {
     // Update local state immediately for responsive UI
     setLocalInputValues(prev => ({
       ...prev,
-      howWeDoIt: { ...prev.howWeDoIt, [optionId]: howWeDoItText }
+      howWeDoIt: { ...prev.howWeDoIt, [optionId]: howWeDoItText },
     }));
-    
+
     // Also update the main state for immediate UI feedback
     const updatedOptions = companyPestOptions.map(option =>
-      option.id === optionId ? { ...option, how_we_do_it_text: howWeDoItText } : option
+      option.id === optionId
+        ? { ...option, how_we_do_it_text: howWeDoItText }
+        : option
     );
     setCompanyPestOptions(updatedOptions);
-    
+
     // Debounce the API call
     debouncedSave(optionId, 'howWeDoIt', howWeDoItText);
   };
 
-  const updatePestOptionSubspecies = (optionId: string, subspeciesText: string) => {
+  const updatePestOptionPlanComparisonHeader = (
+    optionId: string,
+    headerText: string
+  ) => {
     // Update local state immediately for responsive UI
     setLocalInputValues(prev => ({
       ...prev,
-      subspecies: { ...prev.subspecies, [optionId]: subspeciesText }
+      planComparisonHeader: {
+        ...prev.planComparisonHeader,
+        [optionId]: headerText,
+      },
     }));
-    
+
+    // Also update the main state for immediate UI feedback
+    const updatedOptions = companyPestOptions.map(option =>
+      option.id === optionId
+        ? { ...option, plan_comparison_header_text: headerText }
+        : option
+    );
+    setCompanyPestOptions(updatedOptions);
+
+    // Debounce the API call
+    debouncedSave(optionId, 'planComparisonHeader', headerText);
+  };
+
+  const updatePestOptionSubspecies = (
+    optionId: string,
+    subspeciesText: string
+  ) => {
+    // Update local state immediately for responsive UI
+    setLocalInputValues(prev => ({
+      ...prev,
+      subspecies: { ...prev.subspecies, [optionId]: subspeciesText },
+    }));
+
     // Process subspecies on the fly for immediate UI feedback, but don't save yet
     const subspecies = subspeciesText
       .split('\n')
       .map(s => s.trim())
       .filter(s => s.length > 0);
-    
+
     const updatedOptions = companyPestOptions.map(option =>
       option.id === optionId ? { ...option, subspecies } : option
     );
     setCompanyPestOptions(updatedOptions);
-    
+
     // Debounce the API call
     debouncedSave(optionId, 'subspecies', subspecies);
   };
-  
-  const updatePestOptionLabelDebounced = (optionId: string, customLabel: string) => {
+
+  const updatePestOptionLabelDebounced = (
+    optionId: string,
+    customLabel: string
+  ) => {
     // Update local state immediately for responsive UI
     setLocalInputValues(prev => ({
       ...prev,
-      customLabel: { ...prev.customLabel, [optionId]: customLabel }
+      customLabel: { ...prev.customLabel, [optionId]: customLabel },
     }));
-    
+
     // Also update the main state for immediate UI feedback
     const updatedOptions = companyPestOptions.map(option =>
       option.id === optionId ? { ...option, custom_label: customLabel } : option
     );
     setCompanyPestOptions(updatedOptions);
-    
+
     // Debounce the API call
     debouncedSave(optionId, 'customLabel', customLabel);
   };
@@ -1241,7 +1340,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         ...prev.messaging,
         welcomeBenefits: [
           ...prev.messaging.welcomeBenefits,
-          { text: '', icon: '' }
+          { text: '', icon: '' },
         ],
       },
     }));
@@ -1252,12 +1351,18 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       ...prev,
       messaging: {
         ...prev.messaging,
-        welcomeBenefits: prev.messaging.welcomeBenefits.filter((_, i) => i !== index),
+        welcomeBenefits: prev.messaging.welcomeBenefits.filter(
+          (_, i) => i !== index
+        ),
       },
     }));
   };
 
-  const handleBenefitChange = (index: number, field: 'text' | 'icon', value: string) => {
+  const handleBenefitChange = (
+    index: number,
+    field: 'text' | 'icon',
+    value: string
+  ) => {
     setConfig(prev => ({
       ...prev,
       messaging: {
@@ -1275,11 +1380,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       const start = input.selectionStart || 0;
       const end = input.selectionEnd || 0;
       const currentValue = input.value;
-      const newValue = currentValue.slice(0, start) + variable + currentValue.slice(end);
+      const newValue =
+        currentValue.slice(0, start) + variable + currentValue.slice(end);
       input.value = newValue;
       input.focus();
       input.setSelectionRange(start + variable.length, start + variable.length);
-      
+
       // Trigger the onChange handler
       if (inputId === 'stepHeading-address') {
         handleConfigChange('stepHeadings', 'address', newValue);
@@ -1476,7 +1582,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       await deleteFileFromStorage(config.branding.pestSelectBackgroundImage);
     }
 
-    const url = await uploadFile(file, 'brand-assets', 'pest-select-backgrounds');
+    const url = await uploadFile(
+      file,
+      'brand-assets',
+      'pest-select-backgrounds'
+    );
     if (url) {
       handleConfigChange('branding', 'pestSelectBackgroundImage', url);
       // Clear the input so the same file can be selected again if needed
@@ -1495,7 +1605,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       return;
     }
 
-    const deleted = await deleteFileFromStorage(config.branding.pestSelectBackgroundImage);
+    const deleted = await deleteFileFromStorage(
+      config.branding.pestSelectBackgroundImage
+    );
 
     if (deleted) {
       handleConfigChange('branding', 'pestSelectBackgroundImage', '');
@@ -1506,7 +1618,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setTimeout(() => setSaveStatus('idle'), 5000);
     }
   };
-
 
   // How We Do It Background Image handlers
   const handleHowWeDoItBackgroundUpload = async (
@@ -1519,7 +1630,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       await deleteFileFromStorage(config.branding.howWeDoItBackgroundImage);
     }
 
-    const url = await uploadFile(file, 'brand-assets', 'how-we-do-it-backgrounds');
+    const url = await uploadFile(
+      file,
+      'brand-assets',
+      'how-we-do-it-backgrounds'
+    );
     if (url) {
       handleConfigChange('branding', 'howWeDoItBackgroundImage', url);
       event.target.value = '';
@@ -1537,7 +1652,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       return;
     }
 
-    const deleted = await deleteFileFromStorage(config.branding.howWeDoItBackgroundImage);
+    const deleted = await deleteFileFromStorage(
+      config.branding.howWeDoItBackgroundImage
+    );
 
     if (deleted) {
       handleConfigChange('branding', 'howWeDoItBackgroundImage', '');
@@ -1578,7 +1695,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       return;
     }
 
-    const deleted = await deleteFileFromStorage(config.branding.howWeDoItInteriorImage);
+    const deleted = await deleteFileFromStorage(
+      config.branding.howWeDoItInteriorImage
+    );
 
     if (deleted) {
       handleConfigChange('branding', 'howWeDoItInteriorImage', '');
@@ -1601,7 +1720,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       await deleteFileFromStorage(config.branding.almostDoneBackgroundImage);
     }
 
-    const url = await uploadFile(file, 'brand-assets', 'almost-done-backgrounds');
+    const url = await uploadFile(
+      file,
+      'brand-assets',
+      'almost-done-backgrounds'
+    );
     if (url) {
       handleConfigChange('branding', 'almostDoneBackgroundImage', url);
       event.target.value = '';
@@ -1619,7 +1742,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       return;
     }
 
-    const deleted = await deleteFileFromStorage(config.branding.almostDoneBackgroundImage);
+    const deleted = await deleteFileFromStorage(
+      config.branding.almostDoneBackgroundImage
+    );
 
     if (deleted) {
       handleConfigChange('branding', 'almostDoneBackgroundImage', '');
@@ -1642,7 +1767,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       await deleteFileFromStorage(config.branding.detailedQuoteBackgroundImage);
     }
 
-    const url = await uploadFile(file, 'brand-assets', 'detailed-quote-backgrounds');
+    const url = await uploadFile(
+      file,
+      'brand-assets',
+      'detailed-quote-backgrounds'
+    );
     if (url) {
       handleConfigChange('branding', 'detailedQuoteBackgroundImage', url);
       event.target.value = '';
@@ -1660,7 +1789,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       return;
     }
 
-    const deleted = await deleteFileFromStorage(config.branding.detailedQuoteBackgroundImage);
+    const deleted = await deleteFileFromStorage(
+      config.branding.detailedQuoteBackgroundImage
+    );
 
     if (deleted) {
       handleConfigChange('branding', 'detailedQuoteBackgroundImage', '');
@@ -1683,7 +1814,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       await deleteFileFromStorage(config.branding.detailedQuoteInteriorImage);
     }
 
-    const url = await uploadFile(file, 'brand-assets', 'detailed-quote-interior');
+    const url = await uploadFile(
+      file,
+      'brand-assets',
+      'detailed-quote-interior'
+    );
     if (url) {
       handleConfigChange('branding', 'detailedQuoteInteriorImage', url);
       event.target.value = '';
@@ -1701,7 +1836,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       return;
     }
 
-    const deleted = await deleteFileFromStorage(config.branding.detailedQuoteInteriorImage);
+    const deleted = await deleteFileFromStorage(
+      config.branding.detailedQuoteInteriorImage
+    );
 
     if (deleted) {
       handleConfigChange('branding', 'detailedQuoteInteriorImage', '');
@@ -1721,10 +1858,16 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     if (!file) return;
 
     if (config.branding.locationNotServedBackgroundImage) {
-      await deleteFileFromStorage(config.branding.locationNotServedBackgroundImage);
+      await deleteFileFromStorage(
+        config.branding.locationNotServedBackgroundImage
+      );
     }
 
-    const url = await uploadFile(file, 'brand-assets', 'location-not-served-backgrounds');
+    const url = await uploadFile(
+      file,
+      'brand-assets',
+      'location-not-served-backgrounds'
+    );
     if (url) {
       handleConfigChange('branding', 'locationNotServedBackgroundImage', url);
       event.target.value = '';
@@ -1742,7 +1885,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       return;
     }
 
-    const deleted = await deleteFileFromStorage(config.branding.locationNotServedBackgroundImage);
+    const deleted = await deleteFileFromStorage(
+      config.branding.locationNotServedBackgroundImage
+    );
 
     if (deleted) {
       handleConfigChange('branding', 'locationNotServedBackgroundImage', '');
@@ -2122,11 +2267,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             {/* Step Background Images */}
             <hr className={styles.sectionDivider} />
             <h4 className={styles.sectionSubheading}>Step Background Images</h4>
-            
+
             <div className={styles.formGroup}>
               <label>Choose Pest Background Image</label>
               <p className={styles.fieldNote}>
-                Upload a background image for the pest selection step. Image should be 386px wide and optimized for the widget height.
+                Upload a background image for the pest selection step. Image
+                should be 386px wide and optimized for the widget height.
               </p>
               <input
                 type="file"
@@ -2158,13 +2304,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               )}
             </div>
 
-
             <div className={styles.formGroup}>
               <label>How We Do It Images</label>
               <p className={styles.fieldNote}>
-                Upload background and interior images for the &quot;How We Do It&quot; step.
+                Upload background and interior images for the &quot;How We Do
+                It&quot; step.
               </p>
-              
+
               <div className={styles.subFormGroup}>
                 <label>Background Image</label>
                 <input
@@ -2233,29 +2379,60 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.formGroup}>
               <label>Step Headings</label>
               <p className={styles.fieldNote}>
-                Customize the headings for different steps in your widget. 
-                Use variables: <code>{"{"}pest{"}"}</code>, <code>{"{"}initialPrice{"}"}</code>, <code>{"{"}recurringPrice{"}"}</code>
+                Customize the headings for different steps in your widget. Use
+                variables:{' '}
+                <code>
+                  {'{'}pest{'}'}
+                </code>
+                ,{' '}
+                <code>
+                  {'{'}initialPrice{'}'}
+                </code>
+                ,{' '}
+                <code>
+                  {'{'}recurringPrice{'}'}
+                </code>
               </p>
-              
+
               <div className={styles.subFormGroup}>
                 <label>Address Step Heading</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'flex-start',
+                  }}
+                >
                   <input
                     id="stepHeading-address"
                     type="text"
                     value={config.stepHeadings.address}
-                    onChange={(e) => handleConfigChange('stepHeadings', 'address', e.target.value)}
+                    onChange={e =>
+                      handleConfigChange(
+                        'stepHeadings',
+                        'address',
+                        e.target.value
+                      )
+                    }
                     placeholder="Yuck, {pest}! We hate those. No worries, we got you!"
                     style={{ flex: 1 }}
                   />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
                     <button
                       type="button"
-                      onClick={() => insertVariableIntoInput('stepHeading-address', '{pest}')}
+                      onClick={() =>
+                        insertVariableIntoInput('stepHeading-address', '{pest}')
+                      }
                       className={styles.variableButton}
                       title="Insert pest variable"
                     >
-                      {"{"}pest{"}"}
+                      {'{'}pest{'}'}
                     </button>
                   </div>
                 </div>
@@ -2263,27 +2440,55 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
               <div className={styles.subFormGroup}>
                 <label>How We Do It Step Heading</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'flex-start',
+                  }}
+                >
                   <input
                     id="stepHeading-howWeDoIt"
                     type="text"
                     value={config.stepHeadings.howWeDoIt}
-                    onChange={(e) => handleConfigChange('stepHeadings', 'howWeDoIt', e.target.value)}
+                    onChange={e =>
+                      handleConfigChange(
+                        'stepHeadings',
+                        'howWeDoIt',
+                        e.target.value
+                      )
+                    }
                     placeholder="How We Do It"
                     style={{ flex: 1 }}
                   />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
                     <button
                       type="button"
-                      onClick={() => insertVariableIntoInput('stepHeading-howWeDoIt', '{pest}')}
+                      onClick={() =>
+                        insertVariableIntoInput(
+                          'stepHeading-howWeDoIt',
+                          '{pest}'
+                        )
+                      }
                       className={styles.variableButton}
                       title="Insert pest variable"
                     >
-                      {"{"}pest{"}"}
+                      {'{'}pest{'}'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => insertVariableIntoInput('stepHeading-howWeDoIt', '{initialPrice}')}
+                      onClick={() =>
+                        insertVariableIntoInput(
+                          'stepHeading-howWeDoIt',
+                          '{initialPrice}'
+                        )
+                      }
                       className={styles.variableButton}
                       title="Insert initial price variable"
                     >
@@ -2291,7 +2496,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => insertVariableIntoInput('stepHeading-howWeDoIt', '{recurringPrice}')}
+                      onClick={() =>
+                        insertVariableIntoInput(
+                          'stepHeading-howWeDoIt',
+                          '{recurringPrice}'
+                        )
+                      }
                       className={styles.variableButton}
                       title="Insert recurring price variable"
                     >
@@ -2340,9 +2550,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.formGroup}>
               <label>Detailed Quote Images</label>
               <p className={styles.fieldNote}>
-                Upload background and interior images for the detailed quote steps.
+                Upload background and interior images for the detailed quote
+                steps.
               </p>
-              
+
               <div className={styles.subFormGroup}>
                 <label>Background Image</label>
                 <input
@@ -2723,9 +2934,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.formGroup}>
               <label>Welcome Benefits</label>
               <p className={styles.fieldNote}>
-                Add custom benefits with text and SVG icons to display on the welcome screen.
+                Add custom benefits with text and SVG icons to display on the
+                welcome screen.
               </p>
-              
+
               {config.messaging.welcomeBenefits.map((benefit, index) => (
                 <div key={index} className={styles.benefitItem}>
                   <div className={styles.benefitHeader}>
@@ -2738,45 +2950,51 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                       Remove
                     </button>
                   </div>
-                  
+
                   <div className={styles.benefitFields}>
                     <div className={styles.formGroup}>
                       <label>Benefit Text</label>
                       <input
                         type="text"
                         value={benefit.text}
-                        onChange={e => handleBenefitChange(index, 'text', e.target.value)}
+                        onChange={e =>
+                          handleBenefitChange(index, 'text', e.target.value)
+                        }
                         placeholder="e.g., Fully Licensed & Insured"
                       />
                     </div>
-                    
+
                     <div className={styles.formGroup}>
                       <label>SVG Icon</label>
                       <textarea
                         value={benefit.icon}
-                        onChange={e => handleBenefitChange(index, 'icon', e.target.value)}
+                        onChange={e =>
+                          handleBenefitChange(index, 'icon', e.target.value)
+                        }
                         placeholder="<svg>...</svg>"
                         rows={4}
                         className={styles.svgInput}
                       />
                     </div>
-                    
+
                     {benefit.icon && benefit.text && (
                       <div className={styles.benefitPreview}>
                         <div className={styles.previewLabel}>Preview:</div>
                         <div className={styles.previewItem}>
-                          <span 
+                          <span
                             className={styles.previewIcon}
                             dangerouslySetInnerHTML={{ __html: benefit.icon }}
                           />
-                          <span className={styles.previewText}>{benefit.text}</span>
+                          <span className={styles.previewText}>
+                            {benefit.text}
+                          </span>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
               ))}
-              
+
               <button
                 type="button"
                 onClick={handleAddBenefit}
@@ -2821,7 +3039,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             <div className={styles.pestDetails}>
                               <div className={styles.pestName}>
                                 {option.custom_label || option.name}
-                                {debounceTimers.current[`${option.id}-customLabel`] && (
+                                {debounceTimers.current[
+                                  `${option.id}-customLabel`
+                                ] && (
                                   <span className={styles.savingIndicator}>
                                     <Clock size={12} /> Saving...
                                   </span>
@@ -2836,11 +3056,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             <input
                               type="text"
                               placeholder={option.name}
-                              value={localInputValues.customLabel[option.id] !== undefined 
-                                ? localInputValues.customLabel[option.id] 
-                                : option.custom_label || ''}
+                              value={
+                                localInputValues.customLabel[option.id] !==
+                                undefined
+                                  ? localInputValues.customLabel[option.id]
+                                  : option.custom_label || ''
+                              }
                               onChange={e =>
-                                updatePestOptionLabelDebounced(option.id, e.target.value)
+                                updatePestOptionLabelDebounced(
+                                  option.id,
+                                  e.target.value
+                                )
                               }
                               className={styles.customLabelInput}
                             />
@@ -2853,13 +3079,15 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                               ✕
                             </button>
                           </div>
-                          
+
                           {/* How We Do It Content Section */}
                           <div className={styles.pestContentSection}>
                             <div className={styles.pestContentField}>
                               <label className={styles.fieldLabel}>
                                 How We Do It Description:
-                                {debounceTimers.current[`${option.id}-howWeDoIt`] && (
+                                {debounceTimers.current[
+                                  `${option.id}-howWeDoIt`
+                                ] && (
                                   <span className={styles.savingIndicator}>
                                     <Clock size={12} /> Saving...
                                   </span>
@@ -2867,21 +3095,62 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                               </label>
                               <textarea
                                 placeholder="Describe how you treat this pest..."
-                                value={localInputValues.howWeDoIt[option.id] !== undefined 
-                                  ? localInputValues.howWeDoIt[option.id] 
-                                  : option.how_we_do_it_text || ''}
+                                value={
+                                  localInputValues.howWeDoIt[option.id] !==
+                                  undefined
+                                    ? localInputValues.howWeDoIt[option.id]
+                                    : option.how_we_do_it_text || ''
+                                }
                                 onChange={e =>
-                                  updatePestOptionHowWeDoIt(option.id, e.target.value)
+                                  updatePestOptionHowWeDoIt(
+                                    option.id,
+                                    e.target.value
+                                  )
                                 }
                                 className={styles.howWeDoItTextarea}
                                 rows={3}
                               />
                             </div>
-                            
+
+                            <div className={styles.pestContentField}>
+                              <label className={styles.fieldLabel}>
+                                Plan Comparison Header Text:
+                                {debounceTimers.current[
+                                  `${option.id}-planComparisonHeader`
+                                ] && (
+                                  <span className={styles.savingIndicator}>
+                                    <Clock size={12} /> Saving...
+                                  </span>
+                                )}
+                              </label>
+                              <textarea
+                                placeholder="Leave blank to use default: Here's what we recommend for your home to get rid of those pesky [pest type] - and keep them out!"
+                                value={
+                                  localInputValues.planComparisonHeader[
+                                    option.id
+                                  ] !== undefined
+                                    ? localInputValues.planComparisonHeader[
+                                        option.id
+                                      ]
+                                    : option.plan_comparison_header_text || ''
+                                }
+                                onChange={e =>
+                                  updatePestOptionPlanComparisonHeader(
+                                    option.id,
+                                    e.target.value
+                                  )
+                                }
+                                className={styles.howWeDoItTextarea}
+                                rows={3}
+                              />
+                            </div>
+
                             <div className={styles.pestContentField}>
                               <label className={styles.fieldLabel}>
                                 Subspecies (one per line):
-                                {debounceTimers.current[`${option.id}-subspecies`] && (
+                                {debounceTimers.current[
+                                  `${option.id}-subspecies`
+                                ] && (
                                   <span className={styles.savingIndicator}>
                                     <Clock size={12} /> Saving...
                                   </span>
@@ -2889,11 +3158,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                               </label>
                               <textarea
                                 placeholder="Enter subspecies, one per line..."
-                                value={localInputValues.subspecies[option.id] !== undefined 
-                                  ? localInputValues.subspecies[option.id] 
-                                  : option.subspecies.join('\n')}
+                                value={
+                                  localInputValues.subspecies[option.id] !==
+                                  undefined
+                                    ? localInputValues.subspecies[option.id]
+                                    : option.subspecies.join('\n')
+                                }
                                 onChange={e => {
-                                  updatePestOptionSubspecies(option.id, e.target.value);
+                                  updatePestOptionSubspecies(
+                                    option.id,
+                                    e.target.value
+                                  );
                                 }}
                                 className={styles.subspeciesTextarea}
                                 rows={4}
@@ -3570,9 +3845,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.embedCodeGroup}>
               <h4>Simple Embed Code (Recommended)</h4>
               <p className={styles.embedDescription}>
-                Minimal embed code that automatically detects your company from the domain. 
-                All customizations will be loaded from your saved configuration. 
-                Perfect for most use cases.
+                Minimal embed code that automatically detects your company from
+                the domain. All customizations will be loaded from your saved
+                configuration. Perfect for most use cases.
               </p>
               <div className={styles.embedCode}>
                 <code>{generateMinimalEmbedCode()}</code>
@@ -3625,9 +3900,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             <div className={styles.embedCodeGroup}>
               <h4>Full Configuration</h4>
               <p className={styles.embedDescription}>
-                Includes all your customizations as data attributes. Use this if you need
-                to override settings per page or want maximum portability without relying
-                on server configuration.
+                Includes all your customizations as data attributes. Use this if
+                you need to override settings per page or want maximum
+                portability without relying on server configuration.
               </p>
               <div className={styles.embedCode}>
                 <code>{generateFullEmbedCode()}</code>

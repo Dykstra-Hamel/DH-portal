@@ -439,9 +439,8 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
 .dh-subspecies-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: repeat(3, auto);
   gap: 4px 20px;
-  grid-auto-flow: column;
+  grid-auto-flow: row;
 }
 
 .dh-subspecies-grid .dh-subspecies-item {
@@ -1756,7 +1755,6 @@ height: 100%;
   max-height: 889px;
   object-fit: contain;
   border-radius: 0 26px 26px 0;
-  transition: opacity 0.5s ease;
 }
 
 /* Desktop - 2-row pest limitation (1024px and wider) */
@@ -3073,12 +3071,14 @@ line-height: 28px;
 .dh-plan-price-right {
   display: flex;
   flex-direction: column;
+  margin: auto 0;
 }
 
 .dh-plan-price-initial {
   color: ${primaryColor};
   font-family: "${fontName}", sans-serif;
   font-size: 24px;
+  line-height: 20px;
   font-weight: 400;
 }
 
@@ -3236,6 +3236,17 @@ line-height: 28px;
 }
 
 .dh-read-more-link:hover {
+  color: ${secondaryDark};
+}
+
+.dh-read-less-link {
+  color: ${secondaryColor};
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.dh-read-less-link:hover {
   color: ${secondaryDark};
 }
 

@@ -207,6 +207,7 @@ export async function GET(request: NextRequest) {
         display_order,
         how_we_do_it_text,
         subspecies,
+        plan_comparison_header_text,
         pest_types (
           name,
           slug,
@@ -232,6 +233,7 @@ export async function GET(request: NextRequest) {
       category: option.pest_types.pest_categories?.name || 'Unknown',
       how_we_do_it_text: option.how_we_do_it_text,
       subspecies: option.subspecies || [],
+      plan_comparison_header_text: option.plan_comparison_header_text,
     }));
 
     // Fetch company's service plans count for widget config
