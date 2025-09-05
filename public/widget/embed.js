@@ -364,6 +364,26 @@
         );
       }
 
+      // Update plan comparison header with custom text if available
+      const planComparisonHeader = document.getElementById('plan-comparison-header');
+      if (planComparisonHeader && widgetState.formData.pestType) {
+        // Find the pest option that matches the selected pest type
+        const pestOptions = widgetState.widgetConfig?.pestOptions || [];
+        const selectedPestOption = pestOptions.find(option => option.value === widgetState.formData.pestType);
+        
+        
+        if (selectedPestOption && selectedPestOption.plan_comparison_header_text) {
+          // Use custom header text and replace [pest type] placeholder
+          const customHeaderText = selectedPestOption.plan_comparison_header_text
+            .replace(/\[pest type\]/g, getPestTypeDisplay(widgetState.formData.pestType, 'comparison'));
+          planComparisonHeader.innerHTML = customHeaderText;
+        } else {
+          // Fall back to default behavior - update the pest type in the default text
+          const defaultText = `Here's what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">${getPestTypeDisplay(widgetState.formData.pestType, 'comparison')}</span> - and keep them out!`;
+          planComparisonHeader.innerHTML = defaultText;
+        }
+      }
+
       // Update completion step title to Office Hours
       const completionMessage = document.querySelector(
         '#dh-step-complete h3'
@@ -1325,9 +1345,8 @@
   .dh-subspecies-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: repeat(3, auto);
   gap: 4px 20px;
-  grid-auto-flow: column;
+  grid-auto-flow: row;
   }
 
   .dh-subspecies-grid .dh-subspecies-item {
@@ -2642,7 +2661,6 @@
   max-height: 889px;
   object-fit: contain;
   border-radius: 0 26px 26px 0;
-  transition: opacity 0.5s ease;
   }
 
   /* Desktop - 2-row pest limitation (1024px and wider) */
@@ -3958,12 +3976,14 @@
   .dh-plan-price-right {
   display: flex;
   flex-direction: column;
+  margin: auto 0;
   }
 
   .dh-plan-price-initial {
   color: ${primaryColor};
   font-family: "${fontName}", sans-serif;
   font-size: 24px;
+  line-height: 20px;
   font-weight: 400;
   }
 
@@ -4121,6 +4141,17 @@
   }
 
   .dh-read-more-link:hover {
+  color: ${secondaryDark};
+  }
+
+  .dh-read-less-link {
+  color: ${secondaryColor};
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  }
+
+  .dh-read-less-link:hover {
   color: ${secondaryDark};
   }
 
@@ -4855,7 +4886,7 @@
 
   const message = document.createElement('p');
   message.className = 'dh-confirmation-message';
-  message.textContent = 'Your progress will be saved, but you&apos;ll need to start over if you leave now.';
+  message.textContent = "Don't worry, your progress will be saved and you can continue another time.";
 
   const buttonsContainer = document.createElement('div');
   buttonsContainer.className = 'dh-confirmation-buttons';
@@ -6140,15 +6171,33 @@
 
   // Toggle description read more/less functionality
   window.toggleDescription = function (element) {
-  const container = element.parentElement;
+  // Find the container by traversing up the DOM tree
+  let container = element.parentElement;
+  
+  // If we're inside .dh-description-full (for Read Less), go up one more level
+  if (container && container.classList.contains('dh-description-full')) {
+    container = container.parentElement;
+  }
+  
+  if (!container) return; // Safety check
+  
   const descriptionText = container.querySelector('.dh-description-text');
   const fullDescription = container.querySelector('.dh-description-full');
+  const readMoreLink = container.querySelector('.dh-read-more-link');
+  const readLessLink = container.querySelector('.dh-read-less-link');
 
   if (element.textContent === 'Read More') {
-    // Show full description and hide the Read More link
-    descriptionText.style.display = 'none';
-    fullDescription.style.display = 'inline';
-    element.style.display = 'none';
+    // Show full description and switch to Read Less
+    if (descriptionText) descriptionText.style.display = 'none';
+    if (fullDescription) fullDescription.style.display = 'inline';
+    if (readMoreLink) readMoreLink.style.display = 'none';
+    if (readLessLink) readLessLink.style.display = 'inline';
+  } else if (element.textContent === 'Read Less') {
+    // Show truncated description and switch to Read More
+    if (descriptionText) descriptionText.style.display = 'inline';
+    if (fullDescription) fullDescription.style.display = 'none';
+    if (readMoreLink) readMoreLink.style.display = 'inline';
+    if (readLessLink) readLessLink.style.display = 'none';
   }
   };
 
@@ -6401,31 +6450,29 @@
         });
       }
 
-      // Handle "View All Pests" button
+      // Handle "View All Pests" button toggle
       const viewAllPestsButton = document.getElementById('view-all-pests-button');
       if (viewAllPestsButton) {
+        let isExpanded = false;
+        
         viewAllPestsButton.addEventListener('click', () => {
           const hiddenPests = document.querySelectorAll('.dh-pest-option-hidden');
+          const visiblePests = document.querySelectorAll('.dh-pest-option:not(.dh-pest-option-hidden)');
           const pestSelection = document.querySelector('.dh-pest-selection');
           const viewAllContainer = document.querySelector('.dh-view-all-container');
           
-          if (hiddenPests.length > 0) {
-            // Fade out the "View All Pests" button first
-            if (viewAllContainer) {
-              viewAllContainer.style.opacity = '0';
-              viewAllContainer.style.transform = 'translateY(-10px)';
-              viewAllContainer.style.transition = 'all 0.3s ease';
-              
-              setTimeout(() => {
-                viewAllContainer.style.display = 'none';
-              }, 300);
-            }
+          if (!isExpanded && hiddenPests.length > 0) {
+            // Expanding: Show all pests
+            isExpanded = true;
+            
+            // Update button text and icon
+            viewAllPestsButton.innerHTML = `
+              Show Less Pests <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M8 1.0769L1.52239 8.00002L8 14.9231" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            `;
             
             // Expand the pest selection container
             if (pestSelection) {
-              setTimeout(() => {
-                pestSelection.classList.add('expanded');
-              }, 200);
+              pestSelection.classList.add('expanded');
             }
             
             // Animate the newly visible pests with staggered animation
@@ -6438,10 +6485,34 @@
                 setTimeout(() => {
                   pest.classList.remove('dh-pest-option-revealing');
                 }, 400);
-              }, 300 + (index * 80)); // Start after container begins expanding, stagger by 80ms
+              }, index * 80); // Stagger by 80ms
             });
+          } else if (isExpanded) {
+            // Collapsing: Hide pests beyond the first 8
+            isExpanded = false;
             
-            // Re-attach event listeners to newly visible pest options
+            // Update button text and icon back to original
+            viewAllPestsButton.innerHTML = `
+              View All Pests <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            `;
+            
+            // Collapse the pest selection container
+            if (pestSelection) {
+              pestSelection.classList.remove('expanded');
+            }
+            
+            // Hide pests beyond the first 8 with staggered animation
+            const allPestOptions = document.querySelectorAll('.dh-pest-option');
+            for (let i = 8; i < allPestOptions.length; i++) {
+              const pest = allPestOptions[i];
+              setTimeout(() => {
+                pest.classList.add('dh-pest-option-hidden');
+              }, (i - 8) * 50); // Stagger the hiding animation
+            }
+          }
+          
+          // Re-attach event listeners to newly visible pest options after expand/collapse
+          setTimeout(() => {
             const newPestOptions = document.querySelectorAll('.dh-pest-option:not([data-listener-attached])');
             newPestOptions.forEach(option => {
               option.setAttribute('data-listener-attached', 'true');
@@ -6516,7 +6587,7 @@
                 }
               });
             });
-          }
+          }, 300); // Wait for animations to complete
         });
       }
 
@@ -6958,7 +7029,7 @@
 
         // Update safety message with pest name
         if (safetyTextEl && pestConfig) {
-          safetyTextEl.innerHTML = `Oh, and don&apos;t worry. Our ${pestConfig.label.toLowerCase()} treatments are safe for people and pets for your property!`;
+          safetyTextEl.innerHTML = `Oh, and don&apos;t worry, our ${pestConfig.label.toLowerCase()} treatments are people and pet-friendly!`;
         }
 
         // Set pet safety image source using config.baseUrl
@@ -7377,7 +7448,7 @@
           : fullDescription;
 
         const descriptionHtml = shouldTruncate
-          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription}</span>`
+          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription} <span class="dh-read-less-link" onclick="toggleDescription(this)" style="display: none;">Read Less</span></span>`
           : `<span class="dh-description-text">${fullDescription}</span>`;
 
         return `
@@ -7481,7 +7552,7 @@
           : fullDescription;
 
         const descriptionHtml = shouldTruncate
-          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription}</span>`
+          ? `<span class="dh-description-text">${truncatedDescription}...</span> <span class="dh-read-more-link" onclick="toggleDescription(this)">Read More</span><span class="dh-description-full" style="display: none;">${fullDescription} <span class="dh-read-less-link" onclick="toggleDescription(this)" style="display: none;">Read Less</span></span>`
           : `<span class="dh-description-text">${fullDescription}</span>`;
 
         return `
@@ -8109,18 +8180,15 @@
   const MAX_RETRIES = 3;
 
   function loadScriptOnce() {
-    console.log('Turnstile: loadScriptOnce called, scriptLoaded:', scriptLoaded);
     if (scriptLoaded) return Promise.resolve();
     if (scriptLoadPromise) return scriptLoadPromise;
 
-    console.log('Turnstile: Loading script from Cloudflare...');
     scriptLoadPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
       script.async = true;
       script.defer = true;
       script.onload = () => {
-        console.log('Turnstile: Script loaded successfully');
         scriptLoaded = true;
         resolve();
       };
@@ -8290,7 +8358,6 @@
 
   window.dhCaptcha = {
     init: async (provider, inputSiteKey) => {
-      console.log('Turnstile: dhCaptcha.init called with provider:', provider, 'siteKey:', inputSiteKey?.substring(0, 20) + '...');
       
       if (provider !== 'turnstile' || !inputSiteKey) {
         console.log('Turnstile: Not initializing - provider:', provider, 'siteKey present:', !!inputSiteKey);
@@ -8303,7 +8370,6 @@
       try {
         // Only load script, don't pre-render widgets
         await loadScriptOnce();
-        console.log('Turnstile: Initialization complete (script loaded, ready for on-demand tokens)');
       } catch (error) {
         console.error('Turnstile: Init failed:', error);
       }
@@ -8629,7 +8695,7 @@
           <div class="dh-safety-message" id="safety-message">
             <img class="dh-pet-safety-image" src="" alt="Pet Safety" id="pet-safety-image" />
             <div class="dh-safety-text">
-              <p id="safety-message-text">Oh, and don&apos;t worry. Our treatments are safe for people and pets for your property!</p>
+              <p id="safety-message-text">Oh, and don&apos;t worry, our treatments are people and pet-friendly!</p>
             </div>
           </div>
         </div>
@@ -8815,7 +8881,7 @@
           <!-- Logo will be populated from widget config -->
         </div>
         
-        <h2 class="dh-step-heading">Here&apos;s what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">pests</span> - and keep them out!</h2>
+        <h2 class="dh-step-heading" id="plan-comparison-header">Here&apos;s what we recommend for your home to get rid of those pesky <span id="comparison-pest-type">pests</span> - and keep them out!</h2>
         
         <!-- Google Reviews Display -->
         <div class="dh-reviews-container" id="comparison-reviews-container">
@@ -10127,15 +10193,6 @@
         collected_at: 'widget_load',
       };
 
-      // Debug logging for URL capture
-      console.log('DH Widget URL Capture:', {
-        page_url: attributionData.page_url,
-        referrer_url: attributionData.referrer_url,
-        referrer_domain: attributionData.referrer_domain,
-        traffic_source: attributionData.traffic_source,
-        document_referrer: document.referrer,
-        utm_params: urlParams
-      });
       
       // Initialize widget state objects (already declared globally)
       widgetState = {
@@ -10305,7 +10362,6 @@
             localStorage.setItem('dh_widget_progress_' + config.companyId, JSON.stringify(saveData));
             widgetState.formState.lastSaved = new Date().toISOString();
             
-            console.log('DH Widget: Saved form state to localStorage', saveData);
             return true;
           } catch (error) {
             console.warn('Failed to save form state:', error);
@@ -10348,7 +10404,6 @@
         // Check if user has significant progress worth restoring
         shouldPromptToContinue: (savedData) => {
           if (!savedData) {
-            console.log('DH Widget: No saved data for continue prompt');
             return false;
           }
           
@@ -10361,13 +10416,6 @@
             (currentStep !== 'pest-issue' && currentStep !== 'welcome')
           );
           
-          console.log('DH Widget: Checking if should prompt to continue', {
-            hasSignificantProgress,
-            pestType: formData.pestType,
-            address: formData.address,
-            currentStep: currentStep,
-            formData: formData
-          });
           
           return hasSignificantProgress;
         },
@@ -10375,7 +10423,6 @@
         // Start auto-save functionality
         startAutoSave: () => {
           if (!widgetState.formState.progressiveFeatures.autoSave) {
-            console.log('DH Widget: Auto-save is disabled');
             return;
           }
           
@@ -10384,12 +10431,10 @@
             clearInterval(progressiveFormManager.autoSaveTimer);
           }
           
-          console.log('DH Widget: Starting auto-save with interval:', widgetState.formState.autoSaveInterval);
           
           // Start new auto-save timer
           progressiveFormManager.autoSaveTimer = setInterval(() => {
             if (progressiveFormManager.hasSignificantFormData()) {
-              console.log('DH Widget: Auto-save triggered - has significant data');
               progressiveFormManager.saveFormStateToLocalStorage();
             }
           }, widgetState.formState.autoSaveInterval);
@@ -10539,7 +10584,6 @@
         
         // Function to show continue prompt to users with saved progress
         showContinuePrompt: (savedData) => {
-          console.log('DH Widget: showContinuePrompt called with data:', savedData);
           
           // Create overlay
           const overlay = document.createElement('div');
@@ -10726,7 +10770,6 @@
           
           // Then populate form fields after a delay to ensure DOM is ready
           setTimeout(() => {
-            console.log('DH Widget: Session restoration - calling populateFormFields');
             populateFormFields();
             // Clear restoration flag after population is complete
             widgetState.isRestoring = false;
@@ -10744,7 +10787,6 @@
       // Function to populate form fields with restored data
       const populateFormFields = () => {
         const data = widgetState.formData;
-        console.log('DH Widget: populateFormFields called with data:', data);
         
         try {
           // Restore pest selection if available
@@ -10754,7 +10796,6 @@
               option.classList.remove('selected');
               if (option.dataset.pest === data.pestType) {
                 option.classList.add('selected');
-                console.log('DH Widget: Restored pest selection:', data.pestType);
               }
             });
           }
@@ -10764,7 +10805,6 @@
             const addressInput = document.getElementById('address-search-input');
             if (addressInput) {
               addressInput.value = data.address;
-              console.log('DH Widget: Populated address search input:', data.address);
             }
           }
           
@@ -10779,7 +10819,6 @@
             const streetInput = document.getElementById('confirm-street-input');
             if (streetInput) {
               streetInput.value = addressStreet;
-              console.log('DH Widget: Populated confirm-street-input with value:', addressStreet);
               if (typeof updateFloatingLabel === 'function') {
                 updateFloatingLabel(streetInput);
               }
@@ -10790,7 +10829,6 @@
             const cityInput = document.getElementById('confirm-city-input');
             if (cityInput) {
               cityInput.value = addressCity;
-              console.log('DH Widget: Populated confirm-city-input with value:', addressCity);
               if (typeof updateFloatingLabel === 'function') {
                 updateFloatingLabel(cityInput);
               }
@@ -10801,7 +10839,6 @@
             const stateInput = document.getElementById('confirm-state-input');
             if (stateInput) {
               stateInput.value = addressState;
-              console.log('DH Widget: Populated confirm-state-input with value:', addressState);
               if (typeof updateFloatingLabel === 'function') {
                 updateFloatingLabel(stateInput);
               }
@@ -10812,7 +10849,6 @@
             const zipInput = document.getElementById('confirm-zip-input');
             if (zipInput) {
               zipInput.value = addressZip;
-              console.log('DH Widget: Populated confirm-zip-input with value:', addressZip);
               if (typeof updateFloatingLabel === 'function') {
                 updateFloatingLabel(zipInput);
               }
@@ -10920,7 +10956,6 @@
       
       // Function to start fresh widget
       const startFreshWidget = () => {
-        console.log('DH Widget: Starting fresh widget');
         progressiveFormManager.startAutoSave();
         showStep('pest-issue');
         setupStepValidation('pest-issue');
@@ -11103,9 +11138,7 @@
       
       if (sessionIdToQuery && typeof recoverPartialLead === 'function') {
         try {
-          console.log('DH Widget: Querying server with sessionId:', sessionIdToQuery);
           serverRecoveryData = await recoverPartialLead(config.companyId, sessionIdToQuery);
-          console.log('DH Widget: Server recovery data check', serverRecoveryData);
         } catch (error) {
           console.warn('Failed to recover partial lead from server:', error);
         }

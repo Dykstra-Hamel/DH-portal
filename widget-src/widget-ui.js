@@ -164,7 +164,7 @@ const createConfirmationPopup = () => {
 
   const message = document.createElement('p');
   message.className = 'dh-confirmation-message';
-  message.textContent = 'Your progress will be saved, but you&apos;ll need to start over if you leave now.';
+  message.textContent = "Don't worry, your progress will be saved and you can continue another time.";
 
   const buttonsContainer = document.createElement('div');
   buttonsContainer.className = 'dh-confirmation-buttons';

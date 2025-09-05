@@ -15,18 +15,15 @@
   const MAX_RETRIES = 3;
 
   function loadScriptOnce() {
-    console.log('Turnstile: loadScriptOnce called, scriptLoaded:', scriptLoaded);
     if (scriptLoaded) return Promise.resolve();
     if (scriptLoadPromise) return scriptLoadPromise;
 
-    console.log('Turnstile: Loading script from Cloudflare...');
     scriptLoadPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
       script.async = true;
       script.defer = true;
       script.onload = () => {
-        console.log('Turnstile: Script loaded successfully');
         scriptLoaded = true;
         resolve();
       };
@@ -196,7 +193,6 @@
 
   window.dhCaptcha = {
     init: async (provider, inputSiteKey) => {
-      console.log('Turnstile: dhCaptcha.init called with provider:', provider, 'siteKey:', inputSiteKey?.substring(0, 20) + '...');
       
       if (provider !== 'turnstile' || !inputSiteKey) {
         console.log('Turnstile: Not initializing - provider:', provider, 'siteKey present:', !!inputSiteKey);
@@ -209,7 +205,6 @@
       try {
         // Only load script, don't pre-render widgets
         await loadScriptOnce();
-        console.log('Turnstile: Initialization complete (script loaded, ready for on-demand tokens)');
       } catch (error) {
         console.error('Turnstile: Init failed:', error);
       }
