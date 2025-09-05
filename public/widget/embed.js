@@ -3651,6 +3651,7 @@
   color: #6b7280;
   line-height: 1.6;
   margin: 0;
+  text-align: left;
   }
   @media (max-width: 768px) {
   .dh-plan-faqs {
@@ -3696,7 +3697,7 @@
 
   .dh-plan-description {
     font-size: 18px;
-  
+    text-align: left;
   }
 
   .dh-plan-included h4 {

@@ -330,9 +330,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   const [localInputValues, setLocalInputValues] = useState<{
     howWeDoIt: { [optionId: string]: string };
     subspecies: { [optionId: string]: string };
+    customLabel: { [optionId: string]: string };
   }>({
     howWeDoIt: {},
     subspecies: {},
+    customLabel: {},
   });
   const [brandColors, setBrandColors] = useState<{
     primary?: string;
@@ -902,7 +904,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
 
-  const savePestOptions = async (pestOptions: CompanyPestOption[]) => {
+  const savePestOptions = useCallback(async (pestOptions: CompanyPestOption[]) => {
     if (!selectedCompany) return;
     try {
       const updateData = {
@@ -939,7 +941,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       setSaveStatus('error');
       setTimeout(() => setSaveStatus('idle'), 2000);
     }
-  };
+  }, [selectedCompany, setSaveStatus, setCompanyPestOptions]);
 
   const addPestOption = (pestType: PestType) => {
     const newOption: CompanyPestOption = {
@@ -969,16 +971,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     savePestOptions(updatedOptions);
   };
 
-  const updatePestOptionLabel = (optionId: string, customLabel: string) => {
-    const updatedOptions = companyPestOptions.map(option =>
-      option.id === optionId ? { ...option, custom_label: customLabel } : option
-    );
-    setCompanyPestOptions(updatedOptions);
-    savePestOptions(updatedOptions);
-  };
 
   // Debounced save function to prevent API calls on every keystroke
-  const debouncedSave = useCallback((optionId: string, field: 'howWeDoIt' | 'subspecies', value: string | string[]) => {
+  const debouncedSave = useCallback((optionId: string, field: 'howWeDoIt' | 'subspecies' | 'customLabel', value: string | string[]) => {
     const timerKey = `${optionId}-${field}`;
     
     // Clear existing timer
@@ -992,8 +987,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         if (option.id === optionId) {
           if (field === 'howWeDoIt') {
             return { ...option, how_we_do_it_text: value as string };
-          } else {
+          } else if (field === 'subspecies') {
             return { ...option, subspecies: value as string[] };
+          } else if (field === 'customLabel') {
+            return { ...option, custom_label: value as string };
           }
         }
         return option;
@@ -1004,7 +1001,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       // Clear the timer after saving
       delete debounceTimers.current[timerKey];
     }, 500); // 500ms delay
-  }, [companyPestOptions]);
+  }, [companyPestOptions, savePestOptions]);
 
   const updatePestOptionHowWeDoIt = (optionId: string, howWeDoItText: string) => {
     // Update local state immediately for responsive UI
@@ -1043,6 +1040,23 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     
     // Debounce the API call
     debouncedSave(optionId, 'subspecies', subspecies);
+  };
+  
+  const updatePestOptionLabelDebounced = (optionId: string, customLabel: string) => {
+    // Update local state immediately for responsive UI
+    setLocalInputValues(prev => ({
+      ...prev,
+      customLabel: { ...prev.customLabel, [optionId]: customLabel }
+    }));
+    
+    // Also update the main state for immediate UI feedback
+    const updatedOptions = companyPestOptions.map(option =>
+      option.id === optionId ? { ...option, custom_label: customLabel } : option
+    );
+    setCompanyPestOptions(updatedOptions);
+    
+    // Debounce the API call
+    debouncedSave(optionId, 'customLabel', customLabel);
   };
 
   const reorderPestOptions = (fromIndex: number, toIndex: number) => {
@@ -2807,6 +2821,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             <div className={styles.pestDetails}>
                               <div className={styles.pestName}>
                                 {option.custom_label || option.name}
+                                {debounceTimers.current[`${option.id}-customLabel`] && (
+                                  <span className={styles.savingIndicator}>
+                                    <Clock size={12} /> Saving...
+                                  </span>
+                                )}
                               </div>
                               <div className={styles.pestCategory}>
                                 Category: {option.category}
@@ -2817,9 +2836,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             <input
                               type="text"
                               placeholder={option.name}
-                              value={option.custom_label || ''}
+                              value={localInputValues.customLabel[option.id] !== undefined 
+                                ? localInputValues.customLabel[option.id] 
+                                : option.custom_label || ''}
                               onChange={e =>
-                                updatePestOptionLabel(option.id, e.target.value)
+                                updatePestOptionLabelDebounced(option.id, e.target.value)
                               }
                               className={styles.customLabelInput}
                             />
