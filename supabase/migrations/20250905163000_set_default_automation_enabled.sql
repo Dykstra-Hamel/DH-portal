@@ -14,7 +14,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger to run the function when new companies are created
+-- Drop existing trigger if it exists and create new one
+DROP TRIGGER IF EXISTS create_automation_setting_on_company_insert ON companies;
 CREATE TRIGGER create_automation_setting_on_company_insert
     AFTER INSERT ON companies
     FOR EACH ROW
