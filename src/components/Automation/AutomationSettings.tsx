@@ -124,7 +124,7 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
           if (settingsData.settings) {
             const settings = settingsData.settings;
             setAutomationSettings({
-              automation_enabled: settings.automation_enabled?.value === 'true',
+              automation_enabled: Boolean(settings.automation_enabled?.value),
               automation_max_emails_per_day: parseInt(settings.automation_max_emails_per_day?.value || '10'),
             });
             setLogoOverrideUrl(settings.logo_override_url?.value || '');

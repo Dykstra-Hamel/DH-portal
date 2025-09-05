@@ -390,6 +390,9 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
 
   const logoOverrideUrl = logoOverrideSetting?.setting_value || '';
 
+  // Safe customer email with fallback logic for partial leads
+  const customerEmail = leadData.customerEmail || fullLeadData?.customer?.email || '';
+
   // Prepare email variables with proper URL handling
   // Prioritize company logo override, then brand logo, then default
   const logoUrl = logoOverrideUrl || brandData?.logo_url || '/pcocentral-logo.png';
@@ -450,7 +453,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
                    `${fullLeadData.customer.first_name || ''} ${fullLeadData.customer.last_name || ''}`.trim() : ''),
     firstName: fullLeadData?.customer?.first_name || leadData.customerName?.split(' ')[0] || '',
     lastName: fullLeadData?.customer?.last_name || leadData.customerName?.split(' ').slice(1).join(' ') || '',
-    customerEmail: leadData.customerEmail || fullLeadData?.customer?.email || '',
+    customerEmail: customerEmail,
     customerPhone: leadData.customerPhone || fullLeadData?.customer?.phone || '',
     
     // Company variables
@@ -539,7 +542,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        to: leadData.customerEmail,
+        to: customerEmail,
         subject: subjectLine,
         html: htmlContent,
         text: textContent,
@@ -576,7 +579,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
       success: true,
       emailSent: true,
       templateName: template.name,
-      recipient: leadData.customerEmail,
+      recipient: customerEmail,
       subject: subjectLine,
       emailId: emailResult.messageId,
       provider: emailResult.provider,
@@ -586,7 +589,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
   } catch (error) {
     console.error('Error sending automation email:', {
       error: error instanceof Error ? error.message : error,
-      recipient: leadData.customerEmail,
+      recipient: customerEmail,
       template: template.name,
       leadId,
       companyId,
@@ -599,7 +602,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
       emailSent: false,
       error: error instanceof Error ? error.message : 'Unknown email error',
       templateName: template.name,
-      recipient: leadData.customerEmail,
+      recipient: customerEmail,
       subject: subjectLine,
     };
   }
