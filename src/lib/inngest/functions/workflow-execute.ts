@@ -444,12 +444,14 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
   const planData = fullLeadData?.service_plans;
   
   const emailVariables = {
-    // Customer/Lead variables
-    customerName: leadData.customerName,
+    // Customer/Lead variables - with fallback to database data for partial leads
+    customerName: leadData.customerName || 
+                  (fullLeadData?.customer ? 
+                   `${fullLeadData.customer.first_name || ''} ${fullLeadData.customer.last_name || ''}`.trim() : ''),
     firstName: fullLeadData?.customer?.first_name || leadData.customerName?.split(' ')[0] || '',
     lastName: fullLeadData?.customer?.last_name || leadData.customerName?.split(' ').slice(1).join(' ') || '',
-    customerEmail: leadData.customerEmail,
-    customerPhone: leadData.customerPhone || '',
+    customerEmail: leadData.customerEmail || fullLeadData?.customer?.email || '',
+    customerPhone: leadData.customerPhone || fullLeadData?.customer?.phone || '',
     
     // Company variables
     companyName: company?.name || 'Your Company',
