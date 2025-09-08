@@ -31,7 +31,6 @@ function getSingularPestType(pestType: string): string {
   }
 }
 
-
 export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
   const { firstName, pestType, address, selectedPlan } = quoteData;
   const singularPestType = getSingularPestType(pestType);
@@ -875,7 +874,9 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                 </td>
                               </tr>
                             </table>
-${selectedPlan?.requires_quote ? `
+${
+  selectedPlan?.requires_quote
+    ? `
                             <table
                               class="heading_block block-2"
                               width="100%"
@@ -968,13 +969,14 @@ ${selectedPlan?.requires_quote ? `
                                     "
                                   >
                                     <p align="center" style="margin: 0">
-                                      Book a time that works for you, and we&apos;ll call right away with your custom quote. Click Book It below to continue.
+                                      We&apos;ll call right away with your custom quote.
                                     </p>
                                   </div>
                                 </td>
                               </tr>
                             </table>
-` : `
+`
+    : `
                             <table
                               class="heading_block block-2"
                               width="100%"
@@ -1075,7 +1077,8 @@ ${selectedPlan?.requires_quote ? `
                                 </td>
                               </tr>
                             </table>
-`}
+`
+}
                           </td>
                           <td
                             class="column column-2"
