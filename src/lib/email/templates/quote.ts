@@ -875,6 +875,106 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                 </td>
                               </tr>
                             </table>
+${selectedPlan?.requires_quote ? `
+                            <table
+                              class="heading_block block-2"
+                              width="100%"
+                              border="0"
+                              cellpadding="0"
+                              cellspacing="0"
+                              role="presentation"
+                              style="
+                                mso-table-lspace: 0pt;
+                                mso-table-rspace: 0pt;
+                              "
+                            >
+                              <tr>
+                                <td
+                                  class="pad"
+                                  style="
+                                    padding-bottom: 10px;
+                                    padding-left: 20px;
+                                    padding-right: 20px;
+                                    padding-top: 10px;
+                                    text-align: center;
+                                    width: 100%;
+                                  "
+                                >
+                                  <h1
+                                    style="
+                                      margin: 0;
+                                      color: #3b82f6;
+                                      direction: ltr;
+                                      font-family:
+                                        Helvetica Neue,
+                                        Helvetica,
+                                        Arial,
+                                        sans-serif;
+                                      font-size: 24px;
+                                      font-weight: 700;
+                                      letter-spacing: normal;
+                                      line-height: 18px;
+                                      text-align: center;
+                                      margin-top: 0;
+                                      margin-bottom: 0;
+                                      mso-line-height-alt: 18px;
+                                    "
+                                  >
+                                    <span
+                                      class="tinyMce-placeholder"
+                                      style="word-break: break-word"
+                                      >Custom Quote Required</span
+                                    >
+                                  </h1>
+                                </td>
+                              </tr>
+                            </table>
+                            <table
+                              class="paragraph_block block-3"
+                              width="100%"
+                              border="0"
+                              cellpadding="0"
+                              cellspacing="0"
+                              role="presentation"
+                              style="
+                                mso-table-lspace: 0pt;
+                                mso-table-rspace: 0pt;
+                                word-break: break-word;
+                              "
+                            >
+                              <tr>
+                                <td
+                                  class="pad"
+                                  style="
+                                    padding-left: 20px;
+                                    padding-right: 20px;
+                                  "
+                                >
+                                  <div
+                                    style="
+                                      color: #101112;
+                                      direction: ltr;
+                                      font-family:
+                                        Helvetica Neue,
+                                        Helvetica,
+                                        Arial,
+                                        sans-serif;
+                                      font-size: 19px;
+                                      font-weight: 400;
+                                      letter-spacing: 0px;
+                                      line-height: 20px;
+                                      text-align: center;
+                                      mso-line-height-alt: 20px;
+                                    "
+                                  >
+                                    <p align="center" style="margin: 0">
+                                      Book a time that works for you, and we&apos;ll call right away with your custom quote. Click Book It below to continue.
+                                    </p>
+                                  </div>
+                                </td>
+                              </tr>
+                            </table>
+` : `
                             <table
                               class="heading_block block-2"
                               width="100%"
@@ -975,6 +1075,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                 </td>
                               </tr>
                             </table>
+`}
                           </td>
                           <td
                             class="column column-2"

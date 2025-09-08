@@ -200,74 +200,92 @@
     ants: {
       default: 'ants',
       comparison: 'ants',
+      singular: 'ant',
     },
     spiders: {
       default: 'spiders',
       comparison: 'spiders',
+      singular: 'spider',
     },
     cockroaches: {
       default: 'cockroaches',
       comparison: 'roaches',
+      singular: 'cockroach',
     },
     roaches: {
       default: 'cockroaches',
       comparison: 'roaches',
+      singular: 'cockroach',
     },
     rodents: {
       default: 'rodents',
       comparison: 'rodents',
+      singular: 'rodent',
     },
     mice: {
       default: 'mice',
       comparison: 'rodents',
+      singular: 'mouse',
     },
     rats: {
       default: 'rats',
       comparison: 'rodents',
+      singular: 'rat',
     },
     termites: {
       default: 'termites',
       comparison: 'termites',
+      singular: 'termite',
     },
     wasps: {
       default: 'wasps',
       comparison: 'wasps',
+      singular: 'wasp',
     },
     hornets: {
       default: 'wasps and hornets',
       comparison: 'wasps',
+      singular: 'hornet',
     },
     bees: {
       default: 'bees',
       comparison: 'bees',
+      singular: 'bee',
     },
     fleas: {
       default: 'fleas',
       comparison: 'fleas',
+      singular: 'flea',
     },
     ticks: {
       default: 'ticks',
       comparison: 'ticks',
+      singular: 'tick',
     },
     bed_bugs: {
       default: 'bed bugs',
       comparison: 'bed bugs',
+      singular: 'bed bug',
     },
     mosquitoes: {
       default: 'mosquitoes',
       comparison: 'mosquitoes',
+      singular: 'mosquito',
     },
     silverfish: {
       default: 'silverfish',
       comparison: 'silverfish',
+      singular: 'silverfish',
     },
     carpenter_ants: {
       default: 'carpenter ants',
       comparison: 'carpenter ants',
+      singular: 'carpenter ant',
     },
     others: {
       default: 'pests',
       comparison: 'your pest issue',
+      singular: 'pest',
     },
   };
 
@@ -1364,7 +1382,8 @@
   }
 
   .dh-interior-image {
-   width: 244px;
+   width: 215px;
+   min-height: 215px;
    height: auto;
    object-fit: cover;
    border-radius: 16px;
@@ -2771,6 +2790,7 @@
   }
 
   .dh-plan-visual {
+    max-height: unset !important;
     order: -1;
     margin: auto;
   }
@@ -4680,6 +4700,32 @@
   }
   }
 
+  /* ===================================================================
+   CUSTOM QUOTE SECTION STYLES
+   =================================================================== */
+
+  .dh-plan-custom-quote {
+  padding: 20px 0;
+  margin: 10px 0;
+  grid-column: 1 / -1; /* Span all columns */
+  width: 100%;
+  }
+
+  .dh-custom-quote-title {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 18px;
+  color: ${primaryColor};
+  margin-bottom: 21px;
+  }
+
+  .dh-custom-quote-description {
+  font-size: 19px;
+  font-weight: 400;
+  line-height: 20px;
+  color: ${textColor};
+  }
+
   `;
   document.head.appendChild(styleElement);
   };
@@ -5294,7 +5340,6 @@
     }
   }
 
-
   // Populate address fields when reaching address step
   if (stepName === 'address') {
     setTimeout(() => {
@@ -5397,7 +5442,6 @@
 
     const result = data.results[0];
     const location = result.geometry.location;
-
 
     return {
       success: true,
@@ -5996,14 +6040,13 @@
 
   // Function to navigate to detailed quote with proper step tracking
   const navigateToDetailedQuote = () => {
-  
   // Navigate to quote-contact step
   showStep('quote-contact');
   setupStepValidation('quote-contact');
-  
+
   // Update current step tracking
   widgetState.currentStep = 'quote-contact';
-  
+
   // Trigger auto-save to persist the step change
   if (typeof triggerProgressSave === 'function') {
     triggerProgressSave();
@@ -6174,14 +6217,14 @@
   window.toggleDescription = function (element) {
   // Find the container by traversing up the DOM tree
   let container = element.parentElement;
-  
+
   // If we're inside .dh-description-full (for Read Less), go up one more level
   if (container && container.classList.contains('dh-description-full')) {
     container = container.parentElement;
   }
-  
+
   if (!container) return; // Safety check
-  
+
   const descriptionText = container.querySelector('.dh-description-text');
   const fullDescription = container.querySelector('.dh-description-full');
   const readMoreLink = container.querySelector('.dh-read-more-link');
@@ -6393,15 +6436,21 @@
 
             // Fetch and store recommended plan immediately after pest selection
             try {
-              const recommendedPlan = await getCheapestFullCoveragePlan(config.companyId, pestValue);
+              const recommendedPlan = await getCheapestFullCoveragePlan(
+                config.companyId,
+                pestValue
+              );
               if (recommendedPlan) {
                 widgetState.formData.recommendedPlan = recommendedPlan;
                 widgetState.formData.selectedPlan = recommendedPlan; // Default to recommended
-                widgetState.formData.offerPrice = recommendedPlan.recurring_price;
-                
+                widgetState.formData.offerPrice =
+                  recommendedPlan.recurring_price;
               }
             } catch (error) {
-              console.warn('Error fetching recommended plan for pest selection:', error);
+              console.warn(
+                'Error fetching recommended plan for pest selection:',
+                error
+              );
             }
 
             // Save progress immediately with plan data
@@ -6452,36 +6501,44 @@
       }
 
       // Handle "View All Pests" button toggle
-      const viewAllPestsButton = document.getElementById('view-all-pests-button');
+      const viewAllPestsButton = document.getElementById(
+        'view-all-pests-button'
+      );
       if (viewAllPestsButton) {
         let isExpanded = false;
-        
+
         viewAllPestsButton.addEventListener('click', () => {
-          const hiddenPests = document.querySelectorAll('.dh-pest-option-hidden');
-          const visiblePests = document.querySelectorAll('.dh-pest-option:not(.dh-pest-option-hidden)');
+          const hiddenPests = document.querySelectorAll(
+            '.dh-pest-option-hidden'
+          );
+          const visiblePests = document.querySelectorAll(
+            '.dh-pest-option:not(.dh-pest-option-hidden)'
+          );
           const pestSelection = document.querySelector('.dh-pest-selection');
-          const viewAllContainer = document.querySelector('.dh-view-all-container');
-          
+          const viewAllContainer = document.querySelector(
+            '.dh-view-all-container'
+          );
+
           if (!isExpanded && hiddenPests.length > 0) {
             // Expanding: Show all pests
             isExpanded = true;
-            
+
             // Update button text and icon
             viewAllPestsButton.innerHTML = `
               Show Less Pests <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M8 1.0769L1.52239 8.00002L8 14.9231" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             `;
-            
+
             // Expand the pest selection container
             if (pestSelection) {
               pestSelection.classList.add('expanded');
             }
-            
+
             // Animate the newly visible pests with staggered animation
             hiddenPests.forEach((pest, index) => {
               setTimeout(() => {
                 pest.classList.remove('dh-pest-option-hidden');
                 pest.classList.add('dh-pest-option-revealing');
-                
+
                 // Clean up the revealing class after animation completes
                 setTimeout(() => {
                   pest.classList.remove('dh-pest-option-revealing');
@@ -6491,39 +6548,46 @@
           } else if (isExpanded) {
             // Collapsing: Hide pests beyond the first 8
             isExpanded = false;
-            
+
             // Update button text and icon back to original
             viewAllPestsButton.innerHTML = `
               View All Pests <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             `;
-            
+
             // Collapse the pest selection container
             if (pestSelection) {
               pestSelection.classList.remove('expanded');
             }
-            
+
             // Hide pests beyond the first 8 with staggered animation
             const allPestOptions = document.querySelectorAll('.dh-pest-option');
             for (let i = 8; i < allPestOptions.length; i++) {
               const pest = allPestOptions[i];
-              setTimeout(() => {
-                pest.classList.add('dh-pest-option-hidden');
-              }, (i - 8) * 50); // Stagger the hiding animation
+              setTimeout(
+                () => {
+                  pest.classList.add('dh-pest-option-hidden');
+                },
+                (i - 8) * 50
+              ); // Stagger the hiding animation
             }
           }
-          
+
           // Re-attach event listeners to newly visible pest options after expand/collapse
           setTimeout(() => {
-            const newPestOptions = document.querySelectorAll('.dh-pest-option:not([data-listener-attached])');
+            const newPestOptions = document.querySelectorAll(
+              '.dh-pest-option:not([data-listener-attached])'
+            );
             newPestOptions.forEach(option => {
               option.setAttribute('data-listener-attached', 'true');
               option.addEventListener('click', async e => {
                 // Prevent double-clicking if loading overlay is visible
                 const pestLoadingEl = document.getElementById('pest-loading');
-                if (pestLoadingEl && pestLoadingEl.style.display === 'flex') return;
+                if (pestLoadingEl && pestLoadingEl.style.display === 'flex')
+                  return;
 
                 // Remove selected class from all options
-                const allPestOptions = document.querySelectorAll('.dh-pest-option');
+                const allPestOptions =
+                  document.querySelectorAll('.dh-pest-option');
                 allPestOptions.forEach(opt => {
                   opt.classList.remove('selected');
                 });
@@ -6615,10 +6679,13 @@
           checkServiceAreaBtn.classList.remove('disabled');
           checkServiceAreaBtn.innerHTML =
             'Check Service Area <svg xmlns="http://www.w3.org/2000/svg" width="9" height="16" viewBox="0 0 9 16" fill="none"><path d="M1 14.9231L7.47761 7.99998L1 1.0769" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-          
+
           // Populate form fields when returning to address step
           setTimeout(() => {
-            if (!widgetState.isRestoring && typeof window.populateFormFields === 'function') {
+            if (
+              !widgetState.isRestoring &&
+              typeof window.populateFormFields === 'function'
+            ) {
               window.populateFormFields();
             } else if (widgetState.isRestoring) {
             }
@@ -6887,9 +6954,11 @@
 
       // Populate all form fields and setup confirm-address step
       setTimeout(() => {
-        
         // Skip field population if we're in restoration mode (will be handled by session restoration)
-        if (!widgetState.isRestoring && typeof window.populateFormFields === 'function') {
+        if (
+          !widgetState.isRestoring &&
+          typeof window.populateFormFields === 'function'
+        ) {
           window.populateFormFields();
         } else if (widgetState.isRestoring) {
         }
@@ -6914,7 +6983,8 @@
         }
 
         // Populate company name in consent checkbox
-        const companyName = widgetState.widgetConfig?.branding?.companyName || 'Company Name';
+        const companyName =
+          widgetState.widgetConfig?.branding?.companyName || 'Company Name';
         const companyNameElements = [
           document.getElementById('confirm-address-company-name'),
           document.getElementById('confirm-address-company-name-2'),
@@ -6927,7 +6997,9 @@
         });
 
         // Setup consent checkbox validation for continue button
-        const consentCheckbox = document.getElementById('confirm-address-consent-checkbox');
+        const consentCheckbox = document.getElementById(
+          'confirm-address-consent-checkbox'
+        );
         const continueButton = document.getElementById('confirm-address-next');
 
         if (consentCheckbox && continueButton) {
@@ -7030,7 +7102,11 @@
 
         // Update safety message with pest name
         if (safetyTextEl && pestConfig) {
-          safetyTextEl.innerHTML = `Oh, and don&apos;t worry, our ${pestConfig.label.toLowerCase()} treatments are people and pet-friendly!`;
+          const singularPestName = getPestTypeDisplay(
+            widgetState.formData.pestType,
+            'singular'
+          );
+          safetyTextEl.innerHTML = `Oh, and don&apos;t worry, our ${singularPestName} treatments are people and pet-friendly!`;
         }
 
         // Set pet safety image source using config.baseUrl
@@ -7478,6 +7554,13 @@
               `
                   : ''
               }
+  ${plan.requires_quote ? `
+              <div class="dh-plan-custom-quote">
+                <div class="dh-custom-quote-title">Custom Quote Required</div>
+                <div class="dh-custom-quote-description">Book a time that works for you, and we'll call right away with your custom quote. Click Book It below to continue.</div>
+                <div class="dh-plan-price-disclaimer">${plan.plan_disclaimer || '<strong>*Initial required to start service.</strong> Save over 30% on your intial with our internet special pricing. Prices may vary slightly depending on your home layout and service requirements. Your service technician will discuss your specific situation in detail before starting.'}</div>
+              </div>
+  ` : `
               <div class="dh-plan-pricing">
                 <span class="dh-plan-price-starting">Starting at:</span>
                 <div class="dh-plan-price-container">
@@ -7501,6 +7584,7 @@
                 
                 <div class="dh-plan-price-disclaimer">${plan.plan_disclaimer || '<strong>*Initial required to start service.</strong> Save over 30% on your intial with our internet special pricing. Prices may vary slightly depending on your home layout and service requirements. Your service technician will discuss your specific situation in detail before starting.'}</div>
               </div>
+  `}
             </div>
           </div>
 
@@ -7585,6 +7669,13 @@
               `
                   : ''
               }
+  ${plan.requires_quote ? `
+              <div class="dh-plan-custom-quote">
+                <div class="dh-custom-quote-title">Custom Quote Required</div>
+                <div class="dh-custom-quote-description">Book a time that works for you, and we'll call right away with your custom quote. Click Book It below to continue.</div>
+                <div class="dh-plan-price-disclaimer">${plan.plan_disclaimer || '<strong>*Initial required to start service.</strong> Save over 30% on your intial with our internet special pricing. Prices may vary slightly depending on your home layout and service requirements. Your service technician will discuss your specific situation in detail before starting.'}</div>
+              </div>
+  ` : `
               <div class="dh-plan-pricing">
                 <span class="dh-plan-price-starting">Starting at:</span>
                 <div class="dh-plan-price-container">
@@ -7612,6 +7703,7 @@
                 
                 <div class="dh-plan-price-disclaimer">${plan.plan_disclaimer || '*Pricing may vary based on initial inspection findings and other factors.'}</div>
               </div>
+  `}
             </div>
           </div>
 
