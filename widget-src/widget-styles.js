@@ -2588,7 +2588,6 @@ height: 100%;
   font-family: "${fontName}", sans-serif;
   font-size: 13px;
   font-style: normal;
-  font-weight: 700;
   line-height: 18px;
   margin-top: 20px;
   }
