@@ -2,7 +2,6 @@ import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from '@/lib/email';
 import { abTestEngine } from '@/lib/ab-testing/ab-test-engine';
-import type { EmailScheduledEvent } from '../client';
 
 export const emailScheduledHandler = inngest.createFunction(
   {
@@ -20,9 +19,7 @@ export const emailScheduledHandler = inngest.createFunction(
       variables, 
       scheduledFor,
       workflowId,
-      stepId,
-      leadId,
-      customerId
+      leadId
     } = event.data;
     
     console.log(`Processing scheduled email: ${templateId} to ${recipientEmail}`);
@@ -178,7 +175,7 @@ export const emailScheduledHandler = inngest.createFunction(
         // Basic company info
         companyName: emailData.company.name,
         companyWebsite: emailData.company.website,
-        companyPhone: emailData.settings.get('company_phone') || '',
+        companyPhone: emailData.settings?.get('company_phone') || '',
         recipientName,
         
         // Brand colors and styling
@@ -189,7 +186,7 @@ export const emailScheduledHandler = inngest.createFunction(
         
         // Logo settings
         companyLogo: emailData.brandData?.logo_url || '',
-        logoOverride: emailData.settings.get('logo_override_url') || emailData.brandData?.logo_url || '',
+        logoOverride: emailData.settings?.get('logo_override_url') || emailData.brandData?.logo_url || '',
         
         // Google reviews
         googleReviews: emailData.reviews.map(review => ({
@@ -213,18 +210,18 @@ export const emailScheduledHandler = inngest.createFunction(
         selectedPlanName: variables.selectedPlanName || '',
         
         // Additional settings
-        businessAddress: emailData.settings.get('business_address') || '',
-        businessHours: emailData.settings.get('business_hours') || '',
-        licenseNumber: emailData.settings.get('license_number') || '',
+        businessAddress: emailData.settings?.get('business_address') || '',
+        businessHours: emailData.settings?.get('business_hours') || '',
+        licenseNumber: emailData.settings?.get('license_number') || '',
         
         // Social media
-        facebookUrl: emailData.settings.get('facebook_url') || '',
-        instagramUrl: emailData.settings.get('instagram_url') || '',
-        twitterUrl: emailData.settings.get('twitter_url') || '',
+        facebookUrl: emailData.settings?.get('facebook_url') || '',
+        instagramUrl: emailData.settings?.get('instagram_url') || '',
+        twitterUrl: emailData.settings?.get('twitter_url') || '',
         
         // Email customization
-        emailSignature: emailData.settings.get('email_signature') || '',
-        unsubscribeUrl: emailData.settings.get('unsubscribe_url') || '',
+        emailSignature: emailData.settings?.get('email_signature') || '',
+        unsubscribeUrl: emailData.settings?.get('unsubscribe_url') || '',
       };
 
       return processEmailTemplate(emailData.template, templateVariables);
@@ -396,7 +393,7 @@ function processConditionalBlocks(content: string, variables: Record<string, any
   // Handle {{#if variable}}...{{/if}} blocks
   const ifRegex = /{{#if\s+(\w+)}}([\s\S]*?){{\/if}}/g;
   
-  return content.replace(ifRegex, (match, variableName, blockContent) => {
+  return content.replace(ifRegex, (_, variableName, blockContent) => {
     const value = variables[variableName];
     
     // Show block if variable exists and is truthy
