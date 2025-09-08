@@ -114,7 +114,7 @@ export const emailScheduledHandler = inngest.createFunction(
       return {
         template,
         company: company || { name: 'Your Company', website: '' },
-        settings: settingsMap,
+        settings: settingsMap as Map<string, string>,
         brandData: brandData || {},
         reviews: reviewsData || [],
         pricingPlans: pricingPlans || [],
@@ -169,13 +169,18 @@ export const emailScheduledHandler = inngest.createFunction(
 
     // Step 5: Process email template with comprehensive variables
     const processedEmail = await step.run('process-email-template', async () => {
+      // Create a safe settings getter with fallback - ensure it's a Map
+      const settings = (emailData.settings instanceof Map) 
+        ? emailData.settings 
+        : new Map<string, string>();
+      
       // Build comprehensive variables object
       const templateVariables = {
         ...variables,
         // Basic company info
         companyName: emailData.company.name,
         companyWebsite: emailData.company.website,
-        companyPhone: emailData.settings?.get('company_phone') || '',
+        companyPhone: settings.get('company_phone') || '',
         recipientName,
         
         // Brand colors and styling
@@ -186,7 +191,7 @@ export const emailScheduledHandler = inngest.createFunction(
         
         // Logo settings
         companyLogo: emailData.brandData?.logo_url || '',
-        logoOverride: emailData.settings?.get('logo_override_url') || emailData.brandData?.logo_url || '',
+        logoOverride: settings.get('logo_override_url') || emailData.brandData?.logo_url || '',
         
         // Google reviews
         googleReviews: emailData.reviews.map(review => ({
@@ -210,18 +215,18 @@ export const emailScheduledHandler = inngest.createFunction(
         selectedPlanName: variables.selectedPlanName || '',
         
         // Additional settings
-        businessAddress: emailData.settings?.get('business_address') || '',
-        businessHours: emailData.settings?.get('business_hours') || '',
-        licenseNumber: emailData.settings?.get('license_number') || '',
+        businessAddress: settings.get('business_address') || '',
+        businessHours: settings.get('business_hours') || '',
+        licenseNumber: settings.get('license_number') || '',
         
         // Social media
-        facebookUrl: emailData.settings?.get('facebook_url') || '',
-        instagramUrl: emailData.settings?.get('instagram_url') || '',
-        twitterUrl: emailData.settings?.get('twitter_url') || '',
+        facebookUrl: settings.get('facebook_url') || '',
+        instagramUrl: settings.get('instagram_url') || '',
+        twitterUrl: settings.get('twitter_url') || '',
         
         // Email customization
-        emailSignature: emailData.settings?.get('email_signature') || '',
-        unsubscribeUrl: emailData.settings?.get('unsubscribe_url') || '',
+        emailSignature: settings.get('email_signature') || '',
+        unsubscribeUrl: settings.get('unsubscribe_url') || '',
       };
 
       return processEmailTemplate(emailData.template, templateVariables);
