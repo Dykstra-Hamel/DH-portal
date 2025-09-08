@@ -15,74 +15,92 @@ const getPestTypeDisplay = (pestType, context = 'default') => {
     ants: {
       default: 'ants',
       comparison: 'ants',
+      singular: 'ant',
     },
     spiders: {
       default: 'spiders',
       comparison: 'spiders',
+      singular: 'spider',
     },
     cockroaches: {
       default: 'cockroaches',
       comparison: 'roaches',
+      singular: 'cockroach',
     },
     roaches: {
       default: 'cockroaches',
       comparison: 'roaches',
+      singular: 'cockroach',
     },
     rodents: {
       default: 'rodents',
       comparison: 'rodents',
+      singular: 'rodent',
     },
     mice: {
       default: 'mice',
       comparison: 'rodents',
+      singular: 'mouse',
     },
     rats: {
       default: 'rats',
       comparison: 'rodents',
+      singular: 'rat',
     },
     termites: {
       default: 'termites',
       comparison: 'termites',
+      singular: 'termite',
     },
     wasps: {
       default: 'wasps',
       comparison: 'wasps',
+      singular: 'wasp',
     },
     hornets: {
       default: 'wasps and hornets',
       comparison: 'wasps',
+      singular: 'hornet',
     },
     bees: {
       default: 'bees',
       comparison: 'bees',
+      singular: 'bee',
     },
     fleas: {
       default: 'fleas',
       comparison: 'fleas',
+      singular: 'flea',
     },
     ticks: {
       default: 'ticks',
       comparison: 'ticks',
+      singular: 'tick',
     },
     bed_bugs: {
       default: 'bed bugs',
       comparison: 'bed bugs',
+      singular: 'bed bug',
     },
     mosquitoes: {
       default: 'mosquitoes',
       comparison: 'mosquitoes',
+      singular: 'mosquito',
     },
     silverfish: {
       default: 'silverfish',
       comparison: 'silverfish',
+      singular: 'silverfish',
     },
     carpenter_ants: {
       default: 'carpenter ants',
       comparison: 'carpenter ants',
+      singular: 'carpenter ant',
     },
     others: {
       default: 'pests',
       comparison: 'your pest issue',
+      singular: 'pest',
     },
   };
 

@@ -54,6 +54,7 @@ export interface QuoteEmailData {
     initial_price: number;
     recurring_price: number;
     billing_frequency: string;
+    requires_quote?: boolean;
   };
 }
 

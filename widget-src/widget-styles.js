@@ -458,7 +458,8 @@ h3.dh-how-we-do-it-title, .dh-safety-text {
 }
 
 .dh-interior-image {
- width: 244px;
+ width: 215px;
+ min-height: 215px;
  height: auto;
  object-fit: cover;
  border-radius: 16px;
@@ -1865,6 +1866,7 @@ height: 100%;
   }
 
   .dh-plan-visual {
+    max-height: unset !important;
     order: -1;
     margin: auto;
   }
@@ -3772,6 +3774,33 @@ line-height: 28px;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ===================================================================
+   CUSTOM QUOTE SECTION STYLES
+   =================================================================== */
+
+.dh-plan-custom-quote {
+  padding: 20px 0;
+  margin: 10px 0;
+  grid-column: 1 / -1; /* Span all columns */
+  width: 100%;
+}
+
+.dh-custom-quote-title {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 18px;
+  color: ${primaryColor};
+  margin-bottom: 21px;
+}
+
+.dh-custom-quote-description {
+  font-size: 19px;
+  font-weight: 400;
+  line-height: 20px;
+  color: ${textColor};
+  margin-bottom: 50px;
 }
 
   `;
