@@ -266,13 +266,40 @@ async function processSendEmailStep(
   executionId: string,
   companyId: string
 ): Promise<{ success: boolean; stepId: string; error?: string; data?: any }> {
-  const { leadData } = triggerData;
+  const { leadData, formData } = triggerData;
   const templateId = step.template_id;
   
   if (!templateId) {
     return { success: false, stepId: step.id, error: 'No template ID specified' };
   }
 
+  // Resolve customer email with fallbacks for partial leads
+  const customerEmail = leadData?.customerEmail || 
+                       leadData?.email || 
+                       formData?.customerEmail || 
+                       formData?.email ||
+                       formData?.contactInfo?.email ||
+                       '';
+
+  // Resolve customer name with fallbacks for partial leads  
+  const customerName = leadData?.customerName || 
+                      leadData?.name || 
+                      formData?.customerName ||
+                      formData?.name ||
+                      formData?.contactInfo?.name ||
+                      (formData?.contactInfo?.firstName && formData?.contactInfo?.lastName 
+                        ? `${formData.contactInfo.firstName} ${formData.contactInfo.lastName}` 
+                        : '') ||
+                      '';
+
+  // Validate that we have an email address for partial leads
+  if (!customerEmail) {
+    return { 
+      success: false, 
+      stepId: step.id, 
+      error: 'No customer email available for partial lead automation. Email may not be captured yet in the form flow.' 
+    };
+  }
 
   // Send immediately
   await inngest.send({
@@ -280,12 +307,15 @@ async function processSendEmailStep(
     data: {
       companyId,
       templateId,
-      recipientEmail: leadData.customerEmail,
-      recipientName: leadData.customerName,
+      recipientEmail: customerEmail,
+      recipientName: customerName,
       leadId: triggerData.leadId,
       customerId: triggerData.customerId,
       variables: {
         ...leadData,
+        ...formData, // Include form data for partial leads
+        customerEmail,
+        customerName,
         companyName: workflowConfig.company_name || 'Your Company',
       },
       scheduledFor: new Date().toISOString(),
@@ -294,7 +324,7 @@ async function processSendEmailStep(
     },
   });
 
-  return { success: true, stepId: step.id, data: { emailScheduled: true } };
+  return { success: true, stepId: step.id, data: { emailScheduled: true, recipientEmail: customerEmail } };
 }
 
 // Update lead status step processor
