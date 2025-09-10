@@ -77,7 +77,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
 
   const isActiveRoute = (href: string) => {
     if (href === '/dashboard') {
-      return pathname === '/dashboard';
+      return pathname === '/dashboard' || pathname === '/customers';
     }
     if (href === '/conversations/calls-and-forms') {
       return pathname.startsWith('/conversations');
