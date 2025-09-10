@@ -49,7 +49,8 @@ type AdminSection =
   | 'form-analytics'
   | 'pest-management'
   | 'template-library'
-  | 'workflow-executions';
+  | 'workflow-executions'
+;
 
 interface Company {
   id: string;

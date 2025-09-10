@@ -20,6 +20,7 @@ import {
 import { adminAPI } from '@/lib/api-client';
 import { Customer, CustomerFormData } from '@/types/customer';
 import { Lead } from '@/types/lead';
+import { Ticket } from '@/types/ticket';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import styles from './page.module.scss';
 
@@ -43,6 +44,9 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [activeLeadsTab, setActiveLeadsTab] = useState<'active' | 'completed'>(
+    'active'
+  );
+  const [activeTicketsTab, setActiveTicketsTab] = useState<'active' | 'completed'>(
     'active'
   );
   const [isEditing, setIsEditing] = useState(false);
@@ -199,6 +203,10 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
     router.push(`/leads/${leadId}`);
   };
 
+  const handleTicketClick = (ticketId: string) => {
+    router.push(`/tickets/${ticketId}`);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -220,6 +228,9 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
       contacted: '#f59e0b',
       qualified: '#06b6d4',
       quoted: '#8b5cf6',
+      in_progress: '#f59e0b',
+      resolved: '#10b981',
+      closed: '#6b7280',
       won: '#10b981',
       lost: '#ef4444',
       unqualified: '#6b7280',
@@ -268,6 +279,18 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
     ) || [];
   const displayLeads =
     activeLeadsTab === 'active' ? activeLeads : completedLeads;
+
+  // Separate active and completed tickets
+  const activeTickets =
+    customer.tickets?.filter(ticket =>
+      ['new', 'contacted', 'qualified', 'quoted', 'in_progress'].includes(ticket.status)
+    ) || [];
+  const completedTickets =
+    customer.tickets?.filter(ticket =>
+      ['resolved', 'closed', 'won', 'lost', 'unqualified'].includes(ticket.status)
+    ) || [];
+  const displayTickets =
+    activeTicketsTab === 'active' ? activeTickets : completedTickets;
 
   return (
     <div className={styles.container}>
@@ -499,6 +522,10 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
                     <span>{customer.leads?.length || 0}</span>
                   </div>
                   <div className={styles.detailItem}>
+                    <label>Total Tickets</label>
+                    <span>{customer.tickets?.length || 0}</span>
+                  </div>
+                  <div className={styles.detailItem}>
                     <label>Total Value</label>
                     <span className={styles.totalValue}>
                       {formatCurrency(customer.total_value || 0)}
@@ -603,6 +630,103 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
                     {lead.comments && (
                       <div className={styles.leadComments}>
                         <p>{lead.comments}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tickets Section */}
+        <div className={styles.leadsSection}>
+          <div className={styles.leadsHeader}>
+            <h3>Tickets History</h3>
+            <div className={styles.leadsTabs}>
+              <button
+                className={`${styles.tab} ${activeTicketsTab === 'active' ? styles.active : ''}`}
+                onClick={() => setActiveTicketsTab('active')}
+              >
+                Active Tickets ({activeTickets.length})
+              </button>
+              <button
+                className={`${styles.tab} ${activeTicketsTab === 'completed' ? styles.active : ''}`}
+                onClick={() => setActiveTicketsTab('completed')}
+              >
+                Completed Tickets ({completedTickets.length})
+              </button>
+            </div>
+          </div>
+
+          {displayTickets.length === 0 ? (
+            <div className={styles.noLeads}>
+              <p>No {activeTicketsTab} tickets found.</p>
+            </div>
+          ) : (
+            <div className={styles.leadsTable}>
+              {displayTickets.map(ticket => (
+                <div
+                  key={ticket.id}
+                  className={`${styles.leadCard} ${activeTicketsTab === 'active' ? styles.clickable : ''}`}
+                  onClick={() =>
+                    activeTicketsTab === 'active'
+                      ? handleTicketClick(ticket.id)
+                      : undefined
+                  }
+                >
+                  <div className={styles.leadHeader}>
+                    <div className={styles.leadTitle}>
+                      <h4>{ticket.service_type || ticket.type}</h4>
+                      <span className={styles.leadSource}>
+                        {ticket.source}
+                      </span>
+                    </div>
+                    <div className={styles.leadBadges}>
+                      <span
+                        className={styles.statusBadge}
+                        style={{
+                          backgroundColor: getStatusColor(ticket.status),
+                        }}
+                      >
+                        {ticket.status}
+                      </span>
+                      <span
+                        className={styles.priorityBadge}
+                        style={{
+                          backgroundColor: getPriorityColor(ticket.priority),
+                        }}
+                      >
+                        {ticket.priority}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.leadDetails}>
+                    <div className={styles.leadMeta}>
+                      <div className={styles.metaItem}>
+                        <Calendar size={14} />
+                        <span>Created: {formatDate(ticket.created_at)}</span>
+                      </div>
+                      <div className={styles.metaItem}>
+                        {ticket.estimated_value ? (
+                          <span>{formatCurrency(ticket.estimated_value)}</span>
+                        ) : (
+                          <span>No value set</span>
+                        )}
+                      </div>
+                      {ticket.assigned_user && (
+                        <div className={styles.metaItem}>
+                          <UserIcon size={14} />
+                          <span>
+                            Assigned to: {ticket.assigned_user.first_name}{' '}
+                            {ticket.assigned_user.last_name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {ticket.description && (
+                      <div className={styles.leadComments}>
+                        <p>{ticket.description}</p>
                       </div>
                     )}
                   </div>

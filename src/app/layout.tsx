@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
-import { MobileMenuButton } from '@/components/MobileMenu/MobileMenu';
+import { LayoutWrapper } from '@/components/Layout/LayoutWrapper/LayoutWrapper';
 import '@/styles/main.scss';
 
 const outfit = Outfit({
@@ -22,8 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.className}`}>
       <body>
-        <MobileMenuButton />
-        <section className="pageWrapper">{children}</section>
+        <LayoutWrapper>
+          <section className="pageWrapper">{children}</section>
+        </LayoutWrapper>
       </body>
     </html>
   );

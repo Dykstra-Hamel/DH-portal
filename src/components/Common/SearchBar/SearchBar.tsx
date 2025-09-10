@@ -10,6 +10,8 @@ interface SearchBarProps {
   placeholder?: string;
   debounceMs?: number;
   className?: string;
+  id?: string;
+  name?: string;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -18,6 +20,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
   placeholder = 'Search...',
   debounceMs = 300,
   className = '',
+  id = 'search',
+  name = 'search',
 }) => {
   const [localValue, setLocalValue] = useState(value);
 
@@ -45,6 +49,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
         <Search className={styles.searchIcon} size={16} />
         <input
           type="text"
+          id={id}
+          name={name}
           value={localValue}
           onChange={e => setLocalValue(e.target.value)}
           placeholder={placeholder}
