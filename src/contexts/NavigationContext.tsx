@@ -27,7 +27,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       setActivePrimaryNav('tasks');
     } else if (pathname.startsWith('/brand')) {
       setActivePrimaryNav('brand');
-    } else if (pathname.startsWith('/dashboard') || pathname.startsWith('/customers')) {
+    } else if (pathname.startsWith('/dashboard')) {
       setActivePrimaryNav('dashboard');
     } else {
       // Default to dashboard for other routes
