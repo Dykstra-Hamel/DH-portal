@@ -272,7 +272,12 @@ export function SecondarySideNav({
         return [
           {
             items: [
-              { text: 'Dashboard', href: '/dashboard' }
+              { text: 'Dashboard', href: '/dashboard' },
+              { 
+                text: 'Customers', 
+                href: '/customers',
+                count: counts.customers
+              }
             ]
           }
         ];
@@ -339,12 +344,12 @@ export function SecondarySideNav({
                 disabled: true 
               },
               { 
-                text: 'Archived Calls', 
-                href: '/conversations/archived-calls',
-                disabled: true 
+                text: 'Calls', 
+                href: '/conversations/call-records',
+                count: counts.calls
               },
               { 
-                text: 'All Customers', 
+                text: 'Customers', 
                 href: '/customers',
                 count: counts.customers
               }
