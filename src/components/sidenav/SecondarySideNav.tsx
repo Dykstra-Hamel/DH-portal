@@ -274,8 +274,8 @@ export function SecondarySideNav({
             items: [
               { text: 'Dashboard', href: '/dashboard' },
               { 
-                text: 'Customers', 
-                href: '/customers',
+                text: 'All Customers', 
+                href: '/dashboard/customers',
                 count: counts.customers
               }
             ]
@@ -349,8 +349,8 @@ export function SecondarySideNav({
                 count: counts.calls
               },
               { 
-                text: 'Customers', 
-                href: '/customers',
+                text: 'All Customers', 
+                href: '/dashboard/customers',
                 count: counts.customers
               }
             ]
