@@ -7,11 +7,11 @@ import { useRouter } from 'next/navigation';
 import CustomersTable from '@/components/Customers/CustomersTable/CustomersTable';
 import CustomersTabs from '@/components/Customers/CustomersTabs/CustomersTabs';
 import SearchBar from '@/components/Common/SearchBar/SearchBar';
-import CompanyDropdown from '@/components/Common/CompanyDropdown/CompanyDropdown';
 import { adminAPI } from '@/lib/api-client';
 import { Customer, CustomerStatus } from '@/types/customer';
 import { SortDirection } from '@/types/common';
-import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -21,37 +21,21 @@ interface Profile {
   email: string;
 }
 
-interface Company {
-  id: string;
-  name: string;
-}
-
-interface UserCompany {
-  id: string;
-  user_id: string;
-  company_id: string;
-  role: string;
-  is_primary: boolean;
-  companies: Company;
-}
-
 export default function CustomersPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<CustomerStatus | 'all'>('all');
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [adminSelectedCompany, setAdminSelectedCompany] = useState<
-    string | undefined
-  >(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const router = useRouter();
+
+  // Use global company context and date filter
+  const { selectedCompany, isAdmin, isLoading: contextLoading } = useCompany();
+  const { getApiDateParams } = useDateFilter();
 
   useEffect(() => {
     const supabase = createClient();
@@ -77,37 +61,7 @@ export default function CustomersPage() {
 
       if (!profileError && profileData) {
         setProfile(profileData);
-        setIsAdmin(isAuthorizedAdminSync(profileData));
       }
-
-      // Get user companies (skip for admin users)
-      if (!isAuthorizedAdminSync(profileData)) {
-        const { data: companiesData, error: companiesError } = await supabase
-          .from('user_companies')
-          .select(
-            `
-                *,
-                companies (
-                  id,
-                  name
-                )
-              `
-          )
-          .eq('user_id', session.user.id);
-
-        if (!companiesError && companiesData) {
-          setUserCompanies(companiesData);
-
-          // Set primary company as selected, or first company if no primary
-          const primaryCompany = companiesData.find(uc => uc.is_primary);
-          if (primaryCompany) {
-            setSelectedCompany(primaryCompany.companies);
-          } else if (companiesData.length > 0) {
-            setSelectedCompany(companiesData[0].companies);
-          }
-        }
-      }
-      // Admin users don't need a selected company - they use the dropdown to filter
 
       setLoading(false);
     };
@@ -127,16 +81,31 @@ export default function CustomersPage() {
   }, [router]);
 
   const fetchCustomers = useCallback(async () => {
-    if (!selectedCompany) return;
+    if (!selectedCompany && !isAdmin) return;
 
     try {
       setCustomersLoading(true);
-      const customersData = await adminAPI.getUserCustomers({
-        companyId: selectedCompany.id,
+      const dateParams = getApiDateParams();
+      const filters = {
+        companyId: selectedCompany?.id,
         search: searchQuery,
         sortBy: sortKey,
         sortOrder: sortDirection,
-      });
+        ...dateParams,
+      };
+
+      let customersData: Customer[] = [];
+      if (isAdmin) {
+        // Admin users use admin API
+        customersData = await adminAPI.getCustomers(filters);
+      } else if (selectedCompany) {
+        // Regular users use user-specific API and must have a selected company
+        customersData = await adminAPI.getUserCustomers({
+          ...filters,
+          companyId: selectedCompany.id,
+        });
+      }
+      
       setCustomers(customersData || []);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -144,44 +113,14 @@ export default function CustomersPage() {
     } finally {
       setCustomersLoading(false);
     }
-  }, [selectedCompany, searchQuery, sortKey, sortDirection]);
-
-  const fetchCustomersAdmin = useCallback(async () => {
-    try {
-      setCustomersLoading(true);
-      const filters = {
-        companyId: adminSelectedCompany,
-        search: searchQuery,
-        sortBy: sortKey,
-        sortOrder: sortDirection,
-      };
-      const customersData = await adminAPI.getCustomers(filters);
-      setCustomers(customersData || []);
-    } catch (error) {
-      console.error('Error fetching admin customers:', error);
-      setCustomers([]);
-    } finally {
-      setCustomersLoading(false);
-    }
-  }, [adminSelectedCompany, searchQuery, sortKey, sortDirection]);
+  }, [selectedCompany, isAdmin, searchQuery, sortKey, sortDirection, getApiDateParams]);
 
   // Fetch customers when filters change
   useEffect(() => {
-    if (isAdmin) {
-      fetchCustomersAdmin();
-    } else if (selectedCompany) {
+    if (!contextLoading && (selectedCompany || isAdmin)) {
       fetchCustomers();
     }
-  }, [
-    selectedCompany,
-    adminSelectedCompany,
-    isAdmin,
-    searchQuery,
-    sortKey,
-    sortDirection,
-    fetchCustomers,
-    fetchCustomersAdmin,
-  ]);
+  }, [contextLoading, selectedCompany, isAdmin, searchQuery, sortKey, sortDirection, fetchCustomers]);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -196,12 +135,25 @@ export default function CustomersPage() {
     router.push(`/customers/${customer.id}`);
   };
 
-  if (loading) {
+  if (loading || contextLoading) {
     return <div>Loading...</div>;
   }
 
   if (!user || !profile) {
     return <div>Redirecting...</div>;
+  }
+
+  if (!selectedCompany && !isAdmin) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <h1>Customers</h1>
+        </div>
+        <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
+          Please select a company to view customers.
+        </div>
+      </div>
+    );
   }
 
   // Filter customers based on active tab
@@ -233,39 +185,6 @@ export default function CustomersPage() {
             onChange={setSearchQuery}
             placeholder="Search customers by name, phone, or email"
           />
-          {isAdmin ? (
-            <CompanyDropdown
-              selectedCompanyId={adminSelectedCompany}
-              onCompanyChange={setAdminSelectedCompany}
-              includeAllOption={true}
-              placeholder="Select company to view customers"
-            />
-          ) : userCompanies.length > 1 ? (
-            <div className={styles.companySelector}>
-              <label htmlFor="user-company-select" className={styles.selectorLabel}>
-                Select Company:
-              </label>
-              <select
-                id="user-company-select"
-                value={selectedCompany?.id || ''}
-                onChange={(e) => {
-                  const company = userCompanies.find(uc => uc.companies.id === e.target.value)?.companies;
-                  setSelectedCompany(company || null);
-                }}
-                className={styles.companySelect}
-              >
-                {userCompanies.map(uc => (
-                  <option key={uc.companies.id} value={uc.companies.id}>
-                    {uc.companies.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : userCompanies.length === 1 ? (
-            <div className={styles.singleCompanyHeader}>
-              <h3>Customers for {userCompanies[0].companies.name}</h3>
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -273,24 +192,20 @@ export default function CustomersPage() {
         <div className={styles.customersSection}>
           <div className={styles.sectionHeader}>
             <h2>
-              {userCompanies.length === 1 && !isAdmin
-                ? 'Customers' // Don't repeat company name if already shown above
-                : isAdmin
-                  ? adminSelectedCompany
-                    ? `Customers for ${customers.length > 0 ? customers[0].company?.name || 'Selected Company' : 'Selected Company'}`
-                    : 'All Customers (All Companies)'
-                  : userCompanies.length > 1
-                    ? `Customers for ${selectedCompany?.name}`
-                    : `Customers for ${selectedCompany?.name}`}
+              {selectedCompany 
+                ? `Customers for ${selectedCompany.name}`
+                : isAdmin 
+                  ? 'All Customers (All Companies)'
+                  : 'Customers'
+              }
             </h2>
             <p>
-              {isAdmin
-                ? adminSelectedCompany
-                  ? 'Customers for the selected company'
-                  : 'All customers across all companies'
-                : userCompanies.length === 1
-                  ? 'All customers for your company'
-                  : 'All customers for the selected company'}
+              {selectedCompany
+                ? 'All customers for the selected company'
+                : isAdmin
+                  ? 'All customers across all companies'
+                  : 'All customers for your company'
+              }
             </p>
           </div>
 
@@ -313,7 +228,7 @@ export default function CustomersPage() {
                 customers={filteredCustomers}
                 onCustomerClick={handleCustomerClick}
                 showActions={false}
-                showCompanyColumn={isAdmin && !adminSelectedCompany}
+                showCompanyColumn={isAdmin && !selectedCompany}
                 currentSortKey={sortKey}
                 currentSortDirection={sortDirection}
                 onSort={handleSort}

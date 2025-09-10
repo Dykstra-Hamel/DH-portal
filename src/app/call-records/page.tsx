@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { createClient } from '@/lib/supabase/client';
-import { useIsGlobalAdmin } from '@/hooks/useCompanyRole';
 import { Archive } from 'lucide-react';
 import styles from '@/components/Admin/AdminManager.module.scss';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useDateFilter } from '@/contexts/DateFilterContext';
+import { adminAPI } from '@/lib/api-client';
 
 interface CallRecord {
   id: string;
@@ -49,18 +51,10 @@ interface CallRecord {
   };
 }
 
-interface Company {
-  id: string;
-  name: string;
-}
-
 export default function CallRecordsPage() {
-  // Company and Admin State
-  const { isGlobalAdmin, isLoading: adminCheckLoading } = useIsGlobalAdmin();
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
-  const [companiesLoading, setCompaniesLoading] = useState(false);
-  const [companiesError, setCompaniesError] = useState<string | null>(null);
+  // Use global company context and date filter
+  const { selectedCompany, isAdmin, isLoading: contextLoading } = useCompany();
+  const { getApiDateParams } = useDateFilter();
 
   // Call Records State
   const [calls, setCalls] = useState<CallRecord[]>([]);
@@ -73,103 +67,49 @@ export default function CallRecordsPage() {
   const [callToArchive, setCallToArchive] = useState<CallRecord | null>(null);
   const [isArchiving, setIsArchiving] = useState(false);
 
-  const loadCompanies = async () => {
-    try {
-      setCompaniesLoading(true);
-      setCompaniesError(null);
-      
-      const supabase = createClient();
-      const { data: session } = await supabase.auth.getSession();
-      
-      if (!session.session?.access_token) {
-        throw new Error('No authentication session');
-      }
-      
-      const response = await fetch('/api/user-companies', {
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to fetch companies');
-      }
-      
-      const data = await response.json();
-      setCompanies(data.companies || []);
-
-      // For non-admin users, pre-select the first company
-      if (!data.isAdmin && data.companies?.length >= 1) {
-        setSelectedCompanyId(data.companies[0].id);
-      }
-    } catch (err) {
-      setCompaniesError(err instanceof Error ? err.message : 'Failed to load companies');
-    } finally {
-      setCompaniesLoading(false);
-    }
-  };
-
   const loadCalls = useCallback(async () => {
     try {
       setCallsLoading(true);
       setCallsError(null);
       
-      const supabase = createClient();
-      const { data: session } = await supabase.auth.getSession();
-      
-      if (!session.session?.access_token) {
-        throw new Error('No authentication session');
-      }
-      
       // For non-admin users, require a specific company to be selected
-      if (!isGlobalAdmin && (!selectedCompanyId || selectedCompanyId === 'all')) {
+      if (!isAdmin && !selectedCompany) {
         setCalls([]);
         return;
       }
       
-      const url = new URL('/api/calls', window.location.origin);
-      if (selectedCompanyId && selectedCompanyId !== 'all') {
-        url.searchParams.set('company_id', selectedCompanyId);
+      const dateParams = getApiDateParams();
+      let data: CallRecord[] = [];
+      
+      if (isAdmin) {
+        // Admin can see all calls or filter by selected company
+        const filters = { 
+          ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
+          ...dateParams
+        };
+        data = await adminAPI.getAllCalls(filters);
+      } else if (selectedCompany) {
+        // Regular users see calls for their selected company only
+        const filters = { 
+          companyId: selectedCompany.id,
+          ...dateParams
+        };
+        data = await adminAPI.getUserCalls(filters);
       }
       
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to fetch calls');
-      }
-      
-      const data = await response.json();
-      setCalls(data);
+      setCalls(data || []);
     } catch (err) {
       setCallsError(err instanceof Error ? err.message : 'Failed to load calls');
     } finally {
       setCallsLoading(false);
     }
-  }, [isGlobalAdmin, selectedCompanyId]);
+  }, [isAdmin, selectedCompany, getApiDateParams]);
 
   useEffect(() => {
-    if (!adminCheckLoading) {
-      loadCompanies();
-    }
-  }, [adminCheckLoading, isGlobalAdmin]);
-
-  useEffect(() => {
-    if (companies.length > 0 && !adminCheckLoading) {
+    if (!contextLoading) {
       loadCalls();
     }
-  }, [companies, adminCheckLoading, loadCalls]);
-
-  const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
-  };
+  }, [contextLoading, loadCalls]);
 
   const formatDuration = (seconds: number) => {
     if (!seconds) return 'N/A';
@@ -280,47 +220,9 @@ export default function CallRecordsPage() {
         <h2>Call Records</h2>
       </div>
 
-      {/* Company Dropdown - Only show if admin or user has multiple companies */}
-      {!adminCheckLoading && (
-        <div className={styles.companySelector}>
-          {companiesLoading ? (
-            <div className={styles.loading}>Loading companies...</div>
-          ) : companiesError ? (
-            <div className={styles.error}>Error: {companiesError}</div>
-          ) : (isGlobalAdmin || companies.length > 1) ? (
-            <>
-              <label htmlFor="company-select" className={styles.selectorLabel}>
-                Select Company:
-              </label>
-              <select
-                id="company-select"
-                value={selectedCompanyId}
-                onChange={(e) => handleCompanyChange(e.target.value)}
-                className={styles.companySelect}
-              >
-                {companies.length === 0 && (
-                  <option value="">-- No Companies Available --</option>
-                )}
-                {isGlobalAdmin && companies.length > 0 && (
-                  <option value="all">All Companies</option>
-                )}
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </>
-          ) : companies.length === 1 ? (
-            <div className={styles.singleCompanyHeader}>
-              <h3>Call Records for {companies[0].name}</h3>
-            </div>
-          ) : null}
-        </div>
-      )}
 
       <div className={styles.tabContent}>
-        {adminCheckLoading ? (
+        {contextLoading ? (
           <div className={styles.loading}>Loading...</div>
         ) : callsLoading ? (
           <div className={styles.loading}>Loading call records...</div>
@@ -330,13 +232,11 @@ export default function CallRecordsPage() {
           <>
             <div className={styles.recordsHeader}>
               <h3>
-                {companies.length === 1 && !isGlobalAdmin
-                  ? 'Call Records' // Don't repeat company name if already shown above
-                  : isGlobalAdmin && selectedCompanyId === 'all' 
+                {selectedCompany 
+                  ? `${selectedCompany.name} Call Records`
+                  : isAdmin 
                     ? 'All Company Call Records'
-                    : companies.find(c => c.id === selectedCompanyId)?.name 
-                      ? `${companies.find(c => c.id === selectedCompanyId)?.name} Call Records`
-                      : 'Call Records'
+                    : 'Call Records'
                 }
               </h3>
               <p>Total: {calls.length} calls</p>

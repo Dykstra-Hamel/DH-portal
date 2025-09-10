@@ -1,0 +1,170 @@
+// Secondary Sidebar Styles for Context-Aware Navigation
+.sidebar {
+  position: relative;
+  width: 256px;
+  height: calc(100vh - 12px);
+  top: 12px;
+  border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+  background: var(--neutral-800);
+  color: white;
+  padding: 16px 0;
+  overflow-y: auto;
+
+  @media (max-width: 600px) {
+    position: relative;
+    left: 0;
+    top: 0;
+    width: 256px;
+    height: 100vh;
+    flex-shrink: 0;
+    z-index: 1050;
+    transition: all 0.3s ease;
+    border-radius: 0;
+  }
+}
+
+// Section Header (for context modes)
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 35px;
+  padding: 0 12px;
+}
+
+.iconHeader {
+  width: 28px;
+  height: 28px;
+  background: var(--neutral-500);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+}
+
+// Context Navigation
+.contextNav {
+  display: flex;
+  flex-direction: column;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.navItemContainer {
+  width: 100%;
+}
+
+.divider {
+  width: calc(100% - 8px);
+  height: 1px;
+  opacity: 0.1;
+  background: #FFF;
+  margin: 16px 4px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--border-radius-md);
+  text-decoration: none;
+  color: var(--neutral-100);
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover:not(.disabled):not(.active) {
+    background: var(--neutral-600);
+
+    .countBox {
+      &.defaultCount {
+        background: var(--neutral-800);
+        color: white;
+      }
+    }
+  }
+
+  &.active {
+    background: var(--primary-600);
+    color: white;
+
+    .countBox {
+      background: white;
+      color: var(--primary-600);
+    }
+  }
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.navItemText {
+  flex: 1;
+  text-align: left;
+}
+
+// Count boxes
+.countBox {
+  min-width: 13px;
+  height: 16px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.defaultCount {
+  background: var(--neutral-600);
+  color: white;
+}
+
+.errorCount {
+  background: var(--error-500);
+  color: white;
+}
+
+.activeCount {
+  background: white;
+  color: var(--primary-600);
+}
+
+.neutral {
+  background: var(--neutral-600);
+  color: white;
+}
+
+// Legacy sidebar styles for dashboard mode
+.sidebarLogoSection {
+  padding: 0 20px 30px 20px;
+  border-bottom: 1px solid var(--neutral-600);
+  margin-bottom: 20px;
+}
+
+.sidebarNavigation {
+  padding: 0 20px;
+  flex: 1;
+}

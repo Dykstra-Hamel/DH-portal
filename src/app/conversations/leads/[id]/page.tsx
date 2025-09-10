@@ -157,7 +157,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         utm_content: lead.utm_content || '',
       });
       setIsEditing(true);
-      
+
       // Clear the edit URL parameter to prevent edit mode loop
       if (searchParams.get('edit') === 'true') {
         const url = new URL(window.location.href);
@@ -184,7 +184,6 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       router.push(`/customers/${lead.customer_id}`);
     }
   };
-
 
   const handlePhoneCall = async () => {
     if (!lead || !lead.customer) {
@@ -236,13 +235,13 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           status: response.status,
           error: errorData,
         });
-        
+
         // Show specific error message from API
         let errorMessage = 'Failed to initiate phone call.';
         if (errorData.error) {
           errorMessage = errorData.error;
         }
-        
+
         alert(errorMessage);
         return;
       }
@@ -254,7 +253,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         alert(
           `Phone call initiated successfully! Call ID: ${result.callId || 'N/A'}`
         );
-        
+
         // Refresh call history to show the new call
         setCallHistoryRefresh(prev => prev + 1);
       } else {
@@ -262,7 +261,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       }
     } catch (error) {
       console.error('Error creating phone call:', error);
-      alert('Failed to initiate phone call. Please check your internet connection and try again.');
+      alert(
+        'Failed to initiate phone call. Please check your internet connection and try again.'
+      );
     } finally {
       setIsCallLoading(false);
     }
@@ -302,7 +303,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         originalData: editFormData,
         cleanedData: cleanFormData,
         isAdmin,
-        currentUser: user?.id
+        currentUser: user?.id,
       });
 
       let updatedLead;
@@ -311,7 +312,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       } else {
         updatedLead = await adminAPI.updateUserLead(leadId, cleanFormData);
       }
-      
+
       console.log('Lead save successful:', updatedLead);
       setLead(updatedLead);
       setIsEditing(false);
@@ -324,23 +325,23 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         leadId,
         formData: editFormData,
         errorMessage: error.message,
-        errorResponse: error.response?.data
+        errorResponse: error.response?.data,
       });
-      
+
       // Display more specific error message
       let errorMessage = 'Failed to update lead. Please try again.';
-      
+
       if (error.response?.data?.error) {
         errorMessage = `Failed to update lead: ${error.response.data.error}`;
       } else if (error.message) {
         errorMessage = `Failed to update lead: ${error.message}`;
       }
-      
+
       // Show error with additional details if available
       if (error.response?.data?.errorCode) {
         errorMessage += `\n\nError Code: ${error.response.data.errorCode}`;
       }
-      
+
       alert(errorMessage);
     } finally {
       setSaving(false);
@@ -437,9 +438,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       // Function to parse and format timestamps in comment text
       const formatTimestampsInText = (text: string) => {
         // Pattern to match ISO timestamps in comments (e.g., "2025-08-14T17:24:00.000Z")
-        const isoTimestampPattern = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/g;
-        
-        return text.replace(isoTimestampPattern, (match) => {
+        const isoTimestampPattern =
+          /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/g;
+
+        return text.replace(isoTimestampPattern, match => {
           try {
             return formatDateForDisplay(match);
           } catch (error) {
@@ -514,7 +516,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   }
 
   return (
-    <div className={styles.container}>
+    <div className="container">
       <div className={styles.header}>
         <button onClick={handleBack} className={styles.backButton}>
           <ArrowLeft size={16} />
@@ -558,8 +560,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
                 <Edit size={16} />
                 Edit Lead
               </button>
-              <button 
-                onClick={handleDeleteClick} 
+              <button
+                onClick={handleDeleteClick}
                 className={styles.deleteButton}
                 disabled={isEditing}
               >
@@ -936,10 +938,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className={styles.modalOverlay} onClick={handleDeleteCancel}>
-          <div
-            className={styles.modal}
-            onClick={e => e.stopPropagation()}
-          >
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h3>Delete Lead</h3>
               <button
@@ -951,16 +950,17 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
             </div>
             <div className={styles.modalBody}>
               <p>
-                Are you sure you want to delete this lead? This action cannot be undone.
+                Are you sure you want to delete this lead? This action cannot be
+                undone.
               </p>
               <div className={styles.leadInfo}>
-                <strong>Service Type:</strong> {lead?.service_type || 'Not specified'}
+                <strong>Service Type:</strong>{' '}
+                {lead?.service_type || 'Not specified'}
                 <br />
-                <strong>Customer:</strong> {
-                  lead?.customer
-                    ? `${lead.customer.first_name} ${lead.customer.last_name}`
-                    : 'No customer linked'
-                }
+                <strong>Customer:</strong>{' '}
+                {lead?.customer
+                  ? `${lead.customer.first_name} ${lead.customer.last_name}`
+                  : 'No customer linked'}
                 <br />
                 <strong>Status:</strong> {lead?.lead_status || 'Unknown'}
               </div>

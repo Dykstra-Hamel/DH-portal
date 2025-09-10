@@ -1,3 +1,6 @@
 @use './Buttons.scss';
 @use './Globals.scss';
 @use './Home.scss';
+
+// Layout components styles are imported via their individual module.scss files
+// No need to import them here as they use CSS modules

@@ -9,13 +9,15 @@ import { formatDateForDisplay } from '@/lib/utils';
 import styles from './CallHistory.module.scss';
 
 interface CallHistoryProps {
-  leadId: string;
+  leadId?: string;
+  ticketId?: string;
   refreshTrigger?: number; // Optional prop to trigger refresh
   isAdmin?: boolean; // Whether user is admin
 }
 
 export function CallHistory({
   leadId,
+  ticketId,
   refreshTrigger,
   isAdmin = false,
 }: CallHistoryProps) {
@@ -24,26 +26,34 @@ export function CallHistory({
   const [error, setError] = useState<string | null>(null);
 
   const fetchCalls = useCallback(async () => {
+    if (!leadId && !ticketId) return;
+    
     try {
       setLoading(true);
       let callData;
-      if (isAdmin) {
-        callData = await adminAPI.getLeadCalls(leadId);
-      } else {
-        callData = await adminAPI.getUserLeadCalls(leadId);
+      
+      if (leadId) {
+        if (isAdmin) {
+          callData = await adminAPI.getLeadCalls(leadId);
+        } else {
+          callData = await adminAPI.getUserLeadCalls(leadId);
+        }
+      } else if (ticketId) {
+        callData = await adminAPI.tickets.getCalls(ticketId);
       }
-      setCalls(callData);
+      
+      setCalls(callData || []);
     } catch (error) {
       console.error('Error fetching calls:', error);
       setError('Failed to load call history');
     } finally {
       setLoading(false);
     }
-  }, [leadId, isAdmin]);
+  }, [leadId, ticketId, isAdmin]);
 
   useEffect(() => {
     fetchCalls();
-  }, [leadId, refreshTrigger, fetchCalls]);
+  }, [leadId, ticketId, refreshTrigger, fetchCalls]);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);

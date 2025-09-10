@@ -1,0 +1,35 @@
+.sidebarContainer {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  position: relative;
+}
+
+@media (max-width: 600px) {
+  .sidebarContainer {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1100;
+    transition: left 0.3s ease;
+    background: rgba(0, 0, 0, 0.5);
+
+    &.active {
+      left: 0;
+    }
+
+    /* Add overlay click area */
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 320px; /* Width of primary (64px) + secondary (256px) nav */
+      background: transparent;
+      z-index: 0;
+    }
+  }
+}

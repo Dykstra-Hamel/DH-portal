@@ -1,0 +1,242 @@
+.globalLowerHeader {
+  width: 100%;
+  padding: 16px 0;
+  border-bottom: 1px solid #e5e5e5;
+  background-color: var(--white);
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.leftSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-family:
+    'Satoshi Variable',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 28px;
+  color: var(--neutral-800);
+  margin: 0;
+}
+
+.description {
+  font-family:
+    'Satoshi Variable',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--neutral-500);
+  margin: 0;
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+}
+
+// Filter styles
+.filterContainer {
+  position: relative;
+}
+
+.filterButton {
+  display: flex;
+  padding: 8px 12px;
+  align-items: center;
+  gap: 13px;
+  min-width: 225px;
+  background: var(--neutral-100);
+  border: 1px solid var(--neutral-100);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #9ca3af;
+    background-color: #f9fafb;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-600);
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+  }
+}
+
+.filterText {
+  color: var(--neutral-600);
+  text-align: right;
+  font-family:
+    'Satoshi Variable',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  margin-left: auto;
+}
+
+.chevron {
+  color: var(--neutral-600);
+  transition: transform 0.2s ease;
+  display: flex;
+
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+.filterDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 160px;
+  background: var(--white);
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.filterOption {
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  background: var(--white);
+  border: none;
+  cursor: pointer;
+  font-family:
+    'Satoshi Variable',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--neutral-600);
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+
+  &.selected {
+    background-color: var(--primary-50);
+    color: var(--primary-600);
+  }
+
+  &:focus {
+    outline: none;
+    background-color: #f3f4f6;
+  }
+}
+
+// Add Lead button styles
+.addLeadButton {
+  display: flex;
+  height: 36px;
+  padding: 9px 16px 9px 12px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  background: var(--primary-600);
+  color: var(--white);
+  border: none;
+  cursor: pointer;
+  font-family: 'Satoshi Variable', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: #0369a1;
+  }
+
+  &:focus:not(:disabled) {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.3);
+  }
+
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  span {
+    font-size: 14px;
+    font-weight: 600;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .headerContent {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 0 16px;
+  }
+
+  .rightSection {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .title {
+    font-size: 20px;
+    line-height: 24px;
+  }
+
+  .description {
+    font-size: 13px;
+    line-height: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .rightSection {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .filterButton,
+  .addLeadButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .filterDropdown {
+    right: auto;
+    left: 0;
+    width: 100%;
+  }
+}

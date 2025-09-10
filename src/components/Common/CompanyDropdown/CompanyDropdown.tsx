@@ -1,9 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
 import styles from './CompanyDropdown.module.scss';
+
+const ChevronDownIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="17" viewBox="0 0 16 17" fill="none">
+    <path d="M13 6.20032L8 11.2003L3 6.20032" stroke="#525252" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 
 interface Company {
   id: string;
@@ -86,10 +91,9 @@ const CompanyDropdown: React.FC<CompanyDropdownProps> = ({
         type="button"
       >
         <span>{displayText}</span>
-        <ChevronDown
-          size={16}
-          className={`${styles.chevron} ${isOpen ? styles.open : ''}`}
-        />
+        <div className={`${styles.chevron} ${isOpen ? styles.open : ''}`}>
+          <ChevronDownIcon />
+        </div>
       </button>
 
       {isOpen && (

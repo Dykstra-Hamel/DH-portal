@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import AnalyticsDashboard from '@/components/Analytics/AnalyticsDashboard';
 import CallAnalyticsDashboard from '@/components/Analytics/CallAnalyticsDashboard';
+import { useCompany } from '@/contexts/CompanyContext';
 import styles from './Dashboard.module.scss';
 
 interface Profile {
@@ -16,37 +17,20 @@ interface Profile {
   role?: string;
 }
 
-interface Company {
-  id: string;
-  name: string;
-}
-
-interface UserCompany {
-  id: string;
-  user_id: string;
-  company_id: string;
-  role: string;
-  is_primary: boolean;
-  companies: Company;
-}
-
 interface DashboardProps {
   user: User;
   profile: Profile;
-  userCompanies: UserCompany[];
-  selectedCompany: Company | null;
-  onCompanyChange: (company: Company) => void;
 }
 
 export default function Dashboard({
   user,
   profile,
-  userCompanies,
-  selectedCompany,
-  onCompanyChange,
 }: DashboardProps) {
   const router = useRouter();
   const [analyticsView, setAnalyticsView] = useState<'website' | 'calls'>('website');
+  
+  // Use global company context
+  const { selectedCompany, availableCompanies, isAdmin } = useCompany();
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -55,15 +39,6 @@ export default function Dashboard({
       console.error('Error signing out:', error);
     } else {
       router.push('/login');
-    }
-  };
-
-  const handleCompanyChange = (companyId: string) => {
-    const company = userCompanies.find(
-      uc => uc.companies.id === companyId
-    )?.companies;
-    if (company) {
-      onCompanyChange(company);
     }
   };
 
@@ -97,43 +72,23 @@ export default function Dashboard({
 
           {selectedCompany && (
             <div className={styles.companySection}>
-              {userCompanies.length > 1 ? (
-                <div className={styles.companySelector}>
-                  <label
-                    htmlFor="company-select"
-                    className={styles.companyLabel}
-                  >
-                    Company:
-                  </label>
-                  <select
-                    id="company-select"
-                    value={selectedCompany.id}
-                    onChange={e => handleCompanyChange(e.target.value)}
-                    className={styles.companySelect}
-                  >
-                    {userCompanies.map(userCompany => (
-                      <option
-                        key={userCompany.companies.id}
-                        value={userCompany.companies.id}
-                      >
-                        {userCompany.companies.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className={styles.singleCompany}>
-                  <span className={styles.companyName}>
-                    {selectedCompany.name}
-                  </span>
-                </div>
-              )}
+              <div className={styles.singleCompany}>
+                <span className={styles.companyName}>
+                  {selectedCompany.name}
+                </span>
+              </div>
             </div>
           )}
 
-          {userCompanies.length === 0 && (
+          {!selectedCompany && availableCompanies.length === 0 && (
             <div className={styles.noCompany}>
               <p>No companies associated with your account.</p>
+            </div>
+          )}
+
+          {!selectedCompany && availableCompanies.length > 0 && (
+            <div className={styles.noCompany}>
+              <p>Please select a company from the header to view analytics.</p>
             </div>
           )}
         </div>
