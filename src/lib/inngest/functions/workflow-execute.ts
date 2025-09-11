@@ -28,6 +28,27 @@ export const workflowExecuteHandler = inngest.createFunction(
       attribution
     } = event.data;
 
+    // Query partial lead data directly if this is a partial lead automation
+    const partialLeadData = await step.run('get-partial-lead-data', async () => {
+      if (leadData?.partialLeadId) {
+        const supabase = createAdminClient();
+        
+        const { data: partialLead, error } = await supabase
+          .from('partial_leads')
+          .select('*')
+          .eq('id', leadData.partialLeadId)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching partial lead:', error);
+          return null;
+        }
+        
+        
+        return partialLead;
+      }
+      return null;
+    });
 
     // Get workflow configuration and execution
     const { workflow, execution } = await step.run('get-workflow-and-execution', async () => {
@@ -135,7 +156,7 @@ export const workflowExecuteHandler = inngest.createFunction(
         try {
           switch (currentStep.type) {
             case 'send_email':
-              result = await executeEmailStep(currentStep, leadData, companyId, leadId, customerId);
+              result = await executeEmailStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
               break;
             case 'delay':
             case 'wait':
@@ -293,7 +314,7 @@ export const workflowExecuteHandler = inngest.createFunction(
 );
 
 // Helper function to execute email steps
-async function executeEmailStep(step: any, leadData: any, companyId: string, leadId: string, customerId: string) {
+async function executeEmailStep(step: any, leadData: any, companyId: string, leadId: string, customerId: string, attribution: any, partialLeadData: any = null, executionId: string) {
   const supabase = createAdminClient();
 
   // Get email template (check both possible field names)
@@ -390,8 +411,13 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
 
   const logoOverrideUrl = logoOverrideSetting?.setting_value || '';
 
-  // Safe customer email with fallback logic for partial leads
-  const customerEmail = leadData.customerEmail || fullLeadData?.customer?.email || '';
+  // Comprehensive customer email resolution with fallbacks for partial leads
+  const customerEmail = leadData.customerEmail || 
+                       leadData.email ||
+                       leadData.customerInfo?.email ||
+                       leadData.contactInfo?.email ||
+                       fullLeadData?.customer?.email || 
+                       '';
 
   // Prepare email variables with proper URL handling
   // Prioritize company logo override, then brand logo, then default
@@ -443,18 +469,37 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     return `<div class="faq-section">${faqItems}</div>`;
   };
 
-  // Extract plan data
-  const planData = fullLeadData?.service_plans;
+  // Extract plan data with fallbacks for partial leads
+  const planData = fullLeadData?.service_plans || leadData.selectedPlan;
+  const recommendedPlanData = leadData.recommendedPlan;
   
   const emailVariables = {
-    // Customer/Lead variables - with fallback to database data for partial leads
+    // Customer/Lead variables - with comprehensive fallbacks for partial leads
     customerName: leadData.customerName || 
+                  leadData.name ||
+                  leadData.customerInfo?.name ||
+                  leadData.contactInfo?.name ||
+                  (leadData.contactInfo?.firstName && leadData.contactInfo?.lastName 
+                    ? `${leadData.contactInfo.firstName} ${leadData.contactInfo.lastName}` 
+                    : '') ||
                   (fullLeadData?.customer ? 
                    `${fullLeadData.customer.first_name || ''} ${fullLeadData.customer.last_name || ''}`.trim() : ''),
-    firstName: fullLeadData?.customer?.first_name || leadData.customerName?.split(' ')[0] || '',
-    lastName: fullLeadData?.customer?.last_name || leadData.customerName?.split(' ').slice(1).join(' ') || '',
+    firstName: leadData.firstName || 
+               leadData.customerInfo?.firstName ||
+               leadData.contactInfo?.firstName ||
+               fullLeadData?.customer?.first_name || 
+               leadData.customerName?.split(' ')[0] || '',
+    lastName: leadData.lastName ||
+              leadData.customerInfo?.lastName ||
+              leadData.contactInfo?.lastName ||
+              fullLeadData?.customer?.last_name || 
+              leadData.customerName?.split(' ').slice(1).join(' ') || '',
     customerEmail: customerEmail,
-    customerPhone: leadData.customerPhone || fullLeadData?.customer?.phone || '',
+    customerPhone: leadData.customerPhone || 
+                   leadData.phone ||
+                   leadData.customerInfo?.phone ||
+                   leadData.contactInfo?.phone ||
+                   fullLeadData?.customer?.phone || '',
     
     // Company variables
     companyName: company?.name || 'Your Company',
@@ -471,44 +516,94 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     googleRating: reviewsData?.rating ? reviewsData.rating.toString() : '',
     googleReviewCount: reviewsData?.reviewCount ? reviewsData.reviewCount.toString() : '',
     
-    // Service/Lead details
-    pestType: leadData.pestType,
-    urgency: leadData.urgency,
+    // Service/Lead details with enhanced partial lead support
+    pestType: leadData.pestType || leadData.selectedPest || '',
+    urgency: leadData.urgency || '',
     address: leadData.address,
     streetAddress: leadData.streetAddress || '',
     city: leadData.city || '',
     state: leadData.state || '',
     zipCode: leadData.zipCode || '',
     homeSize: leadData.homeSize,
-    leadSource: fullLeadData?.lead_source || '',
+    leadSource: fullLeadData?.lead_source || leadData.leadSource || 'partial_lead_automation',
     createdDate: formatDate(fullLeadData?.created_at),
+    
+    // Additional variables from partial lead forms
+    selectedPlanPrice: formatPrice(leadData.selectedPlan?.recurring_price) || '',
+    offerPrice: formatPrice(leadData.offerPrice) || '',
     
     // Scheduling information
     requestedDate: formatDate(leadData.requestedDate || fullLeadData?.requested_date),
     requestedTime: leadData.requestedTime || fullLeadData?.requested_time || '',
     
-    // Selected Plan Details (when available)
-    selectedPlanName: planData?.plan_name || '',
-    selectedPlanDescription: planData?.plan_description || '',
-    selectedPlanCategory: planData?.plan_category || '',
-    selectedPlanInitialPrice: formatPrice(planData?.initial_price),
-    selectedPlanRecurringPrice: formatPrice(planData?.recurring_price),
-    selectedPlanBillingFrequency: formatBillingFrequency(planData?.billing_frequency),
-    selectedPlanFeatures: formatPlanFeatures(planData?.plan_features),
-    selectedPlanFaqs: formatPlanFaqs(planData?.plan_faqs),
-    selectedPlanImageUrl: planData?.plan_image_url || '',
-    selectedPlanHighlightBadge: planData?.highlight_badge || '',
-    selectedPlanTreatmentFrequency: planData?.treatment_frequency || '',
-    selectedPlanDisclaimer: planData?.plan_disclaimer || '',
+    // Selected Plan Details with comprehensive fallbacks for partial leads
+    selectedPlanName: planData?.plan_name || leadData.selectedPlan?.plan_name || '',
+    selectedPlanDescription: planData?.plan_description || leadData.selectedPlan?.plan_description || '',
+    selectedPlanCategory: planData?.plan_category || leadData.selectedPlan?.plan_category || '',
+    selectedPlanInitialPrice: formatPrice(planData?.initial_price || leadData.selectedPlan?.initial_price),
+    selectedPlanRecurringPrice: formatPrice(planData?.recurring_price || leadData.selectedPlan?.recurring_price),
+    selectedPlanBillingFrequency: formatBillingFrequency(planData?.billing_frequency || leadData.selectedPlan?.billing_frequency),
+    selectedPlanFeatures: formatPlanFeatures(planData?.plan_features || leadData.selectedPlan?.plan_features),
+    selectedPlanFaqs: formatPlanFaqs(planData?.plan_faqs || leadData.selectedPlan?.plan_faqs),
+    selectedPlanImageUrl: planData?.plan_image_url || leadData.selectedPlan?.plan_image_url || '',
+    selectedPlanHighlightBadge: planData?.highlight_badge || leadData.selectedPlan?.highlight_badge || '',
+    selectedPlanTreatmentFrequency: planData?.treatment_frequency || leadData.selectedPlan?.treatment_frequency || '',
+    selectedPlanDisclaimer: planData?.plan_disclaimer || leadData.selectedPlan?.plan_disclaimer || '',
     
-    // Recommended Plan
-    recommendedPlanName: fullLeadData?.recommended_plan_name || '',
+    // Recommended Plan with fallbacks for partial leads
+    recommendedPlanName: fullLeadData?.recommended_plan_name || recommendedPlanData?.plan_name || '',
+    
+    // Session and Attribution Variables - Use direct DB query for partial leads
+    partialLeadSessionId: partialLeadData?.session_id || 
+                         leadData.sessionId || 
+                         leadData.session_id || 
+                         leadData.partialLeadSessionId || 
+                         attribution?.sessionId || 
+                         attribution?.session_id || 
+                         leadData.id ||
+                         'unknown',
+    pageUrl: attribution?.page_url || leadData.pageUrl || leadData.attribution_data?.page_url || company?.website || '#',
     
     // Legacy variables for backward compatibility
     leadId,
     customerId,
     ...step.email_variables, // Any additional variables from step config
   };
+
+  // Calculate the session ID - prioritize DB query for partial leads
+  const resolvedSessionId = partialLeadData?.session_id ||
+                            leadData.sessionId || 
+                            leadData.session_id || 
+                            leadData.partialLeadSessionId || 
+                            attribution?.sessionId || 
+                            attribution?.session_id || 
+                            leadData.id ||
+                            'unknown';
+
+  // Validate required fields for email sending
+  if (!customerEmail || !customerEmail.trim()) {
+    console.error('Email sending failed - no customer email available', {
+      leadId,
+      companyId,
+      templateId: template.id,
+      triggerType: 'workflow_email_step',
+      leadData: {
+        customerEmail: leadData.customerEmail,
+        email: leadData.email,
+        customerInfo: leadData.customerInfo,
+        contactInfo: leadData.contactInfo
+      }
+    });
+    
+    return {
+      success: false,
+      emailSent: false,
+      error: 'No customer email available for sending. Email may not be captured yet in the form flow.',
+      templateName: template.name,
+      recipient: customerEmail,
+      subject: template.subject_line,
+    };
+  }
 
   // Replace variables in email content
   let htmlContent = template.html_content;
@@ -527,6 +622,28 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     subjectLine = subjectLine.replace(new RegExp(placeholder, 'g'), replacement);
     
   });
+
+  // Create email log entry in email_automation_log table (matching old architecture)
+  const { data: emailLogEntry, error: logError } = await supabase
+    .from('email_automation_log')
+    .insert([{
+      execution_id: executionId,
+      company_id: companyId,
+      template_id: template.id,
+      recipient_email: customerEmail,
+      recipient_name: emailVariables.customerName || customerEmail,
+      subject_line: subjectLine,
+      send_status: 'scheduled',
+      scheduled_for: new Date().toISOString(),
+    }])
+    .select('id')
+    .single();
+
+  const emailLogId = emailLogEntry?.id;
+  
+  if (logError) {
+    console.warn('Failed to create email log entry:', logError);
+  }
 
   // Send email using email API with enhanced error handling and fallback
   try {
@@ -574,6 +691,21 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
       emailResult = { success: true, messageId: `workflow-${Date.now()}` };
     }
     
+    // Update email log entry with success status (matching old architecture)
+    if (emailLogId) {
+      try {
+        await supabase
+          .from('email_automation_log')
+          .update({
+            send_status: 'sent',
+            sent_at: new Date().toISOString(),
+            email_provider_id: emailResult.messageId,
+          })
+          .eq('id', emailLogId);
+      } catch (updateError) {
+        console.warn('Failed to update email log entry:', updateError);
+      }
+    }
     
     return {
       success: true,
@@ -594,6 +726,22 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
       leadId,
       companyId,
     });
+    
+    // Update email log entry with failure status (matching old architecture)
+    if (emailLogId) {
+      try {
+        await supabase
+          .from('email_automation_log')
+          .update({
+            send_status: 'failed',
+            failed_at: new Date().toISOString(),
+            error_message: error instanceof Error ? error.message : String(error),
+          })
+          .eq('id', emailLogId);
+      } catch (updateError) {
+        console.warn('Failed to update email log entry with failure:', updateError);
+      }
+    }
     
     // Don't throw the error immediately - let's try to continue the workflow
     // and mark this step as failed but not the entire workflow

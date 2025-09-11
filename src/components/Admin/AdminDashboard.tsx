@@ -17,6 +17,7 @@ import AttributionAnalytics from './AttributionAnalytics';
 import FormAnalytics from './FormAnalytics';
 import PestManager from './PestManager';
 import TemplateLibraryManager from './TemplateLibraryManager';
+import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
 import styles from './AdminDashboard.module.scss';
 
@@ -24,15 +25,33 @@ interface AdminDashboardProps {
   user: User;
 }
 
-type AdminCategory = 'users' | 'companies' | 'analytics' | 'automation' | 'system';
+type AdminCategory =
+  | 'users'
+  | 'companies'
+  | 'analytics'
+  | 'automation'
+  | 'system';
 
 type UserSubsection = 'users' | 'relationships';
 type CompanySubsection = 'companies' | 'projects' | 'brands';
-type AnalyticsSubsection = 'attribution' | 'forms' | 'call-records' | 'partial-leads';
+type AnalyticsSubsection =
+  | 'attribution'
+  | 'forms'
+  | 'call-records'
+  | 'partial-leads';
 type AutomationSubsection = 'templates' | 'executions';
-type SystemSubsection = 'widgets' | 'pest-management' | 'calling';
+type SystemSubsection =
+  | 'widgets'
+  | 'pest-management'
+  | 'calling'
+  | 'sms-testing';
 
-type AdminSubsection = UserSubsection | CompanySubsection | AnalyticsSubsection | AutomationSubsection | SystemSubsection;
+type AdminSubsection =
+  | UserSubsection
+  | CompanySubsection
+  | AnalyticsSubsection
+  | AutomationSubsection
+  | SystemSubsection;
 
 // Legacy type for backward compatibility during migration
 type AdminSection =
@@ -50,7 +69,7 @@ type AdminSection =
   | 'pest-management'
   | 'template-library'
   | 'workflow-executions'
-;
+  | 'sms-testing';
 
 interface Company {
   id: string;
@@ -78,7 +97,11 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
     icon: Users,
     subsections: [
       { id: 'users', label: 'Users', legacySection: 'users' },
-      { id: 'relationships', label: 'User-Company Links', legacySection: 'relationships' },
+      {
+        id: 'relationships',
+        label: 'User-Company Links',
+        legacySection: 'relationships',
+      },
     ],
   },
   {
@@ -96,10 +119,22 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
     label: 'Analytics & Reports',
     icon: BarChart3,
     subsections: [
-      { id: 'attribution', label: 'Attribution Analytics', legacySection: 'attribution-analytics' },
+      {
+        id: 'attribution',
+        label: 'Attribution Analytics',
+        legacySection: 'attribution-analytics',
+      },
       { id: 'forms', label: 'Form Analytics', legacySection: 'form-analytics' },
-      { id: 'call-records', label: 'Call Records', legacySection: 'call-records' },
-      { id: 'partial-leads', label: 'Partial Leads', legacySection: 'partial-leads' },
+      {
+        id: 'call-records',
+        label: 'Call Records',
+        legacySection: 'call-records',
+      },
+      {
+        id: 'partial-leads',
+        label: 'Partial Leads',
+        legacySection: 'partial-leads',
+      },
     ],
   },
   {
@@ -107,8 +142,16 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
     label: 'Automation & Templates',
     icon: Bot,
     subsections: [
-      { id: 'templates', label: 'Template Library', legacySection: 'template-library' },
-      { id: 'executions', label: 'Workflow Executions', legacySection: 'workflow-executions' },
+      {
+        id: 'templates',
+        label: 'Template Library',
+        legacySection: 'template-library',
+      },
+      {
+        id: 'executions',
+        label: 'Workflow Executions',
+        legacySection: 'workflow-executions',
+      },
     ],
   },
   {
@@ -117,22 +160,30 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
     icon: Settings,
     subsections: [
       { id: 'widgets', label: 'Widget Config', legacySection: 'widgets' },
-      { id: 'pest-management', label: 'Pest Management', legacySection: 'pest-management' },
+      {
+        id: 'pest-management',
+        label: 'Pest Management',
+        legacySection: 'pest-management',
+      },
       { id: 'calling', label: 'Calling', legacySection: 'call-settings' },
+      { id: 'sms-testing', label: 'SMS Testing', legacySection: 'sms-testing' },
     ],
   },
 ];
 
 export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [activeCategory, setActiveCategory] = useState<AdminCategory>('users');
-  const [activeSubsection, setActiveSubsection] = useState<AdminSubsection>('users');
+  const [activeSubsection, setActiveSubsection] =
+    useState<AdminSubsection>('users');
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
 
   // Helper function to get legacy section for renderSection compatibility
   const getCurrentLegacySection = (): AdminSection => {
     for (const category of ADMIN_CATEGORIES) {
-      const subsection = category.subsections.find(sub => sub.id === activeSubsection);
+      const subsection = category.subsections.find(
+        sub => sub.id === activeSubsection
+      );
       if (subsection?.legacySection) {
         return subsection.legacySection;
       }
@@ -208,7 +259,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       case 'template-library':
         return <TemplateLibraryManager />;
       case 'workflow-executions':
-        return selectedCompanyId ? <ExecutionManager companyId={selectedCompanyId} /> : <div>Loading...</div>;
+        return selectedCompanyId ? (
+          <ExecutionManager companyId={selectedCompanyId} />
+        ) : (
+          <div>Loading...</div>
+        );
+      case 'sms-testing':
+        return <SMSTestManager />;
       default:
         return <UsersManager />;
     }
@@ -223,7 +280,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
       {/* Primary Navigation - Main Categories */}
       <nav className={styles.primaryNavigation}>
-        {ADMIN_CATEGORIES.map((category) => {
+        {ADMIN_CATEGORIES.map(category => {
           const IconComponent = category.icon;
           return (
             <button
@@ -242,12 +299,15 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
       {/* Secondary Navigation - Subsections */}
       {(() => {
-        const currentCategory = ADMIN_CATEGORIES.find(cat => cat.id === activeCategory);
-        if (!currentCategory || currentCategory.subsections.length <= 1) return null;
-        
+        const currentCategory = ADMIN_CATEGORIES.find(
+          cat => cat.id === activeCategory
+        );
+        if (!currentCategory || currentCategory.subsections.length <= 1)
+          return null;
+
         return (
           <nav className={styles.secondaryNavigation}>
-            {currentCategory.subsections.map((subsection) => (
+            {currentCategory.subsections.map(subsection => (
               <button
                 key={subsection.id}
                 className={`${styles.secondaryNavButton} ${
@@ -269,7 +329,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           <select
             id="company-select"
             value={selectedCompanyId}
-            onChange={(e) => setSelectedCompanyId(e.target.value)}
+            onChange={e => setSelectedCompanyId(e.target.value)}
             className={styles.companySelect}
           >
             {companies.map(company => (

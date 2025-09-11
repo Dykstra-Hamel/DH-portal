@@ -314,6 +314,48 @@ export default function CallSettingsManager() {
 
               <div className={styles.setting}>
                 <div className={styles.settingInfo}>
+                  <label htmlFor="retell-inbound-sms-agent-id" className={styles.settingLabel}>
+                    Retell Inbound SMS Agent ID
+                  </label>
+                  <p className={styles.settingDescription}>
+                    {settings.retell_inbound_sms_agent_id?.description || 'Retell AI agent ID for handling inbound SMS messages'}
+                  </p>
+                </div>
+                <div className={styles.settingControl}>
+                  <input
+                    id="retell-inbound-sms-agent-id"
+                    type="text"
+                    value={settings.retell_inbound_sms_agent_id?.value || ''}
+                    onChange={(e) => handleSettingChange('retell_inbound_sms_agent_id', e.target.value)}
+                    className={styles.textInput}
+                    placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.setting}>
+                <div className={styles.settingInfo}>
+                  <label htmlFor="retell-outbound-sms-agent-id" className={styles.settingLabel}>
+                    Retell Outbound SMS Agent ID
+                  </label>
+                  <p className={styles.settingDescription}>
+                    {settings.retell_outbound_sms_agent_id?.description || 'Retell AI agent ID for handling outbound SMS messages from automations'}
+                  </p>
+                </div>
+                <div className={styles.settingControl}>
+                  <input
+                    id="retell-outbound-sms-agent-id"
+                    type="text"
+                    value={settings.retell_outbound_sms_agent_id?.value || ''}
+                    onChange={(e) => handleSettingChange('retell_outbound_sms_agent_id', e.target.value)}
+                    className={styles.textInput}
+                    placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.setting}>
+                <div className={styles.settingInfo}>
                   <label htmlFor="retell-phone-number" className={styles.settingLabel}>
                     Retell Phone Number
                   </label>
@@ -329,6 +371,27 @@ export default function CallSettingsManager() {
                     onChange={(e) => handleSettingChange('retell_phone_number', e.target.value)}
                     className={styles.textInput}
                     placeholder="+12074197718"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.setting}>
+                <div className={styles.settingInfo}>
+                  <label htmlFor="retell-sms-phone-number" className={styles.settingLabel}>
+                    Retell SMS Phone Number
+                  </label>
+                  <p className={styles.settingDescription}>
+                    {settings.retell_sms_phone_number?.description || 'Phone number specifically for SMS messages (optional - falls back to main phone number if not set)'}
+                  </p>
+                </div>
+                <div className={styles.settingControl}>
+                  <input
+                    id="retell-sms-phone-number"
+                    type="tel"
+                    value={settings.retell_sms_phone_number?.value || ''}
+                    onChange={(e) => handleSettingChange('retell_sms_phone_number', e.target.value)}
+                    className={styles.textInput}
+                    placeholder="+15202241234 (SMS-specific number)"
                   />
                 </div>
               </div>

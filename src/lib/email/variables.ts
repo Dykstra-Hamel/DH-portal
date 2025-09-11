@@ -65,6 +65,10 @@ export interface EmailVariables {
   
   // Recommended Plan
   recommendedPlanName: string;
+  
+  // Session and Attribution Variables
+  partialLeadSessionId: string;
+  pageUrl: string;
 }
 
 /**
@@ -134,6 +138,10 @@ export function createSampleVariables(
     
     // Recommended Plan (sample data)
     recommendedPlanName: 'Premium Protection Plan',
+    
+    // Session and Attribution Variables (sample data)
+    partialLeadSessionId: 'session_abc123def456',
+    pageUrl: 'https://example.com/services/pest-control',
   };
 }
 

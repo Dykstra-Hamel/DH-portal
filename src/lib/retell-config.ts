@@ -213,6 +213,166 @@ export async function getCompanyInboundRetellConfig(companyId: string): Promise<
 }
 
 /**
+ * Retrieves company-specific Retell inbound SMS settings from the database
+ */
+export async function getCompanyInboundSMSRetellConfig(companyId: string): Promise<RetellConfigResult> {
+  try {
+    const supabase = createAdminClient();
+
+    const { data: settings, error } = await supabase
+      .from('company_settings')
+      .select('setting_key, setting_value')
+      .eq('company_id', companyId)
+      .in('setting_key', [
+        'retell_api_key',
+        'retell_inbound_sms_agent_id',
+        'retell_inbound_agent_id', // Fallback to voice inbound agent
+        'retell_agent_id', // Legacy fallback
+        'retell_sms_phone_number', // SMS-specific phone number
+        'retell_phone_number', // Fallback to main phone number
+        'retell_knowledge_base_id'
+      ]);
+
+    if (error) {
+      console.error('Failed to fetch company inbound SMS Retell settings:', error);
+      return { error: 'Failed to load company SMS configuration' };
+    }
+
+    if (!settings || settings.length === 0) {
+      return { 
+        error: 'No Retell SMS configuration found for this company',
+        missingSettings: ['retell_api_key', 'retell_inbound_sms_agent_id', 'retell_phone_number']
+      };
+    }
+
+    // Convert array to key-value map
+    const settingsMap = settings.reduce((acc, setting) => {
+      acc[setting.setting_key] = setting.setting_value;
+      return acc;
+    }, {} as Record<string, string>);
+
+    // Use SMS-specific agent ID if available, fallback to voice agent IDs
+    const agentId = settingsMap.retell_inbound_sms_agent_id || 
+                   settingsMap.retell_inbound_agent_id || 
+                   settingsMap.retell_agent_id;
+
+    // Use SMS-specific phone number if available, fallback to main phone number
+    const phoneNumber = settingsMap.retell_sms_phone_number || settingsMap.retell_phone_number;
+
+    // Check for required settings
+    const requiredSettings = ['retell_api_key'];
+    const missingSettings = requiredSettings.filter(key => !settingsMap[key] || settingsMap[key].trim() === '');
+    
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      missingSettings.push('retell_sms_phone_number');
+    }
+    
+    if (!agentId || agentId.trim() === '') {
+      missingSettings.push('retell_inbound_sms_agent_id');
+    }
+
+    if (missingSettings.length > 0) {
+      return {
+        error: 'Incomplete Retell inbound SMS configuration for this company',
+        missingSettings
+      };
+    }
+
+    return {
+      config: {
+        apiKey: settingsMap.retell_api_key,
+        agentId: agentId,
+        phoneNumber: phoneNumber,
+        knowledgeBaseId: settingsMap.retell_knowledge_base_id || undefined
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching company inbound SMS Retell configuration:', error);
+    return { error: 'An unexpected error occurred while loading SMS configuration' };
+  }
+}
+
+/**
+ * Retrieves company-specific Retell outbound SMS settings from the database
+ */
+export async function getCompanyOutboundSMSRetellConfig(companyId: string): Promise<RetellConfigResult> {
+  try {
+    const supabase = createAdminClient();
+
+    const { data: settings, error } = await supabase
+      .from('company_settings')
+      .select('setting_key, setting_value')
+      .eq('company_id', companyId)
+      .in('setting_key', [
+        'retell_api_key',
+        'retell_outbound_sms_agent_id',
+        'retell_outbound_agent_id', // Fallback to voice outbound agent
+        'retell_agent_id', // Legacy fallback
+        'retell_sms_phone_number', // SMS-specific phone number
+        'retell_phone_number', // Fallback to main phone number
+        'retell_knowledge_base_id'
+      ]);
+
+    if (error) {
+      console.error('Failed to fetch company outbound SMS Retell settings:', error);
+      return { error: 'Failed to load company SMS configuration' };
+    }
+
+    if (!settings || settings.length === 0) {
+      return { 
+        error: 'No Retell SMS configuration found for this company',
+        missingSettings: ['retell_api_key', 'retell_outbound_sms_agent_id', 'retell_phone_number']
+      };
+    }
+
+    // Convert array to key-value map
+    const settingsMap = settings.reduce((acc, setting) => {
+      acc[setting.setting_key] = setting.setting_value;
+      return acc;
+    }, {} as Record<string, string>);
+
+    // Use SMS-specific agent ID if available, fallback to voice agent IDs
+    const agentId = settingsMap.retell_outbound_sms_agent_id || 
+                   settingsMap.retell_outbound_agent_id || 
+                   settingsMap.retell_agent_id;
+
+    // Use SMS-specific phone number if available, fallback to main phone number
+    const phoneNumber = settingsMap.retell_sms_phone_number || settingsMap.retell_phone_number;
+
+    // Check for required settings
+    const requiredSettings = ['retell_api_key'];
+    const missingSettings = requiredSettings.filter(key => !settingsMap[key] || settingsMap[key].trim() === '');
+    
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      missingSettings.push('retell_sms_phone_number');
+    }
+    
+    if (!agentId || agentId.trim() === '') {
+      missingSettings.push('retell_outbound_sms_agent_id');
+    }
+
+    if (missingSettings.length > 0) {
+      return {
+        error: 'Incomplete Retell outbound SMS configuration for this company',
+        missingSettings
+      };
+    }
+
+    return {
+      config: {
+        apiKey: settingsMap.retell_api_key,
+        agentId: agentId,
+        phoneNumber: phoneNumber,
+        knowledgeBaseId: settingsMap.retell_knowledge_base_id || undefined
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching company outbound SMS Retell configuration:', error);
+    return { error: 'An unexpected error occurred while loading SMS configuration' };
+  }
+}
+
+/**
  * Validates if all required Retell settings are configured for a company
  */
 export async function validateRetellConfig(companyId: string): Promise<{

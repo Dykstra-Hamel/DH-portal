@@ -1,6 +1,5 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from '@/lib/email';
 import { abTestEngine } from '@/lib/ab-testing/ab-test-engine';
 
 export const emailScheduledHandler = inngest.createFunction(
@@ -232,70 +231,56 @@ export const emailScheduledHandler = inngest.createFunction(
       return processEmailTemplate(emailData.template, templateVariables);
     });
 
-    // Step 6: Send email via MailerSend
+    // Step 6: Send email using unified email API (same as widget submissions)
     const emailResult = await step.run('send-email', async () => {
       try {
-        // Get custom from email if configured, otherwise use default
-        const fromEmail = await getCompanyFromEmail(companyId) || MAILERSEND_FROM_EMAIL;
-        const fromName = emailData.company.name || 'Your Company';
+        // Use the same email API endpoint as widget submissions for consistency
+        const emailApiUrl = process.env.NEXT_PUBLIC_SITE_URL 
+          ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/email/send`
+          : 'http://localhost:3000/api/email/send';
 
-        const mailersendPayload = {
-          from: {
-            email: fromEmail,
-            name: fromName,
-          },
-          to: [{
-            email: recipientEmail,
-            name: recipientName,
-          }],
-          subject: processedEmail.subject,
-          html: processedEmail.htmlContent,
-          text: processedEmail.textContent,
-          // Add tracking for opens and clicks
-          tags: [
-            `company:${companyId}`,
-            `workflow:${workflowId}`,
-            `template:${finalTemplateId}`,
-            ...(finalTemplateId !== templateId ? [`ab_test:${finalTemplateId}`, `original:${templateId}`] : []),
-            ...(leadId ? [`lead:${leadId}`] : []),
-          ],
-          personalization: [{
-            email: recipientEmail,
-            data: variables,
-          }],
-        };
-
-        const response = await fetch('https://api.mailersend.com/v1/email', {
+        const emailResponse = await fetch(emailApiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
           },
-          body: JSON.stringify(mailersendPayload),
+          body: JSON.stringify({
+            to: recipientEmail,
+            subject: processedEmail.subject,
+            html: processedEmail.htmlContent,
+            text: processedEmail.textContent,
+            companyId,
+            templateId: finalTemplateId,
+            leadId,
+            source: 'partial_lead_automation',
+          }),
         });
 
-        if (!response.ok) {
-          const errorData = await response.text();
-          throw new Error(`MailerSend error: ${response.status} - ${errorData}`);
+        if (!emailResponse.ok) {
+          const errorData = await emailResponse.text();
+          throw new Error(`Email API error: ${emailResponse.status} - ${errorData}`);
         }
 
-        let responseData: any = {};
+        let emailApiResult;
         try {
-          const responseText = await response.text();
+          const responseText = await emailResponse.text();
           if (responseText.trim()) {
-            responseData = JSON.parse(responseText);
+            emailApiResult = JSON.parse(responseText);
+          } else {
+            emailApiResult = { success: true, messageId: `scheduled-${Date.now()}` };
           }
         } catch (parseError) {
-          console.log('MailerSend response was not JSON, but email likely sent successfully');
+          console.error('Failed to parse email API response:', parseError);
+          emailApiResult = { success: true, messageId: `scheduled-${Date.now()}` };
         }
 
         return {
-          success: true,
-          providerId: responseData.message_id || `ms-${Date.now()}`,
-          response: responseData,
+          success: emailApiResult.success,
+          providerId: emailApiResult.messageId,
+          response: emailApiResult,
         };
       } catch (error) {
-        console.error('Error sending email via MailerSend:', error);
+        console.error('Error sending email via unified API:', error);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -410,31 +395,3 @@ function processConditionalBlocks(content: string, variables: Record<string, any
   });
 }
 
-// Get company's custom from email if configured
-async function getCompanyFromEmail(companyId: string): Promise<string | null> {
-  try {
-    const supabase = createAdminClient();
-    
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('setting_key, setting_value')
-      .eq('company_id', companyId)
-      .in('setting_key', ['email_domain', 'email_domain_prefix', 'email_domain_status']);
-
-    const settingsMap = new Map(settings?.map(s => [s.setting_key, s.setting_value]) || []);
-    
-    const domain = settingsMap.get('email_domain');
-    const prefix = settingsMap.get('email_domain_prefix') || 'noreply';
-    const status = settingsMap.get('email_domain_status');
-    
-    // Only use custom domain if it's verified
-    if (domain && status === 'verified') {
-      return `${prefix}@${domain}`;
-    }
-    
-    return null;
-  } catch (error) {
-    console.warn('Error getting company from email:', error);
-    return null;
-  }
-}
