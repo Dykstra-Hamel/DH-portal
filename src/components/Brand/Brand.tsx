@@ -46,11 +46,9 @@ interface BrandProps {
 
 const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const [visibleSections, setVisibleSections] = useState<Set<string>>(
-    new Set(['overview'])
-  );
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [primaryFontLoaded, setPrimaryFontLoaded] = useState<string | null>(null);
+  const [fontLoading, setFontLoading] = useState<boolean>(false);
 
   const getGradientStyle = () => {
     const primaryColor = brandData.primary_color_hex || '#A8B5C8';
@@ -86,8 +84,19 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
   // Load primary brand font when component mounts
   useEffect(() => {
     if (brandData.font_primary_name && brandData.font_primary_url) {
-      const fontFamily = loadFont(brandData.font_primary_name, brandData.font_primary_url);
-      setPrimaryFontLoaded(fontFamily);
+      setFontLoading(true);
+      loadFont(brandData.font_primary_name, brandData.font_primary_url)
+        .then(fontFamily => {
+          if (fontFamily) {
+            setPrimaryFontLoaded(fontFamily);
+          }
+        })
+        .catch(error => {
+          console.warn('Failed to load brand font:', error);
+        })
+        .finally(() => {
+          setFontLoading(false);
+        });
     }
   }, [brandData.font_primary_name, brandData.font_primary_url]);
 
@@ -125,31 +134,33 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
     };
   }, [lightboxImage]);
 
-  // Intersection Observer for scroll animations
+  // Simple intersection observer for opacity animation
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            const sectionId = entry.target.getAttribute('data-section');
-            if (sectionId) {
-              setVisibleSections(prev => new Set([...prev, sectionId]));
-            }
+            entry.target.classList.add(styles.visible);
           }
         });
       },
       {
-        threshold: 0.1, // Trigger when 10% of the element is visible
-        rootMargin: '0px 0px -50px 0px', // Start animation slightly before element is fully visible
+        threshold: 0.2,
+        rootMargin: '0px 0px -10% 0px',
       }
     );
 
     // Observe all sections
-    sectionRefs.current.forEach(element => {
-      if (element) observer.observe(element);
-    });
+    const observeElements = () => {
+      sectionRefs.current.forEach(element => {
+        if (element) observer.observe(element);
+      });
+    };
+
+    const timeoutId = setTimeout(observeElements, 100);
 
     return () => {
+      clearTimeout(timeoutId);
       observer.disconnect();
     };
   }, []);
@@ -162,8 +173,8 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
     }
   };
 
-  const loadFont = (fontName: string, fontUrl: string) => {
-    if (!fontUrl || !fontName) return fontName;
+  const loadFont = async (fontName: string, fontUrl: string): Promise<string | null> => {
+    if (!fontUrl || !fontName) return null;
 
     // Sanitize font name for CSS
     const sanitizedFontName = fontName.replace(/[^a-zA-Z0-9\s-]/g, '');
@@ -174,77 +185,95 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
     );
     if (existingFont) return sanitizedFontName;
 
-    // Create and inject font face CSS
-    const style = document.createElement('style');
-    style.setAttribute('data-font', sanitizedFontName);
-
-    // Handle different types of font URLs
-    let fontFaceRule = '';
-
     try {
-      if (
-        fontUrl.includes('fonts.googleapis.com') ||
-        fontUrl.includes('fonts.google.com')
-      ) {
-        // For Google Fonts, we need to import the URL
-        fontFaceRule = `@import url('${fontUrl}');`;
-      } else if (
-        fontUrl.includes('fonts.adobe.com') ||
-        fontUrl.includes('typekit.net')
-      ) {
-        // For Adobe Fonts, import the URL
-        fontFaceRule = `@import url('${fontUrl}');`;
-      } else if (
-        fontUrl.startsWith('http') &&
-        (fontUrl.includes('.woff') ||
-          fontUrl.includes('.ttf') ||
-          fontUrl.includes('.otf'))
-      ) {
+      // Use the modern Font Loading API when available
+      if ('fonts' in document && document.fonts.load) {
         // For direct font file URLs, create a font-face rule
-        const fontFormat = fontUrl.includes('.woff2')
-          ? 'woff2'
-          : fontUrl.includes('.woff')
-            ? 'woff'
-            : fontUrl.includes('.ttf')
-              ? 'truetype'
-              : fontUrl.includes('.otf')
-                ? 'opentype'
-                : 'woff2';
+        if (fontUrl.startsWith('http') && 
+            (fontUrl.includes('.woff') || fontUrl.includes('.ttf') || fontUrl.includes('.otf'))) {
+          
+          const fontFormat = fontUrl.includes('.woff2') ? 'woff2'
+            : fontUrl.includes('.woff') ? 'woff'
+            : fontUrl.includes('.ttf') ? 'truetype'
+            : fontUrl.includes('.otf') ? 'opentype'
+            : 'woff2';
 
-        fontFaceRule = `
-          @font-face {
-            font-family: '${sanitizedFontName}';
-            src: url('${fontUrl}') format('${fontFormat}');
-            font-display: swap;
-            font-weight: normal;
-            font-style: normal;
+          const fontFaceRule = `
+            @font-face {
+              font-family: '${sanitizedFontName}';
+              src: url('${fontUrl}') format('${fontFormat}');
+              font-display: swap;
+              font-weight: normal;
+              font-style: normal;
+            }
+          `;
+
+          const style = document.createElement('style');
+          style.setAttribute('data-font', sanitizedFontName);
+          style.innerHTML = fontFaceRule;
+          document.head.appendChild(style);
+
+          // Wait for font to load using Font Loading API
+          await document.fonts.load(`normal 400 16px "${sanitizedFontName}"`);
+          return sanitizedFontName;
+        } else if (fontUrl.includes('fonts.googleapis.com') || fontUrl.includes('fonts.google.com')) {
+          // For Google Fonts, use link element for better performance
+          const existingLink = document.querySelector(`link[href*="${fontUrl}"]`);
+          if (!existingLink) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = fontUrl;
+            link.setAttribute('data-font', sanitizedFontName);
+            document.head.appendChild(link);
+
+            // Wait for stylesheet to load
+            await new Promise((resolve) => {
+              link.onload = resolve;
+              link.onerror = resolve; // Don't fail completely if font doesn't load
+              setTimeout(resolve, 2000); // Fallback timeout
+            });
           }
-        `;
+          return sanitizedFontName;
+        } else {
+          // Fallback for other URL types
+          const style = document.createElement('style');
+          style.setAttribute('data-font', sanitizedFontName);
+          style.innerHTML = `@import url('${fontUrl}');`;
+          document.head.appendChild(style);
+
+          // Short delay for import to process
+          await new Promise(resolve => setTimeout(resolve, 500));
+          return sanitizedFontName;
+        }
       } else {
-        // For other URLs (like external CSS files), try importing
-        fontFaceRule = `@import url('${fontUrl}');`;
+        // Fallback for older browsers - load synchronously but with minimal delay
+        const style = document.createElement('style');
+        style.setAttribute('data-font', sanitizedFontName);
+        
+        let fontFaceRule = '';
+        if (fontUrl.includes('fonts.googleapis.com')) {
+          fontFaceRule = `@import url('${fontUrl}');`;
+        } else if (fontUrl.includes('.woff') || fontUrl.includes('.ttf') || fontUrl.includes('.otf')) {
+          const fontFormat = fontUrl.includes('.woff2') ? 'woff2' : 'woff';
+          fontFaceRule = `
+            @font-face {
+              font-family: '${sanitizedFontName}';
+              src: url('${fontUrl}') format('${fontFormat}');
+              font-display: swap;
+            }
+          `;
+        } else {
+          fontFaceRule = `@import url('${fontUrl}');`;
+        }
+        
+        style.innerHTML = fontFaceRule;
+        document.head.appendChild(style);
+        return sanitizedFontName;
       }
-
-      style.innerHTML = fontFaceRule;
-      document.head.appendChild(style);
-
-      // Wait a bit for the font to load, then return
-      setTimeout(() => {
-        // Force a repaint to ensure font is applied
-        const fontElements = document.querySelectorAll(
-          `[style*="font-family"][style*="${sanitizedFontName}"]`
-        );
-        fontElements.forEach(element => {
-          (element as HTMLElement).style.fontFamily = (
-            element as HTMLElement
-          ).style.fontFamily;
-        });
-      }, 100);
     } catch (error) {
       console.warn(`Failed to load font ${fontName} from ${fontUrl}:`, error);
+      return null;
     }
-
-    return sanitizedFontName;
   };
   const hexToRgba = (hex: string, alpha: number): string => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -351,6 +380,22 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
 
   return (
     <div className={styles.brandContainer} style={getBrandContainerFontStyle()}>
+      {/* Font Loading Indicator */}
+      {fontLoading && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: 'rgba(0, 0, 0, 0.8)',
+          color: 'white',
+          padding: '8px 16px',
+          borderRadius: '4px',
+          fontSize: '14px',
+          zIndex: 1000
+        }}>
+          Loading custom font...
+        </div>
+      )}
       {/* Hero Section */}
       <div className={styles.heroSection}>
         <div className={styles.heroGradient} style={getGradientStyle()}>
@@ -374,7 +419,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
 
       {/* Brand Guidelines Overview */}
       <div
-        className={`${styles.contentSection} ${visibleSections.has('overview') ? styles.visible : styles.hidden}`}
+        className={styles.contentSection}
         data-section="overview"
         ref={setSectionRef('overview')}
       >
@@ -452,7 +497,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       {/* Brand Strategy */}
       <div
         id="brand-strategy"
-        className={`${styles.contentSection} ${visibleSections.has('brand-strategy') ? styles.visible : styles.hidden}`}
+        className={styles.contentSection}
         data-section="brand-strategy"
         ref={setSectionRef('brand-strategy')}
       >
@@ -470,7 +515,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       {/* Personality */}
       <div
         id="personality"
-        className={`${styles.contentSection} ${visibleSections.has('personality') ? styles.visible : styles.hidden}`}
+        className={styles.contentSection}
         data-section="personality"
         ref={setSectionRef('personality')}
       >
@@ -488,7 +533,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       {/* Logo */}
       <div
         id="logo"
-        className={`${styles.contentSection} ${visibleSections.has('logo') ? styles.visible : styles.hidden}`}
+        className={styles.contentSection}
         data-section="logo"
         ref={setSectionRef('logo')}
       >
@@ -519,7 +564,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       {/* Color */}
       <div
         id="color"
-        className={`${styles.contentSection} ${visibleSections.has('color') ? styles.visible : styles.hidden}`}
+        className={styles.contentSection}
         data-section="color"
         ref={setSectionRef('color')}
       >
@@ -571,7 +616,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       {/* Typography */}
       <div
         id="typography"
-        className={`${styles.contentSection} ${visibleSections.has('typography') ? styles.visible : styles.hidden}`}
+        className={styles.contentSection}
         data-section="typography"
         ref={setSectionRef('typography')}
       >
@@ -601,7 +646,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       {/* Photography */}
       <div
         id="photography"
-        className={`${styles.contentSection} ${visibleSections.has('photography') ? styles.visible : styles.hidden}`}
+        className={styles.contentSection}
         data-section="photography"
         ref={setSectionRef('photography')}
       >

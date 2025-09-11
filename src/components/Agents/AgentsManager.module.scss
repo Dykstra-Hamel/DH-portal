@@ -1,0 +1,89 @@
+.agentsManager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+
+    .titleSection {
+      flex: 1;
+
+      h1 {
+        margin: 0 0 0.5rem 0;
+        color: #333;
+        font-size: 2rem;
+        font-weight: 600;
+      }
+
+      .description {
+        margin: 0;
+        color: #666;
+        font-size: 1rem;
+        line-height: 1.5;
+        max-width: 600px;
+      }
+    }
+
+    .createButton {
+      padding: 0.75rem 1.5rem;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      white-space: nowrap;
+
+      &:hover {
+        background: #0056b3;
+      }
+
+      &:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+      }
+    }
+  }
+
+  .content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .agentsManager {
+    .header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+
+      .titleSection {
+        h1 {
+          font-size: 1.5rem;
+        }
+
+        .description {
+          font-size: 0.9rem;
+        }
+      }
+
+      .createButton {
+        align-self: stretch;
+        justify-content: center;
+      }
+    }
+  }
+}

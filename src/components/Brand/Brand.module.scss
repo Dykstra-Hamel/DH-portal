@@ -37,23 +37,16 @@
 .contentSection {
   padding: 60px 80px;
   border-bottom: 1px solid #f0f0f0;
-  transition:
-    opacity 0.8s ease-out,
-    transform 0.8s ease-out;
+  opacity: 0.3; // Start with low opacity
+  transition: opacity 0.8s ease-out;
 
   &:last-child {
     border-bottom: none;
   }
 
   // Animation states
-  &.hidden {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-
   &.visible {
-    opacity: 1;
-    transform: translateY(0);
+    opacity: 1; // Full opacity when in view
   }
 }
 

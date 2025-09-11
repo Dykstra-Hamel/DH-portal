@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendEvent } from '@/lib/inngest/client';
 import { sendCallSummaryNotifications } from '@/lib/email/call-summary-notifications';
 import { CallSummaryEmailData } from '@/lib/email/types';
+import { findCompanyByAgentId } from '@/lib/agent-utils';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(durationSeconds: number | null): number | null {
@@ -906,39 +907,6 @@ async function findCustomerByPhone(phoneNumber: string | undefined) {
   return null;
 }
 
-// Find company by Retell agent ID
-async function findCompanyByAgentId(agentId: string | undefined) {
-  if (!agentId) {
-    console.warn('findCompanyByAgentId: No agent ID provided');
-    return null;
-  }
-
-  const supabase = createAdminClient();
-
-  try {
-    const { data, error } = await supabase
-      .from('company_settings')
-      .select('company_id')
-      .eq('setting_key', 'retell_agent_id')
-      .eq('setting_value', agentId)
-      .single();
-
-    if (error) {
-      console.error('findCompanyByAgentId: Database error:', error);
-      return null;
-    }
-
-    if (data) {
-      return data.company_id;
-    }
-
-    console.warn('findCompanyByAgentId: No company found for agent ID:', agentId);
-    return null;
-  } catch (error) {
-    console.error('findCompanyByAgentId: Error:', error);
-    return null;
-  }
-}
 
 function extractCallData(
   dynamicVariables: any,

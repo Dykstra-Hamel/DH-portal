@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import { adminAPI } from '@/lib/api-client';
 import styles from './secondarySidenav.module.scss';
 
@@ -53,6 +54,7 @@ export function SecondarySideNav({
   const pathname = usePathname();
   const { activePrimaryNav } = useNavigation();
   const { selectedCompany, isAdmin } = useCompany();
+  const { getApiDateParams } = useDateFilter();
   const isPublicPage = pathname === '/login' || pathname === '/sign-up';
 
   // Handle client-side hydration
@@ -64,31 +66,35 @@ export function SecondarySideNav({
   const fetchCounts = useCallback(async (companyId: string) => {
     setLoadingCounts(true);
     try {
+      const dateParams = getApiDateParams();
       const [ticketsData, leadsData, customersData, projectsData, callsData] = await Promise.allSettled([
-        // Fetch tickets
+        // Fetch tickets (with date filter)
         isAdmin 
-          ? adminAPI.tickets.list({ companyId, includeArchived: false })
-          : fetch(`/api/tickets?companyId=${companyId}&includeArchived=false`).then(res => res.ok ? res.json() : []),
+          ? adminAPI.tickets.list({ companyId, includeArchived: false, ...dateParams })
+          : (() => {
+              const queryParams = new URLSearchParams({ companyId, includeArchived: 'false', ...dateParams });
+              return fetch(`/api/tickets?${queryParams}`).then(res => res.ok ? res.json() : []);
+            })(),
         
-        // Fetch leads
+        // Fetch leads (with date filter)
         isAdmin 
-          ? adminAPI.getLeads({ companyId })
-          : adminAPI.getUserLeads(companyId),
+          ? adminAPI.getLeads({ companyId, ...dateParams })
+          : adminAPI.getUserLeads(companyId, dateParams),
         
-        // Fetch customers
+        // Fetch customers (NO date filter - always show total count)
         isAdmin 
           ? adminAPI.getCustomers({ companyId })
           : adminAPI.getUserCustomers({ companyId }),
         
-        // Fetch projects
+        // Fetch projects (with date filter if needed)
         isAdmin 
-          ? adminAPI.getProjects({ companyId })
+          ? adminAPI.getProjects({ companyId, ...dateParams })
           : adminAPI.getUserProjects(companyId),
         
-        // Fetch calls (if available)
+        // Fetch calls (with date filter)
         isAdmin 
-          ? adminAPI.getAllCalls({ companyId })
-          : adminAPI.getUserCalls({ companyId }),
+          ? adminAPI.getAllCalls({ companyId, ...dateParams })
+          : adminAPI.getUserCalls({ companyId, ...dateParams }),
       ]);
 
       setCounts({
@@ -104,7 +110,7 @@ export function SecondarySideNav({
     } finally {
       setLoadingCounts(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, getApiDateParams]);
 
   // Fetch counts when company changes
   useEffect(() => {

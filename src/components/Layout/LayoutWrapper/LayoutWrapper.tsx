@@ -52,8 +52,9 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
           showAddLead: true,
         };
       case '/customers':
+      case '/dashboard/customers':
         return {
-          title: 'Customers',
+          title: 'All Customers',
           description: 'Manage and view all your customer information here.',
           showFilter: false,
           showAddLead: true,

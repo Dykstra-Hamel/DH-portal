@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getCompanyOutboundRetellConfig,
+  getDefaultAgentConfig,
   logRetellConfigError,
 } from '@/lib/retell-config';
 
@@ -125,9 +125,9 @@ export async function POST(request: NextRequest) {
     const { createAdminClient } = await import('@/lib/supabase/server-admin');
     const supabase = createAdminClient();
 
-    // Fetch both company outbound settings and company info in parallel
+    // Fetch both company outbound agent config and company info in parallel
     const [configResult, companyResult] = await Promise.all([
-      getCompanyOutboundRetellConfig(companyId),
+      getDefaultAgentConfig(companyId, 'calling', 'outbound'),
       supabase
         .from('companies')
         .select('name, website')
@@ -188,6 +188,15 @@ export async function POST(request: NextRequest) {
       agentId: retellAgentId,
       phoneNumber: retellFromNumber,
     } = configResult.config;
+
+    // Validate required configuration
+    if (!retellFromNumber) {
+      console.error('No phone number configured for outbound calling agent');
+      return NextResponse.json(
+        { error: 'No phone number configured for outbound calling agent. Please configure an outbound calling agent with a phone number in Agent Management.' },
+        { status: 400 }
+      );
+    }
 
     // Clean phone number (remove formatting)
     const cleanPhoneNumber = phone.replace(/[\s\-\(\)\.]/g, '');

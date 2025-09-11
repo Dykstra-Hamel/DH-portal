@@ -11,7 +11,6 @@ import { adminAPI } from '@/lib/api-client';
 import { Customer, CustomerStatus } from '@/types/customer';
 import { SortDirection } from '@/types/common';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useDateFilter } from '@/contexts/DateFilterContext';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -33,9 +32,8 @@ export default function CustomersPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const router = useRouter();
 
-  // Use global company context and date filter
+  // Use global company context
   const { selectedCompany, isAdmin, isLoading: contextLoading } = useCompany();
-  const { getApiDateParams } = useDateFilter();
 
   useEffect(() => {
     const supabase = createClient();
@@ -85,13 +83,11 @@ export default function CustomersPage() {
 
     try {
       setCustomersLoading(true);
-      const dateParams = getApiDateParams();
       const filters = {
         companyId: selectedCompany?.id,
         search: searchQuery,
         sortBy: sortKey,
         sortOrder: sortDirection,
-        ...dateParams,
       };
 
       let customersData: Customer[] = [];
@@ -113,7 +109,7 @@ export default function CustomersPage() {
     } finally {
       setCustomersLoading(false);
     }
-  }, [selectedCompany, isAdmin, searchQuery, sortKey, sortDirection, getApiDateParams]);
+  }, [selectedCompany, isAdmin, searchQuery, sortKey, sortDirection]);
 
   // Fetch customers when filters change
   useEffect(() => {

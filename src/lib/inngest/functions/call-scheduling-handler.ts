@@ -1,6 +1,6 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { getCompanyRetellConfig } from '@/lib/retell-config';
+import { getDefaultAgentConfig } from '@/lib/retell-config';
 
 interface CallSchedulingEvent {
   name: 'automation/schedule_call';
@@ -150,10 +150,10 @@ export const callSchedulingHandler = inngest.createFunction(
     if (shouldScheduleNow) {
       return await step.run('execute-immediate-call', async () => {
         try {
-          // Get Retell configuration
-          const retellConfig = await getCompanyRetellConfig(companyId);
-          if (retellConfig.error || !retellConfig.config) {
-            throw new Error(`Retell configuration error: ${retellConfig.error}`);
+          // Get outbound calling agent configuration
+          const agentConfig = await getDefaultAgentConfig(companyId, 'calling', 'outbound');
+          if (agentConfig.error || !agentConfig.config) {
+            throw new Error(`Agent configuration error: ${agentConfig.error || 'No outbound calling agent found'}`);
           }
 
           const { lead, company } = leadData;
@@ -183,11 +183,11 @@ export const callSchedulingHandler = inngest.createFunction(
 
           // Prepare call data for Retell
           const callPayload = {
-            from_number: retellConfig.config.phoneNumber,
+            from_number: agentConfig.config.phoneNumber,
             to_number: customer.phone.startsWith('+') 
               ? customer.phone 
               : `+1${customer.phone.replace(/\D/g, '')}`,
-            agent_id: retellConfig.config.agentId,
+            agent_id: agentConfig.config.agentId,
             retell_llm_dynamic_variables: {
               customer_first_name: customer.name?.split(' ')[0] || '',
               customer_last_name: customer.name?.split(' ').slice(1).join(' ') || '',
@@ -215,7 +215,7 @@ export const callSchedulingHandler = inngest.createFunction(
           const callResponse = await fetch('https://api.retellai.com/v2/create-phone-call', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${retellConfig.config.apiKey}`,
+              'Authorization': `Bearer ${agentConfig.config.apiKey}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify(callPayload)

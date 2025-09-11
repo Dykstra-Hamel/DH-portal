@@ -8,6 +8,7 @@ import TicketsTable from '@/components/Tickets/TicketsTable/TicketsTable';
 import { adminAPI } from '@/lib/api-client';
 import { Ticket } from '@/types/ticket';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 
 interface Profile {
   id: string;
@@ -29,8 +30,9 @@ export default function TicketsPage() {
   >('all');
   const router = useRouter();
 
-  // Use global company context
+  // Use global company context and date filter
   const { selectedCompany, isAdmin, isLoading: contextLoading } = useCompany();
+  const { getApiDateParams } = useDateFilter();
 
   useEffect(() => {
     const supabase = createClient();
@@ -69,18 +71,23 @@ export default function TicketsPage() {
       setTicketsLoading(true);
       try {
         let fetchedTickets: Ticket[] = [];
+        const dateParams = getApiDateParams();
 
         if (isAdmin) {
           // Admin users fetch from admin API
           fetchedTickets = await adminAPI.tickets.list({
             companyId,
             includeArchived,
+            ...dateParams,
           });
         } else {
           // Regular users fetch from standard API
-          const response = await fetch(
-            `/api/tickets?companyId=${companyId}&includeArchived=${includeArchived}`
-          );
+          const queryParams = new URLSearchParams({
+            companyId,
+            includeArchived: includeArchived.toString(),
+            ...dateParams,
+          });
+          const response = await fetch(`/api/tickets?${queryParams}`);
           if (response.ok) {
             fetchedTickets = await response.json();
           }
@@ -97,7 +104,7 @@ export default function TicketsPage() {
         setTicketsLoading(false);
       }
     },
-    [isAdmin]
+    [isAdmin, getApiDateParams]
   );
 
   useEffect(() => {
