@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { Retell } from 'retell-sdk';
 import { normalizePhoneNumber } from '@/lib/utils';
+import { findCompanyByAgentId } from '@/lib/agent-utils';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -156,39 +157,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Find company by Retell inbound agent ID
-async function findCompanyByInboundAgentId(agentId: string | undefined) {
-  if (!agentId) {
-    console.warn('No agent ID provided for company lookup');
-    return null;
-  }
-
-  const supabase = createAdminClient();
-
-  try {
-    const { data, error } = await supabase
-      .from('company_settings')
-      .select('company_id')
-      .eq('setting_key', 'retell_inbound_agent_id')
-      .eq('setting_value', agentId)
-      .single();
-
-    if (error) {
-      console.error('Company lookup failed:', error.message);
-      return null;
-    }
-
-    if (data) {
-      return data.company_id;
-    }
-
-    console.warn(`No company found for agent ID: ${agentId}`);
-    return null;
-  } catch (error) {
-    console.error('Company lookup error:', error);
-    return null;
-  }
-}
 
 // Find customer by phone number and company ID and return full customer object
 async function findCustomerByPhone(
@@ -252,7 +220,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   // Determine company from inbound agent ID
   const agentIdValue =
     agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
-  const companyId = await findCompanyByInboundAgentId(agentIdValue);
+  const companyId = await findCompanyByAgentId(agentIdValue);
 
   if (!companyId) {
     console.error(`❌ [${requestId}] No company found for agent`);

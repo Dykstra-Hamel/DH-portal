@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { getCompanyOutboundSMSRetellConfig } from '@/lib/retell-config';
+import { getDefaultAgentConfig } from '@/lib/retell-config';
+import { getSMSAgents } from '@/lib/agent-utils';
 
 export interface SMSConversationOptions {
   companyId: string;
@@ -108,16 +109,18 @@ export class SMSService {
       // Get SMS-specific Retell phone number if not provided
       let retellNumber = options.retellNumber;
       if (!retellNumber) {
-        const smsConfig = await getCompanyOutboundSMSRetellConfig(
-          options.companyId
+        const agentConfig = await getDefaultAgentConfig(
+          options.companyId,
+          'sms',
+          'outbound'
         );
-        if (smsConfig.config?.phoneNumber) {
-          retellNumber = smsConfig.config.phoneNumber;
+        if (agentConfig.config?.phoneNumber) {
+          retellNumber = agentConfig.config.phoneNumber;
         } else {
           return {
             success: false,
             error:
-              'No SMS phone number configured for this company. Please configure in Call Settings.',
+              'No outbound SMS agent with phone number configured for this company. Please configure agents in Agent Management.',
           };
         }
       }
@@ -125,16 +128,18 @@ export class SMSService {
       // Get SMS-specific agent configuration
       let finalAgentId = options.agentId;
       if (!finalAgentId) {
-        const smsConfig = await getCompanyOutboundSMSRetellConfig(
-          options.companyId
+        const agentConfig = await getDefaultAgentConfig(
+          options.companyId,
+          'sms',
+          'outbound'
         );
-        if (smsConfig.config?.agentId) {
-          finalAgentId = smsConfig.config.agentId;
+        if (agentConfig.config?.agentId) {
+          finalAgentId = agentConfig.config.agentId;
         } else {
           return {
             success: false,
             error:
-              'No SMS agent ID configured for this company. Please configure in Call Settings.',
+              'No outbound SMS agent configured for this company. Please configure agents in Agent Management.',
           };
         }
       }

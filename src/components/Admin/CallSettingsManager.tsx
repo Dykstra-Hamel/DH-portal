@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
+import AgentsManager from '@/components/Agents/AgentsManager';
 import styles from './AdminManager.module.scss';
 
 interface Company {
@@ -34,6 +35,7 @@ export default function CallSettingsManager() {
   } | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [businessHoursExpanded, setBusinessHoursExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'settings' | 'agents'>('settings');
 
   useEffect(() => {
     loadCompanies();
@@ -116,7 +118,7 @@ export default function CallSettingsManager() {
   return (
     <div className={styles.adminManager}>
       <div className={styles.header}>
-        <h2>Call Settings</h2>
+        <h2>Call Settings & Agent Management</h2>
       </div>
 
       {/* Company Dropdown */}
@@ -139,11 +141,37 @@ export default function CallSettingsManager() {
         </select>
       </div>
 
+      {/* Tabs */}
+      {selectedCompanyId && (
+        <div className={styles.tabContainer}>
+          <div className={styles.tabList}>
+            <button 
+              className={`${styles.tab} ${activeTab === 'settings' ? styles.active : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              <Settings size={16} />
+              Call Settings
+            </button>
+            <button 
+              className={`${styles.tab} ${activeTab === 'agents' ? styles.active : ''}`}
+              onClick={() => setActiveTab('agents')}
+            >
+              <Settings size={16} />
+              Agent Management
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className={styles.tabContent}>
         {!selectedCompanyId ? (
           <div className={styles.noSelection}>
-            <p>Please select a company to manage call settings.</p>
+            <p>Please select a company to manage call settings and agents.</p>
+          </div>
+        ) : activeTab === 'agents' ? (
+          <div className={styles.agentsTab}>
+            <AgentsManager companyId={selectedCompanyId} />
           </div>
         ) : loading ? (
           <div className={styles.loading}>Loading settings...</div>
@@ -157,6 +185,18 @@ export default function CallSettingsManager() {
                 {message.text}
               </div>
             )}
+
+            {/* Migration Notice */}
+            <div className={styles.migrationNotice}>
+              <h3>🎉 New Multi-Agent System</h3>
+              <p>
+                We&apos;ve upgraded to a flexible multi-agent system! You can now create unlimited Retell agents 
+                for different purposes. Use the <strong>Agent Management</strong> tab to configure your agents.
+              </p>
+              <p className={styles.noticeSubtext}>
+                The old individual agent ID fields have been replaced with the new agent management system.
+              </p>
+            </div>
 
             {/* Phone Call Automation */}
             <div className={styles.settingGroup}>
@@ -236,7 +276,7 @@ export default function CallSettingsManager() {
             <div className={styles.settingGroup}>
               <h3 className={styles.groupTitle}>Retell AI Configuration</h3>
               <p className={styles.groupDescription}>
-                Configure Retell AI settings for this company.
+                Configure your Retell AI API key and knowledge base. Individual agents are now managed in the Agent Management tab.
               </p>
 
               <div className={styles.setting}>
@@ -267,132 +307,6 @@ export default function CallSettingsManager() {
                       {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
-                </div>
-              </div>
-
-              <div className={styles.setting}>
-                <div className={styles.settingInfo}>
-                  <label htmlFor="retell-inbound-agent-id" className={styles.settingLabel}>
-                    Retell Inbound Agent ID
-                  </label>
-                  <p className={styles.settingDescription}>
-                    {settings.retell_inbound_agent_id?.description || 'Retell AI agent ID for handling inbound calls'}
-                  </p>
-                </div>
-                <div className={styles.settingControl}>
-                  <input
-                    id="retell-inbound-agent-id"
-                    type="text"
-                    value={settings.retell_inbound_agent_id?.value || ''}
-                    onChange={(e) => handleSettingChange('retell_inbound_agent_id', e.target.value)}
-                    className={styles.textInput}
-                    placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
-                  />
-                </div>
-              </div>
-
-              <div className={styles.setting}>
-                <div className={styles.settingInfo}>
-                  <label htmlFor="retell-outbound-agent-id" className={styles.settingLabel}>
-                    Retell Outbound Agent ID
-                  </label>
-                  <p className={styles.settingDescription}>
-                    {settings.retell_outbound_agent_id?.description || 'Retell AI agent ID for handling outbound calls from form submissions'}
-                  </p>
-                </div>
-                <div className={styles.settingControl}>
-                  <input
-                    id="retell-outbound-agent-id"
-                    type="text"
-                    value={settings.retell_outbound_agent_id?.value || ''}
-                    onChange={(e) => handleSettingChange('retell_outbound_agent_id', e.target.value)}
-                    className={styles.textInput}
-                    placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
-                  />
-                </div>
-              </div>
-
-              <div className={styles.setting}>
-                <div className={styles.settingInfo}>
-                  <label htmlFor="retell-inbound-sms-agent-id" className={styles.settingLabel}>
-                    Retell Inbound SMS Agent ID
-                  </label>
-                  <p className={styles.settingDescription}>
-                    {settings.retell_inbound_sms_agent_id?.description || 'Retell AI agent ID for handling inbound SMS messages'}
-                  </p>
-                </div>
-                <div className={styles.settingControl}>
-                  <input
-                    id="retell-inbound-sms-agent-id"
-                    type="text"
-                    value={settings.retell_inbound_sms_agent_id?.value || ''}
-                    onChange={(e) => handleSettingChange('retell_inbound_sms_agent_id', e.target.value)}
-                    className={styles.textInput}
-                    placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
-                  />
-                </div>
-              </div>
-
-              <div className={styles.setting}>
-                <div className={styles.settingInfo}>
-                  <label htmlFor="retell-outbound-sms-agent-id" className={styles.settingLabel}>
-                    Retell Outbound SMS Agent ID
-                  </label>
-                  <p className={styles.settingDescription}>
-                    {settings.retell_outbound_sms_agent_id?.description || 'Retell AI agent ID for handling outbound SMS messages from automations'}
-                  </p>
-                </div>
-                <div className={styles.settingControl}>
-                  <input
-                    id="retell-outbound-sms-agent-id"
-                    type="text"
-                    value={settings.retell_outbound_sms_agent_id?.value || ''}
-                    onChange={(e) => handleSettingChange('retell_outbound_sms_agent_id', e.target.value)}
-                    className={styles.textInput}
-                    placeholder="agent_xxxxxxxxxxxxxxxxxxxxxxxx"
-                  />
-                </div>
-              </div>
-
-              <div className={styles.setting}>
-                <div className={styles.settingInfo}>
-                  <label htmlFor="retell-phone-number" className={styles.settingLabel}>
-                    Retell Phone Number
-                  </label>
-                  <p className={styles.settingDescription}>
-                    {settings.retell_phone_number?.description || 'Phone number to use for Retell AI calls from this company'}
-                  </p>
-                </div>
-                <div className={styles.settingControl}>
-                  <input
-                    id="retell-phone-number"
-                    type="tel"
-                    value={settings.retell_phone_number?.value || ''}
-                    onChange={(e) => handleSettingChange('retell_phone_number', e.target.value)}
-                    className={styles.textInput}
-                    placeholder="+12074197718"
-                  />
-                </div>
-              </div>
-
-              <div className={styles.setting}>
-                <div className={styles.settingInfo}>
-                  <label htmlFor="retell-sms-phone-number" className={styles.settingLabel}>
-                    Retell SMS Phone Number
-                  </label>
-                  <p className={styles.settingDescription}>
-                    {settings.retell_sms_phone_number?.description || 'Phone number specifically for SMS messages (optional - falls back to main phone number if not set)'}
-                  </p>
-                </div>
-                <div className={styles.settingControl}>
-                  <input
-                    id="retell-sms-phone-number"
-                    type="tel"
-                    value={settings.retell_sms_phone_number?.value || ''}
-                    onChange={(e) => handleSettingChange('retell_sms_phone_number', e.target.value)}
-                    className={styles.textInput}
-                    placeholder="+15202241234 (SMS-specific number)"
-                  />
                 </div>
               </div>
 

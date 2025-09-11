@@ -461,7 +461,6 @@
 
 .adminManager {
   padding: 1.5rem;
-  width: 1600px;
   max-width: 95vw;
   margin: 0 auto;
 
@@ -582,6 +581,17 @@
 // Tab Content Styles
 .tabContent {
   min-height: 400px;
+  max-height: calc(100vh - 200px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.agentsTab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .noSelection {

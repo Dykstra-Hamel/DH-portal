@@ -1,4 +1,163 @@
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { getCompanyAgents, getDefaultAgent } from '@/lib/agent-utils';
+import { Agent, AgentConfig, AgentConfigResult } from '@/types/agent';
+
+/**
+ * NEW MULTI-AGENT CONFIGURATION FUNCTIONS
+ * These functions work with the new agents table system
+ */
+
+/**
+ * Gets all agents for a company with their configuration data
+ */
+export async function getCompanyAgentConfigs(
+  companyId: string, 
+  agentType?: 'calling' | 'sms' | 'web_agent',
+  agentDirection?: 'inbound' | 'outbound'
+): Promise<{ agents: Agent[]; apiKey?: string; error?: string }> {
+  try {
+    const supabase = createAdminClient();
+
+    // Get all agents matching the criteria
+    const agents = await getCompanyAgents(companyId, {
+      agent_type: agentType,
+      agent_direction: agentDirection,
+      is_active: true
+    });
+
+    if (agents.length === 0) {
+      return {
+        agents: [],
+        error: `No ${agentDirection || ''} ${agentType || ''} agents found for company`
+      };
+    }
+
+    // Get the Retell API key from company settings
+    const { data: apiKeySetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'retell_api_key')
+      .single();
+
+    if (!apiKeySetting?.setting_value) {
+      return {
+        agents,
+        error: 'Retell API key not configured for company'
+      };
+    }
+
+    return {
+      agents,
+      apiKey: apiKeySetting.setting_value
+    };
+  } catch (error) {
+    console.error('Error fetching company agent configurations:', error);
+    return {
+      agents: [],
+      error: 'Failed to load agent configurations'
+    };
+  }
+}
+
+/**
+ * Gets a specific agent configuration by agent ID
+ */
+export async function getAgentConfig(
+  companyId: string,
+  agentId: string
+): Promise<AgentConfigResult> {
+  try {
+    const supabase = createAdminClient();
+
+    // Get the specific agent
+    const { data: agent, error: agentError } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('agent_id', agentId)
+      .eq('is_active', true)
+      .single();
+
+    if (agentError || !agent) {
+      return {
+        error: 'Agent not found or inactive'
+      };
+    }
+
+    // Get the Retell API key
+    const { data: apiKeySetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'retell_api_key')
+      .single();
+
+    if (!apiKeySetting?.setting_value) {
+      return {
+        error: 'Retell API key not configured',
+        missingSettings: ['retell_api_key']
+      };
+    }
+
+    const config: AgentConfig = {
+      apiKey: apiKeySetting.setting_value,
+      agentId: agent.agent_id,
+      phoneNumber: agent.phone_number || undefined
+    };
+
+    // Get knowledge base ID from company settings if available
+    const { data: knowledgeBaseSetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'retell_knowledge_base_id')
+      .single();
+
+    if (knowledgeBaseSetting?.setting_value) {
+      config.knowledgeBaseId = knowledgeBaseSetting.setting_value;
+    }
+
+    return { config };
+  } catch (error) {
+    console.error('Error fetching agent configuration:', error);
+    return {
+      error: 'Failed to load agent configuration'
+    };
+  }
+}
+
+/**
+ * Gets the default agent configuration for a specific type and direction
+ */
+export async function getDefaultAgentConfig(
+  companyId: string,
+  agentType: 'calling' | 'sms' | 'web_agent',
+  agentDirection: 'inbound' | 'outbound'
+): Promise<AgentConfigResult> {
+  try {
+    const agent = await getDefaultAgent(companyId, agentType, agentDirection);
+    
+    if (!agent) {
+      return {
+        error: `No ${agentDirection} ${agentType} agent found for company`,
+        missingSettings: [`${agentDirection}_${agentType}_agent`]
+      };
+    }
+
+    return await getAgentConfig(companyId, agent.agent_id);
+  } catch (error) {
+    console.error('Error fetching default agent configuration:', error);
+    return {
+      error: 'Failed to load default agent configuration'
+    };
+  }
+}
+
+/**
+ * LEGACY COMPATIBILITY FUNCTIONS
+ * These maintain backward compatibility with existing code
+ */
 
 export interface RetellConfig {
   apiKey: string;
@@ -14,366 +173,128 @@ export interface RetellConfigResult {
 }
 
 /**
- * Retrieves company-specific Retell settings from the database (legacy function, uses retell_agent_id)
+ * Legacy function - gets first available agent (for backward compatibility)
+ * @deprecated Use getDefaultAgentConfig instead
  */
 export async function getCompanyRetellConfig(companyId: string): Promise<RetellConfigResult> {
-  try {
-    const supabase = createAdminClient();
-
-    const { data: settings, error } = await supabase
-      .from('company_settings')
-      .select('setting_key, setting_value')
-      .eq('company_id', companyId)
-      .in('setting_key', [
-        'retell_api_key',
-        'retell_agent_id', 
-        'retell_phone_number',
-        'retell_knowledge_base_id'
-      ]);
-
-    if (error) {
-      console.error('Failed to fetch company Retell settings:', error);
-      return { error: 'Failed to load company configuration' };
-    }
-
-    if (!settings || settings.length === 0) {
-      return { 
-        error: 'No Retell configuration found for this company',
-        missingSettings: ['retell_api_key', 'retell_agent_id', 'retell_phone_number']
-      };
-    }
-
-    // Convert array to key-value map
-    const settingsMap = settings.reduce((acc, setting) => {
-      acc[setting.setting_key] = setting.setting_value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    // Check for required settings
-    const requiredSettings = ['retell_api_key', 'retell_agent_id', 'retell_phone_number'];
-    const missingSettings = requiredSettings.filter(key => !settingsMap[key] || settingsMap[key].trim() === '');
-
-    if (missingSettings.length > 0) {
-      return {
-        error: 'Incomplete Retell configuration for this company',
-        missingSettings
-      };
-    }
-
+  const result = await getDefaultAgentConfig(companyId, 'calling', 'inbound');
+  
+  if (result.error || !result.config) {
     return {
-      config: {
-        apiKey: settingsMap.retell_api_key,
-        agentId: settingsMap.retell_agent_id,
-        phoneNumber: settingsMap.retell_phone_number,
-        knowledgeBaseId: settingsMap.retell_knowledge_base_id || undefined
-      }
+      error: result.error || 'No configuration found',
+      missingSettings: result.missingSettings
     };
-  } catch (error) {
-    console.error('Error fetching company Retell configuration:', error);
-    return { error: 'An unexpected error occurred while loading configuration' };
   }
+
+  // Convert to legacy format
+  return {
+    config: {
+      apiKey: result.config.apiKey,
+      agentId: result.config.agentId,
+      phoneNumber: result.config.phoneNumber || '',
+      knowledgeBaseId: result.config.knowledgeBaseId
+    }
+  };
 }
 
 /**
- * Retrieves company-specific Retell outbound settings from the database
+ * Legacy function - gets outbound calling agent
+ * @deprecated Use getDefaultAgentConfig instead
  */
 export async function getCompanyOutboundRetellConfig(companyId: string): Promise<RetellConfigResult> {
-  try {
-    const supabase = createAdminClient();
-
-    const { data: settings, error } = await supabase
-      .from('company_settings')
-      .select('setting_key, setting_value')
-      .eq('company_id', companyId)
-      .in('setting_key', [
-        'retell_api_key',
-        'retell_outbound_agent_id',
-        'retell_agent_id', // Fallback for backward compatibility
-        'retell_phone_number',
-        'retell_knowledge_base_id'
-      ]);
-
-    if (error) {
-      console.error('Failed to fetch company outbound Retell settings:', error);
-      return { error: 'Failed to load company configuration' };
-    }
-
-    if (!settings || settings.length === 0) {
-      return { 
-        error: 'No Retell configuration found for this company',
-        missingSettings: ['retell_api_key', 'retell_outbound_agent_id', 'retell_phone_number']
-      };
-    }
-
-    // Convert array to key-value map
-    const settingsMap = settings.reduce((acc, setting) => {
-      acc[setting.setting_key] = setting.setting_value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    // Use outbound agent ID if available, fallback to legacy agent ID
-    const agentId = settingsMap.retell_outbound_agent_id || settingsMap.retell_agent_id;
-
-    // Check for required settings
-    const requiredSettings = ['retell_api_key', 'retell_phone_number'];
-    const missingSettings = requiredSettings.filter(key => !settingsMap[key] || settingsMap[key].trim() === '');
-    
-    if (!agentId || agentId.trim() === '') {
-      missingSettings.push('retell_outbound_agent_id');
-    }
-
-    if (missingSettings.length > 0) {
-      return {
-        error: 'Incomplete Retell outbound configuration for this company',
-        missingSettings
-      };
-    }
-
+  const result = await getDefaultAgentConfig(companyId, 'calling', 'outbound');
+  
+  if (result.error || !result.config) {
     return {
-      config: {
-        apiKey: settingsMap.retell_api_key,
-        agentId: agentId,
-        phoneNumber: settingsMap.retell_phone_number,
-        knowledgeBaseId: settingsMap.retell_knowledge_base_id || undefined
-      }
+      error: result.error || 'No outbound configuration found',
+      missingSettings: result.missingSettings
     };
-  } catch (error) {
-    console.error('Error fetching company outbound Retell configuration:', error);
-    return { error: 'An unexpected error occurred while loading configuration' };
   }
+
+  return {
+    config: {
+      apiKey: result.config.apiKey,
+      agentId: result.config.agentId,
+      phoneNumber: result.config.phoneNumber || '',
+      knowledgeBaseId: result.config.knowledgeBaseId
+    }
+  };
 }
 
 /**
- * Retrieves company-specific Retell inbound settings from the database
+ * Legacy function - gets inbound calling agent
+ * @deprecated Use getDefaultAgentConfig instead
  */
 export async function getCompanyInboundRetellConfig(companyId: string): Promise<RetellConfigResult> {
-  try {
-    const supabase = createAdminClient();
-
-    const { data: settings, error } = await supabase
-      .from('company_settings')
-      .select('setting_key, setting_value')
-      .eq('company_id', companyId)
-      .in('setting_key', [
-        'retell_api_key',
-        'retell_inbound_agent_id',
-        'retell_agent_id', // Fallback for backward compatibility
-        'retell_phone_number',
-        'retell_knowledge_base_id'
-      ]);
-
-    if (error) {
-      console.error('Failed to fetch company inbound Retell settings:', error);
-      return { error: 'Failed to load company configuration' };
-    }
-
-    if (!settings || settings.length === 0) {
-      return { 
-        error: 'No Retell configuration found for this company',
-        missingSettings: ['retell_api_key', 'retell_inbound_agent_id', 'retell_phone_number']
-      };
-    }
-
-    // Convert array to key-value map
-    const settingsMap = settings.reduce((acc, setting) => {
-      acc[setting.setting_key] = setting.setting_value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    // Use inbound agent ID if available, fallback to legacy agent ID
-    const agentId = settingsMap.retell_inbound_agent_id || settingsMap.retell_agent_id;
-
-    // Check for required settings
-    const requiredSettings = ['retell_api_key', 'retell_phone_number'];
-    const missingSettings = requiredSettings.filter(key => !settingsMap[key] || settingsMap[key].trim() === '');
-    
-    if (!agentId || agentId.trim() === '') {
-      missingSettings.push('retell_inbound_agent_id');
-    }
-
-    if (missingSettings.length > 0) {
-      return {
-        error: 'Incomplete Retell inbound configuration for this company',
-        missingSettings
-      };
-    }
-
+  const result = await getDefaultAgentConfig(companyId, 'calling', 'inbound');
+  
+  if (result.error || !result.config) {
     return {
-      config: {
-        apiKey: settingsMap.retell_api_key,
-        agentId: agentId,
-        phoneNumber: settingsMap.retell_phone_number,
-        knowledgeBaseId: settingsMap.retell_knowledge_base_id || undefined
-      }
+      error: result.error || 'No inbound configuration found',
+      missingSettings: result.missingSettings
     };
-  } catch (error) {
-    console.error('Error fetching company inbound Retell configuration:', error);
-    return { error: 'An unexpected error occurred while loading configuration' };
   }
+
+  return {
+    config: {
+      apiKey: result.config.apiKey,
+      agentId: result.config.agentId,
+      phoneNumber: result.config.phoneNumber || '',
+      knowledgeBaseId: result.config.knowledgeBaseId
+    }
+  };
 }
 
 /**
- * Retrieves company-specific Retell inbound SMS settings from the database
+ * Legacy function - gets inbound SMS agent
+ * @deprecated Use getDefaultAgentConfig instead
  */
 export async function getCompanyInboundSMSRetellConfig(companyId: string): Promise<RetellConfigResult> {
-  try {
-    const supabase = createAdminClient();
-
-    const { data: settings, error } = await supabase
-      .from('company_settings')
-      .select('setting_key, setting_value')
-      .eq('company_id', companyId)
-      .in('setting_key', [
-        'retell_api_key',
-        'retell_inbound_sms_agent_id',
-        'retell_inbound_agent_id', // Fallback to voice inbound agent
-        'retell_agent_id', // Legacy fallback
-        'retell_sms_phone_number', // SMS-specific phone number
-        'retell_phone_number', // Fallback to main phone number
-        'retell_knowledge_base_id'
-      ]);
-
-    if (error) {
-      console.error('Failed to fetch company inbound SMS Retell settings:', error);
-      return { error: 'Failed to load company SMS configuration' };
-    }
-
-    if (!settings || settings.length === 0) {
-      return { 
-        error: 'No Retell SMS configuration found for this company',
-        missingSettings: ['retell_api_key', 'retell_inbound_sms_agent_id', 'retell_phone_number']
-      };
-    }
-
-    // Convert array to key-value map
-    const settingsMap = settings.reduce((acc, setting) => {
-      acc[setting.setting_key] = setting.setting_value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    // Use SMS-specific agent ID if available, fallback to voice agent IDs
-    const agentId = settingsMap.retell_inbound_sms_agent_id || 
-                   settingsMap.retell_inbound_agent_id || 
-                   settingsMap.retell_agent_id;
-
-    // Use SMS-specific phone number if available, fallback to main phone number
-    const phoneNumber = settingsMap.retell_sms_phone_number || settingsMap.retell_phone_number;
-
-    // Check for required settings
-    const requiredSettings = ['retell_api_key'];
-    const missingSettings = requiredSettings.filter(key => !settingsMap[key] || settingsMap[key].trim() === '');
-    
-    if (!phoneNumber || phoneNumber.trim() === '') {
-      missingSettings.push('retell_sms_phone_number');
-    }
-    
-    if (!agentId || agentId.trim() === '') {
-      missingSettings.push('retell_inbound_sms_agent_id');
-    }
-
-    if (missingSettings.length > 0) {
-      return {
-        error: 'Incomplete Retell inbound SMS configuration for this company',
-        missingSettings
-      };
-    }
-
+  const result = await getDefaultAgentConfig(companyId, 'sms', 'inbound');
+  
+  if (result.error || !result.config) {
     return {
-      config: {
-        apiKey: settingsMap.retell_api_key,
-        agentId: agentId,
-        phoneNumber: phoneNumber,
-        knowledgeBaseId: settingsMap.retell_knowledge_base_id || undefined
-      }
+      error: result.error || 'No inbound SMS configuration found',
+      missingSettings: result.missingSettings
     };
-  } catch (error) {
-    console.error('Error fetching company inbound SMS Retell configuration:', error);
-    return { error: 'An unexpected error occurred while loading SMS configuration' };
   }
+
+  return {
+    config: {
+      apiKey: result.config.apiKey,
+      agentId: result.config.agentId,
+      phoneNumber: result.config.phoneNumber || '',
+      knowledgeBaseId: result.config.knowledgeBaseId
+    }
+  };
 }
 
 /**
- * Retrieves company-specific Retell outbound SMS settings from the database
+ * Legacy function - gets outbound SMS agent
+ * @deprecated Use getDefaultAgentConfig instead
  */
 export async function getCompanyOutboundSMSRetellConfig(companyId: string): Promise<RetellConfigResult> {
-  try {
-    const supabase = createAdminClient();
-
-    const { data: settings, error } = await supabase
-      .from('company_settings')
-      .select('setting_key, setting_value')
-      .eq('company_id', companyId)
-      .in('setting_key', [
-        'retell_api_key',
-        'retell_outbound_sms_agent_id',
-        'retell_outbound_agent_id', // Fallback to voice outbound agent
-        'retell_agent_id', // Legacy fallback
-        'retell_sms_phone_number', // SMS-specific phone number
-        'retell_phone_number', // Fallback to main phone number
-        'retell_knowledge_base_id'
-      ]);
-
-    if (error) {
-      console.error('Failed to fetch company outbound SMS Retell settings:', error);
-      return { error: 'Failed to load company SMS configuration' };
-    }
-
-    if (!settings || settings.length === 0) {
-      return { 
-        error: 'No Retell SMS configuration found for this company',
-        missingSettings: ['retell_api_key', 'retell_outbound_sms_agent_id', 'retell_phone_number']
-      };
-    }
-
-    // Convert array to key-value map
-    const settingsMap = settings.reduce((acc, setting) => {
-      acc[setting.setting_key] = setting.setting_value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    // Use SMS-specific agent ID if available, fallback to voice agent IDs
-    const agentId = settingsMap.retell_outbound_sms_agent_id || 
-                   settingsMap.retell_outbound_agent_id || 
-                   settingsMap.retell_agent_id;
-
-    // Use SMS-specific phone number if available, fallback to main phone number
-    const phoneNumber = settingsMap.retell_sms_phone_number || settingsMap.retell_phone_number;
-
-    // Check for required settings
-    const requiredSettings = ['retell_api_key'];
-    const missingSettings = requiredSettings.filter(key => !settingsMap[key] || settingsMap[key].trim() === '');
-    
-    if (!phoneNumber || phoneNumber.trim() === '') {
-      missingSettings.push('retell_sms_phone_number');
-    }
-    
-    if (!agentId || agentId.trim() === '') {
-      missingSettings.push('retell_outbound_sms_agent_id');
-    }
-
-    if (missingSettings.length > 0) {
-      return {
-        error: 'Incomplete Retell outbound SMS configuration for this company',
-        missingSettings
-      };
-    }
-
+  const result = await getDefaultAgentConfig(companyId, 'sms', 'outbound');
+  
+  if (result.error || !result.config) {
     return {
-      config: {
-        apiKey: settingsMap.retell_api_key,
-        agentId: agentId,
-        phoneNumber: phoneNumber,
-        knowledgeBaseId: settingsMap.retell_knowledge_base_id || undefined
-      }
+      error: result.error || 'No outbound SMS configuration found',
+      missingSettings: result.missingSettings
     };
-  } catch (error) {
-    console.error('Error fetching company outbound SMS Retell configuration:', error);
-    return { error: 'An unexpected error occurred while loading SMS configuration' };
   }
+
+  return {
+    config: {
+      apiKey: result.config.apiKey,
+      agentId: result.config.agentId,
+      phoneNumber: result.config.phoneNumber || '',
+      knowledgeBaseId: result.config.knowledgeBaseId
+    }
+  };
 }
 
 /**
- * Validates if all required Retell settings are configured for a company
+ * Validates if required Retell settings are configured for a company
  */
 export async function validateRetellConfig(companyId: string): Promise<{
   isValid: boolean;
@@ -402,7 +323,7 @@ export function logRetellConfigError(companyId: string, error: string, missingSe
   if (missingSettings && missingSettings.length > 0) {
     console.error(errorMessage, {
       missingSettings,
-      requiredAction: 'Configure missing settings in Company Call Settings'
+      requiredAction: 'Configure agents in Agent Management or check API key in Company Settings'
     });
   } else {
     console.error(errorMessage);

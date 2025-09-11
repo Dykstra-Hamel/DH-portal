@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { Retell } from 'retell-sdk';
+import { findCompanyByAgentId } from '@/lib/agent-utils';
 
 // Simple rate limiting store (in production, use Redis or similar)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
@@ -93,18 +94,9 @@ export async function POST(request: NextRequest) {
     // Determine company from agent_id or to_number
     let companyId = null;
     
-    // First try to find company by agent_id (inbound agent)
+    // First try to find company by agent_id
     if (agent_id) {
-      const { data: agentCompany } = await supabase
-        .from('company_settings')
-        .select('company_id')
-        .eq('setting_key', 'retell_inbound_agent_id')
-        .eq('setting_value', agent_id)
-        .single();
-      
-      if (agentCompany) {
-        companyId = agentCompany.company_id;
-      }
+      companyId = await findCompanyByAgentId(agent_id);
     }
     
     // If no company found by agent_id, try to find by phone number mapping

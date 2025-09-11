@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { findCompanyByAgentId } from '@/lib/agent-utils';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(durationSeconds: number | null): number | null {
@@ -146,7 +147,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
   } else {
     // Fallback: try to determine company from agent ID and find lead
     const agentIdValue = agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
-    companyId = await findCompanyByOutboundAgentId(agentIdValue);
+    companyId = await findCompanyByAgentId(agentIdValue);
 
     if (!companyId) {
       console.error('Retell Outbound Webhook: No company found for outbound agent ID:', agentIdValue);
@@ -701,47 +702,6 @@ async function findCustomerByPhone(phoneNumber: string | undefined) {
   return null;
 }
 
-// Find company by Retell outbound agent ID
-async function findCompanyByOutboundAgentId(agentId: string | undefined) {
-  if (!agentId) {
-    console.warn('findCompanyByOutboundAgentId: No agent ID provided');
-    return null;
-  }
-
-  const supabase = createAdminClient();
-
-  try {
-    // First try to find by specific outbound agent ID
-    const { data, error } = await supabase
-      .from('company_settings')
-      .select('company_id')
-      .eq('setting_key', 'retell_outbound_agent_id')
-      .eq('setting_value', agentId)
-      .single();
-
-    if (data && !error) {
-      return data.company_id;
-    }
-
-    // Fallback to legacy retell_agent_id for backward compatibility
-    const { data: legacyData, error: legacyError } = await supabase
-      .from('company_settings')
-      .select('company_id')
-      .eq('setting_key', 'retell_agent_id')
-      .eq('setting_value', agentId)
-      .single();
-
-    if (legacyData && !legacyError) {
-      return legacyData.company_id;
-    }
-
-    console.warn('findCompanyByOutboundAgentId: No company found for outbound agent ID:', agentId);
-    return null;
-  } catch (error) {
-    console.error('findCompanyByOutboundAgentId: Error:', error);
-    return null;
-  }
-}
 
 function extractCallData(
   dynamicVariables: any,

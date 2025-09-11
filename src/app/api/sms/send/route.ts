@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { getCompanyOutboundSMSRetellConfig } from '@/lib/retell-config';
+import { getDefaultAgentConfig } from '@/lib/retell-config';
 import { smsService } from '@/lib/sms-service';
 
 interface SMSSendRequest {
@@ -63,27 +63,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get SMS-specific Retell configuration
-    const smsConfig = await getCompanyOutboundSMSRetellConfig(companyId);
+    // Get outbound SMS agent configuration
+    const agentConfig = await getDefaultAgentConfig(companyId, 'sms', 'outbound');
 
-    if (smsConfig.error) {
+    if (agentConfig.error) {
       return NextResponse.json(
         {
           success: false,
-          error: smsConfig.error,
-          missingSettings: smsConfig.missingSettings,
+          error: agentConfig.error,
+          missingSettings: agentConfig.missingSettings,
         },
         { status: 400 }
       );
     }
 
-    // Use provided values or fallback to configuration
-    const finalRetellNumber = retellNumber || smsConfig.config?.phoneNumber;
+    // Use provided values or fallback to agent configuration
+    const finalRetellNumber = retellNumber || agentConfig.config?.phoneNumber;
     let finalAgentId = agentId;
 
-    // If no agent ID provided, use SMS-specific agent from configuration
-    if (!finalAgentId && smsConfig.config?.agentId) {
-      finalAgentId = smsConfig.config.agentId;
+    // If no agent ID provided, use outbound SMS agent from configuration
+    if (!finalAgentId && agentConfig.config?.agentId) {
+      finalAgentId = agentConfig.config.agentId;
     }
 
     if (!finalRetellNumber) {
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            'No Retell phone number configured for SMS. Please configure in Call Settings.',
+            'No Retell phone number configured for SMS. Please configure an outbound SMS agent in Agent Management.',
         },
         { status: 400 }
       );
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            'No SMS agent ID configured for this company. Please configure in Call Settings.',
+            'No SMS agent ID configured for this company. Please configure an outbound SMS agent in Agent Management.',
         },
         { status: 400 }
       );
