@@ -2,7 +2,6 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import Image from 'next/image';
 import Auth from '@/components/Auth/Auth';
 
 function LoginContent() {
@@ -35,21 +34,10 @@ function LoginContent() {
 
 export default function Login() {
   return (
-    <div className="pageWrapper">
-      <main className="main">
-        {/* <Image
-          className={styles.logo}
-          src="/icon-192x192.png"
-          alt="DH Portal logo"
-          width={150}
-          height={150}
-          priority
-        /> */}
-
-        <Suspense fallback={<div>Loading...</div>}>
-          <LoginContent />
-        </Suspense>
-      </main>
-    </div>
+    <main className="main">
+      <Suspense fallback={<div>Loading...</div>}>
+        <LoginContent />
+      </Suspense>
+    </main>
   );
 }

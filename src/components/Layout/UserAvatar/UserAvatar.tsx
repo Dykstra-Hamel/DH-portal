@@ -26,9 +26,11 @@ export function UserAvatar() {
   useEffect(() => {
     const fetchUserData = async () => {
       const supabase = createClient();
-      
+
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         setUser(user);
 
         if (user) {
@@ -68,7 +70,7 @@ export function UserAvatar() {
 
   const handleDropdownAction = (action: string) => {
     setShowDropdown(false);
-    
+
     switch (action) {
       case 'profile':
         // Navigate to profile page when implemented
@@ -104,10 +106,10 @@ export function UserAvatar() {
     if (avatarError) {
       return null;
     }
-    
+
     // Get avatar from user metadata (always fresh from OAuth provider)
     let avatarUrl = null;
-    
+
     if (user?.user_metadata?.avatar_url) {
       avatarUrl = user.user_metadata.avatar_url;
     }
@@ -119,13 +121,13 @@ export function UserAvatar() {
     else if (user?.user_metadata?.profile_image) {
       avatarUrl = user.user_metadata.profile_image;
     }
-    
+
     // Temporarily disable Google avatars due to rate limiting
     // TODO: Remove this after implementing proper avatar caching/proxy
     if (avatarUrl && avatarUrl.includes('googleusercontent.com')) {
       return null;
     }
-    
+
     return avatarUrl;
   };
 
@@ -171,8 +173,8 @@ export function UserAvatar() {
       >
         <div className={styles.avatar}>
           {getAvatarUrl() ? (
-            <img 
-              src={getAvatarUrl()!} 
+            <img
+              src={getAvatarUrl()!}
               alt={getDisplayName()}
               className={styles.avatarImage}
               onError={handleAvatarError}
@@ -181,17 +183,15 @@ export function UserAvatar() {
               loading="lazy"
             />
           ) : (
-            <span className={styles.avatarInitials}>
-              {getInitials()}
-            </span>
+            <span className={styles.avatarInitials}>{getInitials()}</span>
           )}
         </div>
       </button>
 
       {showDropdown && (
         <>
-          <div 
-            className={styles.backdrop} 
+          <div
+            className={styles.backdrop}
             onClick={() => setShowDropdown(false)}
           />
           <div className={styles.userDropdown}>
@@ -199,8 +199,8 @@ export function UserAvatar() {
               <div className={styles.userInfo}>
                 <div className={styles.avatarLarge}>
                   {getAvatarUrl() ? (
-                    <img 
-                      src={getAvatarUrl()!} 
+                    <img
+                      src={getAvatarUrl()!}
                       alt={getDisplayName()}
                       className={styles.avatarImageLarge}
                       onError={handleAvatarError}
@@ -215,15 +215,9 @@ export function UserAvatar() {
                   )}
                 </div>
                 <div className={styles.userDetails}>
-                  <p className={styles.userName}>
-                    {getDisplayName()}
-                  </p>
-                  <p className={styles.userEmail}>
-                    {user?.email}
-                  </p>
-                  <span className={styles.userRole}>
-                    {getUserRole()}
-                  </span>
+                  <p className={styles.userName}>{getDisplayName()}</p>
+                  <p className={styles.userEmail}>{user?.email}</p>
+                  <span className={styles.userRole}>{getUserRole()}</span>
                 </div>
               </div>
             </div>
@@ -236,23 +230,25 @@ export function UserAvatar() {
                 <User size={16} />
                 <span>Profile</span>
               </button>
-              
-              <button
-                className={styles.dropdownItem}
-                onClick={() => handleDropdownAction('settings')}
-              >
-                <Settings size={16} />
-                <span>Settings</span>
-              </button>
 
               {isAdmin && (
-                <button
-                  className={styles.dropdownItem}
-                  onClick={() => handleDropdownAction('admin')}
-                >
-                  <Shield size={16} />
-                  <span>Admin Dashboard</span>
-                </button>
+                <>
+                  <button
+                    className={styles.dropdownItem}
+                    onClick={() => handleDropdownAction('settings')}
+                  >
+                    <Settings size={16} />
+                    <span>Settings</span>
+                  </button>
+
+                  <button
+                    className={styles.dropdownItem}
+                    onClick={() => handleDropdownAction('admin')}
+                  >
+                    <Shield size={16} />
+                    <span>Admin Dashboard</span>
+                  </button>
+                </>
               )}
 
               <hr className={styles.dropdownDivider} />
