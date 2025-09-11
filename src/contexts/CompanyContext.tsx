@@ -96,15 +96,20 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
       const companies = await adminAPI.getCompanies();
       setAvailableCompanies(companies || []);
       
-      // For admins, default to "All Companies" (null)
+      // Set default selected company for admins
       const storedCompanyId = localStorage.getItem(SELECTED_COMPANY_STORAGE_KEY);
+      let defaultCompany: Company | null = null;
+
       if (storedCompanyId && companies) {
-        const storedCompany = companies.find((c: Company) => c.id === storedCompanyId);
-        if (storedCompany) {
-          setSelectedCompanyState(storedCompany);
-        }
+        defaultCompany = companies.find((c: Company) => c.id === storedCompanyId) || null;
       }
-      // If no stored selection or company not found, stay with null (All Companies)
+
+      // If no stored selection or company not found, use first company in list
+      if (!defaultCompany && companies && companies.length > 0) {
+        defaultCompany = companies[0];
+      }
+
+      setSelectedCompanyState(defaultCompany);
     } catch (error) {
       console.error('Error loading all companies:', error);
       setAvailableCompanies([]);

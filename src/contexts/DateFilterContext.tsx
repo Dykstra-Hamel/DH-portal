@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 
 export type DateFilterOption = 'Past 7 Days' | 'Past 30 Days' | 'Past 90 Days' | 'All Time';
 
@@ -41,7 +41,7 @@ export function DateFilterProvider({ children }: DateFilterProviderProps) {
     localStorage.setItem(DATE_FILTER_STORAGE_KEY, filter);
   };
 
-  const getDateRange = (): DateRange => {
+  const getDateRange = useCallback((): DateRange => {
     const endDate = new Date();
     let startDate: Date | null = null;
 
@@ -64,9 +64,9 @@ export function DateFilterProvider({ children }: DateFilterProviderProps) {
     }
 
     return { startDate, endDate };
-  };
+  }, [selectedFilter]);
 
-  const getDaysCount = (): number | null => {
+  const getDaysCount = useCallback((): number | null => {
     switch (selectedFilter) {
       case 'Past 7 Days':
         return 7;
@@ -77,9 +77,9 @@ export function DateFilterProvider({ children }: DateFilterProviderProps) {
       case 'All Time':
         return null; // Unlimited
     }
-  };
+  }, [selectedFilter]);
 
-  const getApiDateParams = (): { dateFrom?: string; dateTo?: string } => {
+  const getApiDateParams = useCallback((): { dateFrom?: string; dateTo?: string } => {
     const { startDate, endDate } = getDateRange();
     
     if (!startDate) {
@@ -91,15 +91,15 @@ export function DateFilterProvider({ children }: DateFilterProviderProps) {
       dateFrom: startDate.toISOString().split('T')[0], // YYYY-MM-DD format
       dateTo: endDate.toISOString().split('T')[0],
     };
-  };
+  }, [getDateRange]);
 
-  const value: DateFilterContextType = {
+  const value = useMemo((): DateFilterContextType => ({
     selectedFilter,
     setSelectedFilter,
     getDateRange,
     getDaysCount,
     getApiDateParams,
-  };
+  }), [selectedFilter, setSelectedFilter, getDateRange, getDaysCount, getApiDateParams]);
 
   return (
     <DateFilterContext.Provider value={value}>

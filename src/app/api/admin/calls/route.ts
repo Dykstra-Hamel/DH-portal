@@ -12,14 +12,11 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Get optional filters from query params
+    // Get company filter from query params (but NOT date filters)
     const url = new URL(request.url);
     const companyIdFilter = url.searchParams.get('companyId');
-    const dateFrom = url.searchParams.get('dateFrom');
-    const dateTo = url.searchParams.get('dateTo');
 
-    // Build the query with date filtering
-    let query = supabase
+    const { data: calls, error } = await supabase
       .from('call_records')
       .select(
         `
@@ -43,19 +40,8 @@ export async function GET(request: NextRequest) {
           company_id
         )
       `
-      );
-
-    // Apply date filtering if provided
-    if (dateFrom) {
-      query = query.gte('created_at', dateFrom);
-    }
-    if (dateTo) {
-      query = query.lte('created_at', dateTo);
-    }
-
-    query = query.order('created_at', { ascending: false });
-
-    const { data: calls, error } = await query;
+      )
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching calls:', error);
@@ -65,10 +51,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Filter calls by company if specified
+    // Filter calls by company if specified (but no date filtering)
     let filteredCalls = calls || [];
     
-    if (companyIdFilter && companyIdFilter !== 'all') {
+    if (companyIdFilter) {
       filteredCalls = filteredCalls.filter(call => {
         const leadCompanyId = call.leads?.company_id;
         const customerCompanyId = call.customers?.company_id;

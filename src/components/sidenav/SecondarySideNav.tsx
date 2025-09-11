@@ -91,10 +91,10 @@ export function SecondarySideNav({
           ? adminAPI.getProjects({ companyId, ...dateParams })
           : adminAPI.getUserProjects(companyId),
         
-        // Fetch calls (with date filter)
+        // Fetch calls (NO date filter - always show total count)
         isAdmin 
-          ? adminAPI.getAllCalls({ companyId, ...dateParams })
-          : adminAPI.getUserCalls({ companyId, ...dateParams }),
+          ? adminAPI.getAllCalls({ companyId })
+          : adminAPI.getUserCalls({ companyId }),
       ]);
 
       setCounts({
@@ -112,12 +112,12 @@ export function SecondarySideNav({
     }
   }, [isAdmin, getApiDateParams]);
 
-  // Fetch counts when company changes
+  // Fetch counts when company changes or date filter changes
   useEffect(() => {
     if (selectedCompany?.id && isHydrated) {
       fetchCounts(selectedCompany.id);
     }
-  }, [selectedCompany?.id, isHydrated, isAdmin, fetchCounts]);
+  }, [selectedCompany?.id, isHydrated, fetchCounts]);
 
 
 

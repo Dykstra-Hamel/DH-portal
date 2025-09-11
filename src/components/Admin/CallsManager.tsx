@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { adminAPI } from '@/lib/api-client';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { createClient } from '@/lib/supabase/client';
@@ -92,34 +92,33 @@ export default function CallsManager() {
   const [callToDelete, setCallToDelete] = useState<CallRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    loadCompanies();
-  }, []);
-
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       const companiesData = await adminAPI.getCompanies();
       setCompanies(companiesData);
+      
+      // Auto-select first company if none is selected
+      if (companiesData && companiesData.length > 0 && !selectedCompanyId) {
+        const firstCompany = companiesData[0];
+        setSelectedCompanyId(firstCompany.id);
+      }
     } catch (err) {
       console.error('Failed to load companies:', err);
     }
-  };
+  }, [selectedCompanyId]);
+
+  useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
 
   const loadCalls = async (companyId?: string) => {
     try {
       setCallsLoading(true);
       setCallsError(null);
-      let data = await adminAPI.getAllCalls();
       
-      // Filter calls by company if a specific company is selected
-      if (companyId && companyId !== 'all') {
-        data = data.filter((call: CallRecord) => {
-          // Check if the call's lead belongs to the selected company OR direct customer belongs to company
-          const leadCompanyId = call.leads?.company_id;
-          const customerCompanyId = call.customers?.company_id;
-          return leadCompanyId === companyId || customerCompanyId === companyId;
-        });
-      }
+      // Use server-side filtering by company (no date filter)
+      const filters = companyId ? { companyId } : {};
+      const data = await adminAPI.getAllCalls(filters);
       
       setCalls(data);
     } catch (err) {
@@ -156,7 +155,7 @@ export default function CallsManager() {
     
     if (activeTab === 'records') {
       loadCalls(companyId);
-    } else if (activeTab === 'settings' && companyId !== 'all') {
+    } else if (activeTab === 'settings' && companyId) {
       loadSettings(companyId);
     }
   };
@@ -182,7 +181,7 @@ export default function CallsManager() {
   };
 
   const handleSaveSettings = async () => {
-    if (!selectedCompanyId || selectedCompanyId === 'all') return;
+    if (!selectedCompanyId) return;
 
     try {
       setSettingsSaving(true);
@@ -343,9 +342,6 @@ export default function CallsManager() {
           className={styles.companySelect}
         >
           <option value="">-- Select a Company --</option>
-          {activeTab === 'records' && (
-            <option value="all">All Companies</option>
-          )}
           {companies.map(company => (
             <option key={company.id} value={company.id}>
               {company.name}
@@ -463,7 +459,7 @@ export default function CallsManager() {
       {/* Call Settings Tab */}
       {activeTab === 'settings' && (
         <div className={styles.tabContent}>
-          {!selectedCompanyId || selectedCompanyId === 'all' ? (
+          {!selectedCompanyId ? (
             <div className={styles.noSelection}>
               <p>Please select a specific company to manage call settings.</p>
             </div>

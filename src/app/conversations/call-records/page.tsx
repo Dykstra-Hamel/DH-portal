@@ -78,21 +78,18 @@ export default function CallRecordsPage() {
         return;
       }
       
-      const dateParams = getApiDateParams();
       let data: CallRecord[] = [];
       
       if (isAdmin) {
-        // Admin can see all calls or filter by selected company
+        // Admin can see all calls or filter by selected company (NO date filter - always show all)
         const filters = { 
-          ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
-          ...dateParams
+          ...(selectedCompany ? { companyId: selectedCompany.id } : {})
         };
         data = await adminAPI.getAllCalls(filters);
       } else if (selectedCompany) {
-        // Regular users see calls for their selected company only
+        // Regular users see calls for their selected company only (NO date filter - always show all)
         const filters = { 
-          companyId: selectedCompany.id,
-          ...dateParams
+          companyId: selectedCompany.id
         };
         data = await adminAPI.getUserCalls(filters);
       }
@@ -103,7 +100,7 @@ export default function CallRecordsPage() {
     } finally {
       setCallsLoading(false);
     }
-  }, [isAdmin, selectedCompany, getApiDateParams]);
+  }, [isAdmin, selectedCompany]);
 
   useEffect(() => {
     if (!contextLoading) {
