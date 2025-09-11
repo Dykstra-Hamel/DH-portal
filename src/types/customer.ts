@@ -39,11 +39,31 @@ export interface Customer {
       email: string;
     };
   }[];
+  tickets?: {
+    id: string;
+    source: string;
+    type: string;
+    service_type?: string;
+    status: string;
+    priority: string;
+    estimated_value?: number;
+    description?: string;
+    created_at: string;
+    updated_at: string;
+    assigned_user?: {
+      id: string;
+      first_name: string;
+      last_name: string;
+      email: string;
+    };
+  }[];
 
   // Computed fields
   full_name?: string;
   total_leads?: number;
   active_leads?: number;
+  total_tickets?: number;
+  active_tickets?: number;
   total_value?: number;
   last_activity?: string;
 }

@@ -87,11 +87,34 @@ export async function GET(
       [];
     let assignedUsers: any[] = [];
 
-    if (assignedUserIds.length > 0) {
+    // Get all tickets for this customer
+    const { data: tickets, error: ticketsError } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('archived', false) // Only show non-archived tickets
+      .order('created_at', { ascending: false });
+
+    if (ticketsError) {
+      console.error('Error fetching tickets:', ticketsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch customer tickets' },
+        { status: 500 }
+      );
+    }
+
+    // Get assigned user profiles for both leads and tickets
+    const ticketAssignedUserIds =
+      tickets?.filter(ticket => ticket.assigned_to).map(ticket => ticket.assigned_to) ||
+      [];
+    
+    const allAssignedUserIds = [...assignedUserIds, ...ticketAssignedUserIds];
+
+    if (allAssignedUserIds.length > 0) {
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email')
-        .in('id', assignedUserIds);
+        .in('id', allAssignedUserIds);
 
       if (!profilesError && profilesData) {
         assignedUsers = profilesData;
@@ -107,10 +130,20 @@ export async function GET(
           : null,
       })) || [];
 
+    // Merge assigned user data with tickets
+    const ticketsWithUsers =
+      tickets?.map(ticket => ({
+        ...ticket,
+        assigned_user: ticket.assigned_to
+          ? assignedUsers.find(user => user.id === ticket.assigned_to)
+          : null,
+      })) || [];
+
     // Enhanced customer object
     const enhancedCustomer = {
       ...customer,
       leads: leadsWithUsers || [],
+      tickets: ticketsWithUsers || [],
     };
 
     return NextResponse.json(enhancedCustomer);

@@ -10,6 +10,7 @@ import {
   formatDuration,
   formatPhoneNumber 
 } from '@/lib/callrail/types';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import styles from './AnalyticsDashboard.module.scss';
@@ -47,12 +48,16 @@ export default function CallAnalyticsDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState<7 | 30 | 90>(30);
+  
+  // Use global date filter instead of local state
+  const { getDaysCount } = useDateFilter();
   const [selectedCall, setSelectedCall] = useState<CallRailCall | null>(null);
 
-  const fetchCallData = useCallback(async (days: number = 30) => {
+  const fetchCallData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    
+    const days = getDaysCount() || 30; // Default to 30 days if "All Time" is selected
     
     try {
       const response = await fetch(`/api/callrail/calls?companyId=${companyId}&days=${days}`);
@@ -73,17 +78,13 @@ export default function CallAnalyticsDashboard({
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, getDaysCount]);
 
   useEffect(() => {
     if (companyId) {
-      fetchCallData(selectedPeriod);
+      fetchCallData();
     }
-  }, [companyId, selectedPeriod, fetchCallData]);
-
-  const handlePeriodChange = (period: 7 | 30 | 90) => {
-    setSelectedPeriod(period);
-  };
+  }, [companyId, fetchCallData]);
 
   if (loading) {
     return (
@@ -119,7 +120,7 @@ export default function CallAnalyticsDashboard({
           <h3>Call Analytics Error</h3>
           <p>{error}</p>
           <button 
-            onClick={() => fetchCallData(selectedPeriod)}
+            onClick={() => fetchCallData()}
             className={styles.retryButton}
           >
             Try Again
@@ -151,20 +152,6 @@ export default function CallAnalyticsDashboard({
           <p style={{ color: '#64748b', fontSize: '14px', margin: '4px 0 0 0' }}>
             CallRail Account: {account.name}
           </p>
-        </div>
-        <div className={styles.periodSelector}>
-          <span className={styles.periodLabel}>Period:</span>
-          <div className={styles.periodButtons}>
-            {[7, 30, 90].map((days) => (
-              <button
-                key={days}
-                className={`${styles.periodButton} ${selectedPeriod === days ? styles.active : ''}`}
-                onClick={() => handlePeriodChange(days as 7 | 30 | 90)}
-              >
-                {days} days
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 

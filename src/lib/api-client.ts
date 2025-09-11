@@ -193,6 +193,8 @@ export const adminAPI = {
       search?: string;
       sortBy?: string;
       sortOrder?: string;
+      dateFrom?: string;
+      dateTo?: string;
     } = {}
   ) {
     const queryParams = new URLSearchParams();
@@ -201,6 +203,8 @@ export const adminAPI = {
     if (filters.search) queryParams.append('search', filters.search);
     if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
     if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
+    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
     const url = `/api/admin/customers${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
@@ -252,24 +256,28 @@ export const adminAPI = {
 
   // Leads
   async getLeads(
-    filters: { companyId?: string; status?: string; priority?: string } = {}
+    filters: { companyId?: string; status?: string; priority?: string; dateFrom?: string; dateTo?: string } = {}
   ) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('companyId', filters.companyId);
     if (filters.status) queryParams.append('status', filters.status);
     if (filters.priority) queryParams.append('priority', filters.priority);
+    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
     const url = `/api/admin/leads${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
   },
 
   async getArchivedLeads(
-    filters: { companyId?: string; status?: string; priority?: string } = {}
+    filters: { companyId?: string; status?: string; priority?: string; dateFrom?: string; dateTo?: string } = {}
   ) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('companyId', filters.companyId);
     if (filters.status) queryParams.append('status', filters.status);
     if (filters.priority) queryParams.append('priority', filters.priority);
+    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
     queryParams.append('includeArchived', 'true');
 
     const url = `/api/admin/leads?${queryParams.toString()}`;
@@ -278,6 +286,10 @@ export const adminAPI = {
 
   async getLead(leadId: string) {
     return authenticatedFetch(`/api/admin/leads/${leadId}`);
+  },
+
+  async getTicket(ticketId: string) {
+    return authenticatedFetch(`/api/tickets/${ticketId}`);
   },
 
   async createLead(leadData: any) {
@@ -305,8 +317,25 @@ export const adminAPI = {
   },
 
   // All Calls (admin)
-  async getAllCalls() {
-    return authenticatedFetch('/api/admin/calls');
+  async getAllCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string } = {}) {
+    const queryParams = new URLSearchParams();
+    if (filters.companyId) queryParams.append('companyId', filters.companyId);
+    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+    const url = `/api/admin/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
+    return authenticatedFetch(url);
+  },
+
+  // Calls for regular users
+  async getUserCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string } = {}) {
+    const queryParams = new URLSearchParams();
+    if (filters.companyId) queryParams.append('company_id', filters.companyId);
+    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+    const url = `/api/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
+    return authenticatedFetch(url);
   },
 
   // Non-admin project endpoints
@@ -315,12 +344,23 @@ export const adminAPI = {
   },
 
   // Non-admin leads endpoints
-  async getUserLeads(companyId: string) {
-    return authenticatedFetch(`/api/leads?companyId=${companyId}`);
+  async getUserLeads(companyId: string, filters: { dateFrom?: string; dateTo?: string } = {}) {
+    const queryParams = new URLSearchParams();
+    queryParams.append('companyId', companyId);
+    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+    return authenticatedFetch(`/api/leads?${queryParams.toString()}`);
   },
 
-  async getUserArchivedLeads(companyId: string) {
-    return authenticatedFetch(`/api/leads?companyId=${companyId}&includeArchived=true`);
+  async getUserArchivedLeads(companyId: string, filters: { dateFrom?: string; dateTo?: string } = {}) {
+    const queryParams = new URLSearchParams();
+    queryParams.append('companyId', companyId);
+    queryParams.append('includeArchived', 'true');
+    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+    return authenticatedFetch(`/api/leads?${queryParams.toString()}`);
   },
 
   // Non-admin customers endpoints
@@ -330,6 +370,8 @@ export const adminAPI = {
     search?: string;
     sortBy?: string;
     sortOrder?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }) {
     const queryParams = new URLSearchParams();
     queryParams.append('companyId', filters.companyId);
@@ -337,6 +379,8 @@ export const adminAPI = {
     if (filters.search) queryParams.append('search', filters.search);
     if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
     if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
+    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
     const url = `/api/customers?${queryParams.toString()}`;
     return authenticatedFetch(url);
@@ -356,6 +400,59 @@ export const adminAPI = {
 
   async getUserLeadCalls(leadId: string) {
     return authenticatedFetch(`/api/leads/${leadId}/calls`);
+  },
+
+  // Tickets
+  tickets: {
+    async list(
+      filters: { 
+        companyId?: string; 
+        status?: string; 
+        priority?: string; 
+        includeArchived?: boolean;
+        dateFrom?: string;
+        dateTo?: string;
+      } = {}
+    ) {
+      const queryParams = new URLSearchParams();
+      if (filters.companyId) queryParams.append('companyId', filters.companyId);
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.priority) queryParams.append('priority', filters.priority);
+      if (filters.includeArchived) queryParams.append('includeArchived', 'true');
+      if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+      const url = `/api/tickets${queryParams.toString() ? `?${queryParams}` : ''}`;
+      return authenticatedFetch(url);
+    },
+
+    async get(ticketId: string) {
+      return authenticatedFetch(`/api/tickets/${ticketId}`);
+    },
+
+    async create(ticketData: any) {
+      return authenticatedFetch('/api/tickets', {
+        method: 'POST',
+        body: JSON.stringify(ticketData),
+      });
+    },
+
+    async update(ticketId: string, ticketData: any) {
+      return authenticatedFetch(`/api/tickets/${ticketId}`, {
+        method: 'PUT',
+        body: JSON.stringify(ticketData),
+      });
+    },
+
+    async archive(ticketId: string) {
+      return authenticatedFetch(`/api/tickets/${ticketId}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async getCalls(ticketId: string) {
+      return authenticatedFetch(`/api/tickets/${ticketId}/calls`);
+    },
   },
 
   // Non-admin individual customer endpoints

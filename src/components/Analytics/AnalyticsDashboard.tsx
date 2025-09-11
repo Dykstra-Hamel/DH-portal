@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GAAnalyticsResponse } from '@/lib/google-analytics/types';
 import { generateDemoAnalyticsData } from '@/lib/analytics-demo-data';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import TrafficChart from './Charts/TrafficChart';
 import DeviceChart from './Charts/DeviceChart';
 import SourceChart from './Charts/SourceChart';
@@ -21,11 +22,15 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState<7 | 30 | 90>(30);
+  
+  // Use global date filter instead of local state
+  const { getDaysCount } = useDateFilter();
 
-  const fetchAnalyticsData = useCallback(async (days: number = 30) => {
+  const fetchAnalyticsData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    
+    const days = getDaysCount() || 30; // Default to 30 days if "All Time" is selected
     
     try {
       const response = await fetch(`/api/analytics?companyId=${companyId}&days=${days}`);
@@ -46,17 +51,13 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, getDaysCount]);
 
   useEffect(() => {
     if (companyId) {
-      fetchAnalyticsData(selectedPeriod);
+      fetchAnalyticsData();
     }
-  }, [companyId, selectedPeriod, fetchAnalyticsData]);
-
-  const handlePeriodChange = (period: 7 | 30 | 90) => {
-    setSelectedPeriod(period);
-  };
+  }, [companyId, fetchAnalyticsData]);
 
   if (loading) {
     return (
@@ -71,27 +72,14 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
 
   if (!configured) {
     // Show demo data with placeholder overlay
-    const demoData = generateDemoAnalyticsData(selectedPeriod);
+    const days = getDaysCount() || 30;
+    const demoData = generateDemoAnalyticsData(days);
     const { traffic, sources, devices, pages, summary } = demoData;
 
     const demoContent = (
       <div className={styles.analyticsContainer}>
         <div className={styles.analyticsHeader}>
           <h2 className={styles.title}>Analytics Dashboard</h2>
-          <div className={styles.periodSelector}>
-            <span className={styles.periodLabel}>Period:</span>
-            <div className={styles.periodButtons}>
-              {[7, 30, 90].map((days) => (
-                <button
-                  key={days}
-                  className={`${styles.periodButton} ${selectedPeriod === days ? styles.active : ''}`}
-                  onClick={() => setSelectedPeriod(days as 7 | 30 | 90)}
-                >
-                  {days} days
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className={styles.metricsCards}>
@@ -180,7 +168,7 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
           <h3>Analytics Error</h3>
           <p>{error}</p>
           <button 
-            onClick={() => fetchAnalyticsData(selectedPeriod)}
+            onClick={() => fetchAnalyticsData()}
             className={styles.retryButton}
           >
             Try Again
@@ -208,20 +196,6 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
     <div className={styles.analyticsContainer}>
       <div className={styles.analyticsHeader}>
         <h2 className={styles.title}>Analytics Dashboard</h2>
-        <div className={styles.periodSelector}>
-          <span className={styles.periodLabel}>Period:</span>
-          <div className={styles.periodButtons}>
-            {[7, 30, 90].map((days) => (
-              <button
-                key={days}
-                className={`${styles.periodButton} ${selectedPeriod === days ? styles.active : ''}`}
-                onClick={() => handlePeriodChange(days as 7 | 30 | 90)}
-              >
-                {days} days
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className={styles.metricsCards}>

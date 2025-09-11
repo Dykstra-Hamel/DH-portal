@@ -50,6 +50,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
     new Set(['overview'])
   );
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [primaryFontLoaded, setPrimaryFontLoaded] = useState<string | null>(null);
 
   const getGradientStyle = () => {
     const primaryColor = brandData.primary_color_hex || '#A8B5C8';
@@ -72,6 +73,23 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
       color: primaryColor,
     };
   };
+
+  const getBrandContainerFontStyle = () => {
+    if (primaryFontLoaded) {
+      return {
+        fontFamily: `"${primaryFontLoaded}", var(--font-satoshi)`,
+      };
+    }
+    return {};
+  };
+
+  // Load primary brand font when component mounts
+  useEffect(() => {
+    if (brandData.font_primary_name && brandData.font_primary_url) {
+      const fontFamily = loadFont(brandData.font_primary_name, brandData.font_primary_url);
+      setPrimaryFontLoaded(fontFamily);
+    }
+  }, [brandData.font_primary_name, brandData.font_primary_url]);
 
   const openLightbox = (imageUrl: string) => {
     setLightboxImage(imageUrl);
@@ -332,7 +350,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
   };
 
   return (
-    <div className={styles.brandContainer}>
+    <div className={styles.brandContainer} style={getBrandContainerFontStyle()}>
       {/* Hero Section */}
       <div className={styles.heroSection}>
         <div className={styles.heroGradient} style={getGradientStyle()}>
