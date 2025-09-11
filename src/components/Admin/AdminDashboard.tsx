@@ -17,6 +17,7 @@ import AttributionAnalytics from './AttributionAnalytics';
 import FormAnalytics from './FormAnalytics';
 import PestManager from './PestManager';
 import TemplateLibraryManager from './TemplateLibraryManager';
+import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
 import styles from './AdminDashboard.module.scss';
 
@@ -30,7 +31,7 @@ type UserSubsection = 'users' | 'relationships';
 type CompanySubsection = 'companies' | 'projects' | 'brands';
 type AnalyticsSubsection = 'attribution' | 'forms' | 'call-records' | 'partial-leads';
 type AutomationSubsection = 'templates' | 'executions';
-type SystemSubsection = 'widgets' | 'pest-management' | 'calling';
+type SystemSubsection = 'widgets' | 'pest-management' | 'calling' | 'sms-testing';
 
 type AdminSubsection = UserSubsection | CompanySubsection | AnalyticsSubsection | AutomationSubsection | SystemSubsection;
 
@@ -49,7 +50,8 @@ type AdminSection =
   | 'form-analytics'
   | 'pest-management'
   | 'template-library'
-  | 'workflow-executions';
+  | 'workflow-executions'
+  | 'sms-testing';
 
 interface Company {
   id: string;
@@ -118,6 +120,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
       { id: 'widgets', label: 'Widget Config', legacySection: 'widgets' },
       { id: 'pest-management', label: 'Pest Management', legacySection: 'pest-management' },
       { id: 'calling', label: 'Calling', legacySection: 'call-settings' },
+      { id: 'sms-testing', label: 'SMS Testing', legacySection: 'sms-testing' },
     ],
   },
 ];
@@ -208,6 +211,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <TemplateLibraryManager />;
       case 'workflow-executions':
         return selectedCompanyId ? <ExecutionManager companyId={selectedCompanyId} /> : <div>Loading...</div>;
+      case 'sms-testing':
+        return <SMSTestManager />;
       default:
         return <UsersManager />;
     }

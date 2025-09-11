@@ -3512,7 +3512,6 @@
   font-family: "${fontName}", sans-serif;
   font-size: 13px;
   font-style: normal;
-  font-weight: 700;
   line-height: 18px;
   margin-top: 20px;
   }
@@ -4724,6 +4723,7 @@
   font-weight: 400;
   line-height: 20px;
   color: ${textColor};
+  margin-bottom: 50px;
   }
 
   `;

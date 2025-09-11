@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
       progressiveState
     } = body;
 
+
     // Validate required fields
     if (!companyId || !sessionId || !formData || !attributionData) {
       return createCorsErrorResponse(
