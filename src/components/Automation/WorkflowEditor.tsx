@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Settings,
   Mail,
+  MessageSquare,
   Clock,
   GitBranch,
   User,
@@ -24,8 +25,10 @@ import styles from './WorkflowEditor.module.scss';
 
 interface WorkflowStep {
   id: string;
-  type: 'send_email' | 'wait' | 'update_lead_status' | 'assign_lead' | 'conditional' | 'make_call' | 'archive_call';
+  type: 'send_email' | 'send_sms' | 'wait' | 'update_lead_status' | 'assign_lead' | 'conditional' | 'make_call' | 'archive_call';
   template_id?: string;
+  sms_message?: string;
+  sms_agent_id?: string;
   delay_minutes?: number;
   new_status?: string;
   assign_to_user_id?: string;
@@ -110,6 +113,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     cancel_on_statuses: ['won', 'closed_won', 'converted'],
   });
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [smsAgents, setSmsAgents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -142,9 +146,33 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     }
   }, [companyId]);
 
+  const fetchSmsAgents = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      
+      const { data, error } = await supabase
+        .from('agents')
+        .select('id, agent_id, agent_name, phone_number')
+        .eq('company_id', companyId)
+        .eq('agent_type', 'sms')
+        .eq('is_active', true)
+        .not('phone_number', 'is', null)
+        .order('agent_name');
+      
+      if (error) {
+        console.error('Error fetching SMS agents:', error);
+      } else {
+        setSmsAgents(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching SMS agents:', error);
+    }
+  }, [companyId]);
+
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
+      fetchSmsAgents();
       if (workflow) {
         setFormData({
           name: workflow.name || '',
@@ -172,7 +200,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
         });
       }
     }
-  }, [isOpen, workflow, fetchTemplates]);
+  }, [isOpen, workflow, fetchTemplates, fetchSmsAgents]);
 
   const handleSave = async () => {
     try {
@@ -297,6 +325,10 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
 
     if (stepType === 'send_email') {
       newStep.delay_minutes = 0;
+    } else if (stepType === 'send_sms') {
+      newStep.delay_minutes = 0;
+      newStep.sms_message = '';
+      newStep.required = true;
     } else if (stepType === 'wait') {
       newStep.delay_minutes = 60;
     } else if (stepType === 'make_call') {
@@ -377,6 +409,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
           <div className={styles.stepInfo}>
             <div className={styles.stepIcon}>
               {step.type === 'send_email' && <Mail size={16} />}
+              {step.type === 'send_sms' && <MessageSquare size={16} />}
               {step.type === 'wait' && <Clock size={16} />}
               {step.type === 'make_call' && <PhoneCall size={16} />}
               {step.type === 'conditional' && <GitBranch size={16} />}
@@ -438,6 +471,46 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Delay (minutes)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10080"
+                    value={step.delay_minutes || 0}
+                    onChange={(e) => updateStep(step.id, { delay_minutes: parseInt(e.target.value) || 0 })}
+                  />
+                  <small>0 = immediate, 60 = 1 hour, 1440 = 1 day</small>
+                </div>
+              </>
+            )}
+
+            {step.type === 'send_sms' && (
+              <>
+                <div className={styles.formGroup}>
+                  <label>SMS Agent *</label>
+                  <select
+                    value={step.sms_agent_id || ''}
+                    onChange={(e) => updateStep(step.id, { sms_agent_id: e.target.value })}
+                  >
+                    <option value="">Select an SMS agent</option>
+                    {smsAgents.map(agent => (
+                      <option key={agent.id} value={agent.agent_id}>
+                        {agent.agent_name} - {agent.phone_number}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>SMS Message *</label>
+                  <textarea
+                    value={step.sms_message || ''}
+                    onChange={(e) => updateStep(step.id, { sms_message: e.target.value })}
+                    placeholder="Enter your SMS message. You can use variables like {{customerName}}, {{selectedPlanName}}, etc."
+                    rows={4}
+                  />
+                  <small>Customize this message with variables. The message will be sent as the initial message to start the SMS conversation.</small>
                 </div>
                 <div className={styles.formGroup}>
                   <label>Delay (minutes)</label>
@@ -921,6 +994,13 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 Add Email
               </button>
               <button 
+                onClick={() => addStep('send_sms')} 
+                className={styles.addStepButton}
+              >
+                <MessageSquare size={16} />
+                Add SMS
+              </button>
+              <button 
                 onClick={() => addStep('wait')} 
                 className={styles.addStepButton}
               >
@@ -1000,6 +1080,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
 function getStepTypeName(type: string): string {
   const names = {
     send_email: 'Send Email',
+    send_sms: 'Send SMS',
     wait: 'Wait/Delay',
     make_call: 'Make Call',
     conditional: 'Conditional Branch',
@@ -1018,6 +1099,12 @@ function getStepDescription(step: WorkflowStep, templates: EmailTemplate[]): str
         return `Send "${template?.name || 'Unknown'}" ${step.delay_minutes ? `after ${step.delay_minutes} minutes` : 'immediately'}`;
       }
       return 'Email template not selected';
+    case 'send_sms':
+      if (step.sms_agent_id && step.sms_message) {
+        const messagePreview = step.sms_message.length > 50 ? step.sms_message.substring(0, 50) + '...' : step.sms_message;
+        return `Send SMS: "${messagePreview}" ${step.delay_minutes ? `after ${step.delay_minutes} minutes` : 'immediately'}`;
+      }
+      return 'SMS agent or message not configured';
     case 'wait':
       return `Wait ${step.delay_minutes || 60} minutes`;
     case 'make_call':

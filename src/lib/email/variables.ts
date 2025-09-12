@@ -54,6 +54,7 @@ export interface EmailVariables {
   selectedPlanDescription: string;
   selectedPlanCategory: string;
   selectedPlanInitialPrice: string;
+  selectedPlanNormalInitialPrice: string;
   selectedPlanRecurringPrice: string;
   selectedPlanBillingFrequency: string;
   selectedPlanFeatures: string;
@@ -127,6 +128,7 @@ export function createSampleVariables(
     selectedPlanDescription: 'We&apos;ll start with a full inspection to provide you with the best possible plan, then complete your service during the same visit.',
     selectedPlanCategory: 'standard',
     selectedPlanInitialPrice: '119',
+    selectedPlanNormalInitialPrice: '199',
     selectedPlanRecurringPrice: '79',
     selectedPlanBillingFrequency: 'mo',
     selectedPlanFeatures: '<ul><li>Covers Ants, Spiders, Wasps &amp; More</li><li>No Hassle Scheduling</li><li>FREE Re-Treatments</li><li>FREE Web Sweeps</li><li>100% Guaranteed visit</li></ul>',

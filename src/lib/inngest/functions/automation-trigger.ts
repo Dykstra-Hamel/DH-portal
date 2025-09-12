@@ -103,6 +103,9 @@ export const automationTriggerHandler = inngest.createFunction(
             stepCompleted,
             ...formData, // Include form data for partial leads
             serviceAreaData,
+            // Ensure phone is accessible at top level for workflow steps
+            phone: formData?.contactInfo?.phone || formData?.phone,
+            customerPhone: formData?.contactInfo?.phone || formData?.phone,
           },
           attribution: attribution || {},
           triggerType: 'partial_lead_automation'
