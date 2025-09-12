@@ -681,6 +681,7 @@ export default function TemplateLibraryManager() {
                         'selectedPlanDescription', 
                         'selectedPlanCategory',
                         'selectedPlanInitialPrice',
+                        'selectedPlanNormalInitialPrice',
                         'selectedPlanRecurringPrice',
                         'selectedPlanBillingFrequency',
                         'selectedPlanFeatures',

@@ -47,6 +47,7 @@ import {
   LeadNotificationData,
 } from '@/lib/email';
 import { sendEvent } from '@/lib/inngest/client';
+import { createOrFindServiceAddress, linkCustomerToServiceAddress, extractAddressData } from '@/lib/service-addresses';
 
 // Helper function to check if auto-calling is enabled for a company
 async function shouldAutoCall(companyId: string): Promise<boolean> {
@@ -373,6 +374,7 @@ export async function POST(request: NextRequest) {
             form_data,
             attribution_data,
             service_area_data,
+            service_address_id,
             created_at
           `
             )
@@ -527,6 +529,57 @@ export async function POST(request: NextRequest) {
       customerId = newCustomer.id;
     }
 
+    // Handle service address creation and linking
+    let serviceAddressId = null;
+    
+    // First, check if partial lead already has a service address
+    if (partialLead?.service_address_id) {
+      serviceAddressId = partialLead.service_address_id;
+      console.log(`✅ Using existing service address from partial lead: ${serviceAddressId}`);
+    } else {
+      // Create service address from submission data
+      try {
+        const addressData = extractAddressData(
+          submission.addressDetails,
+          submission.address,
+          submission.coordinates
+        );
+
+        if (addressData) {
+          const serviceAddressResult = await createOrFindServiceAddress(submission.companyId, addressData);
+          
+          if (serviceAddressResult.success && serviceAddressResult.serviceAddressId) {
+            serviceAddressId = serviceAddressResult.serviceAddressId;
+            console.log(`✅ Service address ${serviceAddressResult.isExisting ? 'found' : 'created'}: ${serviceAddressId}`);
+          } else {
+            console.error('Failed to create service address during submission:', serviceAddressResult.error);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing service address during submission:', error);
+      }
+    }
+
+    // Link customer to service address if we have one
+    if (serviceAddressId && customerId) {
+      try {
+        const linkResult = await linkCustomerToServiceAddress(
+          customerId,
+          serviceAddressId,
+          'owner', // Default relationship type for widget submissions
+          !existingCustomer // Set as primary if this is a new customer
+        );
+
+        if (linkResult.success) {
+          console.log(`✅ Customer ${customerId} linked to service address ${serviceAddressId}`);
+        } else {
+          console.error('Failed to link customer to service address:', linkResult.error);
+        }
+      } catch (error) {
+        console.error('Error linking customer to service address:', error);
+      }
+    }
+
     // Set priority to medium for all leads
     const priority = 'medium';
 
@@ -582,6 +635,7 @@ export async function POST(request: NextRequest) {
           company_id: submission.companyId,
           customer_id: customerId,
           partial_lead_id: partialLead?.id || null,
+          service_address_id: serviceAddressId,
           lead_source: leadSource,
           lead_type: 'web_form',
           lead_status: status,

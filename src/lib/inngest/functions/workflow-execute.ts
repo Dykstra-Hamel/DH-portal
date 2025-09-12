@@ -1,6 +1,6 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { formatDateOnly } from '@/lib/utils';
+import { formatDateOnly, toE164PhoneNumber } from '@/lib/utils';
 
 interface StepResult {
   stepIndex: number;
@@ -25,7 +25,8 @@ export const workflowExecuteHandler = inngest.createFunction(
       leadId, 
       customerId, 
       leadData,
-      attribution
+      attribution,
+      triggerType
     } = event.data;
 
     // Query partial lead data directly if this is a partial lead automation
@@ -126,13 +127,58 @@ export const workflowExecuteHandler = inngest.createFunction(
           .single();
           
         // Check both database status and cancellation flags
-        const isCancelled = currentExecution?.execution_status === 'cancelled' ||
-                           currentExecution?.execution_data?.cancellationProcessed === true;
+        let isCancelled = currentExecution?.execution_status === 'cancelled' ||
+                         currentExecution?.execution_data?.cancellationProcessed === true;
+        let cancellationReason = isCancelled ? 'Database status or cancellation flag' : null;
+        
+        // Additional check: For partial lead workflows, check if lead has been converted
+        if (!isCancelled && triggerType === 'partial_lead_automation' && leadData?.partialLeadId) {
+          console.log('Checking partial lead conversion status for workflow step:', {
+            partialLeadId: leadData.partialLeadId,
+            stepIndex,
+            executionId
+          });
+          
+          const { data: partialLead, error } = await supabase
+            .from('partial_leads')
+            .select('converted_to_lead_id')
+            .eq('id', leadData.partialLeadId)
+            .single();
+            
+          if (error) {
+            console.error('Error checking partial lead conversion:', error);
+            // Continue workflow if we can't check - don't fail on this error
+          } else if (partialLead?.converted_to_lead_id) {
+            isCancelled = true;
+            cancellationReason = `Partial lead converted to full lead (ID: ${partialLead.converted_to_lead_id})`;
+            console.log('🛑 Cancelling partial lead workflow - lead converted:', {
+              partialLeadId: leadData.partialLeadId,
+              convertedToLeadId: partialLead.converted_to_lead_id,
+              stepIndex,
+              executionId
+            });
+            
+            // Update execution status to cancelled
+            await supabase
+              .from('automation_executions')
+              .update({ 
+                execution_status: 'cancelled',
+                completed_at: new Date().toISOString(),
+                execution_data: {
+                  ...currentExecution?.execution_data,
+                  cancellationReason: cancellationReason,
+                  cancellationProcessed: true,
+                  cancelledAtStep: stepIndex
+                }
+              })
+              .eq('id', executionId);
+          }
+        }
           
         return {
           status: currentExecution?.execution_status,
           shouldContinue: !isCancelled,
-          cancellationReason: isCancelled ? 'Database status or cancellation flag' : null
+          cancellationReason
         };
       });
       
@@ -142,7 +188,8 @@ export const workflowExecuteHandler = inngest.createFunction(
           cancelled: true,
           cancelledAt: stepIndex,
           totalSteps: workflowSteps.length,
-          message: 'Workflow execution stopped due to cancellation'
+          cancellationReason: statusCheck.cancellationReason,
+          message: `Workflow execution stopped due to cancellation: ${statusCheck.cancellationReason}`
         };
       }
       
@@ -157,6 +204,9 @@ export const workflowExecuteHandler = inngest.createFunction(
           switch (currentStep.type) {
             case 'send_email':
               result = await executeEmailStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
+              break;
+            case 'send_sms':
+              result = await executeSMSStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
               break;
             case 'delay':
             case 'wait':
@@ -352,11 +402,22 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
         state,
         zip_code
       ),
+      service_address:service_addresses(
+        id,
+        street_address,
+        city,
+        state,
+        zip_code,
+        apartment_unit,
+        address_line_2,
+        address_type
+      ),
       service_plans:selected_plan_id (
         plan_name,
         plan_description,
         plan_category,
         initial_price,
+        initial_discount,
         recurring_price,
         billing_frequency,
         plan_features,
@@ -519,11 +580,11 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     // Service/Lead details with enhanced partial lead support
     pestType: leadData.pestType || leadData.selectedPest || '',
     urgency: leadData.urgency || '',
-    address: leadData.address,
-    streetAddress: leadData.streetAddress || '',
-    city: leadData.city || '',
-    state: leadData.state || '',
-    zipCode: leadData.zipCode || '',
+    address: fullLeadData?.service_address?.street_address || fullLeadData?.customer?.address || partialLeadData?.form_data?.address || leadData.address || '',
+    streetAddress: fullLeadData?.service_address?.street_address || fullLeadData?.customer?.address || partialLeadData?.form_data?.address || leadData.address || '',
+    city: fullLeadData?.service_address?.city || fullLeadData?.customer?.city || partialLeadData?.form_data?.city || leadData.city || '',
+    state: fullLeadData?.service_address?.state || fullLeadData?.customer?.state || partialLeadData?.form_data?.state || leadData.state || '',
+    zipCode: fullLeadData?.service_address?.zip_code || fullLeadData?.customer?.zip_code || partialLeadData?.form_data?.zipCode || leadData.zipCode || '',
     homeSize: leadData.homeSize,
     leadSource: fullLeadData?.lead_source || leadData.leadSource || 'partial_lead_automation',
     createdDate: formatDate(fullLeadData?.created_at),
@@ -541,6 +602,10 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     selectedPlanDescription: planData?.plan_description || leadData.selectedPlan?.plan_description || '',
     selectedPlanCategory: planData?.plan_category || leadData.selectedPlan?.plan_category || '',
     selectedPlanInitialPrice: formatPrice(planData?.initial_price || leadData.selectedPlan?.initial_price),
+    selectedPlanNormalInitialPrice: formatPrice(
+      (planData?.initial_price || leadData.selectedPlan?.initial_price || 0) + 
+      (planData?.initial_discount || leadData.selectedPlan?.initial_discount || 0)
+    ),
     selectedPlanRecurringPrice: formatPrice(planData?.recurring_price || leadData.selectedPlan?.recurring_price),
     selectedPlanBillingFrequency: formatBillingFrequency(planData?.billing_frequency || leadData.selectedPlan?.billing_frequency),
     selectedPlanFeatures: formatPlanFeatures(planData?.plan_features || leadData.selectedPlan?.plan_features),
@@ -752,6 +817,276 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
       templateName: template.name,
       recipient: customerEmail,
       subject: subjectLine,
+    };
+  }
+}
+
+// Helper function to execute SMS steps
+async function executeSMSStep(step: any, leadData: any, companyId: string, leadId: string, customerId: string, attribution: any, partialLeadData: any = null, executionId: string) {
+  try {
+    // Get SMS agent ID
+    const agentId = step.sms_agent_id;
+    
+    if (!agentId) {
+      throw new Error('No SMS agent specified in workflow step');
+    }
+
+    // Get SMS message
+    const smsMessage = step.sms_message;
+    
+    if (!smsMessage?.trim()) {
+      throw new Error('No SMS message specified in workflow step');
+    }
+
+    // Get customer phone number with comprehensive fallback logic (same as email variables)
+    let customerPhone = leadData.customerPhone || 
+                        leadData.phone ||
+                        leadData.customerInfo?.phone ||
+                        leadData.contactInfo?.phone ||
+                        partialLeadData?.form_data?.contactInfo?.phone ||
+                        partialLeadData?.form_data?.phone ||
+                        null;
+    
+    console.log('SMS Step - Phone extraction attempt:', {
+      leadDataCustomerPhone: leadData.customerPhone,
+      leadDataPhone: leadData.phone,
+      leadDataCustomerInfoPhone: leadData.customerInfo?.phone,
+      leadDataContactInfoPhone: leadData.contactInfo?.phone,
+      partialLeadContactInfoPhone: partialLeadData?.form_data?.contactInfo?.phone,
+      partialLeadFormDataPhone: partialLeadData?.form_data?.phone,
+      finalPhone: customerPhone
+    });
+
+    if (!customerPhone) {
+      // Try to get from customer record if we have customerId
+      if (customerId) {
+        const supabase = createAdminClient();
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('phone')
+          .eq('id', customerId)
+          .single();
+        
+        if (customer?.phone) {
+          customerPhone = customer.phone;
+          console.log('SMS Step - Phone found in customer record:', customerPhone);
+        }
+      }
+    }
+
+    if (!customerPhone) {
+      console.error('SMS Step - No phone number found. Available data:', {
+        leadData: Object.keys(leadData),
+        partialLeadData: partialLeadData ? Object.keys(partialLeadData) : null,
+        customerId
+      });
+      throw new Error('Customer phone number not available for SMS');
+    }
+
+    // Import email variables to use for SMS personalization
+    const { createSampleVariables, replaceVariablesWithSample } = await import('@/lib/email/variables');
+
+    // Get full lead data with customer and service address details
+    const supabase = createAdminClient();
+    
+    const { data: fullLeadData } = await supabase
+      .from('leads')
+      .select(`
+        *,
+        customer:customers(
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          address,
+          city,
+          state,
+          zip_code
+        ),
+        service_address:service_addresses(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type
+        ),
+        service_plans:selected_plan_id (
+          plan_name,
+          plan_description,
+          plan_category,
+          initial_price,
+          initial_discount,
+          recurring_price,
+          billing_frequency,
+          plan_features,
+          plan_faqs,
+          plan_image_url,
+          highlight_badge,
+          treatment_frequency,
+          plan_disclaimer
+        )
+      `)
+      .eq('id', leadId)
+      .single();
+
+    // Create email variables for personalization (reuse email variable system)
+    const planData = fullLeadData?.service_plans;
+    
+    // Format price helper
+    const formatPrice = (price: any) => {
+      if (!price && price !== 0) return '';
+      const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+      return isNaN(numPrice) ? '' : numPrice.toString();
+    };
+
+    // Debug logging for SMS variable construction
+    console.log('SMS Step - Data sources for variables:', {
+      fullLeadDataCustomer: fullLeadData?.customer,
+      leadDataKeys: Object.keys(leadData),
+      leadDataName: leadData.customerName || leadData.name,
+      leadDataFirstName: leadData.firstName || leadData.first_name,
+      leadDataLastName: leadData.lastName || leadData.last_name,
+      partialLeadDataContactInfo: partialLeadData?.form_data?.contactInfo
+    });
+
+    // Create comprehensive email variables object for SMS personalization
+    const emailVariables = {
+      // Customer details with enhanced fallbacks for partial leads
+      customerName: fullLeadData?.customer?.first_name && fullLeadData?.customer?.last_name
+        ? `${fullLeadData.customer.first_name} ${fullLeadData.customer.last_name}`
+        : (leadData.customerName || leadData.name || 
+           (leadData.contactInfo?.firstName && leadData.contactInfo?.lastName 
+             ? `${leadData.contactInfo.firstName} ${leadData.contactInfo.lastName}` 
+             : '') ||
+           (partialLeadData?.form_data?.contactInfo?.firstName && partialLeadData?.form_data?.contactInfo?.lastName
+             ? `${partialLeadData.form_data.contactInfo.firstName} ${partialLeadData.form_data.contactInfo.lastName}`
+             : '') ||
+           'Customer'),
+      firstName: fullLeadData?.customer?.first_name || 
+                 leadData.firstName || 
+                 leadData.first_name || 
+                 leadData.contactInfo?.firstName ||
+                 partialLeadData?.form_data?.contactInfo?.firstName || '',
+      lastName: fullLeadData?.customer?.last_name || 
+                leadData.lastName || 
+                leadData.last_name || 
+                leadData.contactInfo?.lastName ||
+                partialLeadData?.form_data?.contactInfo?.lastName || '',
+      customerEmail: fullLeadData?.customer?.email || 
+                     leadData.customerEmail || 
+                     leadData.email ||
+                     leadData.contactInfo?.email ||
+                     partialLeadData?.form_data?.contactInfo?.email || '',
+      customerPhone: customerPhone,
+
+      // Address information
+      address: fullLeadData?.service_address?.street_address || fullLeadData?.customer?.address || partialLeadData?.form_data?.address || leadData.address || '',
+      streetAddress: fullLeadData?.service_address?.street_address || fullLeadData?.customer?.address || partialLeadData?.form_data?.address || leadData.address || '',
+      city: fullLeadData?.service_address?.city || fullLeadData?.customer?.city || partialLeadData?.form_data?.city || leadData.city || '',
+      state: fullLeadData?.service_address?.state || fullLeadData?.customer?.state || partialLeadData?.form_data?.state || leadData.state || '',
+      zipCode: fullLeadData?.service_address?.zip_code || fullLeadData?.customer?.zip_code || partialLeadData?.form_data?.zipCode || leadData.zipCode || '',
+
+      // Service details
+      pestType: leadData.pestType || leadData.pest_type || '',
+      urgency: leadData.urgency || '',
+      leadSource: leadData.leadSource || leadData.lead_source || '',
+
+      // Selected Plan Details
+      selectedPlanName: planData?.plan_name || leadData.selectedPlan?.plan_name || '',
+      selectedPlanInitialPrice: formatPrice(planData?.initial_price || leadData.selectedPlan?.initial_price),
+      selectedPlanNormalInitialPrice: formatPrice(
+        (planData?.initial_price || leadData.selectedPlan?.initial_price || 0) + 
+        (planData?.initial_discount || leadData.selectedPlan?.initial_discount || 0)
+      ),
+      selectedPlanRecurringPrice: formatPrice(planData?.recurring_price || leadData.selectedPlan?.recurring_price),
+    };
+
+    // Debug logging for SMS variables before replacement
+    console.log('SMS Step - Final variables for replacement:', {
+      firstName: emailVariables.firstName,
+      lastName: emailVariables.lastName,
+      customerName: emailVariables.customerName,
+      customerEmail: emailVariables.customerEmail,
+      originalMessage: smsMessage
+    });
+
+    // Replace variables in SMS message
+    const personalizedMessage = replaceVariablesWithSample(smsMessage, emailVariables as any);
+    
+    console.log('SMS Step - Message after variable replacement:', {
+      original: smsMessage,
+      personalized: personalizedMessage
+    });
+
+    // Convert phone number to E.164 format required by SMS API
+    const e164Phone = toE164PhoneNumber(customerPhone);
+    if (!e164Phone) {
+      console.error('SMS Step - Could not convert phone number to E.164 format:', customerPhone);
+      throw new Error(`Invalid phone number format: ${customerPhone}. Cannot convert to E.164 format required for SMS.`);
+    }
+
+    console.log('SMS Step - Phone number conversion:', {
+      originalPhone: customerPhone,
+      e164Phone: e164Phone
+    });
+
+    // Call SMS service
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/sms/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        companyId: companyId,
+        customerNumber: e164Phone, // Use E.164 formatted phone number
+        agentId: agentId,
+        dynamicVariables: {
+          initialMessage: personalizedMessage,
+          ...emailVariables // Include all variables for additional personalization
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`SMS API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
+    }
+
+    const smsResult = await response.json();
+
+    if (!smsResult.success) {
+      throw new Error(`SMS sending failed: ${smsResult.error || 'Unknown error'}`);
+    }
+
+    console.log(`✅ SMS sent successfully via workflow step:`, {
+      originalPhone: customerPhone,
+      e164Phone: e164Phone,
+      agentId,
+      message: personalizedMessage.substring(0, 100) + (personalizedMessage.length > 100 ? '...' : ''),
+      conversationId: smsResult.conversationId,
+      executionId
+    });
+
+    return {
+      success: true,
+      stepType: 'send_sms',
+      customerPhone,
+      agentId,
+      message: personalizedMessage,
+      conversationId: smsResult.conversationId,
+    };
+
+  } catch (error) {
+    console.error('Error executing SMS step:', error);
+    
+    return {
+      success: false,
+      stepType: 'send_sms',
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
