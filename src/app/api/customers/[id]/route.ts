@@ -213,13 +213,29 @@ export async function PUT(
       );
     }
 
-    // Normalize phone number if provided in update
+    // Clean and validate the data before updating
     const updateData = {
       ...body,
-      phone: body.phone
-        ? normalizePhoneNumber(body.phone) || body.phone
-        : body.phone,
+      // Convert empty strings to null and normalize phone
+      email: body.email?.trim() || null,
+      phone: body.phone?.trim()
+        ? normalizePhoneNumber(body.phone.trim()) || body.phone.trim()
+        : null,
+      address: (body.address?.trim() && body.address !== 'none') ? body.address.trim() : null,
+      city: (body.city?.trim() && body.city !== 'none') ? body.city.trim() : null,
+      state: (body.state?.trim() && body.state !== 'none') ? body.state.trim() : null,
+      zip_code: (body.zip_code?.trim() && body.zip_code !== 'none') ? body.zip_code.trim() : null,
+      notes: body.notes?.trim() || null,
     };
+
+    // Remove any fields that are undefined
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
+
+    console.log('Customer API: Updating customer with data:', updateData);
 
     // Update the customer
     const { data: customer, error } = await supabase

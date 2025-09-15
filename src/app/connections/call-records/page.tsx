@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Archive } from 'lucide-react';
 import styles from '@/components/Admin/AdminManager.module.scss';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useDateFilter } from '@/contexts/DateFilterContext';
 import { adminAPI } from '@/lib/api-client';
 
 interface CallRecord {
@@ -52,9 +51,8 @@ interface CallRecord {
 }
 
 export default function CallRecordsPage() {
-  // Use global company context and date filter
+  // Use global company context
   const { selectedCompany, isAdmin, isLoading: contextLoading } = useCompany();
-  const { getApiDateParams } = useDateFilter();
 
   // Call Records State
   const [calls, setCalls] = useState<CallRecord[]>([]);

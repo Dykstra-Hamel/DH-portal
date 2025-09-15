@@ -317,7 +317,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     }
   }
 
-  // Create ticket for inbound calls
+  // Create ticket for inbound calls with 'live' status
   const { data: newTicket, error: ticketError } = await supabase
     .from('tickets')
     .insert({
@@ -325,7 +325,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       customer_id: customerId,
       source: 'cold_call',
       type: 'phone_call',
-      status: 'new',
+      status: 'live', // Set as 'live' for active calls
       priority: 'medium',
       description: `📞 Inbound call started at ${new Date().toISOString()}`,
       created_at: new Date().toISOString(),
@@ -350,12 +350,12 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     final_street_address: customerAddress || extractedData.street_address
   });
 
-  // Create call record
+  // Create call record with bidirectional ticket relationship
   const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
     .insert({
       call_id,
-      ticket_id: newTicket.id, // Link to ticket instead of lead
+      ticket_id: newTicket.id, // Link call record to ticket
       customer_id: customerId,
       phone_number: customerPhone, // Use normalized phone for consistency
       from_number: rawCustomerPhone, // Keep original format from Retell
@@ -385,6 +385,24 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       { error: 'Failed to create call record' },
       { status: 500 }
     );
+  }
+
+  // Create bidirectional relationship by updating the ticket with call_record_id
+  const { error: ticketUpdateError } = await supabase
+    .from('tickets')
+    .update({
+      call_record_id: callRecord.id
+    })
+    .eq('id', newTicket.id);
+
+  if (ticketUpdateError) {
+    console.error(
+      `⚠️ [${requestId}] Failed to create bidirectional link between ticket and call record:`,
+      ticketUpdateError.message
+    );
+    // Don't fail the request - the ticket and call record exist, just not fully linked
+  } else {
+    console.log(`🔗 [${requestId}] Successfully created bidirectional link: ticket ${newTicket.id} ↔ call record ${callRecord.id}`);
   }
 
 
@@ -559,20 +577,20 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       console.log('✅ [DEBUG] Setting ticket as QUALIFIED SALES');
       updateData.type = 'phone_call'; // Keep as phone_call type
       updateData.service_type = 'Sales'; // Set category to Sales
-      updateData.status = 'qualified';
+      updateData.status = 'new'; // Set to 'new' as requested
       updateData.description =
         `${updateData.description}\n\n✅ AI Qualification: QUALIFIED - Category set to Sales`.trim();
     } else if (isQualified === 'false' || isQualified === false) {
       // AI determined this is not qualified for sales - set as customer service
       console.log('❌ [DEBUG] Setting ticket as UNQUALIFIED CUSTOMER SERVICE');
       updateData.service_type = 'Customer Service';
-      updateData.status = 'resolved';
+      updateData.status = 'new'; // Set to 'new' as requested
       updateData.description =
         `${updateData.description}\n\n❌ AI Qualification: UNQUALIFIED - Category set to Customer Service`.trim();
     } else {
-      // No qualification decision provided - keep as contacted for follow-up
-      console.log('🤷 [DEBUG] No qualification decision - setting as CONTACTED');
-      updateData.status = 'contacted';
+      // No qualification decision provided - set as new for follow-up
+      console.log('🤷 [DEBUG] No qualification decision - setting as NEW');
+      updateData.status = 'new'; // Set to 'new' as requested
     }
 
     console.log('📝 [DEBUG] Final update data:', {

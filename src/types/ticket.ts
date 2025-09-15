@@ -25,6 +25,7 @@ export type TicketType =
   | 'other';
 
 export type TicketStatus =
+  | 'live'
   | 'new'
   | 'contacted'
   | 'qualified'
@@ -42,6 +43,7 @@ export interface Ticket {
   id: string;
   company_id: string;
   customer_id?: string;
+  call_record_id?: string; // Direct reference to call record for phone_call tickets
   source: TicketSource;
   type: TicketType;
   service_type?: string;
@@ -182,6 +184,7 @@ export const ticketTypeOptions = [
 ] as const;
 
 export const ticketStatusOptions = [
+  { value: 'live', label: 'Live Call' },
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
   { value: 'qualified', label: 'Qualified' },

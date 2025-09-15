@@ -46,9 +46,7 @@ export function GlobalCompanyDropdown() {
 
   const displayText = selectedCompany
     ? selectedCompany.name
-    : isAdmin
-      ? 'All Companies'
-      : availableCompanies[0]?.name || 'No Company';
+    : availableCompanies[0]?.name || 'Select Company';
 
   const maxDisplayLength = 25;
   const truncatedDisplayText = displayText.length > maxDisplayLength 
@@ -71,15 +69,6 @@ export function GlobalCompanyDropdown() {
 
       {isOpen && (
         <div className={styles.menu}>
-          {isAdmin && (
-            <button
-              className={`${styles.option} ${!selectedCompany ? styles.selected : ''}`}
-              onClick={() => handleCompanySelect(null)}
-            >
-              <span>All Companies</span>
-              {!selectedCompany && <div className={styles.checkmark}>✓</div>}
-            </button>
-          )}
           {availableCompanies.map(company => (
             <button
               key={company.id}

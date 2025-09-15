@@ -25,7 +25,7 @@ interface CompanyDropdownProps {
 const CompanyDropdown: React.FC<CompanyDropdownProps> = ({
   selectedCompanyId,
   onCompanyChange,
-  includeAllOption = true,
+  includeAllOption = false,
   placeholder = 'Select a company',
 }) => {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -59,9 +59,7 @@ const CompanyDropdown: React.FC<CompanyDropdownProps> = ({
   const selectedCompany = companies.find(c => c.id === selectedCompanyId);
   const displayText = selectedCompany
     ? selectedCompany.name
-    : !selectedCompanyId && includeAllOption
-      ? 'All Companies'
-      : placeholder;
+    : placeholder;
 
   if (loading) {
     return (

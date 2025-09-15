@@ -1,0 +1,140 @@
+.card {
+  display: flex;
+  width: 232px;
+  height: 120px;
+  padding: 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+  border-radius: var(--border-radius-md);
+  background: var(--white);
+  box-shadow: var(--box-shadow-card);
+  color: var(--neutral-800);
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--box-shadow-card-hover);
+  }
+
+  &.loading {
+    .loadingContent {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .loadingTitle,
+    .loadingValue,
+    .loadingComparison {
+      background: var(--neutral-100);
+      border-radius: 4px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .loadingTitle {
+      height: 20px;
+      width: 70%;
+    }
+
+    .loadingValue {
+      height: 30px;
+      width: 40%;
+      margin-top: 4px;
+    }
+
+    .loadingComparison {
+      height: 16px;
+      width: 60%;
+      margin-top: auto;
+    }
+  }
+}
+
+.header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--neutral-800);
+  margin: 0;
+}
+
+.content {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.valueSection {
+  display: flex;
+  align-items: center;
+}
+
+.value {
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 30px;
+  color: var(--neutral-800);
+}
+
+.comparisonSection {
+  display: flex;
+  align-items: flex-end;
+  margin-top: auto;
+}
+
+.comparison {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comparisonText {
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.metricsCardWrapper {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+  .card {
+    width: 100%;
+    min-width: 200px;
+    max-width: 232px;
+  }
+
+  .metricsCardWrapper {
+    overflow-x: auto;
+  }
+}

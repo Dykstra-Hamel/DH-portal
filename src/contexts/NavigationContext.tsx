@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
-export type PrimaryNavItem = 'dashboard' | 'conversations' | 'tasks' | 'brand';
+export type PrimaryNavItem = 'dashboard' | 'connections' | 'tasks' | 'brand';
 
 interface NavigationContextType {
   activePrimaryNav: PrimaryNavItem;
@@ -18,13 +18,16 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   // Update active nav based on current route
   useEffect(() => {
-    if (pathname.startsWith('/conversations')) {
-      setActivePrimaryNav('conversations');
+    if (pathname.startsWith('/connections')) {
+      setActivePrimaryNav('connections');
+    } else if (pathname.startsWith('/conversations')) {
+      // Legacy /conversations route should activate connections
+      setActivePrimaryNav('connections');
     } else if (pathname.startsWith('/leads')) {
-      // Legacy /leads route should also activate conversations
-      setActivePrimaryNav('conversations');
+      // Legacy /leads route should also activate connections
+      setActivePrimaryNav('connections');
     } else if (pathname.startsWith('/tickets')) {
-      setActivePrimaryNav('tasks');
+      setActivePrimaryNav('connections'); // Tickets now under connections
     } else if (pathname.startsWith('/brand')) {
       setActivePrimaryNav('brand');
     } else if (pathname.startsWith('/dashboard')) {
