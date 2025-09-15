@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Archive } from 'lucide-react';
 import styles from '@/components/Admin/AdminManager.module.scss';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useDateFilter } from '@/contexts/DateFilterContext';
 import { adminAPI } from '@/lib/api-client';
 
 interface CallRecord {
@@ -52,9 +51,8 @@ interface CallRecord {
 }
 
 export default function CallRecordsPage() {
-  // Use global company context and date filter
+  // Use global company context
   const { selectedCompany, isAdmin, isLoading: contextLoading } = useCompany();
-  const { getApiDateParams } = useDateFilter();
 
   // Call Records State
   const [calls, setCalls] = useState<CallRecord[]>([]);
@@ -78,21 +76,18 @@ export default function CallRecordsPage() {
         return;
       }
       
-      const dateParams = getApiDateParams();
       let data: CallRecord[] = [];
       
       if (isAdmin) {
-        // Admin can see all calls or filter by selected company
+        // Admin can see all calls or filter by selected company (NO date filter - always show all)
         const filters = { 
-          ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
-          ...dateParams
+          ...(selectedCompany ? { companyId: selectedCompany.id } : {})
         };
         data = await adminAPI.getAllCalls(filters);
       } else if (selectedCompany) {
-        // Regular users see calls for their selected company only
+        // Regular users see calls for their selected company only (NO date filter - always show all)
         const filters = { 
-          companyId: selectedCompany.id,
-          ...dateParams
+          companyId: selectedCompany.id
         };
         data = await adminAPI.getUserCalls(filters);
       }
@@ -103,7 +98,7 @@ export default function CallRecordsPage() {
     } finally {
       setCallsLoading(false);
     }
-  }, [isAdmin, selectedCompany, getApiDateParams]);
+  }, [isAdmin, selectedCompany]);
 
   useEffect(() => {
     if (!contextLoading) {

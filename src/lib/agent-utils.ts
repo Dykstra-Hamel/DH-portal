@@ -37,6 +37,47 @@ export async function findCompanyByAgentId(agentId: string | undefined): Promise
 }
 
 /**
+ * Find company ID and agent direction by Retell agent ID
+ * Extended version that also returns the agent direction for determining call type
+ */
+export async function findCompanyAndDirectionByAgentId(agentId: string | undefined): Promise<{
+  company_id: string | null;
+  agent_direction: Agent['agent_direction'] | null;
+}> {
+  if (!agentId) {
+    console.warn('findCompanyAndDirectionByAgentId: No agent ID provided');
+    return { company_id: null, agent_direction: null };
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { data: agent, error } = await supabase
+      .from('agents')
+      .select('company_id, agent_direction')
+      .eq('agent_id', agentId)
+      .eq('is_active', true)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.warn(`findCompanyAndDirectionByAgentId: No active agent found for agent ID: ${agentId}`);
+        return { company_id: null, agent_direction: null };
+      }
+      console.error('findCompanyAndDirectionByAgentId: Database error:', error);
+      return { company_id: null, agent_direction: null };
+    }
+
+    return {
+      company_id: agent.company_id,
+      agent_direction: agent.agent_direction
+    };
+  } catch (error) {
+    console.error('findCompanyAndDirectionByAgentId: Unexpected error:', error);
+    return { company_id: null, agent_direction: null };
+  }
+}
+
+/**
  * Get full agent details by Retell agent ID
  * Returns both agent and company information
  */

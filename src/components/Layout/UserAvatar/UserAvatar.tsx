@@ -122,11 +122,11 @@ export function UserAvatar() {
       avatarUrl = user.user_metadata.profile_image;
     }
 
-    // Temporarily disable Google avatars due to rate limiting
-    // TODO: Remove this after implementing proper avatar caching/proxy
-    if (avatarUrl && avatarUrl.includes('googleusercontent.com')) {
-      return null;
-    }
+    // Enable Google avatars now that domains are configured in next.config.ts
+    // Note: Consider implementing avatar caching/proxy for production if rate limiting becomes an issue
+    // if (avatarUrl && avatarUrl.includes('googleusercontent.com')) {
+    //   return null;
+    // }
 
     return avatarUrl;
   };

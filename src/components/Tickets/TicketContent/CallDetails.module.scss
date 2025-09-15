@@ -1,0 +1,161 @@
+// Shared styles from CustomerInformation
+.section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; // Allow flexbox to shrink properly
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  svg {
+    color: #6b7280;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+  }
+}
+
+.infoGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.infoRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.infoField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &:only-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 400;
+  color: #111827;
+  word-break: break-word;
+}
+
+// Recording section styles
+.recordingSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// Transcript section styles
+.transcriptSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.transcriptBox {
+  flex: 1;
+  min-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.transcriptContent {
+  padding: 16px;
+}
+
+.transcriptLine {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  line-height: 1.5;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.speaker {
+  font-weight: 600;
+  color: #374151;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.message {
+  color: #6b7280;
+  flex: 1;
+}
+
+// Form details styles
+.messageBox {
+  padding: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-top: 4px;
+
+  p {
+    margin: 0;
+    color: #374151;
+    line-height: 1.5;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .transcriptLine {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .speaker {
+    min-width: auto;
+  }
+}

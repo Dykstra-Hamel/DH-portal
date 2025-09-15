@@ -199,12 +199,34 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
+    // Clean and validate the data before updating
+    const updateData = {
+      ...body,
+      // Convert empty strings to null
+      email: body.email?.trim() || null,
+      phone: body.phone?.trim() || null,
+      address: (body.address?.trim() && body.address !== 'none') ? body.address.trim() : null,
+      city: (body.city?.trim() && body.city !== 'none') ? body.city.trim() : null,
+      state: (body.state?.trim() && body.state !== 'none') ? body.state.trim() : null,
+      zip_code: (body.zip_code?.trim() && body.zip_code !== 'none') ? body.zip_code.trim() : null,
+      notes: body.notes?.trim() || null,
+    };
+
+    // Remove any fields that are undefined or null if they shouldn't be updated
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
+
+    console.log('Admin Customer API: Updating customer with data:', updateData);
+
     // Use admin client to update customer
     const supabase = createAdminClient();
 
     const { data: customer, error } = await supabase
       .from('customers')
-      .update(body)
+      .update(updateData)
       .eq('id', id)
       .select(
         `

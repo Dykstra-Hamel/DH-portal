@@ -26,7 +26,7 @@ import {
 import { getTimeAgo, hasLiveCall } from '@/lib/time-utils';
 import { useRouter } from 'next/navigation';
 import styles from './TicketsTable.module.scss';
-import QualifyTicketModal from '../QualifyTicketModal/QualifyTicketModal';
+import { TicketReviewModal } from '../TicketReviewModal';
 
 interface TicketsTableProps {
   tickets: Ticket[];
@@ -631,7 +631,7 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
       />
 
       {qualifyingTicket && (
-        <QualifyTicketModal
+        <TicketReviewModal
           ticket={qualifyingTicket}
           isOpen={showQualifyModal}
           onClose={() => {

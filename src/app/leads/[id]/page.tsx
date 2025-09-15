@@ -26,7 +26,7 @@ import {
 import { CallHistory } from '@/components/Calls/CallHistory/CallHistory';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import { formatDateForDisplay } from '@/lib/utils';
-import styles from '../../conversations/leads/[id]/page.module.scss';
+import styles from '../../connections/leads/[id]/page.module.scss';
 
 interface Profile {
   id: string;
@@ -176,7 +176,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   }, [lead, isEditing, leadLoading, handleEdit, searchParams]);
 
   const handleBack = () => {
-    router.push('/conversations/leads');
+    router.push('/connections/leads');
   };
 
   const handleBackToCustomer = () => {
@@ -376,7 +376,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       }
 
       // Redirect to leads page after successful deletion
-      router.push('/conversations/leads');
+      router.push('/connections/leads');
     } catch (error) {
       console.error('Error deleting lead:', error);
       alert('Failed to delete lead. Please try again.');

@@ -8,7 +8,7 @@ export default function LeadsListRedirect() {
 
   useEffect(() => {
     // Redirect to the new leads location
-    router.replace('/conversations/leads');
+    router.replace('/connections/leads');
   }, [router]);
 
   return (

@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Default behavior: show active tickets (exclude archived)
       query = query
-        .in('status', ['new', 'contacted', 'qualified', 'quoted', 'in_progress', 'resolved', 'unqualified'])
+        .in('status', ['live', 'new', 'contacted', 'qualified', 'quoted', 'in_progress', 'resolved', 'unqualified'])
         .or('archived.is.null,archived.eq.false');
     }
 

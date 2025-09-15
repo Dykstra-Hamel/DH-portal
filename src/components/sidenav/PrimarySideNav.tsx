@@ -28,8 +28,8 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       )
     },
     {
-      id: 'conversations' as PrimaryNavItem,
-      href: '/conversations/calls-and-forms',
+      id: 'connections' as PrimaryNavItem,
+      href: '/connections',
       disabled: false,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -79,8 +79,8 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     if (href === '/dashboard') {
       return pathname.startsWith('/dashboard');
     }
-    if (href === '/conversations/calls-and-forms') {
-      return pathname.startsWith('/conversations');
+    if (href === '/connections') {
+      return pathname.startsWith('/connections') || pathname.startsWith('/tickets');
     }
     return pathname.startsWith(href);
   };

@@ -1,5 +1,3 @@
-import { DateFilterOption } from '@/contexts/DateFilterContext';
-
 /**
  * Format date to YYYY-MM-DD string for API calls
  */
@@ -8,107 +6,82 @@ export function formatDateForApi(date: Date): string {
 }
 
 /**
- * Get date range based on filter option
+ * Format duration in minutes to a readable string
  */
-export function getDateRangeFromFilter(filter: DateFilterOption): {
-  startDate: Date | null;
-  endDate: Date;
-} {
-  const endDate = new Date();
-  let startDate: Date | null = null;
-
-  switch (filter) {
-    case 'Past 7 Days':
-      startDate = new Date();
-      startDate.setDate(endDate.getDate() - 7);
-      break;
-    case 'Past 30 Days':
-      startDate = new Date();
-      startDate.setDate(endDate.getDate() - 30);
-      break;
-    case 'Past 90 Days':
-      startDate = new Date();
-      startDate.setDate(endDate.getDate() - 90);
-      break;
-    case 'All Time':
-      startDate = null; // No start date limit
-      break;
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) {
+    return `${minutes}m`;
   }
-
-  return { startDate, endDate };
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 /**
- * Convert filter to days count for APIs that expect days parameter
+ * Get relative time string (e.g., "2 hours ago")
  */
-export function getDaysFromFilter(filter: DateFilterOption): number | null {
-  switch (filter) {
-    case 'Past 7 Days':
-      return 7;
-    case 'Past 30 Days':
-      return 30;
-    case 'Past 90 Days':
-      return 90;
-    case 'All Time':
-      return null; // Unlimited
+export function getTimeAgo(date: Date | string): string {
+  const now = new Date();
+  const past = new Date(date);
+  const diffMs = now.getTime() - past.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) {
+    return 'Just now';
+  } else if (diffMins < 60) {
+    return `${diffMins}m ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  } else {
+    return `${diffDays}d ago`;
   }
 }
 
 /**
- * Convert filter to API parameters for date filtering
+ * Check if a ticket has a live call in progress
  */
-export function getApiDateParamsFromFilter(filter: DateFilterOption): {
-  dateFrom?: string;
-  dateTo?: string;
-} {
-  const { startDate, endDate } = getDateRangeFromFilter(filter);
-  
-  if (!startDate) {
-    // All Time - no date filtering
-    return {};
+export function hasLiveCall(ticket: any): boolean {
+  if (!ticket.call_records || !Array.isArray(ticket.call_records)) {
+    return false;
   }
 
-  return {
-    dateFrom: formatDateForApi(startDate),
-    dateTo: formatDateForApi(endDate),
-  };
+  // Check if any call record has status indicating live call
+  const hasLive = ticket.call_records.some((record: any) => {
+    // Check for live call statuses
+    const liveStatuses = ['ongoing', 'in-progress', 'active', 'ringing', 'connecting'];
+    const hasLiveStatus = liveStatuses.includes(record.call_status);
+
+    // Check for calls that have started but not ended (backup logic)
+    const hasStartNoEnd = record.start_timestamp && !record.end_timestamp;
+
+    // Additional validation - ensure start_timestamp is recent (within last hour)
+    const isRecent = record.start_timestamp ?
+      (new Date().getTime() - new Date(record.start_timestamp).getTime()) < (60 * 60 * 1000) : false;
+
+    return hasLiveStatus || (hasStartNoEnd && isRecent);
+  });
+
+  return hasLive;
 }
 
 /**
- * Check if a date is within the filter range
+ * Check if a call record represents an active/live call
  */
-export function isDateInRange(
-  date: Date,
-  filter: DateFilterOption
-): boolean {
-  const { startDate, endDate } = getDateRangeFromFilter(filter);
-  
-  if (!startDate) {
-    // All Time - always in range
-    return true;
-  }
+export function isLiveCallRecord(record: any): boolean {
+  if (!record) return false;
 
-  return date >= startDate && date <= endDate;
-}
+  // Check for live call statuses
+  const liveStatuses = ['ongoing', 'in-progress', 'active', 'ringing', 'connecting'];
+  const hasLiveStatus = liveStatuses.includes(record.call_status);
 
-/**
- * Format date range for display
- */
-export function formatDateRangeForDisplay(filter: DateFilterOption): string {
-  const { startDate, endDate } = getDateRangeFromFilter(filter);
-  
-  if (!startDate) {
-    return 'All Time';
-  }
+  // Check for calls that have started but not ended
+  const hasStartNoEnd = record.start_timestamp && !record.end_timestamp;
 
-  const options: Intl.DateTimeFormatOptions = {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  };
+  // Ensure the call is recent (within last hour to prevent stale calls)
+  const isRecent = record.start_timestamp ?
+    (new Date().getTime() - new Date(record.start_timestamp).getTime()) < (60 * 60 * 1000) : false;
 
-  const startFormatted = startDate.toLocaleDateString('en-US', options);
-  const endFormatted = endDate.toLocaleDateString('en-US', options);
-
-  return `${startFormatted} - ${endFormatted}`;
+  return hasLiveStatus || (hasStartNoEnd && isRecent);
 }

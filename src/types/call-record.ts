@@ -3,13 +3,20 @@ export type CallStatus =
   | 'failed'
   | 'busy'
   | 'no_answer'
-  | 'cancelled';
+  | 'cancelled'
+  | 'ongoing'
+  | 'in-progress'
+  | 'active'
+  | 'connecting'
+  | 'processing'
+  | 'transferring';
 export type CallSentiment = 'positive' | 'negative' | 'neutral';
 
 export interface CallRecord {
   id: string;
   call_id: string;
   lead_id?: string;
+  ticket_id?: string; // Reference to ticket created from this call
   customer_id?: string;
   phone_number: string;
   from_number?: string;

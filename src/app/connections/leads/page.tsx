@@ -9,7 +9,6 @@ import LeadsTabs from '@/components/Leads/LeadsTabs/LeadsTabs';
 import { adminAPI } from '@/lib/api-client';
 import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useDateFilter } from '@/contexts/DateFilterContext';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -32,9 +31,8 @@ export default function LeadsPage() {
   >('all');
   const router = useRouter();
 
-  // Use global company context and date filter
+  // Use global company context
   const { selectedCompany, isAdmin } = useCompany();
-  const { getApiDateParams } = useDateFilter();
 
   useEffect(() => {
     const supabase = createClient();
@@ -84,19 +82,17 @@ export default function LeadsPage() {
 
     try {
       setLeadsLoading(true);
-      const dateParams = getApiDateParams();
       
       if (isAdmin) {
         // Admin can filter by specific company or show all
         const filters = { 
           ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
-          ...dateParams
         };
         const leadsData = await adminAPI.getLeads(filters);
         setLeads(leadsData || []);
       } else {
         // Regular user gets leads for their selected company
-        const leadsData = await adminAPI.getUserLeads(selectedCompany!.id, dateParams);
+        const leadsData = await adminAPI.getUserLeads(selectedCompany!.id);
         setLeads(leadsData || []);
       }
     } catch (error) {
@@ -105,26 +101,24 @@ export default function LeadsPage() {
     } finally {
       setLeadsLoading(false);
     }
-  }, [selectedCompany, isAdmin, getApiDateParams]);
+  }, [selectedCompany, isAdmin]);
 
   const fetchArchivedLeads = useCallback(async () => {
     if (!isAdmin && !selectedCompany) return;
 
     try {
       setLeadsLoading(true);
-      const dateParams = getApiDateParams();
       
       if (isAdmin) {
         // Admin can filter by specific company or show all
         const filters = { 
           ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
-          ...dateParams
         };
         const archivedLeadsData = await adminAPI.getArchivedLeads(filters);
         setArchivedLeads(archivedLeadsData || []);
       } else {
         // Regular user gets archived leads for their selected company
-        const archivedLeadsData = await adminAPI.getUserArchivedLeads(selectedCompany!.id, dateParams);
+        const archivedLeadsData = await adminAPI.getUserArchivedLeads(selectedCompany!.id);
         setArchivedLeads(archivedLeadsData || []);
       }
     } catch (error) {
@@ -133,7 +127,7 @@ export default function LeadsPage() {
     } finally {
       setLeadsLoading(false);
     }
-  }, [selectedCompany, isAdmin, getApiDateParams]);
+  }, [selectedCompany, isAdmin]);
 
   const handleDeleteLead = async (leadId: string) => {
     try {

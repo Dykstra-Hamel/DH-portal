@@ -9,8 +9,12 @@
   /* Color Variables */
   --primary-50: #f0f9ff;
   --primary-100: #e0f2fe;
+  --primary-500: #0ca8eb;
   --primary-600: #0284c7;
   --neutral-100: #f5f5f5;
+  --neutral-300: #d4d4d4;
+  --neutral-700: #404040;
+  --light-gray-bg: #fafafc;
   --white: #fff;
   --neutral-800: #262626;
   --error-500: #ef4444;
@@ -26,6 +30,8 @@
   --drop-shadow-hover: #dbdbdd;
   --border-color: #d2d2d7;
   --live-call-gradient: linear-gradient(90deg, #00529b 5.43%, #001c35 99.55%);
+  --box-shadow-card: 0 0 11px 0 #e8e8ea;
+  --box-shadow-card-hover: 0 4px 12px 0 var(--drop-shadow-hover);
 
   /* Border Radius Variables */
   --border-radius-sm: 4px;
@@ -51,13 +57,12 @@ body {
 
 .pageWrapper {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: flex-start;
   min-height: 100vh;
   width: 100%;
   max-width: 1240px;
   margin: 0 auto;
-  overflow: auto;
 }
 
 .container {
