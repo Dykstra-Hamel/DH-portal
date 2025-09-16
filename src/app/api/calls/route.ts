@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
           email,
           company_id
         ),
-        agents (
+        agents!fk_call_records_agent_id (
           agent_name,
           agent_direction
         )

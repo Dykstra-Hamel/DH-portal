@@ -117,6 +117,9 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
     retell_llm_id, // Alternative field name
   } = callData;
 
+  // Extract agent_id for storage
+  const agentIdValue = agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
+
   // For outbound calls, always expect a lead_id in dynamic variables (from form submission)
   const providedLeadId = retell_llm_dynamic_variables?.lead_id;
   const companyIdFromDynamicVars = retell_llm_dynamic_variables?.company_id;
@@ -146,7 +149,6 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
     }
   } else {
     // Fallback: try to determine company from agent ID and find lead
-    const agentIdValue = agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
     companyId = await findCompanyByAgentId(agentIdValue);
 
     if (!companyId) {
@@ -213,6 +215,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
     }
   }
 
+
   // Create initial call record with all available data
   const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
@@ -227,6 +230,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
+      agent_id: agentIdValue, // Store the agent_id for call direction tracking
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
       // Add dynamic variable data immediately
