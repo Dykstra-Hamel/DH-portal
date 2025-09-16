@@ -1,6 +1,14 @@
--- Add assigned_at column to tickets table to track when tickets are assigned
-ALTER TABLE tickets 
-ADD COLUMN assigned_at TIMESTAMP WITH TIME ZONE;
+-- Add assigned_at column to tickets table to track when tickets are assigned - only if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'tickets' AND column_name = 'assigned_at'
+    ) THEN
+        ALTER TABLE tickets
+        ADD COLUMN assigned_at TIMESTAMP WITH TIME ZONE;
+    END IF;
+END $$;
 
 -- Create index for performance
 CREATE INDEX IF NOT EXISTS idx_tickets_assigned_at ON tickets(assigned_at);
