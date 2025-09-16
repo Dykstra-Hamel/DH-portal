@@ -8,7 +8,10 @@ import styles from '@/components/Admin/AdminManager.module.scss';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { adminAPI } from '@/lib/api-client';
-import { CallRecordWithDirection, PaginatedResponse } from '@/types/call-record';
+import {
+  CallRecordWithDirection,
+  PaginatedResponse,
+} from '@/types/call-record';
 
 export default function CallRecordsPage() {
   // Use global company context and date filter
@@ -23,66 +26,76 @@ export default function CallRecordsPage() {
     total: 0,
     totalPages: 0,
     hasNext: false,
-    hasPrev: false
+    hasPrev: false,
   });
   const [callsLoading, setCallsLoading] = useState(false);
   const [callsError, setCallsError] = useState<string | null>(null);
-  const [selectedCall, setSelectedCall] = useState<CallRecordWithDirection | null>(null);
-  
+  const [selectedCall, setSelectedCall] =
+    useState<CallRecordWithDirection | null>(null);
+
   // Archive State
   const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [callToArchive, setCallToArchive] = useState<CallRecordWithDirection | null>(null);
+  const [callToArchive, setCallToArchive] =
+    useState<CallRecordWithDirection | null>(null);
   const [isArchiving, setIsArchiving] = useState(false);
 
-  const loadCalls = useCallback(async (page: number = pagination.page) => {
-    try {
-      setCallsLoading(true);
-      setCallsError(null);
+  const loadCalls = useCallback(
+    async (page: number = pagination.page) => {
+      try {
+        setCallsLoading(true);
+        setCallsError(null);
 
-      // For non-admin users, require a specific company to be selected
-      if (!isAdmin && !selectedCompany) {
-        setCalls([]);
-        setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
-        return;
+        // For non-admin users, require a specific company to be selected
+        if (!isAdmin && !selectedCompany) {
+          setCalls([]);
+          setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
+          return;
+        }
+
+        let response: PaginatedResponse<CallRecordWithDirection>;
+
+        if (isAdmin) {
+          // Admin can see all calls or filter by selected company (NO date filter - always show all)
+          const filters = {
+            ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
+            page,
+            limit: pagination.limit,
+          };
+          response = await adminAPI.getAllCalls(filters);
+        } else if (selectedCompany) {
+          // Regular users see calls for their selected company only (NO date filter - always show all)
+          const filters = {
+            companyId: selectedCompany.id,
+            page,
+            limit: pagination.limit,
+          };
+          response = await adminAPI.getUserCalls(filters);
+        } else {
+          setCalls([]);
+          return;
+        }
+
+        setCalls(response.data || []);
+        setPagination({
+          ...response.pagination,
+          page, // Ensure the current page is set correctly
+        });
+      } catch (err) {
+        setCallsError(
+          err instanceof Error ? err.message : 'Failed to load calls'
+        );
+      } finally {
+        setCallsLoading(false);
       }
-
-      let response: PaginatedResponse<CallRecordWithDirection>;
-
-      if (isAdmin) {
-        // Admin can see all calls or filter by selected company (NO date filter - always show all)
-        const filters = {
-          ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
-          page,
-          limit: pagination.limit
-        };
-        response = await adminAPI.getAllCalls(filters);
-      } else if (selectedCompany) {
-        // Regular users see calls for their selected company only (NO date filter - always show all)
-        const filters = {
-          companyId: selectedCompany.id,
-          page,
-          limit: pagination.limit
-        };
-        response = await adminAPI.getUserCalls(filters);
-      } else {
-        setCalls([]);
-        return;
-      }
-
-      setCalls(response.data || []);
-      setPagination(response.pagination);
-    } catch (err) {
-      setCallsError(err instanceof Error ? err.message : 'Failed to load calls');
-    } finally {
-      setCallsLoading(false);
-    }
-  }, [isAdmin, selectedCompany, pagination.limit]);
+    },
+    [isAdmin, selectedCompany, pagination.limit]
+  );
 
   useEffect(() => {
     if (!contextLoading) {
       loadCalls(1); // Always load first page when dependencies change
     }
-  }, [contextLoading, selectedCompany, isAdmin]);
+  }, [contextLoading, selectedCompany, isAdmin, loadCalls]);
 
   // Pagination handlers
   const handlePageChange = (newPage: number) => {
@@ -109,7 +122,6 @@ export default function CallRecordsPage() {
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
-
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -167,10 +179,10 @@ export default function CallRecordsPage() {
 
     try {
       setIsArchiving(true);
-      
+
       const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
-      
+
       if (!session.session?.access_token) {
         throw new Error('No authentication session');
       }
@@ -178,14 +190,16 @@ export default function CallRecordsPage() {
       const response = await fetch(`/api/calls/${callToArchive.id}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
+          Authorization: `Bearer ${session.session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ archived: true }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: 'Unknown error' }));
         throw new Error(errorData.error || 'Failed to archive call record');
       }
 
@@ -195,7 +209,9 @@ export default function CallRecordsPage() {
       setShowArchiveModal(false);
       setCallToArchive(null);
     } catch (error) {
-      setCallsError(`Failed to archive call record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setCallsError(
+        `Failed to archive call record: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     } finally {
       setIsArchiving(false);
     }
@@ -212,7 +228,6 @@ export default function CallRecordsPage() {
         <h2>Call Records</h2>
       </div>
 
-
       <div className={styles.tabContent}>
         {contextLoading ? (
           <div className={styles.loading}>Loading...</div>
@@ -224,16 +239,15 @@ export default function CallRecordsPage() {
           <>
             <div className={styles.recordsHeader}>
               <h3>
-                {selectedCompany 
+                {selectedCompany
                   ? `${selectedCompany.name} Call Records`
-                  : isAdmin 
+                  : isAdmin
                     ? 'All Company Call Records'
-                    : 'Call Records'
-                }
+                    : 'Call Records'}
               </h3>
               <p>Total: {calls.length} calls</p>
             </div>
-            
+
             <div className={styles.table}>
               <table>
                 <thead>
@@ -245,7 +259,7 @@ export default function CallRecordsPage() {
                     <th>Duration</th>
                     <th>Sentiment</th>
                     <th>Pest Issue</th>
-                    <th>Call Direction</th>
+                    <th>Direction</th>
                     <th>Service Time</th>
                     <th>Data Opt-Out</th>
                     <th>Actions</th>
@@ -254,20 +268,28 @@ export default function CallRecordsPage() {
                 <tbody>
                   {calls.map(call => (
                     <tr key={call.id}>
-                      <td>{call.start_timestamp ? formatDate(call.start_timestamp) : 'N/A'}</td>
+                      <td>
+                        {call.start_timestamp
+                          ? formatDate(call.start_timestamp)
+                          : 'N/A'}
+                      </td>
                       <td>
                         {(() => {
-                          const customer = call.leads?.customers || call.customers;
+                          const customer =
+                            call.leads?.customers || call.customers;
                           return customer
                             ? `${customer.first_name} ${customer.last_name}`
                             : 'Unknown';
                         })()}
                         {(() => {
-                          const customer = call.leads?.customers || call.customers;
-                          return customer?.email && (
-                            <div className={styles.subText}>
-                              {customer.email}
-                            </div>
+                          const customer =
+                            call.leads?.customers || call.customers;
+                          return (
+                            customer?.email && (
+                              <div className={styles.subText}>
+                                {customer.email}
+                              </div>
+                            )
                           );
                         })()}
                       </td>
@@ -275,9 +297,10 @@ export default function CallRecordsPage() {
                         {(() => {
                           // For outbound calls, show the number that was called (phone_number)
                           // For inbound calls, show the caller's number (from_number or phone_number)
-                          const displayNumber = call.call_direction === 'outbound'
-                            ? call.phone_number  // Number that was called
-                            : (call.from_number || call.phone_number); // Caller's number
+                          const displayNumber =
+                            call.call_direction === 'outbound'
+                              ? call.phone_number // Number that was called
+                              : call.from_number || call.phone_number; // Caller's number
                           return formatPhoneNumber(displayNumber);
                         })()}
                       </td>
@@ -291,33 +314,53 @@ export default function CallRecordsPage() {
                           {call.call_status || 'Unknown'}
                         </span>
                       </td>
-                      <td>{call.duration_seconds ? formatDuration(call.duration_seconds) : 'N/A'}</td>
+                      <td>
+                        {call.duration_seconds
+                          ? formatDuration(call.duration_seconds)
+                          : 'N/A'}
+                      </td>
                       <td>
                         <span
                           className={styles.sentiment}
-                          style={{ color: getSentimentColor(call.sentiment || 'neutral') }}
+                          style={{
+                            color: getSentimentColor(
+                              call.sentiment || 'neutral'
+                            ),
+                          }}
                         >
                           {call.sentiment || 'N/A'}
                         </span>
                       </td>
-                      <td className={styles.pestIssueCell} title={call.pest_issue || 'N/A'}>
+                      <td
+                        className={styles.pestIssueCell}
+                        title={call.pest_issue || 'N/A'}
+                      >
                         {call.pest_issue || 'N/A'}
                       </td>
                       <td>
                         <span
                           className={styles.callDirection}
                           style={{
-                            color: call.call_direction === 'inbound' ? '#10b981' :
-                                   call.call_direction === 'outbound' ? '#3b82f6' : '#6b7280',
-                            fontWeight: '500'
+                            color:
+                              call.call_direction === 'inbound'
+                                ? '#10b981'
+                                : call.call_direction === 'outbound'
+                                  ? '#3b82f6'
+                                  : '#6b7280',
+                            fontWeight: '500',
                           }}
                         >
-                          {call.call_direction === 'inbound' ? 'Inbound' :
-                           call.call_direction === 'outbound' ? 'Outbound' : 'Unknown'}
+                          {call.call_direction === 'inbound'
+                            ? 'Inbound'
+                            : call.call_direction === 'outbound'
+                              ? 'Outbound'
+                              : 'Unknown'}
                         </span>
                       </td>
                       <td>{call.preferred_service_time || 'N/A'}</td>
-                      <td>{call.opt_out_sensitive_data_storage ? 'Yes' : 'No'}</td>
+                      <td>
+                        {call.opt_out_sensitive_data_storage ? 'Yes' : 'No'}
+                      </td>
                       <td>
                         <div className={styles.callActions}>
                           <button
@@ -399,7 +442,8 @@ export default function CallRecordsPage() {
                 <div className={styles.detailItem}>
                   <strong>Customer:</strong>{' '}
                   {(() => {
-                    const customer = selectedCall.leads?.customers || selectedCall.customers;
+                    const customer =
+                      selectedCall.leads?.customers || selectedCall.customers;
                     return customer
                       ? `${customer.first_name} ${customer.last_name}`
                       : 'Unknown';
@@ -410,30 +454,39 @@ export default function CallRecordsPage() {
                   {(() => {
                     // For outbound calls, show the number that was called (phone_number)
                     // For inbound calls, show the caller's number (from_number or phone_number)
-                    const displayNumber = selectedCall.call_direction === 'outbound'
-                      ? selectedCall.phone_number  // Number that was called
-                      : (selectedCall.from_number || selectedCall.phone_number); // Caller's number
+                    const displayNumber =
+                      selectedCall.call_direction === 'outbound'
+                        ? selectedCall.phone_number // Number that was called
+                        : selectedCall.from_number || selectedCall.phone_number; // Caller's number
                     return formatPhoneNumber(displayNumber);
                   })()}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>From:</strong>{' '}
-                  {selectedCall.from_number ? formatPhoneNumber(selectedCall.from_number) : 'N/A'}
+                  {selectedCall.from_number
+                    ? formatPhoneNumber(selectedCall.from_number)
+                    : 'N/A'}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Status:</strong> {selectedCall.call_status}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Start Time:</strong>{' '}
-                  {selectedCall.start_timestamp ? formatDate(selectedCall.start_timestamp) : 'N/A'}
+                  {selectedCall.start_timestamp
+                    ? formatDate(selectedCall.start_timestamp)
+                    : 'N/A'}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>End Time:</strong>{' '}
-                  {selectedCall.end_timestamp ? formatDate(selectedCall.end_timestamp) : 'N/A'}
+                  {selectedCall.end_timestamp
+                    ? formatDate(selectedCall.end_timestamp)
+                    : 'N/A'}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Duration:</strong>{' '}
-                  {selectedCall.duration_seconds ? formatDuration(selectedCall.duration_seconds) : 'N/A'}
+                  {selectedCall.duration_seconds
+                    ? formatDuration(selectedCall.duration_seconds)
+                    : 'N/A'}
                 </div>
                 <div className={styles.detailItem}>
                   <strong>Sentiment:</strong> {selectedCall.sentiment || 'N/A'}
@@ -510,24 +563,33 @@ export default function CallRecordsPage() {
             </div>
             <div className={styles.modalBody}>
               <p>
-                Are you sure you want to archive this call record? Archived calls will be hidden from the main view but can be restored if needed.
+                Are you sure you want to archive this call record? Archived
+                calls will be hidden from the main view but can be restored if
+                needed.
               </p>
               <div className={styles.callInfo}>
                 <strong>Call ID:</strong> {callToArchive.call_id}
                 <br />
-                <strong>Phone:</strong> {(() => {
+                <strong>Phone:</strong>{' '}
+                {(() => {
                   // For outbound calls, show the number that was called (phone_number)
                   // For inbound calls, show the caller's number (from_number or phone_number)
-                  const displayNumber = callToArchive.call_direction === 'outbound'
-                    ? callToArchive.phone_number  // Number that was called
-                    : (callToArchive.from_number || callToArchive.phone_number); // Caller's number
+                  const displayNumber =
+                    callToArchive.call_direction === 'outbound'
+                      ? callToArchive.phone_number // Number that was called
+                      : callToArchive.from_number || callToArchive.phone_number; // Caller's number
                   return formatPhoneNumber(displayNumber);
                 })()}
                 <br />
-                <strong>Date:</strong> {callToArchive.start_timestamp ? formatDate(callToArchive.start_timestamp) : 'N/A'}
+                <strong>Date:</strong>{' '}
+                {callToArchive.start_timestamp
+                  ? formatDate(callToArchive.start_timestamp)
+                  : 'N/A'}
                 <br />
-                <strong>Customer:</strong> {(() => {
-                  const customer = callToArchive.leads?.customers || callToArchive.customers;
+                <strong>Customer:</strong>{' '}
+                {(() => {
+                  const customer =
+                    callToArchive.leads?.customers || callToArchive.customers;
                   return customer
                     ? `${customer.first_name} ${customer.last_name}`
                     : 'Unknown';
