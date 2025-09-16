@@ -226,6 +226,9 @@ async function handleCallStarted(supabase: any, callData: any) {
     }
   }
 
+  // Extract agent_id for storage
+  const agentIdValue = agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
+
   // Create initial call record with all available data
   const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
@@ -240,6 +243,7 @@ async function handleCallStarted(supabase: any, callData: any) {
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
+      agent_id: agentIdValue, // Store the agent_id for call direction tracking
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
       // Add dynamic variable data immediately
@@ -384,6 +388,9 @@ async function handleCallEnded(supabase: any, callData: any) {
       }
     }
 
+    // Extract agent_id for storage
+    const agentIdValue = callData.agent_id || callData.retell_llm_id || callData.llm_id;
+
     // Create the call record
     const { data: newRecord, error: insertError } = await supabase
       .from('call_records')
@@ -404,6 +411,7 @@ async function handleCallEnded(supabase: any, callData: any) {
         duration_seconds: durationSeconds,
         billable_duration_seconds: billableDurationSeconds,
         disconnect_reason: disconnection_reason,
+        agent_id: agentIdValue, // Store the agent_id for call direction tracking
         retell_variables: retell_llm_dynamic_variables,
         opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
         // Add dynamic variable data

@@ -21,6 +21,9 @@ export interface CallRecord {
   transcript?: string;
   call_analysis?: any; // Raw Retell analysis object
 
+  // Agent information
+  agent_id?: string;
+
   // Extracted structured data
   sentiment?: CallSentiment;
   home_size?: string;
@@ -78,5 +81,53 @@ export interface CallSummary {
     positive: number;
     negative: number;
     neutral: number;
+  };
+}
+
+// Enhanced call record with agent direction information and joined data
+export interface CallRecordWithDirection extends CallRecord {
+  call_direction?: 'inbound' | 'outbound' | 'unknown';
+  agent_name?: string;
+  // Joined data from API
+  leads?: {
+    id: string;
+    customer_id: string;
+    company_id: string;
+    customers?: {
+      id: string;
+      first_name: string;
+      last_name: string;
+      email?: string;
+    };
+  };
+  customers?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email?: string;
+    company_id: string;
+  };
+  agents?: {
+    agent_name: string;
+    agent_direction: 'inbound' | 'outbound';
+  };
+}
+
+// Pagination interfaces
+export interface PaginationParams {
+  page: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
   };
 }
