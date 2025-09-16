@@ -102,7 +102,8 @@ export function SecondarySideNav({
         leads: leadsData.status === 'fulfilled' ? (Array.isArray(leadsData.value) ? leadsData.value.length : 0) : 0,
         customers: customersData.status === 'fulfilled' ? (Array.isArray(customersData.value) ? customersData.value.length : 0) : 0,
         projects: projectsData.status === 'fulfilled' ? (Array.isArray(projectsData.value) ? projectsData.value.length : 0) : 0,
-        calls: callsData.status === 'fulfilled' ? (Array.isArray(callsData.value) ? callsData.value.length : 0) : 0,
+        calls: callsData.status === 'fulfilled' ?
+          (callsData.value?.pagination?.total || (Array.isArray(callsData.value?.data) ? callsData.value.data.length : 0)) : 0,
       });
     } catch (error) {
       console.error('Error fetching counts:', error);
