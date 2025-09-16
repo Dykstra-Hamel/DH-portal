@@ -367,6 +367,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
+      agent_id: agentIdValue, // Store the agent_id for call direction tracking
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
       // Add dynamic variable data immediately

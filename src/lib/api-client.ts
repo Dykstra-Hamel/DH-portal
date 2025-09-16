@@ -317,22 +317,26 @@ export const adminAPI = {
   },
 
   // All Calls (admin)
-  async getAllCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string } = {}) {
+  async getAllCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number } = {}) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('companyId', filters.companyId);
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+    if (filters.page) queryParams.append('page', filters.page.toString());
+    if (filters.limit) queryParams.append('limit', filters.limit.toString());
 
     const url = `/api/admin/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
   },
 
   // Calls for regular users
-  async getUserCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string } = {}) {
+  async getUserCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number } = {}) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('company_id', filters.companyId);
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+    if (filters.page) queryParams.append('page', filters.page.toString());
+    if (filters.limit) queryParams.append('limit', filters.limit.toString());
 
     const url = `/api/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);

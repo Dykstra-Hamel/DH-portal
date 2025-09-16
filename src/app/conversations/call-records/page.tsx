@@ -40,7 +40,8 @@ export default function CallRecordsPage() {
   const [isArchiving, setIsArchiving] = useState(false);
 
   const loadCalls = useCallback(
-    async (page: number = pagination.page) => {
+    async (page: number = 1) => {
+      console.log('loadCalls called with page:', page);
       try {
         setCallsLoading(true);
         setCallsError(null);
@@ -59,7 +60,7 @@ export default function CallRecordsPage() {
           const filters = {
             ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
             page,
-            limit: pagination.limit,
+            limit: 20,
           };
           response = await adminAPI.getAllCalls(filters);
         } else if (selectedCompany) {
@@ -67,7 +68,7 @@ export default function CallRecordsPage() {
           const filters = {
             companyId: selectedCompany.id,
             page,
-            limit: pagination.limit,
+            limit: 20,
           };
           response = await adminAPI.getUserCalls(filters);
         } else {
@@ -75,11 +76,14 @@ export default function CallRecordsPage() {
           return;
         }
 
-        setCalls(response.data || []);
-        setPagination({
-          ...response.pagination,
-          page, // Ensure the current page is set correctly
+        console.log('API response:', {
+          dataLength: response.data?.length,
+          pagination: response.pagination,
+          requestedPage: page
         });
+        setCalls(response.data || []);
+        setPagination(response.pagination);
+        console.log('Updated pagination state:', response.pagination);
       } catch (err) {
         setCallsError(
           err instanceof Error ? err.message : 'Failed to load calls'
@@ -88,7 +92,7 @@ export default function CallRecordsPage() {
         setCallsLoading(false);
       }
     },
-    [isAdmin, selectedCompany, pagination.limit]
+    [isAdmin, selectedCompany]
   );
 
   useEffect(() => {
@@ -99,7 +103,9 @@ export default function CallRecordsPage() {
 
   // Pagination handlers
   const handlePageChange = (newPage: number) => {
+    console.log('handlePageChange called:', { newPage, currentPage: pagination.page, totalPages: pagination.totalPages });
     if (newPage >= 1 && newPage <= pagination.totalPages) {
+      console.log('Calling loadCalls with page:', newPage);
       loadCalls(newPage);
     }
   };
@@ -203,8 +209,8 @@ export default function CallRecordsPage() {
         throw new Error(errorData.error || 'Failed to archive call record');
       }
 
-      // Refresh the calls list
-      await loadCalls();
+      // Refresh the calls list at the current page
+      await loadCalls(pagination.page);
 
       setShowArchiveModal(false);
       setCallToArchive(null);
@@ -245,7 +251,7 @@ export default function CallRecordsPage() {
                     ? 'All Company Call Records'
                     : 'Call Records'}
               </h3>
-              <p>Total: {calls.length} calls</p>
+              <p>Showing {calls.length} of {pagination.total} calls</p>
             </div>
 
             <div className={styles.table}>
