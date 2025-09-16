@@ -232,3 +232,67 @@ export async function getSMSAgents(companyId: string, direction?: Agent['agent_d
   // Filter to only agents with phone numbers
   return agents.filter(agent => agent.phone_number && agent.phone_number.trim() !== '');
 }
+
+/**
+ * Determine call direction from agent ID
+ * Returns 'inbound', 'outbound', or 'unknown' if agent not found
+ */
+export async function getCallDirectionByAgentId(agentId: string | undefined): Promise<'inbound' | 'outbound' | 'unknown'> {
+  if (!agentId) {
+    return 'unknown';
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { data: agent, error } = await supabase
+      .from('agents')
+      .select('agent_direction')
+      .eq('agent_id', agentId)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !agent) {
+      return 'unknown';
+    }
+
+    return agent.agent_direction as 'inbound' | 'outbound';
+  } catch (error) {
+    console.error('getCallDirectionByAgentId: Unexpected error:', error);
+    return 'unknown';
+  }
+}
+
+/**
+ * Get agent details by agent ID for call records
+ * Returns both direction and name for display purposes
+ */
+export async function getAgentDetailsForCallRecord(agentId: string | undefined): Promise<{
+  direction: 'inbound' | 'outbound' | 'unknown';
+  name: string | null;
+}> {
+  if (!agentId) {
+    return { direction: 'unknown', name: null };
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { data: agent, error } = await supabase
+      .from('agents')
+      .select('agent_direction, agent_name')
+      .eq('agent_id', agentId)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !agent) {
+      return { direction: 'unknown', name: null };
+    }
+
+    return {
+      direction: agent.agent_direction as 'inbound' | 'outbound',
+      name: agent.agent_name
+    };
+  } catch (error) {
+    console.error('getAgentDetailsForCallRecord: Unexpected error:', error);
+    return { direction: 'unknown', name: null };
+  }
+}

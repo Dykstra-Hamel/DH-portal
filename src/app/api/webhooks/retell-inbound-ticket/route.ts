@@ -360,6 +360,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       phone_number: customerPhone, // Use normalized phone for consistency
       from_number: rawCustomerPhone, // Keep original format from Retell
       call_status: 'in-progress',
+      agent_id: agentIdValue, // Store the agent_id for call direction tracking
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
