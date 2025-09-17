@@ -38,6 +38,8 @@ export async function authenticatedFetch(
     
     const errorDetails = {
       url,
+      method: options?.method || 'GET',
+      requestBody: options?.body,
       status: response.status,
       statusText: response.statusText,
       error: errorData,

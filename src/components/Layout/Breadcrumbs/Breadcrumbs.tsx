@@ -35,8 +35,8 @@ export function Breadcrumbs() {
         switch (activePrimaryNav) {
           case 'dashboard':
             return { label: 'Dashboard', href: '/dashboard' };
-          case 'conversations':
-            return { label: 'Conversations', href: '/conversations/calls-and-forms' };
+          case 'connections':
+            return { label: 'Connections', href: '/tickets' };
           case 'tasks':
             return { label: 'Tasks', href: '/tickets' };
           case 'brand':
@@ -61,9 +61,9 @@ export function Breadcrumbs() {
 
         case 'leads':
           // Start with primary nav root only if not already there
-          if (activePrimaryNav === 'conversations') {
-            // For legacy /leads route under conversations, redirect logic
-            crumbs.push({ label: 'Sales Leads', href: '/conversations/leads' });
+          if (activePrimaryNav === 'connections') {
+            // For /leads route under connections
+            crumbs.push({ label: 'Sales Leads', href: '/connections/leads' });
           } else {
             crumbs.push({ label: 'Leads', href: '/leads' });
           }
@@ -137,16 +137,16 @@ export function Breadcrumbs() {
           }
           break;
 
-        case 'conversations':
+        case 'connections':
           // Don't add Conversations again if it's already the primary nav root
-          if (activePrimaryNav !== 'conversations') {
-            crumbs.push({ label: 'Conversations', href: '/conversations/calls-and-forms' });
+          if (activePrimaryNav !== 'connections') {
+            crumbs.push({ label: 'Conversations', href: '/tickets' });
           }
           
           // Handle conversation sub-pages
           if (pathSegments[1]) {
             const conversationPageMap: { [key: string]: string } = {
-              'calls-and-forms': 'Calls & Forms',
+              'calls-and-forms': 'Tickets',
               'leads': 'Sales Leads', 
               'scheduling': 'Scheduling',
               'customer-service': 'Customer Service',
@@ -161,9 +161,9 @@ export function Breadcrumbs() {
                 word.charAt(0).toUpperCase() + word.slice(1)
               ).join(' ');
             
-            crumbs.push({ 
+            crumbs.push({
               label: pageLabel,
-              href: `/conversations/${pathSegments[1]}`
+              href: `/connections/${pathSegments[1]}`
             });
             
             // If viewing specific conversation item (e.g., specific lead or ticket)

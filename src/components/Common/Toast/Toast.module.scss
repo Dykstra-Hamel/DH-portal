@@ -1,0 +1,105 @@
+.toast {
+  position: fixed;
+  top: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100; // Higher than modal overlay (1000)
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: var(--border-radius-md);
+
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  animation: slideIn 0.3s ease-out;
+
+  &.success {
+    background: #10b981; // Emerald green for success
+  }
+
+  @media (max-width: 768px) {
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+    transform: none;
+    max-width: calc(100vw - 2rem);
+  }
+}
+
+.iconContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+}
+
+.message {
+  line-height: 1.4;
+  flex: 1;
+}
+
+.undoButton {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  text-decoration: underline;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    text-decoration: none;
+  }
+
+  &:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    text-decoration: none;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

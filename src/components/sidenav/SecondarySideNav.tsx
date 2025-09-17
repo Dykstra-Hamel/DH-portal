@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useDateFilter } from '@/contexts/DateFilterContext';
 import { adminAPI } from '@/lib/api-client';
 import styles from './secondarySidenav.module.scss';
 
@@ -54,7 +53,6 @@ export function SecondarySideNav({
   const pathname = usePathname();
   const { activePrimaryNav } = useNavigation();
   const { selectedCompany, isAdmin } = useCompany();
-  const { getApiDateParams } = useDateFilter();
   const isPublicPage = pathname === '/login' || pathname === '/sign-up';
 
   // Handle client-side hydration
@@ -66,35 +64,34 @@ export function SecondarySideNav({
   const fetchCounts = useCallback(async (companyId: string) => {
     setLoadingCounts(true);
     try {
-      const dateParams = getApiDateParams();
       const [ticketsData, leadsData, customersData, projectsData, callsData] = await Promise.allSettled([
-        // Fetch tickets (with date filter)
+        // Fetch tickets (active/non-archived tickets only)
         isAdmin 
-          ? adminAPI.tickets.list({ companyId, includeArchived: false, ...dateParams })
+          ? adminAPI.tickets.list({ companyId, includeArchived: false })
           : (() => {
-              const queryParams = new URLSearchParams({ companyId, includeArchived: 'false', ...dateParams });
+              const queryParams = new URLSearchParams({ companyId, includeArchived: 'false' });
               return fetch(`/api/tickets?${queryParams}`).then(res => res.ok ? res.json() : []);
             })(),
         
-        // Fetch leads (with date filter)
+        // Fetch leads (NEW leads only)
         isAdmin 
-          ? adminAPI.getLeads({ companyId, ...dateParams })
-          : adminAPI.getUserLeads(companyId, dateParams),
+          ? adminAPI.getLeads({ companyId, status: 'new' })
+          : adminAPI.getUserLeads(companyId),
         
         // Fetch customers (NO date filter - always show total count)
         isAdmin 
           ? adminAPI.getCustomers({ companyId })
           : adminAPI.getUserCustomers({ companyId }),
         
-        // Fetch projects (with date filter if needed)
+        // Fetch projects (NO date filter - show total counts)
         isAdmin 
-          ? adminAPI.getProjects({ companyId, ...dateParams })
+          ? adminAPI.getProjects({ companyId })
           : adminAPI.getUserProjects(companyId),
         
-        // Fetch calls (with date filter)
+        // Fetch calls (NO date filter - always show total count)
         isAdmin 
-          ? adminAPI.getAllCalls({ companyId, ...dateParams })
-          : adminAPI.getUserCalls({ companyId, ...dateParams }),
+          ? adminAPI.getAllCalls({ companyId })
+          : adminAPI.getUserCalls({ companyId }),
       ]);
 
       setCounts({
@@ -110,14 +107,14 @@ export function SecondarySideNav({
     } finally {
       setLoadingCounts(false);
     }
-  }, [isAdmin, getApiDateParams]);
+  }, [isAdmin]);
 
   // Fetch counts when company changes
   useEffect(() => {
     if (selectedCompany?.id && isHydrated) {
       fetchCounts(selectedCompany.id);
     }
-  }, [selectedCompany?.id, isHydrated, isAdmin, fetchCounts]);
+  }, [selectedCompany?.id, isHydrated, fetchCounts]);
 
 
 
@@ -163,7 +160,7 @@ export function SecondarySideNav({
             />
           </svg>
         );
-      case 'conversations':
+      case 'connections':
         return (
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -295,30 +292,30 @@ export function SecondarySideNav({
             ]
           }
         ];
-      case 'conversations':
+      case 'connections':
       default:
         return [
           {
             items: [
               {
-                text: 'Calls & Forms',
-                href: '/conversations/calls-and-forms',
+                text: 'Tickets',
+                href: '/connections/tickets',
                 count: counts.tickets,
               },
-              { 
-                text: 'Sales Leads', 
-                href: '/conversations/leads', 
-                count: counts.leads 
+              {
+                text: 'Sales Leads',
+                href: '/connections/leads',
+                count: counts.leads
               },
-              { 
-                text: 'Scheduling', 
-                href: '/conversations/scheduling', 
+              {
+                text: 'Scheduling',
+                href: '/connections/scheduling',
                 count: 0, // No data source yet
                 disabled: true
               },
               {
                 text: 'Customer Service',
-                href: '/conversations/customer-service',
+                href: '/connections/customer-service',
                 count: 0, // No data source yet
                 disabled: true
               }
@@ -329,13 +326,13 @@ export function SecondarySideNav({
             items: [
               {
                 text: 'My Tasks',
-                href: '/conversations/my-tasks',
+                href: '/connections/my-tasks',
                 count: 0, // No data source yet
                 disabled: true,
               },
               {
                 text: 'Assigned To Me',
-                href: '/conversations/assigned-to-me',
+                href: '/connections/assigned-to-me',
                 count: 0, // No data source yet
                 disabled: true
               }
@@ -344,14 +341,14 @@ export function SecondarySideNav({
           },
           {
             items: [
-              { 
-                text: 'Reports', 
-                href: '/conversations/reports',
-                disabled: true 
+              {
+                text: 'Reports',
+                href: '/connections/reports',
+                disabled: true
               },
-              { 
-                text: 'Calls', 
-                href: '/conversations/call-records',
+              {
+                text: 'Calls',
+                href: '/connections/call-records',
                 count: counts.calls
               },
               { 
@@ -383,8 +380,10 @@ export function SecondarySideNav({
                 {group.items.map((item) => {
                   const isActive =
                     pathname === item.href ||
-                    (item.href === '/conversations/calls-and-forms' &&
-                      pathname.startsWith('/conversations/calls-and-forms'));
+                    (item.href === '/connections/tickets' &&
+                      (pathname.startsWith('/connections/tickets') || pathname.startsWith('/tickets') || pathname.startsWith('/connections/calls-and-forms'))) ||
+                    (item.href.startsWith('/connections/') &&
+                      pathname.startsWith(item.href));
 
                   return (
                     <div key={item.text} className={styles.navItemContainer}>

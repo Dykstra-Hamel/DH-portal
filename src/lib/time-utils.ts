@@ -138,15 +138,42 @@ export function hasLiveCall(ticket: any): boolean {
   if (!ticket.call_records || !Array.isArray(ticket.call_records)) {
     return false;
   }
-  
+
   // Check if any call record has status indicating live call
   const hasLive = ticket.call_records.some((record: any) => {
-    const isInProgress = record.call_status === 'ongoing' || 
-                        record.call_status === 'in-progress';
+    // Check for live call statuses
+    const liveStatuses = ['ongoing', 'in-progress', 'active', 'ringing', 'connecting'];
+    const hasLiveStatus = liveStatuses.includes(record.call_status);
+
+    // Check for calls that have started but not ended (backup logic)
     const hasStartNoEnd = record.start_timestamp && !record.end_timestamp;
-    
-    return isInProgress || hasStartNoEnd;
+
+    // Additional validation - ensure start_timestamp is recent (within last hour)
+    const isRecent = record.start_timestamp ?
+      (new Date().getTime() - new Date(record.start_timestamp).getTime()) < (60 * 60 * 1000) : false;
+
+    return hasLiveStatus || (hasStartNoEnd && isRecent);
   });
-  
+
   return hasLive;
+}
+
+/**
+ * Check if a call record represents an active/live call
+ */
+export function isLiveCallRecord(record: any): boolean {
+  if (!record) return false;
+
+  // Check for live call statuses
+  const liveStatuses = ['ongoing', 'in-progress', 'active', 'ringing', 'connecting'];
+  const hasLiveStatus = liveStatuses.includes(record.call_status);
+
+  // Check for calls that have started but not ended
+  const hasStartNoEnd = record.start_timestamp && !record.end_timestamp;
+
+  // Ensure the call is recent (within last hour to prevent stale calls)
+  const isRecent = record.start_timestamp ?
+    (new Date().getTime() - new Date(record.start_timestamp).getTime()) < (60 * 60 * 1000) : false;
+
+  return hasLiveStatus || (hasStartNoEnd && isRecent);
 }

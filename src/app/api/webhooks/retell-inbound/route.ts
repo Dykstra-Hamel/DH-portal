@@ -4,7 +4,7 @@ import { Retell } from 'retell-sdk';
 import { normalizePhoneNumber } from '@/lib/utils';
 import { sendCallSummaryNotifications } from '@/lib/email/call-summary-notifications';
 import { CallSummaryEmailData } from '@/lib/email/types';
-import { findCompanyByAgentId } from '@/lib/agent-utils';
+import { findCompanyByAgentId, findCompanyAndDirectionByAgentId } from '@/lib/agent-utils';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -257,15 +257,15 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     );
   }
 
-  // Determine company from inbound agent ID
+  // Determine company and agent direction from agent ID
   const agentIdValue =
     agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
-  const companyId = await findCompanyByAgentId(agentIdValue);
+  const { company_id: companyId, agent_direction } = await findCompanyAndDirectionByAgentId(agentIdValue);
 
   if (!companyId) {
     console.error(`❌ [${requestId}] No company found for agent`);
     return NextResponse.json(
-      { error: 'Company not found for inbound agent ID' },
+      { error: 'Company not found for agent ID' },
       { status: 404 }
     );
   }
@@ -275,14 +275,17 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   let customerId;
 
   if (!existingCustomer) {
-    // Create new customer for inbound caller
+    // Create new customer with name based on agent direction
+    const defaultFirstName = agent_direction === 'outbound' ? 'Outbound' : 'Inbound';
+    const defaultLastName = agent_direction === 'outbound' ? 'Call' : 'Caller';
+    
     const { data: newCustomer, error: customerError } = await supabase
       .from('customers')
       .insert({
         phone: customerPhone,
         company_id: companyId,
-        first_name: 'Inbound', // Default name for inbound callers
-        last_name: 'Caller', // Will be updated when we get actual name
+        first_name: defaultFirstName,
+        last_name: defaultLastName,
         created_at: new Date().toISOString(),
       })
       .select('id')
@@ -416,7 +419,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
   const { data: callRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
-      call_status: call_status || 'completed',
+      call_status: 'processing', // Set to processing to show loading state until analysis
       end_timestamp: end_timestamp
         ? new Date(end_timestamp).toISOString()
         : new Date().toISOString(),
@@ -493,6 +496,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
   const { data: callRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
+      call_status: 'completed', // Set to completed now that analysis is done
       recording_url,
       transcript,
       call_analysis,
@@ -590,10 +594,10 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       const customerUpdateData: any = {};
 
       // Name updates: ONLY update if customer still has default placeholder names
-      if (
-        existingCustomer.first_name === 'Inbound' &&
-        existingCustomer.last_name === 'Caller'
-      ) {
+      const hasInboundPlaceholder = existingCustomer.first_name === 'Inbound' && existingCustomer.last_name === 'Caller';
+      const hasOutboundPlaceholder = existingCustomer.first_name === 'Outbound' && existingCustomer.last_name === 'Call';
+      
+      if (hasInboundPlaceholder || hasOutboundPlaceholder) {
         if (customerFirstName && customerFirstName.trim() !== '') {
           customerUpdateData.first_name = customerFirstName.trim();
         }

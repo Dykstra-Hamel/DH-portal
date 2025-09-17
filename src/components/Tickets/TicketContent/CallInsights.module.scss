@@ -1,0 +1,27 @@
+// Import shared section styles
+@import './SharedSection.module.scss';
+
+// CallInsights-specific styles
+
+// Select field specific to CallInsights
+.select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #006bc2;
+    box-shadow: 0 0 0 3px rgba(0, 107, 194, 0.1);
+  }
+
+  &:disabled {
+    background: #f9fafb;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
+}

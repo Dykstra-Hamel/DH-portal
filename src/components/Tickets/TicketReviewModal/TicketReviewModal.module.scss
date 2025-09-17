@@ -1,0 +1,266 @@
+.ticketModal {
+  max-width: 1200px;
+  width: 100%;
+  transition: all 0.3s ease;
+  opacity: 1;
+  transform: translateY(0);
+
+  &.stepTransition {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.leftColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; // Sections have their own margins
+}
+
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0; // Sections have their own margins
+}
+
+.customDropdown {
+  position: relative;
+  display: inline-block;
+  width: 300px;
+
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+}
+
+.dropdownButton {
+  display: flex;
+  width: 100%;
+  height: 44px;
+  padding: 8px 12px;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 4px;
+  border: 1px solid var(--Misc-Border-Color, #dedede);
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-600);
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+  }
+
+  &:hover:not(.disabled) {
+    border-color: var(--primary-600);
+  }
+
+  &.disabled {
+    background: #f9fafb;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border-color: #e5e7eb;
+  }
+}
+
+.selectedOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--action-500);
+
+  svg path {
+    stroke: var(--action-500);
+  }
+
+  // For Lucide icons (they use currentColor)
+  svg {
+    color: var(--action-500);
+  }
+}
+
+.optionText {
+  font-weight: 600;
+  line-height: 1;
+}
+
+.chevronIcon {
+  color: #000;
+  transition: transform 0.2s ease;
+
+  .open & {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid var(--Misc-Border-Color, #dedede);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.dropdownOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: #fff;
+  color: var(--neutral-800);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background: var(--primary-100, #e0f2fe);
+  }
+
+  &.selected {
+    background: var(--primary-100, #e0f2fe);
+    color: var(--primary-600);
+
+    svg path {
+      stroke: var(--primary-600);
+    }
+
+    // For Lucide icons (they use currentColor)
+    svg {
+      color: var(--primary-600);
+    }
+  }
+
+  svg path {
+    stroke: var(--neutral-800);
+  }
+
+  // For Lucide icons (they use currentColor)
+  svg {
+    color: var(--neutral-800);
+  }
+
+  .optionText {
+    font-weight: 500;
+  }
+}
+
+.loadingMessage {
+  padding: 16px;
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+}
+
+// Responsive design adjustments
+@media (max-width: 768px) {
+  .ticketModal {
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem);
+  }
+
+  .modalContent {
+    max-height: 60vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .ticketModal {
+    margin: 0.25rem;
+    max-width: calc(100vw - 0.5rem);
+  }
+
+  .modalContent {
+    max-height: 65vh;
+  }
+}
+
+.assignmentSelect {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #006bc2;
+    box-shadow: 0 0 0 3px rgba(0, 107, 194, 0.1);
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+.avatarContainer {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarInitials {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #006bc2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  align-items: flex-start;
+}
+
+.userName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--action-600);
+  line-height: 1.2;
+}
+
+.myselfLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--action-600);
+  line-height: 1;
+}

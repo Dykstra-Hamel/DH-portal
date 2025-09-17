@@ -7,7 +7,6 @@ import { GlobalHeader } from '../GlobalHeader/GlobalHeader';
 import { Sidebar } from '@/components/sidenav/Sidebar';
 import { NavigationProvider } from '@/contexts/NavigationContext';
 import { CompanyProvider } from '@/contexts/CompanyContext';
-import { DateFilterProvider } from '@/contexts/DateFilterContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
 import styles from './LayoutWrapper.module.scss';
 
@@ -44,15 +43,15 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         return {
           title: 'Dashboard',
           description: 'View your business analytics and metrics here.',
-          showFilter: true,
           showAddLead: true,
         };
-      case '/conversations/calls-and-forms':
+      case '/tickets':
+      case '/connections/tickets':
+      case '/connections/calls-and-forms':
         return {
-          title: 'Calls & Forms',
+          title: 'Tickets',
           description:
             'Review, qualify, and assign all your incoming leads here.',
-          showFilter: true,
           showAddLead: true,
         };
       case '/customers':
@@ -60,21 +59,18 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         return {
           title: 'All Customers',
           description: 'Manage and view all your customer information here.',
-          showFilter: false,
           showAddLead: true,
         };
       case '/tickets':
         return {
           title: 'Tickets',
           description: 'Track and manage all support tickets here.',
-          showFilter: true,
           showAddLead: false,
         };
       case '/call-records':
         return {
           title: 'Call Records',
           description: 'Review detailed call logs and recordings here.',
-          showFilter: true,
           showAddLead: false,
         };
       case '/settings':
@@ -82,49 +78,43 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
           title: 'Settings',
           description:
             'Configure your account and application preferences here.',
-          showFilter: false,
           showAddLead: false,
         };
       case '/projects':
         return {
           title: 'Projects',
           description: 'Manage your ongoing projects and tasks here.',
-          showFilter: false,
           showAddLead: false,
         };
       case '/brand':
         return {
           title: 'Brand',
           description: 'Customize your brand settings and appearance here.',
-          showFilter: false,
           showAddLead: false,
         };
       case '/admin':
         return {
           title: 'Admin Dashboard',
           description: 'Manage system settings and user administration here.',
-          showFilter: false,
           showAddLead: false,
         };
-      case '/conversations/leads':
+      case '/connections/leads':
+      case '/connections/leads':
         return {
           title: 'Leads',
           description: 'View and manage all your sales leads here.',
-          showFilter: true,
           showAddLead: true,
         };
       case '/test-automation':
         return {
           title: 'Test Automation',
           description: 'Configure and test automated workflows here.',
-          showFilter: false,
           showAddLead: false,
         };
       case '/automation-status':
         return {
           title: 'Automation Status',
           description: 'Monitor the status of your automated processes here.',
-          showFilter: false,
           showAddLead: false,
         };
       // Handle individual record pages (hide lower header)
@@ -132,14 +122,14 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         if (
           pathname.includes('/customers/') ||
           pathname.includes('/tickets/') ||
-          pathname.includes('/conversations/leads/')
+          pathname.includes('/connections/leads/') ||
+          pathname.includes('/connections/leads/')
         ) {
           return null; // Don't show lower header on individual record pages
         }
         return {
           title: 'Page',
           description: 'Welcome to this section of the application.',
-          showFilter: false,
           showAddLead: false,
         };
     }
@@ -154,30 +144,27 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
     <NavigationProvider>
       <CompanyProvider>
-        <DateFilterProvider>
-          <div className={styles.layoutWrapper}>
-            {/* Mobile Menu Button */}
-            <div className="mobileMenuButton" onClick={toggleSidebar}>
-              <Menu size={32} />
-            </div>
+        <div className={styles.layoutWrapper}>
+          {/* Mobile Menu Button */}
+          <div className="mobileMenuButton" onClick={toggleSidebar}>
+            <Menu size={32} />
+          </div>
 
-            <div className={styles.contentWrapper}>
-              <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
-              <div className={styles.rightContent}>
-                <GlobalHeader />
-                {pageConfig && (
-                  <GlobalLowerHeader
-                    title={pageConfig.title}
-                    description={pageConfig.description}
-                    showFilter={pageConfig.showFilter}
-                    showAddLead={pageConfig.showAddLead}
-                  />
-                )}
-                <main className={styles.mainContent}>{children}</main>
-              </div>
+          <div className={styles.contentWrapper}>
+            <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
+            <div className={styles.rightContent}>
+              <GlobalHeader />
+              {pageConfig && (
+                <GlobalLowerHeader
+                  title={pageConfig.title}
+                  description={pageConfig.description}
+                  showAddLead={pageConfig.showAddLead}
+                />
+              )}
+              <main className={styles.mainContent}>{children}</main>
             </div>
           </div>
-        </DateFilterProvider>
+        </div>
       </CompanyProvider>
     </NavigationProvider>
   );

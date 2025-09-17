@@ -284,7 +284,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
   const { data: existingRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
-      call_status: call_status || 'completed',
+      call_status: 'processing', // Set to processing to show loading state until analysis
       end_timestamp: end_timestamp
         ? new Date(end_timestamp).toISOString()
         : new Date().toISOString(),
@@ -376,7 +376,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
         // parent_call_id: parentCallId, // Temporarily disabled until migration is applied
         phone_number: to_number,
         from_number,
-        call_status: call_status || 'completed',
+        call_status: 'processing', // Set to processing to show loading state until analysis
         start_timestamp: start_timestamp
           ? new Date(start_timestamp).toISOString()
           : null,
@@ -497,6 +497,7 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
   const { data: callRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
+      call_status: 'completed', // Set to completed now that analysis is done
       recording_url,
       transcript,
       call_analysis,

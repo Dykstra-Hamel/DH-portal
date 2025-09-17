@@ -1,0 +1,229 @@
+// Shared styles for all modal sections (Customer Information, Call Insights, Call Details)
+
+.section {
+  background: #fff;
+  border: 1px solid #dedede;
+  border-radius: 6px;
+  transition: border-color 0.2s ease;
+
+  &.editing {
+    border-color: var(--action-600);
+  }
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: #f2f2f7;
+  border-radius: 6px 6px 0 0;
+  transition: background-color 0.2s ease;
+
+  &.editing {
+    background: var(--action-600);
+  }
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    transition: color 0.2s ease;
+  }
+
+  svg {
+    color: #111827;
+    transition: color 0.2s ease;
+  }
+}
+
+.sectionHeader.editing .headerLeft h3 {
+  color: white !important;
+}
+
+.sectionHeader.editing .headerLeft svg {
+  color: white !important;
+  stroke: white !important;
+}
+
+.editButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+  }
+
+  svg {
+    color: #6b7280;
+  }
+}
+
+.infoGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.infoRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.infoField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &:only-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--neutral-800);
+  word-break: break-word;
+}
+
+// Edit form styles
+.editForm {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  &.threeColumns {
+    grid-template-columns: 1fr 1fr 1fr;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+  }
+}
+
+.input {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #006bc2;
+    box-shadow: 0 0 0 3px rgba(0, 107, 194, 0.1);
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.cancelButton {
+  background: var(--gray-100);
+  color: #374151;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #e5e5ea;
+    border-color: #9ca3af;
+  }
+}
+
+.saveButton {
+  background: var(--action-600);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &:hover {
+    background: #005aa3;
+  }
+}
+
+// Content padding for all sections
+.sectionContent {
+  padding: 16px;
+}

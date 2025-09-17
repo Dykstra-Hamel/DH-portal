@@ -1,0 +1,8 @@
+// Import and re-export shared section styles
+@import './SharedSection.module.scss';
+
+// Any CustomerInformation-specific styles can be added here
+// For example, if you need section-specific overrides:
+// .customerSpecificClass {
+//   // custom styles here
+// }

@@ -20,6 +20,14 @@
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  opacity: 1;
+  transform: translateY(0);
+
+  &.stepTransition {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 }
 
 .header {
@@ -298,7 +306,7 @@
 }
 
 .primaryButton {
-  background: #3b82f6;
+  background: var(--action-500);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -307,9 +315,12 @@
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 
   &:hover:not(:disabled) {
-    background: #2563eb;
+    background: #0070d4;
   }
 
   &:disabled {
@@ -319,9 +330,9 @@
 }
 
 .secondaryButton {
-  background: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  background: transparent;
+  color: var(--gray-800);
+  border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 6px;
   font-size: 0.875rem;
@@ -331,11 +342,10 @@
 
   &:hover:not(:disabled) {
     background: #f9fafb;
-    border-color: #9ca3af;
   }
 
   &:disabled {
-    background: #f9fafb;
+    background: transparent;
     color: #9ca3af;
     cursor: not-allowed;
   }

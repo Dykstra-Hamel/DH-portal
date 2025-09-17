@@ -255,9 +255,9 @@ export async function POST(
         customer: newLead.customer
       });
     } else {
-      // Update ticket service_type to customer service and mark as qualified
+      // Update ticket service_type to support and mark as qualified
       const updateData: any = {
-        service_type: 'Customer Service',
+        service_type: 'Support',
         status: 'qualified',
         updated_at: new Date().toISOString()
       };
@@ -296,7 +296,7 @@ export async function POST(
       }
 
       return NextResponse.json({
-        message: 'Ticket qualified for customer service',
+        message: 'Ticket qualified for support',
         qualification: 'customer_service',
         ticket: updatedTicket
       });
