@@ -122,7 +122,6 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         if (
           pathname.includes('/customers/') ||
           pathname.includes('/tickets/') ||
-          pathname.includes('/connections/leads/') ||
           pathname.includes('/connections/leads/')
         ) {
           return null; // Don't show lower header on individual record pages
@@ -161,7 +160,9 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
                   showAddLead={pageConfig.showAddLead}
                 />
               )}
-              <main className={styles.mainContent}>{children}</main>
+              <main className={styles.mainContent}>
+                <section className="pageWrapper">{children}</section>
+              </main>
             </div>
           </div>
         </div>
