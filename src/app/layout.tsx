@@ -22,9 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.className}`}>
       <body>
-        <LayoutWrapper>
-          <section className="pageWrapper">{children}</section>
-        </LayoutWrapper>
+        <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
   );

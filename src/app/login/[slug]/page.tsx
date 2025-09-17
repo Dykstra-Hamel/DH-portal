@@ -1,16 +1,18 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useParams } from 'next/navigation';
 import { Suspense } from 'react';
-import Auth from '@/components/Auth/Auth';
+import BrandedAuth from '@/components/Auth/BrandedAuth';
 
-function LoginContent() {
+function BrandedLoginContent() {
   const searchParams = useSearchParams();
-  const error = searchParams.get('error');
+  const params = useParams();
+  const authError = searchParams.get('error');
+  const slug = params.slug as string;
 
   return (
     <>
-      {error && (
+      {authError && (
         <div
           style={{
             padding: '1rem',
@@ -23,19 +25,19 @@ function LoginContent() {
             textAlign: 'center',
           }}
         >
-          Authentication error: {decodeURIComponent(error)}
+          Authentication error: {decodeURIComponent(authError)}
         </div>
       )}
 
-      <Auth />
+      <BrandedAuth slug={slug} />
     </>
   );
 }
 
-export default function Login() {
+export default function BrandedLogin() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <LoginContent />
+      <BrandedLoginContent />
     </Suspense>
   );
 }

@@ -19,7 +19,10 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
 
   // Define which routes should show the header and sidebar
-  const isPublicPage = pathname === '/login' || pathname === '/sign-up';
+  const isPublicPage =
+    pathname === '/login' ||
+    pathname === '/sign-up' ||
+    pathname.match(/^\/login\/[^\/]+$/);
   const isHomePage = pathname === '/';
 
   // Pages that should have the full layout (header + sidebar)
@@ -47,7 +50,8 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
       case '/connections/calls-and-forms':
         return {
           title: 'Tickets',
-          description: 'Review, qualify, and assign all your incoming leads here.',
+          description:
+            'Review, qualify, and assign all your incoming leads here.',
           showAddLead: true,
         };
       case '/customers':
@@ -72,7 +76,8 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
       case '/settings':
         return {
           title: 'Settings',
-          description: 'Configure your account and application preferences here.',
+          description:
+            'Configure your account and application preferences here.',
           showAddLead: false,
         };
       case '/projects':
@@ -114,10 +119,12 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         };
       // Handle individual record pages (hide lower header)
       default:
-        if (pathname.includes('/customers/') ||
-            pathname.includes('/tickets/') ||
-            pathname.includes('/connections/leads/') ||
-            pathname.includes('/connections/leads/')) {
+        if (
+          pathname.includes('/customers/') ||
+          pathname.includes('/tickets/') ||
+          pathname.includes('/connections/leads/') ||
+          pathname.includes('/connections/leads/')
+        ) {
           return null; // Don't show lower header on individual record pages
         }
         return {
@@ -137,7 +144,7 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
     <NavigationProvider>
       <CompanyProvider>
-          <div className={styles.layoutWrapper}>
+        <div className={styles.layoutWrapper}>
           {/* Mobile Menu Button */}
           <div className="mobileMenuButton" onClick={toggleSidebar}>
             <Menu size={32} />
@@ -157,7 +164,7 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
               <main className={styles.mainContent}>{children}</main>
             </div>
           </div>
-          </div>
+        </div>
       </CompanyProvider>
     </NavigationProvider>
   );
