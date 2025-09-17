@@ -196,36 +196,92 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
   }, []);
 
 
-  // Handle real-time ticket changes - EXACT SAME LOGIC AS TICKETS PAGE
-  const handleTicketChange = useCallback((payload: any) => {
+  // Handle real-time ticket changes with customer data enrichment
+  const handleTicketChange = useCallback(async (payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
     switch (eventType) {
       case 'INSERT':
-        // Add new ticket to the list - EXACT SAME AS TICKETS PAGE
-        if (newRecord) {
-          setRealTimeTickets(prev => {
-            // Check if already exists to prevent duplicates
-            const exists = prev.some(ticket => ticket.id === newRecord.id);
-            if (!exists) {
-              return [newRecord, ...prev]; // Add to beginning for newest first
-            }
-            return prev;
-          });
+        // Add new ticket to the list with enriched customer data
+        if (newRecord && newRecord.status === 'live') {
+          try {
+            // Enrich the ticket with customer data since real-time doesn't include joins
+            const supabase = createClient();
+            const { data: enrichedTicket } = await supabase
+              .from('tickets')
+              .select(`
+                *,
+                customer:customers!tickets_customer_id_fkey(
+                  id,
+                  first_name,
+                  last_name,
+                  phone
+                )
+              `)
+              .eq('id', newRecord.id)
+              .single();
+
+            const ticketToAdd = enrichedTicket || newRecord;
+
+            setRealTimeTickets(prev => {
+              // Check if already exists to prevent duplicates
+              const exists = prev.some(ticket => ticket.id === ticketToAdd.id);
+              if (!exists) {
+                return [ticketToAdd, ...prev]; // Add to beginning for newest first
+              }
+              return prev;
+            });
+          } catch (error) {
+            console.error('Error enriching ticket data:', error);
+            // Fallback to raw ticket data
+            setRealTimeTickets(prev => {
+              const exists = prev.some(ticket => ticket.id === newRecord.id);
+              if (!exists) {
+                return [newRecord, ...prev];
+              }
+              return prev;
+            });
+          }
         }
         break;
 
       case 'UPDATE':
-        // Update existing ticket - EXACT SAME AS TICKETS PAGE
+        // Update existing ticket with enriched data
         if (newRecord) {
-          setRealTimeTickets(prev =>
-            prev.map(ticket => ticket.id === newRecord.id ? newRecord : ticket)
-          );
+          try {
+            // Enrich the updated ticket with customer data
+            const supabase = createClient();
+            const { data: enrichedTicket } = await supabase
+              .from('tickets')
+              .select(`
+                *,
+                customer:customers!tickets_customer_id_fkey(
+                  id,
+                  first_name,
+                  last_name,
+                  phone
+                )
+              `)
+              .eq('id', newRecord.id)
+              .single();
+
+            const ticketToUpdate = enrichedTicket || newRecord;
+
+            setRealTimeTickets(prev =>
+              prev.map(ticket => ticket.id === ticketToUpdate.id ? ticketToUpdate : ticket)
+            );
+          } catch (error) {
+            console.error('Error enriching updated ticket data:', error);
+            // Fallback to raw ticket data
+            setRealTimeTickets(prev =>
+              prev.map(ticket => ticket.id === newRecord.id ? newRecord : ticket)
+            );
+          }
         }
         break;
 
       case 'DELETE':
-        // Remove ticket from list - EXACT SAME AS TICKETS PAGE
+        // Remove ticket from list
         if (oldRecord) {
           setRealTimeTickets(prev => prev.filter(ticket => ticket.id !== oldRecord.id));
         }
@@ -263,15 +319,52 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
           schema: 'public',
           table: 'call_records'
         },
-        (payload) => {
+        async (payload) => {
           console.log('LiveCallBar: Call record update:', payload);
-          // When call_records update, we rely on the parent component (tickets page) to
-          // refresh and pass updated tickets through props. The real-time tickets from
-          // our subscription don't have the call_records relationships, so we'll mainly
-          // use the prop tickets which have the full joined data.
+          const { eventType, new: newRecord } = payload;
 
-          // Just trigger a re-render by updating state slightly
-          setRealTimeTickets(prev => [...prev]);
+          // When call_records are created/updated, refresh the ticket data to get the relationship
+          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRecord?.ticket_id) {
+            try {
+              const supabase = createClient();
+
+              // Fetch the updated ticket with its call_records and customer data
+              const { data: updatedTicket } = await supabase
+                .from('tickets')
+                .select(`
+                  *,
+                  customer:customers!tickets_customer_id_fkey(
+                    id,
+                    first_name,
+                    last_name,
+                    phone
+                  ),
+                  call_records!tickets_call_record_id_fkey(
+                    id,
+                    call_id,
+                    call_status,
+                    phone_number,
+                    from_number,
+                    start_timestamp,
+                    end_timestamp,
+                    duration_seconds
+                  )
+                `)
+                .eq('id', newRecord.ticket_id)
+                .single();
+
+              if (updatedTicket && updatedTicket.status === 'live') {
+                // Update the ticket in our real-time list
+                setRealTimeTickets(prev =>
+                  prev.map(ticket =>
+                    ticket.id === updatedTicket.id ? updatedTicket : ticket
+                  )
+                );
+              }
+            } catch (error) {
+              console.error('Error updating ticket with call record data:', error);
+            }
+          }
         }
       )
       .subscribe();
@@ -281,9 +374,9 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
     };
   }, [selectedCompany?.id, handleTicketChange, useMock]);
 
-  // Extract live calls from tickets with 'live' status only
+  // Extract live calls from tickets with 'live' status only, along with ticket info for customer names
   const liveCallsFromTickets = useMemo(() => {
-    const liveCalls: CallRecord[] = [];
+    const liveCalls: (CallRecord & { ticketInfo?: any })[] = [];
 
     // Combine real-time tickets with prop tickets (real-time takes precedence)
     const allTickets = [...realTimeTickets];
@@ -303,22 +396,32 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
       if (ticket.status === 'live') {
         // Active calls with 'live' status - show immediately, fill in data as it arrives
         if (ticket.call_records && ticket.call_records.length > 0) {
-          // Use the actual call records from the joined data
+          // Use the actual call records from the joined data, attach ticket info for customer name
           console.log('LiveCallBar: Adding call records:', ticket.call_records.length, 'for ticket:', ticket.id);
-          liveCalls.push(...(ticket.call_records as CallRecord[]));
+          const enhancedCallRecords = (ticket.call_records as CallRecord[]).map(callRecord => ({
+            ...callRecord,
+            ticketInfo: {
+              customer: ticket.customer
+            }
+          }));
+          liveCalls.push(...enhancedCallRecords);
         } else {
           // Show immediately with fallback data, will update when call_records arrive
           console.log('LiveCallBar: Adding fallback call record for ticket:', ticket.id);
-          const fallbackCallRecord: CallRecord = {
+
+          const fallbackCallRecord: CallRecord & { ticketInfo?: any } = {
             id: `ticket-${ticket.id}`,
             call_id: `ticket-call-${ticket.id}`,
             customer_id: ticket.customer_id,
             phone_number: ticket.customer?.phone || 'Incoming Call',
-            from_number: ticket.customer?.phone || undefined, // Set from_number too
+            from_number: ticket.customer?.phone || undefined,
             call_status: 'ongoing',
             start_timestamp: ticket.created_at,
             created_at: ticket.created_at,
-            updated_at: ticket.updated_at || ticket.created_at
+            updated_at: ticket.updated_at || ticket.created_at,
+            ticketInfo: {
+              customer: ticket.customer
+            }
           };
 
           liveCalls.push(fallbackCallRecord);
@@ -497,7 +600,19 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                 )}
               </div>
               <div className={styles.gridCell}>
-                {call.from_number ? formatPhoneNumber(call.from_number) : 'Unknown Caller'}
+                {(() => {
+                  // Try to get customer name from ticket info, fallback to phone number
+                  const enhancedCall = call as CallRecord & { ticketInfo?: any };
+                  if (enhancedCall.ticketInfo?.customer) {
+                    const { first_name, last_name } = enhancedCall.ticketInfo.customer;
+                    const customerName = `${first_name || ''} ${last_name || ''}`.trim();
+                    if (customerName) {
+                      return customerName;
+                    }
+                  }
+                  // Fallback to formatted phone number
+                  return call.from_number ? formatPhoneNumber(call.from_number) : 'Unknown Caller';
+                })()}
               </div>
               <div className={styles.gridCell}>
                 {call.from_number ? formatPhoneNumber(call.from_number) : 'N/A'}

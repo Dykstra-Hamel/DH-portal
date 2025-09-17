@@ -17,6 +17,7 @@ export interface ModalTopProps {
     avatar?: string | null
     initials?: string
   }
+  reviewingText?: string
   onClose?: () => void
 }
 
@@ -76,7 +77,7 @@ export function Modal({ isOpen, onClose, children, className }: ModalProps) {
   )
 }
 
-export function ModalTop({ title, dropdown, reviewer, onClose }: ModalTopProps) {
+export function ModalTop({ title, dropdown, reviewer, reviewingText = 'Reviewing', onClose }: ModalTopProps) {
   return (
     <div className={styles.modalTop}>
       <div className={styles.topRow}>
@@ -89,7 +90,7 @@ export function ModalTop({ title, dropdown, reviewer, onClose }: ModalTopProps) 
       </div>
 
       {(dropdown || reviewer) && (
-        <div className={styles.topControls}>
+        <div className={`${styles.topControls} ${!dropdown && reviewer ? styles.reviewerOnly : ''}`}>
           {dropdown && (
             <div className={styles.dropdownSection}>
               {dropdown}
@@ -98,7 +99,7 @@ export function ModalTop({ title, dropdown, reviewer, onClose }: ModalTopProps) 
 
           {reviewer && (
             <div className={styles.reviewerSection}>
-              <span className={styles.reviewingText}>Reviewing</span>
+              <span className={styles.reviewingText}>{reviewingText}</span>
               <div className={styles.reviewerInfo}>
                 <div className={styles.avatarContainer}>
                   {reviewer.avatar ? (

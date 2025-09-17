@@ -3,14 +3,14 @@
 
 -- Add ticket_id foreign key to call_records table (primary relationship)
 ALTER TABLE call_records
-ADD COLUMN ticket_id UUID REFERENCES tickets(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES tickets(id) ON DELETE SET NULL;
 
 -- Create index for efficient queries
 CREATE INDEX IF NOT EXISTS idx_call_records_ticket_id ON call_records(ticket_id);
 
 -- Add call_record_id foreign key to tickets table (reverse relationship for convenience)
 ALTER TABLE tickets
-ADD COLUMN call_record_id UUID REFERENCES call_records(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS call_record_id UUID REFERENCES call_records(id) ON DELETE SET NULL;
 
 -- Create index for efficient queries
 CREATE INDEX IF NOT EXISTS idx_tickets_call_record_id ON tickets(call_record_id);

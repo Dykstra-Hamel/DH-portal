@@ -7,6 +7,7 @@ import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import SortableColumnHeader from '@/components/Common/SortableColumnHeader/SortableColumnHeader';
 import TicketRow from '@/components/Tickets/TicketRow/TicketRow';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
+import { Toast } from '@/components/Common/Toast';
 import styles from './TicketsList.module.scss';
 
 interface TicketsListProps {
@@ -40,6 +41,13 @@ export default function TicketsList({
   const [showQualifyModal, setShowQualifyModal] = useState(false);
   const [qualifyingTicket, setQualifyingTicket] = useState<Ticket | null>(null);
   const [isQualifying, setIsQualifying] = useState(false);
+
+  // Toast state
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [showUndoOnToast, setShowUndoOnToast] = useState(false);
+  const [previousTicketState, setPreviousTicketState] = useState<any>(null);
+  const [isUndoing, setIsUndoing] = useState(false);
 
   // Filter tickets based on active tab - exclude 'live' status tickets
   const filteredTickets = useMemo(() => {
@@ -96,11 +104,99 @@ export default function TicketsList({
     setShowQualifyModal(true);
   };
 
+  // Handle toast
+  const handleShowToast = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+
+    // Show undo button only for assignment toast
+    if (message === 'The ticket was successfully assigned.') {
+      setShowUndoOnToast(true);
+
+      // Auto-hide undo option after 15 seconds
+      setTimeout(() => {
+        setShowUndoOnToast(false);
+        setPreviousTicketState(null);
+      }, 15000);
+    } else {
+      setShowUndoOnToast(false);
+    }
+  };
+
+  const handleToastClose = () => {
+    setShowToast(false);
+    setToastMessage('');
+    setShowUndoOnToast(false);
+    // Clear previous state after toast closes
+    setTimeout(() => {
+      setPreviousTicketState(null);
+    }, 100);
+  };
+
+  const handleUndo = async () => {
+    if (!previousTicketState || isUndoing) return;
+
+    setIsUndoing(true);
+
+    try {
+      const response = await fetch(
+        `/api/tickets/${previousTicketState.ticketId}/undo`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            previousState: previousTicketState.previousState,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to undo ticket qualification');
+      }
+
+      // Refresh the tickets list
+      onTicketUpdated?.();
+
+      // Close current toast and show undo success toast
+      setShowToast(false);
+      setShowUndoOnToast(false);
+      setPreviousTicketState(null);
+
+      // Show undo success message
+      setTimeout(() => {
+        setToastMessage('Ticket assignment undone successfully.');
+        setShowToast(true);
+        setShowUndoOnToast(false);
+      }, 300);
+
+    } catch (error) {
+      console.error('Error undoing ticket qualification:', error);
+
+      // Show error toast instead of alert
+      setToastMessage(`Failed to undo: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowToast(true);
+      setShowUndoOnToast(false);
+    } finally {
+      setIsUndoing(false);
+    }
+  };
+
   const handleQualify = async (
     qualification: 'sales' | 'customer_service' | 'junk',
     assignedTo?: string
   ) => {
     if (!qualifyingTicket) return;
+
+    // Store previous state before making changes
+    const previousState = {
+      status: qualifyingTicket.status,
+      service_type: qualifyingTicket.service_type,
+      assigned_to: qualifyingTicket.assigned_to,
+      archived: qualifyingTicket.archived || false
+    };
 
     setIsQualifying(true);
     try {
@@ -122,9 +218,16 @@ export default function TicketsList({
         throw new Error('Failed to qualify ticket');
       }
 
+      // Store previous state for potential undo
+      setPreviousTicketState({
+        ticketId: qualifyingTicket.id,
+        previousState,
+        qualification
+      });
+
       // Refresh the tickets list
       onTicketUpdated?.();
-      
+
       setShowQualifyModal(false);
       setQualifyingTicket(null);
     } catch (error) {
@@ -206,7 +309,16 @@ export default function TicketsList({
   }, [tickets, callRecords]);
 
   return (
-    <div className={styles.container}>
+    <>
+      <Toast
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={handleToastClose}
+        showUndo={showUndoOnToast}
+        onUndo={handleUndo}
+        undoLoading={isUndoing}
+      />
+      <div className={styles.container}>
       <div className={styles.topContent}>
         <h1 className={styles.pageTitle}>Review & Qualify Your Leads</h1>
 
@@ -324,8 +436,10 @@ export default function TicketsList({
           }}
           onQualify={handleQualify}
           isQualifying={isQualifying}
+          onSuccess={handleShowToast}
         />
       )}
     </div>
+    </>
   );
 }

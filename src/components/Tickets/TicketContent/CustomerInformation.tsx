@@ -59,8 +59,8 @@ export default function CustomerInformation({
 
   if (isEditing) {
     return (
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
+      <div className={`${styles.section} ${styles.editing}`}>
+        <div className={`${styles.sectionHeader} ${isEditing ? styles.editing : ''}`}>
           <div className={styles.headerLeft}>
             <User size={20} />
             <h3>Customer Information</h3>
@@ -155,6 +155,9 @@ export default function CustomerInformation({
               Cancel
             </button>
             <button onClick={handleSave} className={styles.saveButton}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M15.75 18.751V13.501C15.75 13.3021 15.671 13.1113 15.5303 12.9706C15.3897 12.83 15.1989 12.751 15 12.751H9C8.80109 12.751 8.61032 12.83 8.46967 12.9706C8.32902 13.1113 8.25 13.3021 8.25 13.501V18.751M8.25 5.25098V8.25098C8.25 8.44989 8.32902 8.64065 8.46967 8.78131C8.61032 8.92196 8.80109 9.00098 9 9.00098H14.25M14.4 5.25098C14.7957 5.25661 15.1731 5.41836 15.45 5.70098L18.3 8.55098C18.5826 8.82792 18.7444 9.20532 18.75 9.60098V17.251C18.75 17.6488 18.592 18.0303 18.3107 18.3116C18.0294 18.5929 17.6478 18.751 17.25 18.751H6.75C6.35218 18.751 5.97064 18.5929 5.68934 18.3116C5.40804 18.0303 5.25 17.6488 5.25 17.251V6.75098C5.25 6.35315 5.40804 5.97162 5.68934 5.69032C5.97064 5.40901 6.35218 5.25098 6.75 5.25098H14.4Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
               Save Changes
             </button>
           </div>
@@ -165,7 +168,7 @@ export default function CustomerInformation({
 
   return (
     <div className={styles.section}>
-      <div className={styles.sectionHeader}>
+      <div className={`${styles.sectionHeader} ${isEditing ? styles.editing : ''}`}>
         <div className={styles.headerLeft}>
           <User size={20} />
           <h3>Customer Information</h3>

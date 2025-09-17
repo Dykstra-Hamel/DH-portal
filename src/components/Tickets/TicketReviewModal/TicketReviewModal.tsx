@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import Image from 'next/image'
 import { ChevronDown, LifeBuoy } from 'lucide-react'
 import { Ticket } from '@/types/ticket'
 import { CallRecord } from '@/types/call-record'
@@ -17,6 +18,21 @@ import {
   CallDetails
 } from '@/components/Tickets/TicketContent'
 import styles from './TicketReviewModal.module.scss'
+import sectionStyles from '@/components/Tickets/TicketContent/SharedSection.module.scss'
+
+// Custom Sales Lead icon
+const SalesLeadIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="25" viewBox="0 0 24 25" fill="none">
+    <path d="M9.75588 12.5369L11.2559 14.0369L14.2559 11.0369M5.89338 10.0019C5.78391 9.50883 5.80072 8.99607 5.94225 8.51119C6.08378 8.02632 6.34544 7.58502 6.70298 7.22823C7.06052 6.87144 7.50236 6.6107 7.98754 6.47018C8.47271 6.32967 8.98551 6.31394 9.47838 6.42444C9.74966 6.00016 10.1234 5.65101 10.5651 5.40915C11.0068 5.1673 11.5023 5.04053 12.0059 5.04053C12.5095 5.04053 13.005 5.1673 13.4467 5.40915C13.8884 5.65101 14.2621 6.00016 14.5334 6.42444C15.027 6.31346 15.5407 6.32912 16.0266 6.46997C16.5126 6.61083 16.955 6.87229 17.3128 7.23005C17.6705 7.58781 17.932 8.03024 18.0728 8.51619C18.2137 9.00214 18.2294 9.51581 18.1184 10.0094C18.5427 10.2807 18.8918 10.6544 19.1337 11.0962C19.3755 11.5379 19.5023 12.0333 19.5023 12.5369C19.5023 13.0405 19.3755 13.536 19.1337 13.9777C18.8918 14.4194 18.5427 14.7932 18.1184 15.0644C18.2289 15.5573 18.2131 16.0701 18.0726 16.5553C17.9321 17.0405 17.6714 17.4823 17.3146 17.8398C16.9578 18.1974 16.5165 18.459 16.0316 18.6006C15.5467 18.7421 15.034 18.7589 14.5409 18.6494C14.27 19.0753 13.8959 19.426 13.4535 19.6689C13.011 19.9119 12.5144 20.0392 12.0096 20.0392C11.5049 20.0392 11.0083 19.9119 10.5658 19.6689C10.1233 19.426 9.74931 19.0753 9.47838 18.6494C8.98551 18.7599 8.47271 18.7442 7.98754 18.6037C7.50236 18.4632 7.06052 18.2024 6.70298 17.8456C6.34544 17.4889 6.08378 17.0476 5.94225 16.5627C5.80072 16.0778 5.78391 15.565 5.89338 15.0719C5.46585 14.8014 5.11369 14.4271 4.86967 13.9838C4.62564 13.5406 4.49768 13.0429 4.49768 12.5369C4.49768 12.031 4.62564 11.5332 4.86967 11.09C5.11369 10.6468 5.46585 10.2725 5.89338 10.0019Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+
+// Custom Customer Support icon
+const CustomerSupportIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+    <path d="M6.6975 6.69896L9.8775 9.87896M14.1225 9.87896L17.3025 6.69896M14.1225 14.124L17.3025 17.304M9.8775 14.124L6.6975 17.304M19.5 12.0015C19.5 16.1436 16.1421 19.5015 12 19.5015C7.85786 19.5015 4.5 16.1436 4.5 12.0015C4.5 7.85933 7.85786 4.50146 12 4.50146C16.1421 4.50146 19.5 7.85933 19.5 12.0015ZM15 12.0015C15 13.6583 13.6569 15.0015 12 15.0015C10.3431 15.0015 9 13.6583 9 12.0015C9 10.3446 10.3431 9.00146 12 9.00146C13.6569 9.00146 15 10.3446 15 12.0015Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
 
 interface CompanyUser {
   id: string
@@ -32,6 +48,7 @@ export interface TicketReviewModalProps {
   onClose: () => void
   onQualify: (qualification: 'sales' | 'customer_service' | 'junk', assignedTo?: string) => Promise<void>
   isQualifying?: boolean
+  onSuccess?: (message: string) => void
 }
 
 export default function TicketReviewModal({
@@ -39,25 +56,55 @@ export default function TicketReviewModal({
   isOpen,
   onClose,
   onQualify,
-  isQualifying = false
+  isQualifying = false,
+  onSuccess
 }: TicketReviewModalProps) {
-  const [selectedQualification, setSelectedQualification] = useState<'sales' | 'customer_service'>('sales')
+  // Set initial qualification based on current ticket service_type
+  const getInitialQualification = (): 'sales' | 'customer_service' => {
+    if (ticket.service_type === 'Support' || ticket.service_type === 'Customer Service') {
+      return 'customer_service'
+    }
+    return 'sales'
+  }
+
+  const [selectedQualification, setSelectedQualification] = useState<'sales' | 'customer_service'>(getInitialQualification())
   const [selectedAssignee, setSelectedAssignee] = useState<string>('')
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [callRecord, setCallRecord] = useState<CallRecord | undefined>()
   const [loadingCallRecord, setLoadingCallRecord] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isAssignmentDropdownOpen, setIsAssignmentDropdownOpen] = useState(false)
+  const [step, setStep] = useState<'review' | 'assignment'>('review')
+  const [isAnimating, setIsAnimating] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const assignmentDropdownRef = useRef<HTMLDivElement>(null)
+
 
   // Get current authenticated user
   const { getDisplayName, getAvatarUrl, getInitials, user } = useUser()
+
+  // Initialize selectedAssignee with current user ID when user is available
+  useEffect(() => {
+    if (user?.id && !selectedAssignee) {
+      setSelectedAssignee(user.id)
+    }
+  }, [user?.id, selectedAssignee])
 
   const currentUser = {
     name: getDisplayName(),
     avatar: getAvatarUrl(),
     initials: getInitials()
   }
+
+  const animateToStep = (newStep: 'review' | 'assignment') => {
+    setIsAnimating(true)
+    setTimeout(() => {
+      setStep(newStep)
+      setIsAnimating(false)
+    }, 150) // Half of the 300ms transition
+  }
+
 
 
   const fetchCompanyUsers = useCallback(async () => {
@@ -106,20 +153,27 @@ export default function TicketReviewModal({
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false)
       }
+      if (assignmentDropdownRef.current && !assignmentDropdownRef.current.contains(event.target as Node)) {
+        setIsAssignmentDropdownOpen(false)
+      }
     }
 
-    if (isDropdownOpen) {
+    if (isDropdownOpen || isAssignmentDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [isDropdownOpen])
+  }, [isDropdownOpen, isAssignmentDropdownOpen])
 
   const handleClose = () => {
-    setSelectedQualification('sales')
-    setSelectedAssignee('')
+    setStep('review')
+    setSelectedQualification(getInitialQualification())
+    setSelectedAssignee(user?.id || '')
+    setIsAnimating(false)
+    setIsDropdownOpen(false)
+    setIsAssignmentDropdownOpen(false)
     onClose()
   }
 
@@ -132,12 +186,30 @@ export default function TicketReviewModal({
     }
   }
 
-  const handleApprove = async () => {
+  const handleApprove = () => {
+    animateToStep('assignment')
+  }
+
+  const handleFinalApprove = async () => {
     try {
       await onQualify(selectedQualification, selectedAssignee || undefined)
       handleClose()
+      // Show toast after modal closes via parent callback
+      if (onSuccess) {
+        setTimeout(() => {
+          onSuccess('The ticket was successfully assigned.')
+        }, 300) // Wait for modal close animation to complete
+      }
     } catch (error) {
       console.error('Error approving ticket:', error)
+    }
+  }
+
+  const handleBack = () => {
+    if (step === 'assignment') {
+      animateToStep('review')
+    } else {
+      handleClose()
     }
   }
 
@@ -149,6 +221,17 @@ export default function TicketReviewModal({
         return 'Support Ticket'
       default:
         return 'Sales Lead'
+    }
+  }
+
+  const getQualificationIcon = () => {
+    switch (selectedQualification) {
+      case 'sales':
+        return <SalesLeadIcon />
+      case 'customer_service':
+        return <CustomerSupportIcon />
+      default:
+        return null
     }
   }
 
@@ -180,6 +263,53 @@ export default function TicketReviewModal({
   const handleOptionSelect = (value: string) => {
     setSelectedQualification(value as 'sales' | 'customer_service')
     setIsDropdownOpen(false)
+    if (onSuccess) {
+      onSuccess('The ticket type was successfully updated.')
+    }
+  }
+
+  const handleAssignmentDropdownToggle = () => {
+    if (!isQualifying) {
+      setIsAssignmentDropdownOpen(!isAssignmentDropdownOpen)
+    }
+  }
+
+  const handleAssigneeSelect = (userId: string) => {
+    setSelectedAssignee(userId)
+    setIsAssignmentDropdownOpen(false)
+  }
+
+  const getSelectedAssigneeData = () => {
+    if (selectedAssignee === user?.id) {
+      return {
+        id: user.id,
+        name: currentUser.name,
+        avatar: currentUser.avatar,
+        initials: currentUser.initials,
+        display_name: currentUser.name,
+        isSelf: true
+      }
+    }
+
+    const assignedUser = companyUsers.find(u => u.id === selectedAssignee)
+    if (assignedUser) {
+      return {
+        ...assignedUser,
+        name: assignedUser.display_name,
+        avatar: null, // Company users don't have avatar URLs in this structure
+        initials: assignedUser.display_name.split(' ').map(n => n[0]).join('').toUpperCase(),
+        isSelf: false
+      }
+    }
+
+    return {
+      id: user?.id || '',
+      name: currentUser.name,
+      avatar: currentUser.avatar,
+      initials: currentUser.initials,
+      display_name: currentUser.name,
+      isSelf: true
+    }
   }
 
   const renderDropdown = () => (
@@ -213,13 +343,209 @@ export default function TicketReviewModal({
     </div>
   )
 
+  const renderAssignmentDropdown = () => {
+    const selectedAssigneeData = getSelectedAssigneeData()
+
+    return (
+      <div ref={assignmentDropdownRef} className={styles.customDropdown}>
+        <button
+          className={`${styles.dropdownButton} ${isAssignmentDropdownOpen ? styles.open : ''} ${isQualifying ? styles.disabled : ''}`}
+          onClick={handleAssignmentDropdownToggle}
+          disabled={isQualifying}
+        >
+          <div className={styles.selectedOption}>
+            <div className={styles.avatarContainer}>
+              {selectedAssigneeData.avatar ? (
+                <Image
+                  src={selectedAssigneeData.avatar}
+                  alt={selectedAssigneeData.name}
+                  width={32}
+                  height={32}
+                  className={styles.avatar}
+                />
+              ) : (
+                <div className={styles.avatarInitials}>
+                  {selectedAssigneeData.initials}
+                </div>
+              )}
+            </div>
+            <div className={styles.userInfo}>
+              <span className={styles.userName}>{selectedAssigneeData.name}</span>
+              {selectedAssigneeData.isSelf && <span className={styles.myselfLabel}>Myself</span>}
+            </div>
+          </div>
+          <ChevronDown size={16} className={styles.chevronIcon} />
+        </button>
+
+        {isAssignmentDropdownOpen && (
+          <div className={styles.dropdownMenu}>
+            {/* Current user first */}
+            <button
+              className={`${styles.dropdownOption} ${selectedAssignee === user?.id ? styles.selected : ''}`}
+              onClick={() => handleAssigneeSelect(user?.id || '')}
+            >
+              <div className={styles.avatarContainer}>
+                {currentUser.avatar ? (
+                  <Image
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    width={32}
+                    height={32}
+                    className={styles.avatar}
+                  />
+                ) : (
+                  <div className={styles.avatarInitials}>
+                    {currentUser.initials}
+                  </div>
+                )}
+              </div>
+              <div className={styles.userInfo}>
+                <span className={styles.userName}>{currentUser.name}</span>
+                <span className={styles.myselfLabel}>Myself</span>
+              </div>
+            </button>
+
+            {/* Other company users */}
+            {companyUsers
+              .filter(companyUser => companyUser.id !== user?.id)
+              .map((companyUser) => (
+                <button
+                  key={companyUser.id}
+                  className={`${styles.dropdownOption} ${selectedAssignee === companyUser.id ? styles.selected : ''}`}
+                  onClick={() => handleAssigneeSelect(companyUser.id)}
+                >
+                  <div className={styles.avatarContainer}>
+                    <div className={styles.avatarInitials}>
+                      {companyUser.display_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </div>
+                  </div>
+                  <div className={styles.userInfo}>
+                    <span className={styles.userName}>{companyUser.display_name}</span>
+                  </div>
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (step === 'assignment') {
+    return (
+      <Modal isOpen={isOpen} onClose={handleClose} className={`${styles.ticketModal} ${isAnimating ? styles.stepTransition : ''}`}>
+          <ModalTop
+            title={`Assign ${getQualificationLabel()}`}
+            reviewer={currentUser}
+            reviewingText="Assigning"
+          />
+
+        <ModalMiddle className={styles.modalContent}>
+          <div style={{ display: 'flex', gap: '16px', width: '100%', alignItems: 'stretch' }}>
+            {/* Left Section - Customer Information */}
+            <div style={{ flex: 1, display: 'flex' }}>
+              <div className={sectionStyles.section} style={{ flex: 1 }}>
+                <div className={sectionStyles.sectionHeader}>
+                  <div className={sectionStyles.headerLeft}>
+                    {getQualificationIcon()}
+                    <h3>
+                      {selectedQualification === 'sales' ? 'New Qualified Sales Lead' : 'New Support Ticket'}
+                    </h3>
+                  </div>
+                </div>
+                <div className={sectionStyles.infoGrid}>
+                  <div className={sectionStyles.infoRow}>
+                    <div className={sectionStyles.infoField}>
+                      <span className={sectionStyles.label}>Customer Name</span>
+                      <span className={sectionStyles.value}>
+                        {ticket.customer ?
+                          `${ticket.customer.first_name} ${ticket.customer.last_name}` :
+                          'Unknown Customer'
+                        }
+                      </span>
+                    </div>
+                    <div className={sectionStyles.infoField}>
+                      <span className={sectionStyles.label}>Primary Phone</span>
+                      <span className={sectionStyles.value}>
+                        {ticket.customer?.phone || 'Not provided'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={sectionStyles.infoRow}>
+                    <div className={sectionStyles.infoField}>
+                      <span className={sectionStyles.label}>Sentiment</span>
+                      <span className={sectionStyles.value}>{callRecord?.sentiment || 'Neutral'}</span>
+                    </div>
+                    <div className={sectionStyles.infoField}>
+                      <span className={sectionStyles.label}>Source</span>
+                      <span className={sectionStyles.value}>
+                        {ticket.source === 'google_cpc' ? 'Paid Advertisement' :
+                         ticket.source === 'organic' ? 'Organic' :
+                         ticket.source === 'referral' ? 'Referral' :
+                         'Other'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={sectionStyles.infoRow}>
+                    <div className={sectionStyles.infoField}>
+                      <span className={sectionStyles.label}>Primary Pest Issue</span>
+                      <span className={sectionStyles.value}>{callRecord?.pest_issue || ticket.pest_type || 'Not specified'}</span>
+                    </div>
+                    <div className={sectionStyles.infoField}>
+                      <span className={sectionStyles.label}>Preferred Service Time</span>
+                      <span className={sectionStyles.value}>{callRecord?.preferred_service_time || 'Anytime'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Section - Assignment */}
+            <div style={{ flex: 1, display: 'flex' }}>
+              <div className={sectionStyles.section} style={{ flex: 1 }}>
+                <div className={sectionStyles.sectionHeader}>
+                  <div className={sectionStyles.headerLeft}>
+                    <h3>
+                      {selectedQualification === 'sales' ? 'Assign lead to:' : 'Assign to:'}
+                    </h3>
+                  </div>
+                </div>
+                <div className={sectionStyles.infoGrid}>
+                  <div className={sectionStyles.infoRow}>
+                    <div className={sectionStyles.infoField} style={{ gridColumn: '1 / -1' }}>
+                      {renderAssignmentDropdown()}
+                      {loadingUsers && <span style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>Loading users...</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalMiddle>
+
+        <ModalBottom>
+          <ModalActionButtons
+            onBack={handleBack}
+            showBackButton={true}
+            isFirstStep={false}
+            onPrimaryAction={handleFinalApprove}
+            primaryButtonText={`Continue ${getQualificationLabel()}`}
+            primaryButtonIcon={getQualificationIcon()}
+            primaryButtonDisabled={false}
+            isLoading={isQualifying}
+            loadingText="Processing..."
+          />
+        </ModalBottom>
+      </Modal>
+    )
+  }
+
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} className={styles.ticketModal}>
-      <ModalTop
-        title="Review Ticket"
-        dropdown={renderDropdown()}
-        reviewer={currentUser}
-      />
+    <Modal isOpen={isOpen} onClose={handleClose} className={`${styles.ticketModal} ${isAnimating ? styles.stepTransition : ''}`}>
+        <ModalTop
+          title="Review Ticket"
+          dropdown={renderDropdown()}
+          reviewer={currentUser}
+        />
 
       <ModalMiddle className={styles.modalContent}>
         <div className={styles.contentGrid}>
@@ -228,7 +554,9 @@ export default function TicketReviewModal({
               ticket={ticket}
               isEditable={true}
               onUpdate={(_customerData) => {
-                // Handle customer data updates if needed
+                if (onSuccess) {
+                  onSuccess('The ticket was successfully updated.')
+                }
               }}
             />
 
@@ -237,7 +565,9 @@ export default function TicketReviewModal({
               callRecord={callRecord}
               isEditable={true}
               onUpdate={(_insightsData) => {
-                // Handle insights data updates if needed
+                if (onSuccess) {
+                  onSuccess('The ticket was successfully updated.')
+                }
               }}
             />
           </div>
@@ -268,6 +598,7 @@ export default function TicketReviewModal({
           }}
           onPrimaryAction={handleApprove}
           primaryButtonText={`Approve ${getQualificationLabel()}`}
+          primaryButtonIcon={getQualificationIcon()}
           primaryButtonDisabled={false}
           isLoading={isQualifying}
           loadingText="Processing..."

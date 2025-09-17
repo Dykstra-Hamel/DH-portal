@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { LifeBuoy } from 'lucide-react';
 import { Ticket } from '@/types/ticket';
 import styles from './TicketRow.module.scss';
 
@@ -162,8 +161,17 @@ export default function TicketRow({ ticket, onClick, onQualify }: TicketRowProps
             <path d="M9 4.04004V15.04M6.25 12.4569L7.05575 13.061C8.12917 13.8667 9.86992 13.8667 10.9442 13.061C12.0186 12.2552 12.0186 10.9499 10.9442 10.1441C10.408 9.74079 9.704 9.54004 9 9.54004C8.33542 9.54004 7.67083 9.33837 7.16392 8.93596C6.15008 8.13021 6.15008 6.82487 7.16392 6.01912C8.17775 5.21337 9.82225 5.21337 10.8361 6.01912L11.2165 6.32162M17.25 9.54004C17.25 10.6234 17.0366 11.6962 16.622 12.6972C16.2074 13.6981 15.5997 14.6076 14.8336 15.3737C14.0675 16.1398 13.1581 16.7474 12.1571 17.162C11.1562 17.5766 10.0834 17.79 9 17.79C7.91659 17.79 6.8438 17.5766 5.84286 17.162C4.84193 16.7474 3.93245 16.1398 3.16637 15.3737C2.40029 14.6076 1.7926 13.6981 1.37799 12.6972C0.963392 11.6962 0.75 10.6234 0.75 9.54004C0.75 7.352 1.61919 5.25358 3.16637 3.70641C4.71354 2.15923 6.81196 1.29004 9 1.29004C11.188 1.29004 13.2865 2.15923 14.8336 3.70641C16.3808 5.25358 17.25 7.352 17.25 9.54004Z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )}
-        {ticket.service_type === 'Customer Service' && (
-          <LifeBuoy size={18} className={styles.supportIcon} />
+        {ticket.service_type && ['Customer Service', 'customer service', 'customer_service', 'Support'].includes(ticket.service_type) && (
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" className={styles.supportIcon}>
+            <g clipPath="url(#clip0_1553_33225)">
+              <path d="M3.28671 3.28671L6.11337 6.11337M9.88671 6.11337L12.7134 3.28671M9.88671 9.88671L12.7134 12.7134M6.11337 9.88671L3.28671 12.7134M14.6667 8.00004C14.6667 11.6819 11.6819 14.6667 8.00004 14.6667C4.31814 14.6667 1.33337 11.6819 1.33337 8.00004C1.33337 4.31814 4.31814 1.33337 8.00004 1.33337C11.6819 1.33337 14.6667 4.31814 14.6667 8.00004ZM10.6667 8.00004C10.6667 9.4728 9.4728 10.6667 8.00004 10.6667C6.52728 10.6667 5.33337 9.4728 5.33337 8.00004C5.33337 6.52728 6.52728 5.33337 8.00004 5.33337C9.4728 5.33337 10.6667 6.52728 10.6667 8.00004Z" stroke="#0087F5" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>
+            </g>
+            <defs>
+              <clipPath id="clip0_1553_33225">
+                <rect width="16" height="16" fill="white"/>
+              </clipPath>
+            </defs>
+          </svg>
         )}
         {ticket.service_type ? formatServiceType(ticket.service_type) : 'N/A'}
       </div>
