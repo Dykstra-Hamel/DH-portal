@@ -20,7 +20,10 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
   const [isSidebarActive, setIsSidebarActive] = useState(false);
 
   // Define which routes should show the header and sidebar
-  const isPublicPage = pathname === '/login' || pathname === '/sign-up';
+  const isPublicPage =
+    pathname === '/login' ||
+    pathname === '/sign-up' ||
+    pathname.match(/^\/login\/[^\/]+$/);
   const isHomePage = pathname === '/';
 
   // Pages that should have the full layout (header + sidebar)
@@ -47,7 +50,8 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
       case '/conversations/calls-and-forms':
         return {
           title: 'Calls & Forms',
-          description: 'Review, qualify, and assign all your incoming leads here.',
+          description:
+            'Review, qualify, and assign all your incoming leads here.',
           showFilter: true,
           showAddLead: true,
         };
@@ -76,7 +80,8 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
       case '/settings':
         return {
           title: 'Settings',
-          description: 'Configure your account and application preferences here.',
+          description:
+            'Configure your account and application preferences here.',
           showFilter: false,
           showAddLead: false,
         };
@@ -124,9 +129,11 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         };
       // Handle individual record pages (hide lower header)
       default:
-        if (pathname.includes('/customers/') || 
-            pathname.includes('/tickets/') || 
-            pathname.includes('/conversations/leads/')) {
+        if (
+          pathname.includes('/customers/') ||
+          pathname.includes('/tickets/') ||
+          pathname.includes('/conversations/leads/')
+        ) {
           return null; // Don't show lower header on individual record pages
         }
         return {
@@ -149,26 +156,26 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
       <CompanyProvider>
         <DateFilterProvider>
           <div className={styles.layoutWrapper}>
-          {/* Mobile Menu Button */}
-          <div className="mobileMenuButton" onClick={toggleSidebar}>
-            <Menu size={32} />
-          </div>
-
-          <div className={styles.contentWrapper}>
-            <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
-            <div className={styles.rightContent}>
-              <GlobalHeader />
-              {pageConfig && (
-                <GlobalLowerHeader
-                  title={pageConfig.title}
-                  description={pageConfig.description}
-                  showFilter={pageConfig.showFilter}
-                  showAddLead={pageConfig.showAddLead}
-                />
-              )}
-              <main className={styles.mainContent}>{children}</main>
+            {/* Mobile Menu Button */}
+            <div className="mobileMenuButton" onClick={toggleSidebar}>
+              <Menu size={32} />
             </div>
-          </div>
+
+            <div className={styles.contentWrapper}>
+              <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
+              <div className={styles.rightContent}>
+                <GlobalHeader />
+                {pageConfig && (
+                  <GlobalLowerHeader
+                    title={pageConfig.title}
+                    description={pageConfig.description}
+                    showFilter={pageConfig.showFilter}
+                    showAddLead={pageConfig.showAddLead}
+                  />
+                )}
+                <main className={styles.mainContent}>{children}</main>
+              </div>
+            </div>
           </div>
         </DateFilterProvider>
       </CompanyProvider>

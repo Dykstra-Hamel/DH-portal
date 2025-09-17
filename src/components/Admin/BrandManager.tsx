@@ -25,6 +25,8 @@ interface BrandData {
   personality?: string;
   logo_url?: string;
   logo_description?: string;
+  icon_logo_url?: string;
+  icon_logo_description?: string;
   primary_color_hex?: string;
   primary_color_cmyk?: string;
   primary_color_pantone?: string;
@@ -230,6 +232,25 @@ export default function BrandManager() {
     const url = await uploadFile(file, 'brand-assets', 'logos');
     if (url) {
       handleInputChange('logo_url', url);
+      // Clear the input so the same file can be selected again if needed
+      event.target.value = '';
+    }
+  };
+
+  const handleIconLogoUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // If there's an existing icon logo, delete it from storage first
+    if (brandData?.icon_logo_url) {
+      await deleteFileFromStorage(brandData.icon_logo_url);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'icon-logos');
+    if (url) {
+      handleInputChange('icon_logo_url', url);
       // Clear the input so the same file can be selected again if needed
       event.target.value = '';
     }
@@ -475,6 +496,57 @@ export default function BrandManager() {
                     placeholder="Logo description..."
                     className={styles.textarea}
                     rows={3}
+                  />
+                </div>
+
+                {/* Icon Logo Section */}
+                <div className={styles.logoSection}>
+                  <h5>Icon Logo</h5>
+                  <p className={styles.sectionDescription}>
+                    Upload a small icon version of your logo
+                  </p>
+                  <div className={styles.uploadInfo}>
+                    <small>
+                      Files will be organized:{' '}
+                      <code>
+                        {selectedCompany?.name
+                          .toLowerCase()
+                          .replace(/[^a-z0-9\s-]/g, '')
+                          .replace(/\s+/g, '-')}
+                        /icon-logos/
+                      </code>
+                    </small>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleIconLogoUpload}
+                    className={styles.fileInput}
+                  />
+                  {brandData.icon_logo_url &&
+                    brandData.icon_logo_url.trim() && (
+                      <div className={styles.iconLogoPreview}>
+                        <Image
+                          src={brandData.icon_logo_url}
+                          alt="Icon logo preview"
+                          width={64}
+                          height={64}
+                          style={{
+                            maxWidth: '64px',
+                            maxHeight: '64px',
+                            objectFit: 'contain',
+                          }}
+                        />
+                      </div>
+                    )}
+                  <textarea
+                    value={brandData.icon_logo_description || ''}
+                    onChange={e =>
+                      handleInputChange('icon_logo_description', e.target.value)
+                    }
+                    placeholder="Icon logo description (e.g., 'Simplified version for favicons, app icons, etc.')..."
+                    className={styles.textarea}
+                    rows={2}
                   />
                 </div>
               </div>

@@ -213,6 +213,56 @@
   gap: 0.5rem;
 }
 
+.manageButton {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-right: 0.5rem;
+
+  &:hover {
+    background-color: #1d4ed8;
+  }
+}
+
+// Brand Manager Styles
+.logoPreview {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  text-align: center;
+}
+
+.iconLogoPreview {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  text-align: center;
+  display: inline-block;
+
+  img {
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    background: white;
+    padding: 0.25rem;
+  }
+}
+
+.sectionDescription {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin: 0.5rem 0 1rem 0;
+  font-style: italic;
+}
+
 .editButton {
   background-color: #f59e0b;
   color: white;

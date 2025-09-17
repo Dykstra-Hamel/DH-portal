@@ -1,115 +1,504 @@
 @use '../../styles/Buttons.scss';
 
-.authWrapper {
-  width: 100%;
-  height: 100%;
-  padding: 0 2rem;
-  justify-self: center;
-  align-self: center;
-  position: relative;
+// Loading spinner animation
+:global {
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes move {
+    0% {
+      transform-origin: bottom left;
+      transform: scale(1);
+    }
+    100% {
+      transform: scale(1.2);
+    }
+  }
+
+  @keyframes show {
+    0% {
+      opacity: 1;
+    }
+    33% {
+      opacity: 1;
+    }
+    34% {
+      opacity: 0;
+    }
+    99% {
+      opacity: 0;
+    }
+    99.5% {
+      opacity: 1;
+    }
+  }
+}
+
+.loadingContainer {
   display: flex;
-  flex-flow: column;
-  margin: 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  gap: 1rem;
+}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loadingText {
+  color: #6b7280;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+// Split-screen layout containers
+.authSplitContainer {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  min-height: 600px;
+}
+
+.authLeftPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  padding: 2rem;
+  background-color: white;
+  position: relative;
+  width: 33%;
+  max-width: 735px;
+}
 
-  h1,
-  h2 {
-    text-align: center;
+.authRightPanel {
+  flex: 1;
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  justify-content: center;
+}
+
+// Legacy wrapper for base auth (no branding)
+.authWrapper {
+  width: 100%;
+  height: 100vh;
+  min-height: 600px;
+  padding: 0 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: white;
+}
+
+// PMPCentral header styles for left panel
+.pmpCentralHeader {
+  margin-bottom: 2rem;
+  text-align: center;
+
+  img {
+    max-width: 180px;
+    height: auto;
   }
+}
 
-  .buttonWrapper {
-    display: flex;
-    position: relative;
-    flex-flow: row wrap;
+.loginFormWrapper {
+  border-radius: 16px;
+  padding: 30px 60px;
+  width: 490px;
+  box-shadow:
+    0 4px 6px 0 rgba(0, 0, 0, 0.04),
+    0 0 12px 0 rgba(74, 85, 101, 0.08);
+}
+
+// Right panel branding styles
+.brandingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #313131;
+  opacity: 0.56;
+  mix-blend-mode: multiply;
+  z-index: 4;
+}
+
+.brandingImages {
+  display: flex;
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.brandingImageItem {
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 3;
+  animation:
+    move 40s cubic-bezier(0.36, 0, 0.64, 1) infinite alternate,
+    show 120s cubic-bezier(0.36, 0, 0.64, 1) infinite;
+
+  &:nth-of-type(2) {
+    animation:
+      move 40s cubic-bezier(0.36, 0, 0.64, 1) infinite alternate,
+      show 120s cubic-bezier(0.36, 0, 0.64, 1) 41s infinite;
+    z-index: 2;
+  }
+  &:nth-of-type(3) {
+    animation:
+      move 40s cubic-bezier(0.36, 0, 0.64, 1) infinite alternate,
+      show 120s cubic-bezier(0.36, 0, 0.64, 1) 81s infinite;
+    z-index: 1;
+  }
+}
+
+.brandingContent {
+  position: relative;
+  z-index: 5;
+  text-align: center;
+  color: white;
+  width: 100%;
+  padding: 95px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-flow: row-reverse;
+
+  @media screen and (width < 1300px) {
+    padding: 45px 60px;
+  }
+}
+
+.brandingCompanyLogo {
+  width: 100%;
+  height: auto;
+  max-width: 250px;
+  object-fit: contain;
+
+  @media screen and (width < 1600px) {
+    max-width: 175px;
+  }
+}
+
+.brandingSlogans {
+  .sloganText {
+    font-size: 3.75rem;
+    font-weight: 800;
+    line-height: 100%;
+    text-align: left;
+
+    @media screen and (width < 1600px) {
+      font-size: 2.5rem;
+    }
+  }
+}
+
+// Responsive behavior
+@media screen and (width < 1200px) {
+  .authSplitContainer {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
     justify-content: center;
     align-items: center;
-    gap: 1rem;
-    margin: 2rem 0;
   }
 
-  .authFormButton {
-    @extend .button;
-
-    color: #fff;
-    background: #353535;
-    border: 1px solid #353535;
-    border-radius: 0 4px 4px 0;
-
-    &:hover {
-      background: #73d2de;
-      border: 1px solid #73d2de;
-      color: #353535;
-    }
-
-    @media screen and (width <= 480px) {
-      border-radius: 4px;
-      margin-top: 5px;
-    }
-  }
-
-  .magicLinkFormWrapper {
-    max-width: 100%;
-    width: 470px;
-  }
-
-  .magicLinkHeading {
-    text-align: center;
-  }
-
-  .magicLinkForm {
-    display: flex;
-    position: relative;
-    justify-content: center;
-    align-items: center;
-    margin-top: 1rem;
-
-    input {
-      padding: 1rem 0.5rem;
-      font-size: 1rem;
-      border: 1px solid #353535;
-      border-radius: 4px 0 0 4px;
-      outline: none;
-      flex-grow: 1;
-    }
-
-    @media screen and (width <= 480px) {
-      flex-flow: column;
-
-      input {
-        border-radius: 4px;
-        width: 100%;
-      }
-    }
-  }
-
-  .resetPasswordForm {
-    @extend .magicLinkForm;
-
-    flex-flow: row wrap;
-  }
-
-  .emailPasswordForm {
-    display: flex;
-    position: relative;
-    flex-flow: column;
+  .authLeftPanel {
+    flex: none;
+    min-height: 100vh;
+    padding: 1.5rem;
     width: 100%;
+  }
+
+  .authRightPanel {
+    display: none; // Hide branding panel on mobile
+  }
+
+  .pmpCentralHeader img {
+    max-width: 150px;
+  }
+
+  .loginFormWrapper {
+    max-width: 100%;
+    padding: 30px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .authLeftPanel {
+    padding: 1rem;
+  }
+
+  .pmpCentralHeader img {
+    max-width: 120px;
+  }
+}
+
+.buttonWrapper {
+  display: flex;
+  position: relative;
+  flex-flow: row wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.authFormButton {
+  @extend .button;
+
+  color: #fff;
+  background: #353535;
+  border: 1px solid #353535;
+  border-radius: 0 4px 4px 0;
+
+  &:hover {
+    background: #73d2de;
+    border: 1px solid #73d2de;
+    color: #353535;
+  }
+
+  @media screen and (width <= 480px) {
+    border-radius: 4px;
+    margin-top: 5px;
+  }
+}
+
+.magicLinkFormWrapper {
+  max-width: 100%;
+  width: 470px;
+}
+
+.magicLinkHeading {
+  text-align: center;
+}
+
+.magicLinkSubheading {
+  color: #252c37;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.magicLinkForm {
+  display: flex;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
+
+  input {
+    padding: 1rem 0.5rem;
+    font-size: 1rem;
+    border: 1px solid #353535;
+    border-radius: 4px 0 0 4px;
+    outline: none;
+    flex-grow: 1;
+  }
+
+  @media screen and (width <= 480px) {
+    flex-flow: column;
 
     input {
-      padding: 1rem 0.5rem;
-      font-size: 1rem;
-      border: 1px solid #353535;
       border-radius: 4px;
-      outline: none;
-      flex-grow: 1;
       width: 100%;
-      margin: 5px 0;
     }
+  }
+}
 
-    .authFormButton {
-      border-radius: 4px;
-      margin-top: 5px;
-    }
+.resetPasswordForm {
+  @extend .magicLinkForm;
+
+  flex-flow: row wrap;
+}
+
+// AuthHeader styles
+.companyLogo {
+  max-width: 200px;
+  max-height: 80px;
+  object-fit: contain;
+  margin-bottom: 1rem;
+}
+
+.slogansContainer {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.sloganPrimary {
+  margin: 0.25rem 0;
+  font-weight: 600;
+}
+
+.sloganSecondary {
+  margin: 0.25rem 0;
+}
+
+.sloganTertiary {
+  margin: 0.25rem 0;
+  font-style: italic;
+}
+
+// Modern form styles
+.magicLinkFormWrapper {
+  max-width: 100%;
+  width: 100%;
+}
+
+.magicLinkHeading {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.emailPasswordForm {
+  display: flex;
+  position: relative;
+  flex-flow: column;
+  width: 100%;
+  gap: 1.5rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.inputLabel {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.formInput {
+  padding: 1rem;
+  font-size: 1rem;
+  background-color: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  outline: none;
+  transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: #3b82f6;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &::placeholder {
+    color: #6b7280;
+  }
+}
+
+.loginButton {
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: #006bc2;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  margin-top: 0.5rem;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// Social button styles
+.socialSubHeaderWrapper {
+  display: flex;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  margin: 1rem 0;
+
+  &::after {
+    display: block;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    content: '';
+    width: 100%;
+    height: 1px;
+    background: #d1d5db;
+  }
+}
+.socialSubHeader {
+  color: #252c37;
+  background: #fff;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  margin: 0;
+  padding: 1rem;
+  z-index: 1;
+}
+
+.socialButtonsContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.socialButton {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+
+  svg {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
   }
 }
 
@@ -198,35 +587,71 @@
 
 .authMethodToggle {
   display: flex;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  overflow: hidden;
-  margin: 1rem 0;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
 }
 
-.activeToggle {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  background-color: #3b82f6;
-  color: white;
-  border: none;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
+.toggleLabel {
+  white-space: nowrap;
+  color: #252c37;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
 }
 
-.inactiveToggle {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  background-color: white;
-  color: #6b7280;
-  border: none;
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
   cursor: pointer;
-  font-size: 0.875rem;
+}
 
-  &:hover {
-    background-color: #f3f4f6;
+.toggleInput {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggleSlider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #d1d5db;
+  border-radius: 32px;
+  transition: all 0.3s ease;
+
+  &:before {
+    position: absolute;
+    content: '';
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    box-shadow:
+      0 1px 2px -1px rgba(0, 0, 0, 0.1),
+      0 1px 3px 0 rgba(74, 85, 101, 0.1);
   }
+}
+
+.toggleInput:checked + .toggleSlider {
+  background-color: #6a7282;
+}
+
+.toggleInput:checked + .toggleSlider:before {
+  transform: translateX(16px);
+}
+
+.toggleSwitch:hover .toggleSlider {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .otpVerificationContainer {
@@ -260,16 +685,19 @@
 .forgotPasswordLink {
   background: none;
   border: none;
-  color: #3b82f6;
-  text-decoration: underline;
+  color: #006bc2;
+  text-decoration: none;
   cursor: pointer;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 5px;
   width: 100%;
-  text-align: center;
+  text-align: right;
+  padding: 0;
 
   &:hover {
     color: #2563eb;
+    text-decoration: underline;
   }
 }
 
@@ -278,22 +706,43 @@
   display: flex;
   align-items: center;
 
-  input {
-    margin: 5px 0;
+  .formInput {
     padding-right: 3rem;
   }
 
   .passwordToggle {
     position: absolute;
-    right: 0.5rem;
+    right: 0.75rem;
     background: none;
     border: none;
-    color: #6b7280;
+    color: #9ca3af;
     cursor: pointer;
-    font-size: 0.875rem;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     &:hover {
-      color: #374151;
+      color: #6b7280;
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    .eyeIcon {
+      width: 18px;
+      height: 18px;
+      color: inherit;
+      flex-shrink: 0;
     }
   }
+}
+
+.termsText {
+  color: #252c37;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  margin: 10px 0;
 }
