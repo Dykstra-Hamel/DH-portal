@@ -3,6 +3,7 @@ import { Ticket } from '@/types/ticket'
 import { getDetailedTimeAgo } from '@/lib/time-utils'
 import { User, Phone, Mail, MapPin, Clock, ArrowRight, Trash2 } from 'lucide-react'
 import { authenticatedFetch } from '@/lib/api-client'
+import { UserSelector } from '@/components/Common/UserSelector'
 import styles from './QualifyTicketModal.module.scss'
 import modalStyles from '@/components/Common/Modal/Modal.module.scss'
 import sectionStyles from '@/components/Tickets/TicketContent/SharedSection.module.scss'
@@ -26,6 +27,7 @@ interface CompanyUser {
   first_name: string
   last_name: string
   email: string
+  avatar_url?: string | null
   display_name: string
 }
 
@@ -361,20 +363,14 @@ export default function QualifyTicketModal({
                   <div className={sectionStyles.infoGrid}>
                     <div className={sectionStyles.infoRow}>
                       <div className={sectionStyles.infoField} style={{ gridColumn: '1 / -1' }}>
-                        <select
-                          value={selectedAssignee}
-                          onChange={(e) => setSelectedAssignee(e.target.value)}
-                          className={modalStyles.dropdown}
+                        <UserSelector
+                          users={companyUsers}
+                          selectedUserId={selectedAssignee}
+                          onSelect={setSelectedAssignee}
+                          placeholder="Select assignee..."
+                          loading={loadingUsers}
                           disabled={loadingUsers}
-                        >
-                          <option value="">Select assignee...</option>
-                          {companyUsers.map(user => (
-                            <option key={user.id} value={user.id}>
-                              {user.display_name}
-                            </option>
-                          ))}
-                        </select>
-                        {loadingUsers && <span style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>Loading users...</span>}
+                        />
                       </div>
                     </div>
                   </div>

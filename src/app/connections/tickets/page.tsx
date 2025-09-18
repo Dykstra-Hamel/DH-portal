@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { adminAPI } from '@/lib/api-client';
 import TicketsList from '@/components/Tickets/TicketsList/TicketsList';
 import { Ticket } from '@/types/ticket';
@@ -9,17 +10,37 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
 import { MetricsResponse } from '@/services/metricsService';
 import { CallRecord } from '@/types/call-record';
+import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import styles from './page.module.scss';
 
-export default function TicketsPage() {
+function TicketsPageContent() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [callRecords, setCallRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  
+
+  // Modal state for URL parameter handling
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [isQualifying, setIsQualifying] = useState(false);
+
   // Use global company context
   const { selectedCompany } = useCompany();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const ticketIdFromUrl = searchParams.get('ticketId');
+
+  // Handle URL parameter for auto-opening ticket modal
+  useEffect(() => {
+    if (ticketIdFromUrl && tickets.length > 0) {
+      const ticket = tickets.find(t => t.id === ticketIdFromUrl);
+      if (ticket) {
+        setSelectedTicket(ticket);
+        setShowTicketModal(true);
+      }
+    }
+  }, [ticketIdFromUrl, tickets]);
 
   const fetchTickets = useCallback(async (companyId: string) => {
     if (!companyId) return;
@@ -248,6 +269,57 @@ export default function TicketsPage() {
     }
   }, []);
 
+  // Handle modal close - clear URL parameter
+  const handleModalClose = useCallback(() => {
+    setShowTicketModal(false);
+    setSelectedTicket(null);
+    // Clear URL parameter without adding to history
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.delete('ticketId');
+    router.replace(newUrl.pathname + newUrl.search);
+  }, [router]);
+
+  // Handle ticket qualification
+  const handleQualify = useCallback(async (
+    qualification: 'sales' | 'customer_service' | 'junk',
+    assignedTo?: string
+  ) => {
+    if (!selectedTicket) return;
+
+    setIsQualifying(true);
+    try {
+      const response = await fetch(
+        `/api/tickets/${selectedTicket.id}/qualify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            qualification,
+            assignedTo,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to qualify ticket');
+      }
+
+      // Refresh the tickets list
+      if (selectedCompany?.id) {
+        fetchTickets(selectedCompany.id);
+        fetchMetrics(selectedCompany.id);
+      }
+
+      handleModalClose();
+    } catch (error) {
+      console.error('Error qualifying ticket:', error);
+      alert('Failed to qualify ticket. Please try again.');
+    } finally {
+      setIsQualifying(false);
+    }
+  }, [selectedTicket, selectedCompany, fetchTickets, fetchMetrics, handleModalClose]);
 
   useEffect(() => {
     if (selectedCompany?.id) {
@@ -418,6 +490,25 @@ export default function TicketsPage() {
           Please select a company to view tickets.
         </div>
       )}
+
+      {/* Ticket Review Modal */}
+      {selectedTicket && (
+        <TicketReviewModal
+          ticket={selectedTicket}
+          isOpen={showTicketModal}
+          onClose={handleModalClose}
+          onQualify={handleQualify}
+          isQualifying={isQualifying}
+        />
+      )}
     </div>
+  );
+}
+
+export default function TicketsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TicketsPageContent />
+    </Suspense>
   );
 }

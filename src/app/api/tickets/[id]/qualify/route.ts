@@ -232,6 +232,26 @@ export async function POST(
         );
       }
 
+      // Create assignment notification if lead was assigned to someone
+      if (assignedTo) {
+        try {
+          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const adminSupabase = createAdminClient();
+
+          await adminSupabase.rpc('create_notification', {
+            p_user_id: assignedTo,
+            p_company_id: ticket.company_id,
+            p_type: 'assignment',
+            p_title: 'New Lead Assignment',
+            p_message: `You have been assigned a new sales lead from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
+            p_reference_id: newLead.id,
+            p_reference_type: 'lead'
+          });
+        } catch (notificationError) {
+          console.error('Error creating lead assignment notification:', notificationError);
+        }
+      }
+
       // Update the ticket to mark it as converted and archived
       const { error: ticketUpdateError } = await supabase
         .from('tickets')
@@ -385,6 +405,24 @@ export async function POST(
 
       if (ticketUpdateError) {
         console.error('Error updating ticket conversion status:', ticketUpdateError);
+      // Create assignment notification if ticket was assigned to someone
+      if (assignedTo) {
+        try {
+          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const adminSupabase = createAdminClient();
+
+          await adminSupabase.rpc('create_notification', {
+            p_user_id: assignedTo,
+            p_company_id: ticket.company_id,
+            p_type: 'assignment',
+            p_title: 'New Support Ticket Assignment',
+            p_message: `You have been assigned a support ticket from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
+            p_reference_id: ticket.id,
+            p_reference_type: 'ticket'
+          });
+        } catch (notificationError) {
+          console.error('Error creating ticket assignment notification:', notificationError);
+        }
       }
 
       return NextResponse.json({

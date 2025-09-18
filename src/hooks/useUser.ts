@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User as SupabaseUser } from '@supabase/supabase-js'
-
-interface Profile {
-  id: string
-  first_name?: string
-  last_name?: string
-  email: string
-  role?: string
-}
+import { Profile } from '@/types/user'
 
 export function useUser() {
   const [user, setUser] = useState<SupabaseUser | null>(null)

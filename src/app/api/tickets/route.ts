@@ -209,6 +209,23 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Failed to create ticket');
     }
 
+    // Generate notifications for support department users
+    try {
+      const adminSupabase = createAdminClient();
+      await adminSupabase.rpc('notify_department_users', {
+        p_company_id: ticketData.company_id,
+        p_department: 'support',
+        p_type: 'department_ticket',
+        p_title: 'New Support Ticket',
+        p_message: `A new support ticket has been created from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
+        p_reference_id: ticket.id,
+        p_reference_type: 'ticket'
+      });
+    } catch (notificationError) {
+      console.error('Error creating ticket notifications:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+
     return createSuccessResponse(ticket, 201);
   } catch (error) {
     console.error('Error in POST tickets API:', error);

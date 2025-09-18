@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useCurrentUserPageAccess } from '@/hooks/useUserDepartments';
 import { adminAPI } from '@/lib/api-client';
 import styles from './secondarySidenav.module.scss';
 
@@ -23,8 +24,8 @@ interface NavItem {
 }
 
 interface NavGroup {
+  title?: string;
   items: NavItem[];
-  showDividerAfter?: boolean;
 }
 
 interface Counts {
@@ -56,6 +57,17 @@ export function SecondarySideNav({
   const { activePrimaryNav } = useNavigation();
   const { selectedCompany, isAdmin } = useCompany();
   const isPublicPage = pathname === '/login' || pathname === '/sign-up';
+
+  // Always call hooks (React requirement), but prioritize admin status
+  const { hasAccess: hasSalesAccess } = useCurrentUserPageAccess('sales');
+  const { hasAccess: hasSchedulingAccess } =
+    useCurrentUserPageAccess('scheduling');
+  const { hasAccess: hasSupportAccess } = useCurrentUserPageAccess('support');
+
+  // Global admins see everything, otherwise check department access
+  const shouldShowSales = isAdmin || hasSalesAccess;
+  const shouldShowScheduling = isAdmin || hasSchedulingAccess;
+  const shouldShowSupport = isAdmin || hasSupportAccess;
 
   // Handle client-side hydration
   useEffect(() => {
@@ -184,8 +196,8 @@ export function SecondarySideNav({
         return (
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
+            width="24"
+            height="24"
             viewBox="0 0 24 24"
             fill="none"
           >
@@ -223,8 +235,8 @@ export function SecondarySideNav({
         return (
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
+            width="24"
+            height="24"
             viewBox="0 0 24 24"
             fill="none"
           >
@@ -248,8 +260,8 @@ export function SecondarySideNav({
         return (
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="15"
+            width="24"
+            height="24"
             viewBox="0 0 24 20"
             fill="none"
           >
@@ -294,8 +306,8 @@ export function SecondarySideNav({
         return (
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
+            width="24"
+            height="24"
             viewBox="0 0 24 24"
             fill="none"
           >
@@ -351,6 +363,43 @@ export function SecondarySideNav({
         ];
       case 'connections':
       default:
+        const connectionItems: NavItem[] = [
+          {
+            text: 'Tickets',
+            href: '/connections/tickets',
+            count: counts.tickets,
+          },
+        ];
+
+        // Add Sales Leads if user has access (admin or sales department)
+        if (shouldShowSales) {
+          connectionItems.push({
+            text: 'Sales Leads',
+            href: '/connections/leads',
+            count: counts.leads,
+          });
+        }
+
+        // Add Scheduling if user has access (admin or scheduling department)
+        if (shouldShowScheduling) {
+          connectionItems.push({
+            text: 'Scheduling',
+            href: '/connections/scheduling',
+            count: 0, // No data source yet
+            disabled: true,
+          });
+        }
+
+        // Add Customer Service if user has access (admin or support department)
+        if (shouldShowSupport) {
+          connectionItems.push({
+            text: 'Customer Service',
+            href: '/connections/customer-service',
+            count: 0, // No data source yet
+            disabled: true,
+          });
+        }
+
         return [
           {
             items: [
@@ -376,9 +425,9 @@ export function SecondarySideNav({
                 count: counts.cases,
               },
             ],
-            showDividerAfter: true,
           },
           {
+            title: 'My Assignments',
             items: [
               {
                 text: 'My Tasks',
@@ -393,9 +442,9 @@ export function SecondarySideNav({
                 disabled: true,
               },
             ],
-            showDividerAfter: true,
           },
           {
+            title: 'Records & Reports',
             items: [
               {
                 text: 'Reports',
@@ -433,6 +482,9 @@ export function SecondarySideNav({
         <nav className={styles.contextNav}>
           {navGroups.map((group, groupIndex) => (
             <div key={groupIndex}>
+              {group.title && (
+                <h3 className={styles.groupTitle}>{group.title}</h3>
+              )}
               <div className={styles.navGroup}>
                 {group.items.map(item => {
                   const isActive =
@@ -487,7 +539,6 @@ export function SecondarySideNav({
                   );
                 })}
               </div>
-              {group.showDividerAfter && <div className={styles.divider}></div>}
             </div>
           ))}
         </nav>

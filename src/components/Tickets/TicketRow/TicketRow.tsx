@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Ticket } from '@/types/ticket';
 import styles from './TicketRow.module.scss';
 
@@ -106,14 +106,14 @@ const formatServiceType = (serviceType: string): string => {
   return serviceTypeMap[serviceType] || serviceType;
 };
 
-export default function TicketRow({ ticket, onClick, onQualify }: TicketRowProps) {
+const TicketRow = memo(function TicketRow({ ticket, onClick, onQualify }: TicketRowProps) {
   const handleClick = () => {
     // Row click should open qualify modal
     onQualify?.(ticket);
     onClick?.(ticket);
   };
 
-  const handleQualifyClick = (e: React.MouseEvent) => {
+  const handleQualifyClick = () => {
     // Button click should also open qualify modal (same as row click)
     onQualify?.(ticket);
     onClick?.(ticket);
@@ -184,4 +184,6 @@ export default function TicketRow({ ticket, onClick, onQualify }: TicketRowProps
       </button>
     </div>
   );
-}
+});
+
+export default TicketRow;

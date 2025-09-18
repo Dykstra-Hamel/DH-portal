@@ -161,7 +161,6 @@ const formatCallStarted = (startTime: string): string => {
 };
 
 export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCallBarProps) {
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [sortConfig, setSortConfig] = useState<{ direction: 'asc' | 'desc' } | null>(null);
   const [realTimeTickets, setRealTimeTickets] = useState<Ticket[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -170,14 +169,6 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
   // Use global company context for real-time filtering
   const { selectedCompany } = useCompany();
 
-  // Update current time every second for live duration calculation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   // Initialize mock mode from localStorage or env (client-side only)
   useEffect(() => {
@@ -467,7 +458,7 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
-  ], [currentTime]);
+  ], []);
 
   // Priority order: live calls from tickets (includes real-time) > fallback prop data
   const validLiveCalls = useMock

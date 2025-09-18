@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import { syncUserAvatar } from '@/lib/avatar-sync';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -39,9 +40,18 @@ export function useAuth() {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Sync avatar on sign-in events
+      if (event === 'SIGNED_IN' && session?.user) {
+        try {
+          await syncUserAvatar(session.user);
+        } catch (error) {
+          console.error('Avatar sync failed on login:', error);
+        }
+      }
 
       // Redirect to dashboard if user is authenticated
       if (session?.user) {

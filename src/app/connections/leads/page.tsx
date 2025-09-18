@@ -9,6 +9,7 @@ import LeadsTabs from '@/components/Leads/LeadsTabs/LeadsTabs';
 import { adminAPI } from '@/lib/api-client';
 import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
+import { PageAccessGuard } from '@/components/Common/AccessControl';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -239,58 +240,60 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>Leads</h1>
-      </div>
-
-      <div className={styles.leadsSection}>
-        <div className={styles.sectionHeader}>
-          <h2>
-            {isAdmin && !selectedCompany
-              ? 'All Leads (All Companies)'
-              : isAdmin && selectedCompany
-                ? `Leads for ${selectedCompany.name}`
-                : selectedCompany
-                  ? `Leads for ${selectedCompany.name}`
-                  : 'Leads'}
-          </h2>
-          <p>
-            {isAdmin && !selectedCompany
-              ? 'All leads across all companies'
-              : selectedCompany
-                ? `All leads for ${selectedCompany.name}`
-                : 'Loading...'}
-          </p>
+    <PageAccessGuard pageType="sales">
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <h1>Leads</h1>
         </div>
 
-        {leadsLoading ? (
-          <div className={styles.loading}>Loading leads...</div>
-        ) : leads.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p>No leads found. Create your first lead to get started!</p>
+        <div className={styles.leadsSection}>
+          <div className={styles.sectionHeader}>
+            <h2>
+              {isAdmin && !selectedCompany
+                ? 'All Leads (All Companies)'
+                : isAdmin && selectedCompany
+                  ? `Leads for ${selectedCompany.name}`
+                  : selectedCompany
+                    ? `Leads for ${selectedCompany.name}`
+                    : 'Leads'}
+            </h2>
+            <p>
+              {isAdmin && !selectedCompany
+                ? 'All leads across all companies'
+                : selectedCompany
+                  ? `All leads for ${selectedCompany.name}`
+                  : 'Loading...'}
+            </p>
           </div>
-        ) : (
-          <>
-            <LeadsTabs
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              leadCounts={leadCounts}
-            />
-            <LeadsTable
-              leads={filteredLeads}
-              showActions={true}
-              showCompanyColumn={isAdmin && !selectedCompany}
-              onEdit={handleEditLead}
-              onDelete={handleDeleteLead}
-              onArchive={handleArchiveLead}
-              onUnarchive={handleUnarchiveLead}
-              userProfile={profile}
-              showArchived={activeTab === 'archived'}
-            />
-          </>
-        )}
+
+          {leadsLoading ? (
+            <div className={styles.loading}>Loading leads...</div>
+          ) : leads.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p>No leads found. Create your first lead to get started!</p>
+            </div>
+          ) : (
+            <>
+              <LeadsTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                leadCounts={leadCounts}
+              />
+              <LeadsTable
+                leads={filteredLeads}
+                showActions={true}
+                showCompanyColumn={isAdmin && !selectedCompany}
+                onEdit={handleEditLead}
+                onDelete={handleDeleteLead}
+                onArchive={handleArchiveLead}
+                onUnarchive={handleUnarchiveLead}
+                userProfile={profile}
+                showArchived={activeTab === 'archived'}
+              />
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </PageAccessGuard>
   );
 }

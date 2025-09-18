@@ -5,7 +5,7 @@
   height: calc(100vh - 12px);
   top: 12px;
   border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
-  background: var(--neutral-800);
+  background: var(--gradient-dh-gray);
   color: white;
   padding: 16px 0;
   overflow-y: auto;
@@ -35,7 +35,6 @@
 .iconHeader {
   width: 28px;
   height: 28px;
-  background: var(--neutral-500);
   border-radius: var(--border-radius-sm);
   display: flex;
   align-items: center;
@@ -57,6 +56,15 @@
   flex-direction: column;
 }
 
+.groupTitle {
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 24px;
+  color: var(--gray-400);
+  padding: 24px 24px 8px 24px;
+}
+
 .navGroup {
   display: flex;
   flex-direction: column;
@@ -72,7 +80,7 @@
   width: calc(100% - 8px);
   height: 1px;
   opacity: 0.1;
-  background: #FFF;
+  background: #fff;
   margin: 16px 4px;
 }
 
@@ -81,7 +89,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px;
+  padding: 12px 10px 12px 21px;
   border-radius: var(--border-radius-md);
   text-decoration: none;
   color: var(--neutral-100);
@@ -91,11 +99,12 @@
   cursor: pointer;
 
   &:hover:not(.disabled):not(.active) {
-    background: var(--neutral-600);
+    background: var(--gray-700);
 
     .countBox {
       &.defaultCount {
-        background: var(--neutral-800);
+        background: transparent;
+        border: 1px solid var(--gray-400);
         color: white;
       }
     }
@@ -125,9 +134,9 @@
 // Count boxes
 .countBox {
   min-width: 13px;
-  height: 16px;
-  padding: 2px 4px;
-  border-radius: 2px;
+  height: 23px;
+  width: 23px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
   display: flex;
@@ -138,7 +147,8 @@
 }
 
 .defaultCount {
-  background: var(--neutral-600);
+  border: 1px solid var(--gray-700);
+  background: transparent;
   color: white;
 }
 
@@ -153,7 +163,7 @@
 }
 
 .neutral {
-  background: var(--neutral-600);
+  border: 1px solid var(--neutral-600);
   color: white;
 }
 

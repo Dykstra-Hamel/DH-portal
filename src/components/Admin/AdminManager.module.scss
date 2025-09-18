@@ -293,6 +293,56 @@
   }
 }
 
+.departmentButton {
+  background-color: #8b5cf6;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #7c3aed;
+  }
+}
+
+// Department-related styles
+.noDepartments {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 0.75rem;
+}
+
+.loading {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.modalHeader {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+
+  p {
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+  }
+}
+
+.departmentSelection {
+  margin: 1rem 0;
+}
+
+.fieldHelp {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  display: block;
+  line-height: 1.3;
+}
+
 .checkboxList {
   max-height: 200px;
   overflow-y: auto;

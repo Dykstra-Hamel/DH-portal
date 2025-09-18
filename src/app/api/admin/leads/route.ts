@@ -156,6 +156,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate notifications for sales department users
+    try {
+      if (body.company_id) {
+        await supabase.rpc('notify_department_users', {
+          p_company_id: body.company_id,
+          p_department: 'sales',
+          p_type: 'department_lead',
+          p_title: 'New Sales Lead',
+          p_message: `A new sales lead has been created${lead.customer_name ? ` from ${lead.customer_name}` : ''}`,
+          p_reference_id: lead.id,
+          p_reference_type: 'lead'
+        });
+      }
+    } catch (notificationError) {
+      console.error('Error creating lead notifications:', notificationError);
+      // Don't fail the request if notification creation fails
+    }
+
     return NextResponse.json(lead, { status: 201 });
   } catch (error) {
     console.error('Admin Leads API: Internal error:', error);
