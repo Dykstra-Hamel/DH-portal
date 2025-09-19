@@ -59,7 +59,6 @@ export default function SortableColumnHeader({
   return (
     <div 
       className={`${styles.columnHeader} ${sortable ? styles.sortable : styles.nonSortable} ${className || ''}`}
-      style={{ width }}
       onClick={handleClick}
     >
       <span className={styles.title}>{title}</span>

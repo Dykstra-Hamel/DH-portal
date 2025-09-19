@@ -457,6 +457,73 @@ export const adminAPI = {
     },
   },
 
+  // Support Cases
+  supportCases: {
+    async list(
+      filters: { 
+        companyId?: string; 
+        status?: string; 
+        issueType?: string;
+        priority?: string; 
+        assignedTo?: string;
+        includeArchived?: boolean;
+        dateFrom?: string;
+        dateTo?: string;
+      } = {}
+    ) {
+      const queryParams = new URLSearchParams();
+      if (filters.companyId) queryParams.append('companyId', filters.companyId);
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.issueType) queryParams.append('issueType', filters.issueType);
+      if (filters.priority) queryParams.append('priority', filters.priority);
+      if (filters.assignedTo) queryParams.append('assignedTo', filters.assignedTo);
+      if (filters.includeArchived) queryParams.append('includeArchived', 'true');
+      if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+      const url = `/api/support-cases${queryParams.toString() ? `?${queryParams}` : ''}`;
+      return authenticatedFetch(url);
+    },
+
+    async get(supportCaseId: string) {
+      return authenticatedFetch(`/api/support-cases/${supportCaseId}`);
+    },
+
+    async create(supportCaseData: any) {
+      return authenticatedFetch('/api/support-cases', {
+        method: 'POST',
+        body: JSON.stringify(supportCaseData),
+      });
+    },
+
+    async update(supportCaseId: string, supportCaseData: any) {
+      return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+        method: 'PUT',
+        body: JSON.stringify(supportCaseData),
+      });
+    },
+
+    async updateStatus(supportCaseId: string, status: string, notes?: string) {
+      return authenticatedFetch(`/api/support-cases/${supportCaseId}/update-status`, {
+        method: 'POST',
+        body: JSON.stringify({ status, notes }),
+      });
+    },
+
+    async archive(supportCaseId: string) {
+      return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async addSatisfactionRating(supportCaseId: string, rating: number, feedback?: string) {
+      return authenticatedFetch(`/api/support-cases/${supportCaseId}/satisfaction`, {
+        method: 'POST',
+        body: JSON.stringify({ rating, feedback }),
+      });
+    },
+  },
+
   // Non-admin individual customer endpoints
   async getUserCustomer(customerId: string) {
     return authenticatedFetch(`/api/customers/${customerId}`);
@@ -466,6 +533,31 @@ export const adminAPI = {
     return authenticatedFetch(`/api/customers/${customerId}`, {
       method: 'PUT',
       body: JSON.stringify(customerData),
+    });
+  },
+
+  // Branding
+  async getBranding(companyId: string) {
+    return authenticatedFetch(`/api/admin/brands?company_id=${companyId}`);
+  },
+
+  async createBranding(brandData: any) {
+    return authenticatedFetch('/api/admin/brands', {
+      method: 'POST',
+      body: JSON.stringify(brandData),
+    });
+  },
+
+  async updateBranding(brandData: any) {
+    return authenticatedFetch('/api/admin/brands', {
+      method: 'PUT',
+      body: JSON.stringify(brandData),
+    });
+  },
+
+  async deleteBranding(brandId: string) {
+    return authenticatedFetch(`/api/admin/brands?id=${brandId}`, {
+      method: 'DELETE',
     });
   },
 };

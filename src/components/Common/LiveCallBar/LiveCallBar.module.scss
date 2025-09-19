@@ -8,7 +8,7 @@
   border-radius: var(--border-radius-md);
   background: #001c35;
   box-shadow: var(--box-shadow-card);
-  margin-bottom: 24px;
+  margin-bottom: 8px;
 
   &.liveCallBackground {
     background: linear-gradient(90deg, #00529b 5.43%, #072f4a 99.55%);
@@ -116,7 +116,7 @@
   transition: all 0.3s ease;
 
   &:nth-child(even) {
-    background: rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.1);
   }
 
   &.exiting {

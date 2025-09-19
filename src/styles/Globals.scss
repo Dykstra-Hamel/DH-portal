@@ -1,4 +1,4 @@
-@import 'fonts';
+@use 'fonts';
 
 :root {
   /* Font Variables */
@@ -21,16 +21,20 @@
   --neutral-600: #525252;
   --gray-light: #979797;
   --gray: #313131;
+  --gray-50: #f9fafb;
+  --gray-100: #f2f2f7;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5dc;
+  --gray-500: #6a7282;
+  --gray-800: #252c37;
+  --gray-900: #161a22;
   --sales-good: #84cc16;
   --sales-bad: #ef4444;
   --neutral-400: #a3a3a3;
   --neutral-500: #737373;
-  --gray-500: #6A7282;
-  --gray-800: #252C37;
-  --action-500: #0087F5;
-  --action-600: #006BC2;
+  --action-500: #0087f5;
+  --action-600: #006bc2;
   --action-700: #1d4ed8;
-  --gray-100: #F2F2F7;
   --drop-shadow: #e8e8ea;
   --highlight-blue-dark: #3190d3;
   --drop-shadow-hover: #dbdbdd;
@@ -38,9 +42,10 @@
   --live-call-gradient: linear-gradient(90deg, #00529b 5.43%, #001c35 99.55%);
   --box-shadow-card: 0 0 11px 0 #e8e8ea;
   --box-shadow-card-hover: 0 4px 12px 0 var(--drop-shadow-hover);
+  --shadow-50: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 
   /* Toast and Status Colors */
-  --Misc-Darker-Green: #25B762;
+  --Misc-Darker-Green: #25b762;
 
   /* Border Radius Variables */
   --border-radius-sm: 4px;

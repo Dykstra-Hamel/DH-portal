@@ -30,6 +30,7 @@ interface NavGroup {
 interface Counts {
   tickets: number;
   leads: number;
+  cases: number;
   customers: number;
   projects: number;
   calls: number;
@@ -44,6 +45,7 @@ export function SecondarySideNav({
   const [counts, setCounts] = useState<Counts>({
     tickets: 0,
     leads: 0,
+    cases: 0,
     customers: 0,
     projects: 0,
     calls: 0,
@@ -61,53 +63,112 @@ export function SecondarySideNav({
   }, []);
 
   // Fetch counts for navigation items
-  const fetchCounts = useCallback(async (companyId: string) => {
-    setLoadingCounts(true);
-    try {
-      const [ticketsData, leadsData, customersData, projectsData, callsData] = await Promise.allSettled([
-        // Fetch tickets (active/non-archived tickets only)
-        isAdmin 
-          ? adminAPI.tickets.list({ companyId, includeArchived: false })
-          : (() => {
-              const queryParams = new URLSearchParams({ companyId, includeArchived: 'false' });
-              return fetch(`/api/tickets?${queryParams}`).then(res => res.ok ? res.json() : []);
-            })(),
-        
-        // Fetch leads (NEW leads only)
-        isAdmin 
-          ? adminAPI.getLeads({ companyId, status: 'new' })
-          : adminAPI.getUserLeads(companyId),
-        
-        // Fetch customers (NO date filter - always show total count)
-        isAdmin 
-          ? adminAPI.getCustomers({ companyId })
-          : adminAPI.getUserCustomers({ companyId }),
-        
-        // Fetch projects (NO date filter - show total counts)
-        isAdmin 
-          ? adminAPI.getProjects({ companyId })
-          : adminAPI.getUserProjects(companyId),
-        
-        // Fetch calls (NO date filter - always show total count)
-        isAdmin 
-          ? adminAPI.getAllCalls({ companyId })
-          : adminAPI.getUserCalls({ companyId }),
-      ]);
+  const fetchCounts = useCallback(
+    async (companyId: string) => {
+      setLoadingCounts(true);
+      try {
+        const [
+          ticketsData,
+          leadsData,
+          casesData,
+          customersData,
+          projectsData,
+          callsData,
+        ] = await Promise.allSettled([
+          // Fetch tickets (active/non-archived tickets only)
+          isAdmin
+            ? adminAPI.tickets.list({ companyId, includeArchived: false })
+            : (() => {
+                const queryParams = new URLSearchParams({
+                  companyId,
+                  includeArchived: 'false',
+                });
+                return fetch(`/api/tickets?${queryParams}`).then(res =>
+                  res.ok ? res.json() : []
+                );
+              })(),
 
-      setCounts({
-        tickets: ticketsData.status === 'fulfilled' ? (Array.isArray(ticketsData.value) ? ticketsData.value.length : 0) : 0,
-        leads: leadsData.status === 'fulfilled' ? (Array.isArray(leadsData.value) ? leadsData.value.length : 0) : 0,
-        customers: customersData.status === 'fulfilled' ? (Array.isArray(customersData.value) ? customersData.value.length : 0) : 0,
-        projects: projectsData.status === 'fulfilled' ? (Array.isArray(projectsData.value) ? projectsData.value.length : 0) : 0,
-        calls: callsData.status === 'fulfilled' ? (Array.isArray(callsData.value) ? callsData.value.length : 0) : 0,
-      });
-    } catch (error) {
-      console.error('Error fetching counts:', error);
-      // Keep counts at 0 on error
-    } finally {
-      setLoadingCounts(false);
-    }
-  }, [isAdmin]);
+          // Fetch leads (NEW leads only)
+          isAdmin
+            ? adminAPI.getLeads({ companyId, status: 'new' })
+            : adminAPI.getUserLeads(companyId),
+
+          // Fetch support cases (NEW leads only)
+          isAdmin
+            ? adminAPI.supportCases.list({ companyId, includeArchived: false })
+            : (() => {
+                const queryParams = new URLSearchParams({
+                  companyId,
+                  includeArchived: 'false',
+                });
+                return fetch(`/api/support-cases?${queryParams}`).then(res =>
+                  res.ok ? res.json() : []
+                );
+              })(),
+
+          // Fetch customers (NO date filter - always show total count)
+          isAdmin
+            ? adminAPI.getCustomers({ companyId })
+            : adminAPI.getUserCustomers({ companyId }),
+
+          // Fetch projects (NO date filter - show total counts)
+          isAdmin
+            ? adminAPI.getProjects({ companyId })
+            : adminAPI.getUserProjects(companyId),
+
+          // Fetch calls (NO date filter - always show total count)
+          isAdmin
+            ? adminAPI.getAllCalls({ companyId })
+            : adminAPI.getUserCalls({ companyId }),
+        ]);
+
+        setCounts({
+          tickets:
+            ticketsData.status === 'fulfilled'
+              ? Array.isArray(ticketsData.value)
+                ? ticketsData.value.length
+                : 0
+              : 0,
+          leads:
+            leadsData.status === 'fulfilled'
+              ? Array.isArray(leadsData.value)
+                ? leadsData.value.length
+                : 0
+              : 0,
+          cases:
+            casesData.status === 'fulfilled'
+              ? Array.isArray(casesData.value)
+                ? casesData.value.length
+                : 0
+              : 0,
+          customers:
+            customersData.status === 'fulfilled'
+              ? Array.isArray(customersData.value)
+                ? customersData.value.length
+                : 0
+              : 0,
+          projects:
+            projectsData.status === 'fulfilled'
+              ? Array.isArray(projectsData.value)
+                ? projectsData.value.length
+                : 0
+              : 0,
+          calls:
+            callsData.status === 'fulfilled'
+              ? Array.isArray(callsData.value)
+                ? callsData.value.length
+                : 0
+              : 0,
+        });
+      } catch (error) {
+        console.error('Error fetching counts:', error);
+        // Keep counts at 0 on error
+      } finally {
+        setLoadingCounts(false);
+      }
+    },
+    [isAdmin]
+  );
 
   // Fetch counts when company changes
   useEffect(() => {
@@ -115,8 +176,6 @@ export function SecondarySideNav({
       fetchCounts(selectedCompany.id);
     }
   }, [selectedCompany?.id, isHydrated, fetchCounts]);
-
-
 
   // Get the icon for the current primary nav
   const getPrimaryNavIcon = () => {
@@ -276,21 +335,19 @@ export function SecondarySideNav({
           {
             items: [
               { text: 'Dashboard', href: '/dashboard' },
-              { 
-                text: 'All Customers', 
+              {
+                text: 'All Customers',
                 href: '/dashboard/customers',
-                count: counts.customers
-              }
-            ]
-          }
+                count: counts.customers,
+              },
+            ],
+          },
         ];
       case 'brand':
         return [
           {
-            items: [
-              { text: 'Brand', href: '/brand' }
-            ]
-          }
+            items: [{ text: 'Brand', href: '/brand' }],
+          },
         ];
       case 'connections':
       default:
@@ -305,22 +362,21 @@ export function SecondarySideNav({
               {
                 text: 'Sales Leads',
                 href: '/connections/leads',
-                count: counts.leads
+                count: counts.leads,
               },
               {
                 text: 'Scheduling',
                 href: '/connections/scheduling',
                 count: 0, // No data source yet
-                disabled: true
+                disabled: true,
               },
               {
                 text: 'Customer Service',
                 href: '/connections/customer-service',
-                count: 0, // No data source yet
-                disabled: true
-              }
+                count: counts.cases,
+              },
             ],
-            showDividerAfter: true
+            showDividerAfter: true,
           },
           {
             items: [
@@ -334,54 +390,57 @@ export function SecondarySideNav({
                 text: 'Assigned To Me',
                 href: '/connections/assigned-to-me',
                 count: 0, // No data source yet
-                disabled: true
-              }
+                disabled: true,
+              },
             ],
-            showDividerAfter: true
+            showDividerAfter: true,
           },
           {
             items: [
               {
                 text: 'Reports',
                 href: '/connections/reports',
-                disabled: true
+                disabled: true,
               },
               {
                 text: 'Calls',
                 href: '/connections/call-records',
-                count: counts.calls
+                count: counts.calls,
               },
-              { 
-                text: 'All Customers', 
+              {
+                text: 'All Customers',
                 href: '/dashboard/customers',
-                count: counts.customers
-              }
-            ]
-          }
+                count: counts.customers,
+              },
+            ],
+          },
         ];
     }
   };
 
   const renderContextNav = () => {
     const navGroups = getNavigationGroups();
-    
+
     return (
       <>
         <div className={styles.sectionHeader}>
           <div className={styles.iconHeader}>{getPrimaryNavIcon()}</div>
           <h2 className={styles.sectionTitle}>
-            {activePrimaryNav.charAt(0).toUpperCase() + activePrimaryNav.slice(1)}
+            {activePrimaryNav.charAt(0).toUpperCase() +
+              activePrimaryNav.slice(1)}
           </h2>
         </div>
         <nav className={styles.contextNav}>
           {navGroups.map((group, groupIndex) => (
             <div key={groupIndex}>
               <div className={styles.navGroup}>
-                {group.items.map((item) => {
+                {group.items.map(item => {
                   const isActive =
                     pathname === item.href ||
                     (item.href === '/connections/tickets' &&
-                      (pathname.startsWith('/connections/tickets') || pathname.startsWith('/tickets') || pathname.startsWith('/connections/calls-and-forms'))) ||
+                      (pathname.startsWith('/connections/tickets') ||
+                        pathname.startsWith('/tickets') ||
+                        pathname.startsWith('/connections/calls-and-forms'))) ||
                     (item.href.startsWith('/connections/') &&
                       pathname.startsWith(item.href));
 
@@ -389,9 +448,13 @@ export function SecondarySideNav({
                     <div key={item.text} className={styles.navItemContainer}>
                       {item.disabled ? (
                         <div className={`${styles.navItem} ${styles.disabled}`}>
-                          <span className={styles.navItemText}>{item.text}</span>
+                          <span className={styles.navItemText}>
+                            {item.text}
+                          </span>
                           {item.count !== undefined && (
-                            <span className={`${styles.countBox} ${styles.neutral}`}>
+                            <span
+                              className={`${styles.countBox} ${styles.neutral}`}
+                            >
                               {loadingCounts ? '•' : item.count}
                             </span>
                           )}
@@ -402,7 +465,9 @@ export function SecondarySideNav({
                           className={`${styles.navItem} ${isActive ? styles.active : ''}`}
                           onClick={onLinkClick}
                         >
-                          <span className={styles.navItemText}>{item.text}</span>
+                          <span className={styles.navItemText}>
+                            {item.text}
+                          </span>
                           {item.count !== undefined && (
                             <span
                               className={`${styles.countBox} ${
@@ -422,16 +487,13 @@ export function SecondarySideNav({
                   );
                 })}
               </div>
-              {group.showDividerAfter && (
-                <div className={styles.divider}></div>
-              )}
+              {group.showDividerAfter && <div className={styles.divider}></div>}
             </div>
           ))}
         </nav>
       </>
     );
   };
-
 
   if (collapsed) {
     return null;

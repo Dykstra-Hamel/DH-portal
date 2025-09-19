@@ -4,6 +4,37 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
+// Utility function to generate URL-safe slug from company name (matches the database function logic)
+function generateCompanySlug(companyName, existingSlugs = []) {
+  if (!companyName || typeof companyName !== 'string') {
+    return 'company';
+  }
+
+  // Convert to lowercase, replace spaces and special chars with hyphens
+  let baseSlug = companyName
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  
+  // Ensure slug is not empty
+  if (!baseSlug || baseSlug.length === 0) {
+    baseSlug = 'company';
+  }
+
+  // Check if slug exists and add counter if needed
+  let finalSlug = baseSlug;
+  let counter = 1;
+  while (existingSlugs.includes(finalSlug)) {
+    finalSlug = baseSlug + '-' + counter;
+    counter++;
+  }
+  
+  return finalSlug;
+}
+
 // Load environment variables from .env.local
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
@@ -216,13 +247,13 @@ async function createCompaniesWithUsers(users) {
     }
 
     // Define companies to create (pest control businesses)
-    const companies = [
+    const companiesData = [
       {
         id: '11111111-1111-1111-1111-111111111111',
         name: 'Elite Pest Solutions',
         description:
           'Professional pest control services specializing in residential and commercial extermination, prevention, and integrated pest management.',
-        website: 'https://elitepestsolutions.com',
+        website: ['https://elitepestsolutions.com'],
         email: 'info@elitepestsolutions.com',
         phone: '(555) 123-4567',
         address: '123 Exterminator Blvd',
@@ -238,7 +269,7 @@ async function createCompaniesWithUsers(users) {
         name: 'Guardian Pest Control',
         description:
           'Advanced pest control technology and eco-friendly solutions for homes and businesses across Texas.',
-        website: 'https://guardianpest.com',
+        website: ['https://guardianpest.com'],
         email: 'hello@guardianpest.com',
         phone: '(555) 987-6543',
         address: '456 Pest Control Ave',
@@ -254,7 +285,7 @@ async function createCompaniesWithUsers(users) {
         name: 'Green Shield Exterminators',
         description:
           'Sustainable and organic pest control solutions with a focus on environmental safety and family protection.',
-        website: 'https://greenshieldpest.com',
+        website: ['https://greenshieldpest.com'],
         email: 'contact@greenshieldpest.com',
         phone: '(555) 456-7890',
         address: '789 Green Way',
@@ -270,7 +301,7 @@ async function createCompaniesWithUsers(users) {
         name: 'Metro Bug Busters',
         description:
           'Full-service urban pest control specialists handling everything from bed bugs to rodent infestations in the metro area.',
-        website: 'https://metrobugbusters.com',
+        website: ['https://metrobugbusters.com'],
         email: 'support@metrobugbusters.com',
         phone: '(555) 321-0987',
         address: '321 Pest Control Plaza',
@@ -286,7 +317,7 @@ async function createCompaniesWithUsers(users) {
         name: 'Pacific Pest Professionals',
         description:
           'Premium pest control services for the Pacific Northwest, specializing in carpenter ants, termites, and moisture control.',
-        website: 'https://pacificpestpro.com',
+        website: ['https://pacificpestpro.com'],
         email: 'service@pacificpestpro.com',
         phone: '(555) 654-3210',
         address: '987 Pacific Lane',
@@ -302,7 +333,7 @@ async function createCompaniesWithUsers(users) {
         name: 'Apex Termite & Pest',
         description:
           'Comprehensive termite inspection and pest control services with advanced treatment technologies.',
-        website: 'https://apextermite.com',
+        website: ['https://apextermite.com'],
         email: 'info@apextermite.com',
         phone: '(555) 888-9999',
         address: '123 Termite Blvd',
@@ -315,6 +346,19 @@ async function createCompaniesWithUsers(users) {
       },
     ];
 
+    // Generate slugs for all companies to ensure uniqueness
+    const existingSlugs = [];
+    const companies = companiesData.map(company => {
+      const slug = generateCompanySlug(company.name, existingSlugs);
+      existingSlugs.push(slug);
+      return {
+        ...company,
+        slug: slug
+      };
+    });
+
+    log(`Generated slugs for companies: ${companies.map(c => `${c.name} -> ${c.slug}`).join(', ')}`);
+
     // Insert companies
     const { error: companyError } = await localClient
       .from('companies')
@@ -325,7 +369,7 @@ async function createCompaniesWithUsers(users) {
       return false;
     }
 
-    log(`Successfully created ${companies.length} companies`);
+    log(`Successfully created ${companies.length} companies with slugs`);
 
     // Get local user profiles (not production IDs)
     const { data: localUsers, error: localUserError } = await localClient
