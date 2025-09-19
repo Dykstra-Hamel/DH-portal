@@ -227,7 +227,6 @@ export async function POST(request: NextRequest) {
         customer_zip: zipCode || '',
         company_id: companyId,
         company_name: company.name,
-        company_url: company.website || '',
         is_follow_up: 'false', // Default to false, can be overridden by caller
         lead_id: leadId || '', // Include lead ID for outbound call tracking
       },

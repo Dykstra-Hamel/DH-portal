@@ -53,12 +53,15 @@ export async function GET(request: NextRequest) {
 
     // Filter calls by company if specified (but no date filtering)
     let filteredCalls = calls || [];
-    
+
     if (companyIdFilter) {
       filteredCalls = filteredCalls.filter(call => {
         const leadCompanyId = call.leads?.company_id;
         const customerCompanyId = call.customers?.company_id;
-        return leadCompanyId === companyIdFilter || customerCompanyId === companyIdFilter;
+        return (
+          leadCompanyId === companyIdFilter ||
+          customerCompanyId === companyIdFilter
+        );
       });
     }
 
