@@ -56,19 +56,21 @@ export default function CallRecordsPage() {
         let response: PaginatedResponse<CallRecordWithDirection>;
 
         if (isAdmin) {
-          // Admin can see all calls or filter by selected company (NO date filter - always show all)
+          // Admin can see all calls or filter by selected company (exclude archived calls)
           const filters = {
             ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
             page,
             limit: 20,
+            archived: false, // Exclude archived call records
           };
           response = await adminAPI.getAllCalls(filters);
         } else if (selectedCompany) {
-          // Regular users see calls for their selected company only (NO date filter - always show all)
+          // Regular users see calls for their selected company only (exclude archived calls)
           const filters = {
             companyId: selectedCompany.id,
             page,
             limit: 20,
+            archived: false, // Exclude archived call records
           };
           response = await adminAPI.getUserCalls(filters);
         } else {
@@ -302,12 +304,12 @@ export default function CallRecordsPage() {
                       <td>
                         {(() => {
                           // For outbound calls, show the number that was called (phone_number)
-                          // For inbound calls, show the caller's number (from_number or phone_number)
+                          // For inbound calls, show the caller's number (phone_number or from_number)
                           const displayNumber =
                             call.call_direction === 'outbound'
                               ? call.phone_number // Number that was called
-                              : call.from_number || call.phone_number; // Caller's number
-                          return formatPhoneNumber(displayNumber);
+                              : call.phone_number || call.from_number; // Caller's number (prefer normalized)
+                          return formatPhoneNumber(displayNumber || 'N/A');
                         })()}
                       </td>
                       <td>
@@ -459,12 +461,12 @@ export default function CallRecordsPage() {
                   <strong>Phone:</strong>{' '}
                   {(() => {
                     // For outbound calls, show the number that was called (phone_number)
-                    // For inbound calls, show the caller's number (from_number or phone_number)
+                    // For inbound calls, show the caller's number (phone_number or from_number)
                     const displayNumber =
                       selectedCall.call_direction === 'outbound'
                         ? selectedCall.phone_number // Number that was called
-                        : selectedCall.from_number || selectedCall.phone_number; // Caller's number
-                    return formatPhoneNumber(displayNumber);
+                        : selectedCall.phone_number || selectedCall.from_number; // Caller's number (prefer normalized)
+                    return formatPhoneNumber(displayNumber || 'N/A');
                   })()}
                 </div>
                 <div className={styles.detailItem}>
@@ -579,12 +581,12 @@ export default function CallRecordsPage() {
                 <strong>Phone:</strong>{' '}
                 {(() => {
                   // For outbound calls, show the number that was called (phone_number)
-                  // For inbound calls, show the caller's number (from_number or phone_number)
+                  // For inbound calls, show the caller's number (phone_number or from_number)
                   const displayNumber =
                     callToArchive.call_direction === 'outbound'
                       ? callToArchive.phone_number // Number that was called
-                      : callToArchive.from_number || callToArchive.phone_number; // Caller's number
-                  return formatPhoneNumber(displayNumber);
+                      : callToArchive.phone_number || callToArchive.from_number; // Caller's number (prefer normalized)
+                  return formatPhoneNumber(displayNumber || 'N/A');
                 })()}
                 <br />
                 <strong>Date:</strong>{' '}

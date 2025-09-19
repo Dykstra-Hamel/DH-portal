@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp, Settings, Phone } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
 import AgentsManager from '@/components/Agents/AgentsManager';
+import TestCalling from './TestCalling';
 import styles from './AdminManager.module.scss';
 
 interface Company {
@@ -35,7 +36,7 @@ export default function CallSettingsManager() {
   } | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [businessHoursExpanded, setBusinessHoursExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'settings' | 'agents'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'agents' | 'test-calling'>('settings');
 
   useEffect(() => {
     loadCompanies();
@@ -152,12 +153,19 @@ export default function CallSettingsManager() {
               <Settings size={16} />
               Call Settings
             </button>
-            <button 
+            <button
               className={`${styles.tab} ${activeTab === 'agents' ? styles.active : ''}`}
               onClick={() => setActiveTab('agents')}
             >
               <Settings size={16} />
               Agent Management
+            </button>
+            <button
+              className={`${styles.tab} ${activeTab === 'test-calling' ? styles.active : ''}`}
+              onClick={() => setActiveTab('test-calling')}
+            >
+              <Phone size={16} />
+              Test Calling
             </button>
           </div>
         </div>
@@ -172,6 +180,10 @@ export default function CallSettingsManager() {
         ) : activeTab === 'agents' ? (
           <div className={styles.agentsTab}>
             <AgentsManager companyId={selectedCompanyId} />
+          </div>
+        ) : activeTab === 'test-calling' ? (
+          <div className={styles.testCallingTab}>
+            <TestCalling companyId={selectedCompanyId} />
           </div>
         ) : loading ? (
           <div className={styles.loading}>Loading settings...</div>

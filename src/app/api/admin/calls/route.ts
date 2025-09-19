@@ -57,7 +57,8 @@ export async function GET(request: NextRequest) {
         )
       `,
         { count: 'exact' }
-      );
+      )
+      .eq('archived', false);
 
     // Apply company filter if specified
     if (companyIdFilter) {
