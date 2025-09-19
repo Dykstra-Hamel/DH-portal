@@ -319,22 +319,18 @@ export const adminAPI = {
   },
 
   // All Calls (admin)
-  async getAllCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string } = {}) {
+  async getAllCalls(filters: { companyId?: string; page?: number; limit?: number; archived?: boolean } = {}) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('companyId', filters.companyId);
-    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
-    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
     const url = `/api/admin/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
   },
 
   // Calls for regular users
-  async getUserCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string } = {}) {
+  async getUserCalls(filters: { companyId?: string; page?: number; limit?: number; archived?: boolean } = {}) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('company_id', filters.companyId);
-    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
-    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
     const url = `/api/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
