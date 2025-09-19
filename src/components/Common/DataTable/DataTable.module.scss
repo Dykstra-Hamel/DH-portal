@@ -1,0 +1,338 @@
+// Reusable DataTable Styles - Extracted from TicketsList
+.pageTitle {
+  color: var(--neutral-800);
+  font-family: var(--font-satoshi);
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 20px;
+}
+
+.topContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tabsContainer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  position: relative;
+  top: 1px;
+  margin-bottom: 0;
+}
+
+.tab {
+  display: flex;
+  padding: 16px 12px;
+  align-items: flex-end;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--neutral-100);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  margin-left: -2px;
+
+  &:first-child {
+    margin-left: 0;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    z-index: 10;
+    right: 0;
+    height: 6px;
+    background: var(--light-gray-bg);
+    border-radius: 4px 4px 0 0;
+    transition: background-color 0.2s ease;
+  }
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  .tabText {
+    color: var(--neutral-700);
+    text-align: right;
+    font-family: var(--font-satoshi);
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 14px;
+  }
+
+  .tabCount {
+    color: var(--primary-600);
+    font-family: var(--font-satoshi);
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 14px;
+  }
+
+  &.active {
+    background: var(--white);
+    border-bottom: 1px solid var(--white);
+
+    &::before {
+      background: var(--primary-500);
+      z-index: 100;
+      overflow: visible;
+      left: -1px;
+      width: calc(100% + 1px);
+    }
+
+    .tabText {
+      color: var(--neutral-800);
+      text-align: right;
+      font-family: var(--font-satoshi);
+      font-size: 14px;
+      font-style: normal;
+      font-weight: 700;
+      line-height: 14px;
+    }
+  }
+}
+
+.contentArea {
+  background: var(--white);
+  border-radius: var(--border-radius-md) 0 0 0;
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  min-height: 400px;
+}
+
+.loading,
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--neutral-600);
+  font-family: var(--font-satoshi);
+  font-size: 16px;
+}
+
+.dataContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.headerRow {
+  display: grid;
+  grid-template-columns: var(
+    --table-columns,
+    120px 180px 140px 250px 100px 120px 150px 150px
+  );
+  padding: 16px;
+  align-items: center;
+  border-radius: 6px 6px 0 0;
+  margin-bottom: 8px;
+
+  // Header text styling
+  color: var(--neutral-800);
+  font-family: var(--font-satoshi);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.dataRows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+// Default row styling with card design (consistent with TicketRow)
+.defaultRow {
+  display: grid;
+  grid-template-columns: var(
+    --table-columns,
+    120px 180px 140px 250px 100px 120px 150px 150px
+  );
+  padding: 16px;
+  border-top: 1px solid var(--gray-200);
+  align-items: center;
+  background: var(--white);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.1s ease;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.defaultCell {
+  display: flex;
+  align-items: flex-start;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  justify-content: flex-start;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--neutral-800);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0; // Allow flex items to shrink below content size
+}
+
+// Cell type specific styling
+.timeCell {
+  color: var(--neutral-600);
+  font-size: 12px;
+}
+
+.nameCell {
+  font-weight: 600;
+}
+
+.phoneCell {
+  font-size: 13px;
+}
+
+.addressCell {
+  color: var(--neutral-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.formatCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.serviceTypeCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: capitalize;
+}
+
+.summaryCell {
+  color: var(--neutral-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.priorityCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &.urgent {
+    color: #ef4444;
+  }
+
+  &.high {
+    color: #f97316;
+  }
+
+  &.medium {
+    color: #eab308;
+  }
+
+  &.low {
+    color: #10b981;
+  }
+}
+
+.statusCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actionButton {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  background: var(--gray-50);
+  color: var(--gray-900);
+  border: 1px solid var(--gray-300);
+  box-shadow: var(--shadow-50);
+  border-radius: 6px;
+  padding: 7px 8px 7px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--gray-200);
+  }
+}
+
+.salesIcon,
+.salesIcon path,
+.supportIcon,
+.supportIcon path,
+.phoneIcon,
+.phoneIcon path,
+.formIcon,
+.formIcon path {
+  stroke: var(--gray-900);
+}
+
+.priorityIcon {
+  font-size: 16px;
+}
+
+.statusIcon {
+  font-size: 16px;
+}
+
+// Table-specific column configurations
+.ticketTable {
+  --table-columns: 120px 180px 140px 250px 100px 120px 150px 150px;
+}
+
+.supportCaseTable {
+  --table-columns: 120px 180px 140px 250px 120px 120px 150px 100px;
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .tabsContainer {
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    padding: 12px 8px;
+    min-width: 120px;
+  }
+
+  .dataContainer {
+    margin-top: 16px;
+  }
+
+  .headerRow {
+    padding: 12px;
+    font-size: 11px;
+  }
+
+  .defaultRow {
+    padding: 12px;
+  }
+
+  .defaultCell {
+    font-size: 13px;
+  }
+}

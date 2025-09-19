@@ -1,16 +1,39 @@
 .companyDropdown {
+  display: flex;
   position: relative;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-right: 1px solid var(--gray-200);
+  padding-right: 20px;
   z-index: 1000;
+}
+
+.iconLogoWrapper {
+  display: flex;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+  align-items: center;
+  padding: 3px;
+  border-radius: 50%;
+}
+
+.iconLogo {
+  display: block;
+  position: relative;
+  width: 100%;
 }
 
 .trigger {
   display: flex;
-  width: 232px;
-  padding: 8px 12px;
+  width: 230px;
+  padding: 8px 12px 8px 6px;
   align-items: center;
   gap: 13px;
   background: white;
-  border: 1px solid var(--border-color);
+  border: none;
   border-radius: var(--border-radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -19,15 +42,13 @@
   line-height: 20px;
   color: var(--neutral-600);
 
-  &:hover {
-    background: var(--neutral-100);
-    border-color: var(--drop-shadow-hover);
+  &:hover .chevron {
+    color: black;
   }
 
   &:focus {
     outline: none;
-    box-shadow: 0 0 0 2px var(--primary-100);
-    border-color: var(--primary-600);
+    border: none;
   }
 }
 
@@ -41,9 +62,9 @@
 
 .chevron {
   color: var(--neutral-600);
-  transition: transform 0.2s ease;
   flex-shrink: 0;
   display: flex;
+  transition: all 0.3s;
 
   &.open {
     transform: rotate(180deg);
@@ -55,6 +76,7 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
+  width: 265px;
   background: white;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-sm);

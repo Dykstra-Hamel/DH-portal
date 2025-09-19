@@ -99,11 +99,16 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
           showAddLead: false,
         };
       case '/connections/leads':
-      case '/connections/leads':
         return {
           title: 'Leads',
           description: 'View and manage all your sales leads here.',
           showAddLead: true,
+        };
+      case '/connections/customer-service':
+        return {
+          title: 'Customer Service',
+          description: 'View and manage all your support cases here.',
+          showAddLead: false,
         };
       case '/test-automation':
         return {

@@ -1,13 +1,15 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
+import { BrandData } from '@/types/branding';
 
 export interface Company {
   id: string;
   name: string;
+  branding?: BrandData | null;
 }
 
 interface UserCompany {
@@ -26,6 +28,7 @@ interface CompanyContextType {
   isLoading: boolean;
   setSelectedCompany: (company: Company | null) => void;
   refreshCompanies: () => Promise<void>;
+  refreshBranding: (companyId?: string) => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -42,6 +45,114 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+
+  // Load branding data for a specific company
+  const loadCompanyBranding = useCallback(async (companyId: string): Promise<BrandData | null> => {
+    try {
+      const response = await adminAPI.getBranding(companyId);
+      return response?.data || null;
+    } catch (error) {
+      console.error(`Error loading branding for company ${companyId}:`, error);
+      return null;
+    }
+  }, []);
+
+  // Load branding for multiple companies
+  const loadBrandingForCompanies = useCallback(async (companies: Company[]): Promise<Company[]> => {
+    const companiesWithBranding = await Promise.all(
+      companies.map(async (company) => {
+        const branding = await loadCompanyBranding(company.id);
+        return {
+          ...company,
+          branding,
+        };
+      })
+    );
+    return companiesWithBranding;
+  }, [loadCompanyBranding]);
+
+  const loadAllCompanies = useCallback(async () => {
+    try {
+      const companies = await adminAPI.getCompanies();
+      
+      if (companies && companies.length > 0) {
+        // Load branding for all companies
+        const companiesWithBranding = await loadBrandingForCompanies(companies);
+        setAvailableCompanies(companiesWithBranding);
+        
+        // Set default selected company for admins (always ensure a company is selected)
+        const storedCompanyId = localStorage.getItem(SELECTED_COMPANY_STORAGE_KEY);
+        let defaultCompany: Company | null = null;
+
+        if (storedCompanyId) {
+          defaultCompany = companiesWithBranding.find((c: Company) => c.id === storedCompanyId) || null;
+        }
+
+        // Always ensure admin has a company selected - use first company if no stored selection
+        if (!defaultCompany) {
+          defaultCompany = companiesWithBranding[0];
+        }
+
+        setSelectedCompanyState(defaultCompany);
+      } else {
+        setAvailableCompanies([]);
+      }
+    } catch (error) {
+      console.error('Error loading all companies:', error);
+      setAvailableCompanies([]);
+    }
+  }, [loadBrandingForCompanies]);
+
+  const loadUserCompanies = useCallback(async (userId: string) => {
+    try {
+      const supabase = createClient();
+      const { data: companiesData, error } = await supabase
+        .from('user_companies')
+        .select(`
+          *,
+          companies (
+            id,
+            name
+          )
+        `)
+        .eq('user_id', userId);
+
+      if (error || !companiesData) {
+        console.error('Error loading user companies:', error);
+        setAvailableCompanies([]);
+        return;
+      }
+
+      const companies = companiesData.map((uc: UserCompany) => uc.companies);
+      
+      // Load branding for all companies
+      const companiesWithBranding = await loadBrandingForCompanies(companies);
+      setAvailableCompanies(companiesWithBranding);
+
+      // Set default selected company
+      const storedCompanyId = localStorage.getItem(SELECTED_COMPANY_STORAGE_KEY);
+      let defaultCompany: Company | null = null;
+
+      if (storedCompanyId) {
+        defaultCompany = companiesWithBranding.find(c => c.id === storedCompanyId) || null;
+      }
+
+      // If no stored selection or company not found, use primary company
+      if (!defaultCompany) {
+        const primaryUserCompany = companiesData.find((uc: UserCompany) => uc.is_primary);
+        if (primaryUserCompany) {
+          defaultCompany = companiesWithBranding.find(c => c.id === primaryUserCompany.companies.id) || companiesWithBranding[0] || null;
+        } else {
+          defaultCompany = companiesWithBranding[0] || null;
+        }
+      }
+
+      setSelectedCompanyState(defaultCompany);
+    } catch (error) {
+      console.error('Error loading user companies:', error);
+      setAvailableCompanies([]);
+    }
+  }, [loadBrandingForCompanies]);
 
   // Initialize user and companies
   useEffect(() => {
@@ -89,76 +200,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
     };
 
     initializeCompanies();
-  }, []);
-
-  const loadAllCompanies = async () => {
-    try {
-      const companies = await adminAPI.getCompanies();
-      setAvailableCompanies(companies || []);
-      
-      // Set default selected company for admins (always ensure a company is selected)
-      const storedCompanyId = localStorage.getItem(SELECTED_COMPANY_STORAGE_KEY);
-      let defaultCompany: Company | null = null;
-
-      if (storedCompanyId && companies) {
-        defaultCompany = companies.find((c: Company) => c.id === storedCompanyId) || null;
-      }
-
-      // Always ensure admin has a company selected - use first company if no stored selection
-      if (!defaultCompany && companies && companies.length > 0) {
-        defaultCompany = companies[0];
-      }
-
-      setSelectedCompanyState(defaultCompany);
-    } catch (error) {
-      console.error('Error loading all companies:', error);
-      setAvailableCompanies([]);
-    }
-  };
-
-  const loadUserCompanies = async (userId: string) => {
-    try {
-      const supabase = createClient();
-      const { data: companiesData, error } = await supabase
-        .from('user_companies')
-        .select(`
-          *,
-          companies (
-            id,
-            name
-          )
-        `)
-        .eq('user_id', userId);
-
-      if (error || !companiesData) {
-        console.error('Error loading user companies:', error);
-        setAvailableCompanies([]);
-        return;
-      }
-
-      const companies = companiesData.map((uc: UserCompany) => uc.companies);
-      setAvailableCompanies(companies);
-
-      // Set default selected company
-      const storedCompanyId = localStorage.getItem(SELECTED_COMPANY_STORAGE_KEY);
-      let defaultCompany: Company | null = null;
-
-      if (storedCompanyId) {
-        defaultCompany = companies.find(c => c.id === storedCompanyId) || null;
-      }
-
-      // If no stored selection or company not found, use primary company
-      if (!defaultCompany) {
-        const primaryUserCompany = companiesData.find((uc: UserCompany) => uc.is_primary);
-        defaultCompany = primaryUserCompany ? primaryUserCompany.companies : companies[0] || null;
-      }
-
-      setSelectedCompanyState(defaultCompany);
-    } catch (error) {
-      console.error('Error loading user companies:', error);
-      setAvailableCompanies([]);
-    }
-  };
+  }, [loadAllCompanies, loadUserCompanies]);
 
   const setSelectedCompany = (company: Company | null) => {
     // Prevent null selection - if null is passed, use first available company
@@ -191,11 +233,39 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
     }
   };
 
+  const refreshBranding = async (companyId?: string) => {
+    const targetCompanyId = companyId || selectedCompany?.id;
+    if (!targetCompanyId) return;
+
+    try {
+      const branding = await loadCompanyBranding(targetCompanyId);
+      
+      // Update the selected company if it matches
+      if (selectedCompany && selectedCompany.id === targetCompanyId) {
+        setSelectedCompanyState({
+          ...selectedCompany,
+          branding,
+        });
+      }
+
+      // Update in available companies list
+      setAvailableCompanies(prev => 
+        prev.map(company => 
+          company.id === targetCompanyId 
+            ? { ...company, branding }
+            : company
+        )
+      );
+    } catch (error) {
+      console.error('Error refreshing branding:', error);
+    }
+  };
+
   // Listen for auth changes
   useEffect(() => {
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_, session) => {
         if (!session?.user) {
           setUser(null);
           setSelectedCompanyState(null);
@@ -219,6 +289,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
         isLoading,
         setSelectedCompany,
         refreshCompanies,
+        refreshBranding,
       }}
     >
       {children}
