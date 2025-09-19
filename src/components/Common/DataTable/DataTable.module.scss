@@ -276,12 +276,15 @@
   }
 }
 
-.salesIcon {
-  stroke: var(--primary-600);
-}
-
-.supportIcon {
-  stroke: #0087f5;
+.salesIcon,
+.salesIcon path,
+.supportIcon,
+.supportIcon path,
+.phoneIcon,
+.phoneIcon path,
+.formIcon,
+.formIcon path {
+  stroke: var(--gray-900);
 }
 
 .priorityIcon {

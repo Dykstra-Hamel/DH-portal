@@ -29,6 +29,9 @@ export default function SupportCasesList({
     // Handle any support case specific actions here
     if (action === 'view') {
       // TODO: Implement support case view/edit functionality
+      // For now, prevent default action until view functionality is implemented
+      const caseId = supportCase.id; // Reference to avoid unused parameter warning
+      void caseId; // Acknowledge we're not using it yet
     }
   };
 

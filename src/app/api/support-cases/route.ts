@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
           name,
           website
         ),
-        ticket:tickets(
+        ticket:tickets!support_cases_ticket_id_fkey(
           id,
           type,
           source,
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
           name,
           website
         ),
-        ticket:tickets(
+        ticket:tickets!support_cases_ticket_id_fkey(
           id,
           type,
           source,

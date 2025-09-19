@@ -255,25 +255,101 @@ export async function POST(
         customer: newLead.customer
       });
     } else {
-      // Update ticket service_type to support and mark as qualified
-      const updateData: any = {
-        service_type: 'Support',
-        status: 'qualified',
-        updated_at: new Date().toISOString()
-      };
-
-      // Add assignment if provided
-      if (assignedTo) {
-        updateData.assigned_to = assignedTo;
+      // Convert to support case (similar to sales flow)
+      if (!ticket.customer_id) {
+        return NextResponse.json(
+          { error: 'Cannot convert ticket without customer' },
+          { status: 400 }
+        );
       }
 
-      const { data: updatedTicket, error: updateError } = await supabase
-        .from('tickets')
-        .update(updateData)
-        .eq('id', id)
+      // Check if this ticket has already been converted to a support case
+      if (ticket.converted_to_support_case_id) {
+        // Update the existing support case instead of creating a new one
+        const updateData: any = {
+          status: 'new',
+          priority: ticket.priority || 'medium',
+          updated_at: new Date().toISOString()
+        };
+
+        // Add assignment if provided
+        if (assignedTo) {
+          updateData.assigned_to = assignedTo;
+        }
+
+        const { data: updatedSupportCase, error: updateSupportCaseError } = await supabase
+          .from('support_cases')
+          .update(updateData)
+          .eq('id', ticket.converted_to_support_case_id)
+          .select(`
+            *,
+            customer:customers!support_cases_customer_id_fkey(
+              id,
+              first_name,
+              last_name,
+              email,
+              phone,
+              address,
+              city,
+              state,
+              zip_code
+            )
+          `)
+          .single();
+
+        if (updateSupportCaseError) {
+          console.error('Error updating existing support case:', updateSupportCaseError);
+          return NextResponse.json(
+            { error: 'Failed to update existing support case' },
+            { status: 500 }
+          );
+        }
+
+        return NextResponse.json({
+          message: 'Existing support case updated successfully',
+          qualification: 'customer_service',
+          supportCase: updatedSupportCase,
+          customer: updatedSupportCase.customer
+        });
+      }
+
+      // Determine issue type based on ticket data
+      let issueType = 'general_inquiry'; // default
+      if (ticket.service_type?.toLowerCase().includes('billing')) {
+        issueType = 'billing';
+      } else if (ticket.service_type?.toLowerCase().includes('schedule')) {
+        issueType = 'scheduling';
+      } else if (ticket.description?.toLowerCase().includes('complaint')) {
+        issueType = 'complaint';
+      } else if (ticket.description?.toLowerCase().includes('service') || ticket.description?.toLowerCase().includes('quality')) {
+        issueType = 'service_quality';
+      }
+
+      // Generate summary from ticket data
+      const summary = ticket.description || 
+                     `${ticket.type} inquiry from ${ticket.source}` ||
+                     'Support request';
+
+      // Create a new support case from the ticket
+      const supportCaseData = {
+        company_id: ticket.company_id,
+        customer_id: ticket.customer_id,
+        ticket_id: ticket.id,
+        issue_type: issueType,
+        summary: summary.substring(0, 255), // Ensure it fits in summary field
+        description: ticket.description,
+        status: 'new',
+        priority: ticket.priority || 'medium',
+        assigned_to: assignedTo || ticket.assigned_to,
+        archived: false
+      };
+
+      const { data: newSupportCase, error: supportCaseError } = await supabase
+        .from('support_cases')
+        .insert(supportCaseData)
         .select(`
           *,
-          customer:customers!tickets_customer_id_fkey(
+          customer:customers!support_cases_customer_id_fkey(
             id,
             first_name,
             last_name,
@@ -287,18 +363,35 @@ export async function POST(
         `)
         .single();
 
-      if (updateError) {
-        console.error('Error updating ticket:', updateError);
+      if (supportCaseError) {
+        console.error('Error creating support case:', supportCaseError);
         return NextResponse.json(
-          { error: 'Failed to qualify ticket' },
+          { error: 'Failed to convert ticket to support case' },
           { status: 500 }
         );
       }
 
+      // Update the ticket to mark it as converted and archived
+      const { error: ticketUpdateError } = await supabase
+        .from('tickets')
+        .update({
+          converted_to_support_case_id: newSupportCase.id,
+          converted_at: new Date().toISOString(),
+          archived: true,
+          status: 'resolved',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (ticketUpdateError) {
+        console.error('Error updating ticket conversion status:', ticketUpdateError);
+      }
+
       return NextResponse.json({
-        message: 'Ticket qualified for support',
+        message: 'Ticket qualified as customer service and converted to support case',
         qualification: 'customer_service',
-        ticket: updatedTicket
+        supportCase: newSupportCase,
+        customer: newSupportCase.customer
       });
     }
   } catch (error) {

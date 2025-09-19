@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Ticket } from '@/types/ticket';
-import { CallRecord } from '@/types/call-record';
 import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable } from '@/components/Common/DataTable';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
@@ -47,8 +46,12 @@ export default function TicketsList({
     setToastMessage(message);
     setShowToast(true);
 
-    // Show undo button only for assignment toast
-    if (message === 'The ticket was successfully assigned.') {
+    // Show undo button for assignment and qualification messages
+    const shouldShowUndo = message === 'The ticket was successfully assigned.' ||
+                          message.includes('converted to lead') ||
+                          message.includes('converted to support case');
+    
+    if (shouldShowUndo) {
       setShowUndoOnToast(true);
 
       // Auto-hide undo option after 15 seconds
@@ -134,6 +137,8 @@ export default function TicketsList({
         throw new Error('Failed to qualify ticket');
       }
 
+      const result = await response.json();
+
       setPreviousTicketState({
         ticketId: qualifyingTicket.id,
         previousState,
@@ -143,6 +148,11 @@ export default function TicketsList({
       onTicketUpdated?.();
       setShowQualifyModal(false);
       setQualifyingTicket(null);
+
+      // Show success message from API response
+      if (result.message) {
+        handleShowToast(result.message);
+      }
     } catch (error) {
       console.error('Error qualifying ticket:', error);
       alert('Failed to qualify ticket. Please try again.');

@@ -139,12 +139,6 @@ export const getSupportCaseColumns = (): ColumnDefinition<SupportCase>[] => [
     sortKey: 'priority',
     render: (supportCase: SupportCase) => (
       <div className={`${styles.priorityCell} ${styles[supportCase.priority]}`}>
-        {supportCase.priority === 'urgent' && (
-          <span className={styles.priorityIcon}>🚨</span>
-        )}
-        {supportCase.priority === 'high' && (
-          <span className={styles.priorityIcon}>⚠️</span>
-        )}
         {formatPriority(supportCase.priority)}
       </div>
     ),
