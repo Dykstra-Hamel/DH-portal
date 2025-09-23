@@ -67,12 +67,27 @@ export async function GET(
       return createErrorResponse('Failed to fetch user profiles');
     }
 
-    // Since we're using LEFT join, all users are already included in profiles
-    // No need to fetch separately or combine
-    const allProfiles = profiles || [];
+    // Separately fetch user roles from user_companies table
+    const { data: userCompaniesData, error: rolesError } = await queryClient
+      .from('user_companies')
+      .select('user_id, role')
+      .eq('company_id', companyId)
+      .in('user_id', userIds);
 
-    // Group departments by user
+    if (rolesError) {
+      console.error('Error fetching user roles:', rolesError);
+      return createErrorResponse('Failed to fetch user roles');
+    }
+
+    // Process the profiles and combine with role data
+    const allProfiles = profiles || [];
+    const roleData = userCompaniesData || [];
+
+    // Group departments and roles by user
     const userDepartments: { [userId: string]: string[] } = {};
+    const userRoles: { [userId: string]: string[] } = {};
+
+    // Process departments from profiles
     allProfiles.forEach((profile: any) => {
       if (!userDepartments[profile.id]) {
         userDepartments[profile.id] = [];
@@ -88,6 +103,17 @@ export async function GET(
       } else if (profile.user_departments?.department && !userDepartments[profile.id].includes(profile.user_departments.department)) {
         // Handle single department object (fallback)
         userDepartments[profile.id].push(profile.user_departments.department);
+      }
+    });
+
+    // Process roles from separate query
+    roleData.forEach((userCompany: any) => {
+      const userId = userCompany.user_id;
+      if (!userRoles[userId]) {
+        userRoles[userId] = [];
+      }
+      if (userCompany.role && !userRoles[userId].includes(userCompany.role)) {
+        userRoles[userId].push(userCompany.role);
       }
     });
 
@@ -114,7 +140,8 @@ export async function GET(
       email: profile.email,
       avatar_url: profile.avatar_url,
       display_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
-      departments: userDepartments[profile.id] || []
+      departments: userDepartments[profile.id] || [],
+      roles: userRoles[profile.id] || []
     }));
 
 

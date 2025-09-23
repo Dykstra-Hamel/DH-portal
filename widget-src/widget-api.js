@@ -120,7 +120,7 @@
       }
 
       // Submit to API
-      const response = await fetch(config.baseUrl + '/api/webhooks/widget-submit-ticket', {
+      const response = await fetch(config.baseUrl + '/api/widget/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

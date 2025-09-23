@@ -72,11 +72,13 @@ export async function GET(
       .eq('id', ticketId)
       .single();
 
+    // For call records, use admin client if user is a global admin to bypass RLS
+    const callRecordsClient = isGlobalAdmin ? createAdminClient() : supabase;
+
     // Try to get the specific call record by ID if we have it
     let callRecordById = null;
     if (fullTicket?.call_record_id) {
-      // Try with regular client first
-      const { data: callById } = await supabase
+      const { data: callById } = await callRecordsClient
         .from('call_records')
         .select('*')
         .eq('id', fullTicket.call_record_id)
@@ -84,23 +86,11 @@ export async function GET(
 
       if (callById) {
         callRecordById = callById;
-      } else {
-        // If that fails, try with admin client to bypass RLS
-        const adminSupabase = createAdminClient();
-        const { data: adminCallById } = await adminSupabase
-          .from('call_records')
-          .select('*')
-          .eq('id', fullTicket.call_record_id)
-          .single();
-
-        if (adminCallById) {
-          callRecordById = adminCallById;
-        }
       }
     }
 
     // Get call records for this ticket
-    const { data: calls, error: callsError } = await supabase
+    const { data: calls, error: callsError } = await callRecordsClient
       .from('call_records')
       .select('*')
       .eq('ticket_id', ticketId)

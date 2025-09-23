@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { CallRecordWithDirection } from '@/types/call-record';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const companyIdFilter = url.searchParams.get('companyId');
 
-    const { data: calls, error } = await supabase
+    const query = supabase
       .from('call_records')
       .select(
         `
@@ -38,10 +39,16 @@ export async function GET(request: NextRequest) {
           last_name,
           email,
           company_id
+        ),
+        agents!fk_call_records_agent_id (
+          agent_name,
+          agent_direction
         )
       `
       )
       .order('created_at', { ascending: false });
+
+    const { data: calls, error } = await query;
 
     if (error) {
       console.error('Error fetching calls:', error);
@@ -65,7 +72,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(filteredCalls);
+    // Transform calls to include call direction
+    const callsWithDirection: CallRecordWithDirection[] = filteredCalls.map(call => ({
+      ...call,
+      call_direction: call.agents?.agent_direction ? call.agents.agent_direction as 'inbound' | 'outbound' : 'unknown',
+      agent_name: call.agents?.agent_name || null
+    }));
+
+    return NextResponse.json(callsWithDirection);
   } catch (error) {
     console.error('Error in calls API:', error);
     return NextResponse.json(

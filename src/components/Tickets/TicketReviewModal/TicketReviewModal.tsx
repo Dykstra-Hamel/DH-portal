@@ -5,6 +5,7 @@ import { Ticket } from '@/types/ticket'
 import { CallRecord } from '@/types/call-record'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useUser } from '@/hooks/useUser'
+import { useAssignableUsers } from '@/hooks/useAssignableUsers'
 import {
   Modal,
   ModalTop,
@@ -34,15 +35,6 @@ const CustomerSupportIcon = () => (
   </svg>
 )
 
-interface CompanyUser {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  avatar_url?: string | null
-  display_name: string
-  departments: string[]
-}
 
 export interface TicketReviewModalProps {
   ticket: Ticket
@@ -71,8 +63,18 @@ export default function TicketReviewModal({
 
   const [selectedQualification, setSelectedQualification] = useState<'sales' | 'customer_service'>(getInitialQualification())
   const [selectedAssignee, setSelectedAssignee] = useState<string>('')
-  const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [callRecord, setCallRecord] = useState<CallRecord | undefined>()
+
+  // Get assignable users based on selected qualification type
+  const {
+    users: assignableUsers,
+    loading: loadingUsers,
+    error: usersError,
+  } = useAssignableUsers({
+    companyId: ticket.company_id,
+    departmentType: selectedQualification === 'sales' ? 'sales' : 'support',
+    enabled: isOpen,
+  })
   const [loadingCallRecord, setLoadingCallRecord] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isAssignmentDropdownOpen, setIsAssignmentDropdownOpen] = useState(false)
@@ -108,15 +110,6 @@ export default function TicketReviewModal({
 
 
 
-  const fetchCompanyUsers = useCallback(async () => {
-    try {
-      const data = await authenticatedFetch(`/api/companies/${ticket.company_id}/users`)
-      setCompanyUsers(data.users || [])
-    } catch (error) {
-      console.error('Error fetching company users:', error)
-      setCompanyUsers([])
-    }
-  }, [ticket.company_id])
 
   const fetchCallRecord = useCallback(async () => {
     // Only fetch call records for phone calls
@@ -140,10 +133,14 @@ export default function TicketReviewModal({
   // Fetch data when modal opens
   useEffect(() => {
     if (isOpen && ticket.company_id) {
-      fetchCompanyUsers()
       fetchCallRecord()
     }
-  }, [isOpen, ticket.company_id, fetchCompanyUsers, fetchCallRecord])
+  }, [isOpen, ticket.company_id, fetchCallRecord])
+
+  // Reset selected assignee when qualification changes (since available users change)
+  useEffect(() => {
+    setSelectedAssignee('')
+  }, [selectedQualification])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -263,11 +260,33 @@ export default function TicketReviewModal({
     }
   }
 
-  const handleOptionSelect = (value: string) => {
-    setSelectedQualification(value as 'sales' | 'customer_service')
+  const handleOptionSelect = async (value: string) => {
+    const newQualification = value as 'sales' | 'customer_service'
+    setSelectedQualification(newQualification)
     setIsDropdownOpen(false)
-    if (onSuccess) {
-      onSuccess('The ticket type was successfully updated.')
+
+    // Update the ticket type based on the new qualification
+    try {
+      const newServiceType = newQualification === 'sales' ? 'Sales' : 'Support'
+
+      await authenticatedFetch(`/api/tickets/${ticket.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          service_type: newServiceType
+        }),
+      })
+
+      if (onSuccess) {
+        onSuccess(`Ticket type updated to ${newServiceType}.`)
+      }
+    } catch (error) {
+      console.error('Error updating ticket type:', error)
+      if (onSuccess) {
+        onSuccess('Failed to update ticket type. Please try again.')
+      }
     }
   }
 
@@ -284,11 +303,11 @@ export default function TicketReviewModal({
 
   // Helper functions for team assignment
   const getSalesTeamCount = () => {
-    return companyUsers.filter(user => user.departments.includes('sales')).length
+    return assignableUsers.filter(user => user.departments.includes('sales')).length
   }
 
   const getSupportTeamCount = () => {
-    return companyUsers.filter(user => user.departments.includes('support')).length
+    return assignableUsers.filter(user => user.departments.includes('support')).length
   }
 
   const isTeamAssignment = (assigneeId: string) => {
@@ -344,7 +363,7 @@ export default function TicketReviewModal({
       }
     }
 
-    const assignedUser = companyUsers.find(u => u.id === selectedAssignee)
+    const assignedUser = assignableUsers.find(u => u.id === selectedAssignee)
     if (assignedUser) {
       return {
         ...assignedUser,
@@ -517,8 +536,8 @@ export default function TicketReviewModal({
               </button>
             )}
 
-            {/* Other company users */}
-            {companyUsers
+            {/* Other eligible users */}
+            {assignableUsers
               .filter(companyUser => companyUser.id !== user?.id)
               .map((companyUser) => (
                 <button

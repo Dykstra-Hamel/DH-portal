@@ -156,19 +156,30 @@ export async function PUT(
       );
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: userCompanyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', existingTicket.company_id)
+    // Check user profile to determine if they're a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
       .single();
 
-    if (userCompanyError || !userCompany) {
-      return NextResponse.json(
-        { error: 'Access denied to this ticket' },
-        { status: 403 }
-      );
+    const isGlobalAdmin = profile?.role === 'admin';
+
+    // Verify user has access to this company (admins have access to all companies)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: userCompanyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', existingTicket.company_id)
+        .single();
+
+      if (userCompanyError || !userCompany) {
+        return NextResponse.json(
+          { error: 'Access denied to this ticket' },
+          { status: 403 }
+        );
+      }
     }
 
     // Update the ticket
@@ -178,7 +189,7 @@ export async function PUT(
       .eq('id', id)
       .select(`
         *,
-        customer:customers(
+        customer:customers!tickets_customer_id_fkey(
           id,
           first_name,
           last_name,
