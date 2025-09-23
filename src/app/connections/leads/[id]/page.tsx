@@ -24,6 +24,8 @@ import {
   leadPriorityOptions,
 } from '@/types/lead';
 import { CallHistory } from '@/components/Calls/CallHistory/CallHistory';
+import { UserSelector } from '@/components/Common/UserSelector';
+import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import { formatDateForDisplay } from '@/lib/utils';
 import styles from './page.module.scss';
@@ -56,6 +58,17 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
+
+  // Hook for fetching assignable users for sales leads
+  const {
+    users: assignableUsers,
+    loading: loadingUsers,
+    error: usersError,
+  } = useAssignableUsers({
+    companyId: lead?.company_id,
+    departmentType: 'sales',
+    enabled: isEditing, // Only fetch when editing
+  });
 
   useEffect(() => {
     const resolveParams = async () => {
@@ -846,6 +859,23 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
                     }
                     className={styles.input}
                   />
+                </div>
+                <div className={styles.formField}>
+                  <label>Assigned To</label>
+                  <UserSelector
+                    users={assignableUsers}
+                    selectedUserId={editFormData.assigned_to}
+                    onSelect={(userId) => handleInputChange('assigned_to', userId)}
+                    placeholder="Select user to assign..."
+                    loading={loadingUsers}
+                    disabled={loadingUsers}
+                    className={styles.userSelector}
+                  />
+                  {usersError && (
+                    <div className={styles.errorMessage}>
+                      Error loading users: {usersError}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

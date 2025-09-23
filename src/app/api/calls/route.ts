@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { CallRecordWithDirection } from '@/types/call-record';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,8 +19,7 @@ export async function GET(request: NextRequest) {
     // Get optional company_id filter from query params
     const url = new URL(request.url);
     const companyIdFilter = url.searchParams.get('company_id');
-    
-    
+
     // Validate company_id format if provided
     if (companyIdFilter && companyIdFilter !== 'all' && companyIdFilter.trim() !== '') {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Build base query with agents join
     const query = supabase
       .from('call_records')
       .select(
@@ -53,6 +54,10 @@ export async function GET(request: NextRequest) {
           last_name,
           email,
           company_id
+        ),
+        agents!fk_call_records_agent_id (
+          agent_name,
+          agent_direction
         )
       `
       )
@@ -143,7 +148,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(filteredCalls);
+    // Transform calls to include call direction
+    const callsWithDirection: CallRecordWithDirection[] = filteredCalls.map(call => ({
+      ...call,
+      call_direction: call.agents?.agent_direction ? call.agents.agent_direction as 'inbound' | 'outbound' : 'unknown',
+      agent_name: call.agents?.agent_name || null
+    }));
+
+    return NextResponse.json(callsWithDirection);
   } catch (error) {
     console.error('Error in calls API:', error);
     return NextResponse.json(

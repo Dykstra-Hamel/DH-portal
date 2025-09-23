@@ -30,19 +30,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // First verify user has access to this company
-    const { data: userCompany, error: userCompanyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
+    // Check user profile to determine if they're a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
       .single();
 
-    if (userCompanyError || !userCompany) {
-      return NextResponse.json(
-        { error: 'Access denied to this company' },
-        { status: 403 }
-      );
+    const isGlobalAdmin = profile?.role === 'admin';
+
+    // Verify user has access to this company (admins have access to all companies)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: userCompanyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .single();
+
+      if (userCompanyError || !userCompany) {
+        return NextResponse.json(
+          { error: 'Access denied to this company' },
+          { status: 403 }
+        );
+      }
     }
 
     // Build query with company join and lead data
