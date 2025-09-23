@@ -161,6 +161,13 @@
     color: var(--neutral-800);
   }
 
+  // Override for team avatar - keep the Users icon white
+  .avatarContainer svg,
+  .avatarContainer path {
+    color: white;
+    stroke: white;
+  }
+
   .optionText {
     font-weight: 500;
   }

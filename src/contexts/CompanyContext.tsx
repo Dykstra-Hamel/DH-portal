@@ -46,11 +46,15 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
-  // Load branding data for a specific company
+  // Load branding data for a specific company (using public endpoint)
   const loadCompanyBranding = useCallback(async (companyId: string): Promise<BrandData | null> => {
     try {
-      const response = await adminAPI.getBranding(companyId);
-      return response?.data || null;
+      const response = await fetch(`/api/companies/${companyId}/login-branding`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch branding: ${response.statusText}`);
+      }
+      const data = await response.json();
+      return data?.branding || null;
     } catch (error) {
       console.error(`Error loading branding for company ${companyId}:`, error);
       return null;
@@ -94,6 +98,11 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
         }
 
         setSelectedCompanyState(defaultCompany);
+
+        // Store the selected company in localStorage
+        if (defaultCompany) {
+          localStorage.setItem(SELECTED_COMPANY_STORAGE_KEY, defaultCompany.id);
+        }
       } else {
         setAvailableCompanies([]);
       }
@@ -148,6 +157,11 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
       }
 
       setSelectedCompanyState(defaultCompany);
+
+      // Store the selected company in localStorage
+      if (defaultCompany) {
+        localStorage.setItem(SELECTED_COMPANY_STORAGE_KEY, defaultCompany.id);
+      }
     } catch (error) {
       console.error('Error loading user companies:', error);
       setAvailableCompanies([]);

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { TicketFormData } from '@/types/ticket';
-import { 
-  getAuthenticatedUser, 
-  verifyCompanyAccess, 
+import {
+  getAuthenticatedUser,
+  verifyCompanyAccess,
   createErrorResponse,
-  createSuccessResponse 
+  createSuccessResponse
 } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
@@ -207,6 +207,22 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error creating ticket:', insertError);
       return createErrorResponse('Failed to create ticket');
+    }
+
+    // Generate notifications for all company users
+    try {
+      const adminSupabase = createAdminClient();
+      await adminSupabase.rpc('notify_all_company_users', {
+        p_company_id: ticketData.company_id,
+        p_type: 'new_ticket',
+        p_title: 'New Ticket Created',
+        p_message: `A new ticket has been created from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
+        p_reference_id: ticket.id,
+        p_reference_type: 'ticket'
+      });
+    } catch (notificationError) {
+      console.error('Error creating ticket notifications:', notificationError);
+      // Don't fail the request if notification creation fails
     }
 
     return createSuccessResponse(ticket, 201);

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { adminAPI } from '@/lib/api-client';
 import TicketsList from '@/components/Tickets/TicketsList/TicketsList';
 import { Ticket } from '@/types/ticket';
@@ -9,17 +10,37 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
 import { MetricsResponse } from '@/services/metricsService';
 import { CallRecord } from '@/types/call-record';
+import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import styles from './page.module.scss';
 
-export default function TicketsPage() {
+function TicketsPageContent() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [callRecords, setCallRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  
+
+  // Modal state for URL parameter handling
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [isQualifying, setIsQualifying] = useState(false);
+
   // Use global company context
   const { selectedCompany } = useCompany();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const ticketIdFromUrl = searchParams.get('ticketId');
+
+  // Handle URL parameter for auto-opening ticket modal
+  useEffect(() => {
+    if (ticketIdFromUrl && tickets.length > 0) {
+      const ticket = tickets.find(t => t.id === ticketIdFromUrl);
+      if (ticket) {
+        setSelectedTicket(ticket);
+        setShowTicketModal(true);
+      }
+    }
+  }, [ticketIdFromUrl, tickets]);
 
   const fetchTickets = useCallback(async (companyId: string) => {
     if (!companyId) return;
@@ -45,7 +66,7 @@ export default function TicketsPage() {
   }, []);
 
 
-  // Granular update handlers for real-time changes
+  // Granular update handlers for real-time changes (no full page refreshes)
   const handleCallRecordChange = useCallback(async (payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
@@ -73,36 +94,58 @@ export default function TicketsPage() {
       }
     }
 
+    // Update specific ticket's call records instead of full refresh
+    const updateTicketCallRecords = async (ticketId: string) => {
+      if (!ticketId) return;
+
+      try {
+        const supabase = createClient();
+        const { data: updatedCallRecords, error } = await supabase
+          .from('call_records')
+          .select('id, call_id, call_status, start_timestamp, end_timestamp, duration_seconds')
+          .eq('ticket_id', ticketId);
+
+        if (error) {
+          console.error('Error fetching updated call records:', error);
+          return;
+        }
+
+        // Update the specific ticket's call records in state
+        setTickets(prev =>
+          prev.map(ticket =>
+            ticket.id === ticketId
+              ? { ...ticket, call_records: updatedCallRecords || [] }
+              : ticket
+          )
+        );
+      } catch (error) {
+        console.error('Error updating ticket call records:', error);
+      }
+    };
+
     switch (eventType) {
       case 'INSERT':
         console.log('Processing INSERT for call record:', newRecord.id);
-
-        // Refresh tickets to get updated call_records relationship
-        if (selectedCompany?.id) {
-          console.log('Refreshing tickets due to new call record');
-          fetchTickets(selectedCompany.id);
+        if (newRecord?.ticket_id) {
+          await updateTicketCallRecords(newRecord.ticket_id);
         }
         break;
 
       case 'UPDATE':
         console.log('Processing UPDATE for call record:', newRecord.id);
-
-        // Always refresh tickets when call record status changes
-        if (selectedCompany?.id) {
-          console.log('Refreshing tickets due to call record status change');
-          fetchTickets(selectedCompany.id);
+        if (newRecord?.ticket_id) {
+          await updateTicketCallRecords(newRecord.ticket_id);
         }
         break;
 
       case 'DELETE':
         console.log('Processing DELETE for call record:', oldRecord?.id);
-        // Refresh tickets when call records are deleted
-        if (selectedCompany?.id) {
-          fetchTickets(selectedCompany.id);
+        if (oldRecord?.ticket_id) {
+          await updateTicketCallRecords(oldRecord.ticket_id);
         }
         break;
     }
-  }, [selectedCompany?.id, fetchTickets]);
+  }, [selectedCompany?.id]);
 
   const handleTicketChange = useCallback((payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
@@ -223,7 +266,7 @@ export default function TicketsPage() {
         }
         break;
     }
-  }, [selectedCompany?.id, tickets]);
+  }, [selectedCompany?.id]);
 
   const fetchMetrics = useCallback(async (companyId: string) => {
     if (!companyId) return;
@@ -248,6 +291,57 @@ export default function TicketsPage() {
     }
   }, []);
 
+  // Handle modal close - clear URL parameter
+  const handleModalClose = useCallback(() => {
+    setShowTicketModal(false);
+    setSelectedTicket(null);
+    // Clear URL parameter without adding to history
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.delete('ticketId');
+    router.replace(newUrl.pathname + newUrl.search);
+  }, [router]);
+
+  // Handle ticket qualification
+  const handleQualify = useCallback(async (
+    qualification: 'sales' | 'customer_service' | 'junk',
+    assignedTo?: string
+  ) => {
+    if (!selectedTicket) return;
+
+    setIsQualifying(true);
+    try {
+      const response = await fetch(
+        `/api/tickets/${selectedTicket.id}/qualify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            qualification,
+            assignedTo,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to qualify ticket');
+      }
+
+      // Refresh the tickets list
+      if (selectedCompany?.id) {
+        fetchTickets(selectedCompany.id);
+        fetchMetrics(selectedCompany.id);
+      }
+
+      handleModalClose();
+    } catch (error) {
+      console.error('Error qualifying ticket:', error);
+      alert('Failed to qualify ticket. Please try again.');
+    } finally {
+      setIsQualifying(false);
+    }
+  }, [selectedTicket, selectedCompany, fetchTickets, fetchMetrics, handleModalClose]);
 
   useEffect(() => {
     if (selectedCompany?.id) {
@@ -418,6 +512,25 @@ export default function TicketsPage() {
           Please select a company to view tickets.
         </div>
       )}
+
+      {/* Ticket Review Modal */}
+      {selectedTicket && (
+        <TicketReviewModal
+          ticket={selectedTicket}
+          isOpen={showTicketModal}
+          onClose={handleModalClose}
+          onQualify={handleQualify}
+          isQualifying={isQualifying}
+        />
+      )}
     </div>
+  );
+}
+
+export default function TicketsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TicketsPageContent />
+    </Suspense>
   );
 }

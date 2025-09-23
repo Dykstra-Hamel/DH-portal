@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
-import { ChevronDown, LifeBuoy } from 'lucide-react'
+import { ChevronDown, LifeBuoy, Users } from 'lucide-react'
 import { Ticket } from '@/types/ticket'
 import { CallRecord } from '@/types/call-record'
 import { authenticatedFetch } from '@/lib/api-client'
@@ -39,7 +39,9 @@ interface CompanyUser {
   first_name: string
   last_name: string
   email: string
+  avatar_url?: string | null
   display_name: string
+  departments: string[]
 }
 
 export interface TicketReviewModalProps {
@@ -70,7 +72,6 @@ export default function TicketReviewModal({
   const [selectedQualification, setSelectedQualification] = useState<'sales' | 'customer_service'>(getInitialQualification())
   const [selectedAssignee, setSelectedAssignee] = useState<string>('')
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
   const [callRecord, setCallRecord] = useState<CallRecord | undefined>()
   const [loadingCallRecord, setLoadingCallRecord] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -109,14 +110,11 @@ export default function TicketReviewModal({
 
   const fetchCompanyUsers = useCallback(async () => {
     try {
-      setLoadingUsers(true)
       const data = await authenticatedFetch(`/api/companies/${ticket.company_id}/users`)
       setCompanyUsers(data.users || [])
     } catch (error) {
       console.error('Error fetching company users:', error)
       setCompanyUsers([])
-    } finally {
-      setLoadingUsers(false)
     }
   }, [ticket.company_id])
 
@@ -192,12 +190,17 @@ export default function TicketReviewModal({
 
   const handleFinalApprove = async () => {
     try {
-      await onQualify(selectedQualification, selectedAssignee || undefined)
+      // For team assignments, pass undefined to leave unassigned but still qualify the ticket
+      const assigneeId = isTeamAssignment(selectedAssignee) ? undefined : (selectedAssignee || undefined)
+      await onQualify(selectedQualification, assigneeId)
       handleClose()
       // Show toast after modal closes via parent callback
       if (onSuccess) {
         setTimeout(() => {
-          onSuccess('The ticket was successfully assigned.')
+          const message = isTeamAssignment(selectedAssignee)
+            ? `The ticket was successfully assigned to ${getTeamDisplayName(selectedAssignee)}.`
+            : 'The ticket was successfully assigned.'
+          onSuccess(message)
         }, 300) // Wait for modal close animation to complete
       }
     } catch (error) {
@@ -279,7 +282,56 @@ export default function TicketReviewModal({
     setIsAssignmentDropdownOpen(false)
   }
 
+  // Helper functions for team assignment
+  const getSalesTeamCount = () => {
+    return companyUsers.filter(user => user.departments.includes('sales')).length
+  }
+
+  const getSupportTeamCount = () => {
+    return companyUsers.filter(user => user.departments.includes('support')).length
+  }
+
+  const isTeamAssignment = (assigneeId: string) => {
+    return assigneeId === 'sales_team' || assigneeId === 'support_team'
+  }
+
+  const getTeamDisplayName = (assigneeId: string) => {
+    switch (assigneeId) {
+      case 'sales_team':
+        return 'Sales Team'
+      case 'support_team':
+        return 'Support Team'
+      default:
+        return ''
+    }
+  }
+
+  const getTeamMemberCount = (assigneeId: string) => {
+    switch (assigneeId) {
+      case 'sales_team':
+        return getSalesTeamCount()
+      case 'support_team':
+        return getSupportTeamCount()
+      default:
+        return 0
+    }
+  }
+
   const getSelectedAssigneeData = () => {
+    // Handle team assignments
+    if (isTeamAssignment(selectedAssignee)) {
+      return {
+        id: selectedAssignee,
+        name: getTeamDisplayName(selectedAssignee),
+        avatar: null,
+        initials: '',
+        display_name: getTeamDisplayName(selectedAssignee),
+        isSelf: false,
+        isTeam: true,
+        memberCount: getTeamMemberCount(selectedAssignee)
+      }
+    }
+
     if (selectedAssignee === user?.id) {
       return {
         id: user.id,
@@ -287,7 +339,8 @@ export default function TicketReviewModal({
         avatar: currentUser.avatar,
         initials: currentUser.initials,
         display_name: currentUser.name,
-        isSelf: true
+        isSelf: true,
+        isTeam: false
       }
     }
 
@@ -296,9 +349,10 @@ export default function TicketReviewModal({
       return {
         ...assignedUser,
         name: assignedUser.display_name,
-        avatar: null, // Company users don't have avatar URLs in this structure
+        avatar: assignedUser.avatar_url,
         initials: assignedUser.display_name.split(' ').map(n => n[0]).join('').toUpperCase(),
-        isSelf: false
+        isSelf: false,
+        isTeam: false
       }
     }
 
@@ -308,9 +362,25 @@ export default function TicketReviewModal({
       avatar: currentUser.avatar,
       initials: currentUser.initials,
       display_name: currentUser.name,
-      isSelf: true
+      isSelf: true,
+      isTeam: false
     }
   }
+
+  // Team avatar component
+  const TeamAvatar = () => (
+    <div style={{
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      backgroundColor: '#005194',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
+      <Users size={18} color="white" />
+    </div>
+  )
 
   const renderDropdown = () => (
     <div ref={dropdownRef} className={styles.customDropdown}>
@@ -355,7 +425,9 @@ export default function TicketReviewModal({
         >
           <div className={styles.selectedOption}>
             <div className={styles.avatarContainer}>
-              {selectedAssigneeData.avatar ? (
+              {selectedAssigneeData.isTeam ? (
+                <TeamAvatar />
+              ) : selectedAssigneeData.avatar ? (
                 <Image
                   src={selectedAssigneeData.avatar}
                   alt={selectedAssigneeData.name}
@@ -370,8 +442,13 @@ export default function TicketReviewModal({
               )}
             </div>
             <div className={styles.userInfo}>
-              <span className={styles.userName}>{selectedAssigneeData.name}</span>
+              <span className={styles.userName} style={selectedAssigneeData.isTeam ? { fontSize: '14px', fontWeight: 700, color: '#171717' } : {}}>{selectedAssigneeData.name}</span>
               {selectedAssigneeData.isSelf && <span className={styles.myselfLabel}>Myself</span>}
+              {selectedAssigneeData.isTeam && (
+                <span style={{ fontSize: '12px', fontWeight: 500, color: '#6A7282' }}>
+                  {selectedAssigneeData.memberCount} members
+                </span>
+              )}
             </div>
           </div>
           <ChevronDown size={16} className={styles.chevronIcon} />
@@ -405,6 +482,41 @@ export default function TicketReviewModal({
               </div>
             </button>
 
+            {/* Team assignments */}
+            {selectedQualification === 'sales' && (
+              <button
+                className={`${styles.dropdownOption} ${selectedAssignee === 'sales_team' ? styles.selected : ''}`}
+                onClick={() => handleAssigneeSelect('sales_team')}
+              >
+                <div className={styles.avatarContainer}>
+                  <TeamAvatar />
+                </div>
+                <div className={styles.userInfo}>
+                  <span className={styles.userName} style={{ fontSize: '14px', fontWeight: 700, color: '#171717' }}>Sales Team</span>
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: '#6A7282' }}>
+                    {getSalesTeamCount()} members
+                  </span>
+                </div>
+              </button>
+            )}
+
+            {selectedQualification === 'customer_service' && (
+              <button
+                className={`${styles.dropdownOption} ${selectedAssignee === 'support_team' ? styles.selected : ''}`}
+                onClick={() => handleAssigneeSelect('support_team')}
+              >
+                <div className={styles.avatarContainer}>
+                  <TeamAvatar />
+                </div>
+                <div className={styles.userInfo}>
+                  <span className={styles.userName} style={{ fontSize: '14px', fontWeight: 700, color: '#171717' }}>Support Team</span>
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: '#6A7282' }}>
+                    {getSupportTeamCount()} members
+                  </span>
+                </div>
+              </button>
+            )}
+
             {/* Other company users */}
             {companyUsers
               .filter(companyUser => companyUser.id !== user?.id)
@@ -415,12 +527,22 @@ export default function TicketReviewModal({
                   onClick={() => handleAssigneeSelect(companyUser.id)}
                 >
                   <div className={styles.avatarContainer}>
-                    <div className={styles.avatarInitials}>
-                      {companyUser.display_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                    </div>
+                    {companyUser.avatar_url ? (
+                      <Image
+                        src={companyUser.avatar_url}
+                        alt={companyUser.display_name}
+                        width={32}
+                        height={32}
+                        className={styles.avatar}
+                      />
+                    ) : (
+                      <div className={styles.avatarInitials}>
+                        {companyUser.display_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <div className={styles.userInfo}>
-                    <span className={styles.userName}>{companyUser.display_name}</span>
+                    <span className={styles.userName} style={{ fontSize: '14px', fontWeight: 700, color: '#171717' }}>{companyUser.display_name}</span>
                   </div>
                 </button>
               ))}
@@ -513,7 +635,6 @@ export default function TicketReviewModal({
                   <div className={sectionStyles.infoRow}>
                     <div className={sectionStyles.infoField} style={{ gridColumn: '1 / -1' }}>
                       {renderAssignmentDropdown()}
-                      {loadingUsers && <span style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>Loading users...</span>}
                     </div>
                   </div>
                 </div>

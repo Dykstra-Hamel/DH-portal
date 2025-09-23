@@ -155,10 +155,10 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    // First get the lead to check company access and capture current status
+    // First get the lead to check company access and capture current status and assignment
     const { data: existingLead, error: existingLeadError } = await supabase
       .from('leads')
-      .select('company_id, lead_status')
+      .select('company_id, lead_status, assigned_to')
       .eq('id', id)
       .single();
 
@@ -257,7 +257,7 @@ export async function PUT(
     // Check if lead status changed and trigger automation
     const oldStatus = existingLead.lead_status;
     const newStatus = body.lead_status;
-    
+
     if (newStatus && oldStatus !== newStatus) {
       try {
         await sendEvent({
@@ -279,6 +279,54 @@ export async function PUT(
       } catch (eventError) {
         console.error('Error sending lead status changed event:', eventError);
         // Don't fail the API call if event sending fails
+      }
+    }
+
+    // Check if assignment changed and trigger notifications
+    const oldAssignedTo = existingLead.assigned_to;
+    const newAssignedTo = body.assigned_to;
+
+    if (newAssignedTo !== oldAssignedTo) {
+      try {
+        const adminSupabase = createAdminClient();
+
+        if (newAssignedTo && !oldAssignedTo) {
+          // Lead became assigned (was unassigned, now assigned)
+          await adminSupabase.rpc('notify_assigned_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_assigned_user_id: newAssignedTo,
+            p_type: 'new_lead_assigned',
+            p_title: 'Lead Assigned to You',
+            p_message: `A lead has been assigned to you${lead.customer?.first_name ? ` from ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        } else if (!newAssignedTo && oldAssignedTo) {
+          // Lead became unassigned (was assigned, now unassigned)
+          await adminSupabase.rpc('notify_department_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_department: 'sales',
+            p_type: 'new_lead_unassigned',
+            p_title: 'Lead Unassigned - Needs Assignment',
+            p_message: `A lead has been unassigned and needs a new assignee${lead.customer?.first_name ? ` from ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        } else if (newAssignedTo && oldAssignedTo && newAssignedTo !== oldAssignedTo) {
+          // Assignment changed from one user to another
+          await adminSupabase.rpc('notify_assigned_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_assigned_user_id: newAssignedTo,
+            p_type: 'new_lead_assigned',
+            p_title: 'Lead Reassigned to You',
+            p_message: `A lead has been reassigned to you${lead.customer?.first_name ? ` from ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error creating assignment notifications:', notificationError);
+        // Don't fail the API call if notification creation fails
       }
     }
 

@@ -138,18 +138,6 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
     setShowModal(false);
     setSelectedLead(null);
   };
-  const getStatusColor = (status: string) => {
-    const statusColorMap: { [key: string]: string } = {
-      new: '#3b82f6',
-      contacted: '#f59e0b',
-      qualified: '#06b6d4',
-      quoted: '#8b5cf6',
-      won: '#10b981',
-      lost: '#ef4444',
-      unqualified: '#6b7280',
-    };
-    return statusColorMap[status] || '#6b7280';
-  };
 
   const getPriorityColor = (priority: string) => {
     const priorityColorMap: { [key: string]: string } = {
@@ -246,10 +234,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                 </span>
               </td>
               <td>
-                <span
-                  className={styles.statusBadge}
-                  style={{ backgroundColor: getStatusColor(lead.lead_status) }}
-                >
+                <span className={styles.statusBadge}>
                   {
                     leadStatusOptions.find(s => s.value === lead.lead_status)
                       ?.label

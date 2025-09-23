@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 import { SupportCaseFormData } from '@/types/support-case';
 
 export async function GET(request: NextRequest) {
@@ -165,6 +166,40 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error creating support case:', insertError);
       return NextResponse.json({ error: 'Failed to create support case' }, { status: 500 });
+    }
+
+    // Generate notifications based on assignment status
+    try {
+      if (newSupportCase.company_id) {
+        const adminSupabase = createAdminClient();
+
+        if (newSupportCase.assigned_to) {
+          // Support case is assigned - notify only the assigned user and managers/admins
+          await adminSupabase.rpc('notify_assigned_and_managers', {
+            p_company_id: newSupportCase.company_id,
+            p_assigned_user_id: newSupportCase.assigned_to,
+            p_type: 'new_support_case_assigned',
+            p_title: 'New Support Case Assigned to You',
+            p_message: `A new support case has been assigned to you: ${newSupportCase.summary}`,
+            p_reference_id: newSupportCase.id,
+            p_reference_type: 'support_case'
+          });
+        } else {
+          // Support case is unassigned - notify all support team and managers/admins
+          await adminSupabase.rpc('notify_department_and_managers', {
+            p_company_id: newSupportCase.company_id,
+            p_department: 'support',
+            p_type: 'new_support_case_unassigned',
+            p_title: 'New Unassigned Support Case',
+            p_message: `A new unassigned support case has been created: ${newSupportCase.summary}`,
+            p_reference_id: newSupportCase.id,
+            p_reference_type: 'support_case'
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error creating support case notifications:', notificationError);
+      // Don't fail the request if notification creation fails
     }
 
     return NextResponse.json(newSupportCase, { status: 201 });

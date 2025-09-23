@@ -232,6 +232,105 @@ export async function POST(
         );
       }
 
+      // Create assignment notification if lead was assigned to someone
+      if (assignedTo) {
+        try {
+          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const adminSupabase = createAdminClient();
+
+          // Helper function to format lead type
+          const formatLeadType = (source: string) => {
+            switch (source) {
+              case 'cold_call': return 'Call';
+              case 'web_form': return 'Form';
+              case 'website_form': return 'Form';
+              case 'phone_call': return 'Call';
+              default: return source?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
+            }
+          };
+
+          // Build customer info for notification (Customer Name | Lead Type)
+          const customerName = `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || 'Unknown Customer';
+          const leadType = formatLeadType(ticket.source);
+          const customerDetails = `${customerName} | ${leadType}`;
+
+          console.log('Creating lead assignment notification with params:', {
+            p_user_id: assignedTo,
+            p_company_id: ticket.company_id,
+            p_type: 'assignment',
+            p_title: 'New Lead Assigned To You',
+            p_message: customerDetails,
+            p_reference_id: newLead.id,
+            p_reference_type: 'lead',
+            p_assigned_to: assignedTo
+          });
+
+          const { data, error } = await adminSupabase.rpc('create_notification', {
+            p_user_id: assignedTo,
+            p_company_id: ticket.company_id,
+            p_type: 'assignment',
+            p_title: 'New Lead Assigned To You',
+            p_message: customerDetails,
+            p_reference_id: newLead.id,
+            p_reference_type: 'lead',
+            p_assigned_to: assignedTo
+          });
+
+          if (error) {
+            console.error('Database error creating lead assignment notification:', error);
+            throw error;
+          }
+
+          console.log('Successfully created lead assignment notification:', data);
+        } catch (notificationError) {
+          console.error('Error creating lead assignment notification:', notificationError);
+          // Don't throw to avoid breaking the main flow, but log thoroughly
+        }
+      } else {
+        // Lead is unassigned - notify all sales department members
+        try {
+          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const adminSupabase = createAdminClient();
+
+          // Build customer info for department notification (Customer Name | Lead Type)
+          const formatLeadType = (source: string) => {
+            switch (source) {
+              case 'cold_call': return 'Call';
+              case 'web_form': return 'Form';
+              case 'website_form': return 'Form';
+              case 'phone_call': return 'Call';
+              default: return source?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
+            }
+          };
+
+          const deptCustomerName = `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || 'Unknown Customer';
+          const deptLeadType = formatLeadType(ticket.source);
+          const deptCustomerDetails = `${deptCustomerName} | ${deptLeadType}`;
+
+          console.log('Creating department notification for unassigned lead');
+
+          const { data, error } = await adminSupabase.rpc('notify_department_and_managers', {
+            p_company_id: ticket.company_id,
+            p_department: 'sales',
+            p_type: 'new_lead_unassigned',
+            p_title: 'New Sales Lead In The Bucket!',
+            p_message: deptCustomerDetails,
+            p_reference_id: newLead.id,
+            p_reference_type: 'lead'
+          });
+
+          if (error) {
+            console.error('Database error creating department lead notification:', error);
+            throw error;
+          }
+
+          console.log('Successfully created department lead notification:', data);
+        } catch (notificationError) {
+          console.error('Error creating department lead notification:', notificationError);
+          // Don't throw to avoid breaking the main flow, but log thoroughly
+        }
+      }
+
       // Update the ticket to mark it as converted and archived
       const { error: ticketUpdateError } = await supabase
         .from('tickets')
@@ -385,6 +484,105 @@ export async function POST(
 
       if (ticketUpdateError) {
         console.error('Error updating ticket conversion status:', ticketUpdateError);
+      }
+
+      // Create assignment notification if ticket was assigned to someone
+      if (assignedTo) {
+        try {
+          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const adminSupabase = createAdminClient();
+
+          // Helper function to format priority
+          const formatPriority = (priority: string) => {
+            switch (priority) {
+              case 'low': return 'Low';
+              case 'medium': return 'Medium';
+              case 'high': return 'High';
+              case 'urgent': return 'Urgent';
+              default: return priority?.replace(/\b\w/g, l => l.toUpperCase()) || 'Medium';
+            }
+          };
+
+          // Build customer info for notification (Customer Name | Priority)
+          const customerName = `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || 'Unknown Customer';
+          const ticketPriority = formatPriority(ticket.priority);
+          const customerDetails = `${customerName} | ${ticketPriority}`;
+
+          console.log('Creating ticket assignment notification with params:', {
+            p_user_id: assignedTo,
+            p_company_id: ticket.company_id,
+            p_type: 'assignment',
+            p_title: 'New Support Ticket Assigned To You',
+            p_message: customerDetails,
+            p_reference_id: ticket.id,
+            p_reference_type: 'ticket',
+            p_assigned_to: assignedTo
+          });
+
+          const { data, error } = await adminSupabase.rpc('create_notification', {
+            p_user_id: assignedTo,
+            p_company_id: ticket.company_id,
+            p_type: 'assignment',
+            p_title: 'New Support Ticket Assigned To You',
+            p_message: customerDetails,
+            p_reference_id: ticket.id,
+            p_reference_type: 'ticket',
+            p_assigned_to: assignedTo
+          });
+
+          if (error) {
+            console.error('Database error creating ticket assignment notification:', error);
+            throw error;
+          }
+
+          console.log('Successfully created ticket assignment notification:', data);
+        } catch (notificationError) {
+          console.error('Error creating ticket assignment notification:', notificationError);
+          // Don't throw to avoid breaking the main flow, but log thoroughly
+        }
+      } else {
+        // Ticket is unassigned - notify all support department members
+        try {
+          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const adminSupabase = createAdminClient();
+
+          // Build customer info for department notification (Customer Name | Priority)
+          const formatPriority = (priority: string) => {
+            switch (priority) {
+              case 'low': return 'Low';
+              case 'medium': return 'Medium';
+              case 'high': return 'High';
+              case 'urgent': return 'Urgent';
+              default: return priority?.replace(/\b\w/g, l => l.toUpperCase()) || 'Medium';
+            }
+          };
+
+          const deptTicketCustomerName = `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || 'Unknown Customer';
+          const deptTicketPriority = formatPriority(ticket.priority);
+          const deptTicketCustomerDetails = `${deptTicketCustomerName} | ${deptTicketPriority}`;
+
+          console.log('Creating department notification for unassigned support ticket');
+
+          const { data, error } = await adminSupabase.rpc('notify_department_and_managers', {
+            p_company_id: ticket.company_id,
+            p_department: 'support',
+            p_type: 'new_support_case_unassigned',
+            p_title: 'New Support Ticket In The Bucket!',
+            p_message: deptTicketCustomerDetails,
+            p_reference_id: ticket.id,
+            p_reference_type: 'ticket'
+          });
+
+          if (error) {
+            console.error('Database error creating department ticket notification:', error);
+            throw error;
+          }
+
+          console.log('Successfully created department ticket notification:', data);
+        } catch (notificationError) {
+          console.error('Error creating department ticket notification:', notificationError);
+          // Don't throw to avoid breaking the main flow, but log thoroughly
+        }
       }
 
       return NextResponse.json({

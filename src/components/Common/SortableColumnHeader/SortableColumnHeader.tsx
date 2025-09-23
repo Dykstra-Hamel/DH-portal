@@ -57,7 +57,7 @@ export default function SortableColumnHeader({
   };
 
   return (
-    <div 
+    <div
       className={`${styles.columnHeader} ${sortable ? styles.sortable : styles.nonSortable} ${className || ''}`}
       onClick={handleClick}
     >

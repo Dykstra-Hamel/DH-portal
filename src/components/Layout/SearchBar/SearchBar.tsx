@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, Phone, Mail, MapPin } from 'lucide-react';
 import { Customer } from '@/types/customer';
@@ -42,36 +42,22 @@ export function SearchBar() {
     setQuery('');
   }, [selectedCompany]);
 
-  // Debounce search function
-  useEffect(() => {
-    const delayedSearch = setTimeout(() => {
-      if (query.trim().length >= 2) {
-        performSearch(query.trim());
-      } else {
-        setResults([]);
-        setShowResults(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayedSearch);
-  }, [query, selectedCompany]);
-
-  const performSearch = async (searchQuery: string) => {
+  const performSearch = useCallback(async (searchQuery: string) => {
     try {
       setLoading(true);
-      
+
       // Build search URL with company filter
       let searchUrl = `/api/customers/search?q=${encodeURIComponent(searchQuery)}`;
-      
+
       // Add company filter if a specific company is selected
       // For admins: if selectedCompany is null, search all companies
       // For regular users: selectedCompany should always be set
       if (selectedCompany) {
         searchUrl += `&companyId=${selectedCompany.id}`;
       }
-      
+
       const response = await fetch(searchUrl);
-      
+
       if (response.ok) {
         const data = await response.json();
         setResults(data.customers || []);
@@ -89,7 +75,21 @@ export function SearchBar() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCompany]);
+
+  // Debounce search function
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      if (query.trim().length >= 2) {
+        performSearch(query.trim());
+      } else {
+        setResults([]);
+        setShowResults(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayedSearch);
+  }, [query, selectedCompany, performSearch]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);

@@ -72,13 +72,15 @@ export function GlobalCompanyDropdown() {
 
   return (
     <div className={styles.companyDropdown} ref={dropdownRef}>
-      <div className={styles.iconLogoWrapper}>
-        <img
-          src={iconLogo}
-          alt={selectedCompany?.name}
-          className={styles.iconLogo}
-        />
-      </div>
+      {iconLogo && (
+        <div className={styles.iconLogoWrapper}>
+          <img
+            src={iconLogo}
+            alt={selectedCompany?.name}
+            className={styles.iconLogo}
+          />
+        </div>
+      )}
       <button
         className={styles.trigger}
         onClick={() => setIsOpen(!isOpen)}

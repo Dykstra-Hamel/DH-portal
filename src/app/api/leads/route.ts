@@ -18,6 +18,9 @@ export async function GET(request: NextRequest) {
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
+    const status = searchParams.get('status');
+    const priority = searchParams.get('priority');
+    const assignedTo = searchParams.get('assignedTo');
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
     if (!companyId) {
@@ -66,8 +69,19 @@ export async function GET(request: NextRequest) {
     } else {
       // Default behavior: show active leads (exclude archived)
       query = query
-        .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
+        .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'won', 'unqualified'])
         .or('archived.is.null,archived.eq.false');
+    }
+
+    // Apply additional filters
+    if (status) {
+      query = query.eq('lead_status', status);
+    }
+    if (priority) {
+      query = query.eq('priority', priority);
+    }
+    if (assignedTo) {
+      query = query.eq('assigned_to', assignedTo);
     }
 
     const { data: leads, error } = await query;

@@ -181,7 +181,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
   const handleBackToCustomer = () => {
     if (lead?.customer_id) {
-      router.push(`/dashboard/customers/${lead.customer_id}`);
+      router.push(`/customers/${lead.customer_id}`);
     }
   };
 

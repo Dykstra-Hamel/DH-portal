@@ -4,11 +4,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
-import LeadsTable from '@/components/Leads/LeadsTable/LeadsTable';
-import LeadsTabs from '@/components/Leads/LeadsTabs/LeadsTabs';
+import LeadsList from '@/components/Leads/LeadsList/LeadsList';
 import { adminAPI } from '@/lib/api-client';
 import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
+import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
+import { MetricsResponse } from '@/services/metricsService';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -23,12 +24,10 @@ export default function LeadsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [archivedLeads, setArchivedLeads] = useState<Lead[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<
-    'new' | 'contacted' | 'qualified' | 'quoted' | 'unqualified' | 'all' | 'archived'
-  >('all');
+  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
   const router = useRouter();
 
   // Use global company context
@@ -82,18 +81,22 @@ export default function LeadsPage() {
 
     try {
       setLeadsLoading(true);
-      
+
       if (isAdmin) {
         // Admin can filter by specific company or show all
-        const filters = { 
+        const filters = {
           ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
+          includeArchived: true, // Get both active and archived leads
         };
         const leadsData = await adminAPI.getLeads(filters);
         setLeads(leadsData || []);
       } else {
-        // Regular user gets leads for their selected company
-        const leadsData = await adminAPI.getUserLeads(selectedCompany!.id);
-        setLeads(leadsData || []);
+        // Regular user gets all leads (active and archived) for their selected company
+        const [activeLeads, archivedLeads] = await Promise.all([
+          adminAPI.getUserLeads(selectedCompany!.id),
+          adminAPI.getUserArchivedLeads(selectedCompany!.id)
+        ]);
+        setLeads([...(activeLeads || []), ...(archivedLeads || [])]);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -103,113 +106,40 @@ export default function LeadsPage() {
     }
   }, [selectedCompany, isAdmin]);
 
-  const fetchArchivedLeads = useCallback(async () => {
-    if (!isAdmin && !selectedCompany) return;
-
-    try {
-      setLeadsLoading(true);
-      
-      if (isAdmin) {
-        // Admin can filter by specific company or show all
-        const filters = { 
-          ...(selectedCompany ? { companyId: selectedCompany.id } : {}),
-        };
-        const archivedLeadsData = await adminAPI.getArchivedLeads(filters);
-        setArchivedLeads(archivedLeadsData || []);
-      } else {
-        // Regular user gets archived leads for their selected company
-        const archivedLeadsData = await adminAPI.getUserArchivedLeads(selectedCompany!.id);
-        setArchivedLeads(archivedLeadsData || []);
-      }
-    } catch (error) {
-      console.error('Error fetching archived leads:', error);
-      setArchivedLeads([]);
-    } finally {
-      setLeadsLoading(false);
-    }
-  }, [selectedCompany, isAdmin]);
-
-  const handleDeleteLead = async (leadId: string) => {
-    try {
-      const response = await fetch(`/api/leads/${leadId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete lead');
-      }
-
-      // Refresh leads after successful deletion
-      fetchLeads();
-
-      // You could add a toast notification here if you have a toast system
-    } catch (error) {
-      console.error('Error deleting lead:', error);
-      // You could show an error toast here
-      alert('Failed to delete lead. Please try again.');
-    }
-  };
-
   const handleEditLead = (lead: Lead) => {
     router.push(`/leads/${lead.id}?edit=true`);
   };
 
-  const handleArchiveLead = async (leadId: string) => {
+  const fetchMetrics = useCallback(async (companyId: string) => {
+    if (!companyId) return;
+
+    setMetricsLoading(true);
     try {
-      const response = await fetch(`/api/leads/${leadId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ archived: true }),
+      const params = new URLSearchParams({
+        companyId
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to archive lead');
+      const response = await fetch(`/api/metrics?${params}`);
+      if (response.ok) {
+        const metricsData = await response.json();
+        setMetrics(metricsData);
+      } else {
+        console.error('Error fetching metrics:', response.statusText);
       }
-
-      // Refresh both active and archived leads after successful archiving
-      fetchLeads();
-      fetchArchivedLeads();
     } catch (error) {
-      console.error('Error archiving lead:', error);
-      alert('Failed to archive lead. Please try again.');
+      console.error('Error fetching metrics:', error);
+    } finally {
+      setMetricsLoading(false);
     }
-  };
+  }, []);
 
-  const handleUnarchiveLead = async (leadId: string) => {
-    try {
-      const response = await fetch(`/api/leads/${leadId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ archived: false }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to unarchive lead');
-      }
-
-      // Refresh both active and archived leads after successful unarchiving
-      fetchLeads();
-      fetchArchivedLeads();
-    } catch (error) {
-      console.error('Error unarchiving lead:', error);
-      alert('Failed to unarchive lead. Please try again.');
-    }
-  };
-
-  // Fetch leads when selectedCompany changes or isAdmin changes
+  // Fetch leads and metrics when selectedCompany changes or isAdmin changes
   useEffect(() => {
-    if (isAdmin || selectedCompany) {
+    if (selectedCompany?.id) {
       fetchLeads();
-      fetchArchivedLeads();
+      fetchMetrics(selectedCompany.id);
     }
-  }, [selectedCompany, isAdmin, fetchLeads, fetchArchivedLeads]);
+  }, [selectedCompany, isAdmin, fetchLeads, fetchMetrics]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -219,78 +149,118 @@ export default function LeadsPage() {
     return <div>Redirecting...</div>;
   }
 
-  // Filter leads based on active tab
-  const filteredLeads =
-    activeTab === 'archived'
-      ? archivedLeads
-      : activeTab === 'all'
-        ? leads
-        : leads.filter(lead => lead.lead_status === activeTab);
-
-  // Calculate lead counts for all statuses
-  const leadCounts = {
-    all: leads.length,
-    new: leads.filter(lead => lead.lead_status === 'new').length,
-    contacted: leads.filter(lead => lead.lead_status === 'contacted').length,
-    qualified: leads.filter(lead => lead.lead_status === 'qualified').length,
-    quoted: leads.filter(lead => lead.lead_status === 'quoted').length,
-    unqualified: leads.filter(lead => lead.lead_status === 'unqualified').length,
-    archived: archivedLeads.length,
-  };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>Leads</h1>
-      </div>
-
-      <div className={styles.leadsSection}>
-        <div className={styles.sectionHeader}>
-          <h2>
-            {isAdmin && !selectedCompany
-              ? 'All Leads (All Companies)'
-              : isAdmin && selectedCompany
-                ? `Leads for ${selectedCompany.name}`
-                : selectedCompany
-                  ? `Leads for ${selectedCompany.name}`
-                  : 'Leads'}
-          </h2>
-          <p>
-            {isAdmin && !selectedCompany
-              ? 'All leads across all companies'
-              : selectedCompany
-                ? `All leads for ${selectedCompany.name}`
-                : 'Loading...'}
-          </p>
-        </div>
-
-        {leadsLoading ? (
-          <div className={styles.loading}>Loading leads...</div>
-        ) : leads.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p>No leads found. Create your first lead to get started!</p>
+    <div style={{ width: '100%' }}>
+      {selectedCompany && (
+        <>
+          {/* Metrics Cards */}
+          <div className={metricsStyles.metricsCardWrapper}>
+            {metrics && !metricsLoading ? (
+              <>
+                <MetricsCard
+                  title={metrics.totalCalls.title}
+                  value={metrics.totalCalls.value}
+                  comparisonValue={metrics.totalCalls.comparisonValue}
+                  comparisonPeriod={metrics.totalCalls.comparisonPeriod}
+                  trend={metrics.totalCalls.trend}
+                />
+                <MetricsCard
+                  title={metrics.totalForms.title}
+                  value={metrics.totalForms.value}
+                  comparisonValue={metrics.totalForms.comparisonValue}
+                  comparisonPeriod={metrics.totalForms.comparisonPeriod}
+                  trend={metrics.totalForms.trend}
+                />
+                <MetricsCard
+                  title={metrics.avgTimeToAssign.title}
+                  value={metrics.avgTimeToAssign.value}
+                  comparisonValue={metrics.avgTimeToAssign.comparisonValue}
+                  comparisonPeriod={metrics.avgTimeToAssign.comparisonPeriod}
+                  trend={metrics.avgTimeToAssign.trend}
+                />
+                <MetricsCard
+                  title={metrics.hangupCalls.title}
+                  value={metrics.hangupCalls.value}
+                  comparisonValue={metrics.hangupCalls.comparisonValue}
+                  comparisonPeriod={metrics.hangupCalls.comparisonPeriod}
+                  trend={metrics.hangupCalls.trend}
+                />
+                <MetricsCard
+                  title={metrics.customerServiceCalls.title}
+                  value={metrics.customerServiceCalls.value}
+                  comparisonValue={metrics.customerServiceCalls.comparisonValue}
+                  comparisonPeriod={metrics.customerServiceCalls.comparisonPeriod}
+                  trend={metrics.customerServiceCalls.trend}
+                />
+              </>
+            ) : (
+              <>
+                <MetricsCard
+                  title="Total Calls"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+                <MetricsCard
+                  title="Total Forms"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+                <MetricsCard
+                  title="Avg Time To Be Assigned"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+                <MetricsCard
+                  title="Hang-up Calls"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+                <MetricsCard
+                  title="Customer Service Calls"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+              </>
+            )}
           </div>
-        ) : (
-          <>
-            <LeadsTabs
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              leadCounts={leadCounts}
-            />
-            <LeadsTable
-              leads={filteredLeads}
-              showActions={true}
-              showCompanyColumn={isAdmin && !selectedCompany}
-              onEdit={handleEditLead}
-              onDelete={handleDeleteLead}
-              onArchive={handleArchiveLead}
-              onUnarchive={handleUnarchiveLead}
-              userProfile={profile}
-              showArchived={activeTab === 'archived'}
-            />
-          </>
-        )}
-      </div>
+        </>
+      )}
+
+      {selectedCompany && (
+        <LeadsList
+          leads={leads}
+          loading={leadsLoading}
+          onLeadUpdated={() => {
+            fetchLeads();
+            fetchMetrics(selectedCompany.id);
+          }}
+          onEdit={handleEditLead}
+          showCompanyColumn={isAdmin && !selectedCompany}
+          userProfile={profile}
+        />
+      )}
+
+      {!selectedCompany && (
+        <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
+          Please select a company to view leads.
+        </div>
+      )}
     </div>
   );
 }

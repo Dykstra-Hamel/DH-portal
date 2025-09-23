@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
+    const assignedTo = searchParams.get('assignedTo');
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
     // Use admin client to fetch leads
@@ -62,6 +63,9 @@ export async function GET(request: NextRequest) {
     }
     if (priority) {
       query = query.eq('priority', priority);
+    }
+    if (assignedTo) {
+      query = query.eq('assigned_to', assignedTo);
     }
 
     const { data: leads, error } = await query;
@@ -154,6 +158,38 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create lead' },
         { status: 500 }
       );
+    }
+
+    // Generate notifications based on assignment status
+    try {
+      if (body.company_id) {
+        if (lead.assigned_to) {
+          // Lead is assigned - notify only the assigned user and managers/admins
+          await supabase.rpc('notify_assigned_and_managers', {
+            p_company_id: body.company_id,
+            p_assigned_user_id: lead.assigned_to,
+            p_type: 'new_lead_assigned',
+            p_title: 'New Lead Assigned to You',
+            p_message: `A new lead has been assigned to you${lead.customer_name ? ` from ${lead.customer_name}` : ''}`,
+            p_reference_id: lead.id,
+            p_reference_type: 'lead'
+          });
+        } else {
+          // Lead is unassigned - notify all sales team and managers/admins
+          await supabase.rpc('notify_department_and_managers', {
+            p_company_id: body.company_id,
+            p_department: 'sales',
+            p_type: 'new_lead_unassigned',
+            p_title: 'New Unassigned Lead',
+            p_message: `A new unassigned lead has been created${lead.customer_name ? ` from ${lead.customer_name}` : ''}`,
+            p_reference_id: lead.id,
+            p_reference_type: 'lead'
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error creating lead notifications:', notificationError);
+      // Don't fail the request if notification creation fails
     }
 
     return NextResponse.json(lead, { status: 201 });

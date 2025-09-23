@@ -6,7 +6,10 @@ import SupportCasesList from '@/components/SupportCases/SupportCasesList/Support
 import { SupportCase } from '@/types/support-case';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
-import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
+import {
+  MetricsCard,
+  styles as metricsStyles,
+} from '@/components/Common/MetricsCard';
 import styles from './page.module.scss';
 
 interface SupportCaseMetrics {
@@ -52,20 +55,20 @@ export default function CustomerServicePage() {
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<SupportCaseMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  
+
   // Use global company context
   const { selectedCompany } = useCompany();
 
   const fetchSupportCases = useCallback(async (companyId: string) => {
     if (!companyId) return;
-    
+
     setLoading(true);
     try {
       const supportCasesData = await adminAPI.supportCases.list({
         companyId,
-        includeArchived: false
+        includeArchived: false,
       });
-      
+
       setSupportCases(supportCasesData);
     } catch (error) {
       console.error('Error fetching support cases:', error);
@@ -81,7 +84,9 @@ export default function CustomerServicePage() {
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
     // Current period (last 30 days)
-    const currentCases = cases.filter(sc => new Date(sc.created_at) >= thirtyDaysAgo);
+    const currentCases = cases.filter(
+      sc => new Date(sc.created_at) >= thirtyDaysAgo
+    );
     // Previous period (30-60 days ago)
     const previousCases = cases.filter(sc => {
       const createdAt = new Date(sc.created_at);
@@ -91,12 +96,16 @@ export default function CustomerServicePage() {
     // Total cases
     const totalCurrent = currentCases.length;
     const totalPrevious = previousCases.length;
-    const totalChange = totalPrevious > 0 ? ((totalCurrent - totalPrevious) / totalPrevious) * 100 : 0;
+    const totalChange =
+      totalPrevious > 0
+        ? ((totalCurrent - totalPrevious) / totalPrevious) * 100
+        : 0;
 
     // New cases
     const newCurrent = currentCases.filter(sc => sc.status === 'new').length;
     const newPrevious = previousCases.filter(sc => sc.status === 'new').length;
-    const newChange = newPrevious > 0 ? ((newCurrent - newPrevious) / newPrevious) * 100 : 0;
+    const newChange =
+      newPrevious > 0 ? ((newCurrent - newPrevious) / newPrevious) * 100 : 0;
 
     // Response time calculation
     const casesWithResponse = currentCases.filter(sc => sc.first_response_at);
@@ -105,9 +114,11 @@ export default function CustomerServicePage() {
       const responded = new Date(sc.first_response_at!).getTime();
       return (responded - created) / (1000 * 60 * 60); // hours
     });
-    const avgResponseTime = responseTimes.length > 0 
-      ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length 
-      : 0;
+    const avgResponseTime =
+      responseTimes.length > 0
+        ? responseTimes.reduce((sum, time) => sum + time, 0) /
+          responseTimes.length
+        : 0;
 
     // Resolution time calculation
     const resolvedCases = currentCases.filter(sc => sc.resolved_at);
@@ -116,15 +127,21 @@ export default function CustomerServicePage() {
       const resolved = new Date(sc.resolved_at!).getTime();
       return (resolved - created) / (1000 * 60 * 60); // hours
     });
-    const avgResolutionTime = resolutionTimes.length > 0
-      ? resolutionTimes.reduce((sum, time) => sum + time, 0) / resolutionTimes.length
-      : 0;
+    const avgResolutionTime =
+      resolutionTimes.length > 0
+        ? resolutionTimes.reduce((sum, time) => sum + time, 0) /
+          resolutionTimes.length
+        : 0;
 
     // Satisfaction score
     const casesWithRating = currentCases.filter(sc => sc.satisfaction_rating);
-    const avgSatisfaction = casesWithRating.length > 0
-      ? casesWithRating.reduce((sum, sc) => sum + sc.satisfaction_rating!, 0) / casesWithRating.length
-      : 0;
+    const avgSatisfaction =
+      casesWithRating.length > 0
+        ? casesWithRating.reduce(
+            (sum, sc) => sum + sc.satisfaction_rating!,
+            0
+          ) / casesWithRating.length
+        : 0;
 
     const formatTime = (hours: number) => {
       if (hours < 1) return `${Math.round(hours * 60)}m`;
@@ -138,53 +155,55 @@ export default function CustomerServicePage() {
         value: totalCurrent.toString(),
         comparisonValue: Math.abs(totalChange),
         comparisonPeriod: 'vs last 30 days',
-        trend: totalChange > 0 ? 'bad' : 'good'
+        trend: totalChange > 0 ? 'bad' : 'good',
       },
       newCases: {
         title: 'New Cases',
         value: newCurrent.toString(),
         comparisonValue: Math.abs(newChange),
         comparisonPeriod: 'vs last 30 days',
-        trend: newChange > 0 ? 'bad' : 'good'
+        trend: newChange > 0 ? 'bad' : 'good',
       },
       avgResponseTime: {
         title: 'Avg Response Time',
         value: formatTime(avgResponseTime),
         comparisonValue: 0,
         comparisonPeriod: 'last 30 days',
-        trend: 'good'
+        trend: 'good',
       },
       avgResolutionTime: {
         title: 'Avg Resolution Time',
         value: formatTime(avgResolutionTime),
         comparisonValue: 0,
         comparisonPeriod: 'last 30 days',
-        trend: 'good'
+        trend: 'good',
       },
       satisfactionScore: {
         title: 'Satisfaction Score',
         value: avgSatisfaction > 0 ? avgSatisfaction.toFixed(1) : '--',
         comparisonValue: 0,
         comparisonPeriod: 'out of 5.0',
-        trend: avgSatisfaction >= 3.5 ? 'good' : 'bad'
-      }
+        trend: avgSatisfaction >= 3.5 ? 'good' : 'bad',
+      },
     } as SupportCaseMetrics;
   }, []);
 
   // Handle support case changes for real-time updates
-  const handleSupportCaseChange = useCallback((payload: any) => {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-    
-    console.log('Support case change:', eventType, newRecord);
-    
-    switch (eventType) {
-      case 'INSERT':
-        if (newRecord && selectedCompany?.id) {
-          // Add new support case to the list
-          const supabase = createClient();
-          supabase
-            .from('support_cases')
-            .select(`
+  const handleSupportCaseChange = useCallback(
+    (payload: any) => {
+      const { eventType, new: newRecord, old: oldRecord } = payload;
+
+      console.log('Support case change:', eventType, newRecord);
+
+      switch (eventType) {
+        case 'INSERT':
+          if (newRecord && selectedCompany?.id) {
+            // Add new support case to the list
+            const supabase = createClient();
+            supabase
+              .from('support_cases')
+              .select(
+                `
               *,
               customer:customers(
                 id,
@@ -208,39 +227,46 @@ export default function CustomerServicePage() {
                 source,
                 created_at
               )
-            `)
-            .eq('id', newRecord.id)
-            .single()
-            .then(({ data: fullSupportCase, error }) => {
-              if (error) {
-                console.error('Error fetching full support case data:', error);
-                setSupportCases(prev => {
-                  const exists = prev.some(sc => sc.id === newRecord.id);
-                  if (!exists) {
-                    return [newRecord, ...prev];
-                  }
-                  return prev;
-                });
-              } else if (fullSupportCase) {
-                setSupportCases(prev => {
-                  const exists = prev.some(sc => sc.id === fullSupportCase.id);
-                  if (!exists) {
-                    return [fullSupportCase, ...prev];
-                  }
-                  return prev;
-                });
-              }
-            });
-        }
-        break;
-        
-      case 'UPDATE':
-        if (newRecord && selectedCompany?.id) {
-          // Update existing support case
-          const supabase = createClient();
-          supabase
-            .from('support_cases')
-            .select(`
+            `
+              )
+              .eq('id', newRecord.id)
+              .single()
+              .then(({ data: fullSupportCase, error }) => {
+                if (error) {
+                  console.error(
+                    'Error fetching full support case data:',
+                    error
+                  );
+                  setSupportCases(prev => {
+                    const exists = prev.some(sc => sc.id === newRecord.id);
+                    if (!exists) {
+                      return [newRecord, ...prev];
+                    }
+                    return prev;
+                  });
+                } else if (fullSupportCase) {
+                  setSupportCases(prev => {
+                    const exists = prev.some(
+                      sc => sc.id === fullSupportCase.id
+                    );
+                    if (!exists) {
+                      return [fullSupportCase, ...prev];
+                    }
+                    return prev;
+                  });
+                }
+              });
+          }
+          break;
+
+        case 'UPDATE':
+          if (newRecord && selectedCompany?.id) {
+            // Update existing support case
+            const supabase = createClient();
+            supabase
+              .from('support_cases')
+              .select(
+                `
               *,
               customer:customers(
                 id,
@@ -264,31 +290,39 @@ export default function CustomerServicePage() {
                 source,
                 created_at
               )
-            `)
-            .eq('id', newRecord.id)
-            .single()
-            .then(({ data: fullSupportCase, error }) => {
-              if (error) {
-                console.error('Error fetching full support case data:', error);
-                setSupportCases(prev =>
-                  prev.map(sc => sc.id === newRecord.id ? newRecord : sc)
-                );
-              } else if (fullSupportCase) {
-                setSupportCases(prev =>
-                  prev.map(sc => sc.id === newRecord.id ? fullSupportCase : sc)
-                );
-              }
-            });
-        }
-        break;
-        
-      case 'DELETE':
-        if (oldRecord) {
-          setSupportCases(prev => prev.filter(sc => sc.id !== oldRecord.id));
-        }
-        break;
-    }
-  }, [selectedCompany?.id]);
+            `
+              )
+              .eq('id', newRecord.id)
+              .single()
+              .then(({ data: fullSupportCase, error }) => {
+                if (error) {
+                  console.error(
+                    'Error fetching full support case data:',
+                    error
+                  );
+                  setSupportCases(prev =>
+                    prev.map(sc => (sc.id === newRecord.id ? newRecord : sc))
+                  );
+                } else if (fullSupportCase) {
+                  setSupportCases(prev =>
+                    prev.map(sc =>
+                      sc.id === newRecord.id ? fullSupportCase : sc
+                    )
+                  );
+                }
+              });
+          }
+          break;
+
+        case 'DELETE':
+          if (oldRecord) {
+            setSupportCases(prev => prev.filter(sc => sc.id !== oldRecord.id));
+          }
+          break;
+      }
+    },
+    [selectedCompany?.id]
+  );
 
   useEffect(() => {
     if (selectedCompany?.id) {
@@ -312,18 +346,18 @@ export default function CustomerServicePage() {
     if (!selectedCompany?.id) return;
 
     const supabase = createClient();
-    
+
     const channel = supabase
       .channel('support-cases-live-updates')
       .on(
         'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
+        {
+          event: '*',
+          schema: 'public',
           table: 'support_cases',
-          filter: `company_id=eq.${selectedCompany.id}`
+          filter: `company_id=eq.${selectedCompany.id}`,
         },
-        (payload) => {
+        payload => {
           console.log('Support case realtime update:', payload);
           handleSupportCaseChange(payload);
         }
@@ -340,7 +374,9 @@ export default function CustomerServicePage() {
       {selectedCompany && (
         <>
           {/* Metrics Cards */}
-          <div className={`${metricsStyles.metricsCardWrapper} ${styles.metricsSection}`}>
+          <div
+            className={`${metricsStyles.metricsCardWrapper} ${styles.metricsSection}`}
+          >
             {metrics && !metricsLoading ? (
               <>
                 <MetricsCard
@@ -438,7 +474,9 @@ export default function CustomerServicePage() {
       )}
 
       {!selectedCompany && (
-        <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
+        <div
+          style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}
+        >
           Please select a company to view support cases.
         </div>
       )}

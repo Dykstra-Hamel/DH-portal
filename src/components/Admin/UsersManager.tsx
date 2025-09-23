@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api-client';
+import { DepartmentSelector } from '@/components/Common/DepartmentSelector';
+import { Department, canHaveDepartments } from '@/types/user';
 import styles from './AdminManager.module.scss';
 
 interface Profile {
@@ -42,6 +44,7 @@ export default function UsersManager() {
     last_name: '',
     company_id: '',
     role: 'member',
+    departments: [] as Department[],
   });
 
   useEffect(() => {
@@ -83,6 +86,12 @@ export default function UsersManager() {
       return;
     }
 
+    // Validate departments for member/manager roles
+    if (canHaveDepartments(formData.role as any) && formData.departments.length === 0) {
+      setError('At least one department must be selected for Member and Manager roles');
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError(null);
@@ -93,6 +102,7 @@ export default function UsersManager() {
         last_name: '',
         company_id: '',
         role: 'member',
+        departments: [],
       });
       setShowCreateForm(false);
       loadUsers();
@@ -230,9 +240,15 @@ export default function UsersManager() {
                 <label>Role:</label>
                 <select
                   value={formData.role}
-                  onChange={e =>
-                    setFormData({ ...formData, role: e.target.value })
-                  }
+                  onChange={e => {
+                    const newRole = e.target.value;
+                    setFormData({
+                      ...formData,
+                      role: newRole,
+                      // Clear departments if role can't have departments
+                      departments: canHaveDepartments(newRole as any) ? formData.departments : []
+                    });
+                  }}
                 >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
@@ -240,6 +256,27 @@ export default function UsersManager() {
                   <option value="owner">Owner</option>
                 </select>
               </div>
+
+              {/* Department Selection - Only show for Member/Manager roles */}
+              {canHaveDepartments(formData.role as any) && (
+                <div className={styles.formGroup}>
+                  <label>Departments: *</label>
+                  <div className={styles.departmentSelection}>
+                    <DepartmentSelector
+                      selectedDepartments={formData.departments}
+                      onDepartmentChange={(departments) =>
+                        setFormData({ ...formData, departments })
+                      }
+                      disabled={submitting}
+                      layout="vertical"
+                      size="medium"
+                    />
+                  </div>
+                  <small className={styles.fieldHelp}>
+                    Select the departments this user will have access to
+                  </small>
+                </div>
+              )}
               <div className={styles.formActions}>
                 <button
                   type="submit"

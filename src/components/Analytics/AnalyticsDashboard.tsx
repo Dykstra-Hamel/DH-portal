@@ -49,7 +49,7 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
     } finally {
       setLoading(false);
     }
-  }, [companyId, ]);
+  }, [companyId]);
 
   useEffect(() => {
     if (companyId) {

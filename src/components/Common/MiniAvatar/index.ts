@@ -1,0 +1,1 @@
+export { MiniAvatar } from './MiniAvatar';

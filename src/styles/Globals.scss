@@ -32,9 +32,15 @@
   --sales-bad: #ef4444;
   --neutral-400: #a3a3a3;
   --neutral-500: #737373;
+  --gray-400: #99a1af;
+  --gray-500: #6a7282;
+  --gray-700: #374152;
+  --gray-800: #252c37;
   --action-500: #0087f5;
   --action-600: #006bc2;
   --action-700: #1d4ed8;
+  --gray-100: #f2f2f7;
+  --slate-100: #f1f5f9;
   --drop-shadow: #e8e8ea;
   --highlight-blue-dark: #3190d3;
   --drop-shadow-hover: #dbdbdd;
@@ -46,6 +52,13 @@
 
   /* Toast and Status Colors */
   --Misc-Darker-Green: #25b762;
+  --gradient-dh-gray: linear-gradient(180deg, #252c37 25%, #262626 100%);
+
+  /* Toast and Status Colors */
+  --Misc-Darker-Green: #25b762;
+
+  /* Notification Colors */
+  --notification-red: #e52c51;
 
   /* Border Radius Variables */
   --border-radius-sm: 4px;

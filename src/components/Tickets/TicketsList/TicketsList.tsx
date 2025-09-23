@@ -15,7 +15,7 @@ interface TicketsListProps {
   onTicketUpdated?: () => void;
 }
 
-export default function TicketsList({
+function TicketsList({
   tickets,
   callRecords = [],
   loading = false,
@@ -47,10 +47,11 @@ export default function TicketsList({
     setShowToast(true);
 
     // Show undo button for assignment and qualification messages
-    const shouldShowUndo = message === 'The ticket was successfully assigned.' ||
-                          message.includes('converted to lead') ||
-                          message.includes('converted to support case');
-    
+    const shouldShowUndo =
+      message === 'The ticket was successfully assigned.' ||
+      message.includes('converted to lead') ||
+      message.includes('converted to support case');
+
     if (shouldShowUndo) {
       setShowUndoOnToast(true);
 
@@ -83,13 +84,17 @@ export default function TicketsList({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ previousState: previousTicketState.previousState }),
+          body: JSON.stringify({
+            previousState: previousTicketState.previousState,
+          }),
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to undo ticket qualification');
+        throw new Error(
+          errorData.error || 'Failed to undo ticket qualification'
+        );
       }
 
       onTicketUpdated?.();
@@ -104,7 +109,9 @@ export default function TicketsList({
       }, 300);
     } catch (error) {
       console.error('Error undoing ticket qualification:', error);
-      setToastMessage(`Failed to undo: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setToastMessage(
+        `Failed to undo: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
       setShowToast(true);
       setShowUndoOnToast(false);
     } finally {
@@ -122,16 +129,19 @@ export default function TicketsList({
       status: qualifyingTicket.status,
       service_type: qualifyingTicket.service_type,
       assigned_to: qualifyingTicket.assigned_to,
-      archived: qualifyingTicket.archived || false
+      archived: qualifyingTicket.archived || false,
     };
 
     setIsQualifying(true);
     try {
-      const response = await fetch(`/api/tickets/${qualifyingTicket.id}/qualify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qualification, assignedTo }),
-      });
+      const response = await fetch(
+        `/api/tickets/${qualifyingTicket.id}/qualify`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qualification, assignedTo }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to qualify ticket');
@@ -142,7 +152,7 @@ export default function TicketsList({
       setPreviousTicketState({
         ticketId: qualifyingTicket.id,
         previousState,
-        qualification
+        qualification,
       });
 
       onTicketUpdated?.();
@@ -207,3 +217,5 @@ export default function TicketsList({
     </>
   );
 }
+
+export default TicketsList;
