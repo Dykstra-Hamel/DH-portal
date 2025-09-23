@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
-export type PrimaryNavItem = 'dashboard' | 'connections' | 'tasks' | 'brand';
+export type PrimaryNavItem = 'dashboard' | 'connections' | 'customers' | 'tasks' | 'brand';
 
 interface NavigationContextType {
   activePrimaryNav: PrimaryNavItem;
@@ -28,6 +28,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       setActivePrimaryNav('connections');
     } else if (pathname.startsWith('/tickets')) {
       setActivePrimaryNav('connections'); // Tickets now under connections
+    } else if (pathname.startsWith('/customers')) {
+      setActivePrimaryNav('customers');
     } else if (pathname.startsWith('/brand')) {
       setActivePrimaryNav('brand');
     } else if (pathname.startsWith('/dashboard')) {

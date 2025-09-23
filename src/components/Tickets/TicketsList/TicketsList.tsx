@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Ticket } from '@/types/ticket';
 import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable } from '@/components/Common/DataTable';
@@ -15,7 +15,7 @@ interface TicketsListProps {
   onTicketUpdated?: () => void;
 }
 
-export default function TicketsList({
+function TicketsList({
   tickets,
   callRecords = [],
   loading = false,

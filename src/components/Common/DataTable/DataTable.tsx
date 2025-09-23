@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import SortableColumnHeader from '@/components/Common/SortableColumnHeader/SortableColumnHeader';
 import { Toast } from '@/components/Common/Toast';
 import DefaultItemRow from './DefaultItemRow';
@@ -15,21 +15,30 @@ export default function DataTable<T>({
   tabs,
   onItemAction,
   onDataUpdated,
+  infiniteScrollEnabled = false,
+  hasMore = false,
+  onLoadMore,
+  loadingMore = false,
   customComponents,
   className = '',
   emptyStateMessage = 'No items found for this category.',
   tableType = 'tickets',
   onShowToast,
 }: DataTableProps<T>) {
-  const [activeTab, setActiveTab] = useState<string>(tabs[0]?.key || 'all');
+  const [activeTab, setActiveTab] = useState<string>(tabs?.[0]?.key || 'all');
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   
   // Toast state
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
+  // Infinite scroll refs and state
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const dataRowsRef = useRef<HTMLDivElement>(null);
+
   // Filter data based on active tab
   const filteredData = useMemo(() => {
+    if (!tabs) return data;
     const activeTabConfig = tabs.find(tab => tab.key === activeTab);
     if (!activeTabConfig) return data;
     return activeTabConfig.filter(data);
@@ -89,11 +98,45 @@ export default function DataTable<T>({
 
   // Calculate counts for each tab
   const tabsWithCounts = useMemo(() => {
+    if (!tabs) return [];
     return tabs.map(tab => ({
       ...tab,
       count: tab.getCount(data),
     }));
   }, [tabs, data]);
+
+  // Infinite scroll intersection observer
+  const handleLoadMore = useCallback(() => {
+    if (infiniteScrollEnabled && hasMore && !loadingMore && onLoadMore) {
+      onLoadMore();
+    }
+  }, [infiniteScrollEnabled, hasMore, loadingMore, onLoadMore]);
+
+  useEffect(() => {
+    if (!infiniteScrollEnabled || !loadMoreRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        if (target.isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '100px',
+      }
+    );
+
+    const currentLoadMoreRef = loadMoreRef.current;
+    observer.observe(currentLoadMoreRef);
+
+    return () => {
+      if (currentLoadMoreRef) {
+        observer.unobserve(currentLoadMoreRef);
+      }
+    };
+  }, [handleLoadMore, infiniteScrollEnabled]);
 
   // Handle toast
   const handleShowToast = (message: string) => {
@@ -113,7 +156,22 @@ export default function DataTable<T>({
   };
 
   // Get table-specific class
-  const tableClass = tableType === 'supportCases' ? styles.supportCaseTable : styles.ticketTable;
+  const getTableClass = () => {
+    switch (tableType) {
+      case 'supportCases':
+        return styles.supportCaseTable;
+      case 'leads':
+        return styles.leadTable;
+      case 'calls':
+        return styles.callTable;
+      case 'customers':
+        return styles.customerTable;
+      case 'tickets':
+      default:
+        return styles.ticketTable;
+    }
+  };
+  const tableClass = getTableClass();
 
   return (
     <>
@@ -127,18 +185,20 @@ export default function DataTable<T>({
           <h1 className={styles.pageTitle}>{title}</h1>
 
           {/* Tab Navigation */}
-          <div className={styles.tabsContainer}>
-            {tabsWithCounts.map(tab => (
-              <button
-                key={tab.key}
-                className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                <span className={styles.tabText}>{tab.label}</span>
-                <span className={styles.tabCount}>{tab.count}</span>
-              </button>
-            ))}
-          </div>
+          {tabs && tabs.length > 0 && (
+            <div className={styles.tabsContainer}>
+              {tabsWithCounts.map(tab => (
+                <button
+                  key={tab.key}
+                  className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
+                  onClick={() => setActiveTab(tab.key)}
+                >
+                  <span className={styles.tabText}>{tab.label}</span>
+                  <span className={styles.tabCount}>{tab.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content Area */}
@@ -172,7 +232,7 @@ export default function DataTable<T>({
               </div>
 
               {/* Data Rows */}
-              <div className={styles.dataRows}>
+              <div className={styles.dataRows} ref={dataRowsRef}>
                 {sortedData.map((item, index) => {
                   // Use custom row component if provided, otherwise use default
                   if (customComponents?.itemRow) {
@@ -185,7 +245,7 @@ export default function DataTable<T>({
                       />
                     );
                   }
-                  
+
                   return (
                     <DefaultItemRow
                       key={index}
@@ -195,6 +255,26 @@ export default function DataTable<T>({
                     />
                   );
                 })}
+
+                {/* Infinite Scroll Loading Indicator */}
+                {infiniteScrollEnabled && (
+                  <div
+                    ref={loadMoreRef}
+                    className={styles.loadMoreIndicator}
+                  >
+                    {loadingMore && (
+                      <div className={styles.loadMoreSpinner}>
+                        <div className={styles.spinner}></div>
+                        <span>Loading more...</span>
+                      </div>
+                    )}
+                    {hasMore && !loadingMore && (
+                      <div className={styles.loadMorePlaceholder}>
+                        {/* This div is used for intersection observer trigger */}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

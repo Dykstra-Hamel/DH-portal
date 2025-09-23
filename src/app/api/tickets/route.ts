@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { TicketFormData } from '@/types/ticket';
-import { 
-  getAuthenticatedUser, 
-  verifyCompanyAccess, 
+import {
+  getAuthenticatedUser,
+  verifyCompanyAccess,
   createErrorResponse,
-  createSuccessResponse 
+  createSuccessResponse
 } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
@@ -209,15 +209,14 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Failed to create ticket');
     }
 
-    // Generate notifications for support department users
+    // Generate notifications for all company users
     try {
       const adminSupabase = createAdminClient();
-      await adminSupabase.rpc('notify_department_users', {
+      await adminSupabase.rpc('notify_all_company_users', {
         p_company_id: ticketData.company_id,
-        p_department: 'support',
-        p_type: 'department_ticket',
-        p_title: 'New Support Ticket',
-        p_message: `A new support ticket has been created from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
+        p_type: 'new_ticket',
+        p_title: 'New Ticket Created',
+        p_message: `A new ticket has been created from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
         p_reference_id: ticket.id,
         p_reference_type: 'ticket'
       });

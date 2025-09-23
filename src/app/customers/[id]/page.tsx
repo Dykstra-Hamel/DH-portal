@@ -22,7 +22,7 @@ import { Customer, CustomerFormData } from '@/types/customer';
 import { Lead } from '@/types/lead';
 import { Ticket } from '@/types/ticket';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
-import styles from '../../dashboard/customers/[id]/page.module.scss';
+import styles from './page.module.scss';
 
 interface Profile {
   id: string;

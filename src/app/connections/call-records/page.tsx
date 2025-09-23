@@ -1,39 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
-import { createClient } from '@/lib/supabase/client';
-import { Archive, ChevronLeft, ChevronRight } from 'lucide-react';
-import styles from '@/components/Admin/AdminManager.module.scss';
 import { useCompany } from '@/contexts/CompanyContext';
 import { adminAPI } from '@/lib/api-client';
-import { CallRecord } from '@/types/call-record';
+import CallRecordsList from '@/components/CallRecords/CallRecordsList/CallRecordsList';
+import { CallRecordWithDirection } from '@/components/CallRecords/CallRecordsList/CallRecordsListConfig';
+import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
+import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
+import { MetricsResponse } from '@/services/metricsService';
+import styles from '@/components/Admin/AdminManager.module.scss';
 
 
-interface CallRecordWithDirection extends CallRecord {
-  call_direction?: 'inbound' | 'outbound' | 'unknown';
-  from_number?: string;
-  archived?: boolean;
-  billable_duration_seconds?: number;
-  leads?: {
-    id: string;
-    customer_id: string;
-    company_id: string;
-    customers?: {
-      id: string;
-      first_name: string;
-      last_name: string;
-      email: string;
-    };
-  };
-  customers?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    company_id: string;
-  };
-}
 
 export default function CallRecordsPage() {
   // Use global company context
@@ -41,33 +18,28 @@ export default function CallRecordsPage() {
 
   // Call Records State
   const [calls, setCalls] = useState<CallRecordWithDirection[]>([]);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    totalPages: 0,
-    hasNext: false,
-    hasPrev: false,
-  });
   const [callsLoading, setCallsLoading] = useState(false);
-  const [callsError, setCallsError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedCall, setSelectedCall] = useState<CallRecordWithDirection | null>(null);
+  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
 
-  // Archive State
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [callToArchive, setCallToArchive] = useState<CallRecordWithDirection | null>(null);
-  const [isArchiving, setIsArchiving] = useState(false);
 
   const loadCalls = useCallback(
-    async (page: number = 1) => {
+    async (page: number = 1, isLoadMore: boolean = false) => {
       try {
-        setCallsLoading(true);
-        setCallsError(null);
+        if (isLoadMore) {
+          setLoadingMore(true);
+        } else {
+          setCallsLoading(true);
+        }
 
         // For non-admin users, require a specific company to be selected
         if (!isAdmin && !selectedCompany) {
           setCalls([]);
-          setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
+          setHasMore(false);
           return;
         }
 
@@ -93,67 +65,89 @@ export default function CallRecordsPage() {
         // Filter out archived calls on the client side
         const nonArchivedCalls = (allCalls || []).filter(call => !call.archived);
 
-        // Client-side pagination
+        // Client-side pagination for infinite scroll
         const limit = 20;
-        const total = nonArchivedCalls.length;
-        const totalPages = Math.ceil(total / limit);
         const startIndex = (page - 1) * limit;
         const endIndex = startIndex + limit;
         const paginatedCalls = nonArchivedCalls.slice(startIndex, endIndex);
 
-        setCalls(paginatedCalls);
-        setPagination({
-          page,
-          limit,
-          total,
-          totalPages,
-          hasNext: page < totalPages,
-          hasPrev: page > 1,
-        });
+        if (isLoadMore) {
+          setCalls(prev => [...prev, ...paginatedCalls]);
+        } else {
+          setCalls(paginatedCalls);
+        }
+
+        // Check if there are more calls to load
+        setHasMore(endIndex < nonArchivedCalls.length);
+        setCurrentPage(page);
       } catch (err) {
-        setCallsError(
-          err instanceof Error ? err.message : 'Failed to load calls'
-        );
+        console.error('Error loading calls:', err);
+        // Keep existing calls on error
       } finally {
         setCallsLoading(false);
+        setLoadingMore(false);
       }
     },
     [isAdmin, selectedCompany]
   );
 
+  const fetchMetrics = useCallback(async (companyId: string) => {
+    if (!companyId) return;
+
+    setMetricsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        companyId
+      });
+
+      const response = await fetch(`/api/metrics?${params}`);
+      if (response.ok) {
+        const metricsData = await response.json();
+        setMetrics(metricsData);
+      } else {
+        console.error('Error fetching metrics:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching metrics:', error);
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!contextLoading) {
+    if (!contextLoading && selectedCompany?.id) {
+      setCurrentPage(1);
+      setCalls([]);
+      setHasMore(true);
       loadCalls(1); // Always load first page when dependencies change
+      fetchMetrics(selectedCompany.id);
     }
-  }, [contextLoading, selectedCompany, isAdmin, loadCalls]);
+  }, [contextLoading, selectedCompany, isAdmin, loadCalls, fetchMetrics]);
 
-  // Pagination handlers
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      loadCalls(newPage);
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (pagination.hasPrev) {
-      handlePageChange(pagination.page - 1);
+  // Infinite scroll handler
+  const handleLoadMore = () => {
+    if (hasMore && !loadingMore) {
+      loadCalls(currentPage + 1, true);
     }
   };
 
-  const handleNextPage = () => {
-    if (pagination.hasNext) {
-      handlePageChange(pagination.page + 1);
+  // Handle view details action
+  const handleViewDetails = (call: CallRecordWithDirection) => {
+    setSelectedCall(call);
+  };
+
+  // Handle call updated (refresh data)
+  const handleCallUpdated = () => {
+    setCurrentPage(1);
+    setCalls([]);
+    setHasMore(true);
+    loadCalls(1);
+    if (selectedCompany?.id) {
+      fetchMetrics(selectedCompany.id);
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    if (!seconds) return 'N/A';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-
+  // Format functions for modal
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString();
@@ -172,268 +166,123 @@ export default function CallRecordsPage() {
     return phone;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'completed':
-        return '#10b981';
-      case 'failed':
-        return '#ef4444';
-      case 'busy':
-        return '#f59e0b';
-      case 'no-answer':
-        return '#6b7280';
-      default:
-        return '#6b7280';
-    }
+  const formatDuration = (seconds: number) => {
+    if (!seconds) return 'N/A';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment?.toLowerCase()) {
-      case 'positive':
-        return '#10b981';
-      case 'negative':
-        return '#ef4444';
-      case 'neutral':
-        return '#6b7280';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  const handleArchiveClick = (call: CallRecordWithDirection) => {
-    setCallToArchive(call);
-    setShowArchiveModal(true);
-  };
-
-  const handleArchiveConfirm = async () => {
-    if (!callToArchive) return;
-
-    try {
-      setIsArchiving(true);
-      
-      const supabase = createClient();
-      const { data: session } = await supabase.auth.getSession();
-      
-      if (!session.session?.access_token) {
-        throw new Error('No authentication session');
-      }
-
-      const response = await fetch(`/api/calls/${callToArchive.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ archived: true }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to archive call record');
-      }
-
-      // Refresh the calls list at the current page
-      await loadCalls(pagination.page);
-
-      setShowArchiveModal(false);
-      setCallToArchive(null);
-    } catch (error) {
-      setCallsError(`Failed to archive call record: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsArchiving(false);
-    }
-  };
-
-  const handleArchiveCancel = () => {
-    setShowArchiveModal(false);
-    setCallToArchive(null);
-  };
 
   return (
-    <div className={styles.adminManager}>
-      <div className={styles.header}>
-        <h2>Call Records</h2>
-      </div>
-
-
-      <div className={styles.tabContent}>
-        {contextLoading ? (
-          <div className={styles.loading}>Loading...</div>
-        ) : callsLoading ? (
-          <div className={styles.loading}>Loading call records...</div>
-        ) : callsError ? (
-          <div className={styles.error}>Error: {callsError}</div>
-        ) : (
-          <>
-            <div className={styles.recordsHeader}>
-              <h3>
-                {selectedCompany 
-                  ? `${selectedCompany.name} Call Records`
-                  : isAdmin 
-                    ? 'All Company Call Records'
-                    : 'Call Records'
-                }
-              </h3>
-              <p>Showing {calls.length} of {pagination.total} calls</p>
-            </div>
-            
-            <div className={styles.table}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Customer</th>
-                    <th>Phone</th>
-                    <th>Status</th>
-                    <th>Duration</th>
-                    <th>Sentiment</th>
-                    <th>Pest Issue</th>
-                    <th>Direction</th>
-                    <th>Service Time</th>
-                    <th>Data Opt-Out</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {calls.map(call => (
-                    <tr key={call.id}>
-                      <td>
-                        {call.start_timestamp
-                          ? formatDate(call.start_timestamp)
-                          : 'N/A'}
-                      </td>
-                      <td>
-                        {(() => {
-                          const customer = call.leads?.customers || call.customers;
-                          return customer
-                            ? `${customer.first_name} ${customer.last_name}`
-                            : 'Unknown';
-                        })()}
-                        {(() => {
-                          const customer = call.leads?.customers || call.customers;
-                          return customer?.email && (
-                            <div className={styles.subText}>
-                              {customer.email}
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td>
-                        {(() => {
-                          // For outbound calls, show the number that was called (phone_number)
-                          // For inbound calls, show the caller's number (phone_number or from_number)
-                          const displayNumber =
-                            call.call_direction === 'outbound'
-                              ? call.phone_number // Number that was called
-                              : call.phone_number || call.from_number; // Caller's number (prefer normalized)
-                          return formatPhoneNumber(displayNumber || 'N/A');
-                        })()}
-                      </td>
-                      <td>
-                        <span
-                          className={styles.status}
-                          style={{
-                            backgroundColor: getStatusColor(call.call_status),
-                          }}
-                        >
-                          {call.call_status || 'Unknown'}
-                        </span>
-                      </td>
-                      <td>
-                        {call.duration_seconds
-                          ? formatDuration(call.duration_seconds)
-                          : 'N/A'}
-                      </td>
-                      <td>
-                        <span
-                          className={styles.sentiment}
-                          style={{ color: getSentimentColor(call.sentiment || 'neutral') }}
-                        >
-                          {call.sentiment || 'N/A'}
-                        </span>
-                      </td>
-                      <td className={styles.pestIssueCell} title={call.pest_issue || 'N/A'}>
-                        {call.pest_issue || 'N/A'}
-                      </td>
-                      <td>
-                        <span
-                          className={styles.callDirection}
-                          style={{
-                            color:
-                              call.call_direction === 'inbound'
-                                ? '#10b981'
-                                : call.call_direction === 'outbound'
-                                  ? '#3b82f6'
-                                  : '#6b7280',
-                            fontWeight: '500',
-                          }}
-                        >
-                          {call.call_direction === 'inbound'
-                            ? 'Inbound'
-                            : call.call_direction === 'outbound'
-                              ? 'Outbound'
-                              : 'Unknown'}
-                        </span>
-                      </td>
-                      <td>{call.preferred_service_time || 'N/A'}</td>
-                      <td>{call.opt_out_sensitive_data_storage ? 'Yes' : 'No'}</td>
-                      <td>
-                        <div className={styles.callActions}>
-                          <button
-                            className={styles.actionButton}
-                            onClick={() => setSelectedCall(call)}
-                          >
-                            View Details
-                          </button>
-                          <button
-                            className={styles.callArchiveButton}
-                            onClick={() => handleArchiveClick(call)}
-                            title="Archive call record"
-                          >
-                            <Archive size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination Controls */}
-            {pagination.totalPages > 1 && (
-              <div className={styles.pagination}>
-                <button
-                  onClick={handlePrevPage}
-                  disabled={!pagination.hasPrev || callsLoading}
-                  className={styles.paginationButton}
-                >
-                  <ChevronLeft size={16} />
-                  Previous
-                </button>
-
-                <div className={styles.pageInfo}>
-                  <span>
-                    Page {pagination.page} of {pagination.totalPages}
-                  </span>
-                  <span className={styles.totalRecords}>
-                    ({pagination.total} total calls)
-                  </span>
-                </div>
-
-                <button
-                  onClick={handleNextPage}
-                  disabled={!pagination.hasNext || callsLoading}
-                  className={styles.paginationButton}
-                >
-                  Next
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+    <div style={{ width: '100%' }}>
+      {selectedCompany && (
+        <>
+          {/* Metrics Cards */}
+          <div className={metricsStyles.metricsCardWrapper}>
+            {metrics && !metricsLoading ? (
+              <>
+                <MetricsCard
+                  title={metrics.totalCalls.title}
+                  value={metrics.totalCalls.value}
+                  comparisonValue={metrics.totalCalls.comparisonValue}
+                  comparisonPeriod={metrics.totalCalls.comparisonPeriod}
+                  trend={metrics.totalCalls.trend}
+                />
+                <MetricsCard
+                  title={metrics.totalForms.title}
+                  value={metrics.totalForms.value}
+                  comparisonValue={metrics.totalForms.comparisonValue}
+                  comparisonPeriod={metrics.totalForms.comparisonPeriod}
+                  trend={metrics.totalForms.trend}
+                />
+                <MetricsCard
+                  title={metrics.avgTimeToAssign.title}
+                  value={metrics.avgTimeToAssign.value}
+                  comparisonValue={metrics.avgTimeToAssign.comparisonValue}
+                  comparisonPeriod={metrics.avgTimeToAssign.comparisonPeriod}
+                  trend={metrics.avgTimeToAssign.trend}
+                />
+                <MetricsCard
+                  title={metrics.hangupCalls.title}
+                  value={metrics.hangupCalls.value}
+                  comparisonValue={metrics.hangupCalls.comparisonValue}
+                  comparisonPeriod={metrics.hangupCalls.comparisonPeriod}
+                  trend={metrics.hangupCalls.trend}
+                />
+                <MetricsCard
+                  title={metrics.customerServiceCalls.title}
+                  value={metrics.customerServiceCalls.value}
+                  comparisonValue={metrics.customerServiceCalls.comparisonValue}
+                  comparisonPeriod={metrics.customerServiceCalls.comparisonPeriod}
+                  trend={metrics.customerServiceCalls.trend}
+                />
+              </>
+            ) : (
+              <>
+                <MetricsCard
+                  title="Total Calls"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+                <MetricsCard
+                  title="Total Forms"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+                <MetricsCard
+                  title="Avg Time To Be Assigned"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+                <MetricsCard
+                  title="Hang-up Calls"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+                <MetricsCard
+                  title="Customer Service Calls"
+                  value="--"
+                  comparisonValue={0}
+                  comparisonPeriod="previous period"
+                  trend="good"
+                  isLoading={true}
+                />
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
+
+      {selectedCompany && (
+        <CallRecordsList
+          calls={calls}
+          loading={callsLoading}
+          hasMore={hasMore}
+          onLoadMore={handleLoadMore}
+          loadingMore={loadingMore}
+          onCallUpdated={handleCallUpdated}
+          onViewDetails={handleViewDetails}
+        />
+      )}
+
+      {!selectedCompany && (
+        <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
+          Please select a company to view call records.
+        </div>
+      )}
 
       {selectedCall && (
         <div className={styles.modal} onClick={() => setSelectedCall(null)}>
@@ -558,72 +407,6 @@ export default function CallRecordsPage() {
         </div>
       )}
 
-      {/* Archive Confirmation Modal */}
-      {showArchiveModal && callToArchive && (
-        <div className={styles.modal} onClick={handleArchiveCancel}>
-          <div
-            className={styles.modalContent}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className={styles.modalHeader}>
-              <h3>Archive Call Record</h3>
-              <button
-                className={styles.closeButton}
-                onClick={handleArchiveCancel}
-              >
-                ×
-              </button>
-            </div>
-            <div className={styles.modalBody}>
-              <p>
-                Are you sure you want to archive this call record? Archived calls will be hidden from the main view but can be restored if needed.
-              </p>
-              <div className={styles.callInfo}>
-                <strong>Call ID:</strong> {callToArchive.call_id}
-                <br />
-                <strong>Phone:</strong>{' '}
-                {(() => {
-                  // For outbound calls, show the number that was called (phone_number)
-                  // For inbound calls, show the caller's number (phone_number or from_number)
-                  const displayNumber =
-                    callToArchive.call_direction === 'outbound'
-                      ? callToArchive.phone_number // Number that was called
-                      : callToArchive.phone_number || callToArchive.from_number; // Caller's number (prefer normalized)
-                  return formatPhoneNumber(displayNumber || 'N/A');
-                })()}
-                <br />
-                <strong>Date:</strong>{' '}
-                {callToArchive.start_timestamp
-                  ? formatDate(callToArchive.start_timestamp)
-                  : 'N/A'}
-                <br />
-                <strong>Customer:</strong> {(() => {
-                  const customer = callToArchive.leads?.customers || callToArchive.customers;
-                  return customer
-                    ? `${customer.first_name} ${customer.last_name}`
-                    : 'Unknown';
-                })()}
-              </div>
-            </div>
-            <div className={styles.modalActions}>
-              <button
-                onClick={handleArchiveCancel}
-                className={styles.cancelButton}
-                disabled={isArchiving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleArchiveConfirm}
-                className={styles.confirmArchiveButton}
-                disabled={isArchiving}
-              >
-                {isArchiving ? 'Archiving...' : 'Archive Call Record'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -2,11 +2,12 @@ export interface Notification {
   id: string;
   user_id: string;
   company_id: string;
-  type: 'assignment' | 'department_lead' | 'department_ticket' | 'department_project';
+  type: 'assignment' | 'department_lead' | 'department_ticket' | 'department_project' | 'new_ticket' | 'new_lead_unassigned' | 'new_lead_assigned' | 'new_support_case_unassigned' | 'new_support_case_assigned';
   title: string;
   message: string;
   reference_id?: string;
-  reference_type?: 'ticket' | 'lead' | 'project' | 'customer';
+  reference_type?: 'ticket' | 'lead' | 'project' | 'customer' | 'support_case';
+  assigned_to?: string;
   read: boolean;
   created_at: string;
   updated_at: string;

@@ -2,34 +2,49 @@
 
 import { useState, useEffect } from 'react';
 import { X, Trash2, CheckCheck, Eye } from 'lucide-react';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useUser } from '@/hooks/useUser';
 import { Notification } from '@/types/notification';
 import styles from './NotificationModal.module.scss';
 
 interface NotificationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  notifications: Notification[];
+  unreadCount: number;
+  loading: boolean;
+  error: string | null;
+  markAsRead: (notificationId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  deleteNotification: (notificationId: string) => Promise<void>;
+  refreshNotifications: () => Promise<void>;
+  navigateToReference: (notification: Notification) => void;
 }
 
-export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const {
-    notifications,
-    unreadCount,
-    loading,
-    error,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-    navigateToReference,
-    refreshNotifications,
-  } = useNotifications();
+export function NotificationModal({
+  isOpen,
+  onClose,
+  notifications,
+  unreadCount,
+  loading,
+  error,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  refreshNotifications,
+  navigateToReference
+}: NotificationModalProps) {
+  const [filter, setFilter] = useState<'all' | 'unread' | 'assigned'>('all');
+  const { user } = useUser();
 
   // Filter notifications based on current filter
   const filteredNotifications = notifications.filter(notification => {
     if (filter === 'unread') return !notification.read;
-    return true;
+    if (filter === 'assigned') return notification.assigned_to === user?.id;
+    return true; // 'all' filter shows everything
   });
+
+  // Get count for assigned notifications
+  const assignedCount = notifications.filter(notification => notification.assigned_to === user?.id).length;
 
   // Format time ago helper
   const formatTimeAgo = (dateString: string) => {
@@ -127,6 +142,12 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
             >
               Unread ({unreadCount})
             </button>
+            <button
+              className={`${styles.filterTab} ${filter === 'assigned' ? styles.active : ''}`}
+              onClick={() => setFilter('assigned')}
+            >
+              Assigned To Me ({assignedCount})
+            </button>
           </div>
 
           {unreadCount > 0 && (
@@ -157,6 +178,8 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
               <p>
                 {filter === 'unread'
                   ? 'No unread notifications'
+                  : filter === 'assigned'
+                  ? 'No notifications assigned to you'
                   : 'No notifications yet'}
               </p>
             </div>
@@ -190,7 +213,9 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
                         </button>
                       </div>
                     </div>
-                    <p className={styles.notificationMessage}>{notification.message}</p>
+                    {notification.message && (
+                      <p className={styles.notificationMessage}>{notification.message}</p>
+                    )}
                     <div className={styles.notificationMeta}>
                       <span className={styles.notificationTime}>
                         {formatTimeAgo(notification.created_at)}

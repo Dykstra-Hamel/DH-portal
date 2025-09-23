@@ -4,10 +4,10 @@ import React from 'react';
 import { DefaultItemRowProps } from './DataTable.types';
 import styles from './DataTable.module.scss';
 
-export default function DefaultItemRow<T>({ 
-  item, 
-  columns, 
-  onAction 
+export default function DefaultItemRow<T>({
+  item,
+  columns,
+  onAction
 }: DefaultItemRowProps<T>) {
   
   // Helper function to get nested property value
@@ -30,7 +30,7 @@ export default function DefaultItemRow<T>({
         const cellContent = column.render ? column.render(item, onAction) : formatCellValue(value);
         
         return (
-          <div 
+          <div
             key={`${column.key}-${index}`}
             className={styles.defaultCell}
           >

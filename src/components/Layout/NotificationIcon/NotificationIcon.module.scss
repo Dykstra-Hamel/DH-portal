@@ -129,10 +129,10 @@
   }
 
   &.unread {
-    background-color: #fef9c3;
+    background-color: var(--primary-50);
 
     &:hover {
-      background-color: #fef3c7;
+      background-color: var(--primary-100);
     }
   }
 }

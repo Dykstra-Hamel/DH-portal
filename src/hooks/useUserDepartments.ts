@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useCompany } from '@/contexts/CompanyContext';
 import { Department, UserDepartment, DepartmentStats } from '@/types/user';
 
 interface UseUserDepartmentsReturn {
@@ -384,6 +385,9 @@ export function useCurrentUserPageAccess(pageType: PageType): UsePageAccessRetur
   const [error, setError] = useState<string | null>(null);
   const [accessReason, setAccessReason] = useState<'admin' | 'owner' | 'department' | 'denied'>('denied');
 
+  // Use CompanyContext to avoid race conditions with localStorage
+  const { selectedCompany, isLoading: companyLoading } = useCompany();
+
   // Map page types to required departments
   const departmentMap: Record<PageType, Department> = {
     sales: 'sales',
@@ -398,6 +402,11 @@ export function useCurrentUserPageAccess(pageType: PageType): UsePageAccessRetur
       try {
         setIsLoading(true);
         setError(null);
+
+        // Wait for CompanyContext to finish loading
+        if (companyLoading) {
+          return; // Keep loading state, don't make access decision yet
+        }
 
         const supabase = createClient();
 
@@ -425,37 +434,26 @@ export function useCurrentUserPageAccess(pageType: PageType): UsePageAccessRetur
           return;
         }
 
-        // Get selected company from localStorage or get the user's primary company
-        const selectedCompanyId = localStorage.getItem('selectedCompanyId');
-        let companyId = selectedCompanyId;
-
-        if (!companyId) {
-          // Get user's primary company
-          const { data: primaryCompany } = await supabase
-            .from('user_companies')
-            .select('company_id')
-            .eq('user_id', userId)
-            .eq('is_primary', true)
-            .single();
-
-          companyId = primaryCompany?.company_id;
-        }
-
-        if (!companyId) {
+        // Use selectedCompany from context instead of localStorage
+        if (!selectedCompany?.id) {
           setHasAccess(false);
           setAccessReason('denied');
           return;
         }
 
-        // Get user's company role
-        const { data: userCompany } = await supabase
-          .from('user_companies')
-          .select('role')
-          .eq('user_id', userId)
-          .eq('company_id', companyId)
-          .single();
+        const companyId = selectedCompany.id;
 
-        const companyRole = userCompany?.role;
+        // Use API endpoint to check user's role in the company
+        const companyRoleResponse = await fetch(`/api/users/${userId}/company-role?companyId=${companyId}`);
+
+        if (!companyRoleResponse.ok) {
+          setHasAccess(false);
+          setAccessReason('denied');
+          return;
+        }
+
+        const roleData = await companyRoleResponse.json();
+        const companyRole = roleData.role;
 
         // Check if user is company owner/admin
         if (companyRole && ['owner', 'admin'].includes(companyRole)) {
@@ -496,7 +494,7 @@ export function useCurrentUserPageAccess(pageType: PageType): UsePageAccessRetur
     };
 
     checkPageAccess();
-  }, [pageType, requiredDepartment]);
+  }, [pageType, requiredDepartment, selectedCompany, companyLoading]);
 
   return {
     hasAccess,

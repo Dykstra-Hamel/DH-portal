@@ -30,33 +30,40 @@ export interface DataTableProps<T> {
   // Data
   data: T[];
   loading?: boolean;
-  
+
   // Configuration
   title: string;
   columns: ColumnDefinition<T>[];
   tabs: TabDefinition<T>[];
-  
+
   // Behavior
   onItemAction?: (action: string, item: T) => void;
   onDataUpdated?: () => void;
-  
+
+  // Infinite scroll
+  infiniteScrollEnabled?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  loadingMore?: boolean;
+
+
   // Custom components
   customComponents?: {
     itemRow?: ComponentType<{ item: T; onAction?: (action: string, item: T) => void }>;
     liveBar?: ComponentType<{ data: T[] }>;
-    actionModal?: ComponentType<{ 
-      item: T | null; 
-      isOpen: boolean; 
-      onClose: () => void; 
+    actionModal?: ComponentType<{
+      item: T | null;
+      isOpen: boolean;
+      onClose: () => void;
       onAction: (action: string, item: T) => void;
     }>;
   };
-  
+
   // Styling
   className?: string;
   emptyStateMessage?: string;
-  tableType?: 'tickets' | 'supportCases'; // Determines column layout
-  
+  tableType?: 'tickets' | 'supportCases' | 'leads' | 'calls' | 'customers' | 'customersWithCompany'; // Determines column layout
+
   // Toast integration
   onShowToast?: (message: string) => void;
 }

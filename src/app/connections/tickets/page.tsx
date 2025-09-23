@@ -66,7 +66,7 @@ function TicketsPageContent() {
   }, []);
 
 
-  // Granular update handlers for real-time changes
+  // Granular update handlers for real-time changes (no full page refreshes)
   const handleCallRecordChange = useCallback(async (payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
@@ -94,36 +94,58 @@ function TicketsPageContent() {
       }
     }
 
+    // Update specific ticket's call records instead of full refresh
+    const updateTicketCallRecords = async (ticketId: string) => {
+      if (!ticketId) return;
+
+      try {
+        const supabase = createClient();
+        const { data: updatedCallRecords, error } = await supabase
+          .from('call_records')
+          .select('id, call_id, call_status, start_timestamp, end_timestamp, duration_seconds')
+          .eq('ticket_id', ticketId);
+
+        if (error) {
+          console.error('Error fetching updated call records:', error);
+          return;
+        }
+
+        // Update the specific ticket's call records in state
+        setTickets(prev =>
+          prev.map(ticket =>
+            ticket.id === ticketId
+              ? { ...ticket, call_records: updatedCallRecords || [] }
+              : ticket
+          )
+        );
+      } catch (error) {
+        console.error('Error updating ticket call records:', error);
+      }
+    };
+
     switch (eventType) {
       case 'INSERT':
         console.log('Processing INSERT for call record:', newRecord.id);
-
-        // Refresh tickets to get updated call_records relationship
-        if (selectedCompany?.id) {
-          console.log('Refreshing tickets due to new call record');
-          fetchTickets(selectedCompany.id);
+        if (newRecord?.ticket_id) {
+          await updateTicketCallRecords(newRecord.ticket_id);
         }
         break;
 
       case 'UPDATE':
         console.log('Processing UPDATE for call record:', newRecord.id);
-
-        // Always refresh tickets when call record status changes
-        if (selectedCompany?.id) {
-          console.log('Refreshing tickets due to call record status change');
-          fetchTickets(selectedCompany.id);
+        if (newRecord?.ticket_id) {
+          await updateTicketCallRecords(newRecord.ticket_id);
         }
         break;
 
       case 'DELETE':
         console.log('Processing DELETE for call record:', oldRecord?.id);
-        // Refresh tickets when call records are deleted
-        if (selectedCompany?.id) {
-          fetchTickets(selectedCompany.id);
+        if (oldRecord?.ticket_id) {
+          await updateTicketCallRecords(oldRecord.ticket_id);
         }
         break;
     }
-  }, [selectedCompany?.id, fetchTickets]);
+  }, [selectedCompany?.id]);
 
   const handleTicketChange = useCallback((payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
@@ -244,7 +266,7 @@ function TicketsPageContent() {
         }
         break;
     }
-  }, [selectedCompany?.id, tickets]);
+  }, [selectedCompany?.id]);
 
   const fetchMetrics = useCallback(async (companyId: string) => {
     if (!companyId) return;

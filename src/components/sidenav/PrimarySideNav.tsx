@@ -89,6 +89,17 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       text: 'Connections',
     },
     {
+      id: 'customers' as PrimaryNavItem,
+      href: '/customers',
+      disabled: false,
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="21" viewBox="0 0 24 21" fill="none">
+          <path d="M18.6 20C18.6 17.7604 17.6729 15.6125 16.0225 14.0289C14.3722 12.4452 12.1339 11.5556 9.8 11.5556M9.8 11.5556C7.46609 11.5556 5.22778 12.4452 3.57746 14.0289C1.92714 15.6125 1 17.7604 1 20M9.8 11.5556C12.8376 11.5556 15.3 9.19261 15.3 6.27778C15.3 3.36294 12.8376 1 9.8 1C6.76243 1 4.3 3.36294 4.3 6.27778C4.3 9.19261 6.76243 11.5556 9.8 11.5556ZM23 18.9444C23 15.3872 20.8 12.0833 18.6 10.5C19.3232 9.97937 19.9014 9.2957 20.2836 8.50951C20.6658 7.72331 20.8402 6.85883 20.7912 5.99257C20.7423 5.12631 20.4716 4.28498 20.003 3.54304C19.5345 2.80111 18.8826 2.18144 18.105 1.73889" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      ),
+      text: 'Customers',
+    },
+    {
       id: 'tasks' as PrimaryNavItem,
       href: '/tickets',
       disabled: true,
@@ -137,7 +148,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
           />
         </svg>
       ),
-      text: 'Customers',
+      text: 'Tracker',
     },
     {
       id: 'brand' as PrimaryNavItem,

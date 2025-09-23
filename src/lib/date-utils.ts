@@ -85,3 +85,32 @@ export function isLiveCallRecord(record: any): boolean {
 
   return hasLiveStatus || (hasStartNoEnd && isRecent);
 }
+
+/**
+ * Format date with ordinal suffix (e.g., "19th Sept 9:40PM")
+ */
+export function formatDateWithOrdinal(date: Date | string): string {
+  const dateObj = new Date(date);
+  if (isNaN(dateObj.getTime())) return 'Invalid Date';
+
+  const day = dateObj.getDate();
+  const month = dateObj.toLocaleDateString('en-US', { month: 'short' });
+  const time = dateObj.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  // Get ordinal suffix
+  const getOrdinalSuffix = (day: number): string => {
+    if (day >= 11 && day <= 13) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+
+  return `${day}${getOrdinalSuffix(day)} ${month} ${time}`;
+}

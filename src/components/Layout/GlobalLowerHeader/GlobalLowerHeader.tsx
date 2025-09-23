@@ -5,7 +5,8 @@ import styles from './GlobalLowerHeader.module.scss';
 interface GlobalLowerHeaderProps {
   title: string;
   description: string;
-  showAddLead?: boolean;
+  showAddButton?: boolean;
+  addButtonText?: string;
 }
 
 const PlusIcon = () => (
@@ -17,7 +18,8 @@ const PlusIcon = () => (
 export function GlobalLowerHeader({
   title,
   description,
-  showAddLead = false,
+  showAddButton = false,
+  addButtonText = 'Add Lead',
 }: GlobalLowerHeaderProps) {
   return (
     <div className={styles.globalLowerHeader}>
@@ -28,14 +30,14 @@ export function GlobalLowerHeader({
         </div>
 
         <div className={styles.rightSection}>
-          {showAddLead && (
+          {showAddButton && (
             <button
               className={styles.addLeadButton}
               disabled={true}
               type="button"
             >
               <PlusIcon />
-              <span>Add Lead</span>
+              <span>{addButtonText}</span>
             </button>
           )}
         </div>

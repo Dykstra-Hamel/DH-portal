@@ -130,15 +130,15 @@ const ExpandCollapseIcon = ({ isExpanded }: { isExpanded: boolean }) => (
 );
 
 // Helper functions
-const formatDuration = (startTime: string): string => {
+const formatDuration = (startTime: string, currentTime: Date = new Date()): string => {
   const start = new Date(startTime).getTime();
-  const now = new Date().getTime();
+  const now = currentTime.getTime();
   const diffSeconds = Math.floor((now - start) / 1000);
-  
+
   const hours = Math.floor(diffSeconds / 3600);
   const minutes = Math.floor((diffSeconds % 3600) / 60);
   const seconds = diffSeconds % 60;
-  
+
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
@@ -165,6 +165,7 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
   const [realTimeTickets, setRealTimeTickets] = useState<Ticket[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
   const [useMock, setUseMock] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Use global company context for real-time filtering
   const { selectedCompany } = useCompany();
@@ -338,7 +339,8 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                     from_number,
                     start_timestamp,
                     end_timestamp,
-                    duration_seconds
+                    duration_seconds,
+                    disconnect_reason
                   )
                 `)
                 .eq('id', newRecord.ticket_id)
@@ -470,6 +472,17 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
   const hasLiveCalls = validLiveCalls.length > 0;
   const liveCallCount = validLiveCalls.length;
 
+  // Update current time every second when there are live calls
+  useEffect(() => {
+    if (!hasLiveCalls) return;
+
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [hasLiveCalls]);
+
 
   const handleSort = () => {
     setSortConfig(prev => ({
@@ -566,29 +579,38 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                 {call.start_timestamp ? formatCallStarted(call.start_timestamp) : 'N/A'}
               </div>
               <div className={styles.gridCell}>
-                {call.call_status === 'transferring' ? (
-                  <div className={styles.statusWithIcon}>
-                    <TransferIcon />
-                    <span>Call Transferring</span>
-                  </div>
-                ) : call.call_status === 'processing' ? (
-                  <div className={styles.statusWithSpinner}>
-                    <LoadingSpinner size={14} />
-                    <span>Processing Call</span>
-                  </div>
-                ) : call.call_status === 'ongoing' ? (
-                  <div className={styles.statusWithIcon}>
-                    <AnimatedSoundWaveIcon />
-                    <span>Caller with AI Agent</span>
-                  </div>
-                ) : (
-                  <span>
-                    {call.call_status === 'in-progress' ? 'In Progress' :
-                     call.call_status === 'active' ? 'Active' :
-                     call.call_status === 'connecting' ? 'Connecting' :
-                     call.call_status || 'In Progress'}
-                  </span>
-                )}
+                {(() => {
+                  // Simple status logic based on webhook events
+                  const enhancedCall = call as CallRecord & { disconnect_reason?: string };
+
+                  // Processing call (after call_ended webhook)
+                  if (call.call_status === 'processing') {
+                    return (
+                      <div className={styles.statusWithSpinner}>
+                        <LoadingSpinner size={14} />
+                        <span>Processing Call</span>
+                      </div>
+                    );
+                  }
+
+                  // Call transfer (based on disconnect_reason from webhook)
+                  if (enhancedCall.disconnect_reason === 'call_transfer') {
+                    return (
+                      <div className={styles.statusWithIcon}>
+                        <TransferIcon />
+                        <span>Call Transferring</span>
+                      </div>
+                    );
+                  }
+
+                  // Default for all other cases: active calls with AI agent
+                  return (
+                    <div className={styles.statusWithIcon}>
+                      <AnimatedSoundWaveIcon />
+                      <span>Caller with AI Agent</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className={styles.gridCell}>
                 {(() => {
@@ -609,7 +631,7 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                 {call.from_number ? formatPhoneNumber(call.from_number) : 'N/A'}
               </div>
               <div className={styles.gridCell}>
-                {call.start_timestamp ? formatDuration(call.start_timestamp) : '00:00:00'}
+                {call.start_timestamp ? formatDuration(call.start_timestamp, currentTime) : '00:00:00'}
               </div>
               <div className={styles.gridCell}>
                 {/* Empty for active calls */}

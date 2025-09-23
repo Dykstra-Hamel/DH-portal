@@ -9,12 +9,16 @@ import styles from './NotificationIcon.module.scss';
 export function NotificationIcon() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
   const {
     notifications,
     unreadCount,
     loading,
     error,
+    markAsRead,
     markAllAsRead,
+    deleteNotification,
+    refreshNotifications,
     navigateToReference,
   } = useNotifications();
 
@@ -125,7 +129,9 @@ export function NotificationIcon() {
                     >
                       <div className={styles.notificationContent}>
                         <p className={styles.notificationTitle}>{notification.title}</p>
-                        <p className={styles.notificationText}>{notification.message}</p>
+                        {notification.message && (
+                          <p className={styles.notificationText}>{notification.message}</p>
+                        )}
                         <span className={styles.notificationTime}>
                           {formatTimeAgo(notification.created_at)}
                         </span>
@@ -164,6 +170,15 @@ export function NotificationIcon() {
       <NotificationModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        loading={loading}
+        error={error}
+        markAsRead={markAsRead}
+        markAllAsRead={markAllAsRead}
+        deleteNotification={deleteNotification}
+        refreshNotifications={refreshNotifications}
+        navigateToReference={navigateToReference}
       />
     </div>
   );

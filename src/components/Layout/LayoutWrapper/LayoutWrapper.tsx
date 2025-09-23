@@ -43,7 +43,8 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         return {
           title: 'Dashboard',
           description: 'View your business analytics and metrics here.',
-          showAddLead: true,
+          showAddButton: true,
+          addButtonText: 'Add Lead',
         };
       case '/tickets':
       case '/connections/tickets':
@@ -52,75 +53,92 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
           title: 'Tickets',
           description:
             'Review, qualify, and assign all your incoming leads here.',
-          showAddLead: true,
+          showAddButton: true,
+          addButtonText: 'Add Ticket',
         };
       case '/customers':
-      case '/dashboard/customers':
         return {
           title: 'All Customers',
           description: 'Manage and view all your customer information here.',
-          showAddLead: true,
-        };
-      case '/tickets':
-        return {
-          title: 'Tickets',
-          description: 'Track and manage all support tickets here.',
-          showAddLead: false,
+          showAddButton: true,
+          addButtonText: 'Add Customer',
         };
       case '/call-records':
         return {
           title: 'Call Records',
           description: 'Review detailed call logs and recordings here.',
-          showAddLead: false,
+          showAddButton: false,
         };
       case '/settings':
         return {
           title: 'Settings',
           description:
             'Configure your account and application preferences here.',
-          showAddLead: false,
+          showAddButton: false,
         };
       case '/projects':
         return {
           title: 'Projects',
           description: 'Manage your ongoing projects and tasks here.',
-          showAddLead: false,
+          showAddButton: false,
         };
       case '/brand':
         return {
           title: 'Brand',
           description: 'Customize your brand settings and appearance here.',
-          showAddLead: false,
+          showAddButton: false,
         };
       case '/admin':
         return {
           title: 'Admin Dashboard',
           description: 'Manage system settings and user administration here.',
-          showAddLead: false,
+          showAddButton: false,
         };
       case '/connections/leads':
         return {
           title: 'Leads',
           description: 'View and manage all your sales leads here.',
-          showAddLead: true,
+          showAddButton: true,
+          addButtonText: 'Add Lead',
+        };
+      case '/connections/scheduling':
+        return {
+          title: 'Scheduling',
+          description: 'Manage all your incoming calls and forms and assign them there.',
+          showAddButton: false,
+        };
+      case '/connections/my-sales-leads':
+        return {
+          title: 'Leads',
+          description: 'View and manage all your sales leads here.',
+          showAddButton: true,
+          addButtonText: 'Add Lead',
         };
       case '/connections/customer-service':
         return {
           title: 'Customer Service',
           description: 'View and manage all your support cases here.',
-          showAddLead: false,
+          showAddButton: true,
+          addButtonText: 'Add Case',
+        };
+      case '/connections/my-support-cases':
+        return {
+          title: 'Customer Service',
+          description: 'View and manage all your support cases here.',
+          showAddButton: true,
+          addButtonText: 'Add Case',
         };
       case '/test-automation':
         return {
           title: 'Test Automation',
           description: 'Configure and test automated workflows here.',
-          showAddLead: false,
+          showAddButton: false,
         };
       case '/automation-status':
         return {
           title: 'Automation Status',
           description: 'Monitor the status of your automated processes here.',
-          showAddLead: false,
+          showAddButton: false,
         };
       // Handle individual record pages (hide lower header)
       default:
@@ -131,10 +149,21 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         ) {
           return null; // Don't show lower header on individual record pages
         }
+
+        // Handle other customer sub-paths
+        if (pathname.startsWith('/customers/') && !pathname.match(/\/customers\/[^\/]+$/)) {
+          return {
+            title: 'Customers',
+            description: 'Manage and view all your customer information here.',
+            showAddButton: true,
+            addButtonText: 'Add Customer',
+          };
+        }
+
         return {
           title: 'Page',
           description: 'Welcome to this section of the application.',
-          showAddLead: false,
+          showAddButton: false,
         };
     }
   };
@@ -162,7 +191,8 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
                 <GlobalLowerHeader
                   title={pageConfig.title}
                   description={pageConfig.description}
-                  showAddLead={pageConfig.showAddLead}
+                  showAddButton={pageConfig.showAddButton}
+                  addButtonText={pageConfig.addButtonText}
                 />
               )}
               <main className={styles.mainContent}>

@@ -6,8 +6,32 @@ import { usePathname } from 'next/navigation';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserPageAccess } from '@/hooks/useUserDepartments';
-import { adminAPI } from '@/lib/api-client';
+import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
 import styles from './secondarySidenav.module.scss';
+
+// Simple RedDot component for new item indicators
+const RedDot = () => (
+  <div className={styles.redDot} />
+);
+
+// Icon components for Records & Reports section
+const ReportsIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 19" fill="none">
+    <path d="M9 12.25V16M12 10.75V16M15 7.75V16M16.5 2.5L10.0155 8.9845C9.98067 9.01942 9.93928 9.04713 9.89372 9.06603C9.84817 9.08494 9.79933 9.09467 9.75 9.09467C9.70067 9.09467 9.65183 9.08494 9.60628 9.06603C9.56072 9.04713 9.51933 9.01942 9.4845 8.9845L7.0155 6.5155C6.94518 6.4452 6.84981 6.4057 6.75037 6.4057C6.65094 6.4057 6.55557 6.4452 6.48525 6.5155L1.5 11.5M3 13.75V16M6 10.75V16" stroke="#6A7282" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const CallsIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 19" fill="none">
+    <path d="M3 6.75V15C3 15.3978 3.15804 15.7794 3.43934 16.0607C3.72064 16.342 4.10218 16.5 4.5 16.5H13.5C13.8978 16.5 14.2794 16.342 14.5607 16.0607C14.842 15.7794 15 15.3978 15 15V6.75M7.5 9.75H10.5M2.25 3H15.75C16.1642 3 16.5 3.33579 16.5 3.75V6C16.5 6.41421 16.1642 6.75 15.75 6.75H2.25C1.83579 6.75 1.5 6.41421 1.5 6V3.75C1.5 3.33579 1.83579 3 2.25 3Z" stroke="#6A7282" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const CustomerLibraryIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 19" fill="none">
+    <path d="M12 1.75V3.25M13.4363 16.75C13.4363 15.5565 12.9621 14.4119 12.1182 13.568C11.2743 12.7241 10.1297 12.25 8.93625 12.25C7.74278 12.25 6.59818 12.7241 5.75427 13.568C4.91036 14.4119 4.43625 15.5565 4.43625 16.75M6 1.75V3.25M12 9.25C12 10.9069 10.6569 12.25 9 12.25C7.34315 12.25 6 10.9069 6 9.25C6 7.59315 7.34315 6.25 9 6.25C10.6569 6.25 12 7.59315 12 9.25ZM3.75 3.25H14.25C15.0784 3.25 15.75 3.92157 15.75 4.75V15.25C15.75 16.0784 15.0784 16.75 14.25 16.75H3.75C2.92157 16.75 2.25 16.0784 2.25 15.25V4.75C2.25 3.92157 2.92157 3.25 3.75 3.25Z" stroke="#6A7282" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 
 interface SidebarProps {
   collapsed?: boolean;
@@ -21,20 +45,15 @@ interface NavItem {
   count?: number;
   disabled?: boolean;
   countColor?: 'default' | 'error';
+  countType?: string; // For animation tracking
+  hasNewItems?: boolean; // For red count badge (My sections)
+  showRedDot?: boolean; // For red dot indicator (main sections)
+  icon?: React.ReactNode; // Optional icon for navigation items
 }
 
 interface NavGroup {
   title?: string;
   items: NavItem[];
-}
-
-interface Counts {
-  tickets: number;
-  leads: number;
-  cases: number;
-  customers: number;
-  projects: number;
-  calls: number;
 }
 
 export function SecondarySideNav({
@@ -43,19 +62,11 @@ export function SecondarySideNav({
   onLinkClick,
 }: SidebarProps) {
   const [isHydrated, setIsHydrated] = useState(false);
-  const [counts, setCounts] = useState<Counts>({
-    tickets: 0,
-    leads: 0,
-    cases: 0,
-    customers: 0,
-    projects: 0,
-    calls: 0,
-  });
-  const [loadingCounts, setLoadingCounts] = useState(false);
 
   const pathname = usePathname();
   const { activePrimaryNav } = useNavigation();
   const { selectedCompany, isAdmin } = useCompany();
+  const { counts, animations, newItemIndicators, loading: loadingCounts, clearNewItemIndicator } = useRealtimeCounts();
   const isPublicPage = pathname === '/login' || pathname === '/sign-up';
 
   // Always call hooks (React requirement), but prioritize admin status
@@ -69,125 +80,19 @@ export function SecondarySideNav({
   const shouldShowScheduling = isAdmin || hasSchedulingAccess;
   const shouldShowSupport = isAdmin || hasSupportAccess;
 
+
   // Handle client-side hydration
   useEffect(() => {
     setIsHydrated(true);
   }, []);
 
-  // Fetch counts for navigation items
-  const fetchCounts = useCallback(
-    async (companyId: string) => {
-      setLoadingCounts(true);
-      try {
-        const [
-          ticketsData,
-          leadsData,
-          casesData,
-          customersData,
-          projectsData,
-          callsData,
-        ] = await Promise.allSettled([
-          // Fetch tickets (active/non-archived tickets only)
-          isAdmin
-            ? adminAPI.tickets.list({ companyId, includeArchived: false })
-            : (() => {
-                const queryParams = new URLSearchParams({
-                  companyId,
-                  includeArchived: 'false',
-                });
-                return fetch(`/api/tickets?${queryParams}`).then(res =>
-                  res.ok ? res.json() : []
-                );
-              })(),
-
-          // Fetch leads (NEW leads only)
-          isAdmin
-            ? adminAPI.getLeads({ companyId, status: 'new' })
-            : adminAPI.getUserLeads(companyId),
-
-          // Fetch support cases (NEW leads only)
-          isAdmin
-            ? adminAPI.supportCases.list({ companyId, includeArchived: false })
-            : (() => {
-                const queryParams = new URLSearchParams({
-                  companyId,
-                  includeArchived: 'false',
-                });
-                return fetch(`/api/support-cases?${queryParams}`).then(res =>
-                  res.ok ? res.json() : []
-                );
-              })(),
-
-          // Fetch customers (NO date filter - always show total count)
-          isAdmin
-            ? adminAPI.getCustomers({ companyId })
-            : adminAPI.getUserCustomers({ companyId }),
-
-          // Fetch projects (NO date filter - show total counts)
-          isAdmin
-            ? adminAPI.getProjects({ companyId })
-            : adminAPI.getUserProjects(companyId),
-
-          // Fetch calls (NO date filter - always show total count)
-          isAdmin
-            ? adminAPI.getAllCalls({ companyId })
-            : adminAPI.getUserCalls({ companyId }),
-        ]);
-
-        setCounts({
-          tickets:
-            ticketsData.status === 'fulfilled'
-              ? Array.isArray(ticketsData.value)
-                ? ticketsData.value.length
-                : 0
-              : 0,
-          leads:
-            leadsData.status === 'fulfilled'
-              ? Array.isArray(leadsData.value)
-                ? leadsData.value.length
-                : 0
-              : 0,
-          cases:
-            casesData.status === 'fulfilled'
-              ? Array.isArray(casesData.value)
-                ? casesData.value.length
-                : 0
-              : 0,
-          customers:
-            customersData.status === 'fulfilled'
-              ? Array.isArray(customersData.value)
-                ? customersData.value.length
-                : 0
-              : 0,
-          projects:
-            projectsData.status === 'fulfilled'
-              ? Array.isArray(projectsData.value)
-                ? projectsData.value.length
-                : 0
-              : 0,
-          calls:
-            callsData.status === 'fulfilled'
-              ? Array.isArray(callsData.value)
-                ? callsData.value.length
-                : 0
-              : 0,
-        });
-      } catch (error) {
-        console.error('Error fetching counts:', error);
-        // Keep counts at 0 on error
-      } finally {
-        setLoadingCounts(false);
-      }
-    },
-    [isAdmin]
-  );
-
-  // Fetch counts when company changes
-  useEffect(() => {
-    if (selectedCompany?.id && isHydrated) {
-      fetchCounts(selectedCompany.id);
+  // Handle navigation click to clear new item indicators
+  const handleNavClick = useCallback((countType?: string) => {
+    if (countType) {
+      clearNewItemIndicator(countType);
     }
-  }, [selectedCompany?.id, isHydrated, fetchCounts]);
+    onLinkClick?.();
+  }, [clearNewItemIndicator, onLinkClick]);
 
   // Get the icon for the current primary nav
   const getPrimaryNavIcon = () => {
@@ -334,6 +239,12 @@ export function SecondarySideNav({
             />
           </svg>
         );
+      case 'customers':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="21" viewBox="0 0 24 21" fill="none">
+            <path d="M18.6 20C18.6 17.7604 17.6729 15.6125 16.0225 14.0289C14.3722 12.4452 12.1339 11.5556 9.8 11.5556M9.8 11.5556C7.46609 11.5556 5.22778 12.4452 3.57746 14.0289C1.92714 15.6125 1 17.7604 1 20M9.8 11.5556C12.8376 11.5556 15.3 9.19261 15.3 6.27778C15.3 3.36294 12.8376 1 9.8 1C6.76243 1 4.3 3.36294 4.3 6.27778C4.3 9.19261 6.76243 11.5556 9.8 11.5556ZM23 18.9444C23 15.3872 20.8 12.0833 18.6 10.5C19.3232 9.97937 19.9014 9.2957 20.2836 8.50951C20.6658 7.72331 20.8402 6.85883 20.7912 5.99257C20.7423 5.12631 20.4716 4.28498 20.003 3.54304C19.5345 2.80111 18.8826 2.18144 18.105 1.73889" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        );
       default:
         return null;
     }
@@ -347,10 +258,16 @@ export function SecondarySideNav({
           {
             items: [
               { text: 'Dashboard', href: '/dashboard' },
+            ],
+          },
+        ];
+      case 'customers':
+        return [
+          {
+            items: [
               {
                 text: 'All Customers',
-                href: '/dashboard/customers',
-                count: counts.customers,
+                href: '/customers',
               },
             ],
           },
@@ -363,43 +280,6 @@ export function SecondarySideNav({
         ];
       case 'connections':
       default:
-        const connectionItems: NavItem[] = [
-          {
-            text: 'Tickets',
-            href: '/connections/tickets',
-            count: counts.tickets,
-          },
-        ];
-
-        // Add Sales Leads if user has access (admin or sales department)
-        if (shouldShowSales) {
-          connectionItems.push({
-            text: 'Sales Leads',
-            href: '/connections/leads',
-            count: counts.leads,
-          });
-        }
-
-        // Add Scheduling if user has access (admin or scheduling department)
-        if (shouldShowScheduling) {
-          connectionItems.push({
-            text: 'Scheduling',
-            href: '/connections/scheduling',
-            count: 0, // No data source yet
-            disabled: true,
-          });
-        }
-
-        // Add Customer Service if user has access (admin or support department)
-        if (shouldShowSupport) {
-          connectionItems.push({
-            text: 'Customer Service',
-            href: '/connections/customer-service',
-            count: 0, // No data source yet
-            disabled: true,
-          });
-        }
-
         return [
           {
             items: [
@@ -407,38 +287,53 @@ export function SecondarySideNav({
                 text: 'Tickets',
                 href: '/connections/tickets',
                 count: counts.tickets,
+                countType: 'tickets',
+                showRedDot: newItemIndicators.tickets && pathname !== '/connections/tickets' && !pathname.startsWith('/connections/tickets/') && !pathname.startsWith('/tickets/') && !pathname.startsWith('/connections/calls-and-forms'),
               },
               {
                 text: 'Sales Leads',
                 href: '/connections/leads',
                 count: counts.leads,
+                countType: 'leads',
+                showRedDot: newItemIndicators.leads && pathname !== '/connections/leads' && !pathname.startsWith('/connections/leads/'),
               },
               {
                 text: 'Scheduling',
                 href: '/connections/scheduling',
-                count: 0, // No data source yet
-                disabled: true,
+                count: counts.scheduling,
+                countType: 'scheduling',
+                showRedDot: newItemIndicators.scheduling && pathname !== '/connections/scheduling' && !pathname.startsWith('/connections/scheduling/'),
               },
               {
                 text: 'Customer Service',
                 href: '/connections/customer-service',
                 count: counts.cases,
+                countType: 'cases',
+                showRedDot: newItemIndicators.cases && pathname !== '/connections/customer-service' && !pathname.startsWith('/connections/customer-service/'),
               },
             ],
           },
           {
             title: 'My Assignments',
             items: [
+              ...(shouldShowSales ? [{
+                text: 'My Sales Leads',
+                href: '/connections/my-sales-leads',
+                count: counts.my_leads,
+                countType: 'my_leads',
+                hasNewItems: newItemIndicators.my_leads && pathname !== '/connections/my-sales-leads' && !pathname.startsWith('/connections/my-sales-leads/'),
+              }] : []),
+              ...(shouldShowSupport ? [{
+                text: 'My Support Cases',
+                href: '/connections/my-support-cases',
+                count: counts.my_cases,
+                countType: 'my_cases',
+                hasNewItems: newItemIndicators.my_cases && pathname !== '/connections/my-support-cases' && !pathname.startsWith('/connections/my-support-cases/'),
+              }] : []),
               {
                 text: 'My Tasks',
                 href: '/connections/my-tasks',
-                count: 0, // No data source yet
-                disabled: true,
-              },
-              {
-                text: 'Assigned To Me',
-                href: '/connections/assigned-to-me',
-                count: 0, // No data source yet
+                count: 0,
                 disabled: true,
               },
             ],
@@ -450,16 +345,17 @@ export function SecondarySideNav({
                 text: 'Reports',
                 href: '/connections/reports',
                 disabled: true,
+                icon: <ReportsIcon />,
               },
               {
                 text: 'Calls',
                 href: '/connections/call-records',
-                count: counts.calls,
+                icon: <CallsIcon />,
               },
               {
-                text: 'All Customers',
-                href: '/dashboard/customers',
-                count: counts.customers,
+                text: 'Customer Library',
+                href: '/customers',
+                icon: <CustomerLibraryIcon />,
               },
             ],
           },
@@ -501,11 +397,16 @@ export function SecondarySideNav({
                       {item.disabled ? (
                         <div className={`${styles.navItem} ${styles.disabled}`}>
                           <span className={styles.navItemText}>
+                            {item.icon && <span className={styles.navItemIcon}>{item.icon}</span>}
                             {item.text}
                           </span>
                           {item.count !== undefined && (
                             <span
-                              className={`${styles.countBox} ${styles.neutral}`}
+                              className={`${styles.countBadge} ${
+                                item.countType && animations[item.countType] ? styles.animating : ''
+                              } ${item.countColor === 'error' ? styles.error : ''} ${styles.neutral} ${
+                                item.hasNewItems ? styles.hasNewItems : ''
+                              }`}
                             >
                               {loadingCounts ? '•' : item.count}
                             </span>
@@ -515,24 +416,28 @@ export function SecondarySideNav({
                         <Link
                           href={item.href}
                           className={`${styles.navItem} ${isActive ? styles.active : ''}`}
-                          onClick={onLinkClick}
+                          onClick={() => handleNavClick(item.countType)}
                         >
                           <span className={styles.navItemText}>
+                            {item.icon && <span className={styles.navItemIcon}>{item.icon}</span>}
                             {item.text}
                           </span>
-                          {item.count !== undefined && (
-                            <span
-                              className={`${styles.countBox} ${
-                                isActive
-                                  ? styles.activeCount
-                                  : item.countColor === 'error'
-                                    ? styles.errorCount
-                                    : styles.defaultCount
-                              }`}
-                            >
-                              {loadingCounts ? '•' : item.count}
-                            </span>
-                          )}
+                          <div className={styles.navItemRight}>
+                            {item.count !== undefined && (
+                              <span
+                                className={`${styles.countBadge} ${
+                                  isActive ? styles.active : ''
+                                } ${
+                                  item.countType && animations[item.countType] ? styles.animating : ''
+                                } ${item.countColor === 'error' ? styles.error : ''} ${
+                                  item.hasNewItems ? styles.hasNewItems : ''
+                                }`}
+                              >
+                                {loadingCounts ? '•' : item.count}
+                              </span>
+                            )}
+                            {item.showRedDot && <RedDot />}
+                          </div>
                         </Link>
                       )}
                     </div>
