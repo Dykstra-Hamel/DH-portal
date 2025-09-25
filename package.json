@@ -31,6 +31,7 @@
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.4",
     "@types/recharts": "^1.8.29",
+    "@userback/widget": "^0.3.11",
     "@vis.gl/react-google-maps": "^1.5.4",
     "dotenv": "^17.2.0",
     "googleapis": "^155.0.0",
