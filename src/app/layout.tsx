@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
 import { LayoutWrapper } from '@/components/Layout/LayoutWrapper/LayoutWrapper';
+import { UserbackProvider } from '@/components/Common/UserbackProvider';
 import '@/styles/main.scss';
 
 const outfit = Outfit({
@@ -22,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.className}`}>
       <body>
-        <LayoutWrapper>{children}</LayoutWrapper>
+        <UserbackProvider>
+          <LayoutWrapper>{children}</LayoutWrapper>
+        </UserbackProvider>
       </body>
     </html>
   );
