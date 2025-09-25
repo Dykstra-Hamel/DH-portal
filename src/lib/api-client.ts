@@ -349,7 +349,10 @@ export const adminAPI = {
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
-    return authenticatedFetch(`/api/leads?${queryParams.toString()}`);
+    const response = await authenticatedFetch(`/api/leads?${queryParams.toString()}`);
+
+
+    return response;
   },
 
   async getUserArchivedLeads(companyId: string, filters: { dateFrom?: string; dateTo?: string } = {}) {

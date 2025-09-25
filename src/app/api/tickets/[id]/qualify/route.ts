@@ -134,7 +134,7 @@ export async function POST(
       if (ticket.converted_to_lead_id) {
         // Update the existing lead instead of creating a new one
         const updateData: any = {
-          lead_status: 'new',
+          lead_status: assignedTo ? 'contacting' : 'unassigned',
           priority: ticket.priority,
           estimated_value: ticket.estimated_value || 0,
           comments: ticket.description || '',
@@ -183,13 +183,13 @@ export async function POST(
       }
 
       // Create a new lead from the ticket
-      const leadData = {
+      const leadInsertData = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
         lead_source: ticket.source,
         lead_type: ticket.type,
         service_type: ticket.service_type,
-        lead_status: 'new',
+        lead_status: (assignedTo || ticket.assigned_to) ? 'contacting' : 'unassigned',
         priority: ticket.priority,
         estimated_value: ticket.estimated_value || 0,
         comments: ticket.description || '',
@@ -205,27 +205,70 @@ export async function POST(
         converted_from_ticket_id: ticket.id  // Required for database trigger validation
       };
 
-      const { data: newLead, error: leadError } = await supabase
-        .from('leads')
-        .insert(leadData)
-        .select(`
-          *,
-          customer:customers!leads_customer_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            phone,
-            address,
-            city,
-            state,
-            zip_code
-          )
-        `)
-        .single();
+      // Start a transaction for lead creation and ticket update
+      let newLead;
+      await supabase.rpc('begin');
 
-      if (leadError) {
-        console.error('Error creating lead:', leadError);
+      try {
+        // Create the lead
+        const { data: leadData, error: leadError } = await supabase
+          .from('leads')
+          .insert(leadInsertData)
+          .select(`
+            *,
+            customer:customers!leads_customer_id_fkey(
+              id,
+              first_name,
+              last_name,
+              email,
+              phone,
+              address,
+              city,
+              state,
+              zip_code
+            )
+          `)
+          .single();
+
+        if (leadError) {
+          await supabase.rpc('rollback');
+          console.error('Error creating lead:', leadError);
+          return NextResponse.json(
+            { error: 'Failed to convert ticket to lead' },
+            { status: 500 }
+          );
+        }
+
+        newLead = leadData;
+
+        // Update the ticket to mark it as converted and archived (atomic with lead creation)
+        const { error: ticketUpdateError } = await supabase
+          .from('tickets')
+          .update({
+            converted_to_lead_id: newLead.id,
+            converted_at: new Date().toISOString(),
+            archived: true,
+            status: 'resolved',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+
+        if (ticketUpdateError) {
+          await supabase.rpc('rollback');
+          console.error('Error updating ticket conversion status:', ticketUpdateError);
+          return NextResponse.json(
+            { error: 'Failed to update ticket after lead creation' },
+            { status: 500 }
+          );
+        }
+
+        // Commit the transaction
+        await supabase.rpc('commit');
+        console.log('✅ Lead creation and ticket archival completed atomically');
+
+      } catch (error) {
+        await supabase.rpc('rollback');
+        console.error('Transaction rolled back due to error:', error);
         return NextResponse.json(
           { error: 'Failed to convert ticket to lead' },
           { status: 500 }
@@ -331,22 +374,6 @@ export async function POST(
         }
       }
 
-      // Update the ticket to mark it as converted and archived
-      const { error: ticketUpdateError } = await supabase
-        .from('tickets')
-        .update({
-          converted_to_lead_id: newLead.id,
-          converted_at: new Date().toISOString(),
-          archived: true,
-          status: 'resolved',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (ticketUpdateError) {
-        console.error('Error updating ticket conversion status:', ticketUpdateError);
-      }
-
       return NextResponse.json({
         message: 'Ticket qualified as sales and converted to lead',
         qualification: 'sales',
@@ -366,14 +393,16 @@ export async function POST(
       if (ticket.converted_to_support_case_id) {
         // Update the existing support case instead of creating a new one
         const updateData: any = {
-          status: 'new',
+          status: assignedTo ? 'in_progress' : 'unassigned',
           priority: ticket.priority || 'medium',
           updated_at: new Date().toISOString()
         };
 
-        // Add assignment if provided
+        // Add assignment if provided, otherwise ensure it's unassigned
         if (assignedTo) {
           updateData.assigned_to = assignedTo;
+        } else {
+          updateData.assigned_to = null;
         }
 
         const { data: updatedSupportCase, error: updateSupportCaseError } = await supabase
@@ -430,60 +459,87 @@ export async function POST(
                      'Support request';
 
       // Create a new support case from the ticket
-      const supportCaseData = {
+      const supportCaseInsertData = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
         ticket_id: ticket.id,
         issue_type: issueType,
         summary: summary.substring(0, 255), // Ensure it fits in summary field
         description: ticket.description,
-        status: 'new',
+        status: (assignedTo || ticket.assigned_to) ? 'in_progress' : 'unassigned',
         priority: ticket.priority || 'medium',
-        assigned_to: assignedTo || ticket.assigned_to,
+        assigned_to: assignedTo || ticket.assigned_to || null,
         archived: false
       };
 
-      const { data: newSupportCase, error: supportCaseError } = await supabase
-        .from('support_cases')
-        .insert(supportCaseData)
-        .select(`
-          *,
-          customer:customers!support_cases_customer_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            phone,
-            address,
-            city,
-            state,
-            zip_code
-          )
-        `)
-        .single();
+      // Start a transaction for support case creation and ticket update
+      let newSupportCase;
+      await supabase.rpc('begin');
 
-      if (supportCaseError) {
-        console.error('Error creating support case:', supportCaseError);
+      try {
+        // Create the support case
+        const { data: supportCaseData, error: supportCaseError } = await supabase
+          .from('support_cases')
+          .insert(supportCaseInsertData)
+          .select(`
+            *,
+            customer:customers!support_cases_customer_id_fkey(
+              id,
+              first_name,
+              last_name,
+              email,
+              phone,
+              address,
+              city,
+              state,
+              zip_code
+            )
+          `)
+          .single();
+
+        if (supportCaseError) {
+          await supabase.rpc('rollback');
+          console.error('Error creating support case:', supportCaseError);
+          return NextResponse.json(
+            { error: 'Failed to convert ticket to support case' },
+            { status: 500 }
+          );
+        }
+
+        newSupportCase = supportCaseData;
+
+        // Update the ticket to mark it as converted and archived (atomic with support case creation)
+        const { error: ticketUpdateError } = await supabase
+          .from('tickets')
+          .update({
+            converted_to_support_case_id: newSupportCase.id,
+            converted_at: new Date().toISOString(),
+            archived: true,
+            status: 'resolved',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+
+        if (ticketUpdateError) {
+          await supabase.rpc('rollback');
+          console.error('Error updating ticket conversion status:', ticketUpdateError);
+          return NextResponse.json(
+            { error: 'Failed to update ticket after support case creation' },
+            { status: 500 }
+          );
+        }
+
+        // Commit the transaction
+        await supabase.rpc('commit');
+        console.log('✅ Support case creation and ticket archival completed atomically');
+
+      } catch (error) {
+        await supabase.rpc('rollback');
+        console.error('Transaction rolled back due to error:', error);
         return NextResponse.json(
           { error: 'Failed to convert ticket to support case' },
           { status: 500 }
         );
-      }
-
-      // Update the ticket to mark it as converted and archived
-      const { error: ticketUpdateError } = await supabase
-        .from('tickets')
-        .update({
-          converted_to_support_case_id: newSupportCase.id,
-          converted_at: new Date().toISOString(),
-          archived: true,
-          status: 'resolved',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (ticketUpdateError) {
-        console.error('Error updating ticket conversion status:', ticketUpdateError);
       }
 
       // Create assignment notification if ticket was assigned to someone

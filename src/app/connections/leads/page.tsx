@@ -107,7 +107,7 @@ export default function LeadsPage() {
   }, [selectedCompany, isAdmin]);
 
   const handleEditLead = (lead: Lead) => {
-    router.push(`/leads/${lead.id}?edit=true`);
+    router.push(`/connections/leads/${lead.id}?edit=true`);
   };
 
   const fetchMetrics = useCallback(async (companyId: string) => {

@@ -21,13 +21,13 @@ export type LeadType =
   | 'other';
 
 export type LeadStatus =
-  | 'new'
-  | 'contacted'
-  | 'qualified'
+  | 'unassigned'
+  | 'contacting'
   | 'quoted'
+  | 'ready_to_schedule'
+  | 'scheduled'
   | 'won'
-  | 'lost'
-  | 'unqualified';
+  | 'lost';
 
 export type LeadPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -53,6 +53,8 @@ export interface Lead {
   referrer_url?: string;
   ip_address?: string;
   user_agent?: string;
+  lost_reason?: string;
+  lost_stage?: string;
   archived?: boolean;
   created_at: string;
   updated_at: string;
@@ -74,6 +76,7 @@ export interface Lead {
     email: string;
     first_name?: string;
     last_name?: string;
+    avatar_url?: string | null;
   };
   company?: {
     id: string;
@@ -126,13 +129,13 @@ export const leadTypeOptions = [
 ] as const;
 
 export const leadStatusOptions = [
-  { value: 'new', label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'qualified', label: 'Qualified' },
+  { value: 'unassigned', label: 'Unassigned' },
+  { value: 'contacting', label: 'Contacting' },
   { value: 'quoted', label: 'Quoted' },
+  { value: 'ready_to_schedule', label: 'Ready To Schedule' },
+  { value: 'scheduled', label: 'Scheduled' },
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },
-  { value: 'unqualified', label: 'Unqualified' },
 ] as const;
 
 export const leadPriorityOptions = [

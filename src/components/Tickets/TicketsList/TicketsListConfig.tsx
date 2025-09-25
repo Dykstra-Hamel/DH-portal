@@ -291,68 +291,76 @@ export const getTicketTabs = (
 ): TabDefinition<Ticket>[] => [
   {
     key: 'all',
-    label: 'All Incoming',
+    label: 'All Tickets',
     filter: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.status !== 'live'),
+      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived),
     getCount: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.status !== 'live').length,
+      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived).length,
   },
   {
-    key: 'completed_calls',
-    label: 'Completed Calls',
+    key: 'incoming_calls',
+    label: 'Incoming Calls',
     filter: (tickets: Ticket[]) =>
       tickets.filter(
-        ticket => ticket.status !== 'live' && ticket.type === 'phone_call'
+        ticket =>
+          ticket.status !== 'live' &&
+          !ticket.archived &&
+          ticket.type === 'phone_call' &&
+          ticket.call_direction === 'inbound'
       ),
     getCount: (tickets: Ticket[]) =>
       tickets.filter(
-        ticket => ticket.status !== 'live' && ticket.type === 'phone_call'
+        ticket =>
+          ticket.status !== 'live' &&
+          !ticket.archived &&
+          ticket.type === 'phone_call' &&
+          ticket.call_direction === 'inbound'
       ).length,
   },
   {
-    key: 'hangup_calls',
-    label: 'Hang-up Calls',
-    filter: (tickets: Ticket[]) => {
-      const completedTickets = tickets.filter(
-        ticket => ticket.status !== 'live'
-      );
-      const unsuccessfulCalls = callRecords.filter(
-        record => record.call_analysis?.call_successful === false
-      );
-      return completedTickets.filter(ticket => {
-        return unsuccessfulCalls.some(
-          record =>
-            record.lead_id === ticket.id ||
-            record.customer_id === ticket.customer_id
-        );
-      });
-    },
-    getCount: (tickets: Ticket[]) => {
-      const completedTickets = tickets.filter(
-        ticket => ticket.status !== 'live'
-      );
-      const unsuccessfulCalls = callRecords.filter(
-        record => record.call_analysis?.call_successful === false
-      );
-      return completedTickets.filter(ticket => {
-        return unsuccessfulCalls.some(
-          record =>
-            record.lead_id === ticket.id ||
-            record.customer_id === ticket.customer_id
-        );
-      }).length;
-    },
-  },
-  {
-    key: 'completed_forms',
-    label: 'Completed Forms',
+    key: 'outbound_calls',
+    label: 'Outbound Calls',
     filter: (tickets: Ticket[]) =>
       tickets.filter(
-        ticket => ticket.status !== 'live' && ticket.type === 'web_form'
+        ticket =>
+          ticket.status !== 'live' &&
+          !ticket.archived &&
+          ticket.type === 'phone_call' &&
+          ticket.call_direction === 'outbound'
       ),
     getCount: (tickets: Ticket[]) =>
       tickets.filter(
-        ticket => ticket.status !== 'live' && ticket.type === 'web_form'
+        ticket =>
+          ticket.status !== 'live' &&
+          !ticket.archived &&
+          ticket.type === 'phone_call' &&
+          ticket.call_direction === 'outbound'
       ).length,
+  },
+  {
+    key: 'forms',
+    label: 'Forms',
+    filter: (tickets: Ticket[]) =>
+      tickets.filter(
+        ticket =>
+          ticket.status !== 'live' &&
+          !ticket.archived &&
+          ticket.type === 'web_form'
+      ),
+    getCount: (tickets: Ticket[]) =>
+      tickets.filter(
+        ticket =>
+          ticket.status !== 'live' &&
+          !ticket.archived &&
+          ticket.type === 'web_form'
+      ).length,
+  },
+  {
+    key: 'junk',
+    label: 'Junk',
+    filter: (tickets: Ticket[]) =>
+      tickets.filter(ticket => ticket.archived === true),
+    getCount: (tickets: Ticket[]) =>
+      tickets.filter(ticket => ticket.archived === true).length,
   },
 ];
