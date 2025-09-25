@@ -98,7 +98,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
     if ((event.target as HTMLElement).closest(`.${styles.actions}`)) {
       return;
     }
-    router.push(`/leads/${leadId}`);
+    router.push(`/connections/leads/${leadId}`);
   };
 
   const handleDeleteClick = (lead: Lead) => {

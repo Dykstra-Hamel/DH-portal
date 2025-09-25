@@ -172,7 +172,7 @@ export default function SupportCaseRow({
 
       {/* Actions */}
       <div className={`${styles.cell} ${styles.actionsCell}`}>
-        {supportCase.status === 'new' && (
+        {supportCase.status === 'unassigned' && (
           <button
             className={styles.actionButton}
             onClick={() => handleStatusChange('in_progress')}

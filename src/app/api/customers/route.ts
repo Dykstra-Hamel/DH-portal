@@ -123,18 +123,17 @@ export async function GET(request: NextRequest) {
       
       const leadCounts = {
         total: leads.length,
-        new: leads.filter((l: any) => l.lead_status === 'new').length,
-        contacted: leads.filter((l: any) => l.lead_status === 'contacted').length,
-        qualified: leads.filter((l: any) => l.lead_status === 'qualified').length,
+        unassigned: leads.filter((l: any) => l.lead_status === 'unassigned').length,
+        contacting: leads.filter((l: any) => l.lead_status === 'contacting').length,
         quoted: leads.filter((l: any) => l.lead_status === 'quoted').length,
+        ready_to_schedule: leads.filter((l: any) => l.lead_status === 'ready_to_schedule').length,
+        scheduled: leads.filter((l: any) => l.lead_status === 'scheduled').length,
         won: leads.filter((l: any) => l.lead_status === 'won').length,
         lost: leads.filter((l: any) => l.lead_status === 'lost').length,
-        unqualified: leads.filter((l: any) => l.lead_status === 'unqualified').length,
       };
 
-      // Calculate active leads (new, contacted, qualified, quoted)
-      const activeLeads = leadCounts.new + leadCounts.contacted + 
-                          leadCounts.qualified + leadCounts.quoted;
+      // Calculate active leads (unassigned, contacting, quoted)
+      const activeLeads = leadCounts.unassigned + leadCounts.contacting + leadCounts.quoted;
 
       // Calculate total estimated value
       const totalEstimatedValue = leads.reduce(

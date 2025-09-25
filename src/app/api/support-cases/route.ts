@@ -2,12 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { SupportCaseFormData } from '@/types/support-case';
+import {
+  getAuthenticatedUser,
+  verifyCompanyAccess,
+  getSupabaseClient
+} from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Get authenticated user and admin status (like leads API)
+    const authResult = await getAuthenticatedUser();
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+
+    const { user, isGlobalAdmin, supabase } = authResult;
+
     const { searchParams } = new URL(request.url);
-    
+
     // Get query parameters
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
@@ -20,25 +32,8 @@ export async function GET(request: NextRequest) {
 
     console.log('Support cases API called with params:', { companyId, status, issueType, priority, assignedTo, includeArchived, dateFrom, dateTo });
 
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    console.log('Auth result:', { user: user?.id, authError });
-    if (authError || !user) {
-      console.log('Authentication failed:', authError);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // If companyId is provided, verify access
     if (companyId) {
-      // Check user profile to determine if they're a global admin
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      const isGlobalAdmin = profile?.role === 'admin';
-
       // Verify user has access to this company (admins have access to all companies)
       if (!isGlobalAdmin) {
         const { data: userCompany, error: userCompanyError } = await supabase
@@ -128,8 +123,54 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch support cases', details: error }, { status: 500 });
     }
 
-    console.log('Support cases fetched successfully:', supportCases?.length || 0, 'cases');
-    return NextResponse.json(supportCases);
+    if (!supportCases || supportCases.length === 0) {
+      console.log('Support cases fetched successfully: 0 cases');
+      return NextResponse.json([]);
+    }
+
+    // Get all unique user IDs from support cases (assigned_to field)
+    const userIds = new Set<string>();
+    supportCases.forEach((supportCase: { assigned_to?: string }) => {
+      if (supportCase.assigned_to) {
+        userIds.add(supportCase.assigned_to);
+      }
+    });
+
+    // Get profiles for assigned users if there are any
+    let profiles: any[] = [];
+    if (userIds.size > 0) {
+      // Always use admin client for profile data so all users can see avatars
+      const queryClient = createAdminClient();
+      const { data: profilesData, error: profilesError } = await queryClient
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .in('id', Array.from(userIds));
+
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        return NextResponse.json(
+          { error: 'Failed to fetch user profiles' },
+          { status: 500 }
+        );
+      }
+
+      profiles = profilesData || [];
+    }
+
+    // Create a map of user profiles for quick lookup
+    const profileMap = new Map(profiles.map(p => [p.id, p]));
+
+    // Enhance support cases with profile data
+    const enhancedSupportCases = supportCases.map((supportCase: { assigned_to?: string; [key: string]: any }) => ({
+      ...supportCase,
+      assigned_user: supportCase.assigned_to
+        ? profileMap.get(supportCase.assigned_to) || null
+        : null,
+    }));
+
+    console.log('Support cases fetched successfully:', enhancedSupportCases.length, 'cases');
+    return NextResponse.json(enhancedSupportCases);
   } catch (error) {
     console.error('Unexpected error in support cases GET:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

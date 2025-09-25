@@ -326,6 +326,7 @@ async function findOrCreateCallRecord(supabase: any, callData: any) {
       customer_id: customerId,
       source: 'cold_call',
       type: 'phone_call',
+      call_direction: 'outbound', // Set direction for filtering
       status: 'closed', // DEFAULT STATUS FOR OUTBOUND
       priority: 'medium',
       description: `📞 Outbound call started at ${new Date().toISOString()} (fallback creation)`,

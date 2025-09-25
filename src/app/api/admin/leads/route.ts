@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Default behavior: show active leads (exclude archived)
       query = query
-        .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
+        .in('lead_status', ['unassigned', 'contacting', 'quoted', 'ready_to_schedule', 'scheduled'])
         .or('archived.is.null,archived.eq.false');
     }
 
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     if (userIds.size > 0) {
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .in('id', Array.from(userIds));
 
       if (profilesError) {

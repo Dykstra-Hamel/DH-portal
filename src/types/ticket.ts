@@ -46,6 +46,7 @@ export interface Ticket {
   call_record_id?: string; // Direct reference to call record for phone_call tickets
   source: TicketSource;
   type: TicketType;
+  call_direction?: 'inbound' | 'outbound' | null; // Direction for phone calls, null for non-calls
   service_type?: string;
   status: TicketStatus;
   description?: string;

@@ -9,13 +9,10 @@ export type SupportCaseIssueType =
   | 'warranty_claim';
 
 export type SupportCaseStatus =
-  | 'new'
-  | 'assigned'
+  | 'unassigned'
   | 'in_progress'
-  | 'awaiting_customer'
-  | 'awaiting_internal'
-  | 'resolved'
-  | 'closed';
+  | 'awaiting_response'
+  | 'resolved';
 
 export type SupportCasePriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -64,6 +61,13 @@ export interface SupportCase {
     state?: string;
     zip_code?: string;
   };
+  assigned_user?: {
+    id: string;
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    avatar_url?: string | null;
+  };
   company?: {
     id: string;
     name: string;
@@ -104,13 +108,10 @@ export const supportCaseIssueTypeOptions = [
 ] as const;
 
 export const supportCaseStatusOptions = [
-  { value: 'new', label: 'New' },
-  { value: 'assigned', label: 'Assigned' },
+  { value: 'unassigned', label: 'Unassigned' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'awaiting_customer', label: 'Awaiting Customer' },
-  { value: 'awaiting_internal', label: 'Awaiting Internal' },
+  { value: 'awaiting_response', label: 'Awaiting Response' },
   { value: 'resolved', label: 'Resolved' },
-  { value: 'closed', label: 'Closed' },
 ] as const;
 
 export const supportCasePriorityOptions = [

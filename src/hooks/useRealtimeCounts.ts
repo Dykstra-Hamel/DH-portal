@@ -8,7 +8,9 @@ import { useUser } from '@/hooks/useUser';
 interface Counts {
   tickets: number;
   leads: number;
+  unassigned_leads: number; // Unassigned leads only (for red dot logic)
   cases: number;
+  unassigned_cases: number; // Unassigned support cases only (for red dot logic)
   customers: number;
   scheduling: number; // Won leads count
   my_leads: number; // Leads assigned to current user
@@ -27,7 +29,9 @@ export function useRealtimeCounts() {
   const [counts, setCounts] = useState<Counts>({
     tickets: 0,
     leads: 0,
+    unassigned_leads: 0,
     cases: 0,
+    unassigned_cases: 0,
     customers: 0,
     scheduling: 0,
     my_leads: 0,
@@ -165,7 +169,9 @@ export function useRealtimeCounts() {
       setCounts({
         tickets: 0,
         leads: 0,
+        unassigned_leads: 0,
         cases: 0,
+        unassigned_cases: 0,
         customers: 0,
         scheduling: 0,
         my_leads: 0,
@@ -182,22 +188,28 @@ export function useRealtimeCounts() {
       const [
         ticketsResponse,
         leadsResponse,
+        unassignedLeadsResponse,
         casesResponse,
+        unassignedCasesResponse,
         customersResponse,
-        wonLeadsResponse,
+        schedulingLeadsResponse,
         myLeadsResponse,
         myCasesResponse,
       ] = await Promise.allSettled([
         // Active tickets
         fetch(`/api/tickets?companyId=${companyId}&includeArchived=false`),
-        // New leads
-        fetch(`/api/leads?companyId=${companyId}&status=new`),
+        // Active leads (unassigned, contacting, quoted)
+        fetch(`/api/leads?companyId=${companyId}&status=unassigned,contacting,quoted`),
+        // Unassigned leads with specific statuses (for red dot logic) - assigned to sales team (assigned_to IS NULL) with unassigned, contacting, or quoted status
+        fetch(`/api/leads?companyId=${companyId}&unassigned=true&status=unassigned,contacting,quoted`),
         // Active support cases
         fetch(`/api/support-cases?companyId=${companyId}&includeArchived=false`),
+        // Unassigned support cases only (for red dot logic)
+        fetch(`/api/support-cases?companyId=${companyId}&status=new`),
         // Total customers
         fetch(`/api/customers?companyId=${companyId}`),
-        // Won leads for scheduling
-        fetch(`/api/leads?companyId=${companyId}&status=won`),
+        // Ready to schedule and scheduled leads for scheduling
+        fetch(`/api/leads?companyId=${companyId}&status=ready_to_schedule,scheduled`),
         // My assigned leads
         fetch(`/api/leads?companyId=${companyId}&assignedTo=${user.id}`),
         // My assigned support cases
@@ -207,7 +219,9 @@ export function useRealtimeCounts() {
       const newCounts = {
         tickets: 0,
         leads: 0,
+        unassigned_leads: 0,
         cases: 0,
+        unassigned_cases: 0,
         customers: 0,
         scheduling: 0,
         my_leads: 0,
@@ -226,10 +240,22 @@ export function useRealtimeCounts() {
         newCounts.leads = Array.isArray(leadsData) ? leadsData.length : 0;
       }
 
+      // Process unassigned leads
+      if (unassignedLeadsResponse.status === 'fulfilled' && unassignedLeadsResponse.value.ok) {
+        const unassignedLeadsData = await unassignedLeadsResponse.value.json();
+        newCounts.unassigned_leads = Array.isArray(unassignedLeadsData) ? unassignedLeadsData.length : 0;
+      }
+
       // Process support cases
       if (casesResponse.status === 'fulfilled' && casesResponse.value.ok) {
         const casesData = await casesResponse.value.json();
         newCounts.cases = Array.isArray(casesData) ? casesData.length : 0;
+      }
+
+      // Process unassigned support cases
+      if (unassignedCasesResponse.status === 'fulfilled' && unassignedCasesResponse.value.ok) {
+        const unassignedCasesData = await unassignedCasesResponse.value.json();
+        newCounts.unassigned_cases = Array.isArray(unassignedCasesData) ? unassignedCasesData.length : 0;
       }
 
       // Process customers
@@ -239,10 +265,10 @@ export function useRealtimeCounts() {
       }
 
 
-      // Process won leads (scheduling)
-      if (wonLeadsResponse.status === 'fulfilled' && wonLeadsResponse.value.ok) {
-        const wonLeadsData = await wonLeadsResponse.value.json();
-        newCounts.scheduling = Array.isArray(wonLeadsData) ? wonLeadsData.length : 0;
+      // Process scheduling leads (ready_to_schedule + scheduled)
+      if (schedulingLeadsResponse.status === 'fulfilled' && schedulingLeadsResponse.value.ok) {
+        const schedulingLeadsData = await schedulingLeadsResponse.value.json();
+        newCounts.scheduling = Array.isArray(schedulingLeadsData) ? schedulingLeadsData.length : 0;
       }
 
       // Process my assigned leads
@@ -311,22 +337,28 @@ export function useRealtimeCounts() {
             filter: `company_id=eq.${companyId}`,
           },
           async (payload) => {
-            // Refetch new leads, won leads, and my assigned leads
+            // Refetch active leads, unassigned leads, won leads, and my assigned leads
             try {
-              const [newLeadsResponse, wonLeadsResponse, myLeadsResponse] = await Promise.all([
-                fetch(`/api/leads?companyId=${companyId}&status=new`),
-                fetch(`/api/leads?companyId=${companyId}&status=won`),
+              const [activeLeadsResponse, unassignedLeadsResponse, schedulingLeadsResponse, myLeadsResponse] = await Promise.all([
+                fetch(`/api/leads?companyId=${companyId}&status=unassigned,contacting,quoted`),
+                fetch(`/api/leads?companyId=${companyId}&unassigned=true&status=unassigned,contacting,quoted`),
+                fetch(`/api/leads?companyId=${companyId}&status=ready_to_schedule,scheduled`),
                 fetch(`/api/leads?companyId=${companyId}&assignedTo=${user.id}`),
               ]);
 
-              if (newLeadsResponse.ok) {
-                const newLeadsData = await newLeadsResponse.json();
-                updateCount('leads', Array.isArray(newLeadsData) ? newLeadsData.length : 0);
+              if (activeLeadsResponse.ok) {
+                const activeLeadsData = await activeLeadsResponse.json();
+                updateCount('leads', Array.isArray(activeLeadsData) ? activeLeadsData.length : 0);
               }
 
-              if (wonLeadsResponse.ok) {
-                const wonLeadsData = await wonLeadsResponse.json();
-                updateCount('scheduling', Array.isArray(wonLeadsData) ? wonLeadsData.length : 0);
+              if (unassignedLeadsResponse.ok) {
+                const unassignedLeadsData = await unassignedLeadsResponse.json();
+                updateCount('unassigned_leads', Array.isArray(unassignedLeadsData) ? unassignedLeadsData.length : 0);
+              }
+
+              if (schedulingLeadsResponse.ok) {
+                const schedulingLeadsData = await schedulingLeadsResponse.json();
+                updateCount('scheduling', Array.isArray(schedulingLeadsData) ? schedulingLeadsData.length : 0);
               }
 
               if (myLeadsResponse.ok) {
@@ -352,16 +384,22 @@ export function useRealtimeCounts() {
             filter: `company_id=eq.${companyId}`,
           },
           async (payload) => {
-            // Refetch support cases count and my assigned cases
+            // Refetch support cases count, unassigned cases, and my assigned cases
             try {
-              const [casesResponse, myCasesResponse] = await Promise.all([
+              const [casesResponse, unassignedCasesResponse, myCasesResponse] = await Promise.all([
                 fetch(`/api/support-cases?companyId=${companyId}&includeArchived=false`),
+                fetch(`/api/support-cases?companyId=${companyId}&status=new`),
                 fetch(`/api/support-cases?companyId=${companyId}&assignedTo=${user.id}`),
               ]);
 
               if (casesResponse.ok) {
                 const casesData = await casesResponse.json();
                 updateCount('cases', Array.isArray(casesData) ? casesData.length : 0);
+              }
+
+              if (unassignedCasesResponse.ok) {
+                const unassignedCasesData = await unassignedCasesResponse.json();
+                updateCount('unassigned_cases', Array.isArray(unassignedCasesData) ? unassignedCasesData.length : 0);
               }
 
               if (myCasesResponse.ok) {

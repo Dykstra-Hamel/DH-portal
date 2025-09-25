@@ -6,6 +6,7 @@ import { ColumnDefinition, TabDefinition } from '@/components/Common/DataTable';
 import { ChevronRight, Mail, Phone } from 'lucide-react';
 import { formatDateWithOrdinal } from '@/lib/date-utils';
 import { getTimeAgo } from '@/lib/time-utils';
+import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import styles from '@/components/Common/DataTable/DataTable.module.scss';
 
 // Helper functions for data formatting
@@ -29,7 +30,6 @@ const formatPhone = (phone?: string): string => {
   return phone;
 };
 
-
 // Define columns for leads table - New 5-column structure
 export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
   {
@@ -43,9 +43,7 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
         <div className={styles.primaryDate}>
           {formatDateWithOrdinal(lead.created_at)}
         </div>
-        <div className={styles.relativeTime}>
-          {getTimeAgo(lead.created_at)}
-        </div>
+        <div className={styles.relativeTime}>{getTimeAgo(lead.created_at)}</div>
       </div>
     ),
   },
@@ -109,13 +107,30 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
   {
     key: 'lead_status',
     title: 'Status',
-    width: '120px',
+    width: '180px',
     sortable: true,
     sortKey: 'lead_status',
     render: (lead: Lead) => (
-      <span className={styles.statusBadge}>
-        {leadStatusOptions.find(s => s.value === lead.lead_status)?.label}
-      </span>
+      <div className={styles.statusWithAssignment}>
+        {lead.lead_status === 'unassigned' ? (
+          <span className={styles.statusBadge}>Unassigned</span>
+        ) : (
+          <div className={styles.assignedStatus}>
+            {lead.assigned_user && (
+              <MiniAvatar
+                firstName={lead.assigned_user.first_name}
+                lastName={lead.assigned_user.last_name}
+                email={lead.assigned_user.email}
+                avatarUrl={lead.assigned_user.avatar_url}
+                size="small"
+              />
+            )}
+            <span className={styles.statusBadge}>
+              {leadStatusOptions.find(s => s.value === lead.lead_status)?.label}
+            </span>
+          </div>
+        )}
+      </div>
     ),
   },
   {
@@ -123,10 +138,7 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
     title: '',
     width: '140px',
     sortable: false,
-    render: (
-      lead: Lead,
-      onAction?: (action: string, item: Lead) => void
-    ) => (
+    render: (lead: Lead, onAction?: (action: string, item: Lead) => void) => (
       <button
         className={styles.actionButton}
         onClick={e => {
@@ -141,48 +153,56 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
   },
 ];
 
-// Define tabs for leads filtering - matching current LeadsTabs logic
+// Define tabs for leads filtering - reordered with Unassigned as default
+// Scheduling-related statuses (Ready To Schedule, Scheduled, Won, Lost) moved to Scheduling page
 export const getLeadTabs = (): TabDefinition<Lead>[] => [
   {
-    key: 'all',
-    label: 'All Leads',
-    filter: (leads: Lead[]) => leads.filter(lead => !lead.archived),
-    getCount: (leads: Lead[]) => leads.filter(lead => !lead.archived).length,
+    key: 'unassigned',
+    label: 'Unassigned',
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'unassigned'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'unassigned')
+        .length,
   },
   {
-    key: 'new',
-    label: 'New',
-    filter: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'new'),
-    getCount: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'new').length,
-  },
-  {
-    key: 'contacted',
-    label: 'Contacted',
-    filter: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'contacted'),
-    getCount: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'contacted').length,
-  },
-  {
-    key: 'qualified',
-    label: 'Qualified',
-    filter: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'qualified'),
-    getCount: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'qualified').length,
+    key: 'contacting',
+    label: 'Contacting',
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'contacting'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'contacting')
+        .length,
   },
   {
     key: 'quoted',
     label: 'Quoted',
-    filter: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'quoted'),
-    getCount: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'quoted').length,
-  },
-  {
-    key: 'unqualified',
-    label: 'Unqualified',
-    filter: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'unqualified'),
-    getCount: (leads: Lead[]) => leads.filter(lead => !lead.archived && lead.lead_status === 'unqualified').length,
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'quoted'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'quoted')
+        .length,
   },
   {
     key: 'archived',
     label: 'Archived',
     filter: (leads: Lead[]) => leads.filter(lead => lead.archived),
     getCount: (leads: Lead[]) => leads.filter(lead => lead.archived).length,
+  },
+  {
+    key: 'all',
+    label: 'All Leads',
+    filter: (leads: Lead[]) =>
+      leads.filter(
+        lead =>
+          !lead.archived &&
+          ['unassigned', 'contacting', 'quoted'].includes(lead.lead_status)
+      ),
+    getCount: (leads: Lead[]) =>
+      leads.filter(
+        lead =>
+          !lead.archived &&
+          ['unassigned', 'contacting', 'quoted'].includes(lead.lead_status)
+      ).length,
   },
 ];

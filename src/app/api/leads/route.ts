@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { Lead } from '@/types/lead';
+import {
+  getAuthenticatedUser,
+  verifyCompanyAccess,
+  getSupabaseClient
+} from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Get the current user from the session
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and admin status (like company users API)
+    const authResult = await getAuthenticatedUser();
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
+
+    const { user, isGlobalAdmin, supabase } = authResult;
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
@@ -21,6 +24,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
     const assignedTo = searchParams.get('assignedTo');
+    const unassigned = searchParams.get('unassigned') === 'true';
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
     if (!companyId) {
@@ -30,14 +34,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check user profile to determine if they're a global admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    // Check user profile to determine if they're a global admin (already provided by getAuthenticatedUser)
+    // const { data: profile } = await supabase
+    //   .from('profiles')
+    //   .select('role')
+    //   .eq('id', user.id)
+    //   .single();
 
-    const isGlobalAdmin = profile?.role === 'admin';
+    // const isGlobalAdmin = profile?.role === 'admin'; // Already provided by authResult
 
     // Verify user has access to this company (admins have access to all companies)
     if (!isGlobalAdmin) {
@@ -80,19 +84,29 @@ export async function GET(request: NextRequest) {
     } else {
       // Default behavior: show active leads (exclude archived)
       query = query
-        .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'won', 'unqualified'])
+        .in('lead_status', ['unassigned', 'contacting', 'quoted', 'ready_to_schedule', 'scheduled', 'won', 'lost'])
         .or('archived.is.null,archived.eq.false');
     }
 
     // Apply additional filters
     if (status) {
-      query = query.eq('lead_status', status);
+      // Handle comma-separated status values (e.g., "unassigned,contacting,quoted")
+      const statusArray = status.split(',').map(s => s.trim());
+      if (statusArray.length === 1) {
+        query = query.eq('lead_status', statusArray[0]);
+      } else {
+        query = query.in('lead_status', statusArray);
+      }
     }
     if (priority) {
       query = query.eq('priority', priority);
     }
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo);
+    }
+    if (unassigned) {
+      // Filter for leads assigned to sales team (assigned_to IS NULL)
+      query = query.is('assigned_to', null);
     }
 
     const { data: leads, error } = await query;
@@ -111,7 +125,7 @@ export async function GET(request: NextRequest) {
 
     // Get all unique user IDs from leads (assigned_to field)
     const userIds = new Set<string>();
-    leads.forEach(lead => {
+    leads.forEach((lead: Lead) => {
       if (lead.assigned_to) {
         userIds.add(lead.assigned_to);
       }
@@ -120,10 +134,13 @@ export async function GET(request: NextRequest) {
     // Get profiles for assigned users if there are any
     let profiles: any[] = [];
     if (userIds.size > 0) {
-      const { data: profilesData, error: profilesError } = await supabase
+      // Always use admin client for profile data so all users can see avatars
+      const queryClient = createAdminClient();
+      const { data: profilesData, error: profilesError } = await queryClient
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .in('id', Array.from(userIds));
+
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
@@ -140,7 +157,7 @@ export async function GET(request: NextRequest) {
     const profileMap = new Map(profiles.map(p => [p.id, p]));
 
     // Enhance leads with profile data
-    const enhancedLeads = leads.map(lead => ({
+    const enhancedLeads = leads.map((lead: Lead) => ({
       ...lead,
       assigned_user: lead.assigned_to
         ? profileMap.get(lead.assigned_to) || null

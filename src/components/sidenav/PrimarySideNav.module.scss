@@ -43,6 +43,10 @@
     opacity: 0.4;
     cursor: not-allowed;
     pointer-events: none;
+
+    svg {
+      margin: 12px 0;
+    }
   }
 
   .iconWrapper {
@@ -51,11 +55,11 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    padding: 12px;
   }
 
   &.active .iconWrapper {
     background-color: var(--slate-100);
-    padding: 12px;
   }
 
   svg {

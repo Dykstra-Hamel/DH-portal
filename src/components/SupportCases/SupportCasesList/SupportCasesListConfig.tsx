@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { SupportCase } from '@/types/support-case';
+import { SupportCase, supportCaseStatusOptions } from '@/types/support-case';
 import { ColumnDefinition, TabDefinition } from '@/components/Common/DataTable';
 import { ChevronRight } from 'lucide-react';
+import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import styles from '@/components/Common/DataTable/DataTable.module.scss';
 
 // Helper functions for data formatting
@@ -146,25 +147,31 @@ export const getSupportCaseColumns = (): ColumnDefinition<SupportCase>[] => [
   {
     key: 'status',
     title: 'Status',
-    width: '150px',
+    width: '180px',
     sortable: true,
     sortKey: 'status',
-    render: (supportCase: SupportCase) => {
-      const statusClass = ['resolved', 'closed'].includes(supportCase.status)
-        ? 'resolved'
-        : ['in_progress', 'assigned'].includes(supportCase.status)
-          ? 'inProgress'
-          : ['awaiting_customer', 'awaiting_internal'].includes(
-                supportCase.status
-              )
-            ? 'waiting'
-            : 'new';
-      return (
-        <div className={`${styles.statusCell} ${styles[statusClass]}`}>
-          {formatStatus(supportCase.status)}
-        </div>
-      );
-    },
+    render: (supportCase: SupportCase) => (
+      <div className={styles.statusWithAssignment}>
+        {!supportCase.assigned_to ? (
+          <span className={styles.statusBadge}>Unassigned</span>
+        ) : (
+          <div className={styles.assignedStatus}>
+            {supportCase.assigned_user && (
+              <MiniAvatar
+                firstName={supportCase.assigned_user.first_name}
+                lastName={supportCase.assigned_user.last_name}
+                email={supportCase.assigned_user.email}
+                avatarUrl={supportCase.assigned_user.avatar_url}
+                size="small"
+              />
+            )}
+            <span className={styles.statusBadge}>
+              {supportCaseStatusOptions.find(s => s.value === supportCase.status)?.label}
+            </span>
+          </div>
+        )}
+      </div>
+    ),
   },
   {
     key: 'actions',
@@ -194,47 +201,39 @@ export const getSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
   {
     key: 'all',
     label: 'All Cases',
-    filter: (supportCases: SupportCase[]) => supportCases,
-    getCount: (supportCases: SupportCase[]) => supportCases.length,
+    filter: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived),
+    getCount: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived).length,
   },
   {
-    key: 'new',
-    label: 'New',
+    key: 'unassigned',
+    label: 'Unassigned',
     filter: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => sc.status === 'new'),
+      supportCases.filter(sc => !sc.archived && !sc.assigned_to),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => sc.status === 'new').length,
+      supportCases.filter(sc => !sc.archived && !sc.assigned_to).length,
   },
   {
     key: 'in_progress',
     label: 'In Progress',
     filter: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc =>
-        ['assigned', 'in_progress'].includes(sc.status)
-      ),
+      supportCases.filter(sc => !sc.archived && sc.status === 'in_progress'),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => ['assigned', 'in_progress'].includes(sc.status))
-        .length,
+      supportCases.filter(sc => !sc.archived && sc.status === 'in_progress').length,
   },
   {
     key: 'awaiting_response',
     label: 'Awaiting Response',
     filter: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc =>
-        ['awaiting_customer', 'awaiting_internal'].includes(sc.status)
-      ),
+      supportCases.filter(sc => !sc.archived && sc.status === 'awaiting_response'),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc =>
-        ['awaiting_customer', 'awaiting_internal'].includes(sc.status)
-      ).length,
+      supportCases.filter(sc => !sc.archived && sc.status === 'awaiting_response').length,
   },
   {
     key: 'resolved',
     label: 'Resolved',
     filter: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => ['resolved', 'closed'].includes(sc.status)),
+      supportCases.filter(sc => !sc.archived && sc.status === 'resolved'),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => ['resolved', 'closed'].includes(sc.status))
-        .length,
+      supportCases.filter(sc => !sc.archived && sc.status === 'resolved').length,
   },
 ];
