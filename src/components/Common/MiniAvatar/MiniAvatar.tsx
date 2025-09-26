@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import styles from './MiniAvatar.module.scss';
 
@@ -11,6 +11,7 @@ interface MiniAvatarProps {
   avatarUrl?: string | null;
   size?: 'small' | 'medium' | 'large';
   className?: string;
+  showTooltip?: boolean;
 }
 
 export function MiniAvatar({
@@ -19,7 +20,8 @@ export function MiniAvatar({
   email,
   avatarUrl,
   size = 'medium',
-  className = ''
+  className = '',
+  showTooltip = true,
 }: MiniAvatarProps) {
   const [imageError, setImageError] = useState(false);
 
@@ -36,30 +38,57 @@ export function MiniAvatar({
     return 'U';
   };
 
-  const handleImageError = () => {
+  const getDisplayName = (): string => {
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    }
+    if (firstName) {
+      return firstName;
+    }
+    return email;
+  };
+
+  useEffect(() => {
+    // Reset error state when avatarUrl changes
+    setImageError(false);
+  }, [avatarUrl]);
+
+  const handleImageError = (error: any) => {
+    console.log('MiniAvatar image error:', {
+      avatarUrl,
+      error,
+      firstName,
+      lastName,
+      email,
+    });
     setImageError(true);
   };
 
   const showImage = avatarUrl && !imageError;
 
-
   return (
-    <div className={`${styles.miniAvatar} ${styles[size]} ${className}`}>
-      {showImage ? (
-        <Image
-          src={avatarUrl}
-          alt={`${firstName || ''} ${lastName || ''}`.trim() || email}
-          className={styles.avatarImage}
-          onError={handleImageError}
-          width={size === 'small' ? 24 : size === 'medium' ? 32 : 40}
-          height={size === 'small' ? 24 : size === 'medium' ? 32 : 40}
-          unoptimized={true}
-        />
-      ) : (
-        <span className={styles.avatarInitials}>
-          {getInitials()}
-        </span>
-      )}
+    <div className={styles.tooltipContainer}>
+      <div className={`${styles.miniAvatar} ${styles[size]} ${className}`}>
+        {showTooltip && (
+          <div className={styles.tooltip}>
+            {getDisplayName()}
+            <div className={styles.tooltipArrow} />
+          </div>
+        )}
+        {showImage ? (
+          <Image
+            src={avatarUrl}
+            alt={`${firstName || ''} ${lastName || ''}`.trim() || email}
+            className={styles.avatarImage}
+            onError={handleImageError}
+            width={size === 'small' ? 24 : size === 'medium' ? 32 : 40}
+            height={size === 'small' ? 24 : size === 'medium' ? 32 : 40}
+            loading="lazy"
+          />
+        ) : (
+          <span className={styles.avatarInitials}>{getInitials()}</span>
+        )}
+      </div>
     </div>
   );
 }

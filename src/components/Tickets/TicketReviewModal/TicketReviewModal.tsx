@@ -501,7 +501,7 @@ export default function TicketReviewModal({
               </div>
             </button>
 
-            {/* Team assignments */}
+            {/* Team assignments - moved to second position */}
             {selectedQualification === 'sales' && (
               <button
                 className={`${styles.dropdownOption} ${selectedAssignee === 'sales_team' ? styles.selected : ''}`}

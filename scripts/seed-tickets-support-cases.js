@@ -51,7 +51,7 @@ const priorities = ['low', 'medium', 'high', 'urgent'];
 
 // Support case issue types and statuses
 const supportIssueTypes = ['billing', 'scheduling', 'complaint', 'service_quality', 'treatment_request', 're_service', 'general_inquiry', 'warranty_claim'];
-const supportStatuses = ['new', 'assigned', 'in_progress', 'awaiting_customer', 'awaiting_internal', 'resolved', 'closed'];
+const supportStatuses = ['unassigned', 'in_progress', 'awaiting_response', 'resolved'];
 
 // Generate realistic ticket descriptions (no title field in current schema)
 function generateTicketContent(serviceType, source, status) {
@@ -471,11 +471,11 @@ async function createTestSupportCases() {
       let satisfactionRating = null;
       let satisfactionFeedback = null;
 
-      if (['assigned', 'in_progress', 'awaiting_customer', 'awaiting_internal', 'resolved', 'closed'].includes(status)) {
+      if (['in_progress', 'awaiting_response', 'resolved'].includes(status)) {
         firstResponseAt = new Date(createdAt.getTime() + Math.random() * 4 * 60 * 60 * 1000); // Within 4 hours
       }
 
-      if (['resolved', 'closed'].includes(status)) {
+      if (status === 'resolved') {
         resolvedAt = new Date(createdAt.getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000); // Within a week
         
         // Add satisfaction rating for resolved cases (60% chance)
@@ -489,9 +489,8 @@ async function createTestSupportCases() {
         }
       }
 
-      if (status === 'closed') {
-        closedAt = resolvedAt ? new Date(resolvedAt.getTime() + 24 * 60 * 60 * 1000) : null; // Day after resolved
-      }
+      // Note: 'closed' status no longer exists in the new system
+      // All resolved cases are considered complete
 
       supportCases.push({
         id: generateUUID(),
@@ -504,11 +503,11 @@ async function createTestSupportCases() {
         resolution_action: resolution,
         notes: Math.random() > 0.5 ? 'Customer follow-up scheduled for next week.' : null,
         status: status,
-        assigned_to: Math.random() > 0.2 ? randomUser.id : null, // 80% assigned
+        assigned_to: status === 'unassigned' ? null : (Math.random() > 0.2 ? randomUser.id : null), // Unassigned cases have no assignment, otherwise 80% assigned
         priority: priority,
         first_response_at: firstResponseAt?.toISOString(),
         resolved_at: resolvedAt?.toISOString(),
-        closed_at: closedAt?.toISOString(),
+        closed_at: status === 'resolved' && resolvedAt ? new Date(resolvedAt.getTime() + 24 * 60 * 60 * 1000).toISOString() : null,
         satisfaction_rating: satisfactionRating,
         satisfaction_feedback: satisfactionFeedback,
         satisfaction_collected_at: satisfactionRating ? resolvedAt?.toISOString() : null,

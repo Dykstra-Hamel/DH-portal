@@ -295,7 +295,7 @@ export function SecondarySideNav({
                 href: '/connections/leads',
                 count: counts.leads,
                 countType: 'leads',
-                showRedDot: newItemIndicators.leads && pathname !== '/connections/leads' && !pathname.startsWith('/connections/leads/'),
+                showRedDot: counts.unassigned_leads > 0,
               },
               {
                 text: 'Scheduling',
@@ -309,7 +309,7 @@ export function SecondarySideNav({
                 href: '/connections/customer-service',
                 count: counts.cases,
                 countType: 'cases',
-                showRedDot: newItemIndicators.cases && pathname !== '/connections/customer-service' && !pathname.startsWith('/connections/customer-service/'),
+                showRedDot: counts.unassigned_cases > 0,
               },
             ],
           },

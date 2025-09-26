@@ -101,9 +101,9 @@ export default function CustomerServicePage() {
         ? ((totalCurrent - totalPrevious) / totalPrevious) * 100
         : 0;
 
-    // New cases
-    const newCurrent = currentCases.filter(sc => sc.status === 'new').length;
-    const newPrevious = previousCases.filter(sc => sc.status === 'new').length;
+    // Unassigned cases (equivalent to "new" cases)
+    const newCurrent = currentCases.filter(sc => sc.status === 'unassigned').length;
+    const newPrevious = previousCases.filter(sc => sc.status === 'unassigned').length;
     const newChange =
       newPrevious > 0 ? ((newCurrent - newPrevious) / newPrevious) * 100 : 0;
 

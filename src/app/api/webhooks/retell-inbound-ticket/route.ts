@@ -325,6 +325,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       customer_id: customerId,
       source: 'cold_call',
       type: 'phone_call',
+      call_direction: 'inbound', // Set direction for filtering
       status: 'live', // Set as 'live' for active calls
       priority: 'medium',
       description: `📞 Inbound call started at ${new Date().toISOString()}`,

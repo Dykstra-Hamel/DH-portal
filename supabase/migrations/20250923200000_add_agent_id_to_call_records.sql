@@ -3,9 +3,14 @@ ALTER TABLE call_records
 ADD COLUMN IF NOT EXISTS agent_id VARCHAR(255);
 
 -- Add foreign key constraint to reference agents table
-ALTER TABLE call_records
-ADD CONSTRAINT fk_call_records_agent_id
-FOREIGN KEY (agent_id) REFERENCES agents(agent_id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_call_records_agent_id') THEN
+        ALTER TABLE call_records
+        ADD CONSTRAINT fk_call_records_agent_id
+        FOREIGN KEY (agent_id) REFERENCES agents(agent_id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- Create index for performance
 CREATE INDEX IF NOT EXISTS idx_call_records_agent_id ON call_records(agent_id);

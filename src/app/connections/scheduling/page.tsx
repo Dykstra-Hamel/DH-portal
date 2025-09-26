@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import LeadsList from '@/components/Leads/LeadsList/LeadsList';
 import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
+import { getSchedulingLeadTabs } from '@/components/Leads/LeadsList/SchedulingLeadsListConfig';
 
 interface Profile {
   id: string;
@@ -19,7 +20,7 @@ interface Profile {
 export default function SchedulingPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [wonLeads, setWonLeads] = useState<Lead[]>([]);
+  const [schedulingLeads, setSchedulingLeads] = useState<Lead[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -70,39 +71,47 @@ export default function SchedulingPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  const fetchWonLeads = useCallback(async () => {
+  const fetchSchedulingLeads = useCallback(async () => {
     if (!selectedCompany?.id) return;
 
     try {
       setLeadsLoading(true);
 
-      // Use direct API call to fetch won leads for the selected company
-      const response = await fetch(`/api/leads?companyId=${selectedCompany.id}&status=won`);
+      // Fetch all scheduling-related leads (ready_to_schedule, scheduled, won, lost)
+      const response = await fetch(`/api/leads?companyId=${selectedCompany.id}`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch won leads');
+        throw new Error('Failed to fetch scheduling leads');
       }
 
       const leadsData = await response.json();
-      setWonLeads(Array.isArray(leadsData) ? leadsData : []);
+
+      // Filter to only include scheduling-related statuses
+      const filteredLeads = Array.isArray(leadsData)
+        ? leadsData.filter((lead: Lead) =>
+            ['ready_to_schedule', 'scheduled', 'won', 'lost'].includes(lead.lead_status)
+          )
+        : [];
+
+      setSchedulingLeads(filteredLeads);
     } catch (error) {
-      console.error('Error fetching won leads:', error);
-      setWonLeads([]);
+      console.error('Error fetching scheduling leads:', error);
+      setSchedulingLeads([]);
     } finally {
       setLeadsLoading(false);
     }
   }, [selectedCompany?.id]);
 
   const handleEditLead = (lead: Lead) => {
-    router.push(`/leads/${lead.id}?edit=true`);
+    router.push(`/connections/leads/${lead.id}?edit=true`);
   };
 
-  // Fetch won leads when selectedCompany changes
+  // Fetch scheduling leads when selectedCompany changes
   useEffect(() => {
     if (selectedCompany?.id) {
-      fetchWonLeads();
+      fetchSchedulingLeads();
     }
-  }, [selectedCompany?.id, fetchWonLeads]);
+  }, [selectedCompany?.id, fetchSchedulingLeads]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -117,22 +126,15 @@ export default function SchedulingPage() {
       {selectedCompany && (
             <div>
               <LeadsList
-                leads={wonLeads}
+                leads={schedulingLeads}
                 loading={leadsLoading}
                 onLeadUpdated={() => {
-                  fetchWonLeads();
+                  fetchSchedulingLeads();
                 }}
                 onEdit={handleEditLead}
                 showCompanyColumn={isAdmin && !selectedCompany}
                 userProfile={profile}
-                customTabs={[
-                  {
-                    key: 'ready-to-schedule',
-                    label: 'Ready to Schedule',
-                    filter: (leads) => leads, // Show all leads (they're already filtered to won)
-                    getCount: (leads) => leads.length,
-                  }
-                ]}
+                customTabs={getSchedulingLeadTabs()}
               />
             </div>
           )}

@@ -38,7 +38,9 @@ export function useUser() {
 
     // Subscribe to auth changes
     const supabase = createClient()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔐 [useUser] Auth state change:', event, 'User ID:', session?.user?.id);
+
       setUser(session?.user ?? null)
       if (!session?.user) {
         setProfile(null)
@@ -49,6 +51,7 @@ export function useUser() {
   }, [])
 
   const getAvatarUrl = () => {
+    // Use Google avatar URL directly - Next.js Image will handle caching
     if (!user?.user_metadata) return null
 
     // Check different avatar field names from OAuth providers
@@ -61,12 +64,6 @@ export function useUser() {
     if (!avatarUrl && user.user_metadata.picture?.data?.url) {
       avatarUrl = user.user_metadata.picture.data.url
     }
-
-    // Temporarily enable Google avatars for testing
-    // Note: You might want to implement avatar caching/proxy for production
-    // if (avatarUrl && avatarUrl.includes('googleusercontent.com')) {
-    //   return null
-    // }
 
     return avatarUrl
   }

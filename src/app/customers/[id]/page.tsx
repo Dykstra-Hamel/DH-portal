@@ -200,7 +200,7 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
   };
 
   const handleLeadClick = (leadId: string) => {
-    router.push(`/leads/${leadId}`);
+    router.push(`/connections/leads/${leadId}`);
   };
 
   const handleTicketClick = (ticketId: string) => {

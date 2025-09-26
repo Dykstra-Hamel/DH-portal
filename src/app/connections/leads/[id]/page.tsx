@@ -189,7 +189,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   }, [lead, isEditing, leadLoading, handleEdit, searchParams]);
 
   const handleBack = () => {
-    router.push('/leads');
+    router.push('/connections/leads');
   };
 
   const handleBackToCustomer = () => {
@@ -217,7 +217,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     try {
       setIsCallLoading(true);
 
-      const isFollowUp = lead.lead_status !== 'new';
+      const isFollowUp = lead.lead_status !== 'unassigned';
 
       // Prepare call request data to send to our retell-call API
       const callRequest = {
@@ -389,7 +389,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       }
 
       // Redirect to leads page after successful deletion
-      router.push('/leads');
+      router.push('/connections/leads');
     } catch (error) {
       console.error('Error deleting lead:', error);
       alert('Failed to delete lead. Please try again.');
@@ -545,7 +545,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
             <PhoneCall size={16} />
             {isCallLoading
               ? 'Calling...'
-              : lead.lead_status === 'new'
+              : lead.lead_status === 'unassigned'
                 ? 'Call Customer'
                 : 'Follow Up'}
           </button>

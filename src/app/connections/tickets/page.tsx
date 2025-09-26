@@ -215,7 +215,21 @@ function TicketsPageContent() {
       case 'UPDATE':
         // Update existing ticket - fetch full data with joins for real-time updates
         if (newRecord && selectedCompany?.id) {
-          // Fetch the full ticket data with joins
+          console.log('Processing ticket UPDATE:', newRecord.id, {
+            archived: newRecord.archived,
+            status: newRecord.status,
+            converted_to_lead_id: newRecord.converted_to_lead_id,
+            converted_to_support_case_id: newRecord.converted_to_support_case_id
+          });
+
+          // If ticket becomes archived or resolved (from qualification), remove it from active view
+          if (newRecord.archived === true || newRecord.status === 'resolved') {
+            console.log('Removing archived/resolved ticket from active view:', newRecord.id);
+            setTickets(prev => prev.filter(ticket => ticket.id !== newRecord.id));
+            break;
+          }
+
+          // For non-archived updates, fetch full data with joins
           const supabase = createClient();
           supabase
             .from('tickets')
@@ -245,15 +259,28 @@ function TicketsPageContent() {
             .single()
             .then(({ data: fullTicket, error }) => {
               if (error) {
-                console.error('Error fetching full ticket data:', error);
-                // Fallback to basic update
-                setTickets(prev =>
-                  prev.map(ticket => ticket.id === newRecord.id ? newRecord : ticket)
-                );
+                console.error('Error fetching full ticket data for update:', error);
+                // If ticket no longer exists or is archived, remove it
+                if (error.code === 'PGRST116') { // No rows returned
+                  console.log('Ticket no longer exists, removing from list:', newRecord.id);
+                  setTickets(prev => prev.filter(ticket => ticket.id !== newRecord.id));
+                } else {
+                  // Fallback to basic update for other errors
+                  setTickets(prev =>
+                    prev.map(ticket => ticket.id === newRecord.id ? newRecord : ticket)
+                  );
+                }
               } else if (fullTicket) {
-                setTickets(prev =>
-                  prev.map(ticket => ticket.id === newRecord.id ? fullTicket : ticket)
-                );
+                // Check again if the full ticket data shows it should be removed
+                if (fullTicket.archived === true || fullTicket.status === 'resolved') {
+                  console.log('Full ticket data shows archived/resolved, removing:', fullTicket.id);
+                  setTickets(prev => prev.filter(ticket => ticket.id !== fullTicket.id));
+                } else {
+                  console.log('Updating ticket with full data:', fullTicket.id);
+                  setTickets(prev =>
+                    prev.map(ticket => ticket.id === newRecord.id ? fullTicket : ticket)
+                  );
+                }
               }
             });
         }
@@ -367,11 +394,23 @@ function TicketsPageContent() {
           filter: `company_id=eq.${selectedCompany.id}`
         },
         (payload) => {
-          console.log('Ticket realtime update:', payload);
+          const newTicket = payload.new as any;
+          const oldTicket = payload.old as any;
+
+          console.log('Ticket realtime update received:', {
+            eventType: payload.eventType,
+            ticketId: newTicket?.id || oldTicket?.id,
+            companyId: selectedCompany.id,
+            timestamp: new Date().toISOString(),
+            oldData: oldTicket,
+            newData: newTicket
+          });
           handleTicketChange(payload);
-          
-          // Still refresh metrics on ticket changes since they affect aggregates
-          if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+
+          // Refresh metrics on ticket changes since they affect aggregates
+          if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE' ||
+              (payload.eventType === 'UPDATE' && (newTicket?.archived !== oldTicket?.archived))) {
+            console.log('Refreshing metrics due to ticket change that affects counts');
             fetchMetrics(selectedCompany.id);
           }
         }
@@ -394,9 +433,26 @@ function TicketsPageContent() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime subscription status for tickets:', {
+          status,
+          companyId: selectedCompany.id,
+          timestamp: new Date().toISOString()
+        });
+
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime tickets subscription active');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Realtime tickets subscription error');
+        } else if (status === 'TIMED_OUT') {
+          console.warn('⏰ Realtime tickets subscription timed out');
+        } else if (status === 'CLOSED') {
+          console.log('🔒 Realtime tickets subscription closed');
+        }
+      });
 
     return () => {
+      console.log('Cleaning up realtime subscription for company:', selectedCompany.id);
       supabase.removeChannel(channel);
     };
   }, [selectedCompany?.id, handleTicketChange, handleCallRecordChange, fetchMetrics]);
