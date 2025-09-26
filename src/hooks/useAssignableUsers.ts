@@ -15,13 +15,13 @@ interface AssignableUser {
 
 interface UseAssignableUsersProps {
   companyId: string | null | undefined;
-  departmentType: 'sales' | 'support';
+  departmentType?: 'sales' | 'support' | 'all';
   enabled?: boolean;
 }
 
 export function useAssignableUsers({
   companyId,
-  departmentType,
+  departmentType = 'all',
   enabled = true
 }: UseAssignableUsersProps) {
   const [users, setUsers] = useState<AssignableUser[]>([]);
@@ -32,13 +32,18 @@ export function useAssignableUsers({
   const isUserEligible = useCallback((user: AssignableUser): boolean => {
     const roles = user.roles || [];
 
+    // If departmentType is 'all', include all users
+    if (departmentType === 'all') {
+      return true;
+    }
+
     // Company admins and managers can be assigned to any department
     if (roles.includes('admin') || roles.includes('manager')) {
       return true;
     }
 
     // If user has the required department, they're eligible
-    if (user.departments.includes(departmentType)) {
+    if (departmentType && user.departments.includes(departmentType)) {
       return true;
     }
 

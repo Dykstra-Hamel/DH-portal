@@ -1,0 +1,168 @@
+.taskForm {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.label {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--color-text-primary, #374151);
+  margin-bottom: 4px;
+}
+
+.input,
+.select,
+.textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary, #3b82f6);
+    box-shadow: 0 0 0 3px var(--color-primary-light, rgba(59, 130, 246, 0.1));
+  }
+
+  &:disabled {
+    background-color: var(--color-background-disabled, #f3f4f6);
+    color: var(--color-text-disabled, #9ca3af);
+    cursor: not-allowed;
+  }
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.inputError {
+  border-color: var(--color-error, #ef4444);
+
+  &:focus {
+    border-color: var(--color-error, #ef4444);
+    box-shadow: 0 0 0 3px var(--color-error-light, rgba(239, 68, 68, 0.1));
+  }
+}
+
+.errorText {
+  font-size: 0.75rem;
+  color: var(--color-error, #ef4444);
+  margin-top: 4px;
+}
+
+.loadingText {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+  margin-top: 4px;
+}
+
+.relatedEntityInfo {
+  padding: 8px 12px;
+  background-color: var(--color-background-secondary, #f8fafc);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.formActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  justify-content: flex-end;
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+  }
+}
+
+.cancelButton {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border, #d1d5db);
+  background-color: white;
+  color: var(--color-text-primary, #374151);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-background-hover, #f9fafb);
+    border-color: var(--color-border-hover, #9ca3af);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.submitButton {
+  padding: 8px 16px;
+  border: none;
+  background-color: var(--color-primary, #3b82f6);
+  color: white;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-hover, #2563eb);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// Dark mode support (if implemented)
+@media (prefers-color-scheme: dark) {
+  .taskForm {
+    background: var(--color-background-dark, #1f2937);
+    color: var(--color-text-dark, #f3f4f6);
+  }
+
+  .input,
+  .select,
+  .textarea {
+    background-color: var(--color-background-input-dark, #374151);
+    border-color: var(--color-border-dark, #4b5563);
+    color: var(--color-text-dark, #f3f4f6);
+
+    &:focus {
+      border-color: var(--color-primary-dark, #60a5fa);
+    }
+  }
+}

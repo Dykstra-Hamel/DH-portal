@@ -104,7 +104,8 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
       case '/connections/scheduling':
         return {
           title: 'Scheduling',
-          description: 'Manage all your incoming calls and forms and assign them there.',
+          description:
+            'Manage all your incoming calls and forms and assign them there.',
           showAddButton: false,
         };
       case '/connections/my-sales-leads':
@@ -127,6 +128,13 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
           description: 'View and manage all your support cases here.',
           showAddButton: true,
           addButtonText: 'Add Case',
+        };
+      case '/connections/tasks':
+        return {
+          title: 'Tasks',
+          description: 'View and manage all tasks here.',
+          showAddButton: true,
+          addButtonText: 'Create Task',
         };
       case '/test-automation':
         return {
@@ -151,7 +159,10 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         }
 
         // Handle other customer sub-paths
-        if (pathname.startsWith('/customers/') && !pathname.match(/\/customers\/[^\/]+$/)) {
+        if (
+          pathname.startsWith('/customers/') &&
+          !pathname.match(/\/customers\/[^\/]+$/)
+        ) {
           return {
             title: 'Customers',
             description: 'Manage and view all your customer information here.',

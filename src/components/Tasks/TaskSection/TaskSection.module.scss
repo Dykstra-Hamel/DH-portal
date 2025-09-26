@@ -1,0 +1,158 @@
+.taskSection {
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  background: white;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  background-color: var(--color-background-secondary, #f8fafc);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #374151);
+}
+
+.createButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  background-color: var(--color-primary, #3b82f6);
+  color: white;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-hover, #2563eb);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.formContainer {
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  background-color: var(--color-background-tertiary, #ffffff);
+}
+
+.formHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  background-color: var(--color-background-secondary, #f8fafc);
+}
+
+.formTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #374151);
+}
+
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--color-text-secondary, #6b7280);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-background-hover, #f3f4f6);
+    color: var(--color-text-primary, #374151);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.tasksList {
+  // Remove border and padding from the nested DataTable since we're wrapping it
+  :global(.dataTable) {
+    border: none;
+    box-shadow: none;
+    
+    .header {
+      border-radius: 0;
+      border-bottom: 1px solid var(--color-border, #e5e7eb);
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .title {
+    text-align: center;
+  }
+
+  .createButton {
+    justify-content: center;
+  }
+
+  .formHeader {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .formTitle {
+    text-align: center;
+  }
+
+  .closeButton {
+    align-self: flex-end;
+  }
+}
+
+// Dark mode support (if implemented)
+@media (prefers-color-scheme: dark) {
+  .taskSection {
+    background: var(--color-background-dark, #1f2937);
+    border-color: var(--color-border-dark, #4b5563);
+  }
+
+  .header,
+  .formHeader {
+    background-color: var(--color-background-secondary-dark, #374151);
+    border-color: var(--color-border-dark, #4b5563);
+  }
+
+  .title,
+  .formTitle {
+    color: var(--color-text-dark, #f3f4f6);
+  }
+
+  .formContainer {
+    background-color: var(--color-background-dark, #1f2937);
+    border-color: var(--color-border-dark, #4b5563);
+  }
+}
