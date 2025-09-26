@@ -1,0 +1,573 @@
+.contentLeft,
+.contentRight {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardContent {
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+// Assign Ticket Card Styles
+.customerSection {
+  div {
+    margin-bottom: 4px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.section {
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.sectionLabel {
+  margin-bottom: 12px !important;
+}
+
+// Radio Button Group
+.radioGroup {
+  display: flex;
+  gap: 24px;
+  padding: 12px;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  background: white;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+
+  input[type='radio'] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.radioCustom {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #d1d5db;
+  border-radius: 50%;
+  position: relative;
+  background: white;
+  transition: all 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--action-500);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.2s ease;
+  }
+
+  input:checked + & {
+    border-color: var(--action-500);
+
+    &::after {
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
+}
+
+// Dropdown Styles
+.dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdownButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: 4px 12px;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: none;
+  }
+}
+
+.dropdownContent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatarContainer {
+  flex-shrink: 0;
+  display: flex;
+}
+
+.defaultAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.userInfo {
+  flex: 1;
+  text-align: left;
+}
+
+.chevronIcon {
+  color: #6b7280;
+  transition: transform 0.2s ease;
+
+  &.rotated {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  margin-top: 4px;
+}
+
+.dropdownOption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+
+  &:first-child {
+    border-radius: 8px 8px 0 0;
+  }
+
+  &:last-child {
+    border-radius: 0 0 8px 8px;
+  }
+
+  &:first-child:last-child {
+    border-radius: 8px;
+  }
+}
+
+// Team Avatar
+.teamAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--action-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// User Avatar
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+// Selected State
+.selected {
+  background-color: var(--gray-50);
+}
+
+// Action Button
+.actionSection {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.assignButton {
+  background: var(--action-500);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover {
+    background: var(--action-600);
+  }
+
+  &:active {
+    background: var(--action-600);
+  }
+}
+
+// Call Information Card Styles
+.callInsightsSection {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-300);
+  margin-bottom: 16px;
+}
+
+.callInsightsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+
+.callDetailsHeader {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-300);
+  margin-bottom: 16px;
+}
+
+.callDetailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.transcriptHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.toggleContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggleLabel {
+  color: var(--gray-500);
+  font-size: 12px;
+  font-weight: 550;
+  user-select: none;
+  transition: color 0.2s ease;
+
+  .toggleContainer.active & {
+    color: var(--action-500);
+  }
+}
+
+.transcriptContent {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.transcriptToggle {
+  display: flex;
+  width: 44px;
+  height: 24px;
+  padding: 2px;
+  align-items: flex-start;
+  border-radius: 12px;
+  background: var(--gray-300);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border: none;
+  outline: none;
+
+  &:focus {
+    outline: 2px solid var(--action-200);
+    outline-offset: 2px;
+  }
+}
+
+.toggleCircle {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--White, #FFF);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.10), 0 1px 2px -1px rgba(0, 0, 0, 0.10);
+  transition: transform 0.2s ease;
+  transform: translateX(0px);
+
+  .transcriptToggle.active & {
+    transform: translateX(20px);
+  }
+}
+
+.noCallData {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+// Service Location Form Styles
+.serviceLocationGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.gridRow {
+  display: grid;
+  gap: 8px;
+
+  &.threeColumns {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  &.twoColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &.oneColumn {
+    grid-template-columns: 1fr;
+  }
+
+  @media (max-width: 768px) {
+    &.threeColumns,
+    &.twoColumns {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.textInput {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.selectInput {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+}
+
+.fieldWithSuffix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fieldSuffix {
+  position: absolute;
+  right: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-500);
+  pointer-events: none;
+}
+
+.selectInput.withSuffix {
+  padding-right: 60px;
+}
+
+.streetViewContainer {
+  width: 100%;
+  height: 240px;
+  border-radius: 8px;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    height: 200px;
+  }
+}
+
+// Address Actions (Save/Cancel buttons)
+.addressActions {
+  padding: 16px;
+  background: var(--amber-50);
+  border: 1px solid var(--amber-200);
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.addressActionsContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+}
+
+.changesMessage {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--amber-700);
+}
+
+.actionButtons {
+  display: flex;
+  gap: 12px;
+
+  @media (max-width: 640px) {
+    justify-content: flex-end;
+  }
+}
+
+.button {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 90px;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.saveButton {
+  background: var(--action-500);
+  color: white;
+  border: 1px solid var(--action-500);
+
+  &:hover:not(:disabled) {
+    background: var(--action-600);
+    border-color: var(--action-600);
+  }
+}
+
+.cancelButton {
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+}

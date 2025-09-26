@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendEvent } from '@/lib/inngest/client';
+import { getCustomerPrimaryServiceAddress } from '@/lib/service-addresses';
 
 export async function GET(
   request: NextRequest,
@@ -53,6 +54,18 @@ export async function GET(
       );
     }
 
+    // Get customer's primary service address if lead has a customer
+    let primaryServiceAddress = null;
+    if (lead.customer_id) {
+      try {
+        const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
+        primaryServiceAddress = result.serviceAddress;
+      } catch (serviceAddressError) {
+        console.error('Error fetching primary service address:', serviceAddressError);
+        // Don't fail the API call if service address fetching fails
+      }
+    }
+
     // Get assigned user profile if lead has one
     let assignedUser = null;
     if (lead.assigned_to) {
@@ -67,10 +80,19 @@ export async function GET(
       }
     }
 
+    // Get call record separately using lead_id foreign key
+    const { data: callRecord, error: callError } = await supabase
+      .from('call_records')
+      .select('*')
+      .eq('lead_id', id)
+      .single();
+
     // Enhanced lead object
     const enhancedLead = {
       ...lead,
+      call_record: callRecord || null,
       assigned_user: assignedUser,
+      primary_service_address: primaryServiceAddress,
     };
 
     return NextResponse.json(enhancedLead);
@@ -210,6 +232,18 @@ export async function PUT(
       }
     }
 
+    // Get customer's primary service address if lead has a customer
+    let primaryServiceAddress = null;
+    if (lead.customer_id) {
+      try {
+        const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
+        primaryServiceAddress = result.serviceAddress;
+      } catch (serviceAddressError) {
+        console.error('Error fetching primary service address:', serviceAddressError);
+        // Don't fail the API call if service address fetching fails
+      }
+    }
+
     // Get assigned user profile if lead has one
     let assignedUser = null;
     if (lead.assigned_to) {
@@ -224,10 +258,19 @@ export async function PUT(
       }
     }
 
+    // Get call record separately using lead_id foreign key
+    const { data: callRecord, error: callError } = await supabase
+      .from('call_records')
+      .select('*')
+      .eq('lead_id', id)
+      .single();
+
     // Enhanced lead object
     const enhancedLead = {
       ...lead,
+      call_record: callRecord || null,
       assigned_user: assignedUser,
+      primary_service_address: primaryServiceAddress,
     };
 
     return NextResponse.json(enhancedLead);

@@ -1,0 +1,170 @@
+.autocompleteContainer {
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
+
+.autocompleteInput {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.loadingIndicator {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 12px;
+  color: var(--gray-500);
+  z-index: 1000;
+}
+
+.errorIndicator {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 8px 16px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 12px;
+  color: #dc2626;
+  z-index: 1000;
+}
+
+// Override Google Places autocomplete dropdown styles
+:global(.pac-container) {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid var(--gray-300) !important;
+  font-family: inherit !important;
+  z-index: 10000 !important;
+  background: white !important;
+  margin-top: 4px !important;
+  position: relative !important;
+
+  .pac-item {
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+    border-top: 1px solid var(--gray-200) !important;
+    cursor: pointer !important;
+    background: white !important;
+
+    &:first-child {
+      border-top: none !important;
+      border-radius: 8px 8px 0 0 !important;
+    }
+
+    &:last-child {
+      border-radius: 0 0 8px 8px !important;
+    }
+
+    &:hover,
+    &.pac-item-selected {
+      background: var(--gray-50) !important;
+    }
+
+    .pac-icon {
+      margin-right: 12px !important;
+      width: 15px !important;
+      height: 20px !important;
+    }
+
+    .pac-item-query {
+      color: var(--gray-900) !important;
+      font-weight: 500 !important;
+    }
+
+    .pac-matched {
+      color: var(--action-500) !important;
+      font-weight: 600 !important;
+    }
+  }
+}
+
+:global(.pac-logo) {
+  padding: 8px !important;
+}
+
+// Custom suggestions dropdown styling
+.suggestionsDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.suggestionItem {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--gray-200);
+  transition: background-color 0.15s ease;
+
+  &:last-child {
+    border-bottom: none;
+    border-radius: 0 0 8px 8px;
+  }
+
+  &:hover,
+  &.selected {
+    background: var(--gray-50);
+  }
+}
+
+.suggestionMain {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  margin-bottom: 2px;
+}
+
+.streetAddress {
+  color: var(--action-500);
+  font-weight: 600;
+}
+
+.suggestionSecondary {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+

@@ -1,0 +1,14 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--slate-300);
+  background: linear-gradient(180deg, #e3e8f2 0%, #fafafc 100%);
+  margin-bottom: 24px;
+}
+
+.stepComponent {
+  // Any specific styling for the step component within the wrapper
+}

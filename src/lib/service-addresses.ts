@@ -11,6 +11,7 @@ export interface ServiceAddressData {
   longitude?: number;
   address_type?: 'residential' | 'commercial' | 'industrial' | 'mixed_use';
   property_notes?: string;
+  hasStreetView?: boolean;
 }
 
 export interface CreateServiceAddressResult {
@@ -293,5 +294,89 @@ export async function getCustomerPrimaryServiceAddress(customerId: string): Prom
   } catch (error) {
     console.error('Error getting customer primary service address:', error);
     return { error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Updates a lead's service_address_id to link it to a service address
+ */
+export async function updateLeadServiceAddress(
+  leadId: string,
+  serviceAddressId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createAdminClient();
+
+    const { error } = await supabase
+      .from('leads')
+      .update({ service_address_id: serviceAddressId })
+      .eq('id', leadId);
+
+    if (error) {
+      console.error('Error updating lead service address:', error);
+      return {
+        success: false,
+        error: `Failed to update lead service address: ${error.message}`
+      };
+    }
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error in updateLeadServiceAddress:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+/**
+ * Creates a service address and links it to both customer and lead
+ */
+export async function createServiceAddressForLead(
+  companyId: string,
+  customerId: string,
+  leadId: string,
+  addressData: ServiceAddressData,
+  isPrimary: boolean = false
+): Promise<CreateServiceAddressResult & { linkedToCustomer?: boolean; linkedToLead?: boolean }> {
+  try {
+    // First create or find the service address
+    const serviceAddressResult = await createOrFindServiceAddress(companyId, addressData);
+
+    if (!serviceAddressResult.success || !serviceAddressResult.serviceAddressId) {
+      return serviceAddressResult;
+    }
+
+    // Link to customer
+    const customerLinkResult = await linkCustomerToServiceAddress(
+      customerId,
+      serviceAddressResult.serviceAddressId,
+      'owner',
+      isPrimary
+    );
+
+    // Link to lead
+    const leadLinkResult = await updateLeadServiceAddress(
+      leadId,
+      serviceAddressResult.serviceAddressId
+    );
+
+    return {
+      ...serviceAddressResult,
+      linkedToCustomer: customerLinkResult.success,
+      linkedToLead: leadLinkResult.success,
+      error: !customerLinkResult.success ? customerLinkResult.error :
+             !leadLinkResult.success ? leadLinkResult.error :
+             serviceAddressResult.error
+    };
+
+  } catch (error) {
+    console.error('Error in createServiceAddressForLead:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 }

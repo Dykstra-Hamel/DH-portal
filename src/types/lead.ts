@@ -70,6 +70,8 @@ export interface Lead {
     city?: string;
     state?: string;
     zip_code?: string;
+    latitude?: number;
+    longitude?: number;
   };
   assigned_user?: {
     id: string;
@@ -82,6 +84,38 @@ export interface Lead {
     id: string;
     name: string;
     website?: string;
+  };
+  primary_service_address?: {
+    id: string;
+    street_address: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    apartment_unit?: string;
+    address_line_2?: string;
+    latitude?: number;
+    longitude?: number;
+    address_type: 'residential' | 'commercial' | 'industrial' | 'mixed_use';
+    property_notes?: string;
+  };
+  call_record?: {
+    id: string;
+    call_id: string;
+    phone_number: string;
+    call_status: string;
+    start_timestamp?: string;
+    end_timestamp?: string;
+    duration_seconds?: number;
+    recording_url?: string;
+    transcript?: string;
+    sentiment?: string;
+    pest_issue?: string;
+    preferred_service_time?: string;
+    disconnect_reason?: string;
+    call_analysis?: {
+      call_summary?: string;
+      [key: string]: any;
+    };
   };
 }
 
