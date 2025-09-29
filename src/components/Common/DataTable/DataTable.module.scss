@@ -303,6 +303,22 @@
   display: flex;
   align-items: center;
   gap: 6px;
+
+  &.statusNew {
+    color: #3b82f6;
+  }
+
+  &.statusPending {
+    color: #f97316;
+  }
+
+  &.statusInProgress {
+    color: #eab308;
+  }
+
+  &.statusCompleted {
+    color: #10b981;
+  }
 }
 
 .actionButton {
@@ -369,6 +385,17 @@
 
 .customerTableWithCompany {
   --table-columns: 220px 220px 120px 140px 100px 100px 120px 120px 180px;
+}
+
+.taskTable {
+  --table-columns: 1fr 100px 90px 150px 150px 400px;
+}
+
+.taskActions {
+  display: flex;
+  flex-flow: row;
+  gap: 8px;
+  margin-left: auto;
 }
 
 // Responsive design

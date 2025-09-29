@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Task, TaskFormData, TaskRelatedEntityType } from '@/types/task';
 import TasksList from '../TasksList/TasksList';
 import TaskForm from '../TaskForm/TaskForm';
@@ -28,11 +29,13 @@ export default function TaskSection({
   assignableUsers = [],
   className,
 }: TaskSectionProps) {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState<TaskFormData | null>(null);
 
   // Load tasks related to this entity
   useEffect(() => {
@@ -63,6 +66,10 @@ export default function TaskSection({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewTask = (task: Task) => {
+    router.push(`/connections/tasks/${task.id}`);
   };
 
   const handleCreateTask = async (formData: TaskFormData) => {
@@ -161,6 +168,7 @@ export default function TaskSection({
   const handleCancelForm = () => {
     setShowCreateForm(false);
     setEditingTask(null);
+    setFormData(null);
   };
 
   const taskTabs = [
@@ -222,8 +230,7 @@ export default function TaskSection({
             task={editingTask || undefined}
             companyId={companyId}
             assignableUsers={assignableUsers}
-            onSubmit={editingTask ? handleEditTask : handleCreateTask}
-            onCancel={handleCancelForm}
+            onFormDataChange={setFormData}
             loading={submitting}
             relatedEntity={{
               type: relatedEntityType,
@@ -231,6 +238,30 @@ export default function TaskSection({
               name: relatedEntityName,
             }}
           />
+          <div className={styles.formActions}>
+            <button
+              onClick={handleCancelForm}
+              className={styles.cancelButton}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                if (formData) {
+                  if (editingTask) {
+                    await handleEditTask(formData);
+                  } else {
+                    await handleCreateTask(formData);
+                  }
+                }
+              }}
+              className={styles.submitButton}
+              disabled={!formData || submitting}
+            >
+              {submitting ? 'Saving...' : (editingTask ? 'Update Task' : 'Create Task')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -239,6 +270,7 @@ export default function TaskSection({
           tasks={tasks}
           loading={loading}
           onTaskUpdated={loadTasks}
+          onView={handleViewTask}
           onEdit={setEditingTask}
           onArchive={handleArchiveTask}
           onComplete={handleCompleteTask}

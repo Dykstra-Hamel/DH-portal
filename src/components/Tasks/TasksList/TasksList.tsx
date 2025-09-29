@@ -12,6 +12,7 @@ interface TasksListProps {
   loading?: boolean;
   onTaskUpdated?: () => void;
   onEdit?: (task: Task) => void;
+  onView?: (task: Task) => void;
   onArchive?: (taskId: string) => void;
   onUnarchive?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
@@ -20,6 +21,7 @@ interface TasksListProps {
   showCompanyColumn?: boolean;
   userProfile?: { role?: string; id?: string };
   customTabs?: TabDefinition<Task>[] | null;
+  customColumnWidths?: string; // Custom CSS grid template columns (e.g., "2fr 120px 100px 180px 200px 300px")
 }
 
 function TasksList({
@@ -27,6 +29,7 @@ function TasksList({
   loading = false,
   onTaskUpdated,
   onEdit,
+  onView,
   onArchive,
   onUnarchive,
   onDelete,
@@ -35,6 +38,7 @@ function TasksList({
   showCompanyColumn = false,
   userProfile,
   customTabs,
+  customColumnWidths,
 }: TasksListProps) {
   // Toast state for undo functionality
   const [toastMessage, setToastMessage] = useState('');
@@ -45,7 +49,9 @@ function TasksList({
 
   // Handle item actions (edit, archive, etc.)
   const handleItemAction = (action: string, task: Task) => {
-    if (action === 'edit') {
+    if (action === 'view') {
+      onView?.(task);
+    } else if (action === 'edit') {
       onEdit?.(task);
     } else if (action === 'archive') {
       handleArchiveTask(task.id);
@@ -149,10 +155,12 @@ function TasksList({
         data={tasks}
         loading={loading}
         title="Tasks"
-        columns={getTaskColumns(showCompanyColumn, userProfile?.role)}
+        columns={getTaskColumns(showCompanyColumn)}
         tabs={filteredTabs}
         onItemAction={handleItemAction}
         onDataUpdated={onTaskUpdated}
+        tableType="tasks"
+        customColumnWidths={customColumnWidths}
       />
 
       {showToast && (

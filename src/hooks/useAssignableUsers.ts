@@ -22,33 +22,36 @@ interface UseAssignableUsersProps {
 export function useAssignableUsers({
   companyId,
   departmentType = 'all',
-  enabled = true
+  enabled = true,
 }: UseAssignableUsersProps) {
   const [users, setUsers] = useState<AssignableUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Check if user is eligible for assignment based on department and role
-  const isUserEligible = useCallback((user: AssignableUser): boolean => {
-    const roles = user.roles || [];
+  const isUserEligible = useCallback(
+    (user: AssignableUser): boolean => {
+      const roles = user.roles || [];
 
-    // If departmentType is 'all', include all users
-    if (departmentType === 'all') {
-      return true;
-    }
+      // If departmentType is 'all', include all users
+      if (departmentType === 'all') {
+        return true;
+      }
 
-    // Company admins and managers can be assigned to any department
-    if (roles.includes('admin') || roles.includes('manager')) {
-      return true;
-    }
+      // Company admins and managers can be assigned to any department
+      if (roles.includes('admin') || roles.includes('manager')) {
+        return true;
+      }
 
-    // If user has the required department, they're eligible
-    if (departmentType && user.departments.includes(departmentType)) {
-      return true;
-    }
+      // If user has the required department, they're eligible
+      if (departmentType && user.departments.includes(departmentType)) {
+        return true;
+      }
 
-    return false;
-  }, [departmentType]);
+      return false;
+    },
+    [departmentType]
+  );
 
   const fetchAssignableUsers = useCallback(async () => {
     if (!companyId || !enabled) {

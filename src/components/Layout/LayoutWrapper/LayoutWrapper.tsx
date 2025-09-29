@@ -7,6 +7,10 @@ import { GlobalHeader } from '../GlobalHeader/GlobalHeader';
 import { Sidebar } from '@/components/sidenav/Sidebar';
 import { NavigationProvider } from '@/contexts/NavigationContext';
 import { CompanyProvider } from '@/contexts/CompanyContext';
+import {
+  PageActionsProvider,
+  usePageActions,
+} from '@/contexts/PageActionsContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
 import styles from './LayoutWrapper.module.scss';
 
@@ -14,9 +18,10 @@ interface LayoutWrapperProps {
   children: React.ReactNode;
 }
 
-export function LayoutWrapper({ children }: LayoutWrapperProps) {
+function LayoutContent({ children }: LayoutWrapperProps) {
   const pathname = usePathname();
   const [isSidebarActive, setIsSidebarActive] = useState(false);
+  const { getPageAction } = usePageActions();
 
   // Define which routes should show the header and sidebar
   const isPublicPage =
@@ -136,6 +141,13 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
           showAddButton: true,
           addButtonText: 'Create Task',
         };
+      case '/connections/my-tasks':
+        return {
+          title: 'My Tasks',
+          description: 'View and manage your assigned tasks here.',
+          showAddButton: true,
+          addButtonText: 'Create Task',
+        };
       case '/test-automation':
         return {
           title: 'Test Automation',
@@ -146,6 +158,12 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         return {
           title: 'Automation Status',
           description: 'Monitor the status of your automated processes here.',
+          showAddButton: false,
+        };
+      case '/reports':
+        return {
+          title: 'Reports',
+          description: 'Run detailed record reports here.',
           showAddButton: false,
         };
       // Handle individual record pages (hide lower header)
@@ -186,32 +204,45 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pageConfig = getPageConfig();
 
   return (
+    <div className={styles.layoutWrapper}>
+      {/* Mobile Menu Button */}
+      <div className="mobileMenuButton" onClick={toggleSidebar}>
+        <Menu size={32} />
+      </div>
+
+      <div className={styles.contentWrapper}>
+        <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
+        <div className={styles.rightContent}>
+          <GlobalHeader />
+          {pageConfig && (
+            <GlobalLowerHeader
+              title={pageConfig.title}
+              description={pageConfig.description}
+              showAddButton={pageConfig.showAddButton}
+              addButtonText={pageConfig.addButtonText}
+              onAddClick={
+                pageConfig.showAddButton
+                  ? getPageAction('add') || undefined
+                  : undefined
+              }
+            />
+          )}
+          <main className={styles.mainContent}>
+            <section className="pageWrapper">{children}</section>
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LayoutWrapper({ children }: LayoutWrapperProps) {
+  return (
     <NavigationProvider>
       <CompanyProvider>
-        <div className={styles.layoutWrapper}>
-          {/* Mobile Menu Button */}
-          <div className="mobileMenuButton" onClick={toggleSidebar}>
-            <Menu size={32} />
-          </div>
-
-          <div className={styles.contentWrapper}>
-            <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
-            <div className={styles.rightContent}>
-              <GlobalHeader />
-              {pageConfig && (
-                <GlobalLowerHeader
-                  title={pageConfig.title}
-                  description={pageConfig.description}
-                  showAddButton={pageConfig.showAddButton}
-                  addButtonText={pageConfig.addButtonText}
-                />
-              )}
-              <main className={styles.mainContent}>
-                <section className="pageWrapper">{children}</section>
-              </main>
-            </div>
-          </div>
-        </div>
+        <PageActionsProvider>
+          <LayoutContent>{children}</LayoutContent>
+        </PageActionsProvider>
       </CompanyProvider>
     </NavigationProvider>
   );

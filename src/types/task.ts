@@ -1,9 +1,8 @@
 export type TaskStatus =
   | 'new'
+  | 'pending'
   | 'in_progress'
-  | 'completed'
-  | 'cancelled'
-  | 'on_hold';
+  | 'completed';
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -11,8 +10,6 @@ export type TaskRelatedEntityType =
   | 'leads' 
   | 'support_cases' 
   | 'customers' 
-  | 'tickets'
-  | 'call_records'
   | null;
 
 export interface Task {
@@ -89,8 +86,6 @@ export interface TaskFormData {
   assigned_to?: string | null;
   due_date?: string;
   due_time?: string;
-  estimated_hours?: number;
-  actual_hours?: number;
   related_entity_type?: TaskRelatedEntityType;
   related_entity_id?: string | null;
 }
@@ -106,10 +101,9 @@ export interface TaskUpdateData extends Partial<TaskFormData> {
 
 export const taskStatusOptions = [
   { value: 'new', label: 'New' },
+  { value: 'pending', label: 'Pending' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'on_hold', label: 'On Hold' },
 ] as const;
 
 export const taskPriorityOptions = [
@@ -123,8 +117,6 @@ export const taskRelatedEntityTypeOptions = [
   { value: 'leads', label: 'Lead' },
   { value: 'support_cases', label: 'Support Case' },
   { value: 'customers', label: 'Customer' },
-  { value: 'tickets', label: 'Ticket' },
-  { value: 'call_records', label: 'Call Record' },
 ] as const;
 
 // Utility functions
@@ -132,14 +124,12 @@ export const getTaskStatusColor = (status: TaskStatus): string => {
   switch (status) {
     case 'new':
       return 'blue';
+    case 'pending':
+      return 'orange';
     case 'in_progress':
       return 'yellow';
     case 'completed':
       return 'green';
-    case 'cancelled':
-      return 'red';
-    case 'on_hold':
-      return 'gray';
     default:
       return 'gray';
   }
@@ -174,7 +164,7 @@ export const formatTaskDueDateTime = (due_date?: string, due_time?: string): str
 };
 
 export const isTaskOverdue = (task: Task): boolean => {
-  if (!task.due_date || task.status === 'completed' || task.status === 'cancelled') {
+  if (!task.due_date || task.status === 'completed') {
     return false;
   }
   

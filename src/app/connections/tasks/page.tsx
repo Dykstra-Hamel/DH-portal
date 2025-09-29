@@ -1,23 +1,31 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Task, TaskFormData, isTaskOverdue } from '@/types/task';
 import TasksList from '@/components/Tasks/TasksList/TasksList';
 import TaskForm from '@/components/Tasks/TaskForm/TaskForm';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { useCompany } from '@/contexts/CompanyContext';
-import { Modal, ModalTop, ModalMiddle } from '@/components/Common/Modal/Modal';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
+import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
 import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
 
 export default function TasksPage() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState<TaskFormData | null>(null);
 
   // Use global company context
   const { selectedCompany } = useCompany();
+
+  // Register page actions for global header
+  const { registerPageAction, unregisterPageAction } = usePageActions();
 
   // Get assignable users for the company (all departments for tasks)
   const { users: assignableUsers } = useAssignableUsers({
@@ -29,7 +37,7 @@ export default function TasksPage() {
   const calculateTaskMetrics = () => {
     return {
       total: tasks.length,
-      pending: tasks.filter(t => t.status === 'new').length,
+      pending: tasks.filter(t => t.status === 'pending').length,
       inProgress: tasks.filter(t => t.status === 'in_progress').length,
       completed: tasks.filter(t => t.status === 'completed').length,
       overdue: tasks.filter(isTaskOverdue).length
@@ -91,6 +99,16 @@ export default function TasksPage() {
       loadTasks(selectedCompany.id);
     }
   }, [selectedCompany?.id, loadTasks]);
+
+  // Register the add action for the global header button
+  useEffect(() => {
+    registerPageAction('add', () => setShowCreateForm(true));
+    return () => unregisterPageAction('add');
+  }, [registerPageAction, unregisterPageAction]);
+
+  const handleViewTask = (task: Task) => {
+    router.push(`/connections/tasks/${task.id}`);
+  };
 
   const handleCreateTask = async (formData: TaskFormData) => {
     if (!selectedCompany?.id) return;
@@ -196,6 +214,7 @@ export default function TasksPage() {
   const handleCancelForm = () => {
     setShowCreateForm(false);
     setEditingTask(null);
+    setFormData(null);
   };
 
   if (!selectedCompany) {
@@ -308,11 +327,30 @@ export default function TasksPage() {
             task={editingTask || undefined}
             companyId={selectedCompany.id}
             assignableUsers={assignableUsers}
-            onSubmit={editingTask ? handleEditTask : handleCreateTask}
-            onCancel={handleCancelForm}
+            onFormDataChange={setFormData}
             loading={submitting}
           />
         </ModalMiddle>
+        <ModalBottom>
+          <ModalActionButtons
+            onBack={handleCancelForm}
+            showBackButton={true}
+            isFirstStep={true}
+            onPrimaryAction={async () => {
+              if (formData) {
+                if (editingTask) {
+                  await handleEditTask(formData);
+                } else {
+                  await handleCreateTask(formData);
+                }
+              }
+            }}
+            primaryButtonText={editingTask ? 'Update Task' : 'Create Task'}
+            primaryButtonDisabled={!formData || submitting}
+            isLoading={submitting}
+            loadingText="Saving..."
+          />
+        </ModalBottom>
       </Modal>
 
       <div style={{ minHeight: '400px' }}>
@@ -320,6 +358,7 @@ export default function TasksPage() {
           tasks={tasks}
           loading={tasksLoading}
           onTaskUpdated={() => selectedCompany?.id && loadTasks(selectedCompany.id)}
+          onView={handleViewTask}
           onEdit={setEditingTask}
           onArchive={handleArchiveTask}
           onComplete={handleCompleteTask}

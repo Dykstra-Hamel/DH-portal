@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUser } from '@/hooks/useUser';
@@ -15,6 +15,7 @@ interface Counts {
   scheduling: number; // Won leads count
   my_leads: number; // Leads assigned to current user
   my_cases: number; // Support cases assigned to current user
+  my_tasks: number; // Tasks assigned to current user (excluding completed)
 }
 
 interface CountAnimation {
@@ -36,17 +37,18 @@ export function useRealtimeCounts() {
     scheduling: 0,
     my_leads: 0,
     my_cases: 0,
+    my_tasks: 0,
   });
 
   const [animations, setAnimations] = useState<CountAnimation>({});
-  const [newItemIndicators, setNewItemIndicators] = useState<NewItemIndicators>({});
+  const [newItemIndicators, setNewItemIndicators] = useState<NewItemIndicators>(
+    {}
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const { user } = useUser();
-  const { selectedCompany } = useCompany();
-  const companyId = selectedCompany?.id;
-  const supabase = useMemo(() => createClient(), []);
+  const { selectedCompany, isLoading: companyLoading } = useCompany();
 
   // Trigger animation for a specific count
   const triggerAnimation = useCallback((countType: string) => {
@@ -62,110 +64,119 @@ export function useRealtimeCounts() {
   }, []);
 
   // Clear new item indicator when user visits page
-  const clearNewItemIndicator = useCallback((countType: string) => {
-    setNewItemIndicators(prev => ({ ...prev, [countType]: false }));
-    // Also update localStorage when user visits the page
-    if (companyId) {
-      setLastViewedTimestamp(countType, companyId);
-    }
-  }, [companyId]);
+  const clearNewItemIndicator = useCallback(
+    (countType: string) => {
+      setNewItemIndicators(prev => ({ ...prev, [countType]: false }));
+      // Also update localStorage when user visits the page
+      if (selectedCompany?.id) {
+        setLastViewedTimestamp(countType, selectedCompany.id);
+      }
+    },
+    [selectedCompany?.id]
+  );
 
   // localStorage helper functions for persistent notification badges
-  const getLastViewedTimestamp = useCallback((pageType: string, companyId: string): number => {
-    try {
-      const key = `lastViewed_${pageType}_${companyId}`;
-      const timestamp = localStorage.getItem(key);
-      return timestamp ? parseInt(timestamp, 10) : 0;
-    } catch (error) {
-      console.error('Error reading from localStorage:', error);
-      return 0;
-    }
-  }, []);
+  const getLastViewedTimestamp = useCallback(
+    (pageType: string, companyId: string): number => {
+      try {
+        const key = `lastViewed_${pageType}_${companyId}`;
+        const timestamp = localStorage.getItem(key);
+        return timestamp ? parseInt(timestamp, 10) : 0;
+      } catch (error) {
+        console.error('Error reading from localStorage:', error);
+        return 0;
+      }
+    },
+    []
+  );
 
-  const setLastViewedTimestamp = useCallback((pageType: string, companyId: string): void => {
-    try {
-      const key = `lastViewed_${pageType}_${companyId}`;
-      const timestamp = Date.now().toString();
-      localStorage.setItem(key, timestamp);
-    } catch (error) {
-      console.error('Error writing to localStorage:', error);
-    }
-  }, []);
+  const setLastViewedTimestamp = useCallback(
+    (pageType: string, companyId: string): void => {
+      try {
+        const key = `lastViewed_${pageType}_${companyId}`;
+        const timestamp = Date.now().toString();
+        localStorage.setItem(key, timestamp);
+      } catch (error) {
+        console.error('Error writing to localStorage:', error);
+      }
+    },
+    []
+  );
 
   // Check if there are new items since last view
-  const hasNewItemsSinceLastView = useCallback(async (pageType: string, companyId: string): Promise<boolean> => {
-    if (!user?.id || !companyId) return false;
+  const hasNewItemsSinceLastView = useCallback(
+    async (pageType: string, companyId: string): Promise<boolean> => {
+      if (!user?.id || !companyId) return false;
 
-    const lastViewed = getLastViewedTimestamp(pageType, companyId);
-    if (lastViewed === 0) return false; // No previous view recorded, don't show badge on first visit
+      const lastViewed = getLastViewedTimestamp(pageType, companyId);
+      if (lastViewed === 0) return false; // No previous view recorded, don't show badge on first visit
 
-    try {
-      let apiEndpoint = '';
-      if (pageType === 'my_leads') {
-        apiEndpoint = `/api/leads?companyId=${companyId}&assignedTo=${user.id}`;
-      } else if (pageType === 'my_cases') {
-        apiEndpoint = `/api/support-cases?companyId=${companyId}&assignedTo=${user.id}`;
-      } else {
+      try {
+        let apiEndpoint = '';
+        if (pageType === 'my_leads') {
+          apiEndpoint = `/api/leads?companyId=${companyId}&assignedTo=${user.id}`;
+        } else if (pageType === 'my_cases') {
+          apiEndpoint = `/api/support-cases?companyId=${companyId}&assignedTo=${user.id}`;
+        } else if (pageType === 'my_tasks') {
+          apiEndpoint = `/api/tasks?companyId=${companyId}&assignedTo=${user.id}&includeArchived=false`;
+        } else {
+          return false;
+        }
+
+        const response = await fetch(apiEndpoint);
+        if (!response.ok) return false;
+
+        const data = await response.json();
+        let items = [];
+
+        if (pageType === 'my_tasks') {
+          // Tasks API returns { tasks: [...] } structure
+          items = data.tasks || [];
+          // Filter out completed tasks for my_tasks
+          items = items.filter((task: any) => task.status !== 'completed');
+        } else {
+          // Other APIs return arrays directly
+          items = Array.isArray(data) ? data : [];
+        }
+
+        if (!Array.isArray(items)) return false;
+
+        // Check if any items were created/assigned after last viewed time
+        return items.some(item => {
+          const itemTime = new Date(
+            item.created_at || item.assigned_at || 0
+          ).getTime();
+          return itemTime > lastViewed;
+        });
+      } catch (error) {
+        console.error(`Error checking new items for ${pageType}:`, error);
         return false;
       }
-
-      const response = await fetch(apiEndpoint);
-      if (!response.ok) return false;
-
-      const items = await response.json();
-      if (!Array.isArray(items)) return false;
-
-      // Check if any items were created/assigned after last viewed time
-      return items.some(item => {
-        const itemTime = new Date(item.created_at || item.assigned_at || 0).getTime();
-        return itemTime > lastViewed;
-      });
-    } catch (error) {
-      console.error(`Error checking new items for ${pageType}:`, error);
-      return false;
-    }
-  }, [user?.id, getLastViewedTimestamp]);
-
-  // Check for persistent new item indicators on initialization
-  const checkPersistentIndicators = useCallback(async () => {
-    if (!companyId || !user?.id) return;
-
-    try {
-      // Check for new leads and cases since last view
-      const [hasNewLeads, hasNewCases] = await Promise.all([
-        hasNewItemsSinceLastView('my_leads', companyId),
-        hasNewItemsSinceLastView('my_cases', companyId)
-      ]);
-
-      // Update indicators if there are new items
-      setNewItemIndicators(prev => ({
-        ...prev,
-        my_leads: hasNewLeads,
-        my_cases: hasNewCases
-      }));
-    } catch (error) {
-      console.error('Error checking persistent indicators:', error);
-    }
-  }, [companyId, user?.id, hasNewItemsSinceLastView]);
+    },
+    [user?.id, getLastViewedTimestamp]
+  );
 
   // Update count with animation trigger
-  const updateCount = useCallback((countType: keyof Counts, newValue: number) => {
-    setCounts(prev => {
-      const oldValue = prev[countType];
-      if (oldValue !== newValue) {
-        triggerAnimation(countType);
-        // Trigger red dot only if count increased (new items added)
-        if (newValue > oldValue) {
-          triggerNewItemIndicator(countType);
+  const updateCount = useCallback(
+    (countType: keyof Counts, newValue: number) => {
+      setCounts(prev => {
+        const oldValue = prev[countType];
+        if (oldValue !== newValue) {
+          triggerAnimation(countType);
+          // Trigger red dot only if count increased (new items added)
+          if (newValue > oldValue) {
+            triggerNewItemIndicator(countType);
+          }
         }
-      }
-      return { ...prev, [countType]: newValue };
-    });
-  }, [triggerAnimation, triggerNewItemIndicator]);
+        return { ...prev, [countType]: newValue };
+      });
+    },
+    []
+  ); // Empty deps like LiveCallBar's handleTicketChange
 
   // Fetch initial counts
   const fetchInitialCounts = useCallback(async () => {
-    if (!companyId || !user?.id) {
+    if (!selectedCompany?.id || !user?.id) {
       setCounts({
         tickets: 0,
         leads: 0,
@@ -176,6 +187,7 @@ export function useRealtimeCounts() {
         scheduling: 0,
         my_leads: 0,
         my_cases: 0,
+        my_tasks: 0,
       });
       setLoading(false);
       return;
@@ -195,25 +207,44 @@ export function useRealtimeCounts() {
         schedulingLeadsResponse,
         myLeadsResponse,
         myCasesResponse,
+        myTasksResponse,
       ] = await Promise.allSettled([
         // Active tickets
-        fetch(`/api/tickets?companyId=${companyId}&includeArchived=false`),
+        fetch(
+          `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false`
+        ),
         // Active leads (unassigned, contacting, quoted)
-        fetch(`/api/leads?companyId=${companyId}&status=unassigned,contacting,quoted`),
+        fetch(
+          `/api/leads?companyId=${selectedCompany.id}&status=unassigned,contacting,quoted`
+        ),
         // Unassigned leads with specific statuses (for red dot logic) - assigned to sales team (assigned_to IS NULL) with unassigned, contacting, or quoted status
-        fetch(`/api/leads?companyId=${companyId}&unassigned=true&status=unassigned,contacting,quoted`),
+        fetch(
+          `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=unassigned,contacting,quoted`
+        ),
         // Active support cases
-        fetch(`/api/support-cases?companyId=${companyId}&includeArchived=false`),
+        fetch(
+          `/api/support-cases?companyId=${selectedCompany.id}&includeArchived=false`
+        ),
         // Unassigned support cases only (for red dot logic)
-        fetch(`/api/support-cases?companyId=${companyId}&status=new`),
+        fetch(`/api/support-cases?companyId=${selectedCompany.id}&status=new`),
         // Total customers
-        fetch(`/api/customers?companyId=${companyId}`),
+        fetch(`/api/customers?companyId=${selectedCompany.id}`),
         // Ready to schedule and scheduled leads for scheduling
-        fetch(`/api/leads?companyId=${companyId}&status=ready_to_schedule,scheduled`),
+        fetch(
+          `/api/leads?companyId=${selectedCompany.id}&status=ready_to_schedule,scheduled`
+        ),
         // My assigned leads
-        fetch(`/api/leads?companyId=${companyId}&assignedTo=${user.id}`),
+        fetch(
+          `/api/leads?companyId=${selectedCompany.id}&assignedTo=${user.id}`
+        ),
         // My assigned support cases
-        fetch(`/api/support-cases?companyId=${companyId}&assignedTo=${user.id}`),
+        fetch(
+          `/api/support-cases?companyId=${selectedCompany.id}&assignedTo=${user.id}`
+        ),
+        // My assigned tasks (excluding completed)
+        fetch(
+          `/api/tasks?companyId=${selectedCompany.id}&assignedTo=${user.id}&includeArchived=false`
+        ),
       ]);
 
       const newCounts = {
@@ -226,6 +257,7 @@ export function useRealtimeCounts() {
         scheduling: 0,
         my_leads: 0,
         my_cases: 0,
+        my_tasks: 0,
       };
 
       // Process tickets
@@ -241,9 +273,14 @@ export function useRealtimeCounts() {
       }
 
       // Process unassigned leads
-      if (unassignedLeadsResponse.status === 'fulfilled' && unassignedLeadsResponse.value.ok) {
+      if (
+        unassignedLeadsResponse.status === 'fulfilled' &&
+        unassignedLeadsResponse.value.ok
+      ) {
         const unassignedLeadsData = await unassignedLeadsResponse.value.json();
-        newCounts.unassigned_leads = Array.isArray(unassignedLeadsData) ? unassignedLeadsData.length : 0;
+        newCounts.unassigned_leads = Array.isArray(unassignedLeadsData)
+          ? unassignedLeadsData.length
+          : 0;
       }
 
       // Process support cases
@@ -253,34 +290,62 @@ export function useRealtimeCounts() {
       }
 
       // Process unassigned support cases
-      if (unassignedCasesResponse.status === 'fulfilled' && unassignedCasesResponse.value.ok) {
+      if (
+        unassignedCasesResponse.status === 'fulfilled' &&
+        unassignedCasesResponse.value.ok
+      ) {
         const unassignedCasesData = await unassignedCasesResponse.value.json();
-        newCounts.unassigned_cases = Array.isArray(unassignedCasesData) ? unassignedCasesData.length : 0;
+        newCounts.unassigned_cases = Array.isArray(unassignedCasesData)
+          ? unassignedCasesData.length
+          : 0;
       }
 
       // Process customers
-      if (customersResponse.status === 'fulfilled' && customersResponse.value.ok) {
+      if (
+        customersResponse.status === 'fulfilled' &&
+        customersResponse.value.ok
+      ) {
         const customersData = await customersResponse.value.json();
-        newCounts.customers = Array.isArray(customersData) ? customersData.length : 0;
+        newCounts.customers = Array.isArray(customersData)
+          ? customersData.length
+          : 0;
       }
 
-
       // Process scheduling leads (ready_to_schedule + scheduled)
-      if (schedulingLeadsResponse.status === 'fulfilled' && schedulingLeadsResponse.value.ok) {
+      if (
+        schedulingLeadsResponse.status === 'fulfilled' &&
+        schedulingLeadsResponse.value.ok
+      ) {
         const schedulingLeadsData = await schedulingLeadsResponse.value.json();
-        newCounts.scheduling = Array.isArray(schedulingLeadsData) ? schedulingLeadsData.length : 0;
+        newCounts.scheduling = Array.isArray(schedulingLeadsData)
+          ? schedulingLeadsData.length
+          : 0;
       }
 
       // Process my assigned leads
       if (myLeadsResponse.status === 'fulfilled' && myLeadsResponse.value.ok) {
         const myLeadsData = await myLeadsResponse.value.json();
-        newCounts.my_leads = Array.isArray(myLeadsData) ? myLeadsData.length : 0;
+        newCounts.my_leads = Array.isArray(myLeadsData)
+          ? myLeadsData.length
+          : 0;
       }
 
       // Process my assigned support cases
       if (myCasesResponse.status === 'fulfilled' && myCasesResponse.value.ok) {
         const myCasesData = await myCasesResponse.value.json();
-        newCounts.my_cases = Array.isArray(myCasesData) ? myCasesData.length : 0;
+        newCounts.my_cases = Array.isArray(myCasesData)
+          ? myCasesData.length
+          : 0;
+      }
+
+      // Process my assigned tasks (excluding completed)
+      if (myTasksResponse.status === 'fulfilled' && myTasksResponse.value.ok) {
+        const myTasksData = await myTasksResponse.value.json();
+        // Filter out completed tasks from the count
+        const activeTasks = Array.isArray(myTasksData.tasks)
+          ? myTasksData.tasks.filter((task: any) => task.status !== 'completed')
+          : [];
+        newCounts.my_tasks = activeTasks.length;
       }
 
       setCounts(newCounts);
@@ -290,176 +355,222 @@ export function useRealtimeCounts() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, user?.id]);
+  }, [selectedCompany?.id, user?.id]);
 
-  // Set up real-time subscriptions
-  useEffect(() => {
-    if (!companyId || !user) return;
-
-    const channels: any[] = [];
+  // Check for persistent new item indicators on initialization
+  const checkPersistentIndicators = useCallback(async () => {
+    if (!selectedCompany?.id || !user?.id) return;
 
     try {
-      // Subscribe to tickets changes
-      const ticketsChannel = supabase
-        .channel('tickets_count_channel')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'tickets',
-            filter: `company_id=eq.${companyId}`,
-          },
-          async (payload) => {
-            // Refetch tickets count
-            try {
-              const response = await fetch(`/api/tickets?companyId=${companyId}&includeArchived=false`);
-              if (response.ok) {
-                const data = await response.json();
-                updateCount('tickets', Array.isArray(data) ? data.length : 0);
-              }
-            } catch (error) {
-              console.error('Error updating tickets count:', error);
-            }
-          }
-        )
-        .subscribe();
+      // Check for new leads, cases, and tasks since last view
+      const [hasNewLeads, hasNewCases, hasNewTasks] = await Promise.all([
+        hasNewItemsSinceLastView('my_leads', selectedCompany.id),
+        hasNewItemsSinceLastView('my_cases', selectedCompany.id),
+        hasNewItemsSinceLastView('my_tasks', selectedCompany.id),
+      ]);
 
-      // Subscribe to leads changes
-      const leadsChannel = supabase
-        .channel('leads_count_channel')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'leads',
-            filter: `company_id=eq.${companyId}`,
-          },
-          async (payload) => {
-            // Refetch active leads, unassigned leads, won leads, and my assigned leads
-            try {
-              const [activeLeadsResponse, unassignedLeadsResponse, schedulingLeadsResponse, myLeadsResponse] = await Promise.all([
-                fetch(`/api/leads?companyId=${companyId}&status=unassigned,contacting,quoted`),
-                fetch(`/api/leads?companyId=${companyId}&unassigned=true&status=unassigned,contacting,quoted`),
-                fetch(`/api/leads?companyId=${companyId}&status=ready_to_schedule,scheduled`),
-                fetch(`/api/leads?companyId=${companyId}&assignedTo=${user.id}`),
+      // Update indicators if there are new items
+      setNewItemIndicators(prev => ({
+        ...prev,
+        my_leads: hasNewLeads,
+        my_cases: hasNewCases,
+        my_tasks: hasNewTasks,
+      }));
+    } catch (error) {
+      console.error('Error checking persistent indicators:', error);
+    }
+  }, [selectedCompany?.id, user?.id, hasNewItemsSinceLastView]);
+
+  // Initial data fetch - separate from subscriptions
+  useEffect(() => {
+    if (companyLoading) return; // Wait for company to load
+    fetchInitialCounts();
+    checkPersistentIndicators();
+  }, [companyLoading, fetchInitialCounts, checkPersistentIndicators]);
+
+  // Broadcast-based realtime subscription for all count updates
+  // This replaces individual Postgres Changes subscriptions with a single Broadcast channel
+  useEffect(() => {
+    if (companyLoading) return; // Wait for company to load
+    if (!selectedCompany?.id || !user?.id) return;
+
+    const channelName = `company:${selectedCompany.id}:counts`;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(channelName, {
+        config: {
+          broadcast: { self: true, ack: true },
+        },
+      })
+      .on('broadcast', { event: 'count_update' }, async payload => {
+        const { table, company_id, action } = payload.payload;
+
+        // Verify this is for our company
+        if (company_id !== selectedCompany.id) {
+          return;
+        }
+
+        try {
+          // Update counts based on which table changed
+          switch (table) {
+            case 'tickets':
+              const ticketsResponse = await fetch(
+                `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false`
+              );
+              if (ticketsResponse.ok) {
+                const ticketsData = await ticketsResponse.json();
+                updateCount(
+                  'tickets',
+                  Array.isArray(ticketsData) ? ticketsData.length : 0
+                );
+              }
+              break;
+
+            case 'leads':
+              const [
+                activeLeadsResponse,
+                unassignedLeadsResponse,
+                schedulingLeadsResponse,
+                myLeadsResponse,
+              ] = await Promise.all([
+                fetch(
+                  `/api/leads?companyId=${selectedCompany.id}&status=unassigned,contacting,quoted`
+                ),
+                fetch(
+                  `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=unassigned,contacting,quoted`
+                ),
+                fetch(
+                  `/api/leads?companyId=${selectedCompany.id}&status=ready_to_schedule,scheduled`
+                ),
+                fetch(
+                  `/api/leads?companyId=${selectedCompany.id}&assignedTo=${user.id}`
+                ),
               ]);
 
               if (activeLeadsResponse.ok) {
                 const activeLeadsData = await activeLeadsResponse.json();
-                updateCount('leads', Array.isArray(activeLeadsData) ? activeLeadsData.length : 0);
+                updateCount(
+                  'leads',
+                  Array.isArray(activeLeadsData) ? activeLeadsData.length : 0
+                );
               }
-
               if (unassignedLeadsResponse.ok) {
-                const unassignedLeadsData = await unassignedLeadsResponse.json();
-                updateCount('unassigned_leads', Array.isArray(unassignedLeadsData) ? unassignedLeadsData.length : 0);
+                const unassignedLeadsData =
+                  await unassignedLeadsResponse.json();
+                updateCount(
+                  'unassigned_leads',
+                  Array.isArray(unassignedLeadsData)
+                    ? unassignedLeadsData.length
+                    : 0
+                );
               }
-
               if (schedulingLeadsResponse.ok) {
-                const schedulingLeadsData = await schedulingLeadsResponse.json();
-                updateCount('scheduling', Array.isArray(schedulingLeadsData) ? schedulingLeadsData.length : 0);
+                const schedulingLeadsData =
+                  await schedulingLeadsResponse.json();
+                updateCount(
+                  'scheduling',
+                  Array.isArray(schedulingLeadsData)
+                    ? schedulingLeadsData.length
+                    : 0
+                );
               }
-
               if (myLeadsResponse.ok) {
                 const myLeadsData = await myLeadsResponse.json();
-                updateCount('my_leads', Array.isArray(myLeadsData) ? myLeadsData.length : 0);
+                updateCount(
+                  'my_leads',
+                  Array.isArray(myLeadsData) ? myLeadsData.length : 0
+                );
               }
-            } catch (error) {
-              console.error('Error updating leads count:', error);
-            }
-          }
-        )
-        .subscribe();
+              break;
 
-      // Subscribe to support cases changes
-      const casesChannel = supabase
-        .channel('support_cases_count_channel')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'support_cases',
-            filter: `company_id=eq.${companyId}`,
-          },
-          async (payload) => {
-            // Refetch support cases count, unassigned cases, and my assigned cases
-            try {
-              const [casesResponse, unassignedCasesResponse, myCasesResponse] = await Promise.all([
-                fetch(`/api/support-cases?companyId=${companyId}&includeArchived=false`),
-                fetch(`/api/support-cases?companyId=${companyId}&status=new`),
-                fetch(`/api/support-cases?companyId=${companyId}&assignedTo=${user.id}`),
-              ]);
+            case 'support_cases':
+              const [casesResponse, unassignedCasesResponse, myCasesResponse] =
+                await Promise.all([
+                  fetch(
+                    `/api/support-cases?companyId=${selectedCompany.id}&includeArchived=false`
+                  ),
+                  fetch(
+                    `/api/support-cases?companyId=${selectedCompany.id}&status=new`
+                  ),
+                  fetch(
+                    `/api/support-cases?companyId=${selectedCompany.id}&assignedTo=${user.id}`
+                  ),
+                ]);
 
               if (casesResponse.ok) {
                 const casesData = await casesResponse.json();
-                updateCount('cases', Array.isArray(casesData) ? casesData.length : 0);
+                updateCount(
+                  'cases',
+                  Array.isArray(casesData) ? casesData.length : 0
+                );
               }
-
               if (unassignedCasesResponse.ok) {
-                const unassignedCasesData = await unassignedCasesResponse.json();
-                updateCount('unassigned_cases', Array.isArray(unassignedCasesData) ? unassignedCasesData.length : 0);
+                const unassignedCasesData =
+                  await unassignedCasesResponse.json();
+                updateCount(
+                  'unassigned_cases',
+                  Array.isArray(unassignedCasesData)
+                    ? unassignedCasesData.length
+                    : 0
+                );
               }
-
               if (myCasesResponse.ok) {
                 const myCasesData = await myCasesResponse.json();
-                updateCount('my_cases', Array.isArray(myCasesData) ? myCasesData.length : 0);
+                updateCount(
+                  'my_cases',
+                  Array.isArray(myCasesData) ? myCasesData.length : 0
+                );
               }
-            } catch (error) {
-              console.error('Error updating support cases count:', error);
-            }
-          }
-        )
-        .subscribe();
+              break;
 
-      // Subscribe to customers changes
-      const customersChannel = supabase
-        .channel('customers_count_channel')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'customers',
-            filter: `company_id=eq.${companyId}`,
-          },
-          async (payload) => {
-            // Refetch customers count
-            try {
-              const response = await fetch(`/api/customers?companyId=${companyId}`);
-              if (response.ok) {
-                const data = await response.json();
-                updateCount('customers', Array.isArray(data) ? data.length : 0);
+            case 'customers':
+              const customersResponse = await fetch(
+                `/api/customers?companyId=${selectedCompany.id}`
+              );
+              if (customersResponse.ok) {
+                const customersData = await customersResponse.json();
+                updateCount(
+                  'customers',
+                  Array.isArray(customersData) ? customersData.length : 0
+                );
               }
-            } catch (error) {
-              console.error('Error updating customers count:', error);
-            }
+              break;
+
+            case 'tasks':
+              const tasksResponse = await fetch(
+                `/api/tasks?companyId=${selectedCompany.id}&assignedTo=${user.id}&includeArchived=false`
+              );
+              if (tasksResponse.ok) {
+                const tasksData = await tasksResponse.json();
+                const activeTasks = Array.isArray(tasksData.tasks)
+                  ? tasksData.tasks.filter(
+                      (task: any) => task.status !== 'completed'
+                    )
+                  : [];
+                updateCount('my_tasks', activeTasks.length);
+              }
+              break;
+
+            default:
+              // Unknown table - no action needed
           }
-        )
-        .subscribe();
+        } catch (error) {
+          console.error(`Error updating ${table} count:`, error);
+        }
+      })
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime counts subscription error:', channelName);
+        } else if (status === 'TIMED_OUT') {
+          console.error('Realtime counts subscription timed out:', channelName);
+        }
+      });
 
-      channels.push(ticketsChannel, leadsChannel, casesChannel, customersChannel);
-
-      // Initial fetch
-      fetchInitialCounts();
-
-      // Check for persistent new item indicators from localStorage
-      checkPersistentIndicators();
-
-      // Cleanup subscriptions
-      return () => {
-        channels.forEach(channel => {
-          if (channel) {
-            supabase.removeChannel(channel);
-          }
-        });
-      };
-    } catch (error) {
-      console.error('Error setting up real-time subscriptions:', error);
-      setError('Failed to set up real-time updates');
-    }
-  }, [companyId, user, supabase, fetchInitialCounts, updateCount, checkPersistentIndicators]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedCompany?.id, user?.id, companyLoading]);
 
   return {
     counts,

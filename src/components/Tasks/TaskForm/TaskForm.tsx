@@ -8,8 +8,7 @@ interface TaskFormProps {
   task?: Task; // For editing existing task
   companyId: string;
   assignableUsers?: Array<{ id: string; first_name: string; last_name: string; email: string }>;
-  onSubmit: (data: TaskFormData) => Promise<void>;
-  onCancel: () => void;
+  onFormDataChange?: (data: TaskFormData | null) => void;
   loading?: boolean;
   relatedEntity?: {
     type: TaskRelatedEntityType;
@@ -22,8 +21,7 @@ export default function TaskForm({
   task,
   companyId,
   assignableUsers = [],
-  onSubmit,
-  onCancel,
+  onFormDataChange,
   loading = false,
   relatedEntity,
 }: TaskFormProps) {
@@ -36,8 +34,6 @@ export default function TaskForm({
     assigned_to: task?.assigned_to || undefined,
     due_date: task?.due_date || '',
     due_time: task?.due_time || '',
-    estimated_hours: task?.estimated_hours || undefined,
-    actual_hours: task?.actual_hours || undefined,
     related_entity_type: task?.related_entity_type || relatedEntity?.type || undefined,
     related_entity_id: task?.related_entity_id || relatedEntity?.id || undefined,
   });
@@ -70,12 +66,6 @@ export default function TaskForm({
         case 'customers':
           endpoint = `/api/customers?companyId=${companyId}&limit=100`;
           break;
-        case 'tickets':
-          endpoint = `/api/tickets?companyId=${companyId}&limit=100`;
-          break;
-        case 'call_records':
-          endpoint = `/api/calls?companyId=${companyId}&limit=100`;
-          break;
         default:
           return;
       }
@@ -83,11 +73,15 @@ export default function TaskForm({
       const response = await fetch(endpoint);
       if (response.ok) {
         const data = await response.json();
-        const entities = data[entityType] || data.data || [];
+        const entities = Array.isArray(data) ? data : [];
         setRelatedEntities(entities);
+      } else {
+        console.error('Error fetching related entities:', response.status, response.statusText);
+        setRelatedEntities([]);
       }
     } catch (error) {
       console.error('Error loading related entities:', error);
+      setRelatedEntities([]);
     } finally {
       setLoadingRelatedEntities(false);
     }
@@ -111,55 +105,47 @@ export default function TaskForm({
     }
   };
 
-  const validateForm = (): boolean => {
+  const validateForm = (updateErrors: boolean = true): boolean => {
     const newErrors: Partial<Record<keyof TaskFormData, string>> = {};
 
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
     }
 
-    if (formData.estimated_hours && formData.estimated_hours < 0) {
-      newErrors.estimated_hours = 'Estimated hours must be positive';
-    }
-
-    if (formData.actual_hours && formData.actual_hours < 0) {
-      newErrors.actual_hours = 'Actual hours must be positive';
-    }
 
     if (formData.related_entity_type && !formData.related_entity_id) {
       newErrors.related_entity_id = 'Please select a related entity';
     }
 
-    setErrors(newErrors);
+    if (updateErrors) {
+      setErrors(newErrors);
+    }
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      return;
+  useEffect(() => {
+    if (onFormDataChange) {
+      const isValid = validateForm(false);
+      onFormDataChange(isValid ? formData : null);
     }
-
-    try {
-      await onSubmit(formData);
-    } catch (error) {
-      console.error('Error submitting task form:', error);
-    }
-  };
+  }, [formData, onFormDataChange]);
 
   const getEntityDisplayName = (entity: any, entityType: TaskRelatedEntityType) => {
     switch (entityType) {
       case 'leads':
-        return entity.service_type || `Lead #${entity.id.slice(-8)}`;
+        const customerName = entity.customer 
+          ? `${entity.customer.first_name} ${entity.customer.last_name || ''}`.trim()
+          : 'Unknown Customer';
+        const serviceType = entity.service_type || 'No Service Type';
+        return `${customerName} - ${serviceType}`;
       case 'support_cases':
-        return entity.summary || `Case #${entity.id.slice(-8)}`;
+        const supportCustomerName = entity.customer 
+          ? `${entity.customer.first_name} ${entity.customer.last_name || ''}`.trim()
+          : 'Unknown Customer';
+        const caseSummary = entity.summary || `Case #${entity.id.slice(-8)}`;
+        return `${supportCustomerName} - ${caseSummary}`;
       case 'customers':
         return `${entity.first_name} ${entity.last_name || ''}`.trim();
-      case 'tickets':
-        return entity.title || `Ticket #${entity.id.slice(-8)}`;
-      case 'call_records':
-        return `Call #${entity.id.slice(-8)}`;
       default:
         return entity.id;
     }
@@ -167,7 +153,8 @@ export default function TaskForm({
 
   return (
     <div className={styles.taskForm}>
-      <form onSubmit={handleSubmit} className={styles.form}>
+      <div className={styles.section}>
+        <div className={styles.form}>
         <div className={styles.formGroup}>
           <label htmlFor="title" className={styles.label}>
             Title *
@@ -296,47 +283,6 @@ export default function TaskForm({
           </div>
         </div>
 
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label htmlFor="estimated_hours" className={styles.label}>
-              Estimated Hours
-            </label>
-            <input
-              type="number"
-              id="estimated_hours"
-              name="estimated_hours"
-              value={formData.estimated_hours || ''}
-              onChange={handleInputChange}
-              className={`${styles.input} ${errors.estimated_hours ? styles.inputError : ''}`}
-              min="0"
-              step="0.25"
-              placeholder="0"
-              disabled={loading}
-            />
-            {errors.estimated_hours && <span className={styles.errorText}>{errors.estimated_hours}</span>}
-          </div>
-
-          {task && (
-            <div className={styles.formGroup}>
-              <label htmlFor="actual_hours" className={styles.label}>
-                Actual Hours
-              </label>
-              <input
-                type="number"
-                id="actual_hours"
-                name="actual_hours"
-                value={formData.actual_hours || ''}
-                onChange={handleInputChange}
-                className={`${styles.input} ${errors.actual_hours ? styles.inputError : ''}`}
-                min="0"
-                step="0.25"
-                placeholder="0"
-                disabled={loading}
-              />
-              {errors.actual_hours && <span className={styles.errorText}>{errors.actual_hours}</span>}
-            </div>
-          )}
-        </div>
 
         {!relatedEntity && (
           <>
@@ -413,24 +359,8 @@ export default function TaskForm({
           />
         </div>
 
-        <div className={styles.formActions}>
-          <button
-            type="button"
-            onClick={onCancel}
-            className={styles.cancelButton}
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={styles.submitButton}
-            disabled={loading}
-          >
-            {loading ? 'Saving...' : (task ? 'Update Task' : 'Create Task')}
-          </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

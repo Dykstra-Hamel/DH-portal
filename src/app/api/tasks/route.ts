@@ -274,11 +274,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Clean the task data - convert empty strings to null for UUID fields
+    // Clean the task data - convert empty strings to null for UUID and time fields
     const cleanedTaskData = {
       ...taskData,
       assigned_to: taskData.assigned_to || null,
       related_entity_id: taskData.related_entity_id || null,
+      due_date: taskData.due_date || null,
+      due_time: taskData.due_time || null,
     };
 
     // If assigned_to is provided, verify the user exists and has access to the company

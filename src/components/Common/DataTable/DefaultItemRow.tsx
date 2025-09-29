@@ -33,6 +33,7 @@ export default function DefaultItemRow<T>({
           <div
             key={`${column.key}-${index}`}
             className={styles.defaultCell}
+            style={column.width ? { width: column.width } : undefined}
           >
             {cellContent}
           </div>
