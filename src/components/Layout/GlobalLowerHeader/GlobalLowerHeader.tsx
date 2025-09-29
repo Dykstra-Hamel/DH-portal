@@ -7,6 +7,7 @@ interface GlobalLowerHeaderProps {
   description: string;
   showAddButton?: boolean;
   addButtonText?: string;
+  onAddClick?: () => void;
 }
 
 const PlusIcon = () => (
@@ -20,6 +21,7 @@ export function GlobalLowerHeader({
   description,
   showAddButton = false,
   addButtonText = 'Add Lead',
+  onAddClick,
 }: GlobalLowerHeaderProps) {
   return (
     <div className={styles.globalLowerHeader}>
@@ -33,7 +35,8 @@ export function GlobalLowerHeader({
           {showAddButton && (
             <button
               className={styles.addLeadButton}
-              disabled={true}
+              onClick={onAddClick}
+              disabled={!onAddClick}
               type="button"
             >
               <PlusIcon />

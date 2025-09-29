@@ -1,0 +1,111 @@
+.tasksList {
+  .taskTitle {
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .relatedEntity {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+
+  .statusBadge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-block;
+  }
+
+  .priorityBadge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-block;
+  }
+
+  .assignedUser {
+    font-weight: 400;
+  }
+
+  .unassigned {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .dueDate {
+    font-size: 0.875rem;
+    
+    &.overdue {
+      color: var(--color-error);
+      font-weight: 500;
+    }
+  }
+
+  .noDueDate {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  .createdDate {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+
+  .overdueIndicator {
+    margin-left: 4px;
+    font-size: 0.75rem;
+  }
+}
+
+// Status colors
+.statusBadge {
+  &.statusNew {
+    background-color: var(--color-blue-100);
+    color: var(--color-blue-800);
+  }
+
+  &.statusInProgress {
+    background-color: var(--color-yellow-100);
+    color: var(--color-yellow-800);
+  }
+
+  &.statusCompleted {
+    background-color: var(--color-green-100);
+    color: var(--color-green-800);
+  }
+
+  &.statusCancelled {
+    background-color: var(--color-red-100);
+    color: var(--color-red-800);
+  }
+
+  &.statusOnHold {
+    background-color: var(--color-gray-100);
+    color: var(--color-gray-800);
+  }
+}
+
+// Priority colors
+.priorityBadge {
+  &.priorityLow {
+    background-color: var(--color-gray-100);
+    color: var(--color-gray-800);
+  }
+
+  &.priorityMedium {
+    background-color: var(--color-blue-100);
+    color: var(--color-blue-800);
+  }
+
+  &.priorityHigh {
+    background-color: var(--color-orange-100);
+    color: var(--color-orange-800);
+  }
+
+  &.priorityUrgent {
+    background-color: var(--color-red-100);
+    color: var(--color-red-800);
+  }
+}

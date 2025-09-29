@@ -17,7 +17,7 @@ export function useNotifications() {
   const { selectedCompany, isLoading: companyLoading } = useCompany();
   const userId = user?.id;
   const companyId = selectedCompany?.id;
-  const supabase = useMemo(() => createClient(), []);
+  // Note: Supabase client is now created directly in useEffect to ensure fresh auth context
 
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
@@ -58,67 +58,79 @@ export function useNotifications() {
     }
   }, [user, companyId, companyLoading]);
 
-  // Set up real-time subscription and initial fetch
+  // Set up broadcast-based real-time subscription and initial fetch
   useEffect(() => {
     // Wait for company to load before setting up subscriptions
     if (companyLoading) return;
     if (!userId || !companyId) return;
 
-    // Subscribe to real-time changes
+    const channelName = `company:${companyId}:notifications`;
+
+    // Create fresh Supabase client with current auth context
+    const supabase = createClient();
 
     const channel = supabase
-      .channel('notifications_channel')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
+      .channel(channelName, {
+        config: {
+          broadcast: { self: true, ack: true },
         },
+      })
+      .on(
+        'broadcast',
+        { event: 'notification_update' },
         (payload: any) => {
+          const { action, notification, company_id } = payload.payload;
 
-          // Check event type
-          const isInsert = payload.eventType === 'INSERT';
-          const isUpdate = payload.eventType === 'UPDATE';
-          const isDelete = payload.eventType === 'DELETE';
+          // Verify this is for our company
+          if (company_id !== companyId) {
+            return;
+          }
 
-          if (isInsert) {
-            const newNotification = payload.new as Notification;
+          // Only process notifications for the current user
+          if (notification.user_id !== userId) {
+            return;
+          }
 
-            // Filter by company_id in the client since we removed it from the subscription filter
-            if (newNotification.company_id === companyId) {
+          try {
+            if (action === 'INSERT') {
+              const newNotification = notification as Notification;
               setNotifications(prev => [newNotification, ...prev]);
               setUnreadCount(prev => prev + 1);
-            }
-          } else if (isUpdate) {
-            const updatedNotification = payload.new as Notification;
-
-            // Filter by company_id for updates too
-            if (updatedNotification.company_id === companyId) {
+            } else if (action === 'UPDATE') {
+              const updatedNotification = notification as Notification;
               setNotifications(prev =>
                 prev.map(notif =>
                   notif.id === updatedNotification.id ? updatedNotification : notif
                 )
               );
 
-              // Update unread count if read status changed
-              if (payload.old?.read !== updatedNotification.read) {
-                setUnreadCount(prev => updatedNotification.read ? Math.max(0, prev - 1) : prev + 1);
+              // We don't have access to old data in broadcast, so recalculate unread count
+              setNotifications(currentNotifications => {
+                const unreadCount = currentNotifications.filter(n => !n.read).length;
+                setUnreadCount(unreadCount);
+                return currentNotifications;
+              });
+            } else if (action === 'DELETE') {
+              const deletedId = notification.id;
+              const wasUnread = notification.read === false;
+
+              setNotifications(prev => prev.filter(notif => notif.id !== deletedId));
+              if (wasUnread) {
+                setUnreadCount(prev => Math.max(0, prev - 1));
               }
             }
-          } else if (isDelete) {
-            const deletedId = payload.old?.id;
-            const wasUnread = payload.old?.read === false;
-
-            setNotifications(prev => prev.filter(notif => notif.id !== deletedId));
-            if (wasUnread) {
-              setUnreadCount(prev => Math.max(0, prev - 1));
-            }
+          } catch (error) {
+            console.error(`Error processing notification ${action}:`, error);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime notifications subscription error:', channelName);
+        } else if (status === 'TIMED_OUT') {
+          console.error('Realtime notifications subscription timed out:', channelName);
+        }
+      });
 
     // Initial fetch
     fetchNotifications();
@@ -127,7 +139,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, companyId, companyLoading, supabase, fetchNotifications]); // Depend on both user ID and company ID for proper filtering
+  }, [userId, companyId, companyLoading, fetchNotifications]); // Depend on both user ID and company ID for proper filtering
 
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId: string) => {

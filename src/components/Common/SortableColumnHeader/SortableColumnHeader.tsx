@@ -60,6 +60,7 @@ export default function SortableColumnHeader({
     <div
       className={`${styles.columnHeader} ${sortable ? styles.sortable : styles.nonSortable} ${className || ''}`}
       onClick={handleClick}
+      style={width ? { width } : undefined}
     >
       <span className={styles.title}>{title}</span>
       {sortable && <SortIcon direction={direction} isActive={isActive} />}

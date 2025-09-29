@@ -20,9 +20,10 @@ const ChartDownIcon = ({ color }: { color: string }) => (
 export interface MetricsCardProps {
   title: string;
   value: number | string;
-  comparisonValue: number;
-  comparisonPeriod: string;
-  trend: 'good' | 'bad';
+  comparisonValue?: number;
+  comparisonPeriod?: string;
+  trend?: 'good' | 'bad';
+  showComparison?: boolean;
   type?: 'ticket';
   isLoading?: boolean;
 }
@@ -30,9 +31,10 @@ export interface MetricsCardProps {
 export default function MetricsCard({
   title,
   value,
-  comparisonValue,
-  comparisonPeriod,
-  trend,
+  comparisonValue = 0,
+  comparisonPeriod = '',
+  trend = 'good',
+  showComparison = true,
   type = 'ticket',
   isLoading = false
 }: MetricsCardProps) {
@@ -45,7 +47,7 @@ export default function MetricsCard({
         <div className={styles.loadingContent}>
           <div className={styles.loadingTitle}></div>
           <div className={styles.loadingValue}></div>
-          <div className={styles.loadingComparison}></div>
+          {showComparison && <div className={styles.loadingComparison}></div>}
         </div>
       </div>
     );
@@ -62,18 +64,20 @@ export default function MetricsCard({
           <span className={styles.value}>{value}</span>
         </div>
         
-        <div className={styles.comparisonSection}>
-          <div className={styles.comparison}>
-            {isPositive ? (
-              <ChartUpIcon color={trendColor} />
-            ) : (
-              <ChartDownIcon color={trendColor} />
-            )}
-            <span className={styles.comparisonText}>
-              {Math.abs(comparisonValue)}% {comparisonPeriod}
-            </span>
+        {showComparison && (
+          <div className={styles.comparisonSection}>
+            <div className={styles.comparison}>
+              {isPositive ? (
+                <ChartUpIcon color={trendColor} />
+              ) : (
+                <ChartDownIcon color={trendColor} />
+              )}
+              <span className={styles.comparisonText}>
+                {Math.abs(comparisonValue)}% {comparisonPeriod}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
