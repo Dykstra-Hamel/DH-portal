@@ -51,6 +51,13 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           showAddButton: true,
           addButtonText: 'Add Lead',
         };
+      case '/connections':
+        return {
+          title: 'Connections Central',
+          description:
+            'Review and manage tickets, leads, and customer support cases here.',
+          showAddButton: false,
+        };
       case '/tickets':
       case '/connections/tickets':
       case '/connections/calls-and-forms':

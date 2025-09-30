@@ -8,12 +8,21 @@ import TaskForm from '@/components/Tasks/TaskForm/TaskForm';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
-import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
+import {
+  Modal,
+  ModalTop,
+  ModalMiddle,
+  ModalBottom,
+} from '@/components/Common/Modal/Modal';
 import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
-import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
+import {
+  MetricsCard,
+  styles as metricsStyles,
+} from '@/components/Common/MetricsCard';
 
 export default function TasksPage() {
   const router = useRouter();
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -40,11 +49,20 @@ export default function TasksPage() {
       pending: tasks.filter(t => t.status === 'pending').length,
       inProgress: tasks.filter(t => t.status === 'in_progress').length,
       completed: tasks.filter(t => t.status === 'completed').length,
-      overdue: tasks.filter(isTaskOverdue).length
+      overdue: tasks.filter(isTaskOverdue).length,
     };
   };
 
   const metrics = calculateTaskMetrics();
+
+  useEffect(() => {
+    // Redirect to my tasks. All tasks page not currently in use
+    router.replace('/connections/my-tasks');
+  }, [router]);
+
+  return null;
+
+  /* 
 
   const loadTasks = useCallback(async (companyId: string) => {
     if (!companyId) return;
@@ -246,10 +264,8 @@ export default function TasksPage() {
 
   return (
     <div style={{ width: '100%' }}>
-      
       {selectedCompany && (
         <>
-          {/* Metrics Cards */}
           <div className={metricsStyles.metricsCardWrapper}>
             {!tasksLoading ? (
               <>
@@ -357,7 +373,9 @@ export default function TasksPage() {
         <TasksList
           tasks={tasks}
           loading={tasksLoading}
-          onTaskUpdated={() => selectedCompany?.id && loadTasks(selectedCompany.id)}
+          onTaskUpdated={() =>
+            selectedCompany?.id && loadTasks(selectedCompany.id)
+          }
           onView={handleViewTask}
           onEdit={setEditingTask}
           onArchive={handleArchiveTask}
@@ -366,4 +384,5 @@ export default function TasksPage() {
       </div>
     </div>
   );
+*/
 }
