@@ -23,6 +23,7 @@ export default function DataTable<T>({
   className = '',
   emptyStateMessage = 'No items found for this category.',
   tableType = 'tickets',
+  customColumnWidths,
   onShowToast,
 }: DataTableProps<T>) {
   const [activeTab, setActiveTab] = useState<string>(tabs?.[0]?.key || 'all');
@@ -166,6 +167,8 @@ export default function DataTable<T>({
         return styles.callTable;
       case 'customers':
         return styles.customerTable;
+      case 'tasks':
+        return styles.taskTable;
       case 'tickets':
       default:
         return styles.ticketTable;
@@ -180,7 +183,10 @@ export default function DataTable<T>({
         isVisible={showToast}
         onClose={handleToastClose}
       />
-      <div className={`${styles.container} ${tableClass} ${className}`}>
+      <div 
+        className={`${styles.container} ${tableClass} ${className}`}
+        style={customColumnWidths ? { '--table-columns': customColumnWidths } as React.CSSProperties : undefined}
+      >
         <div className={styles.topContent}>
           <h1 className={styles.pageTitle}>{title}</h1>
 
