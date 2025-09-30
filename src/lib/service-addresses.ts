@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { createClient } from '@/lib/supabase/client';
 
 export interface ServiceAddressData {
   street_address: string;
@@ -12,6 +13,8 @@ export interface ServiceAddressData {
   address_type?: 'residential' | 'commercial' | 'industrial' | 'mixed_use';
   property_notes?: string;
   hasStreetView?: boolean;
+  home_size?: number; // Square feet
+  yard_size?: number; // Acres (decimal)
 }
 
 export interface CreateServiceAddressResult {
@@ -104,7 +107,9 @@ export async function createOrFindServiceAddress(
         geocoded_at: (addressData.latitude && addressData.longitude) ? new Date().toISOString() : null,
         service_area_id: serviceAreaId,
         address_type: addressData.address_type || 'residential',
-        property_notes: addressData.property_notes?.trim() || null
+        property_notes: addressData.property_notes?.trim() || null,
+        home_size: addressData.home_size || null,
+        yard_size: addressData.yard_size || null
       })
       .select('id')
       .single();
@@ -324,6 +329,152 @@ export async function updateLeadServiceAddress(
 
   } catch (error) {
     console.error('Error in updateLeadServiceAddress:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+/**
+ * Updates an existing service address with new data
+ */
+export async function updateExistingServiceAddress(
+  serviceAddressId: string,
+  addressData: ServiceAddressData
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createClient();
+
+    // Get the existing service address to determine company_id for service area validation
+    const { data: existingAddress, error: fetchError } = await supabase
+      .from('service_addresses')
+      .select('company_id')
+      .eq('id', serviceAddressId)
+      .single();
+
+    if (fetchError || !existingAddress) {
+      return {
+        success: false,
+        error: `Service address not found: ${fetchError?.message || 'Unknown error'}`
+      };
+    }
+
+    // Try to match with service areas if coordinates are provided
+    let serviceAreaId = null;
+    if (addressData.latitude && addressData.longitude) {
+      try {
+        const serviceAreaResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_SITE_URL}/api/service-areas/validate`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: existingAddress.company_id,
+              latitude: addressData.latitude,
+              longitude: addressData.longitude,
+              zipCode: addressData.zip_code
+            })
+          }
+        );
+
+        if (serviceAreaResponse.ok) {
+          const serviceAreaData = await serviceAreaResponse.json();
+          if (serviceAreaData.served && serviceAreaData.primaryArea?.id) {
+            serviceAreaId = serviceAreaData.primaryArea.id;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to validate service area for updated address:', error);
+        // Continue without service area assignment
+      }
+    }
+
+    // Update the existing service address
+    const { error: updateError } = await supabase
+      .from('service_addresses')
+      .update({
+        street_address: addressData.street_address.trim(),
+        city: addressData.city.trim(),
+        state: addressData.state.trim().toUpperCase(),
+        zip_code: addressData.zip_code.trim(),
+        apartment_unit: addressData.apartment_unit?.trim() || null,
+        address_line_2: addressData.address_line_2?.trim() || null,
+        latitude: addressData.latitude || null,
+        longitude: addressData.longitude || null,
+        geocoded_at: (addressData.latitude && addressData.longitude) ? new Date().toISOString() : null,
+        service_area_id: serviceAreaId,
+        address_type: addressData.address_type || 'residential',
+        property_notes: addressData.property_notes?.trim() || null,
+        home_size: addressData.home_size || null,
+        yard_size: addressData.yard_size || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', serviceAddressId);
+
+    if (updateError) {
+      console.error('Error updating service address:', updateError);
+      return {
+        success: false,
+        error: `Failed to update service address: ${updateError.message}`
+      };
+    }
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error in updateExistingServiceAddress:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+/**
+ * Updates only the home_size and yard_size fields for a service address
+ */
+export async function updateServiceAddressProperties(
+  serviceAddressId: string,
+  homeSize?: number,
+  yardSize?: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createClient();
+
+    const updateData: { [key: string]: number | string | null } = {};
+
+    if (homeSize !== undefined) {
+      updateData.home_size = homeSize || null;
+    }
+
+    if (yardSize !== undefined) {
+      updateData.yard_size = yardSize || null;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return { success: true }; // Nothing to update
+    }
+
+    updateData.updated_at = new Date().toISOString();
+
+    const { error: updateError } = await supabase
+      .from('service_addresses')
+      .update(updateData)
+      .eq('id', serviceAddressId);
+
+    if (updateError) {
+      console.error('Error updating service address properties:', updateError);
+      return {
+        success: false,
+        error: `Failed to update service address properties: ${updateError.message}`
+      };
+    }
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error in updateServiceAddressProperties:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

@@ -5,7 +5,7 @@ export interface ToastProps {
   message: string
   isVisible: boolean
   onClose: () => void
-  type?: 'success'
+  type?: 'success' | 'error'
   duration?: number
   showUndo?: boolean
   onUndo?: () => void
@@ -39,10 +39,17 @@ export function Toast({
   return (
     <div className={`${styles.toast} ${styles[type]}`}>
       <div className={styles.iconContainer}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 26 27" fill="none" className={styles.icon}>
-          <circle cx="13" cy="13.54" r="12" fill="white" stroke="#25B762" strokeWidth="2"/>
-          <path d="M9.4 13.54L11.8 15.94L16.6 11.14" fill="none" stroke="#25B762" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        {type === 'success' ? (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 26 27" fill="none" className={styles.icon}>
+            <circle cx="13" cy="13.54" r="12" fill="white" stroke="#25B762" strokeWidth="2"/>
+            <path d="M9.4 13.54L11.8 15.94L16.6 11.14" fill="none" stroke="#25B762" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 26 27" fill="none" className={styles.icon}>
+            <circle cx="13" cy="13.54" r="12" fill="white" stroke="#E74C3C" strokeWidth="2"/>
+            <path d="M16 10.54L10 16.54M10 10.54l6 6" stroke="#E74C3C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
       </div>
       <span className={styles.message}>{message}</span>
       {showUndo && onUndo && (

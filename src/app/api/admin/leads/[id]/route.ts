@@ -20,7 +20,7 @@ export async function GET(
     // Use admin client to fetch lead with all related data
     const supabase = createAdminClient();
 
-    // Get lead with customer and company info
+    // Get lead with customer, company info, and primary service address
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select(
@@ -31,7 +31,15 @@ export async function GET(
           first_name,
           last_name,
           email,
-          phone
+          phone,
+          address,
+          city,
+          state,
+          zip_code,
+          customer_status,
+          notes,
+          created_at,
+          updated_at
         ),
         company:companies(
           id,
@@ -61,7 +69,10 @@ export async function GET(
         const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
         primaryServiceAddress = result.serviceAddress;
       } catch (serviceAddressError) {
-        console.error('Error fetching primary service address:', serviceAddressError);
+        console.error(
+          'Error fetching primary service address:',
+          serviceAddressError
+        );
         // Don't fail the API call if service address fetching fails
       }
     }
@@ -130,7 +141,10 @@ export async function PUT(
       .single();
 
     if (existingLeadError) {
-      console.error('Admin Lead Detail API: Error fetching existing lead:', existingLeadError);
+      console.error(
+        'Admin Lead Detail API: Error fetching existing lead:',
+        existingLeadError
+      );
       if (existingLeadError.code === 'PGRST116') {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       }
@@ -146,7 +160,7 @@ export async function PUT(
       updateData: body,
       adminUserId: user.id,
       oldStatus: existingLead.lead_status,
-      newStatus: body.lead_status
+      newStatus: body.lead_status,
     });
 
     const { data: lead, error } = await supabase
@@ -161,7 +175,15 @@ export async function PUT(
           first_name,
           last_name,
           email,
-          phone
+          phone,
+          address,
+          city,
+          state,
+          zip_code,
+          customer_status,
+          notes,
+          created_at,
+          updated_at
         ),
         company:companies(
           id,
@@ -181,23 +203,23 @@ export async function PUT(
         errorHint: error.hint,
         leadId: id,
         updateData: body,
-        adminUserId: user.id
+        adminUserId: user.id,
       });
-      
+
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       }
-      
+
       // Return more specific error message
       const errorMessage = error.message || 'Failed to update lead';
       const errorDetails = error.details ? ` Details: ${error.details}` : '';
       const errorHint = error.hint ? ` Hint: ${error.hint}` : '';
-      
+
       return NextResponse.json(
-        { 
+        {
           error: `${errorMessage}${errorDetails}${errorHint}`,
           errorCode: error.code,
-          originalError: error.message
+          originalError: error.message,
         },
         { status: 500 }
       );
@@ -206,7 +228,7 @@ export async function PUT(
     // Check if lead status changed and trigger automation
     const oldStatus = existingLead.lead_status;
     const newStatus = body.lead_status;
-    
+
     if (newStatus && oldStatus !== newStatus) {
       try {
         await sendEvent({
@@ -225,7 +247,9 @@ export async function PUT(
             timestamp: new Date().toISOString(),
           },
         });
-        console.log(`Admin Lead Status Change Event: ${oldStatus} → ${newStatus} for lead ${id}`);
+        console.log(
+          `Admin Lead Status Change Event: ${oldStatus} → ${newStatus} for lead ${id}`
+        );
       } catch (eventError) {
         console.error('Error sending lead status changed event:', eventError);
         // Don't fail the API call if event sending fails
@@ -239,7 +263,10 @@ export async function PUT(
         const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
         primaryServiceAddress = result.serviceAddress;
       } catch (serviceAddressError) {
-        console.error('Error fetching primary service address:', serviceAddressError);
+        console.error(
+          'Error fetching primary service address:',
+          serviceAddressError
+        );
         // Don't fail the API call if service address fetching fails
       }
     }

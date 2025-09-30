@@ -142,10 +142,18 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         };
       // Handle individual record pages (hide lower header)
       default:
+        // Show lower header for lead detail pages
+        if (pathname.match(/^\/connections\/leads\/[^\/]+$/)) {
+          return {
+            title: 'Lead Details',
+            description: 'View and manage this lead information.',
+            showAddButton: false,
+          };
+        }
+
         if (
           pathname.includes('/customers/') ||
-          pathname.includes('/tickets/') ||
-          pathname.includes('/connections/leads/')
+          pathname.includes('/tickets/')
         ) {
           return null; // Don't show lower header on individual record pages
         }

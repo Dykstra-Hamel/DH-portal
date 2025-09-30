@@ -85,6 +85,14 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_disclaimer: '',
     is_active: true,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
+    home_size_pricing: {
+      initial_cost_per_interval: 20.00,
+      recurring_cost_per_interval: 10.00,
+    },
+    yard_size_pricing: {
+      initial_cost_per_interval: 25.00,
+      recurring_cost_per_interval: 15.00,
+    },
   });
 
   const [activeTab, setActiveTab] = useState('basic');
@@ -114,6 +122,14 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
           pest_id: pc.pest_id,
           coverage_level: pc.coverage_level,
         })) || [],
+        home_size_pricing: (plan as any).home_size_pricing || {
+          initial_cost_per_interval: 20.00,
+          recurring_cost_per_interval: 10.00,
+        },
+        yard_size_pricing: (plan as any).yard_size_pricing || {
+          initial_cost_per_interval: 25.00,
+          recurring_cost_per_interval: 15.00,
+        },
       });
     } else {
       // Reset form for new plan
@@ -136,6 +152,14 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_disclaimer: '',
         is_active: true,
         pest_coverage: [],
+        home_size_pricing: {
+          initial_cost_per_interval: 20.00,
+          recurring_cost_per_interval: 10.00,
+        },
+        yard_size_pricing: {
+          initial_cost_per_interval: 25.00,
+          recurring_cost_per_interval: 15.00,
+        },
       });
     }
   }, [plan]);
@@ -351,6 +375,13 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
             onClick={() => setActiveTab('coverage')}
           >
             Pest Coverage
+          </button>
+          <button
+            type="button"
+            className={`${styles.tabButton} ${activeTab === 'pricing' ? styles.active : ''}`}
+            onClick={() => setActiveTab('pricing')}
+          >
+            Pricing
           </button>
         </div>
 
@@ -655,6 +686,105 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     </select>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'pricing' && (
+            <div className={styles.tabContent}>
+              <h4>Pricing Per Interval</h4>
+              <p>Set pricing increases for each size interval above the base size defined in company settings.</p>
+
+              <div className={styles.pricingSection}>
+                <h5>Home Size Pricing</h5>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label>Initial Cost Per Interval ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.home_size_pricing.initial_cost_per_interval}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        home_size_pricing: {
+                          ...formData.home_size_pricing,
+                          initial_cost_per_interval: parseFloat(e.target.value) || 0,
+                        },
+                      })}
+                      placeholder="20.00"
+                    />
+                    <small>Added to initial price for each interval above base</small>
+                  </div>
+
+                  <div className={styles.formGroup}>
+                    <label>Recurring Cost Per Interval ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.home_size_pricing.recurring_cost_per_interval}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        home_size_pricing: {
+                          ...formData.home_size_pricing,
+                          recurring_cost_per_interval: parseFloat(e.target.value) || 0,
+                        },
+                      })}
+                      placeholder="10.00"
+                    />
+                    <small>Added to recurring price for each interval above base</small>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.pricingSection}>
+                <h5>Yard Size Pricing</h5>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label>Initial Cost Per Interval ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.yard_size_pricing.initial_cost_per_interval}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        yard_size_pricing: {
+                          ...formData.yard_size_pricing,
+                          initial_cost_per_interval: parseFloat(e.target.value) || 0,
+                        },
+                      })}
+                      placeholder="25.00"
+                    />
+                    <small>Added to initial price for each interval above base</small>
+                  </div>
+
+                  <div className={styles.formGroup}>
+                    <label>Recurring Cost Per Interval ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.yard_size_pricing.recurring_cost_per_interval}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        yard_size_pricing: {
+                          ...formData.yard_size_pricing,
+                          recurring_cost_per_interval: parseFloat(e.target.value) || 0,
+                        },
+                      })}
+                      placeholder="15.00"
+                    />
+                    <small>Added to recurring price for each interval above base</small>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.pricingNote}>
+                <strong>Note:</strong> These prices are applied for each interval step above the base size.
+                For example, if a home is in the second interval (1501-2000 sq ft), the initial cost increase
+                would be 1 × Initial Cost Per Interval.
               </div>
             </div>
           )}

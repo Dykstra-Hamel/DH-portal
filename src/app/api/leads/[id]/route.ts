@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { sendEvent } from '@/lib/inngest/client';
+import { getCustomerPrimaryServiceAddress } from '@/lib/service-addresses';
 
 export async function GET(
   request: NextRequest,
@@ -49,7 +50,15 @@ export async function GET(
           first_name,
           last_name,
           email,
-          phone
+          phone,
+          address,
+          city,
+          state,
+          zip_code,
+          customer_status,
+          notes,
+          created_at,
+          updated_at
         ),
         company:companies(
           id,
@@ -71,6 +80,22 @@ export async function GET(
         { status: 500 }
       );
     }
+
+    // Get call record separately using lead_id foreign key
+    const { data: callRecord, error: callError } = await supabase
+      .from('call_records')
+      .select('*')
+      .eq('lead_id', id)
+      .single();
+
+    console.log('Call record query results:', {
+      leadId: id,
+      callRecord,
+      callError,
+      hasCallRecord: !!callRecord
+    });
+
+    // Note: Call record might not exist, so we don't error on callError
 
     // For session-based auth, verify user has access to this lead's company
     // Bearer token auth relies on RLS policies for access control
@@ -104,11 +129,34 @@ export async function GET(
       }
     }
 
+    // Get customer's primary service address if lead has a customer
+    let primaryServiceAddress = null;
+    if (lead.customer_id) {
+      try {
+        const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
+        primaryServiceAddress = result.serviceAddress;
+      } catch (serviceAddressError) {
+        console.error(
+          'Error fetching primary service address:',
+          serviceAddressError
+        );
+        // Don't fail the API call if service address fetching fails
+      }
+    }
+
     // Enhanced lead object
     const enhancedLead = {
       ...lead,
+      call_record: callRecord || null,
       assigned_user: assignedUser,
+      primary_service_address: primaryServiceAddress,
     };
+
+    console.log('Returning enhanced lead with call record:', {
+      leadId: enhancedLead.id,
+      hasCallRecord: !!enhancedLead.call_record,
+      callRecordId: enhancedLead.call_record?.id
+    });
 
     return NextResponse.json(enhancedLead);
   } catch (error) {
@@ -212,7 +260,15 @@ export async function PUT(
           first_name,
           last_name,
           email,
-          phone
+          phone,
+          address,
+          city,
+          state,
+          zip_code,
+          customer_status,
+          notes,
+          created_at,
+          updated_at
         ),
         company:companies(
           id,
@@ -330,6 +386,22 @@ export async function PUT(
       }
     }
 
+    // Get call record separately using lead_id foreign key
+    const { data: callRecord, error: callError } = await supabase
+      .from('call_records')
+      .select('*')
+      .eq('lead_id', id)
+      .single();
+
+    console.log('Call record query results:', {
+      leadId: id,
+      callRecord,
+      callError,
+      hasCallRecord: !!callRecord
+    });
+
+    // Note: Call record might not exist, so we don't error on callError
+
     // Get assigned user profile if lead has one
     let assignedUser = null;
     if (lead.assigned_to) {
@@ -344,11 +416,34 @@ export async function PUT(
       }
     }
 
+    // Get customer's primary service address if lead has a customer
+    let primaryServiceAddress = null;
+    if (lead.customer_id) {
+      try {
+        const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
+        primaryServiceAddress = result.serviceAddress;
+      } catch (serviceAddressError) {
+        console.error(
+          'Error fetching primary service address:',
+          serviceAddressError
+        );
+        // Don't fail the API call if service address fetching fails
+      }
+    }
+
     // Enhanced lead object
     const enhancedLead = {
       ...lead,
+      call_record: callRecord || null,
       assigned_user: assignedUser,
+      primary_service_address: primaryServiceAddress,
     };
+
+    console.log('Returning enhanced lead with call record:', {
+      leadId: enhancedLead.id,
+      hasCallRecord: !!enhancedLead.call_record,
+      callRecordId: enhancedLead.call_record?.id
+    });
 
     return NextResponse.json(enhancedLead);
   } catch (error) {

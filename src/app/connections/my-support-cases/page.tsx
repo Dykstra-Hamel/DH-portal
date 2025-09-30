@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { DataTable } from '@/components/Common/DataTable';
-import { getSupportCaseColumns, getSupportCaseTabs } from '@/components/SupportCases/SupportCasesList/SupportCasesListConfig';
+import { getSupportCaseColumns, getUserSupportCaseTabs } from '@/components/SupportCases/SupportCasesList/SupportCasesListConfig';
 import { SupportCase } from '@/types/support-case';
 
 export default function MySupportCasesPage() {
@@ -68,7 +68,7 @@ export default function MySupportCasesPage() {
         data={supportCases}
         title="My Support Cases"
         columns={getSupportCaseColumns()}
-        tabs={getSupportCaseTabs()}
+        tabs={getUserSupportCaseTabs()}
         loading={loading}
         emptyStateMessage="No support cases assigned to you yet."
         tableType="supportCases"

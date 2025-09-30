@@ -52,13 +52,15 @@ export function StreetViewImage({
       setIsLoading(true);
       setError(null);
 
+      // Determine if we should try Street View first
+      // If hasStreetView is explicitly false, skip straight to satellite
+      // If hasStreetView is true or undefined, try Street View first
+      const shouldTryStreetView = hasStreetView !== false && latitude && longitude;
+
       try {
-        // Determine if we should use Street View or satellite based on metadata
-        const shouldUseStreetView = hasStreetView === true;
 
-
-        if (shouldUseStreetView && latitude && longitude) {
-          // Use Street View - we know it's available from metadata
+        if (shouldTryStreetView) {
+          // Try Street View first - either we know it's available or we'll check dynamically
           const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?` +
             `location=${latitude},${longitude}&` +
             `size=${width}x${height}&` +
@@ -67,10 +69,40 @@ export function StreetViewImage({
             `heading=0&` +
             `pitch=0`;
 
-          setImageUrl(streetViewUrl);
-          setImageType('streetview');
+          // Test if Street View image loads successfully
+          const testImage = new window.Image();
+          testImage.onload = () => {
+            // Street View loaded successfully
+            setImageUrl(streetViewUrl);
+            setImageType('streetview');
+            setIsLoading(false);
+          };
+          testImage.onerror = () => {
+            // Street View failed, fall back to satellite if enabled
+            if (fallbackToSatellite && latitude && longitude) {
+              const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?` +
+                `center=${latitude},${longitude}&` +
+                `zoom=18&` +
+                `size=${width}x${height}&` +
+                `maptype=satellite&` +
+                `markers=color:red%7C${latitude},${longitude}&` +
+                `key=${apiKey}`;
+
+              setImageUrl(satelliteUrl);
+              setImageType('satellite');
+            } else {
+              setError('Street View not available for this location');
+              setImageUrl(null);
+              setImageType(null);
+            }
+            setIsLoading(false);
+          };
+          testImage.src = streetViewUrl;
+
+          // Don't set loading to false here - wait for image load/error
+          return;
         } else if (fallbackToSatellite && latitude && longitude) {
-          // Use satellite view - either no Street View or fallback preference
+          // Use satellite view directly - hasStreetView was explicitly false
           const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?` +
             `center=${latitude},${longitude}&` +
             `zoom=18&` +
@@ -90,8 +122,12 @@ export function StreetViewImage({
       } catch (err) {
         setError('Failed to load location image');
         console.error('Error generating location image:', err);
-      } finally {
         setIsLoading(false);
+      } finally {
+        // Only set loading to false if we're not waiting for image load test
+        if (!shouldTryStreetView) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -167,9 +203,6 @@ export function StreetViewImage({
             setError(null);
           }}
         />
-        <div className={styles.imageTypeIndicator}>
-          {imageType === 'streetview' ? '📍 Street View' : '🛰️ Satellite View'}
-        </div>
       </div>
     </div>
   );
