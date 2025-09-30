@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { DataTable } from '@/components/Common/DataTable';
-import { getLeadColumns, getLeadTabs } from '@/components/Leads/LeadsList/LeadsListConfig';
+import { getLeadColumns, getUserLeadTabs } from '@/components/Leads/LeadsList/LeadsListConfig';
 import { Lead } from '@/types/lead';
 
 export default function MySalesLeadsPage() {
@@ -67,7 +67,7 @@ export default function MySalesLeadsPage() {
         data={leads}
         title="My Sales Leads"
         columns={getLeadColumns()}
-        tabs={getLeadTabs()}
+        tabs={getUserLeadTabs()}
         loading={loading}
         emptyStateMessage="No leads assigned to you yet."
         tableType="leads"

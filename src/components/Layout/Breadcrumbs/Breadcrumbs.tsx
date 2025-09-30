@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminAPI } from '@/lib/api-client';
 import { useNavigation } from '@/contexts/NavigationContext';
+import { useUser } from '@/hooks/useUser';
+import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import styles from './Breadcrumbs.module.scss';
 
 const BreadcrumbArrow = () => (
@@ -22,8 +24,12 @@ export function Breadcrumbs() {
   const pathname = usePathname();
   const params = useParams();
   const { activePrimaryNav } = useNavigation();
+  const { user, profile } = useUser();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Check if user is admin
+  const isAdmin = profile ? isAuthorizedAdminSync(profile) : false;
 
   useEffect(() => {
     const generateBreadcrumbs = async () => {
@@ -72,16 +78,19 @@ export function Breadcrumbs() {
           if (pathSegments[1] && params?.id) {
             try {
               setLoading(true);
-              const lead = await adminAPI.getLead(params.id as string);
+              // Use appropriate API based on admin status
+              const lead = isAdmin
+                ? await adminAPI.getLead(params.id as string)
+                : await adminAPI.getUserLead(params.id as string);
               if (lead?.customer) {
                 const customerName = `${lead.customer.first_name} ${lead.customer.last_name}`.trim();
                 crumbs.push({ label: customerName });
               } else {
-                crumbs.push({ label: `Lead ${(params.id as string).slice(0, 8)}` });
+                crumbs.push({ label: `Lead` });
               }
             } catch (error) {
               console.error('Error fetching lead for breadcrumb:', error);
-              crumbs.push({ label: `Lead ${(params.id as string).slice(0, 8)}` });
+              crumbs.push({ label: `Lead` });
             } finally {
               setLoading(false);
             }
@@ -103,11 +112,11 @@ export function Breadcrumbs() {
                 const customerName = `${ticket.customer.first_name} ${ticket.customer.last_name}`.trim();
                 crumbs.push({ label: customerName });
               } else {
-                crumbs.push({ label: `Ticket ${(params.id as string).slice(0, 8)}` });
+                crumbs.push({ label: `Ticket` });
               }
             } catch (error) {
               console.error('Error fetching ticket for breadcrumb:', error);
-              crumbs.push({ label: `Ticket ${(params.id as string).slice(0, 8)}` });
+              crumbs.push({ label: `Ticket` });
             } finally {
               setLoading(false);
             }
@@ -121,16 +130,19 @@ export function Breadcrumbs() {
           if (pathSegments[1] && params?.id) {
             try {
               setLoading(true);
-              const customer = await adminAPI.getCustomer(params.id as string);
+              // Use appropriate API based on admin status
+              const customer = isAdmin
+                ? await adminAPI.getCustomer(params.id as string)
+                : await adminAPI.getUserCustomer(params.id as string);
               if (customer) {
                 const customerName = `${customer.first_name} ${customer.last_name}`.trim();
                 crumbs.push({ label: customerName });
               } else {
-                crumbs.push({ label: `Customer ${(params.id as string).slice(0, 8)}` });
+                crumbs.push({ label: `Customer` });
               }
             } catch (error) {
               console.error('Error fetching customer for breadcrumb:', error);
-              crumbs.push({ label: `Customer ${(params.id as string).slice(0, 8)}` });
+              crumbs.push({ label: `Customer` });
             } finally {
               setLoading(false);
             }
@@ -142,28 +154,33 @@ export function Breadcrumbs() {
           if (activePrimaryNav !== 'connections') {
             crumbs.push({ label: 'Conversations', href: '/tickets' });
           }
-          
+
           // Handle conversation sub-pages
           if (pathSegments[1]) {
-            const conversationPageMap: { [key: string]: string } = {
-              'calls-and-forms': 'Tickets',
-              'leads': 'Sales Leads', 
-              'scheduling': 'Scheduling',
-              'customer-service': 'Customer Service',
-              'my-tasks': 'My Tasks',
-              'assigned-to-me': 'Assigned To Me',
-              'reports': 'Reports',
-              'archived-calls': 'Archived Calls'
+            const conversationPageMap: { [key: string]: { label: string; href: string } } = {
+              'calls-and-forms': { label: 'Tickets', href: '/connections/calls-and-forms' },
+              'leads': { label: 'Sales Leads', href: '/connections/leads' },
+              'scheduling': { label: 'Scheduling', href: '/connections/scheduling' },
+              'customer-service': { label: 'Customer Service', href: '/connections/customer-service' },
+              'support-cases': { label: 'Support Cases', href: '/connections/customer-service' },
+              'my-sales-leads': { label: 'My Sales Leads', href: '/connections/my-sales-leads' },
+              'my-support-cases': { label: 'My Support Cases', href: '/connections/my-support-cases' },
+              'my-tasks': { label: 'My Tasks', href: '/connections/my-tasks' },
+              'assigned-to-me': { label: 'Assigned To Me', href: '/connections/assigned-to-me' },
+              'reports': { label: 'Reports', href: '/connections/reports' },
+              'archived-calls': { label: 'Archived Calls', href: '/connections/archived-calls' }
             };
-            
-            const pageLabel = conversationPageMap[pathSegments[1]] || 
-              pathSegments[1].split('-').map(word => 
+
+            const pageConfig = conversationPageMap[pathSegments[1]] || {
+              label: pathSegments[1].split('-').map(word =>
                 word.charAt(0).toUpperCase() + word.slice(1)
-              ).join(' ');
-            
-            crumbs.push({
-              label: pageLabel,
+              ).join(' '),
               href: `/connections/${pathSegments[1]}`
+            };
+
+            crumbs.push({
+              label: pageConfig.label,
+              href: pageConfig.href
             });
             
             // If viewing specific conversation item (e.g., specific lead or ticket)
@@ -174,11 +191,37 @@ export function Breadcrumbs() {
                 let itemLabel = '';
                 
                 if (pathSegments[1] === 'leads') {
-                  itemData = await adminAPI.getLead(params.id as string);
+                  if (isAdmin) {
+                    itemData = await adminAPI.getLead(params.id as string);
+                  } else {
+                    itemData = await adminAPI.getUserLead(params.id as string);
+                  }
                   if (itemData?.customer) {
                     itemLabel = `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
                   } else {
-                    itemLabel = `Lead ${(params.id as string).slice(0, 8)}`;
+                    itemLabel = `Lead`;
+                  }
+                } else if (pathSegments[1] === 'support-cases') {
+                  if (isAdmin) {
+                    itemData = await adminAPI.getSupportCase(params.id as string);
+                  } else {
+                    itemData = await adminAPI.getUserSupportCase(params.id as string);
+                  }
+                  if (itemData?.customer) {
+                    itemLabel = `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
+                  } else {
+                    itemLabel = `Support Case`;
+                  }
+                } else if (pathSegments[1] === 'customer-service') {
+                  if (isAdmin) {
+                    itemData = await adminAPI.getSupportCase(params.id as string);
+                  } else {
+                    itemData = await adminAPI.getUserSupportCase(params.id as string);
+                  }
+                  if (itemData?.customer) {
+                    itemLabel = `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
+                  } else {
+                    itemLabel = `Support Case`;
                   }
                 } else if (pathSegments[1] === 'calls-and-forms') {
                   // Could be a ticket or call record
@@ -187,20 +230,29 @@ export function Breadcrumbs() {
                     if (itemData?.customer) {
                       itemLabel = `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
                     } else {
-                      itemLabel = `Ticket ${(params.id as string).slice(0, 8)}`;
+                      itemLabel = `Ticket`;
                     }
                   } catch {
                     // Fallback to call record if ticket fails
-                    itemLabel = `Call ${(params.id as string).slice(0, 8)}`;
+                    itemLabel = `Call`;
                   }
                 } else {
-                  itemLabel = `${pageLabel} ${(params.id as string).slice(0, 8)}`;
+                  itemLabel = pageConfig.label;
                 }
-                
+
                 crumbs.push({ label: itemLabel });
               } catch (error) {
                 console.error('Error fetching conversation item for breadcrumb:', error);
-                crumbs.push({ label: `${pageLabel} ${(params.id as string).slice(0, 8)}` });
+                // Use generic labels based on page type
+                if (pathSegments[1] === 'leads') {
+                  crumbs.push({ label: 'Lead' });
+                } else if (pathSegments[1] === 'support-cases') {
+                  crumbs.push({ label: 'Support Case' });
+                } else if (pathSegments[1] === 'customer-service') {
+                  crumbs.push({ label: 'Support Case' });
+                } else {
+                  crumbs.push({ label: pageConfig.label });
+                }
               } finally {
                 setLoading(false);
               }

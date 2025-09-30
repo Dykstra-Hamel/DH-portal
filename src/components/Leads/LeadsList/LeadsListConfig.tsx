@@ -184,6 +184,24 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
         .length,
   },
   {
+    key: 'won',
+    label: 'Won',
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'won'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'won')
+        .length,
+  },
+  {
+    key: 'lost',
+    label: 'Lost',
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'lost'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'lost')
+        .length,
+  },
+  {
     key: 'archived',
     label: 'Archived',
     filter: (leads: Lead[]) => leads.filter(lead => lead.archived),
@@ -203,6 +221,62 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
         lead =>
           !lead.archived &&
           ['unassigned', 'contacting', 'quoted'].includes(lead.lead_status)
+      ).length,
+  },
+];
+
+// User-specific tabs - excludes "unassigned" tab for "My Sales Leads" view
+export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
+  {
+    key: 'contacting',
+    label: 'Contacting',
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'contacting'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'contacting')
+        .length,
+  },
+  {
+    key: 'quoted',
+    label: 'Quoted',
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'quoted'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'quoted')
+        .length,
+  },
+  {
+    key: 'won',
+    label: 'Won',
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'won'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'won')
+        .length,
+  },
+  {
+    key: 'lost',
+    label: 'Lost',
+    filter: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'lost'),
+    getCount: (leads: Lead[]) =>
+      leads.filter(lead => !lead.archived && lead.lead_status === 'lost')
+        .length,
+  },
+  {
+    key: 'all',
+    label: 'All My Leads',
+    filter: (leads: Lead[]) =>
+      leads.filter(
+        lead =>
+          !lead.archived &&
+          ['contacting', 'quoted'].includes(lead.lead_status)
+      ),
+    getCount: (leads: Lead[]) =>
+      leads.filter(
+        lead =>
+          !lead.archived &&
+          ['contacting', 'quoted'].includes(lead.lead_status)
       ).length,
   },
 ];

@@ -23,6 +23,10 @@
     background: #10b981; // Emerald green for success
   }
 
+  &.error {
+    background: #E74C3C; // Red for error
+  }
+
   @media (max-width: 768px) {
     top: 1rem;
     left: 1rem;
