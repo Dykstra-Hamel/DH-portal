@@ -283,11 +283,12 @@ export const getTicketTabs = (
 ): TabDefinition<Ticket>[] => [
   {
     key: 'all',
-    label: 'All Tickets',
+    label: 'All Incoming',
     filter: (tickets: Ticket[]) =>
       tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived),
     getCount: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived).length,
+      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived)
+        .length,
   },
   {
     key: 'incoming_calls',
@@ -346,13 +347,5 @@ export const getTicketTabs = (
           !ticket.archived &&
           ticket.type === 'web_form'
       ).length,
-  },
-  {
-    key: 'junk',
-    label: 'Junk',
-    filter: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.archived === true),
-    getCount: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.archived === true).length,
   },
 ];

@@ -10,8 +10,20 @@ import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import styles from './Breadcrumbs.module.scss';
 
 const BreadcrumbArrow = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="6" height="10" viewBox="0 0 6 10" fill="none">
-    <path d="M1 1.25L4.65132 5L1 8.75" stroke="#A3A3A3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="6"
+    height="10"
+    viewBox="0 0 6 10"
+    fill="none"
+  >
+    <path
+      d="M1 1.25L4.65132 5L1 8.75"
+      stroke="#A3A3A3"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -42,9 +54,9 @@ export function Breadcrumbs() {
           case 'dashboard':
             return { label: 'Dashboard', href: '/dashboard' };
           case 'connections':
-            return { label: 'Connections', href: '/tickets' };
+            return { label: 'Connections', href: '/connections' };
           case 'tasks':
-            return { label: 'Tasks', href: '/tickets' };
+            return { label: 'Tasks', href: '/connections' };
           case 'brand':
             return { label: 'Brand', href: '/brand' };
           default:
@@ -73,7 +85,7 @@ export function Breadcrumbs() {
           } else {
             crumbs.push({ label: 'Leads', href: '/leads' });
           }
-          
+
           // If viewing specific lead
           if (pathSegments[1] && params?.id) {
             try {
@@ -83,7 +95,8 @@ export function Breadcrumbs() {
                 ? await adminAPI.getLead(params.id as string)
                 : await adminAPI.getUserLead(params.id as string);
               if (lead?.customer) {
-                const customerName = `${lead.customer.first_name} ${lead.customer.last_name}`.trim();
+                const customerName =
+                  `${lead.customer.first_name} ${lead.customer.last_name}`.trim();
                 crumbs.push({ label: customerName });
               } else {
                 crumbs.push({ label: `Lead` });
@@ -100,16 +113,17 @@ export function Breadcrumbs() {
         case 'tickets':
           // Don't add root again if we're in tasks nav
           if (activePrimaryNav !== 'tasks') {
-            crumbs.push({ label: 'Tickets', href: '/tickets' });
+            crumbs.push({ label: 'Incoming', href: '/connections/incoming' });
           }
-          
+
           // If viewing specific ticket
           if (pathSegments[1] && params?.id) {
             try {
               setLoading(true);
               const ticket = await adminAPI.getTicket(params.id as string);
               if (ticket?.customer) {
-                const customerName = `${ticket.customer.first_name} ${ticket.customer.last_name}`.trim();
+                const customerName =
+                  `${ticket.customer.first_name} ${ticket.customer.last_name}`.trim();
                 crumbs.push({ label: customerName });
               } else {
                 crumbs.push({ label: `Ticket` });
@@ -125,7 +139,7 @@ export function Breadcrumbs() {
 
         case 'customers':
           crumbs.push({ label: 'Customers', href: '/customers' });
-          
+
           // If viewing specific customer
           if (pathSegments[1] && params?.id) {
             try {
@@ -135,7 +149,8 @@ export function Breadcrumbs() {
                 ? await adminAPI.getCustomer(params.id as string)
                 : await adminAPI.getUserCustomer(params.id as string);
               if (customer) {
-                const customerName = `${customer.first_name} ${customer.last_name}`.trim();
+                const customerName =
+                  `${customer.first_name} ${customer.last_name}`.trim();
                 crumbs.push({ label: customerName });
               } else {
                 crumbs.push({ label: `Customer` });
@@ -152,44 +167,71 @@ export function Breadcrumbs() {
         case 'connections':
           // Don't add Conversations again if it's already the primary nav root
           if (activePrimaryNav !== 'connections') {
-            crumbs.push({ label: 'Conversations', href: '/tickets' });
+            crumbs.push({ label: 'Connections', href: '/connections' });
           }
 
           // Handle conversation sub-pages
           if (pathSegments[1]) {
-            const conversationPageMap: { [key: string]: { label: string; href: string } } = {
-              'calls-and-forms': { label: 'Tickets', href: '/connections/calls-and-forms' },
-              'leads': { label: 'Sales Leads', href: '/connections/leads' },
-              'scheduling': { label: 'Scheduling', href: '/connections/scheduling' },
-              'customer-service': { label: 'Customer Service', href: '/connections/customer-service' },
-              'support-cases': { label: 'Support Cases', href: '/connections/customer-service' },
-              'my-sales-leads': { label: 'My Sales Leads', href: '/connections/my-sales-leads' },
-              'my-support-cases': { label: 'My Support Cases', href: '/connections/my-support-cases' },
+            const conversationPageMap: {
+              [key: string]: { label: string; href: string };
+            } = {
+              'calls-and-forms': {
+                label: 'Tickets',
+                href: '/connections/calls-and-forms',
+              },
+              leads: { label: 'Sales Leads', href: '/connections/leads' },
+              scheduling: {
+                label: 'Scheduling',
+                href: '/connections/scheduling',
+              },
+              'customer-service': {
+                label: 'Customer Service',
+                href: '/connections/customer-service',
+              },
+              'support-cases': {
+                label: 'Support Cases',
+                href: '/connections/customer-service',
+              },
+              'my-sales-leads': {
+                label: 'My Sales Leads',
+                href: '/connections/my-sales-leads',
+              },
+              'my-support-cases': {
+                label: 'My Support Cases',
+                href: '/connections/my-support-cases',
+              },
               'my-tasks': { label: 'My Tasks', href: '/connections/my-tasks' },
-              'assigned-to-me': { label: 'Assigned To Me', href: '/connections/assigned-to-me' },
-              'reports': { label: 'Reports', href: '/connections/reports' },
-              'archived-calls': { label: 'Archived Calls', href: '/connections/archived-calls' }
+              'assigned-to-me': {
+                label: 'Assigned To Me',
+                href: '/connections/assigned-to-me',
+              },
+              reports: { label: 'Reports', href: '/connections/reports' },
+              'archived-calls': {
+                label: 'Archived Calls',
+                href: '/connections/archived-calls',
+              },
             };
 
             const pageConfig = conversationPageMap[pathSegments[1]] || {
-              label: pathSegments[1].split('-').map(word =>
-                word.charAt(0).toUpperCase() + word.slice(1)
-              ).join(' '),
-              href: `/connections/${pathSegments[1]}`
+              label: pathSegments[1]
+                .split('-')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' '),
+              href: `/connections/${pathSegments[1]}`,
             };
 
             crumbs.push({
               label: pageConfig.label,
-              href: pageConfig.href
+              href: pageConfig.href,
             });
-            
+
             // If viewing specific conversation item (e.g., specific lead or ticket)
             if (pathSegments[2] && params?.id) {
               try {
                 setLoading(true);
                 let itemData = null;
                 let itemLabel = '';
-                
+
                 if (pathSegments[1] === 'leads') {
                   if (isAdmin) {
                     itemData = await adminAPI.getLead(params.id as string);
@@ -197,29 +239,40 @@ export function Breadcrumbs() {
                     itemData = await adminAPI.getUserLead(params.id as string);
                   }
                   if (itemData?.customer) {
-                    itemLabel = `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
+                    itemLabel =
+                      `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
                   } else {
                     itemLabel = `Lead`;
                   }
                 } else if (pathSegments[1] === 'support-cases') {
                   if (isAdmin) {
-                    itemData = await adminAPI.getSupportCase(params.id as string);
+                    itemData = await adminAPI.getSupportCase(
+                      params.id as string
+                    );
                   } else {
-                    itemData = await adminAPI.getUserSupportCase(params.id as string);
+                    itemData = await adminAPI.getUserSupportCase(
+                      params.id as string
+                    );
                   }
                   if (itemData?.customer) {
-                    itemLabel = `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
+                    itemLabel =
+                      `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
                   } else {
                     itemLabel = `Support Case`;
                   }
                 } else if (pathSegments[1] === 'customer-service') {
                   if (isAdmin) {
-                    itemData = await adminAPI.getSupportCase(params.id as string);
+                    itemData = await adminAPI.getSupportCase(
+                      params.id as string
+                    );
                   } else {
-                    itemData = await adminAPI.getUserSupportCase(params.id as string);
+                    itemData = await adminAPI.getUserSupportCase(
+                      params.id as string
+                    );
                   }
                   if (itemData?.customer) {
-                    itemLabel = `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
+                    itemLabel =
+                      `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
                   } else {
                     itemLabel = `Support Case`;
                   }
@@ -228,7 +281,8 @@ export function Breadcrumbs() {
                   try {
                     itemData = await adminAPI.getTicket(params.id as string);
                     if (itemData?.customer) {
-                      itemLabel = `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
+                      itemLabel =
+                        `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
                     } else {
                       itemLabel = `Ticket`;
                     }
@@ -242,7 +296,10 @@ export function Breadcrumbs() {
 
                 crumbs.push({ label: itemLabel });
               } catch (error) {
-                console.error('Error fetching conversation item for breadcrumb:', error);
+                console.error(
+                  'Error fetching conversation item for breadcrumb:',
+                  error
+                );
                 // Use generic labels based on page type
                 if (pathSegments[1] === 'leads') {
                   crumbs.push({ label: 'Lead' });
@@ -281,8 +338,10 @@ export function Breadcrumbs() {
 
         default:
           // For any other routes, capitalize the segment
-          crumbs.push({ 
-            label: pathSegments[0].charAt(0).toUpperCase() + pathSegments[0].slice(1).replace('-', ' ') 
+          crumbs.push({
+            label:
+              pathSegments[0].charAt(0).toUpperCase() +
+              pathSegments[0].slice(1).replace('-', ' '),
           });
       }
 
@@ -311,14 +370,22 @@ export function Breadcrumbs() {
     <div className={styles.breadcrumbs}>
       {breadcrumbs.map((crumb, index) => (
         <div key={index} className={styles.breadcrumbGroup}>
-          {index > 0 && <div className={styles.separator}><BreadcrumbArrow /></div>}
+          {index > 0 && (
+            <div className={styles.separator}>
+              <BreadcrumbArrow />
+            </div>
+          )}
           {crumb.href && index < breadcrumbs.length - 1 ? (
             <Link href={crumb.href} className={styles.breadcrumbLink}>
               {crumb.label}
             </Link>
           ) : (
-            <span className={`${styles.breadcrumbItem} ${index === breadcrumbs.length - 1 ? styles.current : ''}`}>
-              {loading && index === breadcrumbs.length - 1 ? 'Loading...' : crumb.label}
+            <span
+              className={`${styles.breadcrumbItem} ${index === breadcrumbs.length - 1 ? styles.current : ''}`}
+            >
+              {loading && index === breadcrumbs.length - 1
+                ? 'Loading...'
+                : crumb.label}
             </span>
           )}
         </div>

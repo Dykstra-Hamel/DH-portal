@@ -1,19 +1,33 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import { usePathname } from 'next/navigation';
 
-export type PrimaryNavItem = 'dashboard' | 'connections' | 'customers' | 'tasks' | 'brand';
+export type PrimaryNavItem =
+  | 'dashboard'
+  | 'connections'
+  | 'customers'
+  | 'tasks'
+  | 'brand';
 
 interface NavigationContextType {
   activePrimaryNav: PrimaryNavItem;
   setActivePrimaryNav: (nav: PrimaryNavItem) => void;
 }
 
-const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
+const NavigationContext = createContext<NavigationContextType | undefined>(
+  undefined
+);
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
-  const [activePrimaryNav, setActivePrimaryNav] = useState<PrimaryNavItem>('dashboard');
+  const [activePrimaryNav, setActivePrimaryNav] =
+    useState<PrimaryNavItem>('dashboard');
   const pathname = usePathname();
 
   // Update active nav based on current route
@@ -26,8 +40,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     } else if (pathname.startsWith('/leads')) {
       // Legacy /leads route should also activate connections
       setActivePrimaryNav('connections');
-    } else if (pathname.startsWith('/tickets')) {
-      setActivePrimaryNav('connections'); // Tickets now under connections
     } else if (pathname.startsWith('/customers')) {
       setActivePrimaryNav('customers');
     } else if (pathname.startsWith('/brand')) {
@@ -41,7 +53,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   return (
-    <NavigationContext.Provider value={{ activePrimaryNav, setActivePrimaryNav }}>
+    <NavigationContext.Provider
+      value={{ activePrimaryNav, setActivePrimaryNav }}
+    >
       {children}
     </NavigationContext.Provider>
   );
