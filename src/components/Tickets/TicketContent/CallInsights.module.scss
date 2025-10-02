@@ -1,9 +1,44 @@
 // Import shared section styles
 @import './SharedSection.module.scss';
 
-// CallInsights-specific styles
+// Simple container styles for headerless layout
+.simpleContainer {
+  background: #fff;
+  padding: 16px;
+}
 
-// Select field specific to CallInsights
+.singleColumn {
+  display: flex;
+  flex-direction: column;
+}
+
+.infoField {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  align-items: baseline;
+  gap: 4px;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 10px;
+
+  &:last-of-type {
+    border: none;
+  }
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 450;
+  color: var(--gray-500);
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+  word-break: break-word;
+}
+
+// Legacy styles for editing functionality (if needed in future)
 .select {
   padding: 8px 12px;
   border: 1px solid #d1d5db;

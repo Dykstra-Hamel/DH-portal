@@ -226,7 +226,7 @@ export function AddressAutocomplete({
   };
 
   return (
-    <div className={`${styles.autocompleteContainer} ${className}`} ref={containerRef}>
+    <div className={`${styles.autocompleteContainer} ${styles.googlePlacesWrapper} ${className}`} ref={containerRef}>
       <input
         ref={inputRef}
         type="text"

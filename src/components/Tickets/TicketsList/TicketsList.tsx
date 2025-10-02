@@ -50,7 +50,8 @@ function TicketsList({
     const shouldShowUndo =
       message === 'The ticket was successfully assigned.' ||
       message.includes('converted to lead') ||
-      message.includes('converted to support case');
+      message.includes('converted to support case') ||
+      message === 'Ticket has been archived';
 
     if (shouldShowUndo) {
       setShowUndoOnToast(true);
@@ -103,7 +104,10 @@ function TicketsList({
       setPreviousTicketState(null);
 
       setTimeout(() => {
-        setToastMessage('Ticket assignment undone successfully.');
+        const undoMessage = previousTicketState.qualification === 'junk' 
+          ? 'Ticket restored successfully.' 
+          : 'Ticket assignment undone successfully.';
+        setToastMessage(undoMessage);
         setShowToast(true);
         setShowUndoOnToast(false);
       }, 300);
@@ -121,7 +125,8 @@ function TicketsList({
 
   const handleQualify = async (
     qualification: 'sales' | 'customer_service' | 'junk',
-    assignedTo?: string
+    assignedTo?: string,
+    customStatus?: string
   ) => {
     if (!qualifyingTicket) return;
 
@@ -139,7 +144,7 @@ function TicketsList({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ qualification, assignedTo }),
+          body: JSON.stringify({ qualification, assignedTo, customStatus }),
         }
       );
 
@@ -156,13 +161,20 @@ function TicketsList({
       });
 
       onTicketUpdated?.();
-      setShowQualifyModal(false);
-      setQualifyingTicket(null);
-
-      // Show success message from API response
-      if (result.message) {
-        handleShowToast(result.message);
+      
+      // For live calls (customStatus provided), don't auto-close modal or show toast
+      // The modal component will handle these actions
+      if (!customStatus) {
+        setShowQualifyModal(false);
+        setQualifyingTicket(null);
+        
+        // Show success message from API response
+        if (result.message) {
+          handleShowToast(result.message);
+        }
       }
+
+      return result;
     } catch (error) {
       console.error('Error qualifying ticket:', error);
       alert('Failed to qualify ticket. Please try again.');

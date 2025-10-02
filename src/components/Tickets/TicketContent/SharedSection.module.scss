@@ -2,13 +2,7 @@
 
 .section {
   background: #fff;
-  border: 1px solid #dedede;
-  border-radius: 6px;
   transition: border-color 0.2s ease;
-
-  &.editing {
-    border-color: var(--action-600);
-  }
 }
 
 .sectionHeader {

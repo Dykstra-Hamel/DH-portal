@@ -20,11 +20,17 @@ export async function POST(
     }
 
     const { id } = await params;
-    const { qualification, assignedTo } = await request.json();
+    const { qualification, assignedTo, customStatus } = await request.json();
 
-    if (!qualification || !['sales', 'customer_service', 'junk'].includes(qualification)) {
+    if (
+      !qualification ||
+      !['sales', 'customer_service', 'junk'].includes(qualification)
+    ) {
       return NextResponse.json(
-        { error: 'Invalid qualification. Must be "sales", "customer_service", or "junk"' },
+        {
+          error:
+            'Invalid qualification. Must be "sales", "customer_service", or "junk"',
+        },
         { status: 400 }
       );
     }
@@ -32,7 +38,8 @@ export async function POST(
     // First get the current ticket to verify access and get data
     const { data: ticket, error: fetchError } = await supabase
       .from('tickets')
-      .select(`
+      .select(
+        `
         *,
         customer:customers!tickets_customer_id_fkey(
           id,
@@ -45,16 +52,14 @@ export async function POST(
           state,
           zip_code
         )
-      `)
+      `
+      )
       .eq('id', id)
       .single();
 
     if (fetchError) {
       console.error('Error fetching ticket:', fetchError);
-      return NextResponse.json(
-        { error: 'Ticket not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
     // 🔍 DEBUG: Log ticket data
@@ -99,10 +104,11 @@ export async function POST(
         .update({
           status: 'closed',
           archived: true,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
-        .select(`
+        .select(
+          `
           *,
           customer:customers!tickets_customer_id_fkey(
             id,
@@ -115,7 +121,8 @@ export async function POST(
             state,
             zip_code
           )
-        `)
+        `
+        )
         .single();
 
       if (updateError) {
@@ -127,9 +134,9 @@ export async function POST(
       }
 
       return NextResponse.json({
-        message: 'Ticket marked as junk and archived',
+        message: 'Ticket has been archived',
         qualification: 'junk',
-        ticket: updatedTicket
+        ticket: updatedTicket,
       });
     } else if (qualification === 'sales') {
       // Convert to lead directly
@@ -144,11 +151,11 @@ export async function POST(
       if (ticket.converted_to_lead_id) {
         // Update the existing lead instead of creating a new one
         const updateData: any = {
-          lead_status: assignedTo ? 'contacting' : 'unassigned',
+          lead_status: customStatus || (assignedTo ? 'contacting' : 'unassigned'),
           priority: ticket.priority,
           estimated_value: ticket.estimated_value || 0,
           comments: ticket.description || '',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         };
 
         // Add assignment if provided
@@ -160,7 +167,8 @@ export async function POST(
           .from('leads')
           .update(updateData)
           .eq('id', ticket.converted_to_lead_id)
-          .select(`
+          .select(
+            `
             *,
             customer:customers!leads_customer_id_fkey(
               id,
@@ -173,7 +181,8 @@ export async function POST(
               state,
               zip_code
             )
-          `)
+          `
+          )
           .single();
 
         if (updateLeadError) {
@@ -217,7 +226,8 @@ export async function POST(
           message: 'Existing lead updated successfully',
           qualification: 'sales',
           lead: updatedLead,
-          customer: updatedLead.customer
+          customer: updatedLead.customer,
+          leadId: updatedLead.id,
         });
       }
 
@@ -228,7 +238,8 @@ export async function POST(
         lead_source: ticket.source,
         lead_type: ticket.type,
         service_type: ticket.service_type,
-        lead_status: (assignedTo || ticket.assigned_to) ? 'contacting' : 'unassigned',
+        lead_status:
+          customStatus || (assignedTo || ticket.assigned_to ? 'contacting' : 'unassigned'),
         priority: ticket.priority,
         estimated_value: ticket.estimated_value || 0,
         comments: ticket.description || '',
@@ -242,7 +253,7 @@ export async function POST(
         referrer_url: ticket.referrer_url,
         ip_address: ticket.ip_address,
         user_agent: ticket.user_agent,
-        converted_from_ticket_id: ticket.id  // Required for database trigger validation
+        converted_from_ticket_id: ticket.id, // Required for database trigger validation
       };
 
       // Start a transaction for lead creation and ticket update
@@ -254,7 +265,8 @@ export async function POST(
         const { data: leadData, error: leadError } = await supabase
           .from('leads')
           .insert(leadInsertData)
-          .select(`
+          .select(
+            `
             *,
             customer:customers!leads_customer_id_fkey(
               id,
@@ -267,7 +279,8 @@ export async function POST(
               state,
               zip_code
             )
-          `)
+          `
+          )
           .single();
 
         if (leadError) {
@@ -289,13 +302,16 @@ export async function POST(
             converted_at: new Date().toISOString(),
             archived: true,
             status: 'resolved',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', id);
 
         if (ticketUpdateError) {
           await supabase.rpc('rollback');
-          console.error('Error updating ticket conversion status:', ticketUpdateError);
+          console.error(
+            'Error updating ticket conversion status:',
+            ticketUpdateError
+          );
           return NextResponse.json(
             { error: 'Failed to update ticket after lead creation' },
             { status: 500 }
@@ -304,8 +320,9 @@ export async function POST(
 
         // Commit the transaction
         await supabase.rpc('commit');
-        console.log('✅ Lead creation and ticket archival completed atomically');
-
+        console.log(
+          '✅ Lead creation and ticket archival completed atomically'
+        );
       } catch (error) {
         await supabase.rpc('rollback');
         console.error('Transaction rolled back due to error:', error);
@@ -442,22 +459,35 @@ export async function POST(
       // Create assignment notification if lead was assigned to someone
       if (assignedTo) {
         try {
-          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const { createAdminClient } = await import(
+            '@/lib/supabase/server-admin'
+          );
           const adminSupabase = createAdminClient();
 
           // Helper function to format lead type
           const formatLeadType = (source: string) => {
             switch (source) {
-              case 'cold_call': return 'Call';
-              case 'web_form': return 'Form';
-              case 'website_form': return 'Form';
-              case 'phone_call': return 'Call';
-              default: return source?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
+              case 'cold_call':
+                return 'Call';
+              case 'web_form':
+                return 'Form';
+              case 'website_form':
+                return 'Form';
+              case 'phone_call':
+                return 'Call';
+              default:
+                return (
+                  source
+                    ?.replace('_', ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'
+                );
             }
           };
 
           // Build customer info for notification (Customer Name | Lead Type)
-          const customerName = `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || 'Unknown Customer';
+          const customerName =
+            `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() ||
+            'Unknown Customer';
           const leadType = formatLeadType(ticket.source);
           const customerDetails = `${customerName} | ${leadType}`;
 
@@ -469,71 +499,108 @@ export async function POST(
             p_message: customerDetails,
             p_reference_id: newLead.id,
             p_reference_type: 'lead',
-            p_assigned_to: assignedTo
+            p_assigned_to: assignedTo,
           });
 
-          const { data, error } = await adminSupabase.rpc('create_notification', {
-            p_user_id: assignedTo,
-            p_company_id: ticket.company_id,
-            p_type: 'assignment',
-            p_title: 'New Lead Assigned To You',
-            p_message: customerDetails,
-            p_reference_id: newLead.id,
-            p_reference_type: 'lead',
-            p_assigned_to: assignedTo
-          });
+          const { data, error } = await adminSupabase.rpc(
+            'create_notification',
+            {
+              p_user_id: assignedTo,
+              p_company_id: ticket.company_id,
+              p_type: 'assignment',
+              p_title: 'New Lead Assigned To You',
+              p_message: customerDetails,
+              p_reference_id: newLead.id,
+              p_reference_type: 'lead',
+              p_assigned_to: assignedTo,
+            }
+          );
 
           if (error) {
-            console.error('Database error creating lead assignment notification:', error);
+            console.error(
+              'Database error creating lead assignment notification:',
+              error
+            );
             throw error;
           }
 
-          console.log('Successfully created lead assignment notification:', data);
+          console.log(
+            'Successfully created lead assignment notification:',
+            data
+          );
         } catch (notificationError) {
-          console.error('Error creating lead assignment notification:', notificationError);
+          console.error(
+            'Error creating lead assignment notification:',
+            notificationError
+          );
           // Don't throw to avoid breaking the main flow, but log thoroughly
         }
       } else {
         // Lead is unassigned - notify all sales department members
         try {
-          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const { createAdminClient } = await import(
+            '@/lib/supabase/server-admin'
+          );
           const adminSupabase = createAdminClient();
 
           // Build customer info for department notification (Customer Name | Lead Type)
           const formatLeadType = (source: string) => {
             switch (source) {
-              case 'cold_call': return 'Call';
-              case 'web_form': return 'Form';
-              case 'website_form': return 'Form';
-              case 'phone_call': return 'Call';
-              default: return source?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
+              case 'cold_call':
+                return 'Call';
+              case 'web_form':
+                return 'Form';
+              case 'website_form':
+                return 'Form';
+              case 'phone_call':
+                return 'Call';
+              default:
+                return (
+                  source
+                    ?.replace('_', ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'
+                );
             }
           };
 
-          const deptCustomerName = `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || 'Unknown Customer';
+          const deptCustomerName =
+            `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() ||
+            'Unknown Customer';
           const deptLeadType = formatLeadType(ticket.source);
           const deptCustomerDetails = `${deptCustomerName} | ${deptLeadType}`;
 
           console.log('Creating department notification for unassigned lead');
 
-          const { data, error } = await adminSupabase.rpc('notify_department_and_managers', {
-            p_company_id: ticket.company_id,
-            p_department: 'sales',
-            p_type: 'new_lead_unassigned',
-            p_title: 'New Sales Lead In The Bucket!',
-            p_message: deptCustomerDetails,
-            p_reference_id: newLead.id,
-            p_reference_type: 'lead'
-          });
+          const { data, error } = await adminSupabase.rpc(
+            'notify_department_and_managers',
+            {
+              p_company_id: ticket.company_id,
+              p_department: 'sales',
+              p_type: 'new_lead_unassigned',
+              p_title: 'New Sales Lead In The Bucket!',
+              p_message: deptCustomerDetails,
+              p_reference_id: newLead.id,
+              p_reference_type: 'lead',
+            }
+          );
 
           if (error) {
-            console.error('Database error creating department lead notification:', error);
+            console.error(
+              'Database error creating department lead notification:',
+              error
+            );
             throw error;
           }
 
-          console.log('Successfully created department lead notification:', data);
+          console.log(
+            'Successfully created department lead notification:',
+            data
+          );
         } catch (notificationError) {
-          console.error('Error creating department lead notification:', notificationError);
+          console.error(
+            'Error creating department lead notification:',
+            notificationError
+          );
           // Don't throw to avoid breaking the main flow, but log thoroughly
         }
       }
@@ -542,7 +609,8 @@ export async function POST(
         message: 'Ticket qualified as sales and converted to lead',
         qualification: 'sales',
         lead: newLead,
-        customer: newLead.customer
+        customer: newLead.customer,
+        leadId: newLead.id,
       });
     } else {
       // Convert to support case (similar to sales flow)
@@ -557,9 +625,9 @@ export async function POST(
       if (ticket.converted_to_support_case_id) {
         // Update the existing support case instead of creating a new one
         const updateData: any = {
-          status: assignedTo ? 'in_progress' : 'unassigned',
+          status: customStatus || (assignedTo ? 'in_progress' : 'unassigned'),
           priority: ticket.priority || 'medium',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         };
 
         // Add assignment if provided, otherwise ensure it's unassigned
@@ -569,11 +637,13 @@ export async function POST(
           updateData.assigned_to = null;
         }
 
-        const { data: updatedSupportCase, error: updateSupportCaseError } = await supabase
-          .from('support_cases')
-          .update(updateData)
-          .eq('id', ticket.converted_to_support_case_id)
-          .select(`
+        const { data: updatedSupportCase, error: updateSupportCaseError } =
+          await supabase
+            .from('support_cases')
+            .update(updateData)
+            .eq('id', ticket.converted_to_support_case_id)
+            .select(
+              `
             *,
             customer:customers!support_cases_customer_id_fkey(
               id,
@@ -586,11 +656,15 @@ export async function POST(
               state,
               zip_code
             )
-          `)
-          .single();
+          `
+            )
+            .single();
 
         if (updateSupportCaseError) {
-          console.error('Error updating existing support case:', updateSupportCaseError);
+          console.error(
+            'Error updating existing support case:',
+            updateSupportCaseError
+          );
           return NextResponse.json(
             { error: 'Failed to update existing support case' },
             { status: 500 }
@@ -601,7 +675,8 @@ export async function POST(
           message: 'Existing support case updated successfully',
           qualification: 'customer_service',
           supportCase: updatedSupportCase,
-          customer: updatedSupportCase.customer
+          customer: updatedSupportCase.customer,
+          supportCaseId: updatedSupportCase.id,
         });
       }
 
@@ -613,14 +688,18 @@ export async function POST(
         issueType = 'scheduling';
       } else if (ticket.description?.toLowerCase().includes('complaint')) {
         issueType = 'complaint';
-      } else if (ticket.description?.toLowerCase().includes('service') || ticket.description?.toLowerCase().includes('quality')) {
+      } else if (
+        ticket.description?.toLowerCase().includes('service') ||
+        ticket.description?.toLowerCase().includes('quality')
+      ) {
         issueType = 'service_quality';
       }
 
       // Generate summary from ticket data
-      const summary = ticket.description || 
-                     `${ticket.type} inquiry from ${ticket.source}` ||
-                     'Support request';
+      const summary =
+        ticket.description ||
+        `${ticket.type} inquiry from ${ticket.source}` ||
+        'Support request';
 
       // Create a new support case from the ticket
       const supportCaseInsertData = {
@@ -630,10 +709,10 @@ export async function POST(
         issue_type: issueType,
         summary: summary.substring(0, 255), // Ensure it fits in summary field
         description: ticket.description,
-        status: (assignedTo || ticket.assigned_to) ? 'in_progress' : 'unassigned',
+        status: customStatus || (assignedTo || ticket.assigned_to ? 'in_progress' : 'unassigned'),
         priority: ticket.priority || 'medium',
         assigned_to: assignedTo || ticket.assigned_to || null,
-        archived: false
+        archived: false,
       };
 
       // Start a transaction for support case creation and ticket update
@@ -642,10 +721,12 @@ export async function POST(
 
       try {
         // Create the support case
-        const { data: supportCaseData, error: supportCaseError } = await supabase
-          .from('support_cases')
-          .insert(supportCaseInsertData)
-          .select(`
+        const { data: supportCaseData, error: supportCaseError } =
+          await supabase
+            .from('support_cases')
+            .insert(supportCaseInsertData)
+            .select(
+              `
             *,
             customer:customers!support_cases_customer_id_fkey(
               id,
@@ -658,8 +739,9 @@ export async function POST(
               state,
               zip_code
             )
-          `)
-          .single();
+          `
+            )
+            .single();
 
         if (supportCaseError) {
           await supabase.rpc('rollback');
@@ -680,13 +762,16 @@ export async function POST(
             converted_at: new Date().toISOString(),
             archived: true,
             status: 'resolved',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', id);
 
         if (ticketUpdateError) {
           await supabase.rpc('rollback');
-          console.error('Error updating ticket conversion status:', ticketUpdateError);
+          console.error(
+            'Error updating ticket conversion status:',
+            ticketUpdateError
+          );
           return NextResponse.json(
             { error: 'Failed to update ticket after support case creation' },
             { status: 500 }
@@ -695,8 +780,9 @@ export async function POST(
 
         // Commit the transaction
         await supabase.rpc('commit');
-        console.log('✅ Support case creation and ticket archival completed atomically');
-
+        console.log(
+          '✅ Support case creation and ticket archival completed atomically'
+        );
       } catch (error) {
         await supabase.rpc('rollback');
         console.error('Transaction rolled back due to error:', error);
@@ -709,22 +795,33 @@ export async function POST(
       // Create assignment notification if ticket was assigned to someone
       if (assignedTo) {
         try {
-          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const { createAdminClient } = await import(
+            '@/lib/supabase/server-admin'
+          );
           const adminSupabase = createAdminClient();
 
           // Helper function to format priority
           const formatPriority = (priority: string) => {
             switch (priority) {
-              case 'low': return 'Low';
-              case 'medium': return 'Medium';
-              case 'high': return 'High';
-              case 'urgent': return 'Urgent';
-              default: return priority?.replace(/\b\w/g, l => l.toUpperCase()) || 'Medium';
+              case 'low':
+                return 'Low';
+              case 'medium':
+                return 'Medium';
+              case 'high':
+                return 'High';
+              case 'urgent':
+                return 'Urgent';
+              default:
+                return (
+                  priority?.replace(/\b\w/g, l => l.toUpperCase()) || 'Medium'
+                );
             }
           };
 
           // Build customer info for notification (Customer Name | Priority)
-          const customerName = `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || 'Unknown Customer';
+          const customerName =
+            `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() ||
+            'Unknown Customer';
           const ticketPriority = formatPriority(ticket.priority);
           const customerDetails = `${customerName} | ${ticketPriority}`;
 
@@ -736,80 +833,119 @@ export async function POST(
             p_message: customerDetails,
             p_reference_id: ticket.id,
             p_reference_type: 'ticket',
-            p_assigned_to: assignedTo
+            p_assigned_to: assignedTo,
           });
 
-          const { data, error } = await adminSupabase.rpc('create_notification', {
-            p_user_id: assignedTo,
-            p_company_id: ticket.company_id,
-            p_type: 'assignment',
-            p_title: 'New Support Ticket Assigned To You',
-            p_message: customerDetails,
-            p_reference_id: ticket.id,
-            p_reference_type: 'ticket',
-            p_assigned_to: assignedTo
-          });
+          const { data, error } = await adminSupabase.rpc(
+            'create_notification',
+            {
+              p_user_id: assignedTo,
+              p_company_id: ticket.company_id,
+              p_type: 'assignment',
+              p_title: 'New Support Ticket Assigned To You',
+              p_message: customerDetails,
+              p_reference_id: ticket.id,
+              p_reference_type: 'ticket',
+              p_assigned_to: assignedTo,
+            }
+          );
 
           if (error) {
-            console.error('Database error creating ticket assignment notification:', error);
+            console.error(
+              'Database error creating ticket assignment notification:',
+              error
+            );
             throw error;
           }
 
-          console.log('Successfully created ticket assignment notification:', data);
+          console.log(
+            'Successfully created ticket assignment notification:',
+            data
+          );
         } catch (notificationError) {
-          console.error('Error creating ticket assignment notification:', notificationError);
+          console.error(
+            'Error creating ticket assignment notification:',
+            notificationError
+          );
           // Don't throw to avoid breaking the main flow, but log thoroughly
         }
       } else {
         // Ticket is unassigned - notify all support department members
         try {
-          const { createAdminClient } = await import('@/lib/supabase/server-admin');
+          const { createAdminClient } = await import(
+            '@/lib/supabase/server-admin'
+          );
           const adminSupabase = createAdminClient();
 
           // Build customer info for department notification (Customer Name | Priority)
           const formatPriority = (priority: string) => {
             switch (priority) {
-              case 'low': return 'Low';
-              case 'medium': return 'Medium';
-              case 'high': return 'High';
-              case 'urgent': return 'Urgent';
-              default: return priority?.replace(/\b\w/g, l => l.toUpperCase()) || 'Medium';
+              case 'low':
+                return 'Low';
+              case 'medium':
+                return 'Medium';
+              case 'high':
+                return 'High';
+              case 'urgent':
+                return 'Urgent';
+              default:
+                return (
+                  priority?.replace(/\b\w/g, l => l.toUpperCase()) || 'Medium'
+                );
             }
           };
 
-          const deptTicketCustomerName = `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || 'Unknown Customer';
+          const deptTicketCustomerName =
+            `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() ||
+            'Unknown Customer';
           const deptTicketPriority = formatPriority(ticket.priority);
           const deptTicketCustomerDetails = `${deptTicketCustomerName} | ${deptTicketPriority}`;
 
-          console.log('Creating department notification for unassigned support ticket');
+          console.log(
+            'Creating department notification for unassigned support ticket'
+          );
 
-          const { data, error } = await adminSupabase.rpc('notify_department_and_managers', {
-            p_company_id: ticket.company_id,
-            p_department: 'support',
-            p_type: 'new_support_case_unassigned',
-            p_title: 'New Support Ticket In The Bucket!',
-            p_message: deptTicketCustomerDetails,
-            p_reference_id: ticket.id,
-            p_reference_type: 'ticket'
-          });
+          const { data, error } = await adminSupabase.rpc(
+            'notify_department_and_managers',
+            {
+              p_company_id: ticket.company_id,
+              p_department: 'support',
+              p_type: 'new_support_case_unassigned',
+              p_title: 'New Support Ticket In The Bucket!',
+              p_message: deptTicketCustomerDetails,
+              p_reference_id: ticket.id,
+              p_reference_type: 'ticket',
+            }
+          );
 
           if (error) {
-            console.error('Database error creating department ticket notification:', error);
+            console.error(
+              'Database error creating department ticket notification:',
+              error
+            );
             throw error;
           }
 
-          console.log('Successfully created department ticket notification:', data);
+          console.log(
+            'Successfully created department ticket notification:',
+            data
+          );
         } catch (notificationError) {
-          console.error('Error creating department ticket notification:', notificationError);
+          console.error(
+            'Error creating department ticket notification:',
+            notificationError
+          );
           // Don't throw to avoid breaking the main flow, but log thoroughly
         }
       }
 
       return NextResponse.json({
-        message: 'Ticket qualified as customer service and converted to support case',
+        message:
+          'Ticket qualified as customer service and converted to support case',
         qualification: 'customer_service',
         supportCase: newSupportCase,
-        customer: newSupportCase.customer
+        customer: newSupportCase.customer,
+        supportCaseId: newSupportCase.id,
       });
     }
   } catch (error) {

@@ -13,8 +13,8 @@ export interface ServiceAddressData {
   address_type?: 'residential' | 'commercial' | 'industrial' | 'mixed_use';
   property_notes?: string;
   hasStreetView?: boolean;
-  home_size?: number; // Square feet
-  yard_size?: number; // Acres (decimal)
+  home_size_range?: string;
+  yard_size_range?: string;
 }
 
 export interface CreateServiceAddressResult {
@@ -108,6 +108,8 @@ export async function createOrFindServiceAddress(
         service_area_id: serviceAreaId,
         address_type: addressData.address_type || 'residential',
         property_notes: addressData.property_notes?.trim() || null,
+        home_size_range: addressData.home_size_range || null,
+        yard_size_range: addressData.yard_size_range || null
       })
       .select('id')
       .single();
@@ -404,6 +406,8 @@ export async function updateExistingServiceAddress(
         service_area_id: serviceAreaId,
         address_type: addressData.address_type || 'residential',
         property_notes: addressData.property_notes?.trim() || null,
+        home_size_range: addressData.home_size_range || null,
+        yard_size_range: addressData.yard_size_range || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', serviceAddressId);
@@ -427,56 +431,6 @@ export async function updateExistingServiceAddress(
   }
 }
 
-/**
- * Updates only the home_size and yard_size fields for a service address
- */
-export async function updateServiceAddressProperties(
-  serviceAddressId: string,
-  homeSize?: number,
-  yardSize?: number
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = createClient();
-
-    const updateData: { [key: string]: number | string | null } = {};
-
-    if (homeSize !== undefined) {
-      updateData.home_size = homeSize || null;
-    }
-
-    if (yardSize !== undefined) {
-      updateData.yard_size = yardSize || null;
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      return { success: true }; // Nothing to update
-    }
-
-    updateData.updated_at = new Date().toISOString();
-
-    const { error: updateError } = await supabase
-      .from('service_addresses')
-      .update(updateData)
-      .eq('id', serviceAddressId);
-
-    if (updateError) {
-      console.error('Error updating service address properties:', updateError);
-      return {
-        success: false,
-        error: `Failed to update service address properties: ${updateError.message}`
-      };
-    }
-
-    return { success: true };
-
-  } catch (error) {
-    console.error('Error in updateServiceAddressProperties:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
-}
 
 /**
  * Creates a service address and links it to both customer and lead
