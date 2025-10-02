@@ -6,6 +6,7 @@ import { Ticket } from '@/types/ticket';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import LoadingSpinner from '@/components/Common/LoadingSpinner/LoadingSpinner';
+import { getCustomerDisplayName } from '@/lib/display-utils';
 import styles from './LiveCallBar.module.scss';
 
 interface LiveCallBarProps {
@@ -197,7 +198,7 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
         // Add new ticket to the list with enriched customer data
         if (newRecord && newRecord.status === 'live') {
           try {
-            // Enrich the ticket with customer data since real-time doesn't include joins
+            // Enrich the ticket with customer data and call_records since real-time doesn't include joins
             const supabase = createClient();
             const { data: enrichedTicket } = await supabase
               .from('tickets')
@@ -208,6 +209,17 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                   first_name,
                   last_name,
                   phone
+                ),
+                call_records!tickets_call_record_id_fkey(
+                  id,
+                  call_id,
+                  call_status,
+                  phone_number,
+                  from_number,
+                  start_timestamp,
+                  end_timestamp,
+                  duration_seconds,
+                  disconnect_reason
                 )
               `)
               .eq('id', newRecord.id)
@@ -241,7 +253,7 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
         // Update existing ticket with enriched data
         if (newRecord) {
           try {
-            // Enrich the updated ticket with customer data
+            // Enrich the updated ticket with customer data and call_records
             const supabase = createClient();
             const { data: enrichedTicket } = await supabase
               .from('tickets')
@@ -252,6 +264,17 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                   first_name,
                   last_name,
                   phone
+                ),
+                call_records!tickets_call_record_id_fkey(
+                  id,
+                  call_id,
+                  call_status,
+                  phone_number,
+                  from_number,
+                  start_timestamp,
+                  end_timestamp,
+                  duration_seconds,
+                  disconnect_reason
                 )
               `)
               .eq('id', newRecord.id)
@@ -388,10 +411,21 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
 
       if (ticket.status === 'live') {
         // Active calls with 'live' status - show immediately, fill in data as it arrives
-        if (ticket.call_records && ticket.call_records.length > 0) {
+        // Handle call_records being either a single object (one-to-one) or array (one-to-many)
+        const hasCallRecords = ticket.call_records &&
+          (Array.isArray(ticket.call_records)
+            ? ticket.call_records.length > 0
+            : (ticket.call_records as any).id);
+
+        if (hasCallRecords) {
           // Use the actual call records from the joined data, attach ticket info for customer name
-          console.log('LiveCallBar: Adding call records:', ticket.call_records.length, 'for ticket:', ticket.id);
-          const enhancedCallRecords = (ticket.call_records as CallRecord[]).map(callRecord => ({
+          // Normalize to array format
+          const callRecordsArray = Array.isArray(ticket.call_records)
+            ? ticket.call_records
+            : [ticket.call_records];
+
+          console.log('LiveCallBar: Adding call records:', callRecordsArray.length, 'for ticket:', ticket.id);
+          const enhancedCallRecords = (callRecordsArray as CallRecord[]).map(callRecord => ({
             ...callRecord,
             ticketInfo: {
               customer: ticket.customer
@@ -406,8 +440,8 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
             id: `ticket-${ticket.id}`,
             call_id: `ticket-call-${ticket.id}`,
             customer_id: ticket.customer_id,
-            phone_number: ticket.customer?.phone || 'Incoming Call',
-            from_number: ticket.customer?.phone || undefined,
+            phone_number: ticket.customer?.phone || 'Loading...',
+            from_number: ticket.customer?.phone || 'Loading...',
             call_status: 'ongoing',
             start_timestamp: ticket.created_at,
             created_at: ticket.created_at,
@@ -614,21 +648,12 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
               </div>
               <div className={styles.gridCell}>
                 {(() => {
-                  // Try to get customer name from ticket info, fallback to phone number
                   const enhancedCall = call as CallRecord & { ticketInfo?: any };
-                  if (enhancedCall.ticketInfo?.customer) {
-                    const { first_name, last_name } = enhancedCall.ticketInfo.customer;
-                    const customerName = `${first_name || ''} ${last_name || ''}`.trim();
-                    if (customerName) {
-                      return customerName;
-                    }
-                  }
-                  // Fallback to formatted phone number
-                  return call.from_number ? formatPhoneNumber(call.from_number) : 'Unknown Caller';
+                  return getCustomerDisplayName(enhancedCall.ticketInfo?.customer);
                 })()}
               </div>
               <div className={styles.gridCell}>
-                {call.from_number ? formatPhoneNumber(call.from_number) : 'N/A'}
+                {formatPhoneNumber(call.from_number || call.phone_number || '')}
               </div>
               <div className={styles.gridCell}>
                 {call.start_timestamp ? formatDuration(call.start_timestamp, currentTime) : '00:00:00'}

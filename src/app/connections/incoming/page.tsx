@@ -90,8 +90,6 @@ function TicketsPageContent() {
   const handleCallRecordChange = useCallback(async (payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
-    console.log('Call record change:', eventType, newRecord);
-
     // Check if this call record belongs to the current company
     // We need to verify through the lead relationship
     if (newRecord?.lead_id && selectedCompany?.id) {
@@ -105,7 +103,6 @@ function TicketsPageContent() {
 
         // Only process if this call belongs to the current company
         if (lead?.company_id !== selectedCompany.id) {
-          console.log('Call record does not belong to current company, ignoring');
           return;
         }
       } catch (error) {
@@ -145,21 +142,18 @@ function TicketsPageContent() {
 
     switch (eventType) {
       case 'INSERT':
-        console.log('Processing INSERT for call record:', newRecord.id);
         if (newRecord?.ticket_id) {
           await updateTicketCallRecords(newRecord.ticket_id);
         }
         break;
 
       case 'UPDATE':
-        console.log('Processing UPDATE for call record:', newRecord.id);
         if (newRecord?.ticket_id) {
           await updateTicketCallRecords(newRecord.ticket_id);
         }
         break;
 
       case 'DELETE':
-        console.log('Processing DELETE for call record:', oldRecord?.id);
         if (oldRecord?.ticket_id) {
           await updateTicketCallRecords(oldRecord.ticket_id);
         }
@@ -169,9 +163,7 @@ function TicketsPageContent() {
 
   const handleTicketChange = useCallback((payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
-    
-    console.log('Ticket change:', eventType, newRecord);
-    
+
     switch (eventType) {
       case 'INSERT':
         // Add new ticket to the list - fetch full data with joins
@@ -235,16 +227,8 @@ function TicketsPageContent() {
       case 'UPDATE':
         // Update existing ticket - fetch full data with joins for real-time updates
         if (newRecord && selectedCompany?.id) {
-          console.log('Processing ticket UPDATE:', newRecord.id, {
-            archived: newRecord.archived,
-            status: newRecord.status,
-            converted_to_lead_id: newRecord.converted_to_lead_id,
-            converted_to_support_case_id: newRecord.converted_to_support_case_id
-          });
-
           // If ticket becomes archived or resolved (from qualification), remove it from active view
           if (newRecord.archived === true || newRecord.status === 'resolved') {
-            console.log('Removing archived/resolved ticket from active view:', newRecord.id);
             setTickets(prev => prev.filter(ticket => ticket.id !== newRecord.id));
             break;
           }
@@ -282,7 +266,6 @@ function TicketsPageContent() {
                 console.error('Error fetching full ticket data for update:', error);
                 // If ticket no longer exists or is archived, remove it
                 if (error.code === 'PGRST116') { // No rows returned
-                  console.log('Ticket no longer exists, removing from list:', newRecord.id);
                   setTickets(prev => prev.filter(ticket => ticket.id !== newRecord.id));
                 } else {
                   // Fallback to basic update for other errors
@@ -293,10 +276,8 @@ function TicketsPageContent() {
               } else if (fullTicket) {
                 // Check again if the full ticket data shows it should be removed
                 if (fullTicket.archived === true || fullTicket.status === 'resolved') {
-                  console.log('Full ticket data shows archived/resolved, removing:', fullTicket.id);
                   setTickets(prev => prev.filter(ticket => ticket.id !== fullTicket.id));
                 } else {
-                  console.log('Updating ticket with full data:', fullTicket.id);
                   setTickets(prev =>
                     prev.map(ticket => ticket.id === newRecord.id ? fullTicket : ticket)
                   );
@@ -412,7 +393,6 @@ function TicketsPageContent() {
 
         if (customerResponse.ok) {
           const newCustomer = await customerResponse.json();
-          console.log('Customer created successfully:', newCustomer);
           customerId = newCustomer.id;
         } else {
           const errorData = await customerResponse.json().catch(() => ({}));
@@ -437,14 +417,6 @@ function TicketsPageContent() {
         }).filter(([_, value]) => value !== undefined && value !== null && value !== '')
       );
 
-      // Log the data being sent for debugging
-      console.log('Creating ticket with data:', ticketData);
-      
-      // Log service address auto-linking
-      if (ticketData.service_address_id) {
-        console.log('🔗 Ticket will be automatically linked to service address:', ticketData.service_address_id);
-      }
-      
       const response = await fetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -452,8 +424,7 @@ function TicketsPageContent() {
       });
 
       if (response.ok) {
-        const createdTicket = await response.json();
-        console.log('Ticket created successfully:', createdTicket);
+        await response.json();
         setShowCreateForm(false);
         setFormData(null);
         if (selectedCompany?.id) {
@@ -523,20 +494,18 @@ function TicketsPageContent() {
           // Refresh metrics on ticket changes since they affect aggregates
           if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE' ||
               (payload.eventType === 'UPDATE' && (newTicket?.archived !== oldTicket?.archived))) {
-            console.log('Refreshing metrics due to ticket change that affects counts');
             fetchMetrics(selectedCompany.id);
           }
         }
       )
       .on(
         'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
+        {
+          event: '*',
+          schema: 'public',
           table: 'call_records'
         },
         (payload) => {
-          console.log('Call record realtime update:', payload);
           handleCallRecordChange(payload);
           
           // Refresh metrics if call status affects aggregations
@@ -547,25 +516,14 @@ function TicketsPageContent() {
         }
       )
       .subscribe((status) => {
-        console.log('Realtime subscription status for tickets:', {
-          status,
-          companyId: selectedCompany.id,
-          timestamp: new Date().toISOString()
-        });
-
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Realtime tickets subscription active');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Realtime tickets subscription error');
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime tickets subscription error');
         } else if (status === 'TIMED_OUT') {
-          console.warn('⏰ Realtime tickets subscription timed out');
-        } else if (status === 'CLOSED') {
-          console.log('🔒 Realtime tickets subscription closed');
+          console.warn('Realtime tickets subscription timed out');
         }
       });
 
     return () => {
-      console.log('Cleaning up realtime subscription for company:', selectedCompany.id);
       supabase.removeChannel(channel);
     };
   }, [selectedCompany?.id, handleTicketChange, handleCallRecordChange, fetchMetrics]);

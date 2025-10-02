@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import styles from './AddressAutocomplete.module.scss';
+import './google-places-override.css';
 
 export interface AddressComponents {
   street_number?: string;
@@ -50,6 +51,7 @@ export function AddressAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
+  const userHasInteractedRef = useRef(false);
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -112,7 +114,8 @@ export function AddressAutocomplete({
         return;
       }
 
-      if (value && value.trim().length >= 2) {
+      // Only fetch suggestions if user has interacted with the input
+      if (userHasInteractedRef.current && value && value.trim().length >= 2) {
         fetchSuggestions(value);
       } else {
         setSuggestions([]);
@@ -169,6 +172,9 @@ export function AddressAutocomplete({
     const newValue = e.target.value;
     onChange(newValue);
 
+    // Mark that user has interacted
+    userHasInteractedRef.current = true;
+
     // Reset selection when input changes
     setSelectedIndex(-1);
   };
@@ -203,6 +209,9 @@ export function AddressAutocomplete({
   };
 
   const handleInputFocus = () => {
+    // Mark that user has interacted
+    userHasInteractedRef.current = true;
+
     if (suggestions.length > 0 && value.length >= 2) {
       setShowSuggestions(true);
     }

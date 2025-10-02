@@ -108,10 +108,8 @@ async function recalculateAllLineItemPrices(
       finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
     }
 
-    let finalRecurringPrice = recurringPriceWithSize - discountAmount;
-    if (discountPercentage > 0) {
-      finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
-    }
+    // Discount only applies to initial price, not recurring
+    const finalRecurringPrice = recurringPriceWithSize;
 
     // Update the line item
     await supabase
@@ -326,13 +324,7 @@ export async function PUT(
       // Process line items
       for (const lineItem of body.line_items) {
         if (lineItem.id && lineItem.service_plan_id) {
-          // If updating existing line item with new service plan, delete and recreate
-          await supabase
-            .from('quote_line_items')
-            .delete()
-            .eq('id', lineItem.id);
-
-          // Create new line item with the new service plan
+          // Update existing line item with new service plan
           const { data: servicePlan } = await supabase
             .from('service_plans')
             .select('*')
@@ -373,35 +365,51 @@ export async function PUT(
             const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
             const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
 
-            const discountAmount = lineItem.discount_amount || 0;
-            const discountPercentage = lineItem.discount_percentage || 0;
+            // Get existing discounts or use new ones
+            const { data: existingLineItem } = await supabase
+              .from('quote_line_items')
+              .select('discount_percentage, discount_amount')
+              .eq('id', lineItem.id)
+              .single();
+
+            const discountAmount = lineItem.discount_amount !== undefined
+              ? lineItem.discount_amount
+              : (existingLineItem?.discount_amount || 0);
+            const discountPercentage = lineItem.discount_percentage !== undefined
+              ? lineItem.discount_percentage
+              : (existingLineItem?.discount_percentage || 0);
 
             let finalInitialPrice = initialPriceWithSize - discountAmount;
             if (discountPercentage > 0) {
               finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
             }
 
-            let finalRecurringPrice = recurringPriceWithSize - discountAmount;
-            if (discountPercentage > 0) {
-              finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
+            // Discount only applies to initial price, not recurring
+            const finalRecurringPrice = recurringPriceWithSize;
+
+            // UPDATE the existing line item with new service plan
+            const updateData: any = {
+              service_plan_id: servicePlan.id,
+              plan_name: servicePlan.plan_name,
+              plan_description: servicePlan.plan_description,
+              initial_price: initialPriceWithSize,
+              recurring_price: recurringPriceWithSize,
+              billing_frequency: servicePlan.billing_frequency,
+              discount_percentage: discountPercentage,
+              discount_amount: discountAmount,
+              final_initial_price: Math.max(0, finalInitialPrice),
+              final_recurring_price: Math.max(0, finalRecurringPrice),
+            };
+
+            // Include service_frequency if provided
+            if (lineItem.service_frequency !== undefined) {
+              updateData.service_frequency = lineItem.service_frequency;
             }
 
             await supabase
               .from('quote_line_items')
-              .insert({
-                quote_id: id,
-                service_plan_id: servicePlan.id,
-                plan_name: servicePlan.plan_name,
-                plan_description: servicePlan.plan_description,
-                initial_price: initialPriceWithSize,
-                recurring_price: recurringPriceWithSize,
-                billing_frequency: servicePlan.billing_frequency,
-                discount_percentage: discountPercentage,
-                discount_amount: discountAmount,
-                final_initial_price: Math.max(0, finalInitialPrice),
-                final_recurring_price: Math.max(0, finalRecurringPrice),
-                display_order: lineItem.display_order || 0,
-              });
+              .update(updateData)
+              .eq('id', lineItem.id);
           }
         } else if (lineItem.id) {
           // Update existing line item (only discounts/display order, no service plan change)
@@ -417,6 +425,10 @@ export async function PUT(
 
           if (lineItem.display_order !== undefined) {
             updateLineItemData.display_order = lineItem.display_order;
+          }
+
+          if (lineItem.service_frequency !== undefined) {
+            updateLineItemData.service_frequency = lineItem.service_frequency;
           }
 
           // Recalculate final prices if discounts changed
@@ -436,10 +448,8 @@ export async function PUT(
                 finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
               }
 
-              let finalRecurringPrice = existingLineItem.recurring_price - discountAmount;
-              if (discountPercentage > 0) {
-                finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
-              }
+              // Discount only applies to initial price, not recurring
+              const finalRecurringPrice = existingLineItem.recurring_price;
 
               updateLineItemData.final_initial_price = Math.max(0, finalInitialPrice);
               updateLineItemData.final_recurring_price = Math.max(0, finalRecurringPrice);
@@ -508,27 +518,32 @@ export async function PUT(
               finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
             }
 
-            let finalRecurringPrice = recurringPriceWithSize - discountAmount;
-            if (discountPercentage > 0) {
-              finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
+            // Discount only applies to initial price, not recurring
+            const finalRecurringPrice = recurringPriceWithSize;
+
+            const insertData: any = {
+              quote_id: id,
+              service_plan_id: servicePlan.id,
+              plan_name: servicePlan.plan_name,
+              plan_description: servicePlan.plan_description,
+              initial_price: initialPriceWithSize,
+              recurring_price: recurringPriceWithSize,
+              billing_frequency: servicePlan.billing_frequency,
+              discount_percentage: discountPercentage,
+              discount_amount: discountAmount,
+              final_initial_price: Math.max(0, finalInitialPrice),
+              final_recurring_price: Math.max(0, finalRecurringPrice),
+              display_order: lineItem.display_order || 0,
+            };
+
+            // Include service_frequency if provided
+            if (lineItem.service_frequency !== undefined) {
+              insertData.service_frequency = lineItem.service_frequency;
             }
 
             await supabase
               .from('quote_line_items')
-              .insert({
-                quote_id: id,
-                service_plan_id: servicePlan.id,
-                plan_name: servicePlan.plan_name,
-                plan_description: servicePlan.plan_description,
-                initial_price: initialPriceWithSize,
-                recurring_price: recurringPriceWithSize,
-                billing_frequency: servicePlan.billing_frequency,
-                discount_percentage: discountPercentage,
-                discount_amount: discountAmount,
-                final_initial_price: Math.max(0, finalInitialPrice),
-                final_recurring_price: Math.max(0, finalRecurringPrice),
-                display_order: lineItem.display_order || 0,
-              });
+              .insert(insertData);
           }
         }
       }

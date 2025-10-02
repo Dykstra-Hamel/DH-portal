@@ -63,66 +63,6 @@
   z-index: 1000;
 }
 
-// Override Google Places autocomplete dropdown styles
-.googlePlacesWrapper {
-  // This wrapper class ensures the global styles are properly scoped
-  
-  :global(.pac-container) {
-    border-radius: 8px !important;
-    box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-    border: 1px solid var(--gray-300) !important;
-    font-family: inherit !important;
-    z-index: 10000 !important;
-    background: white !important;
-    margin-top: 4px !important;
-    position: relative !important;
-  }
-
-  :global(.pac-item) {
-    padding: 12px 16px !important;
-    font-size: 14px !important;
-    border-top: 1px solid var(--gray-200) !important;
-    cursor: pointer !important;
-    background: white !important;
-
-    &:first-child {
-      border-top: none !important;
-      border-radius: 8px 8px 0 0 !important;
-    }
-
-    &:last-child {
-      border-radius: 0 0 8px 8px !important;
-    }
-
-    &:hover,
-    &.pac-item-selected {
-      background: var(--gray-50) !important;
-    }
-  }
-
-  :global(.pac-icon) {
-    margin-right: 12px !important;
-    width: 15px !important;
-    height: 20px !important;
-  }
-
-  :global(.pac-item-query) {
-    color: var(--gray-900) !important;
-    font-weight: 500 !important;
-  }
-
-  :global(.pac-matched) {
-    color: var(--action-500) !important;
-    font-weight: 600 !important;
-  }
-
-  :global(.pac-logo) {
-    padding: 8px !important;
-  }
-}
-
 // Custom suggestions dropdown styling
 .suggestionsDropdown {
   position: absolute;

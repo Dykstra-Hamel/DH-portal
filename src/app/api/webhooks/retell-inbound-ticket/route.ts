@@ -222,6 +222,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   // Determine company and agent direction from agent ID
   const agentIdValue =
     agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
+
   const { company_id: companyId, agent_direction } = await findCompanyAndDirectionByAgentId(agentIdValue);
 
   if (!companyId) {
@@ -288,18 +289,10 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     }
   } else {
     customerId = existingCustomer.id;
-    console.log('🏠 [DEBUG] Existing customer found:', {
-      customer_id: customerId,
-      address: existingCustomer.address,
-      city: existingCustomer.city,
-      state: existingCustomer.state,
-      zip_code: existingCustomer.zip_code
-    });
-    
+
     // Use existing customer address if available
     if (existingCustomer.address) {
       customerAddress = existingCustomer.address;
-      console.log('✅ [DEBUG] Using existing customer address:', customerAddress);
     } else {
       // Format address from customer address components if address field is empty
       const addressComponents = [
@@ -307,12 +300,9 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
         existingCustomer.state,
         existingCustomer.zip_code
       ].filter(Boolean);
-      
+
       if (addressComponents.length > 0) {
         customerAddress = addressComponents.join(', ');
-        console.log('🔧 [DEBUG] Built address from components:', customerAddress);
-      } else {
-        console.log('⚠️ [DEBUG] No address data available for existing customer');
       }
     }
   }
@@ -345,13 +335,6 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   // Extract data (will be mostly empty until call_analyzed event)
   const extractedData = extractCallData(undefined, undefined, retell_llm_dynamic_variables);
 
-  console.log('📍 [DEBUG] Address assignment for call record:', {
-    customerAddress: customerAddress,
-    extractedData_street_address: extractedData.street_address,
-    final_street_address: customerAddress || extractedData.street_address
-  });
-
-  // Create call record with bidirectional ticket relationship
   const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
     .insert({
@@ -364,6 +347,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
+      agent_id: agentIdValue, // Track which agent handled the call
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
       // Add dynamic variable data immediately
@@ -402,10 +386,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       ticketUpdateError.message
     );
     // Don't fail the request - the ticket and call record exist, just not fully linked
-  } else {
-    console.log(`🔗 [${requestId}] Successfully created bidirectional link: ticket ${newTicket.id} ↔ call record ${callRecord.id}`);
   }
-
 
   return NextResponse.json({
     success: true,
@@ -480,6 +461,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
       .update({
         description: `${callRecord.tickets.description || ''}\n\n${callSummary}`.trim(),
         service_type: extractedData.pest_issue,
+        pest_type: extractedData.pest_issue,
         updated_at: new Date().toISOString(),
       })
       .eq('id', callRecord.tickets.id);
@@ -544,15 +526,6 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
   if (callRecord.tickets) {
     // Get is_qualified from call analysis (Post-Call Analysis)
     const isQualified = call_analysis?.custom_analysis_data?.is_qualified;
-    
-    // Debug logging for qualification
-    console.log('🔍 [DEBUG] Call Analysis Data:', {
-      call_analysis: call_analysis ? 'Present' : 'Missing',
-      custom_analysis_data: call_analysis?.custom_analysis_data ? 'Present' : 'Missing',
-      is_qualified_value: isQualified,
-      is_qualified_type: typeof isQualified,
-      ticket_id: callRecord.tickets.id
-    });
 
     const updateData: any = {
       description: callRecord.tickets.description || '',
@@ -566,17 +539,8 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     }
 
     // Update ticket status and category based on AI qualification decision
-    console.log('🎯 [DEBUG] Qualification Logic Check:', {
-      isQualified_raw: isQualified,
-      isQualified_string_true: isQualified === 'true',
-      isQualified_boolean_true: isQualified === true,
-      isQualified_string_false: isQualified === 'false',
-      isQualified_boolean_false: isQualified === false
-    });
-
     if (isQualified === 'true' || isQualified === true) {
       // AI determined this is qualified for sales - set category to sales
-      console.log('✅ [DEBUG] Setting ticket as QUALIFIED SALES');
       updateData.type = 'phone_call'; // Keep as phone_call type
       updateData.service_type = 'Sales'; // Set category to Sales
       updateData.status = 'new'; // Set to 'new' as requested
@@ -584,35 +548,27 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         `${updateData.description}\n\n✅ AI Qualification: QUALIFIED - Category set to Sales`.trim();
     } else if (isQualified === 'false' || isQualified === false) {
       // AI determined this is not qualified for sales - set as customer service
-      console.log('❌ [DEBUG] Setting ticket as UNQUALIFIED CUSTOMER SERVICE');
       updateData.service_type = 'Customer Service';
       updateData.status = 'new'; // Set to 'new' as requested
       updateData.description =
         `${updateData.description}\n\n❌ AI Qualification: UNQUALIFIED - Category set to Customer Service`.trim();
     } else {
       // No qualification decision provided - set as new for follow-up
-      console.log('🤷 [DEBUG] No qualification decision - setting as NEW');
       updateData.status = 'new'; // Set to 'new' as requested
     }
 
     // Check action_required and override status if needed
     if (extractedData.action_required === 'false') {
-      console.log('🔒 [DEBUG] action_required is false - setting ticket to CLOSED');
       updateData.status = 'closed';
       updateData.description =
         `${updateData.description}\n\n🔒 Action Required: FALSE - Ticket closed automatically`.trim();
     } else if (extractedData.action_required === 'true') {
-      console.log('🔄 [DEBUG] action_required is true - ticket will remain active for follow-up');
       updateData.description =
         `${updateData.description}\n\n🔄 Action Required: TRUE - Follow-up needed`.trim();
     }
 
-    console.log('📝 [DEBUG] Final update data:', {
-      service_type: updateData.service_type,
-      status: updateData.status,
-      type: updateData.type,
-      action_required: extractedData.action_required
-    });
+    // Add pest_type from extracted data
+    updateData.pest_type = extractedData.pest_issue;
 
     await supabase
       .from('tickets')
@@ -649,47 +605,61 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       // Build update object conditionally
       const customerUpdateData: any = {};
 
+      // Helper: Check if a value needs updating (is null, empty, or "none")
+      const needsUpdate = (value: string | null | undefined): boolean => {
+        return !value || value.trim() === '' || value.toLowerCase() === 'none';
+      };
+
+      // Helper: Check if incoming value is valid (not null, empty, or "none")
+      const isValidValue = (value: string | null | undefined): boolean => {
+        return !!(value && value.trim() !== '' && value.toLowerCase() !== 'none');
+      };
+
       // Name updates: ONLY update if customer still has default placeholder names
       const hasInboundPlaceholder = existingCustomer.first_name === 'Inbound' && existingCustomer.last_name === 'Caller';
       const hasOutboundPlaceholder = existingCustomer.first_name === 'Outbound' && existingCustomer.last_name === 'Call';
-      
-      if (hasInboundPlaceholder || hasOutboundPlaceholder) {
-        if (customerFirstName && customerFirstName.trim() !== '') {
-          customerUpdateData.first_name = customerFirstName.trim();
-        }
-        if (customerLastName && customerLastName.trim() !== '') {
-          customerUpdateData.last_name = customerLastName.trim();
-        }
+      const shouldUpdateFirstName =
+        hasInboundPlaceholder ||
+        hasOutboundPlaceholder ||
+        needsUpdate(existingCustomer.first_name);
+      const shouldUpdateLastName =
+        hasInboundPlaceholder ||
+        hasOutboundPlaceholder ||
+        needsUpdate(existingCustomer.last_name);
+
+      if (shouldUpdateFirstName && isValidValue(customerFirstName)) {
+        customerUpdateData.first_name = customerFirstName.trim();
+      }
+      if (shouldUpdateLastName && isValidValue(customerLastName)) {
+        customerUpdateData.last_name = customerLastName.trim();
       }
 
-      // Address updates: ONLY if customer has NO existing address data
-      if (!hasExistingAddress(existingCustomer)) {
-        if (customerCity && customerCity.trim() !== '') {
-          customerUpdateData.city = customerCity.trim();
-        }
+      // Address updates: Update each field independently if it's null or "none"
+      if (needsUpdate(existingCustomer.city) && isValidValue(customerCity)) {
+        customerUpdateData.city = customerCity.trim();
+      }
 
-        if (customerState && customerState.trim() !== '') {
-          customerUpdateData.state = customerState.trim();
-        }
+      if (needsUpdate(existingCustomer.state) && isValidValue(customerState)) {
+        customerUpdateData.state = customerState.trim();
+      }
 
-        if (customerZip && customerZip.trim() !== '') {
-          customerUpdateData.zip_code = customerZip.trim();
-        }
+      if (needsUpdate(existingCustomer.zip_code) && isValidValue(customerZip)) {
+        customerUpdateData.zip_code = customerZip.trim();
+      }
 
-        // Create formatted address from components and store in address field
-        if (
-          customerStreetAddress ||
-          customerCity ||
-          customerState ||
-          customerZip
-        ) {
-          customerUpdateData.address = formatAddress(
-            customerStreetAddress,
-            customerCity,
-            customerState,
-            customerZip
-          );
-        }
+      // Rebuild formatted address from final values (mix of updated and existing)
+      const finalCity = customerUpdateData.city || existingCustomer.city;
+      const finalState = customerUpdateData.state || existingCustomer.state;
+      const finalZip = customerUpdateData.zip_code || existingCustomer.zip_code;
+
+      // Only rebuild address if we have at least one valid component
+      if (isValidValue(finalCity) || isValidValue(finalState) || isValidValue(finalZip) || isValidValue(customerStreetAddress)) {
+        customerUpdateData.address = formatAddress(
+          customerStreetAddress,
+          finalCity,
+          finalState,
+          finalZip
+        );
       }
 
       // Only update if we have changes to make
@@ -736,19 +706,19 @@ function formatAddress(
 ): string {
   const components = [];
 
-  if (street && street.trim() !== '') {
+  if (street && street.trim() !== '' && street.toLowerCase() !== 'none') {
     components.push(street.trim());
   }
 
-  if (city && city.trim() !== '') {
+  if (city && city.trim() !== '' && city.toLowerCase() !== 'none') {
     components.push(city.trim());
   }
 
-  if (state && state.trim() !== '') {
+  if (state && state.trim() !== '' && state.toLowerCase() !== 'none') {
     components.push(state.trim());
   }
 
-  if (zip && zip.trim() !== '') {
+  if (zip && zip.trim() !== '' && zip.toLowerCase() !== 'none') {
     components.push(zip.trim());
   }
 
@@ -911,19 +881,7 @@ async function sendTicketNotificationEmailsIfEnabled(
     // Only send emails for successful conversations where real interaction occurred
     const disconnectionReason = callData.disconnection_reason || callRecord.disconnect_reason;
     const callStatus = callData.call_status || callRecord.call_status;
-    
-    // Debug logging to understand what values we're getting
-    console.log(`[Ticket Notification Emails DEBUG] Call ${callId}:`, {
-      callData_disconnection_reason: callData.disconnection_reason,
-      callRecord_disconnect_reason: callRecord.disconnect_reason,
-      final_disconnectionReason: disconnectionReason,
-      callData_call_status: callData.call_status,
-      callRecord_call_status: callRecord.call_status,
-      final_callStatus: callStatus,
-      disconnectionReasonType: typeof disconnectionReason,
-      disconnectionReasonLength: disconnectionReason?.length
-    });
-    
+
     // Only send emails for successful conversations (user_hangup or agent_hangup)
     // All other reasons indicate unsuccessful calls, transfers, or technical issues
     if (disconnectionReason !== 'user_hangup' && disconnectionReason !== 'agent_hangup') {
@@ -999,18 +957,6 @@ async function sendTicketNotificationEmailsIfEnabled(
       
       customerData = customer;
     }
-
-    // Debug logging for call summary data extraction
-    console.log(`[Ticket Notification DEBUG] Call ${callId} - Summary extraction:`, {
-      extractedData_summary: extractedData.summary,
-      extractedData_summary_length: extractedData.summary?.length,
-      callData_has_call_analysis: !!callData.call_analysis,
-      callData_call_analysis_call_summary: callData.call_analysis?.call_summary,
-      callData_call_analysis_call_summary_length: callData.call_analysis?.call_summary?.length,
-      callRecord_has_call_analysis: !!callRecord.call_analysis,
-      callRecord_call_analysis_call_summary: callRecord.call_analysis?.call_summary,
-      final_summary_value: extractedData.summary || callData.call_analysis?.call_summary
-    });
 
     // Build call summary data for email
     const callSummaryData: CallSummaryEmailData = {

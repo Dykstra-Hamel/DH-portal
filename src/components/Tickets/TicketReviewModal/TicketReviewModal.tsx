@@ -444,9 +444,11 @@ export default function TicketReviewModal({
           break;
         case 'spam':
           newServiceType = 'Spam';
+          animateToStep('review');
           break;
         case 'other':
           newServiceType = 'Other';
+          animateToStep('review');
           break;
         default:
           newServiceType = 'Sales';

@@ -88,13 +88,6 @@ export async function GET(
       .eq('lead_id', id)
       .single();
 
-    console.log('Call record query results:', {
-      leadId: id,
-      callRecord,
-      callError,
-      hasCallRecord: !!callRecord
-    });
-
     // Note: Call record might not exist, so we don't error on callError
 
     // For session-based auth, verify user has access to this lead's company
@@ -392,13 +385,6 @@ export async function PUT(
       .select('*')
       .eq('lead_id', id)
       .single();
-
-    console.log('Call record query results:', {
-      leadId: id,
-      callRecord,
-      callError,
-      hasCallRecord: !!callRecord
-    });
 
     // Note: Call record might not exist, so we don't error on callError
 

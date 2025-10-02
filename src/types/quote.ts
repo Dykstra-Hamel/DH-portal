@@ -42,6 +42,7 @@ export interface QuoteLineItem {
   initial_price: number;
   recurring_price: number;
   billing_frequency: string;
+  service_frequency?: string;
 
   // Discount information
   discount_percentage?: number;
@@ -81,6 +82,7 @@ export interface UpdateQuoteRequest {
     discount_percentage?: number;
     discount_amount?: number;
     display_order?: number;
+    service_frequency?: string;
   }>;
 }
 

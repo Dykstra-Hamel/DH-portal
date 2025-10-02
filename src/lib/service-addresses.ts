@@ -344,7 +344,7 @@ export async function updateExistingServiceAddress(
   addressData: ServiceAddressData
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createClient();
+    const supabase = createAdminClient();
 
     // Get the existing service address to determine company_id for service area validation
     const { data: existingAddress, error: fetchError } = await supabase
