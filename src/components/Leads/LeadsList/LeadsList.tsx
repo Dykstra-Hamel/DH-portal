@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Lead } from '@/types/lead';
-import { DataTable } from '@/components/Common/DataTable';
+import { DataTable, SortConfig } from '@/components/Common/DataTable';
 import { getLeadColumns, getLeadTabs } from './LeadsListConfig';
 import { TabDefinition } from '@/components/Common/DataTable';
 import { Toast } from '@/components/Common/Toast';
@@ -19,6 +19,7 @@ interface LeadsListProps {
   showCompanyColumn?: boolean;
   userProfile?: { role?: string };
   customTabs?: TabDefinition<Lead>[] | null; // null means no tabs
+  defaultSort?: SortConfig;
 }
 
 function LeadsList({
@@ -33,6 +34,7 @@ function LeadsList({
   showCompanyColumn = false,
   userProfile,
   customTabs,
+  defaultSort,
 }: LeadsListProps) {
   // Toast state for undo functionality
   const [toastMessage, setToastMessage] = useState('');
@@ -102,9 +104,7 @@ function LeadsList({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(
-          errorData.error || 'Failed to undo lead action'
-        );
+        throw new Error(errorData.error || 'Failed to undo lead action');
       }
 
       onLeadUpdated?.();
@@ -238,12 +238,15 @@ function LeadsList({
         loading={loading}
         title="Leads Overview"
         columns={getLeadColumns()}
-        tabs={customTabs !== undefined ? (customTabs || getLeadTabs()) : getLeadTabs()}
+        tabs={
+          customTabs !== undefined ? customTabs || getLeadTabs() : getLeadTabs()
+        }
         tableType="leads"
         onItemAction={handleItemAction}
         onDataUpdated={onLeadUpdated}
         emptyStateMessage="No leads found for this category."
         onShowToast={handleShowToast}
+        defaultSort={defaultSort}
       />
     </>
   );

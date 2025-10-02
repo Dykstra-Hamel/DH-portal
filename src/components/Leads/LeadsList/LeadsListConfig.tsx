@@ -18,6 +18,27 @@ const formatCustomerName = (lead: Lead): string => {
   return fullName || 'N/A';
 };
 
+const getLeadActionButtonText = (status: string): string => {
+  switch (status) {
+    case 'unassigned':
+      return 'Assign Lead';
+    case 'contacting':
+      return 'Manage Lead';
+    case 'quoted':
+      return 'Manage Lead';
+    case 'ready_to_schedule':
+      return 'Schedule Service';
+    case 'scheduled':
+      return 'View Lead';
+    case 'won':
+      return 'View Lead';
+    case 'lost':
+      return 'View Lead';
+    default:
+      return 'Manage Lead';
+  }
+};
+
 const formatPhone = (phone?: string): string => {
   if (!phone) return 'N/A';
 
@@ -38,14 +59,30 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
     width: '180px',
     sortable: true,
     sortKey: 'created_at',
-    render: (lead: Lead) => (
-      <div className={styles.dateCell}>
-        <div className={styles.primaryDate}>
-          {formatDateWithOrdinal(lead.created_at)}
+    render: (lead: Lead) => {
+      const createdDate = new Date(lead.created_at);
+      const now = new Date();
+      const hoursDiff =
+        (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
+
+      let colorClass = '';
+      if (hoursDiff > 24) {
+        colorClass = styles.dateRed;
+      } else if (hoursDiff > 12) {
+        colorClass = styles.dateOrange;
+      }
+
+      return (
+        <div className={`${styles.dateCell} ${colorClass}`}>
+          <div className={styles.primaryDate}>
+            {formatDateWithOrdinal(lead.created_at)}
+          </div>
+          <div className={styles.relativeTime}>
+            {getTimeAgo(lead.created_at)}
+          </div>
         </div>
-        <div className={styles.relativeTime}>{getTimeAgo(lead.created_at)}</div>
-      </div>
-    ),
+      );
+    },
   },
   {
     key: 'last_contacted_at',
@@ -113,7 +150,9 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
     render: (lead: Lead) => (
       <div className={styles.statusWithAssignment}>
         {lead.lead_status === 'unassigned' ? (
-          <span className={styles.statusBadge}>Unassigned</span>
+          <span className={`${styles.statusBadge} ${styles.statusUnassigned}`}>
+            Unassigned
+          </span>
         ) : (
           <div className={styles.assignedStatus}>
             {lead.assigned_user && (
@@ -146,7 +185,7 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
           onAction?.('edit', lead);
         }}
       >
-        Manage Lead
+        {getLeadActionButtonText(lead.lead_status)}
         <ChevronRight size={16} />
       </button>
     ),
@@ -189,8 +228,7 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
     filter: (leads: Lead[]) =>
       leads.filter(lead => !lead.archived && lead.lead_status === 'won'),
     getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'won')
-        .length,
+      leads.filter(lead => !lead.archived && lead.lead_status === 'won').length,
   },
   {
     key: 'lost',
@@ -251,8 +289,7 @@ export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
     filter: (leads: Lead[]) =>
       leads.filter(lead => !lead.archived && lead.lead_status === 'won'),
     getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'won')
-        .length,
+      leads.filter(lead => !lead.archived && lead.lead_status === 'won').length,
   },
   {
     key: 'lost',
@@ -269,14 +306,12 @@ export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
     filter: (leads: Lead[]) =>
       leads.filter(
         lead =>
-          !lead.archived &&
-          ['contacting', 'quoted'].includes(lead.lead_status)
+          !lead.archived && ['contacting', 'quoted'].includes(lead.lead_status)
       ),
     getCount: (leads: Lead[]) =>
       leads.filter(
         lead =>
-          !lead.archived &&
-          ['contacting', 'quoted'].includes(lead.lead_status)
+          !lead.archived && ['contacting', 'quoted'].includes(lead.lead_status)
       ).length,
   },
 ];
