@@ -8,7 +8,7 @@ export default function ConnectionsPage() {
 
   useEffect(() => {
     // Redirect to tickets page which is now the main connections page
-    router.replace('/connections/tickets');
+    router.replace('/connections/incoming');
   }, [router]);
 
   return null;

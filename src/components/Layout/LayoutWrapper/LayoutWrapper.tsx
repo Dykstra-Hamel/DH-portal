@@ -51,13 +51,12 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           showAddButton: true,
           addButtonText: 'Add Lead',
         };
-      case '/tickets':
-      case '/connections/tickets':
+      case '/connections/incoming':
       case '/connections/calls-and-forms':
         return {
-          title: 'Tickets',
+          title: 'Incoming',
           description:
-            'Review, qualify, and assign all your incoming leads here.',
+            'Review, qualify, and assign all your incoming customer communications here.',
           showAddButton: true,
           addButtonText: 'Add Ticket',
         };
@@ -179,7 +178,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
         if (
           pathname.includes('/customers/') ||
-          pathname.includes('/tickets/')
+          pathname.includes('/connections/incoming/')
         ) {
           return null; // Don't show lower header on individual record pages
         }

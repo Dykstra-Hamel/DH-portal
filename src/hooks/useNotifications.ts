@@ -40,7 +40,7 @@ export function useNotifications() {
 
       const params = new URLSearchParams({
         limit: '50',
-        companyId: companyId
+        companyId: companyId,
       });
       const response = await fetch(`/api/notifications?${params.toString()}`);
       if (!response.ok) {
@@ -52,7 +52,9 @@ export function useNotifications() {
       setUnreadCount(Math.max(0, data.unreadCount));
     } catch (err) {
       console.error('Error fetching notifications:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
+      setError(
+        err instanceof Error ? err.message : 'Failed to fetch notifications'
+      );
     } finally {
       setLoading(false);
     }
@@ -75,60 +77,68 @@ export function useNotifications() {
           broadcast: { self: true, ack: true },
         },
       })
-      .on(
-        'broadcast',
-        { event: 'notification_update' },
-        (payload: any) => {
-          const { action, notification, company_id } = payload.payload;
+      .on('broadcast', { event: 'notification_update' }, (payload: any) => {
+        const { action, notification, company_id } = payload.payload;
 
-          // Verify this is for our company
-          if (company_id !== companyId) {
-            return;
-          }
-
-          // Only process notifications for the current user
-          if (notification.user_id !== userId) {
-            return;
-          }
-
-          try {
-            if (action === 'INSERT') {
-              const newNotification = notification as Notification;
-              setNotifications(prev => [newNotification, ...prev]);
-              setUnreadCount(prev => prev + 1);
-            } else if (action === 'UPDATE') {
-              const updatedNotification = notification as Notification;
-              setNotifications(prev =>
-                prev.map(notif =>
-                  notif.id === updatedNotification.id ? updatedNotification : notif
-                )
-              );
-
-              // We don't have access to old data in broadcast, so recalculate unread count
-              setNotifications(currentNotifications => {
-                const unreadCount = currentNotifications.filter(n => !n.read).length;
-                setUnreadCount(unreadCount);
-                return currentNotifications;
-              });
-            } else if (action === 'DELETE') {
-              const deletedId = notification.id;
-              const wasUnread = notification.read === false;
-
-              setNotifications(prev => prev.filter(notif => notif.id !== deletedId));
-              if (wasUnread) {
-                setUnreadCount(prev => Math.max(0, prev - 1));
-              }
-            }
-          } catch (error) {
-            console.error(`Error processing notification ${action}:`, error);
-          }
+        // Verify this is for our company
+        if (company_id !== companyId) {
+          return;
         }
-      )
-      .subscribe((status) => {
+
+        // Only process notifications for the current user
+        if (notification.user_id !== userId) {
+          return;
+        }
+
+        try {
+          if (action === 'INSERT') {
+            const newNotification = notification as Notification;
+            setNotifications(prev => [newNotification, ...prev]);
+            setUnreadCount(prev => prev + 1);
+          } else if (action === 'UPDATE') {
+            const updatedNotification = notification as Notification;
+            setNotifications(prev =>
+              prev.map(notif =>
+                notif.id === updatedNotification.id
+                  ? updatedNotification
+                  : notif
+              )
+            );
+
+            // We don't have access to old data in broadcast, so recalculate unread count
+            setNotifications(currentNotifications => {
+              const unreadCount = currentNotifications.filter(
+                n => !n.read
+              ).length;
+              setUnreadCount(unreadCount);
+              return currentNotifications;
+            });
+          } else if (action === 'DELETE') {
+            const deletedId = notification.id;
+            const wasUnread = notification.read === false;
+
+            setNotifications(prev =>
+              prev.filter(notif => notif.id !== deletedId)
+            );
+            if (wasUnread) {
+              setUnreadCount(prev => Math.max(0, prev - 1));
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing notification ${action}:`, error);
+        }
+      })
+      .subscribe(status => {
         if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime notifications subscription error:', channelName);
+          console.error(
+            'Realtime notifications subscription error:',
+            channelName
+          );
         } else if (status === 'TIMED_OUT') {
-          console.error('Realtime notifications subscription timed out:', channelName);
+          console.error(
+            'Realtime notifications subscription timed out:',
+            channelName
+          );
         }
       });
 
@@ -144,9 +154,12 @@ export function useNotifications() {
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'POST',
-      });
+      const response = await fetch(
+        `/api/notifications/${notificationId}/read`,
+        {
+          method: 'POST',
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to mark notification as read');
@@ -155,7 +168,11 @@ export function useNotifications() {
       // Real-time subscription will handle the state update automatically
     } catch (err) {
       console.error('Error marking notification as read:', err);
-      setError(err instanceof Error ? err.message : 'Failed to mark notification as read');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to mark notification as read'
+      );
     }
   }, []);
 
@@ -175,7 +192,11 @@ export function useNotifications() {
       setUnreadCount(0);
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
-      setError(err instanceof Error ? err.message : 'Failed to mark all notifications as read');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to mark all notifications as read'
+      );
     }
   }, []);
 
@@ -193,42 +214,49 @@ export function useNotifications() {
       // Real-time subscription will handle the state update automatically
     } catch (err) {
       console.error('Error deleting notification:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete notification');
+      setError(
+        err instanceof Error ? err.message : 'Failed to delete notification'
+      );
     }
   }, []);
 
   // Navigate to notification reference
-  const navigateToReference = useCallback((notification: Notification) => {
-    if (!notification.reference_id || !notification.reference_type) {
-      return;
-    }
+  const navigateToReference = useCallback(
+    (notification: Notification) => {
+      if (!notification.reference_id || !notification.reference_type) {
+        return;
+      }
 
-    // Mark as read when navigating
-    if (!notification.read) {
-      markAsRead(notification.id);
-    }
+      // Mark as read when navigating
+      if (!notification.read) {
+        markAsRead(notification.id);
+      }
 
-    // Navigate based on reference type
-    switch (notification.reference_type) {
-      case 'ticket':
-        router.push(`/connections/tickets?ticketId=${notification.reference_id}`);
-        break;
-      case 'lead':
-        router.push(`/connections/leads/${notification.reference_id}`);
-        break;
-      case 'support_case':
-        router.push('/connections/customer-service');
-        break;
-      case 'project':
-        router.push(`/projects?highlight=${notification.reference_id}`);
-        break;
-      case 'customer':
-        router.push(`/customers/${notification.reference_id}`);
-        break;
-      default:
-        console.warn('Unknown reference type:', notification.reference_type);
-    }
-  }, [router, markAsRead]);
+      // Navigate based on reference type
+      switch (notification.reference_type) {
+        case 'ticket':
+          router.push(
+            `/connections/incoming?ticketId=${notification.reference_id}`
+          );
+          break;
+        case 'lead':
+          router.push(`/connections/leads/${notification.reference_id}`);
+          break;
+        case 'support_case':
+          router.push('/connections/customer-service');
+          break;
+        case 'project':
+          router.push(`/projects?highlight=${notification.reference_id}`);
+          break;
+        case 'customer':
+          router.push(`/customers/${notification.reference_id}`);
+          break;
+        default:
+          console.warn('Unknown reference type:', notification.reference_type);
+      }
+    },
+    [router, markAsRead]
+  );
 
   return {
     notifications,
