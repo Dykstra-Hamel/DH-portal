@@ -1,38 +1,37 @@
-import React from 'react'
-import { ReceiptText } from 'lucide-react'
-import { Ticket } from '@/types/ticket'
-import { CallRecord } from '@/types/call-record'
-import { getDetailedTimeAgo } from '@/lib/time-utils'
-import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer'
-import styles from './CallDetails.module.scss'
+import React from 'react';
+import { Ticket } from '@/types/ticket';
+import { CallRecord } from '@/types/call-record';
+import { getDetailedTimeAgo } from '@/lib/time-utils';
+import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
+import styles from './CallDetails.module.scss';
 
 interface CallDetailsProps {
-  ticket: Ticket
-  callRecord?: CallRecord
+  ticket: Ticket;
+  callRecord?: CallRecord;
 }
 
 export default function CallDetails({ ticket, callRecord }: CallDetailsProps) {
-
-
-  const isFormSubmission = ticket.type === 'web_form'
+  const isFormSubmission = ticket.type === 'web_form';
 
   const formatDuration = (seconds?: number) => {
-    if (!seconds) return '0:00'
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
-  }
+    if (!seconds) return '0:00';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
   const getCallTimes = () => {
     if (!callRecord?.start_timestamp) {
       return {
         started: 'N/A',
-        ended: 'N/A'
-      }
+        ended: 'N/A',
+      };
     }
 
-    const startDate = new Date(callRecord.start_timestamp)
-    const endDate = callRecord.end_timestamp ? new Date(callRecord.end_timestamp) : null
+    const startDate = new Date(callRecord.start_timestamp);
+    const endDate = callRecord.end_timestamp
+      ? new Date(callRecord.end_timestamp)
+      : null;
 
     return {
       started: startDate.toLocaleString('en-US', {
@@ -42,32 +41,27 @@ export default function CallDetails({ ticket, callRecord }: CallDetailsProps) {
         hour: 'numeric',
         minute: '2-digit',
         second: '2-digit',
-        hour12: true
+        hour12: true,
       }),
-      ended: endDate ? endDate.toLocaleString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      }) : 'N/A'
-    }
-  }
+      ended: endDate
+        ? endDate.toLocaleString('en-US', {
+            month: 'numeric',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+          })
+        : 'N/A',
+    };
+  };
 
-  const callTimes = getCallTimes()
+  const callTimes = getCallTimes();
 
   if (isFormSubmission) {
     return (
       <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <div className={styles.headerLeft}>
-            <ReceiptText size={20} />
-            <h3>Form Details</h3>
-          </div>
-        </div>
-
         <div className={styles.infoGrid}>
           <div className={styles.infoRow}>
             <div className={styles.infoField}>
@@ -90,18 +84,11 @@ export default function CallDetails({ ticket, callRecord }: CallDetailsProps) {
           )}
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className={styles.section}>
-      <div className={styles.sectionHeader}>
-        <div className={styles.headerLeft}>
-          <ReceiptText size={20} />
-          <h3>Call Details</h3>
-        </div>
-      </div>
-
       <div className={styles.infoGrid}>
         <div className={styles.infoRow}>
           <div className={styles.infoField}>
@@ -130,8 +117,8 @@ export default function CallDetails({ ticket, callRecord }: CallDetailsProps) {
             <div className={styles.transcriptBox}>
               <div className={styles.transcriptContent}>
                 {callRecord.transcript.split('\n').map((line, index) => {
-                  const [speaker, ...messageParts] = line.split(': ')
-                  const message = messageParts.join(': ')
+                  const [speaker, ...messageParts] = line.split(': ');
+                  const message = messageParts.join(': ');
 
                   if (message) {
                     return (
@@ -139,14 +126,14 @@ export default function CallDetails({ ticket, callRecord }: CallDetailsProps) {
                         <span className={styles.speaker}>{speaker}:</span>
                         <span className={styles.message}>{message}</span>
                       </div>
-                    )
+                    );
                   }
 
                   return (
                     <div key={index} className={styles.transcriptLine}>
                       <span className={styles.message}>{line}</span>
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -154,5 +141,5 @@ export default function CallDetails({ ticket, callRecord }: CallDetailsProps) {
         )}
       </div>
     </div>
-  )
+  );
 }

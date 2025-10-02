@@ -4,13 +4,18 @@ import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { adminAPI } from '@/lib/api-client';
 import TicketsList from '@/components/Tickets/TicketsList/TicketsList';
-import { Ticket } from '@/types/ticket';
+import { Ticket, TicketFormData } from '@/types/ticket';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
 import { MetricsResponse } from '@/services/metricsService';
 import { CallRecord } from '@/types/call-record';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
+import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
+import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
+import TicketForm from '@/components/Tickets/TicketForm/TicketForm';
 import styles from './page.module.scss';
 
 function TicketsPageContent() {
@@ -25,8 +30,23 @@ function TicketsPageContent() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isQualifying, setIsQualifying] = useState(false);
 
+  // Add ticket form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState<TicketFormData | null>(null);
+
   // Use global company context
   const { selectedCompany } = useCompany();
+
+  // Register page actions for global header
+  const { registerPageAction, unregisterPageAction } = usePageActions();
+
+  // Get assignable users for the company
+  const { users: assignableUsers } = useAssignableUsers({
+    companyId: selectedCompany?.id,
+    departmentType: 'all',
+  });
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const ticketIdFromUrl = searchParams.get('ticketId');
@@ -370,6 +390,99 @@ function TicketsPageContent() {
     }
   }, [selectedTicket, selectedCompany, fetchTickets, fetchMetrics, handleModalClose]);
 
+  const handleCreateTicket = useCallback(async (formData: TicketFormData & { newCustomerData?: any }) => {
+    if (!selectedCompany?.id) return;
+
+    setSubmitting(true);
+    try {
+      let customerId = formData.customer_id;
+
+      // If creating a new customer, create customer first
+      if (formData.newCustomerData && !customerId) {
+        console.log('Creating new customer with data:', formData.newCustomerData);
+        
+        const customerResponse = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData.newCustomerData,
+            company_id: selectedCompany.id,
+          }),
+        });
+
+        if (customerResponse.ok) {
+          const newCustomer = await customerResponse.json();
+          console.log('Customer created successfully:', newCustomer);
+          customerId = newCustomer.id;
+        } else {
+          const errorData = await customerResponse.json().catch(() => ({}));
+          console.error('Customer creation failed:', {
+            status: customerResponse.status,
+            statusText: customerResponse.statusText,
+            errorData
+          });
+          throw new Error(errorData.error || 'Failed to create customer');
+        }
+      }
+
+      // Create the ticket data, filtering out undefined values and non-API fields
+      const { newCustomerData, ...cleanFormData } = formData;
+      
+      // Filter out undefined values
+      const ticketData = Object.fromEntries(
+        Object.entries({
+          ...cleanFormData,
+          customer_id: customerId,
+          company_id: selectedCompany.id,
+        }).filter(([_, value]) => value !== undefined && value !== null && value !== '')
+      );
+
+      // Log the data being sent for debugging
+      console.log('Creating ticket with data:', ticketData);
+      
+      // Log service address auto-linking
+      if (ticketData.service_address_id) {
+        console.log('🔗 Ticket will be automatically linked to service address:', ticketData.service_address_id);
+      }
+      
+      const response = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ticketData),
+      });
+
+      if (response.ok) {
+        const createdTicket = await response.json();
+        console.log('Ticket created successfully:', createdTicket);
+        setShowCreateForm(false);
+        setFormData(null);
+        if (selectedCompany?.id) {
+          await fetchTickets(selectedCompany.id);
+          await fetchMetrics(selectedCompany.id);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Ticket creation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          sentData: ticketData
+        });
+        throw new Error(errorData.error || `Failed to create ticket (${response.status})`);
+      }
+    } catch (error) {
+      console.error('Error creating ticket:', error);
+      alert('Failed to create ticket. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [selectedCompany, fetchTickets, fetchMetrics]);
+
+  const handleCancelForm = useCallback(() => {
+    setShowCreateForm(false);
+    setFormData(null);
+  }, []);
+
   useEffect(() => {
     if (selectedCompany?.id) {
       fetchTickets(selectedCompany.id);
@@ -456,6 +569,12 @@ function TicketsPageContent() {
       supabase.removeChannel(channel);
     };
   }, [selectedCompany?.id, handleTicketChange, handleCallRecordChange, fetchMetrics]);
+
+  // Register the add action for the global header button
+  useEffect(() => {
+    registerPageAction('add', () => setShowCreateForm(true));
+    return () => unregisterPageAction('add');
+  }, [registerPageAction, unregisterPageAction]);
 
   return (
     <div style={{ width: '100%' }}>
@@ -579,6 +698,38 @@ function TicketsPageContent() {
           isQualifying={isQualifying}
         />
       )}
+
+      {/* Create Ticket Modal */}
+      <Modal isOpen={showCreateForm} onClose={handleCancelForm}>
+        <ModalTop
+          title="Create New Ticket"
+          onClose={handleCancelForm}
+        />
+        <ModalMiddle>
+          <TicketForm
+            companyId={selectedCompany?.id || ''}
+            assignableUsers={assignableUsers}
+            onFormDataChange={setFormData}
+            loading={submitting}
+          />
+        </ModalMiddle>
+        <ModalBottom>
+          <ModalActionButtons
+            onBack={handleCancelForm}
+            showBackButton={true}
+            isFirstStep={true}
+            onPrimaryAction={async () => {
+              if (formData) {
+                await handleCreateTicket(formData);
+              }
+            }}
+            primaryButtonText="Create Ticket"
+            primaryButtonDisabled={!formData || submitting}
+            isLoading={submitting}
+            loadingText="Creating..."
+          />
+        </ModalBottom>
+      </Modal>
     </div>
   );
 }

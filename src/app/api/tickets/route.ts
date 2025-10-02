@@ -49,6 +49,19 @@ export async function GET(request: NextRequest) {
           city,
           state,
           zip_code
+        ),
+        service_address:service_addresses!left(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type,
+          property_notes,
+          home_size_range,
+          yard_size_range
         )
       `
       )
@@ -190,7 +203,7 @@ export async function POST(request: NextRequest) {
       .insert([ticketData])
       .select(`
         *,
-        customer:customers(
+        customer:customers!tickets_customer_id_fkey(
           id,
           first_name,
           last_name,
@@ -200,6 +213,19 @@ export async function POST(request: NextRequest) {
           city,
           state,
           zip_code
+        ),
+        service_address:service_addresses!left(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type,
+          property_notes,
+          home_size_range,
+          yard_size_range
         )
       `)
       .single();

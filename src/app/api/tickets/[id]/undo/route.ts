@@ -82,6 +82,18 @@ export async function POST(
       }
     }
 
+    // Security check: ensure the ticket was recently modified (within 15 minutes for safety)
+    const lastUpdated = new Date(currentTicket.updated_at);
+    const now = new Date();
+    const timeDiffMinutes = (now.getTime() - lastUpdated.getTime()) / (1000 * 60);
+    
+    if (timeDiffMinutes > 15) {
+      return NextResponse.json(
+        { error: 'Undo operation expired. Can only undo recent changes.' },
+        { status: 400 }
+      );
+    }
+
     // Handle lead conversion undo
     if (currentTicket.converted_to_lead_id || currentTicket.converted_at) {
       try {
@@ -140,6 +152,61 @@ export async function POST(
       }
     }
 
+    // Handle support case conversion undo
+    if (currentTicket.converted_to_support_case_id) {
+      try {
+        // First check if the support case exists
+        const { data: supportCaseExists, error: supportCaseCheckError } = await supabase
+          .from('support_cases')
+          .select('id')
+          .eq('id', currentTicket.converted_to_support_case_id)
+          .single();
+
+        if (supportCaseCheckError && supportCaseCheckError.code !== 'PGRST116') {
+          console.error('Error checking support case existence:', supportCaseCheckError);
+          return NextResponse.json(
+            { error: `Failed to verify support case existence: ${supportCaseCheckError.message}` },
+            { status: 500 }
+          );
+        }
+
+        // If support case exists, try to delete it or mark as archived
+        if (supportCaseExists) {
+          const { error: deleteSupportCaseError } = await supabase
+            .from('support_cases')
+            .delete()
+            .eq('id', currentTicket.converted_to_support_case_id);
+
+          if (deleteSupportCaseError) {
+            console.error('Error deleting support case during undo:', deleteSupportCaseError);
+
+            // If deletion fails due to constraints, try to mark as archived instead
+            const { error: archiveSupportCaseError } = await supabase
+              .from('support_cases')
+              .update({
+                archived: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', currentTicket.converted_to_support_case_id);
+
+            if (archiveSupportCaseError) {
+              console.error('Error archiving support case during undo:', archiveSupportCaseError);
+              return NextResponse.json(
+                { error: `Failed to remove support case: ${deleteSupportCaseError.message}. Could not archive support case either: ${archiveSupportCaseError.message}` },
+                { status: 500 }
+              );
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Unexpected error during support case handling:', error);
+        return NextResponse.json(
+          { error: 'Unexpected error during support case handling' },
+          { status: 500 }
+        );
+      }
+    }
+
     // Restore ticket to previous state
     const restoreData = {
       status: previousState.status,
@@ -147,6 +214,7 @@ export async function POST(
       assigned_to: previousState.assigned_to,
       archived: previousState.archived || false,
       converted_to_lead_id: null,
+      converted_to_support_case_id: null,
       converted_at: null,
       updated_at: new Date().toISOString()
     };
@@ -226,8 +294,18 @@ export async function POST(
       }
     }
 
+    // Determine appropriate success message based on what was undone
+    let message = 'Ticket qualification undone successfully';
+    if (currentTicket.archived && currentTicket.status === 'closed') {
+      message = 'Ticket restored successfully';
+    } else if (currentTicket.converted_to_lead_id) {
+      message = 'Lead conversion undone successfully';
+    } else if (currentTicket.converted_to_support_case_id) {
+      message = 'Support case conversion undone successfully';
+    }
+
     return NextResponse.json({
-      message: 'Ticket qualification undone successfully',
+      message,
       ticket: restoredTicket
     });
 
