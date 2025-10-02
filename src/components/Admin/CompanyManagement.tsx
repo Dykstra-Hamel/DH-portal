@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign } from 'lucide-react';
+import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
+import SalesConfigManager from './SalesConfigManager';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -45,7 +46,7 @@ interface CompanyManagementProps {
   user: User;
 }
 
-type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pricing-settings';
+type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pricing-settings' | 'sales-config';
 
 export default function CompanyManagement({ companyId, user }: CompanyManagementProps) {
   const router = useRouter();
@@ -411,6 +412,7 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     { id: 'google-places', label: 'Google Places', icon: Settings },
     { id: 'login-page', label: 'Login Page', icon: Monitor },
     { id: 'pricing-settings', label: 'Pricing Settings', icon: DollarSign },
+    { id: 'sales-config', label: 'Sales Config', icon: Target },
   ] as const;
 
   return (
@@ -516,6 +518,9 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
           )}
           {activeSection === 'pricing-settings' && (
             <PricingSettingsManager companyId={companyId} />
+          )}
+          {activeSection === 'sales-config' && (
+            <SalesConfigManager companyId={companyId} />
           )}
         </div>
       </div>

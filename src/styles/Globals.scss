@@ -40,6 +40,8 @@
   --action-600: #0069e0;
   --action-700: #1d4ed8;
   --success-500: #00c281;
+  --success-700: #089b6a;
+  --emerald-500: #00bc7d;
   --gray-100: #f2f2f7;
   --slate-100: #F1F3F9;
   --slate-300: #cbd2e1;
@@ -67,6 +69,16 @@
   --border-radius-sm: 4px;
   --border-radius-md: 8px;
   --border-radius-lg: 12px;
+
+  /* Priority Colors */
+  --priority-low-outer: #eaf6ec;
+  --priority-low-inner: #00a73d;
+  --priority-medium-outer: #fbf2cb;
+  --priority-medium-inner: #e9a23b;
+  --priority-high-outer: #ffe7ec;
+  --priority-high-inner: #ed0040;
+  --priority-urgent-outer: #ffe7ec;
+  --priority-urgent-inner: #ed0040;
 }
 
 * {

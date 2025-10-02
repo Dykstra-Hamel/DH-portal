@@ -5,6 +5,7 @@ import { Ticket } from '@/types/ticket';
 import { CallRecord } from '@/types/call-record';
 import { ColumnDefinition, TabDefinition } from '@/components/Common/DataTable';
 import { ChevronRight } from 'lucide-react';
+import { getCustomerDisplayName, getPhoneDisplay } from '@/lib/display-utils';
 import styles from '@/components/Common/DataTable/DataTable.module.scss';
 
 // Helper functions for data formatting (moved from TicketRow)
@@ -28,34 +29,25 @@ const formatTimeInQueue = (createdAt: string): string => {
 };
 
 const formatCustomerName = (ticket: Ticket): string => {
-  if (!ticket.customer) return 'N/A';
-  const firstName = ticket.customer.first_name || '';
-  const lastName = ticket.customer.last_name || '';
-  const fullName = `${firstName} ${lastName}`.trim();
-  return fullName || 'N/A';
+  return getCustomerDisplayName(ticket.customer);
 };
 
 const formatPhone = (phone?: string): string => {
-  if (!phone) return 'N/A';
-
-  const cleaned = phone.replace(/\D/g, '');
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-  } else if (cleaned.length === 11 && cleaned[0] === '1') {
-    return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
-  }
-  return phone;
+  return getPhoneDisplay(phone);
 };
 
 const formatAddress = (ticket: Ticket): string => {
-  if (!ticket.customer) return 'N/A';
+  if (!ticket.customer) return 'Unknown';
 
   const customer = ticket.customer;
-  const parts = [customer.city, customer.state, customer.zip_code].filter(
-    Boolean
-  );
 
-  return parts.length > 0 ? parts.join(', ') : 'N/A';
+  // Build address from components, filtering out "none" values
+  const parts = [customer.city, customer.state, customer.zip_code]
+    .filter(Boolean)
+    .map(part => part?.trim())
+    .filter(part => part && part.toLowerCase() !== 'none');
+
+  return parts.length > 0 ? parts.join(', ') : 'Unknown';
 };
 
 const formatTicketType = (type: string): string => {

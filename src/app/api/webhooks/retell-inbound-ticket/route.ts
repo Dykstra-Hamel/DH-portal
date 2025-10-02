@@ -222,6 +222,15 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   // Determine company and agent direction from agent ID
   const agentIdValue =
     agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
+
+  console.log('🔍 [WEBHOOK DEBUG] Agent ID extraction:', {
+    agent_id,
+    retell_llm_id,
+    llm_id: callData.llm_id,
+    agent_id_from_data: callData.agent_id,
+    final_agentIdValue: agentIdValue
+  });
+
   const { company_id: companyId, agent_direction } = await findCompanyAndDirectionByAgentId(agentIdValue);
 
   if (!companyId) {
@@ -352,6 +361,14 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   });
 
   // Create call record with bidirectional ticket relationship
+  console.log('🔍 [WEBHOOK DEBUG] Creating call_record with:', {
+    call_id,
+    ticket_id: newTicket.id,
+    customer_id: customerId,
+    agent_id: agentIdValue,
+    has_agent_id: !!agentIdValue
+  });
+
   const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
     .insert({
@@ -364,6 +381,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
+      agent_id: agentIdValue, // Track which agent handled the call
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
       // Add dynamic variable data immediately
@@ -406,6 +424,12 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     console.log(`🔗 [${requestId}] Successfully created bidirectional link: ticket ${newTicket.id} ↔ call record ${callRecord.id}`);
   }
 
+  console.log('✅ [WEBHOOK DEBUG] Call record created successfully:', {
+    call_record_id: callRecord.id,
+    ticket_id: callRecord.ticket_id,
+    agent_id: callRecord.agent_id,
+    has_agent_id: !!callRecord.agent_id
+  });
 
   return NextResponse.json({
     success: true,
@@ -480,6 +504,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
       .update({
         description: `${callRecord.tickets.description || ''}\n\n${callSummary}`.trim(),
         service_type: extractedData.pest_issue,
+        pest_type: extractedData.pest_issue,
         updated_at: new Date().toISOString(),
       })
       .eq('id', callRecord.tickets.id);
@@ -607,8 +632,12 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         `${updateData.description}\n\n🔄 Action Required: TRUE - Follow-up needed`.trim();
     }
 
+    // Add pest_type from extracted data
+    updateData.pest_type = extractedData.pest_issue;
+
     console.log('📝 [DEBUG] Final update data:', {
       service_type: updateData.service_type,
+      pest_type: updateData.pest_type,
       status: updateData.status,
       type: updateData.type,
       action_required: extractedData.action_required
@@ -649,47 +678,61 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       // Build update object conditionally
       const customerUpdateData: any = {};
 
+      // Helper: Check if a value needs updating (is null, empty, or "none")
+      const needsUpdate = (value: string | null | undefined): boolean => {
+        return !value || value.trim() === '' || value.toLowerCase() === 'none';
+      };
+
+      // Helper: Check if incoming value is valid (not null, empty, or "none")
+      const isValidValue = (value: string | null | undefined): boolean => {
+        return !!(value && value.trim() !== '' && value.toLowerCase() !== 'none');
+      };
+
       // Name updates: ONLY update if customer still has default placeholder names
       const hasInboundPlaceholder = existingCustomer.first_name === 'Inbound' && existingCustomer.last_name === 'Caller';
       const hasOutboundPlaceholder = existingCustomer.first_name === 'Outbound' && existingCustomer.last_name === 'Call';
-      
-      if (hasInboundPlaceholder || hasOutboundPlaceholder) {
-        if (customerFirstName && customerFirstName.trim() !== '') {
-          customerUpdateData.first_name = customerFirstName.trim();
-        }
-        if (customerLastName && customerLastName.trim() !== '') {
-          customerUpdateData.last_name = customerLastName.trim();
-        }
+      const shouldUpdateFirstName =
+        hasInboundPlaceholder ||
+        hasOutboundPlaceholder ||
+        needsUpdate(existingCustomer.first_name);
+      const shouldUpdateLastName =
+        hasInboundPlaceholder ||
+        hasOutboundPlaceholder ||
+        needsUpdate(existingCustomer.last_name);
+
+      if (shouldUpdateFirstName && isValidValue(customerFirstName)) {
+        customerUpdateData.first_name = customerFirstName.trim();
+      }
+      if (shouldUpdateLastName && isValidValue(customerLastName)) {
+        customerUpdateData.last_name = customerLastName.trim();
       }
 
-      // Address updates: ONLY if customer has NO existing address data
-      if (!hasExistingAddress(existingCustomer)) {
-        if (customerCity && customerCity.trim() !== '') {
-          customerUpdateData.city = customerCity.trim();
-        }
+      // Address updates: Update each field independently if it's null or "none"
+      if (needsUpdate(existingCustomer.city) && isValidValue(customerCity)) {
+        customerUpdateData.city = customerCity.trim();
+      }
 
-        if (customerState && customerState.trim() !== '') {
-          customerUpdateData.state = customerState.trim();
-        }
+      if (needsUpdate(existingCustomer.state) && isValidValue(customerState)) {
+        customerUpdateData.state = customerState.trim();
+      }
 
-        if (customerZip && customerZip.trim() !== '') {
-          customerUpdateData.zip_code = customerZip.trim();
-        }
+      if (needsUpdate(existingCustomer.zip_code) && isValidValue(customerZip)) {
+        customerUpdateData.zip_code = customerZip.trim();
+      }
 
-        // Create formatted address from components and store in address field
-        if (
-          customerStreetAddress ||
-          customerCity ||
-          customerState ||
-          customerZip
-        ) {
-          customerUpdateData.address = formatAddress(
-            customerStreetAddress,
-            customerCity,
-            customerState,
-            customerZip
-          );
-        }
+      // Rebuild formatted address from final values (mix of updated and existing)
+      const finalCity = customerUpdateData.city || existingCustomer.city;
+      const finalState = customerUpdateData.state || existingCustomer.state;
+      const finalZip = customerUpdateData.zip_code || existingCustomer.zip_code;
+
+      // Only rebuild address if we have at least one valid component
+      if (isValidValue(finalCity) || isValidValue(finalState) || isValidValue(finalZip) || isValidValue(customerStreetAddress)) {
+        customerUpdateData.address = formatAddress(
+          customerStreetAddress,
+          finalCity,
+          finalState,
+          finalZip
+        );
       }
 
       // Only update if we have changes to make
@@ -736,19 +779,19 @@ function formatAddress(
 ): string {
   const components = [];
 
-  if (street && street.trim() !== '') {
+  if (street && street.trim() !== '' && street.toLowerCase() !== 'none') {
     components.push(street.trim());
   }
 
-  if (city && city.trim() !== '') {
+  if (city && city.trim() !== '' && city.toLowerCase() !== 'none') {
     components.push(city.trim());
   }
 
-  if (state && state.trim() !== '') {
+  if (state && state.trim() !== '' && state.toLowerCase() !== 'none') {
     components.push(state.trim());
   }
 
-  if (zip && zip.trim() !== '') {
+  if (zip && zip.trim() !== '' && zip.toLowerCase() !== 'none') {
     components.push(zip.trim());
   }
 

@@ -103,6 +103,19 @@
 .dropdown {
   position: relative;
   width: 100%;
+
+  svg {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%) rotate(180deg);
+    pointer-events: none;
+    transition: transform 0.2s ease;
+  }
+
+  select:focus + svg {
+    transform: translateY(-50%) rotate(0deg);
+  }
 }
 
 .dropdownButton {
@@ -258,6 +271,35 @@
 
   &:active {
     background: var(--action-600);
+  }
+}
+
+.primaryButton {
+  background: var(--action-500);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover:not(:disabled) {
+    background: var(--action-600);
+  }
+
+  &:active:not(:disabled) {
+    background: var(--action-600);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
 
@@ -617,6 +659,9 @@
 .tabContainer {
   display: flex;
   gap: 0px;
+  background-color: var(--gray-100);
+  padding: 4px;
+  border-radius: 6px;
 }
 
 .tabButton {
@@ -708,8 +753,9 @@
   position: absolute;
   right: 16px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) rotate(180deg);
   pointer-events: none;
+  transition: transform 0.2s ease;
 }
 
 // Plan sections
@@ -885,11 +931,12 @@
   }
 
   svg {
+    transform: rotate(180deg);
     transition: transform 0.2s ease;
   }
 
   &.open svg {
-    transform: rotate(180deg);
+    transform: rotate(0deg);
   }
 }
 

@@ -3,11 +3,14 @@ import Image from 'next/image';
 import { Lead } from '@/types/lead';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { QuoteSummaryCard } from '@/components/Common/QuoteSummaryCard/QuoteSummaryCard';
+import { SalesCadenceCard } from '@/components/Common/SalesCadenceCard/SalesCadenceCard';
+import { ContactInformationCard } from '@/components/Common/ContactInformationCard/ContactInformationCard';
+import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { useQuoteRealtime } from '@/hooks/useQuoteRealtime';
-import { adminAPI } from '@/lib/api-client';
+import { authenticatedFetch, adminAPI } from '@/lib/api-client';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import {
   AddressAutocomplete,
@@ -16,8 +19,6 @@ import {
 import { StreetViewImage } from '@/components/Common/StreetViewImage/StreetViewImage';
 import {
   ServiceAddressData,
-  createServiceAddressForLead,
-  updateExistingServiceAddress,
 } from '@/lib/service-addresses';
 import {
   generateHomeSizeOptions,
@@ -40,8 +41,11 @@ import {
   ShieldCheck,
   CirclePlus,
   CircleOff,
+  Phone,
+  Mail,
 } from 'lucide-react';
 import styles from './LeadStepContent.module.scss';
+import cadenceStyles from '../SalesCadenceCard/SalesCadenceCard.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
 interface LeadStepContentProps {
@@ -93,6 +97,8 @@ export function LeadStepContent({
   const [isPestDropdownOpen, setIsPestDropdownOpen] = useState(false);
   const [isAdditionalPestDropdownOpen, setIsAdditionalPestDropdownOpen] = useState(false);
   const [pestOptions, setPestOptions] = useState<any[]>([]);
+  const initialLineItemCreatedRef = useRef(false);
+  const lineItemCreationLockRef = useRef<Set<number>>(new Set());
   const [serviceSelections, setServiceSelections] = useState<Array<{
     id: string;
     servicePlan: any | null;
@@ -109,6 +115,16 @@ export function LeadStepContent({
   const [discount, setDiscount] = useState<string>('');
   const [preferredDate, setPreferredDate] = useState<string>('');
   const [preferredTime, setPreferredTime] = useState<string>('');
+
+  // Contact Log activity state
+  const [selectedActionType, setSelectedActionType] = useState<string>('live_call');
+  const [activityNotes, setActivityNotes] = useState<string>('');
+  const [isLoggingActivity, setIsLoggingActivity] = useState(false);
+  const [nextTask, setNextTask] = useState<any | null>(null);
+  const [loadingNextTask, setLoadingNextTask] = useState(false);
+  const [hasActiveCadence, setHasActiveCadence] = useState<boolean | null>(null);
+  const [isStartingCadence, setIsStartingCadence] = useState(false);
+  const [selectedCadenceId, setSelectedCadenceId] = useState<string | null>(null);
 
   const { user } = useUser();
   const { users: assignableUsers } = useAssignableUsers({
@@ -242,31 +258,46 @@ export function LeadStepContent({
     }
   }, [lead.requested_date, lead.requested_time, preferredDate, preferredTime]);
 
-  // Pre-fill home size and yard size from service address data
+  // Pre-fill home size and yard size from service address or quote
   useEffect(() => {
-    if (lead.primary_service_address?.home_size && homeSize === '') {
-      setHomeSize(lead.primary_service_address.home_size);
-    }
-    if (lead.primary_service_address?.yard_size && yardSize === '') {
-      setYardSize(lead.primary_service_address.yard_size);
-    }
-    // Pre-fill size range options from quote (not service_address)
+    // Priority 1: Load from quote if available
     if (quote?.home_size_range && selectedHomeSizeOption === '') {
       setSelectedHomeSizeOption(quote.home_size_range);
     }
     if (quote?.yard_size_range && selectedYardSizeOption === '') {
       setSelectedYardSizeOption(quote.yard_size_range);
     }
+
+    // Priority 2: Load from service address if no quote data
+    if (!quote?.home_size_range && lead.primary_service_address?.home_size_range && selectedHomeSizeOption === '') {
+      setSelectedHomeSizeOption(lead.primary_service_address.home_size_range);
+    }
+    if (!quote?.yard_size_range && lead.primary_service_address?.yard_size_range && selectedYardSizeOption === '') {
+      setSelectedYardSizeOption(lead.primary_service_address.yard_size_range);
+    }
   }, [
-    lead.primary_service_address?.home_size,
-    lead.primary_service_address?.yard_size,
+    lead.primary_service_address?.home_size_range,
+    lead.primary_service_address?.yard_size_range,
     quote?.home_size_range,
     quote?.yard_size_range,
-    homeSize,
-    yardSize,
     selectedHomeSizeOption,
     selectedYardSizeOption
   ]);
+
+  // Pre-fill service frequency and discount from quote line items
+  useEffect(() => {
+    const firstLineItem = quote?.line_items?.[0];
+    if (firstLineItem) {
+      // Pre-fill service frequency
+      if (firstLineItem.service_frequency && serviceFrequency === '') {
+        setServiceFrequency(firstLineItem.service_frequency);
+      }
+      // Pre-fill discount
+      if (firstLineItem.discount_percentage !== undefined && discount === '') {
+        setDiscount(firstLineItem.discount_percentage.toString());
+      }
+    }
+  }, [quote?.line_items, serviceFrequency, discount]);
 
   // Pre-fill service location with primary service address when component loads
   useEffect(() => {
@@ -327,43 +358,6 @@ export function LeadStepContent({
         const response = await adminAPI.getPestOptions(lead.company_id);
         if (response.success) {
           setPestOptions(response.data);
-
-          // Pre-populate with quote.primary_pest if available (from quote, not lead)
-          if (quote?.primary_pest && response.data.length > 0) {
-            const matchingPest = response.data.find(
-              (pest: any) =>
-                pest.name.toLowerCase() === quote.primary_pest?.toLowerCase() ||
-                pest.slug === quote.primary_pest
-            );
-            if (matchingPest && !selectedPests.includes(matchingPest.id)) {
-              setSelectedPests([matchingPest.id]);
-            }
-          }
-
-          // Pre-populate additional pests from quote.additional_pests (from quote, not lead)
-          if (quote?.additional_pests && quote.additional_pests.length > 0) {
-            const additionalPestIds = response.data
-              .filter((pest: any) =>
-                quote.additional_pests?.some((pestName: string) =>
-                  pestName.toLowerCase() === pest.name?.toLowerCase() ||
-                  pestName.toLowerCase() === pest.custom_label?.toLowerCase()
-                )
-              )
-              .map((pest: any) => pest.id);
-
-            setAdditionalPests(additionalPestIds);
-
-            // Add to selected pests if not already included
-            setSelectedPests(prev => {
-              const primaryPest = prev[0];
-              if (primaryPest) {
-                // Filter out any duplicates and ensure primary is first
-                const uniqueAdditional = additionalPestIds.filter((id: string) => id !== primaryPest);
-                return [primaryPest, ...uniqueAdditional];
-              }
-              return additionalPestIds;
-            });
-          }
         }
       } catch (error) {
         console.error('Error loading pest options:', error);
@@ -373,8 +367,89 @@ export function LeadStepContent({
     };
 
     loadPestOptions();
+  }, [lead.company_id]);
+
+  // Reset initial line item creation flag and lock when lead changes
+  useEffect(() => {
+    initialLineItemCreatedRef.current = false;
+    lineItemCreationLockRef.current.clear();
+  }, [lead.id]);
+
+  // Load next recommended task from cadence and check if cadence exists
+  useEffect(() => {
+    const loadCadenceData = async () => {
+      try {
+        setLoadingNextTask(true);
+
+        // Check if lead has active cadence (authenticatedFetch returns JSON directly, not Response)
+        const cadenceResult = await authenticatedFetch(`/api/leads/${lead.id}/cadence`);
+        const hasActiveCadence = cadenceResult.data !== null && cadenceResult.data.completed_at === null;
+        setHasActiveCadence(hasActiveCadence);
+
+        // Only fetch next task if cadence exists
+        if (hasActiveCadence) {
+          const taskResult = await authenticatedFetch(`/api/leads/${lead.id}/next-task`);
+          setNextTask(taskResult.data);
+        } else {
+          setNextTask(null);
+        }
+      } catch (error) {
+        console.error('Error loading cadence data:', error);
+        // If there's an error, assume no cadence
+        setHasActiveCadence(false);
+        setNextTask(null);
+      } finally {
+        setLoadingNextTask(false);
+      }
+    };
+
+    loadCadenceData();
+  }, [lead.id]);
+
+  // Pre-populate pests from quote or lead - runs separately to avoid reloading pest options
+  useEffect(() => {
+    if (pestOptions.length === 0) return;
+
+    // Pre-populate with quote.primary_pest if available, otherwise use lead.pest_type
+    const primaryPestValue = quote?.primary_pest || lead.pest_type;
+
+    if (primaryPestValue) {
+      const matchingPest = pestOptions.find(
+        (pest: any) =>
+          pest.name.toLowerCase() === primaryPestValue?.toLowerCase() ||
+          pest.slug === primaryPestValue
+      );
+      if (matchingPest && !selectedPests.includes(matchingPest.id)) {
+        setSelectedPests([matchingPest.id]);
+      }
+    }
+
+    // Pre-populate additional pests from quote.additional_pests
+    if (quote?.additional_pests && quote.additional_pests.length > 0) {
+      const additionalPestIds = pestOptions
+        .filter((pest: any) =>
+          quote.additional_pests?.some((pestName: string) =>
+            pestName.toLowerCase() === pest.name?.toLowerCase() ||
+            pestName.toLowerCase() === pest.custom_label?.toLowerCase()
+          )
+        )
+        .map((pest: any) => pest.id);
+
+      setAdditionalPests(additionalPestIds);
+
+      // Add to selected pests if not already included
+      setSelectedPests(prev => {
+        const primaryPest = prev[0];
+        if (primaryPest) {
+          // Filter out any duplicates and ensure primary is first
+          const uniqueAdditional = additionalPestIds.filter((id: string) => id !== primaryPest);
+          return [primaryPest, ...uniqueAdditional];
+        }
+        return additionalPestIds;
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead.company_id, quote?.primary_pest, quote?.additional_pests]);
+  }, [quote?.additional_pests, lead.pest_type, pestOptions.length]);
 
   // Load service plan for first selection when primary pest is selected
   useEffect(() => {
@@ -395,21 +470,29 @@ export function LeadStepContent({
           primaryPest
         );
         if (response.success && response.cheapest_plan) {
-          // Update first service selection with cheapest plan
+          // Cross-reference with allServicePlans to get complete plan data with pest_coverage
+          const fullPlan = allServicePlans.find(p => p.id === response.cheapest_plan.id) || response.cheapest_plan;
+
+          // Update first service selection with complete plan data
           setServiceSelections(prev => prev.map((sel, idx) =>
-            idx === 0 ? { ...sel, servicePlan: response.cheapest_plan } : sel
+            idx === 0 ? { ...sel, servicePlan: fullPlan } : sel
           ));
 
-          // Automatically create quote line item if quote exists
-          // Only create if this is a new plan (not already in line items)
-          if (quote) {
-            const existingLineItem = quote.line_items?.find(
-              (item) => item.display_order === 0
-            );
+          // Automatically create or update quote line item if quote exists
+          // Always check quote.line_items first (most reliable guard)
+          const existingLineItem = quote?.line_items?.find(
+            (item) => item.display_order === 0
+          );
 
-            // Only create/update if the plan is different or doesn't exist
-            if (!existingLineItem || existingLineItem.service_plan_id !== response.cheapest_plan.id) {
-              await createOrUpdateQuoteLineItem(response.cheapest_plan, 0);
+          if (quote) {
+            // Case 1: No existing line item - create new one (initial creation)
+            if (!existingLineItem && !initialLineItemCreatedRef.current) {
+              await createOrUpdateQuoteLineItem(fullPlan, 0);
+              initialLineItemCreatedRef.current = true;
+            }
+            // Case 2: Existing line item with different service plan - update it
+            else if (existingLineItem && existingLineItem.service_plan_id !== fullPlan.id) {
+              await createOrUpdateQuoteLineItem(fullPlan, 0);
             }
           }
         } else {
@@ -430,7 +513,7 @@ export function LeadStepContent({
     loadServicePlan();
     // Only depend on PRIMARY pest (first element), not the entire selectedPests array
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPests[0], lead.company_id]);
+  }, [selectedPests[0], lead.company_id, allServicePlans]);
 
   // Removed auto-sync useEffect to prevent update loops
   // Line items are now only created/updated on explicit user actions
@@ -740,36 +823,43 @@ export function LeadStepContent({
     try {
       // Check if we have an existing primary service address to update
       if (lead.primary_service_address?.id) {
-        // UPDATE existing service address
-        const updateResult = await updateExistingServiceAddress(
-          lead.primary_service_address.id,
-          serviceLocationData
-        );
+        // UPDATE existing service address via API
+        const result = await authenticatedFetch(`/api/leads/${lead.id}/service-address`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceAddressId: lead.primary_service_address.id,
+            addressData: serviceLocationData,
+          }),
+        });
 
-        if (!updateResult.success) {
+        if (!result.success) {
           throw new Error(
-            updateResult.error || 'Failed to update service address'
+            result.error || 'Failed to update service address'
           );
         }
 
         showSuccessToast('Service address updated successfully');
       } else {
-        // CREATE new service address and link to both customer and lead
+        // CREATE new service address and link to both customer and lead via API
         const isPrimary = !lead.primary_service_address; // Set as primary if no existing primary address
 
-        const result = await createServiceAddressForLead(
-          lead.company_id,
-          lead.customer.id,
-          lead.id,
-          serviceLocationData,
-          isPrimary
-        );
+        const result = await authenticatedFetch(`/api/leads/${lead.id}/service-address`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId: lead.company_id,
+            customerId: lead.customer.id,
+            isPrimary,
+            addressData: serviceLocationData,
+          }),
+        });
 
         if (!result.success) {
           throw new Error(result.error || 'Failed to save service address');
         }
 
-        if (result.isExisting) {
+        if (result.data?.isExisting) {
           showSuccessToast('Service address linked successfully');
         } else {
           showSuccessToast('Service address created and linked successfully');
@@ -803,6 +893,63 @@ export function LeadStepContent({
     setServiceLocationData({
       ...originalServiceAddress,
     });
+  };
+
+  const handleUpdateServiceAddressSize = async (field: 'home_size_range' | 'yard_size_range', value: string, label: string) => {
+    if (!lead.primary_service_address?.id || !value) return;
+
+    try {
+      await authenticatedFetch(
+        `/api/service-addresses/${lead.primary_service_address.id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: value }),
+        }
+      );
+      showSuccessToast(`${label} updated`);
+    } catch (error) {
+      console.error(`Error updating ${label.toLowerCase()}:`, error);
+      showErrorToast(`Failed to update ${label.toLowerCase()}`);
+    }
+  };
+
+  const handleStartCadence = async () => {
+    setIsStartingCadence(true);
+    try {
+      const body = selectedCadenceId
+        ? JSON.stringify({ cadence_id: selectedCadenceId })
+        : JSON.stringify({});
+
+      const result = await authenticatedFetch(`/api/leads/${lead.id}/cadence`, {
+        method: 'POST',
+        body,
+      });
+
+      if (!result.ok && result.error) {
+        throw new Error(result.error);
+      }
+
+      onShowToast?.('Sales cadence started successfully', 'success');
+
+      // Reload cadence data and next task
+      setHasActiveCadence(true);
+
+      try {
+        const taskResult = await authenticatedFetch(`/api/leads/${lead.id}/next-task`);
+        if (taskResult && taskResult.data) {
+          setNextTask(taskResult.data);
+        }
+      } catch (taskError) {
+        console.error('Error fetching next task:', taskError);
+        // Don't fail the whole operation if we can't fetch the next task
+      }
+    } catch (error: any) {
+      console.error('Error starting cadence:', error);
+      showErrorToast(error.message || 'Failed to start sales cadence');
+    } finally {
+      setIsStartingCadence(false);
+    }
   };
 
   const handleAssignTicket = async () => {
@@ -974,6 +1121,7 @@ export function LeadStepContent({
           requested_date: date,
         });
       }
+      onShowToast?.('Preferred date updated successfully', 'success');
       // Don't call onLeadUpdate to prevent re-rendering
     } catch (error) {
       console.error('Failed to update requested date:', error);
@@ -1108,6 +1256,7 @@ export function LeadStepContent({
           requested_time: time,
         });
       }
+      onShowToast?.('Preferred time updated successfully', 'success');
       // Don't call onLeadUpdate to prevent re-rendering
     } catch (error) {
       console.error('Failed to update requested time:', error);
@@ -1117,21 +1266,31 @@ export function LeadStepContent({
 
   /**
    * Creates or updates a quote line item with size-based price calculations
+   * Uses a lock to prevent concurrent executions for the same display order
    */
-  const createOrUpdateQuoteLineItem = async (servicePlan: any, displayOrder: number) => {
-    if (!quote) {
-      console.error('No quote found');
-      onShowToast?.('Quote not found. Please try again.', 'error');
+  const createOrUpdateQuoteLineItem = async (servicePlan: any, displayOrder: number, additionalData?: { service_frequency?: string; discount_percentage?: number }) => {
+    // Check if already creating/updating this display order
+    if (lineItemCreationLockRef.current.has(displayOrder)) {
+      console.log(`Skipping duplicate line item creation for display_order ${displayOrder}`);
       return;
     }
 
-    if (!pricingSettings) {
-      console.error('No pricing settings found');
-      onShowToast?.('Pricing settings not configured', 'error');
-      return;
-    }
+    // Acquire lock
+    lineItemCreationLockRef.current.add(displayOrder);
 
     try {
+      if (!quote) {
+        console.error('No quote found');
+        onShowToast?.('Quote not found. Please try again.', 'error');
+        return;
+      }
+
+      if (!pricingSettings) {
+        console.error('No pricing settings found');
+        onShowToast?.('Pricing settings not configured', 'error');
+        return;
+      }
+
       // Get size ranges from quote (single source of truth)
       const homeSizeRange = quote.home_size_range;
       const yardSizeRange = quote.yard_size_range;
@@ -1142,11 +1301,21 @@ export function LeadStepContent({
       );
 
       // Prepare the line item data
-      const lineItemData = {
+      const lineItemData: any = {
         id: existingLineItem?.id, // If exists, update it; otherwise create new
         service_plan_id: servicePlan.id,
         display_order: displayOrder,
       };
+
+      // Add service frequency if provided
+      if (additionalData?.service_frequency !== undefined) {
+        lineItemData.service_frequency = additionalData.service_frequency;
+      }
+
+      // Add discount if provided
+      if (additionalData?.discount_percentage !== undefined) {
+        lineItemData.discount_percentage = additionalData.discount_percentage;
+      }
 
       // Call the quote API to update with the new line item
       const response = await fetch(`/api/quotes/${quote.id}`, {
@@ -1174,6 +1343,9 @@ export function LeadStepContent({
     } catch (error) {
       console.error('Error creating/updating quote line item:', error);
       onShowToast?.('Failed to update quote', 'error');
+    } finally {
+      // Always release lock
+      lineItemCreationLockRef.current.delete(displayOrder);
     }
   };
 
@@ -1899,163 +2071,23 @@ export function LeadStepContent({
           </div>
         </InfoCard>
 
-        <InfoCard
-          title="Service Location"
-          icon={<MapPinned size={20} />}
+        <ServiceLocationCard
+          serviceAddress={lead.primary_service_address || null}
           startExpanded={true}
-        >
-          <div className={styles.cardContent}>
-            <div className={styles.serviceLocationGrid}>
-              {/* Row 1: City, State, Zip (3 columns) */}
-              <div className={`${styles.gridRow} ${styles.threeColumns}`}>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>City</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.city}
-                    onChange={e =>
-                      handleServiceLocationChange('city', e.target.value)
-                    }
-                    placeholder="Anytown"
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>State</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.state}
-                    onChange={e =>
-                      handleServiceLocationChange('state', e.target.value)
-                    }
-                    placeholder="CA"
-                    maxLength={2}
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>Zip</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.zip_code}
-                    onChange={e =>
-                      handleServiceLocationChange('zip_code', e.target.value)
-                    }
-                    placeholder="12345"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Address (1 column - full width) */}
-              <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>Address</label>
-                  <AddressAutocomplete
-                    value={serviceLocationData.street_address}
-                    onChange={value =>
-                      handleServiceLocationChange('street_address', value)
-                    }
-                    onAddressSelect={handleAddressSelect}
-                    placeholder="324 Winston Churchill Drive, Suite #34"
-                    hideDropdown={hasCompleteUnchangedAddress}
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Size of Home, Yard Size (2 columns) */}
-              <div className={`${styles.gridRow} ${styles.twoColumns}`}>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>Size of Home</label>
-                  </div>
-                  <select
-                    className={styles.selectInput}
-                    value={selectedHomeSizeOption}
-                    onChange={e => {
-                      setSelectedHomeSizeOption(e.target.value);
-                      const option = homeSizeOptions.find(opt => opt.value === e.target.value);
-                      if (option) {
-                        setHomeSize(option.rangeStart);
-                      }
-                    }}
-                  >
-                    <option value="">Select home size</option>
-                    {homeSizeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>Yard Size</label>
-                  </div>
-                  <select
-                    className={styles.selectInput}
-                    value={selectedYardSizeOption}
-                    onChange={e => {
-                      setSelectedYardSizeOption(e.target.value);
-                      const option = yardSizeOptions.find(opt => opt.value === e.target.value);
-                      if (option) {
-                        setYardSize(option.rangeStart);
-                      }
-                    }}
-                  >
-                    <option value="">Select yard size</option>
-                    {yardSizeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 4: Street View Image (1 column - full width) */}
-              <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-                <div className={styles.streetViewContainer}>
-                  <StreetViewImage
-                    address={currentFormattedAddress}
-                    latitude={serviceLocationData.latitude}
-                    longitude={serviceLocationData.longitude}
-                    width={600}
-                    height={240}
-                    className={styles.streetViewImage}
-                    showPlaceholder={
-                      !currentFormattedAddress && !serviceLocationData.latitude
-                    }
-                    fallbackToSatellite={true}
-                    hasStreetView={serviceLocationData.hasStreetView}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Save/Cancel Address Changes */}
-            {hasAddressChanges && (
-              <div className={styles.addressActions}>
-                <div className={styles.actionButtons}>
-                  <button
-                    className={`${styles.button} ${styles.cancelButton}`}
-                    onClick={handleCancelAddressChanges}
-                    disabled={isSavingAddress}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className={`${styles.button} ${styles.saveButton}`}
-                    onClick={handleSaveAddress}
-                    disabled={!hasAddressChanges || isSavingAddress}
-                  >
-                    {isSavingAddress ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </InfoCard>
+          showSizeInputs
+          pricingSettings={pricingSettings || undefined}
+          onShowToast={onShowToast}
+          editable={true}
+          onAddressSelect={handleAddressSelect}
+          onSaveAddress={handleSaveAddress}
+          onCancelAddress={handleCancelAddressChanges}
+          hasAddressChanges={hasAddressChanges}
+          isSavingAddress={isSavingAddress}
+          serviceLocationData={serviceLocationData}
+          onServiceLocationChange={handleServiceLocationChange}
+          hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
+          currentFormattedAddress={currentFormattedAddress}
+        />
 
         <InfoCard
           title="Activity"
@@ -2093,92 +2125,113 @@ export function LeadStepContent({
               <h4 className={cardStyles.defaultText}>
                 Next Recommended Action:
               </h4>
-              <div
-                style={{
-                  padding: '12px',
-                  border: '1px solid var(--gray-300)',
-                  borderRadius: '6px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      backgroundColor: 'var(--gray-100)',
-                      border: '1px solid var(--gray-200)',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      padding: '3px',
-                    }}
-                  >
-                    <MessageSquareMore
-                      size={18}
-                      style={{ color: 'var(--gray-500)' }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '2px',
-                    }}
-                  >
-                    <span className={cardStyles.inputText}>
-                      Day 1: Afternoon Text
-                    </span>
-                    <div className={cardStyles.dataLabel}>
-                      Target: Thursday, 9/25 | 5PM
+              {loadingNextTask ? (
+                <div className={cardStyles.dataLabel}>Loading...</div>
+              ) : hasActiveCadence ? (
+                // Active cadence exists - show next task or completion message
+                nextTask ? (
+                  <div className={cadenceStyles.stepItem}>
+                    <div className={cadenceStyles.stepIcon}>
+                      {nextTask.action_type === 'live_call' || nextTask.action_type === 'outbound_call' || nextTask.action_type === 'ai_call' ? (
+                        <Phone size={16} />
+                      ) : nextTask.action_type === 'text_message' ? (
+                        <MessageSquareMore size={16} />
+                      ) : nextTask.action_type === 'email' ? (
+                        <Mail size={16} />
+                      ) : (
+                        <MessageSquareMore size={16} />
+                      )}
+                    </div>
+                    <div className={cadenceStyles.stepContent}>
+                      <div className={cadenceStyles.stepHeader}>
+                        <span className={cardStyles.inputText}>
+                          Day {nextTask.day_number}: {nextTask.time_of_day === 'AM' ? 'Morning' : nextTask.time_of_day === 'PM' ? 'Afternoon' : nextTask.time_of_day} {
+                            nextTask.action_type === 'live_call' ? 'Call' :
+                            nextTask.action_type === 'outbound_call' ? 'Outbound Call' :
+                            nextTask.action_type === 'ai_call' ? 'AI Call' :
+                            nextTask.action_type === 'text_message' ? 'Text' :
+                            nextTask.action_type === 'email' ? 'Email' :
+                            nextTask.action_type
+                          }
+                        </span>
+                        <div className={cadenceStyles.priorityIndicator}>
+                          <span className={cardStyles.inputText}>
+                            {nextTask.priority.charAt(0).toUpperCase() + nextTask.priority.slice(1)}
+                          </span>
+                          <div className={`${cadenceStyles.priorityDot} ${
+                            nextTask.priority === 'urgent' ? cadenceStyles.priorityDotUrgent :
+                            nextTask.priority === 'high' ? cadenceStyles.priorityDotHigh :
+                            nextTask.priority === 'low' ? cadenceStyles.priorityDotLow :
+                            cadenceStyles.priorityDotMedium
+                          }`}>
+                            <div className={cadenceStyles.priorityDotInner} />
+                          </div>
+                        </div>
+                      </div>
+                      {nextTask.due_date && nextTask.due_time ? (
+                        <div className={cardStyles.dataLabel}>
+                          Target: {new Date(nextTask.due_date).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' })} | {
+                            new Date(`1970-01-01T${nextTask.due_time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                          }
+                        </div>
+                      ) : nextTask.due_date ? (
+                        <div className={cardStyles.dataLabel}>
+                          Target: {new Date(nextTask.due_date).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' })}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
-                  <span
-                    style={{
-                      marginLeft: 'auto',
-                      padding: '2px 8px',
-                      backgroundColor: '#fbbf24',
-                      color: 'white',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                    }}
+                ) : (
+                  <div className={cardStyles.dataLabel}>
+                    All cadence steps completed! 🎉
+                  </div>
+                )
+              ) : (
+                // No active cadence - show start button
+                <div>
+                  <p className={cardStyles.dataLabel} style={{ marginBottom: '12px' }}>
+                    No active sales cadence. Start a cadence to begin automated follow-up tasks.
+                  </p>
+                  <button
+                    onClick={handleStartCadence}
+                    disabled={isStartingCadence || !lead.assigned_to}
+                    className={styles.primaryButton}
                   >
-                    Medium
-                  </span>
+                    {isStartingCadence ? 'Starting...' : 'Start Sales Cadence'}
+                  </button>
+                  {!lead.assigned_to && (
+                    <p className={cardStyles.dataLabel} style={{ marginTop: '8px', color: '#e53e3e' }}>
+                      Lead must be assigned before starting a cadence
+                    </p>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
 
             <div>
               <h4 className={cardStyles.defaultText}>
-                Log an action:
+                Select an action to log:
               </h4>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: '8px',
-                }}
-              >
-                <button className={styles.actionButton}>
-                  Inbound Call/Transfer
-                </button>
-                <button className={styles.actionButton}>Outbound Call</button>
-                <button
-                  className={`${styles.actionButton} ${styles.actionButtonActive}`}
-                >
-                  Text Message
-                </button>
-                <button className={styles.actionButton}>AI Call</button>
-                <button className={styles.actionButton}>Email Sent</button>
-                <button className={styles.actionButton}>Email Reply</button>
+              <div className={styles.tabContainer}>
+                {[
+                  { id: 'live_call', label: 'Live Call' },
+                  { id: 'outbound_call', label: 'Outbound Call' },
+                  { id: 'text_message', label: 'Text Message' },
+                  { id: 'ai_call', label: 'AI Call' },
+                  { id: 'email', label: 'Email' },
+                ].map((tab, index, array) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setSelectedActionType(tab.id)}
+                    className={`${styles.tabButton} ${
+                      selectedActionType === tab.id ? styles.active : styles.inactive
+                    } ${index === 0 ? styles.firstTab : ''} ${
+                      index === array.length - 1 ? styles.lastTab : ''
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -2190,7 +2243,9 @@ export function LeadStepContent({
                 Notes <span className={cardStyles.dataLabel}>(optional)</span>
               </label>
               <textarea
-                placeholder="Sent Katie Newburn a message letting her know that she could reach me here until 5pm and that I'd be happy to answer any questions."
+                value={activityNotes}
+                onChange={(e) => setActivityNotes(e.target.value)}
+                placeholder="Add details about this call"
                 style={{
                   width: '100%',
                   minHeight: '80px',
@@ -2213,6 +2268,10 @@ export function LeadStepContent({
               }}
             >
               <button
+                onClick={() => {
+                  setActivityNotes('');
+                  setSelectedActionType('live_call');
+                }}
                 style={{
                   padding: '8px 16px',
                   border: '1px solid var(--gray-300)',
@@ -2227,6 +2286,34 @@ export function LeadStepContent({
                 Clear
               </button>
               <button
+                onClick={async () => {
+                  setIsLoggingActivity(true);
+                  try {
+                    const response = await fetch(`/api/leads/${lead.id}/activities`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        activity_type: selectedActionType,
+                        notes: activityNotes || null,
+                      }),
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Failed to log activity');
+                    }
+
+                    onShowToast?.('Activity logged successfully', 'success');
+                    setActivityNotes('');
+                    setSelectedActionType('live_call');
+                    onLeadUpdate?.();
+                  } catch (error) {
+                    console.error('Error logging activity:', error);
+                    onShowToast?.('Failed to log activity', 'error');
+                  } finally {
+                    setIsLoggingActivity(false);
+                  }
+                }}
+                disabled={isLoggingActivity}
                 style={{
                   padding: '8px 16px',
                   border: 'none',
@@ -2235,14 +2322,22 @@ export function LeadStepContent({
                   color: 'white',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: 'pointer',
+                  cursor: isLoggingActivity ? 'not-allowed' : 'pointer',
+                  opacity: isLoggingActivity ? 0.6 : 1,
                 }}
               >
-                Log Activity
+                {isLoggingActivity ? 'Logging...' : 'Log Activity'}
               </button>
             </div>
           </div>
         </InfoCard>
+
+        <SalesCadenceCard
+          leadId={lead.id}
+          companyId={lead.company_id}
+          leadCreatedAt={lead.created_at}
+          onCadenceSelect={setSelectedCadenceId}
+        />
       </div>
 
       <div className={styles.contentRight}>
@@ -2305,163 +2400,23 @@ export function LeadStepContent({
           </div>
         </InfoCard>
 
-        <InfoCard
-          title="Service Location"
-          icon={<MapPinned size={20} />}
+        <ServiceLocationCard
+          serviceAddress={lead.primary_service_address || null}
           startExpanded={false}
-        >
-          <div className={styles.cardContent}>
-            <div className={styles.serviceLocationGrid}>
-              {/* Row 1: City, State, Zip (3 columns) */}
-              <div className={`${styles.gridRow} ${styles.threeColumns}`}>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>City</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.city}
-                    onChange={e =>
-                      handleServiceLocationChange('city', e.target.value)
-                    }
-                    placeholder="Anytown"
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>State</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.state}
-                    onChange={e =>
-                      handleServiceLocationChange('state', e.target.value)
-                    }
-                    placeholder="CA"
-                    maxLength={2}
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>Zip</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.zip_code}
-                    onChange={e =>
-                      handleServiceLocationChange('zip_code', e.target.value)
-                    }
-                    placeholder="12345"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Address (1 column - full width) */}
-              <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>Address</label>
-                  <AddressAutocomplete
-                    value={serviceLocationData.street_address}
-                    onChange={value =>
-                      handleServiceLocationChange('street_address', value)
-                    }
-                    onAddressSelect={handleAddressSelect}
-                    placeholder="324 Winston Churchill Drive, Suite #34"
-                    hideDropdown={hasCompleteUnchangedAddress}
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Size of Home, Yard Size (2 columns) */}
-              <div className={`${styles.gridRow} ${styles.twoColumns}`}>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>Size of Home</label>
-                  </div>
-                  <select
-                    className={styles.selectInput}
-                    value={selectedHomeSizeOption}
-                    onChange={e => {
-                      setSelectedHomeSizeOption(e.target.value);
-                      const option = homeSizeOptions.find(opt => opt.value === e.target.value);
-                      if (option) {
-                        setHomeSize(option.rangeStart);
-                      }
-                    }}
-                  >
-                    <option value="">Select home size</option>
-                    {homeSizeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>Yard Size</label>
-                  </div>
-                  <select
-                    className={styles.selectInput}
-                    value={selectedYardSizeOption}
-                    onChange={e => {
-                      setSelectedYardSizeOption(e.target.value);
-                      const option = yardSizeOptions.find(opt => opt.value === e.target.value);
-                      if (option) {
-                        setYardSize(option.rangeStart);
-                      }
-                    }}
-                  >
-                    <option value="">Select yard size</option>
-                    {yardSizeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 4: Street View Image (1 column - full width) */}
-              <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-                <div className={styles.streetViewContainer}>
-                  <StreetViewImage
-                    address={currentFormattedAddress}
-                    latitude={serviceLocationData.latitude}
-                    longitude={serviceLocationData.longitude}
-                    width={600}
-                    height={240}
-                    className={styles.streetViewImage}
-                    showPlaceholder={
-                      !currentFormattedAddress && !serviceLocationData.latitude
-                    }
-                    fallbackToSatellite={true}
-                    hasStreetView={serviceLocationData.hasStreetView}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Save/Cancel Address Changes */}
-            {hasAddressChanges && (
-              <div className={styles.addressActions}>
-                <div className={styles.actionButtons}>
-                  <button
-                    className={`${styles.button} ${styles.cancelButton}`}
-                    onClick={handleCancelAddressChanges}
-                    disabled={isSavingAddress}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className={`${styles.button} ${styles.saveButton}`}
-                    onClick={handleSaveAddress}
-                    disabled={!hasAddressChanges || isSavingAddress}
-                  >
-                    {isSavingAddress ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </InfoCard>
+          showSizeInputs
+          pricingSettings={pricingSettings || undefined}
+          onShowToast={onShowToast}
+          editable={true}
+          onAddressSelect={handleAddressSelect}
+          onSaveAddress={handleSaveAddress}
+          onCancelAddress={handleCancelAddressChanges}
+          hasAddressChanges={hasAddressChanges}
+          isSavingAddress={isSavingAddress}
+          serviceLocationData={serviceLocationData}
+          onServiceLocationChange={handleServiceLocationChange}
+          hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
+          currentFormattedAddress={currentFormattedAddress}
+        />
 
         <InfoCard
           title="Activity"
@@ -2498,7 +2453,28 @@ export function LeadStepContent({
           icon={<CopyCheck size={20} />}
           startExpanded={true}
         >
-          <div className={styles.cardContent}>
+          <div className={styles.cardContent} style={{ position: 'relative' }}>
+            {loadingPlan && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10,
+                  borderRadius: '6px',
+                }}
+              >
+                <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
+                  Updating service plan...
+                </div>
+              </div>
+            )}
             {loadingPestOptions ? (
               <div className={cardStyles.lightText}>
                 Loading pest options...
@@ -2718,8 +2694,29 @@ export function LeadStepContent({
           icon={<ShieldCheck size={20} />}
           startExpanded={true}
         >
-          <div className={styles.cardContent}>
-            {loadingPlan ? (
+          <div className={styles.cardContent} style={{ position: 'relative' }}>
+            {(loadingPlan || isQuoteUpdating) && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10,
+                  borderRadius: '6px',
+                }}
+              >
+                <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
+                  {loadingPlan ? 'Loading service plan...' : 'Updating...'}
+                </div>
+              </div>
+            )}
+            {loadingPlan && !selectedPlan ? (
               <div
                 style={{
                   padding: '20px',
@@ -2786,6 +2783,7 @@ export function LeadStepContent({
 
                               if (data.success && data.data) {
                                 await broadcastQuoteUpdate(data.data);
+                                onShowToast?.('Home size updated successfully', 'success');
                               }
                             } catch (error) {
                               console.error('Error updating home size range:', error);
@@ -2834,6 +2832,7 @@ export function LeadStepContent({
 
                               if (data.success && data.data) {
                                 await broadcastQuoteUpdate(data.data);
+                                onShowToast?.('Yard size updated successfully', 'success');
                               }
                             } catch (error) {
                               console.error('Error updating yard size range:', error);
@@ -2853,12 +2852,11 @@ export function LeadStepContent({
                   </div>
 
                   {/* Row 2: Select Service (1 column) */}
-                  <div
-                    className={`${styles.gridRow} ${styles.oneColumn}`}
-                  >
+                  {/* Row: Select Service, Service Frequency, Discount (3 columns) */}
+                  <div className={`${styles.gridRow} ${styles.threeColumns}`}>
                     <div className={styles.formField}>
                       <label className={styles.fieldLabel}>
-                        Select Service
+                        Select Service 1
                       </label>
                       <div className={styles.dropdown}>
                         <select
@@ -2899,13 +2897,6 @@ export function LeadStepContent({
                           height="21"
                           viewBox="0 0 20 21"
                           fill="none"
-                          style={{
-                            position: 'absolute',
-                            right: '12px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            pointerEvents: 'none',
-                          }}
                         >
                           <path
                             d="M6 12.2539L10 7.80946L14 12.2539"
@@ -2917,10 +2908,6 @@ export function LeadStepContent({
                         </svg>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Row 3: Service Frequency, Discount (2 columns) */}
-                  <div className={`${styles.gridRow} ${styles.twoColumns}`}>
                     <div className={styles.formField}>
                       <label className={styles.fieldLabel}>
                         Service Frequency
@@ -2929,7 +2916,19 @@ export function LeadStepContent({
                         <select
                           className={styles.selectInput}
                           value={serviceFrequency}
-                          onChange={e => setServiceFrequency(e.target.value)}
+                          onChange={async e => {
+                            const newFrequency = e.target.value;
+                            setServiceFrequency(newFrequency);
+
+                            // Update quote line item if we have a selected service plan
+                            if (selectedPlan && newFrequency) {
+                              await createOrUpdateQuoteLineItem(selectedPlan, 0, {
+                                service_frequency: newFrequency,
+                              });
+                            } else if (newFrequency) {
+                              onShowToast?.('Service frequency updated successfully', 'success');
+                            }
+                          }}
                         >
                           <option value="">Select Frequency</option>
                           <option value="monthly">Monthly</option>
@@ -2943,13 +2942,6 @@ export function LeadStepContent({
                           height="21"
                           viewBox="0 0 20 21"
                           fill="none"
-                          style={{
-                            position: 'absolute',
-                            right: '12px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            pointerEvents: 'none',
-                          }}
                         >
                           <path
                             d="M6 12.2539L10 7.80946L14 12.2539"
@@ -2967,14 +2959,26 @@ export function LeadStepContent({
                         <select
                           className={styles.selectInput}
                           value={discount}
-                          onChange={e => setDiscount(e.target.value)}
+                          onChange={async e => {
+                            const newDiscount = e.target.value;
+                            setDiscount(newDiscount);
+
+                            // Update quote line item if we have a selected service plan
+                            if (selectedPlan && newDiscount !== '') {
+                              await createOrUpdateQuoteLineItem(selectedPlan, 0, {
+                                discount_percentage: parseFloat(newDiscount),
+                              });
+                            } else if (newDiscount !== '') {
+                              onShowToast?.('Discount updated successfully', 'success');
+                            }
+                          }}
                         >
                           <option value="">Select Discount</option>
                           <option value="0">No Discount</option>
-                          <option value="5">5% Off</option>
-                          <option value="10">10% Off</option>
-                          <option value="15">15% Off</option>
-                          <option value="20">20% Off</option>
+                          <option value="5">5% off Initial</option>
+                          <option value="10">10% off Initial</option>
+                          <option value="15">15% off Initial</option>
+                          <option value="20">20% off Initial</option>
                         </select>
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -2982,13 +2986,6 @@ export function LeadStepContent({
                           height="21"
                           viewBox="0 0 20 21"
                           fill="none"
-                          style={{
-                            position: 'absolute',
-                            right: '12px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            pointerEvents: 'none',
-                          }}
                         >
                           <path
                             d="M6 12.2539L10 7.80946L14 12.2539"
@@ -3010,6 +3007,12 @@ export function LeadStepContent({
                   <div className={styles.pestContainer}>
                     {pestOptions
                       .filter(pest => selectedPests.includes(pest.id))
+                      .sort((a, b) => {
+                        // Sort by selectedPests order - primary pest (index 0) appears first
+                        const indexA = selectedPests.indexOf(a.id);
+                        const indexB = selectedPests.indexOf(b.id);
+                        return indexA - indexB;
+                      })
                       .map(pest => {
                         // Check if this pest is covered by the selected plan
                         const isCovered = selectedPlan.pest_coverage?.some(
@@ -3594,213 +3597,23 @@ export function LeadStepContent({
           </div>
         </InfoCard>
 
-        <InfoCard
-          title="Service Location"
-          icon={<MapPinned size={20} />}
+        <ServiceLocationCard
+          serviceAddress={lead.primary_service_address || null}
           startExpanded={false}
-        >
-          <div className={styles.cardContent}>
-            <div className={styles.serviceLocationGrid}>
-              {/* Row 1: City, State, Zip (3 columns) */}
-              <div className={`${styles.gridRow} ${styles.threeColumns}`}>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>City</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.city}
-                    onChange={e =>
-                      handleServiceLocationChange('city', e.target.value)
-                    }
-                    placeholder="Anytown"
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>State</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.state}
-                    onChange={e =>
-                      handleServiceLocationChange('state', e.target.value)
-                    }
-                    placeholder="CA"
-                    maxLength={2}
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>Zip</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.zip_code}
-                    onChange={e =>
-                      handleServiceLocationChange('zip_code', e.target.value)
-                    }
-                    placeholder="12345"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Address (1 column - full width) */}
-              <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-                <div className={styles.formField}>
-                  <label className={styles.fieldLabel}>Address</label>
-                  <AddressAutocomplete
-                    value={serviceLocationData.street_address}
-                    onChange={value =>
-                      handleServiceLocationChange('street_address', value)
-                    }
-                    onAddressSelect={handleAddressSelect}
-                    placeholder="324 Winston Churchill Drive, Suite #34"
-                    hideDropdown={hasCompleteUnchangedAddress}
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Size of Home, Yard Size (2 columns) */}
-              <div className={`${styles.gridRow} ${styles.twoColumns}`}>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>Size of Home</label>
-                  </div>
-                  <select
-                    className={styles.selectInput}
-                    value={selectedHomeSizeOption}
-                    onChange={async e => {
-                      const rangeValue = e.target.value;
-                      setSelectedHomeSizeOption(rangeValue);
-                      const option = homeSizeOptions.find(opt => opt.value === rangeValue);
-                      if (option) {
-                        setHomeSize(option.rangeStart);
-                      }
-
-                      // Update quote (which will also update service_address via API)
-                      if (quote && rangeValue) {
-                        try {
-                          const response = await fetch(`/api/quotes/${quote.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ home_size_range: rangeValue }),
-                          });
-
-                          if (!response.ok) {
-                            throw new Error('Failed to update home size range');
-                          }
-
-                          const data = await response.json();
-
-                          if (data.success && data.data) {
-                            await broadcastQuoteUpdate(data.data);
-                          }
-                        } catch (error) {
-                          console.error('Error updating home size range:', error);
-                          onShowToast?.('Failed to update home size', 'error');
-                        }
-                      }
-                    }}
-                  >
-                    <option value="">Select home size</option>
-                    {homeSizeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>Yard Size</label>
-                  </div>
-                  <select
-                    className={styles.selectInput}
-                    value={selectedYardSizeOption}
-                    onChange={async e => {
-                      const rangeValue = e.target.value;
-                      setSelectedYardSizeOption(rangeValue);
-                      const option = yardSizeOptions.find(opt => opt.value === rangeValue);
-                      if (option) {
-                        setYardSize(option.rangeStart);
-                      }
-
-                      // Update quote (which will also update service_address via API)
-                      if (quote && rangeValue) {
-                        try {
-                          const response = await fetch(`/api/quotes/${quote.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ yard_size_range: rangeValue }),
-                          });
-
-                          if (!response.ok) {
-                            throw new Error('Failed to update yard size range');
-                          }
-
-                          const data = await response.json();
-
-                          if (data.success && data.data) {
-                            await broadcastQuoteUpdate(data.data);
-                          }
-                        } catch (error) {
-                          console.error('Error updating yard size range:', error);
-                          onShowToast?.('Failed to update yard size', 'error');
-                        }
-                      }
-                    }}
-                  >
-                    <option value="">Select yard size</option>
-                    {yardSizeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 4: Street View Image (1 column - full width) */}
-              <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-                <div className={styles.streetViewContainer}>
-                  <StreetViewImage
-                    address={currentFormattedAddress}
-                    latitude={serviceLocationData.latitude}
-                    longitude={serviceLocationData.longitude}
-                    width={600}
-                    height={240}
-                    className={styles.streetViewImage}
-                    showPlaceholder={
-                      !currentFormattedAddress && !serviceLocationData.latitude
-                    }
-                    fallbackToSatellite={true}
-                    hasStreetView={serviceLocationData.hasStreetView}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Save/Cancel Address Changes */}
-            {hasAddressChanges && (
-              <div className={styles.addressActions}>
-                <div className={styles.actionButtons}>
-                  <button
-                    className={`${styles.button} ${styles.cancelButton}`}
-                    onClick={handleCancelAddressChanges}
-                    disabled={isSavingAddress}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className={`${styles.button} ${styles.saveButton}`}
-                    onClick={handleSaveAddress}
-                    disabled={!hasAddressChanges || isSavingAddress}
-                  >
-                    {isSavingAddress ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </InfoCard>
+          showSizeInputs
+          pricingSettings={pricingSettings || undefined}
+          onShowToast={onShowToast}
+          editable={true}
+          onAddressSelect={handleAddressSelect}
+          onSaveAddress={handleSaveAddress}
+          onCancelAddress={handleCancelAddressChanges}
+          hasAddressChanges={hasAddressChanges}
+          isSavingAddress={isSavingAddress}
+          serviceLocationData={serviceLocationData}
+          onServiceLocationChange={handleServiceLocationChange}
+          hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
+          currentFormattedAddress={currentFormattedAddress}
+        />
 
         <InfoCard
           title="Activity"
@@ -3838,95 +3651,14 @@ export function LeadStepContent({
         />
       </div>
       <div className={styles.contentRight}>
-        <InfoCard
-          title="Contact Information"
-          icon={<SquareUserRound size={20} />}
-          startExpanded={false}
-        >
-          <div className={styles.cardContent}>
-            {lead.customer ? (
-              <div className={styles.callInsightsGrid}>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Name</span>
-                  <span className={cardStyles.dataText}>
-                    {`${lead.customer.first_name} ${lead.customer.last_name}`.trim()}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Phone Number</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.customer.phone || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Email</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.customer.email || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Customer Status</span>
-                  <span className={cardStyles.dataText}>
-                    {capitalizeFirst(lead.customer.customer_status)}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Created At</span>
-                  <span className={cardStyles.dataText}>
-                    {new Date(lead.customer.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className={cardStyles.lightText}>
-                No customer information available
-              </div>
-            )}
-          </div>
-        </InfoCard>
+        <ContactInformationCard customer={lead.customer || null} />
 
-        <InfoCard
-          title="Service Location"
-          icon={<MapPinned size={20} />}
-          startExpanded={false}
-        >
-          <div className={styles.cardContent}>
-            {lead.primary_service_address ? (
-              <div className={styles.callInsightsGrid}>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Street Address</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.primary_service_address.street_address}
-                    {lead.primary_service_address.apartment_unit &&
-                      `, ${lead.primary_service_address.apartment_unit}`}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>City</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.primary_service_address.city}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>State</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.primary_service_address.state}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Zip Code</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.primary_service_address.zip_code}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className={cardStyles.lightText}>
-                No service location available
-              </div>
-            )}
-          </div>
-        </InfoCard>
+        <ServiceLocationCard
+          serviceAddress={lead.primary_service_address || null}
+          showSizeInputs
+          pricingSettings={pricingSettings || undefined}
+          onShowToast={onShowToast}
+        />
 
         <InfoCard
           title="Activity"

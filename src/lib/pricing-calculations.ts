@@ -53,13 +53,6 @@ export function generateHomeSizeOptions(
       label = `${rangeStart.toLocaleString()}-${rangeEnd.toLocaleString()} Sq Ft`;
     }
 
-    // Add pricing info if service plan is selected and not the base interval
-    if (servicePlanPricing && intervalIndex > 0) {
-      label += ` (+$${initialIncrease.toFixed(
-        2
-      )} initial, +$${recurringIncrease.toFixed(2)}/month)`;
-    }
-
     options.push({
       value: isLastInterval ? `${rangeStart}+` : `${rangeStart}-${rangeEnd}`,
       label,
@@ -133,13 +126,6 @@ export function generateYardSizeOptions(
     } else {
       // Middle intervals: "0.26-0.50 Acres"
       label = `${rangeStart.toFixed(2)}-${rangeEnd.toFixed(2)} Acres`;
-    }
-
-    // Add pricing info if service plan is selected and not the base interval
-    if (servicePlanPricing && intervalIndex > 0) {
-      label += ` (+$${initialIncrease.toFixed(
-        2
-      )} initial, +$${recurringIncrease.toFixed(2)}/month)`;
     }
 
     options.push({

@@ -108,8 +108,6 @@ export async function createOrFindServiceAddress(
         service_area_id: serviceAreaId,
         address_type: addressData.address_type || 'residential',
         property_notes: addressData.property_notes?.trim() || null,
-        home_size: addressData.home_size || null,
-        yard_size: addressData.yard_size || null
       })
       .select('id')
       .single();
@@ -344,7 +342,7 @@ export async function updateExistingServiceAddress(
   addressData: ServiceAddressData
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createClient();
+    const supabase = createAdminClient();
 
     // Get the existing service address to determine company_id for service area validation
     const { data: existingAddress, error: fetchError } = await supabase
@@ -406,8 +404,6 @@ export async function updateExistingServiceAddress(
         service_area_id: serviceAreaId,
         address_type: addressData.address_type || 'residential',
         property_notes: addressData.property_notes?.trim() || null,
-        home_size: addressData.home_size || null,
-        yard_size: addressData.yard_size || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', serviceAddressId);

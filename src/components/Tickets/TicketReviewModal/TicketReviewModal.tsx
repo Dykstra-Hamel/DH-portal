@@ -6,6 +6,8 @@ import { CallRecord } from '@/types/call-record'
 import { authenticatedFetch } from '@/lib/api-client'
 import { useUser } from '@/hooks/useUser'
 import { useAssignableUsers } from '@/hooks/useAssignableUsers'
+import { isAuthorizedAdminSync } from '@/lib/auth-helpers'
+import { getCustomerDisplayName, getPhoneDisplay } from '@/lib/display-utils'
 import {
   Modal,
   ModalTop,
@@ -85,7 +87,8 @@ export default function TicketReviewModal({
 
 
   // Get current authenticated user
-  const { getDisplayName, getAvatarUrl, getInitials, user } = useUser()
+  const { getDisplayName, getAvatarUrl, getInitials, user, profile } = useUser()
+  const isAdmin = profile ? isAuthorizedAdminSync(profile) : false
 
   // Initialize selectedAssignee with current user ID when user is available
   useEffect(() => {
@@ -598,16 +601,13 @@ export default function TicketReviewModal({
                     <div className={sectionStyles.infoField}>
                       <span className={sectionStyles.label}>Customer Name</span>
                       <span className={sectionStyles.value}>
-                        {ticket.customer ?
-                          `${ticket.customer.first_name} ${ticket.customer.last_name}` :
-                          'Unknown Customer'
-                        }
+                        {getCustomerDisplayName(ticket.customer)}
                       </span>
                     </div>
                     <div className={sectionStyles.infoField}>
                       <span className={sectionStyles.label}>Primary Phone</span>
                       <span className={sectionStyles.value}>
-                        {ticket.customer?.phone || 'Not provided'}
+                        {getPhoneDisplay(ticket.customer?.phone)}
                       </span>
                     </div>
                   </div>
@@ -693,6 +693,7 @@ export default function TicketReviewModal({
             <CustomerInformation
               ticket={ticket}
               isEditable={true}
+              isAdmin={isAdmin}
               onUpdate={(_customerData) => {
                 if (onSuccess) {
                   onSuccess('The ticket was successfully updated.')

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function POST(
   request: NextRequest,
@@ -55,6 +56,15 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    // 🔍 DEBUG: Log ticket data
+    console.log('🔍 [QUALIFY DEBUG] Ticket data:', {
+      ticketId: ticket.id,
+      call_record_id: ticket.call_record_id,
+      hasCallRecordId: !!ticket.call_record_id,
+      qualification: qualification,
+      assignedTo: assignedTo
+    });
 
     // Check user profile to determine if they're a global admin
     const { data: profile } = await supabase
@@ -174,6 +184,35 @@ export async function POST(
           );
         }
 
+        // Ensure call_record is linked to the lead (in case it wasn't done previously)
+        if (ticket.call_record_id) {
+          console.log('🔍 [QUALIFY DEBUG] Attempting to update call_record for existing lead:', {
+            call_record_id: ticket.call_record_id,
+            ticket_id: ticket.id,
+            lead_id: ticket.converted_to_lead_id
+          });
+
+          // Use admin client to bypass RLS for updating call_records
+          const adminSupabase = createAdminClient();
+          const { data: updateResult, error: callRecordUpdateError } = await adminSupabase
+            .from('call_records')
+            .update({ lead_id: ticket.converted_to_lead_id })
+            .eq('id', ticket.call_record_id)
+            .select();
+
+          if (callRecordUpdateError) {
+            console.error('❌ [QUALIFY DEBUG] Failed to update call_record with lead_id:', callRecordUpdateError);
+            // Don't fail the request - the lead was updated successfully
+          } else {
+            console.log('✅ [QUALIFY DEBUG] Successfully updated call_record:', {
+              updatedRecords: updateResult?.length || 0,
+              records: updateResult
+            });
+          }
+        } else {
+          console.log('⚠️ [QUALIFY DEBUG] No call_record_id found on ticket for existing lead conversion');
+        }
+
         return NextResponse.json({
           message: 'Existing lead updated successfully',
           qualification: 'sales',
@@ -194,6 +233,7 @@ export async function POST(
         estimated_value: ticket.estimated_value || 0,
         comments: ticket.description || '',
         assigned_to: assignedTo || ticket.assigned_to,
+        pest_type: ticket.pest_type,
         utm_source: ticket.utm_source,
         utm_medium: ticket.utm_medium,
         utm_campaign: ticket.utm_campaign,
@@ -273,6 +313,130 @@ export async function POST(
           { error: 'Failed to convert ticket to lead' },
           { status: 500 }
         );
+      }
+
+      // After successful lead creation, geocode customer address and create service address
+      try {
+        const { createOrFindServiceAddress } = await import('@/lib/service-addresses');
+
+        // Fetch customer data to get address
+        const customer = ticket.customer;
+
+        if (customer) {
+          // Try to geocode the customer's address
+          const geocodeResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/internal/geocode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              street: customer.address,
+              city: customer.city,
+              state: customer.state,
+              zip: customer.zip_code
+            })
+          });
+
+          let coordinates = null;
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json();
+            if (geocodeData.success && geocodeData.coordinates) {
+              coordinates = geocodeData.coordinates;
+              console.log('✅ Successfully geocoded customer address:', coordinates);
+            }
+          } else {
+            console.warn('⚠️ Geocoding failed or skipped for customer address');
+          }
+
+          // Create service address with or without coordinates
+          const serviceAddressData: any = {
+            street_address: customer.address || '',
+            city: customer.city || '',
+            state: customer.state || '',
+            zip_code: customer.zip_code || ''
+          };
+
+          // Add coordinates if geocoding was successful
+          if (coordinates) {
+            serviceAddressData.latitude = coordinates.lat;
+            serviceAddressData.longitude = coordinates.lng;
+            serviceAddressData.hasStreetView = coordinates.hasStreetView;
+          }
+
+          // Create or find the service address
+          const serviceAddressResult = await createOrFindServiceAddress(
+            ticket.company_id,
+            serviceAddressData
+          );
+
+          if (serviceAddressResult.success && serviceAddressResult.serviceAddressId) {
+            // Link service address to the lead
+            const { error: linkError } = await supabase
+              .from('leads')
+              .update({ service_address_id: serviceAddressResult.serviceAddressId })
+              .eq('id', newLead.id);
+
+            if (linkError) {
+              console.error('Failed to link service address to lead:', linkError);
+            } else {
+              console.log('✅ Service address linked to lead with coordinates');
+            }
+          }
+        }
+      } catch (serviceAddressError) {
+        // Don't fail the entire request if service address creation fails
+        console.error('Error creating service address for lead:', serviceAddressError);
+      }
+
+      // Update call_record to link it to the newly created lead
+      // This ensures call information shows up on the lead detail page
+      if (ticket.call_record_id) {
+        console.log('🔍 [QUALIFY DEBUG] Attempting to update call_record for new lead:', {
+          call_record_id: ticket.call_record_id,
+          ticket_id: ticket.id,
+          new_lead_id: newLead.id
+        });
+
+        // First, fetch the existing call_record to see what's in it
+        const { data: existingCallRecord, error: fetchError } = await supabase
+          .from('call_records')
+          .select('*')
+          .eq('id', ticket.call_record_id)
+          .single();
+
+        console.log('🔍 [QUALIFY DEBUG] Existing call_record data:', {
+          found: !!existingCallRecord,
+          call_record: existingCallRecord ? {
+            id: existingCallRecord.id,
+            call_id: existingCallRecord.call_id,
+            ticket_id: existingCallRecord.ticket_id,
+            lead_id: existingCallRecord.lead_id,
+            customer_id: existingCallRecord.customer_id
+          } : null,
+          fetchError: fetchError ? {
+            code: fetchError.code,
+            message: fetchError.message
+          } : null
+        });
+
+        // Update by call_record ID instead of ticket_id to ensure we update the right record
+        // Use admin client to bypass RLS for updating call_records
+        const adminSupabase = createAdminClient();
+        const { data: updateResult, error: callRecordUpdateError } = await adminSupabase
+          .from('call_records')
+          .update({ lead_id: newLead.id })
+          .eq('id', ticket.call_record_id)
+          .select();
+
+        if (callRecordUpdateError) {
+          console.error('❌ [QUALIFY DEBUG] Failed to update call_record with lead_id:', callRecordUpdateError);
+          // Don't fail the request - the lead was created successfully
+        } else {
+          console.log('✅ [QUALIFY DEBUG] Successfully updated call_record:', {
+            updatedRecords: updateResult?.length || 0,
+            records: updateResult
+          });
+        }
+      } else {
+        console.log('⚠️ [QUALIFY DEBUG] No call_record_id found on ticket for new lead creation');
       }
 
       // Create assignment notification if lead was assigned to someone

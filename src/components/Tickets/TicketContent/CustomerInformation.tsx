@@ -1,18 +1,21 @@
 import React, { useState } from 'react'
 import { User } from 'lucide-react'
 import { Ticket } from '@/types/ticket'
+import { authenticatedFetch } from '@/lib/api-client'
 import styles from './CustomerInformation.module.scss'
 
 interface CustomerInformationProps {
   ticket: Ticket
   isEditable?: boolean
   onUpdate?: (customerData: any) => void
+  isAdmin?: boolean
 }
 
 export default function CustomerInformation({
   ticket,
   isEditable = false,
-  onUpdate
+  onUpdate,
+  isAdmin = false
 }: CustomerInformationProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState({
@@ -38,9 +41,33 @@ export default function CustomerInformation({
     return parts.length > 0 ? parts.join(', ') : 'No address'
   }
 
-  const handleSave = () => {
-    onUpdate?.(editData)
-    setIsEditing(false)
+  const handleSave = async () => {
+    if (!ticket.customer?.id) {
+      console.error('No customer ID available')
+      return
+    }
+
+    try {
+      // Use admin API if user is admin, otherwise use regular API
+      const apiPath = isAdmin
+        ? `/api/admin/customers/${ticket.customer.id}`
+        : `/api/customers/${ticket.customer.id}`
+
+      // Update customer information
+      await authenticatedFetch(apiPath, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editData),
+      })
+
+      // Call the onUpdate callback if provided
+      onUpdate?.(editData)
+      setIsEditing(false)
+    } catch (error) {
+      console.error('Error updating customer:', error)
+    }
   }
 
   const handleCancel = () => {

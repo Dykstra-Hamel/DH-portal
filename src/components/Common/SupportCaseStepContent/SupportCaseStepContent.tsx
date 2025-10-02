@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { SupportCase, supportCaseIssueTypeOptions, supportCasePriorityOptions } from '@/types/support-case';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
+import { ContactInformationCard } from '@/components/Common/ContactInformationCard/ContactInformationCard';
+import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
@@ -635,222 +637,24 @@ export function SupportCaseStepContent({
       </div>
 
       <div className={styles.contentRight}>
-        {/* Contact Information InfoCard - Exact copy from LeadStepContent */}
-        <InfoCard
-          title="Contact Information"
-          icon={<SquareUserRound size={20} />}
-          startExpanded={false}
-        >
-          <div className={styles.cardContent}>
-            {supportCase.customer ? (
-              <div className={styles.callInsightsGrid}>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Name</span>
-                  <span className={cardStyles.dataText}>
-                    {`${supportCase.customer.first_name} ${supportCase.customer.last_name}`.trim()}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Phone Number</span>
-                  <span className={cardStyles.dataText}>
-                    {supportCase.customer.phone || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Email</span>
-                  <span className={cardStyles.dataText}>
-                    {supportCase.customer.email || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Address</span>
-                  <span className={cardStyles.dataText}>
-                    {supportCase.customer.address || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>City</span>
-                  <span className={cardStyles.dataText}>
-                    {supportCase.customer.city || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>State</span>
-                  <span className={cardStyles.dataText}>
-                    {supportCase.customer.state || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Zip Code</span>
-                  <span className={cardStyles.dataText}>
-                    {supportCase.customer.zip_code || 'Not provided'}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <p>No customer information available.</p>
-            )}
-          </div>
-        </InfoCard>
+        <ContactInformationCard customer={supportCase.customer || null} />
 
-        {/* Service Location InfoCard */}
-        <InfoCard
-          title="Service Location"
-          icon={<MapPinned size={20} />}
-          startExpanded={false}
-        >
-          <div className={styles.cardContent}>
-            <div className={styles.serviceLocationGrid}>
-              {/* Row 1: City, State, Zip (3 columns) */}
-              <div className={`${styles.gridRow} ${styles.threeColumns}`}>
-                <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>City</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.city}
-                    onChange={e =>
-                      handleServiceLocationChange('city', e.target.value)
-                    }
-                    placeholder="Anytown"
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>State</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.state}
-                    onChange={e =>
-                      handleServiceLocationChange('state', e.target.value)
-                    }
-                    placeholder="CA"
-                    maxLength={2}
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>Zip</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={serviceLocationData.zip_code}
-                    onChange={e =>
-                      handleServiceLocationChange('zip_code', e.target.value)
-                    }
-                    placeholder="12345"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Address (1 column - full width) */}
-              <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-                <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>Address</label>
-                  <AddressAutocomplete
-                    value={serviceLocationData.street_address}
-                    onChange={value =>
-                      handleServiceLocationChange('street_address', value)
-                    }
-                    onAddressSelect={handleAddressSelect}
-                    placeholder="324 Winston Churchill Drive, Suite #34"
-                    hideDropdown={hasCompleteUnchangedAddress}
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Size of Home, Yard Size (2 columns) */}
-              <div className={`${styles.gridRow} ${styles.twoColumns}`}>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={cardStyles.inputLabels}>Size of Home</label>
-                  </div>
-                  <select
-                    className={styles.selectInput}
-                    value={selectedHomeSizeOption}
-                    onChange={e => {
-                      setSelectedHomeSizeOption(e.target.value);
-                      const option = homeSizeOptions.find(opt => opt.value === e.target.value);
-                      if (option) {
-                        setHomeSize(option.rangeStart);
-                      }
-                    }}
-                  >
-                    <option value="">Select home size</option>
-                    {homeSizeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={cardStyles.inputLabels}>Yard Size</label>
-                  </div>
-                  <select
-                    className={styles.selectInput}
-                    value={selectedYardSizeOption}
-                    onChange={e => {
-                      setSelectedYardSizeOption(e.target.value);
-                      const option = yardSizeOptions.find(opt => opt.value === e.target.value);
-                      if (option) {
-                        setYardSize(option.rangeStart);
-                      }
-                    }}
-                  >
-                    <option value="">Select yard size</option>
-                    {yardSizeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 4: Street View Image (1 column - full width) */}
-              <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-                <div className={styles.streetViewContainer}>
-                  <StreetViewImage
-                    address={currentFormattedAddress}
-                    latitude={serviceLocationData.latitude}
-                    longitude={serviceLocationData.longitude}
-                    width={600}
-                    height={240}
-                    className={styles.streetViewImage}
-                    showPlaceholder={
-                      !currentFormattedAddress && !serviceLocationData.latitude
-                    }
-                    fallbackToSatellite={true}
-                    hasStreetView={serviceLocationData.hasStreetView}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Save/Cancel Address Changes */}
-            {hasAddressChanges && (
-              <div className={styles.addressActions}>
-                <div className={styles.actionButtons}>
-                  <button
-                    className={`${styles.button} ${styles.cancelButton}`}
-                    onClick={handleCancelAddressChanges}
-                    disabled={isSavingAddress}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className={`${styles.button} ${styles.saveButton}`}
-                    onClick={handleSaveAddress}
-                    disabled={!hasAddressChanges || isSavingAddress}
-                  >
-                    {isSavingAddress ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </InfoCard>
+        <ServiceLocationCard
+          serviceAddress={supportCase.primary_service_address || null}
+          showSizeInputs
+          pricingSettings={pricingSettings || undefined}
+          onShowToast={onShowToast}
+          editable={true}
+          onAddressSelect={handleAddressSelect}
+          onSaveAddress={handleSaveAddress}
+          onCancelAddress={handleCancelAddressChanges}
+          hasAddressChanges={hasAddressChanges}
+          isSavingAddress={isSavingAddress}
+          serviceLocationData={serviceLocationData}
+          onServiceLocationChange={handleServiceLocationChange}
+          hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
+          currentFormattedAddress={currentFormattedAddress}
+        />
       </div>
     </>
   );

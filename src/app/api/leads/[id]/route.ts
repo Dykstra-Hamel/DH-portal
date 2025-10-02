@@ -82,16 +82,33 @@ export async function GET(
     }
 
     // Get call record separately using lead_id foreign key
+    console.log('🔍 [LEAD API DEBUG] Querying call_records for lead:', {
+      leadId: id,
+      queryMethod: 'by lead_id'
+    });
+
     const { data: callRecord, error: callError } = await supabase
       .from('call_records')
       .select('*')
       .eq('lead_id', id)
       .single();
 
-    console.log('Call record query results:', {
+    console.log('🔍 [LEAD API DEBUG] Call record query results:', {
       leadId: id,
-      callRecord,
-      callError,
+      callRecord: callRecord ? {
+        id: callRecord.id,
+        call_id: callRecord.call_id,
+        lead_id: callRecord.lead_id,
+        ticket_id: callRecord.ticket_id,
+        agent_id: callRecord.agent_id,
+        has_transcript: !!callRecord.transcript,
+        has_recording: !!callRecord.recording_url
+      } : null,
+      callError: callError ? {
+        code: callError.code,
+        message: callError.message,
+        details: callError.details
+      } : null,
       hasCallRecord: !!callRecord
     });
 
@@ -387,16 +404,33 @@ export async function PUT(
     }
 
     // Get call record separately using lead_id foreign key
+    console.log('🔍 [LEAD API PUT DEBUG] Querying call_records for lead:', {
+      leadId: id,
+      queryMethod: 'by lead_id'
+    });
+
     const { data: callRecord, error: callError } = await supabase
       .from('call_records')
       .select('*')
       .eq('lead_id', id)
       .single();
 
-    console.log('Call record query results:', {
+    console.log('🔍 [LEAD API PUT DEBUG] Call record query results:', {
       leadId: id,
-      callRecord,
-      callError,
+      callRecord: callRecord ? {
+        id: callRecord.id,
+        call_id: callRecord.call_id,
+        lead_id: callRecord.lead_id,
+        ticket_id: callRecord.ticket_id,
+        agent_id: callRecord.agent_id,
+        has_transcript: !!callRecord.transcript,
+        has_recording: !!callRecord.recording_url
+      } : null,
+      callError: callError ? {
+        code: callError.code,
+        message: callError.message,
+        details: callError.details
+      } : null,
       hasCallRecord: !!callRecord
     });
 
