@@ -53,7 +53,7 @@ const formatAddress = (ticket: Ticket): string => {
     const parts = [
       ticket.service_address.city,
       ticket.service_address.state,
-      ticket.service_address.zip_code
+      ticket.service_address.zip_code,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : 'N/A';
   }
@@ -63,7 +63,7 @@ const formatAddress = (ticket: Ticket): string => {
     const parts = [
       ticket.customer.city,
       ticket.customer.state,
-      ticket.customer.zip_code
+      ticket.customer.zip_code,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : 'N/A';
   }
@@ -304,11 +304,12 @@ export const getTicketTabs = (
 ): TabDefinition<Ticket>[] => [
   {
     key: 'all',
-    label: 'All Tickets',
+    label: 'All Incoming',
     filter: (tickets: Ticket[]) =>
       tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived),
     getCount: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived).length,
+      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived)
+        .length,
   },
   {
     key: 'incoming_calls',
@@ -367,13 +368,5 @@ export const getTicketTabs = (
           !ticket.archived &&
           ticket.type === 'web_form'
       ).length,
-  },
-  {
-    key: 'junk',
-    label: 'Junk',
-    filter: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.archived === true),
-    getCount: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.archived === true).length,
   },
 ];

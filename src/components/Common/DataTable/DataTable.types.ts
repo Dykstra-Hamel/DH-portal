@@ -46,6 +46,9 @@ export interface DataTableProps<T> {
   onLoadMore?: () => void;
   loadingMore?: boolean;
 
+  // Search
+  searchEnabled?: boolean; // Enable/disable search (default: true)
+  searchPlaceholder?: string; // Placeholder text for search input
 
   // Custom components
   customComponents?: {
