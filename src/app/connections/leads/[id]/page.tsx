@@ -471,7 +471,14 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  const fetchLead = useCallback(async () => {
+  const fetchLead = useCallback(async (updatedLead?: Lead) => {
+    // If we have an updated lead passed in (optimistic update), use it directly
+    if (updatedLead) {
+      setLead(updatedLead);
+      return;
+    }
+
+    // Otherwise fetch from API
     if (!leadId) return;
 
     try {

@@ -62,6 +62,12 @@ export async function GET(request: NextRequest) {
           property_notes,
           home_size_range,
           yard_size_range
+        ),
+        reviewed_by_profile:profiles!reviewed_by(
+          id,
+          first_name,
+          last_name,
+          email
         )
       `
       )

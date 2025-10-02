@@ -6,11 +6,18 @@ import { QuoteSummaryCard } from '@/components/Common/QuoteSummaryCard/QuoteSumm
 import { SalesCadenceCard } from '@/components/Common/SalesCadenceCard/SalesCadenceCard';
 import { ContactInformationCard } from '@/components/Common/ContactInformationCard/ContactInformationCard';
 import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
+import CustomerInformation from '@/components/Tickets/TicketContent/CustomerInformation';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { useQuoteRealtime } from '@/hooks/useQuoteRealtime';
 import { authenticatedFetch, adminAPI } from '@/lib/api-client';
+import {
+  createCustomerChannel,
+  broadcastCustomerUpdate,
+  removeCustomerChannel,
+  subscribeToCustomerUpdates,
+} from '@/lib/realtime/customer-channel';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import {
   AddressAutocomplete,
@@ -51,7 +58,7 @@ import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 interface LeadStepContentProps {
   lead: Lead;
   isAdmin: boolean;
-  onLeadUpdate?: () => void;
+  onLeadUpdate?: (updatedLead?: Lead) => void;
   onShowToast?: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -68,9 +75,22 @@ export function LeadStepContent({
   const [isAssigning, setIsAssigning] = useState(false);
   const [showCallSummary, setShowCallSummary] = useState(false);
 
+  // Create a ticket-like object for the CustomerInformation component
+  // Include lead.customer in dependencies to update when customer data changes
+  const createTicketFromLead = useMemo(() => {
+    return {
+      id: lead.id,
+      customer: lead.customer || undefined,
+      company_id: lead.company_id,
+      created_at: lead.created_at,
+      updated_at: lead.updated_at,
+    } as any;
+  }, [lead.id, lead.customer, lead.company_id, lead.created_at, lead.updated_at]);
+
   // Refs
   const pestDropdownRef = useRef<HTMLDivElement>(null);
   const additionalPestDropdownRef = useRef<HTMLDivElement>(null);
+  const customerChannelRef = useRef<any>(null);
 
   // Service Location form state
   const [serviceLocationData, setServiceLocationData] =
@@ -221,6 +241,35 @@ export function LeadStepContent({
       setSelectedAssignee(user.id);
     }
   }, [user?.id, selectedAssignee]);
+
+  // Set up customer realtime channel for broadcasting updates
+  useEffect(() => {
+    if (!lead.customer?.id) {
+      // Clean up existing channel if no customer
+      if (customerChannelRef.current) {
+        removeCustomerChannel(customerChannelRef.current);
+        customerChannelRef.current = null;
+      }
+      return;
+    }
+
+    // Create customer channel for broadcasting
+    const channel = createCustomerChannel(lead.customer.id);
+    customerChannelRef.current = channel;
+
+    // Must subscribe to the channel before we can broadcast on it
+    subscribeToCustomerUpdates(channel, () => {
+      // Empty callback - channel subscription required for broadcasting
+    });
+
+    // Cleanup on unmount or when customer ID changes
+    return () => {
+      if (customerChannelRef.current) {
+        removeCustomerChannel(customerChannelRef.current);
+        customerChannelRef.current = null;
+      }
+    };
+  }, [lead.customer?.id]);
 
   // Close pest dropdowns on click outside
   useEffect(() => {
@@ -2017,58 +2066,45 @@ export function LeadStepContent({
           icon={<SquareUserRound size={20} />}
           startExpanded={false}
         >
-          <div className={styles.cardContent}>
-            {lead.customer ? (
-              <div className={styles.callInsightsGrid}>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Name</span>
-                  <span className={cardStyles.dataText}>
-                    {`${lead.customer.first_name} ${lead.customer.last_name}`.trim()}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Phone Number</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.customer.phone || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Email</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.customer.email || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Customer Status</span>
-                  <span className={cardStyles.dataText}>
-                    {capitalizeFirst(lead.customer.customer_status)}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Created At</span>
-                  <span className={cardStyles.dataText}>
-                    {new Date(lead.customer.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Updated At</span>
-                  <span className={cardStyles.dataText}>
-                    {new Date(lead.customer.updated_at).toLocaleDateString()}
-                  </span>
-                </div>
-                {lead.customer.notes && (
-                  <div className={styles.callDetailItem}>
-                    <span className={cardStyles.dataLabel}>Notes</span>
-                    <span className={cardStyles.dataText}>
-                      {lead.customer.notes}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p>No customer information available.</p>
-            )}
-          </div>
+          <CustomerInformation
+            ticket={createTicketFromLead}
+            onUpdate={async (updatedCustomer) => {
+              // Update the lead's customer data optimistically
+              if (lead.customer && updatedCustomer) {
+                // Merge the updated customer data into the lead
+                const updatedLead = {
+                  ...lead,
+                  customer: {
+                    ...lead.customer,
+                    ...updatedCustomer,
+                  },
+                };
+
+                // Call onLeadUpdate with the updated lead data
+                // This will update the parent state without a full page reload
+                if (onLeadUpdate) {
+                  onLeadUpdate(updatedLead);
+                }
+
+                // Broadcast the customer update via realtime channel
+                if (customerChannelRef.current && lead.customer.id) {
+                  await broadcastCustomerUpdate(customerChannelRef.current, {
+                    customer_id: lead.customer.id,
+                    first_name: updatedCustomer.first_name,
+                    last_name: updatedCustomer.last_name,
+                    email: updatedCustomer.email,
+                    phone: updatedCustomer.phone,
+                    updated_by: user?.id,
+                    timestamp: new Date().toISOString(),
+                  });
+                }
+              }
+
+              if (onShowToast) {
+                onShowToast('Customer information updated successfully.', 'success');
+              }
+            }}
+          />
         </InfoCard>
 
         <ServiceLocationCard
@@ -2346,58 +2382,45 @@ export function LeadStepContent({
           icon={<SquareUserRound size={20} />}
           startExpanded={false}
         >
-          <div className={styles.cardContent}>
-            {lead.customer ? (
-              <div className={styles.callInsightsGrid}>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Name</span>
-                  <span className={cardStyles.dataText}>
-                    {`${lead.customer.first_name} ${lead.customer.last_name}`.trim()}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Phone Number</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.customer.phone || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Email</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.customer.email || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Customer Status</span>
-                  <span className={cardStyles.dataText}>
-                    {capitalizeFirst(lead.customer.customer_status)}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Created At</span>
-                  <span className={cardStyles.dataText}>
-                    {new Date(lead.customer.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Updated At</span>
-                  <span className={cardStyles.dataText}>
-                    {new Date(lead.customer.updated_at).toLocaleDateString()}
-                  </span>
-                </div>
-                {lead.customer.notes && (
-                  <div className={styles.callDetailItem}>
-                    <span className={cardStyles.dataLabel}>Notes</span>
-                    <span className={cardStyles.dataText}>
-                      {lead.customer.notes}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p>No customer information available.</p>
-            )}
-          </div>
+          <CustomerInformation
+            ticket={createTicketFromLead}
+            onUpdate={async (updatedCustomer) => {
+              // Update the lead's customer data optimistically
+              if (lead.customer && updatedCustomer) {
+                // Merge the updated customer data into the lead
+                const updatedLead = {
+                  ...lead,
+                  customer: {
+                    ...lead.customer,
+                    ...updatedCustomer,
+                  },
+                };
+
+                // Call onLeadUpdate with the updated lead data
+                // This will update the parent state without a full page reload
+                if (onLeadUpdate) {
+                  onLeadUpdate(updatedLead);
+                }
+
+                // Broadcast the customer update via realtime channel
+                if (customerChannelRef.current && lead.customer.id) {
+                  await broadcastCustomerUpdate(customerChannelRef.current, {
+                    customer_id: lead.customer.id,
+                    first_name: updatedCustomer.first_name,
+                    last_name: updatedCustomer.last_name,
+                    email: updatedCustomer.email,
+                    phone: updatedCustomer.phone,
+                    updated_by: user?.id,
+                    timestamp: new Date().toISOString(),
+                  });
+                }
+              }
+
+              if (onShowToast) {
+                onShowToast('Customer information updated successfully.', 'success');
+              }
+            }}
+          />
         </InfoCard>
 
         <ServiceLocationCard
@@ -3543,58 +3566,45 @@ export function LeadStepContent({
           icon={<SquareUserRound size={20} />}
           startExpanded={false}
         >
-          <div className={styles.cardContent}>
-            {lead.customer ? (
-              <div className={styles.callInsightsGrid}>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Name</span>
-                  <span className={cardStyles.dataText}>
-                    {`${lead.customer.first_name} ${lead.customer.last_name}`.trim()}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Phone Number</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.customer.phone || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Email</span>
-                  <span className={cardStyles.dataText}>
-                    {lead.customer.email || 'Not provided'}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Customer Status</span>
-                  <span className={cardStyles.dataText}>
-                    {capitalizeFirst(lead.customer.customer_status)}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Created At</span>
-                  <span className={cardStyles.dataText}>
-                    {new Date(lead.customer.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Updated At</span>
-                  <span className={cardStyles.dataText}>
-                    {new Date(lead.customer.updated_at).toLocaleDateString()}
-                  </span>
-                </div>
-                {lead.customer.notes && (
-                  <div className={styles.callDetailItem}>
-                    <span className={cardStyles.dataLabel}>Notes</span>
-                    <span className={cardStyles.dataText}>
-                      {lead.customer.notes}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p>No customer information available.</p>
-            )}
-          </div>
+          <CustomerInformation
+            ticket={createTicketFromLead}
+            onUpdate={async (updatedCustomer) => {
+              // Update the lead's customer data optimistically
+              if (lead.customer && updatedCustomer) {
+                // Merge the updated customer data into the lead
+                const updatedLead = {
+                  ...lead,
+                  customer: {
+                    ...lead.customer,
+                    ...updatedCustomer,
+                  },
+                };
+
+                // Call onLeadUpdate with the updated lead data
+                // This will update the parent state without a full page reload
+                if (onLeadUpdate) {
+                  onLeadUpdate(updatedLead);
+                }
+
+                // Broadcast the customer update via realtime channel
+                if (customerChannelRef.current && lead.customer.id) {
+                  await broadcastCustomerUpdate(customerChannelRef.current, {
+                    customer_id: lead.customer.id,
+                    first_name: updatedCustomer.first_name,
+                    last_name: updatedCustomer.last_name,
+                    email: updatedCustomer.email,
+                    phone: updatedCustomer.phone,
+                    updated_by: user?.id,
+                    timestamp: new Date().toISOString(),
+                  });
+                }
+              }
+
+              if (onShowToast) {
+                onShowToast('Customer information updated successfully.', 'success');
+              }
+            }}
+          />
         </InfoCard>
 
         <ServiceLocationCard

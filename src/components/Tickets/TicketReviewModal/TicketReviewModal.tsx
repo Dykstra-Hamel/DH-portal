@@ -29,6 +29,11 @@ import {
   CallDetails,
   ServiceLocation,
 } from '@/components/Tickets/TicketContent';
+import {
+  createTicketReviewChannel,
+  broadcastTicketReviewUpdate,
+  subscribeToTicketReviewUpdates,
+} from '@/lib/realtime/ticket-review-channel';
 import styles from './TicketReviewModal.module.scss';
 import sectionStyles from '@/components/Tickets/TicketContent/SharedSection.module.scss';
 
@@ -140,9 +145,11 @@ export default function TicketReviewModal({
   const [isAnimating, setIsAnimating] = useState(false);
   const assignmentDropdownRef = useRef<HTMLDivElement>(null);
   const reasonDropdownRef = useRef<HTMLDivElement>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const reviewChannelRef = useRef<any>(null);
 
   // Get current authenticated user
-  const { getDisplayName, getAvatarUrl, getInitials, user } = useUser();
+  const { getDisplayName, getAvatarUrl, getInitials, user, profile } = useUser();
   const router = useRouter();
 
   // Initialize selectedAssignee with current user ID when user is available
@@ -222,6 +229,111 @@ export default function TicketReviewModal({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isAssignmentDropdownOpen, isReasonDropdownOpen]);
+
+  // Manage ticket review status
+  useEffect(() => {
+    if (!isOpen || !ticket.id || !user?.id) return;
+
+    const displayName = getDisplayName();
+
+    // Start review when modal opens
+    const startReview = async () => {
+      try {
+        await authenticatedFetch(`/api/tickets/${ticket.id}/review-status`, {
+          method: 'PUT',
+          body: JSON.stringify({ action: 'start' }),
+        });
+
+        // Set up heartbeat to keep review status alive (every 60 seconds)
+        heartbeatIntervalRef.current = setInterval(async () => {
+          try {
+            await authenticatedFetch(`/api/tickets/${ticket.id}/review-status`, {
+              method: 'PUT',
+              body: JSON.stringify({ action: 'heartbeat' }),
+            });
+          } catch (error) {
+            console.error('Error sending review heartbeat:', error);
+          }
+        }, 60000); // 60 seconds
+
+        // Set up realtime channel
+        const channel = createTicketReviewChannel();
+        reviewChannelRef.current = channel;
+
+        // Subscribe to updates from other users
+        subscribeToTicketReviewUpdates(channel, (payload) => {
+          // Channel will be used by TicketsList to update UI
+        });
+
+        // Broadcast the review start
+        await broadcastTicketReviewUpdate(channel, {
+          ticket_id: ticket.id,
+          reviewed_by: user.id,
+          reviewed_by_name: displayName,
+          reviewed_by_email: user.email || profile?.email || '',
+          reviewed_by_first_name: profile?.first_name,
+          reviewed_by_last_name: profile?.last_name,
+          reviewed_at: new Date().toISOString(),
+          review_expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error('Error starting ticket review:', error);
+      }
+    };
+
+    startReview();
+
+    // Function to end review (used by cleanup and beforeunload)
+    const endReviewStatus = () => {
+      // Clear heartbeat interval
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+
+      // End review status using authenticatedFetch with keepalive
+      // This works better than sendBeacon because it includes auth headers
+      authenticatedFetch(`/api/tickets/${ticket.id}/review-status`, {
+        method: 'PUT',
+        body: JSON.stringify({ action: 'end' }),
+        keepalive: true, // Keeps request alive even if page unloads
+      }).catch(err => {
+        // Errors are expected on page unload, ignore them
+      });
+
+      // Broadcast the review end
+      if (reviewChannelRef.current) {
+        broadcastTicketReviewUpdate(reviewChannelRef.current, {
+          ticket_id: ticket.id,
+          reviewed_by: undefined,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    };
+
+    // Add multiple event handlers for better cleanup coverage
+    const handleBeforeUnload = () => {
+      endReviewStatus();
+    };
+
+    const handleVisibilityChange = () => {
+      // Clear review when tab becomes hidden (user might be closing/navigating)
+      if (document.visibilityState === 'hidden') {
+        endReviewStatus();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Clean up on unmount or modal close
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      endReviewStatus();
+    };
+  }, [isOpen, ticket.id, user?.id]);
 
   const handleClose = () => {
     setStep('review');

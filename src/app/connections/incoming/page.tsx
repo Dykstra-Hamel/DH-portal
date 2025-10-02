@@ -38,6 +38,33 @@ function TicketsPageContent() {
   // Use global company context
   const { selectedCompany } = useCompany();
 
+  // Clean up any stale review statuses on page load
+  useEffect(() => {
+    const cleanupStaleReviews = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user || !selectedCompany?.id) return;
+
+        // Clear any tickets that this user is reviewing but shouldn't be (from interrupted sessions)
+        await supabase
+          .from('tickets')
+          .update({
+            reviewed_by: null,
+            reviewed_at: null,
+            review_expires_at: null,
+          })
+          .eq('reviewed_by', user.id)
+          .eq('company_id', selectedCompany.id);
+      } catch (error) {
+        console.error('Error cleaning up stale reviews:', error);
+      }
+    };
+
+    cleanupStaleReviews();
+  }, [selectedCompany?.id]);
+
   // Register page actions for global header
   const { registerPageAction, unregisterPageAction } = usePageActions();
 

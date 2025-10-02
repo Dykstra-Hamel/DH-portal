@@ -386,6 +386,21 @@
   }
 }
 
+.reviewingStatus {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 8px;
+}
+
+.reviewingText {
+  color: var(--action-500);
+  font-size: 14px;
+  font-weight: 500;
+}
+
 .salesIcon,
 .salesIcon path,
 .supportIcon,
