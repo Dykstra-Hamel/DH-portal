@@ -223,14 +223,6 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
   const agentIdValue =
     agent_id || retell_llm_id || callData.llm_id || callData.agent_id;
 
-  console.log('🔍 [WEBHOOK DEBUG] Agent ID extraction:', {
-    agent_id,
-    retell_llm_id,
-    llm_id: callData.llm_id,
-    agent_id_from_data: callData.agent_id,
-    final_agentIdValue: agentIdValue
-  });
-
   const { company_id: companyId, agent_direction } = await findCompanyAndDirectionByAgentId(agentIdValue);
 
   if (!companyId) {
@@ -297,18 +289,10 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     }
   } else {
     customerId = existingCustomer.id;
-    console.log('🏠 [DEBUG] Existing customer found:', {
-      customer_id: customerId,
-      address: existingCustomer.address,
-      city: existingCustomer.city,
-      state: existingCustomer.state,
-      zip_code: existingCustomer.zip_code
-    });
-    
+
     // Use existing customer address if available
     if (existingCustomer.address) {
       customerAddress = existingCustomer.address;
-      console.log('✅ [DEBUG] Using existing customer address:', customerAddress);
     } else {
       // Format address from customer address components if address field is empty
       const addressComponents = [
@@ -316,12 +300,9 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
         existingCustomer.state,
         existingCustomer.zip_code
       ].filter(Boolean);
-      
+
       if (addressComponents.length > 0) {
         customerAddress = addressComponents.join(', ');
-        console.log('🔧 [DEBUG] Built address from components:', customerAddress);
-      } else {
-        console.log('⚠️ [DEBUG] No address data available for existing customer');
       }
     }
   }
@@ -353,21 +334,6 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
 
   // Extract data (will be mostly empty until call_analyzed event)
   const extractedData = extractCallData(undefined, undefined, retell_llm_dynamic_variables);
-
-  console.log('📍 [DEBUG] Address assignment for call record:', {
-    customerAddress: customerAddress,
-    extractedData_street_address: extractedData.street_address,
-    final_street_address: customerAddress || extractedData.street_address
-  });
-
-  // Create call record with bidirectional ticket relationship
-  console.log('🔍 [WEBHOOK DEBUG] Creating call_record with:', {
-    call_id,
-    ticket_id: newTicket.id,
-    customer_id: customerId,
-    agent_id: agentIdValue,
-    has_agent_id: !!agentIdValue
-  });
 
   const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
@@ -420,16 +386,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       ticketUpdateError.message
     );
     // Don't fail the request - the ticket and call record exist, just not fully linked
-  } else {
-    console.log(`🔗 [${requestId}] Successfully created bidirectional link: ticket ${newTicket.id} ↔ call record ${callRecord.id}`);
   }
-
-  console.log('✅ [WEBHOOK DEBUG] Call record created successfully:', {
-    call_record_id: callRecord.id,
-    ticket_id: callRecord.ticket_id,
-    agent_id: callRecord.agent_id,
-    has_agent_id: !!callRecord.agent_id
-  });
 
   return NextResponse.json({
     success: true,
@@ -569,15 +526,6 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
   if (callRecord.tickets) {
     // Get is_qualified from call analysis (Post-Call Analysis)
     const isQualified = call_analysis?.custom_analysis_data?.is_qualified;
-    
-    // Debug logging for qualification
-    console.log('🔍 [DEBUG] Call Analysis Data:', {
-      call_analysis: call_analysis ? 'Present' : 'Missing',
-      custom_analysis_data: call_analysis?.custom_analysis_data ? 'Present' : 'Missing',
-      is_qualified_value: isQualified,
-      is_qualified_type: typeof isQualified,
-      ticket_id: callRecord.tickets.id
-    });
 
     const updateData: any = {
       description: callRecord.tickets.description || '',
@@ -591,17 +539,8 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     }
 
     // Update ticket status and category based on AI qualification decision
-    console.log('🎯 [DEBUG] Qualification Logic Check:', {
-      isQualified_raw: isQualified,
-      isQualified_string_true: isQualified === 'true',
-      isQualified_boolean_true: isQualified === true,
-      isQualified_string_false: isQualified === 'false',
-      isQualified_boolean_false: isQualified === false
-    });
-
     if (isQualified === 'true' || isQualified === true) {
       // AI determined this is qualified for sales - set category to sales
-      console.log('✅ [DEBUG] Setting ticket as QUALIFIED SALES');
       updateData.type = 'phone_call'; // Keep as phone_call type
       updateData.service_type = 'Sales'; // Set category to Sales
       updateData.status = 'new'; // Set to 'new' as requested
@@ -609,39 +548,27 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         `${updateData.description}\n\n✅ AI Qualification: QUALIFIED - Category set to Sales`.trim();
     } else if (isQualified === 'false' || isQualified === false) {
       // AI determined this is not qualified for sales - set as customer service
-      console.log('❌ [DEBUG] Setting ticket as UNQUALIFIED CUSTOMER SERVICE');
       updateData.service_type = 'Customer Service';
       updateData.status = 'new'; // Set to 'new' as requested
       updateData.description =
         `${updateData.description}\n\n❌ AI Qualification: UNQUALIFIED - Category set to Customer Service`.trim();
     } else {
       // No qualification decision provided - set as new for follow-up
-      console.log('🤷 [DEBUG] No qualification decision - setting as NEW');
       updateData.status = 'new'; // Set to 'new' as requested
     }
 
     // Check action_required and override status if needed
     if (extractedData.action_required === 'false') {
-      console.log('🔒 [DEBUG] action_required is false - setting ticket to CLOSED');
       updateData.status = 'closed';
       updateData.description =
         `${updateData.description}\n\n🔒 Action Required: FALSE - Ticket closed automatically`.trim();
     } else if (extractedData.action_required === 'true') {
-      console.log('🔄 [DEBUG] action_required is true - ticket will remain active for follow-up');
       updateData.description =
         `${updateData.description}\n\n🔄 Action Required: TRUE - Follow-up needed`.trim();
     }
 
     // Add pest_type from extracted data
     updateData.pest_type = extractedData.pest_issue;
-
-    console.log('📝 [DEBUG] Final update data:', {
-      service_type: updateData.service_type,
-      pest_type: updateData.pest_type,
-      status: updateData.status,
-      type: updateData.type,
-      action_required: extractedData.action_required
-    });
 
     await supabase
       .from('tickets')
@@ -954,19 +881,7 @@ async function sendTicketNotificationEmailsIfEnabled(
     // Only send emails for successful conversations where real interaction occurred
     const disconnectionReason = callData.disconnection_reason || callRecord.disconnect_reason;
     const callStatus = callData.call_status || callRecord.call_status;
-    
-    // Debug logging to understand what values we're getting
-    console.log(`[Ticket Notification Emails DEBUG] Call ${callId}:`, {
-      callData_disconnection_reason: callData.disconnection_reason,
-      callRecord_disconnect_reason: callRecord.disconnect_reason,
-      final_disconnectionReason: disconnectionReason,
-      callData_call_status: callData.call_status,
-      callRecord_call_status: callRecord.call_status,
-      final_callStatus: callStatus,
-      disconnectionReasonType: typeof disconnectionReason,
-      disconnectionReasonLength: disconnectionReason?.length
-    });
-    
+
     // Only send emails for successful conversations (user_hangup or agent_hangup)
     // All other reasons indicate unsuccessful calls, transfers, or technical issues
     if (disconnectionReason !== 'user_hangup' && disconnectionReason !== 'agent_hangup') {
@@ -1042,18 +957,6 @@ async function sendTicketNotificationEmailsIfEnabled(
       
       customerData = customer;
     }
-
-    // Debug logging for call summary data extraction
-    console.log(`[Ticket Notification DEBUG] Call ${callId} - Summary extraction:`, {
-      extractedData_summary: extractedData.summary,
-      extractedData_summary_length: extractedData.summary?.length,
-      callData_has_call_analysis: !!callData.call_analysis,
-      callData_call_analysis_call_summary: callData.call_analysis?.call_summary,
-      callData_call_analysis_call_summary_length: callData.call_analysis?.call_summary?.length,
-      callRecord_has_call_analysis: !!callRecord.call_analysis,
-      callRecord_call_analysis_call_summary: callRecord.call_analysis?.call_summary,
-      final_summary_value: extractedData.summary || callData.call_analysis?.call_summary
-    });
 
     // Build call summary data for email
     const callSummaryData: CallSummaryEmailData = {

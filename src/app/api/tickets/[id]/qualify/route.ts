@@ -62,15 +62,6 @@ export async function POST(
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
-    // 🔍 DEBUG: Log ticket data
-    console.log('🔍 [QUALIFY DEBUG] Ticket data:', {
-      ticketId: ticket.id,
-      call_record_id: ticket.call_record_id,
-      hasCallRecordId: !!ticket.call_record_id,
-      qualification: qualification,
-      assignedTo: assignedTo
-    });
-
     // Check user profile to determine if they're a global admin
     const { data: profile } = await supabase
       .from('profiles')
@@ -195,31 +186,18 @@ export async function POST(
 
         // Ensure call_record is linked to the lead (in case it wasn't done previously)
         if (ticket.call_record_id) {
-          console.log('🔍 [QUALIFY DEBUG] Attempting to update call_record for existing lead:', {
-            call_record_id: ticket.call_record_id,
-            ticket_id: ticket.id,
-            lead_id: ticket.converted_to_lead_id
-          });
-
           // Use admin client to bypass RLS for updating call_records
           const adminSupabase = createAdminClient();
-          const { data: updateResult, error: callRecordUpdateError } = await adminSupabase
+          const { error: callRecordUpdateError } = await adminSupabase
             .from('call_records')
             .update({ lead_id: ticket.converted_to_lead_id })
             .eq('id', ticket.call_record_id)
             .select();
 
           if (callRecordUpdateError) {
-            console.error('❌ [QUALIFY DEBUG] Failed to update call_record with lead_id:', callRecordUpdateError);
+            console.error('Failed to update call_record with lead_id:', callRecordUpdateError);
             // Don't fail the request - the lead was updated successfully
-          } else {
-            console.log('✅ [QUALIFY DEBUG] Successfully updated call_record:', {
-              updatedRecords: updateResult?.length || 0,
-              records: updateResult
-            });
           }
-        } else {
-          console.log('⚠️ [QUALIFY DEBUG] No call_record_id found on ticket for existing lead conversion');
         }
 
         return NextResponse.json({
@@ -406,54 +384,18 @@ export async function POST(
       // Update call_record to link it to the newly created lead
       // This ensures call information shows up on the lead detail page
       if (ticket.call_record_id) {
-        console.log('🔍 [QUALIFY DEBUG] Attempting to update call_record for new lead:', {
-          call_record_id: ticket.call_record_id,
-          ticket_id: ticket.id,
-          new_lead_id: newLead.id
-        });
-
-        // First, fetch the existing call_record to see what's in it
-        const { data: existingCallRecord, error: fetchError } = await supabase
-          .from('call_records')
-          .select('*')
-          .eq('id', ticket.call_record_id)
-          .single();
-
-        console.log('🔍 [QUALIFY DEBUG] Existing call_record data:', {
-          found: !!existingCallRecord,
-          call_record: existingCallRecord ? {
-            id: existingCallRecord.id,
-            call_id: existingCallRecord.call_id,
-            ticket_id: existingCallRecord.ticket_id,
-            lead_id: existingCallRecord.lead_id,
-            customer_id: existingCallRecord.customer_id
-          } : null,
-          fetchError: fetchError ? {
-            code: fetchError.code,
-            message: fetchError.message
-          } : null
-        });
-
-        // Update by call_record ID instead of ticket_id to ensure we update the right record
         // Use admin client to bypass RLS for updating call_records
         const adminSupabase = createAdminClient();
-        const { data: updateResult, error: callRecordUpdateError } = await adminSupabase
+        const { error: callRecordUpdateError } = await adminSupabase
           .from('call_records')
           .update({ lead_id: newLead.id })
           .eq('id', ticket.call_record_id)
           .select();
 
         if (callRecordUpdateError) {
-          console.error('❌ [QUALIFY DEBUG] Failed to update call_record with lead_id:', callRecordUpdateError);
+          console.error('Failed to update call_record with lead_id:', callRecordUpdateError);
           // Don't fail the request - the lead was created successfully
-        } else {
-          console.log('✅ [QUALIFY DEBUG] Successfully updated call_record:', {
-            updatedRecords: updateResult?.length || 0,
-            records: updateResult
-          });
         }
-      } else {
-        console.log('⚠️ [QUALIFY DEBUG] No call_record_id found on ticket for new lead creation');
       }
 
       // Create assignment notification if lead was assigned to someone

@@ -1,98 +1,164 @@
-import React, { useState } from 'react'
-import { User } from 'lucide-react'
-import { Ticket } from '@/types/ticket'
-import { authenticatedFetch } from '@/lib/api-client'
-import styles from './CustomerInformation.module.scss'
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Ticket } from '@/types/ticket';
+import { authenticatedFetch } from '@/lib/api-client';
+import styles from './CustomerInformation.module.scss';
 
 interface CustomerInformationProps {
-  ticket: Ticket
-  isEditable?: boolean
-  onUpdate?: (customerData: any) => void
-  isAdmin?: boolean
+  ticket: Ticket;
+  onUpdate?: (customerData: any) => void;
+}
+
+interface FieldState {
+  value: string;
+  isLoading: boolean;
+  hasError: boolean;
+  showSuccess: boolean;
 }
 
 export default function CustomerInformation({
   ticket,
-  isEditable = false,
   onUpdate,
-  isAdmin = false
 }: CustomerInformationProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState({
-    first_name: ticket.customer?.first_name || '',
-    last_name: ticket.customer?.last_name || '',
-    email: ticket.customer?.email || '',
-    phone: ticket.customer?.phone || '',
-    address: ticket.customer?.address || '',
-    city: ticket.customer?.city || '',
-    state: ticket.customer?.state || '',
-    zip_code: ticket.customer?.zip_code || ''
-  })
+  // Initialize form fields with current customer data (contact info only)
+  const [fields, setFields] = useState<Record<string, FieldState>>({
+    first_name: {
+      value: ticket.customer?.first_name || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
+    last_name: {
+      value: ticket.customer?.last_name || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
+    email: {
+      value: ticket.customer?.email || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
+    phone: {
+      value: ticket.customer?.phone || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
+  });
 
-  const formatAddress = () => {
-    if (!ticket.customer) return 'No address'
+  // Store timeout refs for debouncing
+  const timeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
+  const successTimeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
 
-    const parts = []
-    if (ticket.customer.address) parts.push(ticket.customer.address)
-    if (ticket.customer.city) parts.push(ticket.customer.city)
-    if (ticket.customer.state) parts.push(ticket.customer.state)
-    if (ticket.customer.zip_code) parts.push(ticket.customer.zip_code)
+  // Update field state helper
+  const updateFieldState = (
+    fieldName: string,
+    updates: Partial<FieldState>
+  ) => {
+    setFields(prev => ({
+      ...prev,
+      [fieldName]: { ...prev[fieldName], ...updates },
+    }));
+  };
 
-    return parts.length > 0 ? parts.join(', ') : 'No address'
-  }
+  // Auto-save function with debouncing
+  const autoSave = useCallback(
+    async (fieldName: string, value: string) => {
+      if (!ticket.customer?.id) return;
 
-  const handleSave = async () => {
-    if (!ticket.customer?.id) {
-      console.error('No customer ID available')
-      return
+      try {
+        updateFieldState(fieldName, { isLoading: true, hasError: false });
+
+        const updateData = { [fieldName]: value.trim() || null };
+
+        const updatedCustomer = await authenticatedFetch(
+          `/api/customers/${ticket.customer.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+          }
+        );
+
+        updateFieldState(fieldName, {
+          isLoading: false,
+          hasError: false,
+          showSuccess: true,
+        });
+
+        // Hide success indicator after 2 seconds
+        if (successTimeoutRefs.current[fieldName]) {
+          clearTimeout(successTimeoutRefs.current[fieldName]);
+        }
+        successTimeoutRefs.current[fieldName] = setTimeout(() => {
+          updateFieldState(fieldName, { showSuccess: false });
+        }, 2000);
+
+        // Call parent update callback
+        if (onUpdate) {
+          onUpdate(updatedCustomer);
+        }
+      } catch (error) {
+        console.error(`Error updating ${fieldName}:`, error);
+        updateFieldState(fieldName, {
+          isLoading: false,
+          hasError: true,
+          showSuccess: false,
+        });
+
+        // Clear error after 3 seconds
+        setTimeout(() => {
+          updateFieldState(fieldName, { hasError: false });
+        }, 3000);
+      }
+    },
+    [ticket.customer?.id, onUpdate]
+  );
+
+  // Handle field changes with debouncing
+  const handleFieldChange = (fieldName: string, value: string) => {
+    // Update local state immediately for responsive UI
+    updateFieldState(fieldName, { value, showSuccess: false, hasError: false });
+
+    // Clear existing timeout
+    if (timeoutRefs.current[fieldName]) {
+      clearTimeout(timeoutRefs.current[fieldName]);
     }
 
-    try {
-      // Use admin API if user is admin, otherwise use regular API
-      const apiPath = isAdmin
-        ? `/api/admin/customers/${ticket.customer.id}`
-        : `/api/customers/${ticket.customer.id}`
+    // Set new timeout for auto-save (500ms after user stops typing)
+    timeoutRefs.current[fieldName] = setTimeout(() => {
+      autoSave(fieldName, value);
+    }, 500);
+  };
 
-      // Update customer information
-      await authenticatedFetch(apiPath, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editData),
-      })
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(timeoutRefs.current).forEach(clearTimeout);
+      Object.values(successTimeoutRefs.current).forEach(clearTimeout);
+    };
+  }, []);
 
-      // Call the onUpdate callback if provided
-      onUpdate?.(editData)
-      setIsEditing(false)
-    } catch (error) {
-      console.error('Error updating customer:', error)
+  // Field status indicator component
+  const FieldStatusIndicator = ({ fieldName }: { fieldName: string }) => {
+    const field = fields[fieldName];
+
+    if (field.isLoading) {
+      return <Loader2 size={16} className={styles.loadingIcon} />;
     }
-  }
 
-  const handleCancel = () => {
-    setEditData({
-      first_name: ticket.customer?.first_name || '',
-      last_name: ticket.customer?.last_name || '',
-      email: ticket.customer?.email || '',
-      phone: ticket.customer?.phone || '',
-      address: ticket.customer?.address || '',
-      city: ticket.customer?.city || '',
-      state: ticket.customer?.state || '',
-      zip_code: ticket.customer?.zip_code || ''
-    })
-    setIsEditing(false)
-  }
+    if (field.hasError) {
+      return <AlertCircle size={16} className={styles.errorIcon} />;
+    }
 
-  if (isEditing) {
-    return (
-      <div className={`${styles.section} ${styles.editing}`}>
-        <div className={`${styles.sectionHeader} ${isEditing ? styles.editing : ''}`}>
-          <div className={styles.headerLeft}>
-            <User size={20} />
-            <h3>Customer Information</h3>
-          </div>
-        </div>
+    if (field.showSuccess) {
+      return <Check size={16} className={styles.successIcon} />;
+    }
+
+    return null;
+  };
 
   return (
     <div className={styles.section}>

@@ -1,13 +1,21 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import Image from 'next/image'
-import { ChevronDown, LifeBuoy, Users } from 'lucide-react'
-import { Ticket } from '@/types/ticket'
-import { CallRecord } from '@/types/call-record'
-import { authenticatedFetch } from '@/lib/api-client'
-import { useUser } from '@/hooks/useUser'
-import { useAssignableUsers } from '@/hooks/useAssignableUsers'
-import { isAuthorizedAdminSync } from '@/lib/auth-helpers'
-import { getCustomerDisplayName, getPhoneDisplay } from '@/lib/display-utils'
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
+import {
+  ChevronDown,
+  LifeBuoy,
+  Users,
+  Sparkle,
+  ReceiptText,
+  SquareUserRound,
+  MapPinned,
+  ChevronRight,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Ticket } from '@/types/ticket';
+import { CallRecord } from '@/types/call-record';
+import { authenticatedFetch } from '@/lib/api-client';
+import { useUser } from '@/hooks/useUser';
+import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import {
   Modal,
   ModalTop,
@@ -134,8 +142,8 @@ export default function TicketReviewModal({
   const reasonDropdownRef = useRef<HTMLDivElement>(null);
 
   // Get current authenticated user
-  const { getDisplayName, getAvatarUrl, getInitials, user, profile } = useUser()
-  const isAdmin = profile ? isAuthorizedAdminSync(profile) : false
+  const { getDisplayName, getAvatarUrl, getInitials, user } = useUser();
+  const router = useRouter();
 
   // Initialize selectedAssignee with current user ID when user is available
   useEffect(() => {
@@ -436,9 +444,11 @@ export default function TicketReviewModal({
           break;
         case 'spam':
           newServiceType = 'Spam';
+          animateToStep('review');
           break;
         case 'other':
           newServiceType = 'Other';
+          animateToStep('review');
           break;
         default:
           newServiceType = 'Sales';
@@ -857,58 +867,51 @@ export default function TicketReviewModal({
       className={`${styles.ticketModal}`}
     >
       <ModalTop title="Review Ticket" onClose={handleClose} />
-        <ModalMiddle className={styles.modalContent}>
-          <div style={{ display: 'flex', gap: '16px', width: '100%', alignItems: 'stretch' }}>
-            {/* Left Section - Customer Information */}
-            <div style={{ flex: 1, display: 'flex' }}>
-              <div className={sectionStyles.section} style={{ flex: 1 }}>
-                <div className={sectionStyles.sectionHeader}>
-                  <div className={sectionStyles.headerLeft}>
-                    {getQualificationIcon()}
-                    <h3>
-                      {selectedQualification === 'sales' ? 'New Qualified Sales Lead' : 'New Support Ticket'}
-                    </h3>
-                  </div>
-                </div>
-                <div className={sectionStyles.infoGrid}>
-                  <div className={sectionStyles.infoRow}>
-                    <div className={sectionStyles.infoField}>
-                      <span className={sectionStyles.label}>Customer Name</span>
-                      <span className={sectionStyles.value}>
-                        {getCustomerDisplayName(ticket.customer)}
-                      </span>
-                    </div>
-                    <div className={sectionStyles.infoField}>
-                      <span className={sectionStyles.label}>Primary Phone</span>
-                      <span className={sectionStyles.value}>
-                        {getPhoneDisplay(ticket.customer?.phone)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={sectionStyles.infoRow}>
-                    <div className={sectionStyles.infoField}>
-                      <span className={sectionStyles.label}>Sentiment</span>
-                      <span className={sectionStyles.value}>{callRecord?.sentiment || 'Neutral'}</span>
-                    </div>
-                    <div className={sectionStyles.infoField}>
-                      <span className={sectionStyles.label}>Source</span>
-                      <span className={sectionStyles.value}>
-                        {ticket.source === 'google_cpc' ? 'Paid Advertisement' :
-                         ticket.source === 'organic' ? 'Organic' :
-                         ticket.source === 'referral' ? 'Referral' :
-                         'Other'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={sectionStyles.infoRow}>
-                    <div className={sectionStyles.infoField}>
-                      <span className={sectionStyles.label}>Primary Pest Issue</span>
-                      <span className={sectionStyles.value}>{callRecord?.pest_issue || ticket.pest_type || 'Not specified'}</span>
-                    </div>
-                    <div className={sectionStyles.infoField}>
-                      <span className={sectionStyles.label}>Preferred Service Time</span>
-                      <span className={sectionStyles.value}>{callRecord?.preferred_service_time || 'Anytime'}</span>
-                    </div>
+
+      <ModalMiddle className={styles.modalContent}>
+        <div className={styles.ticketSummarySection}>
+          <div className={styles.ticketSummary}>
+            <h2 className={styles.ticketSummaryName}>
+              {ticket.customer
+                ? `${ticket.customer.first_name} ${ticket.customer.last_name}`
+                : 'Unknown Customer'}
+            </h2>
+            <p>{ticket.customer?.phone || 'Phone not provided'}</p>
+            {/* Show service address if available, otherwise fall back to customer address */}
+            {ticket.service_address ? (
+              <>
+                <p>{ticket.service_address.street_address}</p>
+                <p>
+                  {ticket.service_address.city}, {ticket.service_address.state}{' '}
+                  {ticket.service_address.zip_code}
+                </p>
+              </>
+            ) : (
+              <>
+                <p>{ticket.customer?.address || 'Address not provided'}</p>
+                <p>
+                  {ticket.customer?.city}
+                  {ticket.customer?.state} {ticket.customer?.zip_code}
+                </p>
+              </>
+            )}
+          </div>
+          <div className={styles.reviewerSection}>
+            <span className={styles.reviewingText}>Reviewing</span>
+            <div className={styles.reviewerInfo}>
+              <div className={styles.avatarContainer}>
+                {currentUser.avatar ? (
+                  <Image
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    width={32}
+                    height={32}
+                    className={styles.avatar}
+                  />
+                ) : (
+                  <div className={styles.avatarInitials}>
+                    {currentUser.initials ||
+                      currentUser.name.charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
@@ -1086,78 +1089,7 @@ export default function TicketReviewModal({
             isLoading={isQualifying}
             loadingText="Processing..."
           />
-        </ModalBottom>
-      </Modal>
-    )
-  }
-
-  return (
-    <Modal isOpen={isOpen} onClose={handleClose} className={`${styles.ticketModal} ${isAnimating ? styles.stepTransition : ''}`}>
-        <ModalTop
-          title="Review Ticket"
-          dropdown={renderDropdown()}
-          reviewer={currentUser}
-        />
-
-      <ModalMiddle className={styles.modalContent}>
-        <div className={styles.contentGrid}>
-          <div className={styles.leftColumn}>
-            <CustomerInformation
-              ticket={ticket}
-              isEditable={true}
-              isAdmin={isAdmin}
-              onUpdate={(_customerData) => {
-                if (onSuccess) {
-                  onSuccess('The ticket was successfully updated.')
-                }
-              }}
-            />
-
-            <CallInsights
-              ticket={ticket}
-              callRecord={callRecord}
-              isEditable={true}
-              onUpdate={(_insightsData) => {
-                if (onSuccess) {
-                  onSuccess('The ticket was successfully updated.')
-                }
-              }}
-            />
-          </div>
-
-          <div className={styles.rightColumn}>
-            <CallDetails
-              ticket={ticket}
-              callRecord={callRecord}
-            />
-
-            {loadingCallRecord && (
-              <div className={styles.loadingMessage}>
-                Loading call details...
-              </div>
-            )}
-          </div>
-        </div>
-      </ModalMiddle>
-
-      <ModalBottom>
-        <ModalActionButtons
-          onBack={handleClose}
-          showBackButton={true}
-          isFirstStep={true}
-          onJunk={handleJunk}
-          onAddTask={() => {
-            // TODO: Implement add task functionality
-          }}
-          onPrimaryAction={handleApprove}
-          primaryButtonText={`Approve ${getQualificationLabel()}`}
-          primaryButtonIcon={getQualificationIcon()}
-          primaryButtonDisabled={false}
-          isLoading={isQualifying}
-          loadingText="Processing..."
-          addTaskDisabled={true}
-          junkDisabled={isQualifying}
-        />
+        )}
       </ModalBottom>
     </Modal>
   );
