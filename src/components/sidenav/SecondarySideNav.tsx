@@ -336,15 +336,14 @@ export function SecondarySideNav({
           {
             items: [
               {
-                text: 'Tickets',
-                href: '/connections/tickets',
+                text: 'Incoming',
+                href: '/connections/incoming',
                 count: counts.tickets,
                 countType: 'tickets',
                 showRedDot:
                   newItemIndicators.tickets &&
-                  pathname !== '/connections/tickets' &&
-                  !pathname.startsWith('/connections/tickets/') &&
-                  !pathname.startsWith('/tickets/') &&
+                  pathname !== '/connections/incoming' &&
+                  !pathname.startsWith('/connections/incoming/') &&
                   !pathname.startsWith('/connections/calls-and-forms'),
               },
               {
@@ -465,9 +464,8 @@ export function SecondarySideNav({
                 {group.items.map(item => {
                   const isActive =
                     pathname === item.href ||
-                    (item.href === '/connections/tickets' &&
-                      (pathname.startsWith('/connections/tickets') ||
-                        pathname.startsWith('/tickets') ||
+                    (item.href === '/connections/incoming' &&
+                      (pathname.startsWith('/connections/incoming') ||
                         pathname.startsWith('/connections/calls-and-forms'))) ||
                     (item.href.startsWith('/connections/') &&
                       pathname.startsWith(item.href));

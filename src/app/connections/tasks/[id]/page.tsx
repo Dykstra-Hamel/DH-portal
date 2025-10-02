@@ -18,7 +18,14 @@ import {
   Clock,
   AlertCircle,
 } from 'lucide-react';
-import { Task, TaskFormData, taskStatusOptions, taskPriorityOptions, isTaskOverdue, formatTaskDueDateTime } from '@/types/task';
+import {
+  Task,
+  TaskFormData,
+  taskStatusOptions,
+  taskPriorityOptions,
+  isTaskOverdue,
+  formatTaskDueDateTime,
+} from '@/types/task';
 import { CallHistory } from '@/components/Calls/CallHistory/CallHistory';
 import { UserSelector } from '@/components/Common/UserSelector';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
@@ -127,7 +134,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     try {
       setTaskLoading(true);
       const response = await fetch(`/api/tasks/${taskId}`);
-      
+
       if (!response.ok) {
         if (response.status === 404) {
           setTask(null);
@@ -195,19 +202,21 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     if (task?.related_entity_type && task?.related_entity_id) {
       const entityType = task.related_entity_type;
       const entityId = task.related_entity_id;
-      
+
       switch (entityType) {
         case 'leads':
           router.push(`/connections/leads/${entityId}`);
           break;
         case 'support_cases':
-          router.push(`/connections/tickets/${entityId}`);
+          router.push(`/connections/incoming/${entityId}`);
           break;
         case 'customers':
           router.push(`/customers/${entityId}`);
           break;
         default:
-          console.warn(`Navigation not implemented for entity type: ${entityType}`);
+          console.warn(
+            `Navigation not implemented for entity type: ${entityType}`
+          );
       }
     }
   };
@@ -484,23 +493,28 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
           {task.description && (
             <div className={styles.infoCard}>
               <h3>Description</h3>
-              <div className={styles.description}>
-                {task.description}
-              </div>
+              <div className={styles.description}>{task.description}</div>
             </div>
           )}
 
           {/* Related Entity Information */}
           {task.related_entity && task.related_entity_type && (
             <div className={styles.infoCard}>
-              <h3>Related {task.related_entity_type === 'support_cases' ? 'Support Case' : task.related_entity_type.replace('_', ' ')}</h3>
+              <h3>
+                Related{' '}
+                {task.related_entity_type === 'support_cases'
+                  ? 'Support Case'
+                  : task.related_entity_type.replace('_', ' ')}
+              </h3>
               <div className={styles.relatedEntity}>
                 <button
                   onClick={handleBackToRelatedEntity}
                   className={styles.entityLink}
                 >
                   <UserIcon size={16} />
-                  {task.related_entity.name || task.related_entity.title || `${task.related_entity_type} #${task.related_entity.id.slice(-8)}`}
+                  {task.related_entity.name ||
+                    task.related_entity.title ||
+                    `${task.related_entity_type} #${task.related_entity.id.slice(-8)}`}
                 </button>
                 {task.related_entity.status && (
                   <div className={styles.entityStatus}>
@@ -540,9 +554,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <input
                     type="text"
                     value={editFormData.title}
-                    onChange={e =>
-                      handleInputChange('title', e.target.value)
-                    }
+                    onChange={e => handleInputChange('title', e.target.value)}
                     className={styles.input}
                   />
                 </div>
@@ -620,7 +632,9 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <UserSelector
                     users={assignableUsers}
                     selectedUserId={editFormData.assigned_to}
-                    onSelect={(userId) => handleInputChange('assigned_to', userId)}
+                    onSelect={userId =>
+                      handleInputChange('assigned_to', userId)
+                    }
                     placeholder="Select user to assign..."
                     loading={loadingUsers}
                     disabled={loadingUsers}
@@ -636,9 +650,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <label>Notes</label>
                   <textarea
                     value={editFormData.notes}
-                    onChange={e =>
-                      handleInputChange('notes', e.target.value)
-                    }
+                    onChange={e => handleInputChange('notes', e.target.value)}
                     className={styles.textarea}
                     rows={4}
                   />
@@ -658,7 +670,8 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                       backgroundColor: getStatusColor(task.status),
                     }}
                   >
-                    {task.status.charAt(0).toUpperCase() + task.status.slice(1).replace('_', ' ')}
+                    {task.status.charAt(0).toUpperCase() +
+                      task.status.slice(1).replace('_', ' ')}
                   </span>
                 </div>
                 <div className={styles.detailItem}>
@@ -666,9 +679,12 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <div className={styles.priorityContainer}>
                     <span
                       className={styles.priorityBadge}
-                      style={{ backgroundColor: getPriorityColor(task.priority) }}
+                      style={{
+                        backgroundColor: getPriorityColor(task.priority),
+                      }}
                     >
-                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                      {task.priority.charAt(0).toUpperCase() +
+                        task.priority.slice(1)}
                     </span>
                     {isOverdue && (
                       <span className={styles.overdueIndicator}>
@@ -697,7 +713,9 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                     <label>Due Date</label>
                     <div className={styles.dueDateInfo}>
                       <Calendar size={16} />
-                      <span>{formatTaskDueDateTime(task.due_date, task.due_time)}</span>
+                      <span>
+                        {formatTaskDueDateTime(task.due_date, task.due_time)}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -766,7 +784,9 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   step="0.5"
                   min="0"
                   value={actualHours || ''}
-                  onChange={e => setActualHours(parseFloat(e.target.value) || undefined)}
+                  onChange={e =>
+                    setActualHours(parseFloat(e.target.value) || undefined)
+                  }
                   className={styles.input}
                   placeholder="Enter hours spent"
                 />
