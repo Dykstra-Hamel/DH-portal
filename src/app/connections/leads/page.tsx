@@ -8,7 +8,10 @@ import LeadsList from '@/components/Leads/LeadsList/LeadsList';
 import { adminAPI } from '@/lib/api-client';
 import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
-import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
+import {
+  MetricsCard,
+  styles as metricsStyles,
+} from '@/components/Common/MetricsCard';
 import { MetricsResponse } from '@/services/metricsService';
 import styles from './page.module.scss';
 
@@ -94,7 +97,7 @@ export default function LeadsPage() {
         // Regular user gets all leads (active and archived) for their selected company
         const [activeLeads, archivedLeads] = await Promise.all([
           adminAPI.getUserLeads(selectedCompany!.id),
-          adminAPI.getUserArchivedLeads(selectedCompany!.id)
+          adminAPI.getUserArchivedLeads(selectedCompany!.id),
         ]);
         setLeads([...(activeLeads || []), ...(archivedLeads || [])]);
       }
@@ -116,7 +119,7 @@ export default function LeadsPage() {
     setMetricsLoading(true);
     try {
       const params = new URLSearchParams({
-        companyId
+        companyId,
       });
 
       const response = await fetch(`/api/metrics?${params}`);
@@ -148,7 +151,6 @@ export default function LeadsPage() {
   if (!user || !profile) {
     return <div>Redirecting...</div>;
   }
-
 
   return (
     <div style={{ width: '100%' }}>
@@ -190,7 +192,9 @@ export default function LeadsPage() {
                   title={metrics.customerServiceCalls.title}
                   value={metrics.customerServiceCalls.value}
                   comparisonValue={metrics.customerServiceCalls.comparisonValue}
-                  comparisonPeriod={metrics.customerServiceCalls.comparisonPeriod}
+                  comparisonPeriod={
+                    metrics.customerServiceCalls.comparisonPeriod
+                  }
                   trend={metrics.customerServiceCalls.trend}
                 />
               </>
@@ -253,11 +257,14 @@ export default function LeadsPage() {
           onEdit={handleEditLead}
           showCompanyColumn={isAdmin && !selectedCompany}
           userProfile={profile}
+          defaultSort={{ key: 'created_at', direction: 'asc' }}
         />
       )}
 
       {!selectedCompany && (
-        <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
+        <div
+          style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}
+        >
           Please select a company to view leads.
         </div>
       )}

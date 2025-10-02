@@ -32,10 +32,11 @@ export default function DataTable<T>({
   emptyStateMessage = 'No items found for this category.',
   tableType = 'tickets',
   customColumnWidths,
+  defaultSort,
   onShowToast,
 }: DataTableProps<T>) {
   const [activeTab, setActiveTab] = useState<string>(tabs?.[0]?.key || 'all');
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(defaultSort || null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Toast state
@@ -178,11 +179,11 @@ export default function DataTable<T>({
   }, [handleLoadMore, infiniteScrollEnabled]);
 
   // Handle toast
-  const handleShowToast = (message: string) => {
+  const handleShowToast = useCallback((message: string) => {
     setToastMessage(message);
     setShowToast(true);
     onShowToast?.(message);
-  };
+  }, [onShowToast]);
 
   const handleToastClose = () => {
     setShowToast(false);

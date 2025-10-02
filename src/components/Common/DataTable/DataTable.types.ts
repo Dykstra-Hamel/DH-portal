@@ -68,6 +68,9 @@ export interface DataTableProps<T> {
   tableType?: 'tickets' | 'supportCases' | 'leads' | 'calls' | 'customers' | 'customersWithCompany' | 'tasks'; // Determines column layout
   customColumnWidths?: string; // Custom CSS grid template columns (e.g., "1fr 120px 100px 200px")
 
+  // Sorting
+  defaultSort?: SortConfig; // Default sort configuration
+
   // Toast integration
   onShowToast?: (message: string) => void;
 }
