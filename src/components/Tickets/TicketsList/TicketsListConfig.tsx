@@ -6,6 +6,7 @@ import { CallRecord } from '@/types/call-record';
 import { ColumnDefinition, TabDefinition } from '@/components/Common/DataTable';
 import { ChevronRight } from 'lucide-react';
 import { getCustomerDisplayName, getPhoneDisplay } from '@/lib/display-utils';
+import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import styles from '@/components/Common/DataTable/DataTable.module.scss';
 
 // Helper functions for data formatting (moved from TicketRow)
@@ -94,7 +95,19 @@ const formatServiceType = (serviceType: string): string => {
 };
 
 // Define columns for tickets table
-export const getTicketColumns = (): ColumnDefinition<Ticket>[] => [
+export const getTicketColumns = (
+  reviewStatuses?: Map<
+    string,
+    {
+      reviewedBy: string;
+      reviewedByName?: string;
+      reviewedByEmail?: string;
+      reviewedByFirstName?: string;
+      reviewedByLastName?: string;
+      expiresAt: string;
+    }
+  >
+): ColumnDefinition<Ticket>[] => [
   {
     key: 'created_at',
     title: 'In Queue',
@@ -262,18 +275,43 @@ export const getTicketColumns = (): ColumnDefinition<Ticket>[] => [
     render: (
       ticket: Ticket,
       onAction?: (action: string, item: Ticket) => void
-    ) => (
-      <button
-        className={styles.actionButton}
-        onClick={e => {
-          e.stopPropagation();
-          onAction?.('qualify', ticket);
-        }}
-      >
-        Review Ticket
-        <ChevronRight size={18} />
-      </button>
-    ),
+    ) => {
+      const reviewStatus = reviewStatuses?.get(ticket.id);
+      // Check if being reviewed - avoid creating new Date on every render
+      const isBeingReviewed = reviewStatus
+        ? Date.now() < new Date(reviewStatus.expiresAt).getTime()
+        : false;
+
+      if (isBeingReviewed && reviewStatus) {
+        // Show "Reviewing" status with avatar
+        return (
+          <div className={styles.reviewingStatus}>
+            <span className={styles.reviewingText}>Reviewing</span>
+            <MiniAvatar
+              firstName={reviewStatus.reviewedByFirstName}
+              lastName={reviewStatus.reviewedByLastName}
+              email={reviewStatus.reviewedByEmail || ''}
+              size="small"
+              showTooltip={true}
+            />
+          </div>
+        );
+      }
+
+      // Show normal "Review Ticket" button
+      return (
+        <button
+          className={styles.actionButton}
+          onClick={e => {
+            e.stopPropagation();
+            onAction?.('qualify', ticket);
+          }}
+        >
+          Review Ticket
+          <ChevronRight size={18} />
+        </button>
+      );
+    },
   },
 ];
 

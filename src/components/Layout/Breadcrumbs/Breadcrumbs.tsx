@@ -1,12 +1,19 @@
 'use client';
 
 import { usePathname, useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { adminAPI } from '@/lib/api-client';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useUser } from '@/hooks/useUser';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
+import {
+  createCustomerChannel,
+  subscribeToCustomerUpdates,
+  removeCustomerChannel,
+  CustomerUpdatePayload,
+} from '@/lib/realtime/customer-channel';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import styles from './Breadcrumbs.module.scss';
 
 const BreadcrumbArrow = () => (
@@ -39,6 +46,8 @@ export function Breadcrumbs() {
   const { user, profile } = useUser();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const customerChannelRef = useRef<RealtimeChannel | null>(null);
 
   // Check if user is admin
   const isAdmin = profile ? isAuthorizedAdminSync(profile) : false;
@@ -98,12 +107,16 @@ export function Breadcrumbs() {
                 const customerName =
                   `${lead.customer.first_name} ${lead.customer.last_name}`.trim();
                 crumbs.push({ label: customerName });
+                // Store customer ID for realtime updates
+                setCustomerId(lead.customer.id);
               } else {
                 crumbs.push({ label: `Lead` });
+                setCustomerId(null);
               }
             } catch (error) {
               console.error('Error fetching lead for breadcrumb:', error);
               crumbs.push({ label: `Lead` });
+              setCustomerId(null);
             } finally {
               setLoading(false);
             }
@@ -241,8 +254,11 @@ export function Breadcrumbs() {
                   if (itemData?.customer) {
                     itemLabel =
                       `${itemData.customer.first_name} ${itemData.customer.last_name}`.trim();
+                    // Store customer ID for realtime updates
+                    setCustomerId(itemData.customer.id);
                   } else {
                     itemLabel = `Lead`;
+                    setCustomerId(null);
                   }
                 } else if (pathSegments[1] === 'support-cases') {
                   if (isAdmin) {
@@ -355,6 +371,46 @@ export function Breadcrumbs() {
 
     generateBreadcrumbs();
   }, [pathname, params, activePrimaryNav]);
+
+  // Subscribe to customer updates for realtime breadcrumb updates
+  useEffect(() => {
+    if (!customerId) {
+      // Clean up existing channel if customer ID is cleared
+      if (customerChannelRef.current) {
+        removeCustomerChannel(customerChannelRef.current);
+        customerChannelRef.current = null;
+      }
+      return;
+    }
+
+    // Create and subscribe to customer channel
+    const channel = createCustomerChannel(customerId);
+    customerChannelRef.current = channel;
+
+    subscribeToCustomerUpdates(channel, (payload: CustomerUpdatePayload) => {
+      // Update breadcrumb with new customer name
+      setBreadcrumbs(prev => {
+        const updated = [...prev];
+        const lastCrumb = updated[updated.length - 1];
+
+        // Only update if the last breadcrumb was a customer name (no href)
+        if (lastCrumb && !lastCrumb.href) {
+          const newName = `${payload.first_name || ''} ${payload.last_name || ''}`.trim();
+          updated[updated.length - 1] = { label: newName };
+        }
+
+        return updated;
+      });
+    });
+
+    // Cleanup on unmount or when customer ID changes
+    return () => {
+      if (customerChannelRef.current) {
+        removeCustomerChannel(customerChannelRef.current);
+        customerChannelRef.current = null;
+      }
+    };
+  }, [customerId]);
 
   if (breadcrumbs.length <= 1) {
     return (

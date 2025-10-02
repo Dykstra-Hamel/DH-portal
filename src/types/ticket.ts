@@ -80,12 +80,23 @@ export interface Ticket {
   ip_address?: string;
   user_agent?: string;
   
+  // Review tracking - for preventing simultaneous editing conflicts
+  reviewed_by?: string; // User ID currently reviewing this ticket
+  reviewed_at?: string;
+  review_expires_at?: string;
+
   // Metadata
   archived?: boolean;
   created_at: string;
   updated_at: string;
 
   // Joined data from related tables
+  reviewed_by_profile?: {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    email: string;
+  };
   customer?: {
     id: string;
     first_name: string;
