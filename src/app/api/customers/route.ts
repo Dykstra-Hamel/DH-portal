@@ -162,3 +162,83 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    // Get the current user from the session
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const customerData = await request.json();
+    const { company_id, ...customerFields } = customerData;
+
+    if (!company_id) {
+      return NextResponse.json(
+        { error: 'Company ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check user profile to determine if they're a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const isGlobalAdmin = profile?.role === 'admin';
+
+    // Verify user has access to this company (admins have access to all companies)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: userCompanyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', company_id)
+        .single();
+
+      if (userCompanyError || !userCompany) {
+        return NextResponse.json(
+          { error: 'Unauthorized access to company' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Insert the new customer
+    const { data: customer, error: insertError } = await supabase
+      .from('customers')
+      .insert([{
+        ...customerFields,
+        company_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }])
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error creating customer:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to create customer', details: insertError.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(customer, { status: 201 });
+  } catch (error) {
+    console.error('Error in POST customers API:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

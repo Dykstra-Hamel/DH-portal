@@ -1,240 +1,221 @@
-import React, { useState } from 'react'
-import { User } from 'lucide-react'
-import { Ticket } from '@/types/ticket'
-import styles from './CustomerInformation.module.scss'
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Ticket } from '@/types/ticket';
+import { authenticatedFetch } from '@/lib/api-client';
+import styles from './CustomerInformation.module.scss';
 
 interface CustomerInformationProps {
-  ticket: Ticket
-  isEditable?: boolean
-  onUpdate?: (customerData: any) => void
+  ticket: Ticket;
+  onUpdate?: (customerData: any) => void;
+}
+
+interface FieldState {
+  value: string;
+  isLoading: boolean;
+  hasError: boolean;
+  showSuccess: boolean;
 }
 
 export default function CustomerInformation({
   ticket,
-  isEditable = false,
-  onUpdate
+  onUpdate,
 }: CustomerInformationProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState({
-    first_name: ticket.customer?.first_name || '',
-    last_name: ticket.customer?.last_name || '',
-    email: ticket.customer?.email || '',
-    phone: ticket.customer?.phone || '',
-    address: ticket.customer?.address || '',
-    city: ticket.customer?.city || '',
-    state: ticket.customer?.state || '',
-    zip_code: ticket.customer?.zip_code || ''
-  })
+  // Initialize form fields with current customer data (contact info only)
+  const [fields, setFields] = useState<Record<string, FieldState>>({
+    first_name: {
+      value: ticket.customer?.first_name || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
+    last_name: {
+      value: ticket.customer?.last_name || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
+    email: {
+      value: ticket.customer?.email || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
+    phone: {
+      value: ticket.customer?.phone || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
+  });
 
-  const formatAddress = () => {
-    if (!ticket.customer) return 'No address'
+  // Store timeout refs for debouncing
+  const timeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
+  const successTimeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
 
-    const parts = []
-    if (ticket.customer.address) parts.push(ticket.customer.address)
-    if (ticket.customer.city) parts.push(ticket.customer.city)
-    if (ticket.customer.state) parts.push(ticket.customer.state)
-    if (ticket.customer.zip_code) parts.push(ticket.customer.zip_code)
+  // Update field state helper
+  const updateFieldState = (
+    fieldName: string,
+    updates: Partial<FieldState>
+  ) => {
+    setFields(prev => ({
+      ...prev,
+      [fieldName]: { ...prev[fieldName], ...updates },
+    }));
+  };
 
-    return parts.length > 0 ? parts.join(', ') : 'No address'
-  }
+  // Auto-save function with debouncing
+  const autoSave = useCallback(
+    async (fieldName: string, value: string) => {
+      if (!ticket.customer?.id) return;
 
-  const handleSave = () => {
-    onUpdate?.(editData)
-    setIsEditing(false)
-  }
+      try {
+        updateFieldState(fieldName, { isLoading: true, hasError: false });
 
-  const handleCancel = () => {
-    setEditData({
-      first_name: ticket.customer?.first_name || '',
-      last_name: ticket.customer?.last_name || '',
-      email: ticket.customer?.email || '',
-      phone: ticket.customer?.phone || '',
-      address: ticket.customer?.address || '',
-      city: ticket.customer?.city || '',
-      state: ticket.customer?.state || '',
-      zip_code: ticket.customer?.zip_code || ''
-    })
-    setIsEditing(false)
-  }
+        const updateData = { [fieldName]: value.trim() || null };
 
-  if (isEditing) {
-    return (
-      <div className={`${styles.section} ${styles.editing}`}>
-        <div className={`${styles.sectionHeader} ${isEditing ? styles.editing : ''}`}>
-          <div className={styles.headerLeft}>
-            <User size={20} />
-            <h3>Customer Information</h3>
-          </div>
-        </div>
+        const updatedCustomer = await authenticatedFetch(
+          `/api/customers/${ticket.customer.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+          }
+        );
 
-        <div className={styles.editForm}>
-          <div className={styles.formRow}>
-            <div className={styles.formField}>
-              <label>First Name</label>
-              <input
-                type="text"
-                value={editData.first_name}
-                onChange={(e) => setEditData({ ...editData, first_name: e.target.value })}
-                className={styles.input}
-              />
-            </div>
-            <div className={styles.formField}>
-              <label>Last Name</label>
-              <input
-                type="text"
-                value={editData.last_name}
-                onChange={(e) => setEditData({ ...editData, last_name: e.target.value })}
-                className={styles.input}
-              />
-            </div>
-          </div>
+        updateFieldState(fieldName, {
+          isLoading: false,
+          hasError: false,
+          showSuccess: true,
+        });
 
-          <div className={styles.formRow}>
-            <div className={styles.formField}>
-              <label>Email</label>
-              <input
-                type="email"
-                value={editData.email}
-                onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                className={styles.input}
-              />
-            </div>
-            <div className={styles.formField}>
-              <label>Phone</label>
-              <input
-                type="tel"
-                value={editData.phone}
-                onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                className={styles.input}
-              />
-            </div>
-          </div>
+        // Hide success indicator after 2 seconds
+        if (successTimeoutRefs.current[fieldName]) {
+          clearTimeout(successTimeoutRefs.current[fieldName]);
+        }
+        successTimeoutRefs.current[fieldName] = setTimeout(() => {
+          updateFieldState(fieldName, { showSuccess: false });
+        }, 2000);
 
-          <div className={styles.formField}>
-            <label>Address</label>
-            <input
-              type="text"
-              value={editData.address}
-              onChange={(e) => setEditData({ ...editData, address: e.target.value })}
-              className={styles.input}
-            />
-          </div>
+        // Call parent update callback
+        if (onUpdate) {
+          onUpdate(updatedCustomer);
+        }
+      } catch (error) {
+        console.error(`Error updating ${fieldName}:`, error);
+        updateFieldState(fieldName, {
+          isLoading: false,
+          hasError: true,
+          showSuccess: false,
+        });
 
-          <div className={styles.formRow}>
-            <div className={styles.formField}>
-              <label>City</label>
-              <input
-                type="text"
-                value={editData.city}
-                onChange={(e) => setEditData({ ...editData, city: e.target.value })}
-                className={styles.input}
-              />
-            </div>
-            <div className={styles.formField}>
-              <label>State</label>
-              <input
-                type="text"
-                value={editData.state}
-                onChange={(e) => setEditData({ ...editData, state: e.target.value })}
-                className={styles.input}
-              />
-            </div>
-            <div className={styles.formField}>
-              <label>Zip Code</label>
-              <input
-                type="text"
-                value={editData.zip_code}
-                onChange={(e) => setEditData({ ...editData, zip_code: e.target.value })}
-                className={styles.input}
-              />
-            </div>
-          </div>
+        // Clear error after 3 seconds
+        setTimeout(() => {
+          updateFieldState(fieldName, { hasError: false });
+        }, 3000);
+      }
+    },
+    [ticket.customer?.id, onUpdate]
+  );
 
-          <div className={styles.formActions}>
-            <button onClick={handleCancel} className={styles.cancelButton}>
-              Cancel
-            </button>
-            <button onClick={handleSave} className={styles.saveButton}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M15.75 18.751V13.501C15.75 13.3021 15.671 13.1113 15.5303 12.9706C15.3897 12.83 15.1989 12.751 15 12.751H9C8.80109 12.751 8.61032 12.83 8.46967 12.9706C8.32902 13.1113 8.25 13.3021 8.25 13.501V18.751M8.25 5.25098V8.25098C8.25 8.44989 8.32902 8.64065 8.46967 8.78131C8.61032 8.92196 8.80109 9.00098 9 9.00098H14.25M14.4 5.25098C14.7957 5.25661 15.1731 5.41836 15.45 5.70098L18.3 8.55098C18.5826 8.82792 18.7444 9.20532 18.75 9.60098V17.251C18.75 17.6488 18.592 18.0303 18.3107 18.3116C18.0294 18.5929 17.6478 18.751 17.25 18.751H6.75C6.35218 18.751 5.97064 18.5929 5.68934 18.3116C5.40804 18.0303 5.25 17.6488 5.25 17.251V6.75098C5.25 6.35315 5.40804 5.97162 5.68934 5.69032C5.97064 5.40901 6.35218 5.25098 6.75 5.25098H14.4Z" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Save Changes
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Handle field changes with debouncing
+  const handleFieldChange = (fieldName: string, value: string) => {
+    // Update local state immediately for responsive UI
+    updateFieldState(fieldName, { value, showSuccess: false, hasError: false });
+
+    // Clear existing timeout
+    if (timeoutRefs.current[fieldName]) {
+      clearTimeout(timeoutRefs.current[fieldName]);
+    }
+
+    // Set new timeout for auto-save (500ms after user stops typing)
+    timeoutRefs.current[fieldName] = setTimeout(() => {
+      autoSave(fieldName, value);
+    }, 500);
+  };
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(timeoutRefs.current).forEach(clearTimeout);
+      Object.values(successTimeoutRefs.current).forEach(clearTimeout);
+    };
+  }, []);
+
+  // Field status indicator component
+  const FieldStatusIndicator = ({ fieldName }: { fieldName: string }) => {
+    const field = fields[fieldName];
+
+    if (field.isLoading) {
+      return <Loader2 size={16} className={styles.loadingIcon} />;
+    }
+
+    if (field.hasError) {
+      return <AlertCircle size={16} className={styles.errorIcon} />;
+    }
+
+    if (field.showSuccess) {
+      return <Check size={16} className={styles.successIcon} />;
+    }
+
+    return null;
+  };
 
   return (
     <div className={styles.section}>
-      <div className={`${styles.sectionHeader} ${isEditing ? styles.editing : ''}`}>
-        <div className={styles.headerLeft}>
-          <User size={20} />
-          <h3>Customer Information</h3>
-        </div>
-        {isEditable && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className={styles.editButton}
-            aria-label="Edit customer information"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="21" viewBox="0 0 20 21" fill="none">
-              <path d="M9.67876 5.05777H5.16472C4.82267 5.05777 4.49462 5.19365 4.25275 5.43552C4.01088 5.67739 3.875 6.00544 3.875 6.3475V15.3756C3.875 15.7176 4.01088 16.0457 4.25275 16.2875C4.49462 16.5294 4.82267 16.6653 5.16472 16.6653H14.1928C14.5348 16.6653 14.8629 16.5294 15.1048 16.2875C15.3466 16.0457 15.4825 15.7176 15.4825 15.3756V10.8615M13.7897 4.81595C14.0463 4.55941 14.3942 4.41528 14.757 4.41528C15.1198 4.41528 15.4678 4.55941 15.7243 4.81595C15.9809 5.07249 16.125 5.42044 16.125 5.78324C16.125 6.14605 15.9809 6.49399 15.7243 6.75053L9.9122 12.5633C9.75907 12.7163 9.56991 12.8283 9.36213 12.889L7.50944 13.4307C7.45395 13.4468 7.39513 13.4478 7.33914 13.4335C7.28315 13.4191 7.23204 13.39 7.19117 13.3491C7.1503 13.3082 7.12116 13.2571 7.10682 13.2011C7.09247 13.1452 7.09344 13.0863 7.10963 13.0308L7.65131 11.1782C7.71227 10.9705 7.82448 10.7816 7.97761 10.6287L13.7897 4.81595Z" stroke="#252C37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Edit
-          </button>
-        )}
-      </div>
-
-      <div className={styles.infoGrid}>
-        <div className={styles.infoRow}>
-          <div className={styles.infoField}>
-            <span className={styles.label}>Customer Name</span>
-            <span className={styles.value}>
-              {ticket.customer ?
-                `${ticket.customer.first_name} ${ticket.customer.last_name}` :
-                'Unknown Customer'
-              }
-            </span>
-          </div>
-          <div className={styles.infoField}>
-            <span className={styles.label}>Primary Phone</span>
-            <span className={styles.value}>
-              {ticket.customer?.phone || 'Not provided'}
-            </span>
+      <div className={styles.formGrid}>
+        <div className={styles.formField}>
+          <label>First Name</label>
+          <div className={styles.inputWrapper}>
+            <input
+              type="text"
+              value={fields.first_name.value}
+              onChange={e => handleFieldChange('first_name', e.target.value)}
+              className={`${styles.autoSaveInput} ${fields.first_name.hasError ? styles.hasError : ''}`}
+              placeholder="Enter first name"
+            />
+            <FieldStatusIndicator fieldName="first_name" />
           </div>
         </div>
-
-        <div className={styles.infoRow}>
-          <div className={styles.infoField}>
-            <span className={styles.label}>Email</span>
-            <span className={styles.value}>
-              {ticket.customer?.email || 'Not provided'}
-            </span>
+        <div className={styles.formField}>
+          <label>Last Name</label>
+          <div className={styles.inputWrapper}>
+            <input
+              type="text"
+              value={fields.last_name.value}
+              onChange={e => handleFieldChange('last_name', e.target.value)}
+              className={`${styles.autoSaveInput} ${fields.last_name.hasError ? styles.hasError : ''}`}
+              placeholder="Enter last name"
+            />
+            <FieldStatusIndicator fieldName="last_name" />
           </div>
         </div>
-
-        <div className={styles.infoRow}>
-          <div className={styles.infoField}>
-            <span className={styles.label}>Service Address</span>
-            <span className={styles.value}>
-              {formatAddress()}
-            </span>
+        <div className={styles.formField}>
+          <label>Email</label>
+          <div className={styles.inputWrapper}>
+            <input
+              type="email"
+              value={fields.email.value}
+              onChange={e => handleFieldChange('email', e.target.value)}
+              className={`${styles.autoSaveInput} ${fields.email.hasError ? styles.hasError : ''}`}
+              placeholder="Enter email address"
+            />
+            <FieldStatusIndicator fieldName="email" />
           </div>
         </div>
-
-        <div className={styles.infoRow}>
-          <div className={styles.infoField}>
-            <span className={styles.label}>Home Size</span>
-            <span className={styles.value}>N/A</span>
-          </div>
-          <div className={styles.infoField}>
-            <span className={styles.label}>Yard Size</span>
-            <span className={styles.value}>N/A</span>
+        <div className={styles.formField}>
+          <label>Phone</label>
+          <div className={styles.inputWrapper}>
+            <input
+              type="tel"
+              value={fields.phone.value}
+              onChange={e => handleFieldChange('phone', e.target.value)}
+              className={`${styles.autoSaveInput} ${fields.phone.hasError ? styles.hasError : ''}`}
+              placeholder="Enter phone number"
+            />
+            <FieldStatusIndicator fieldName="phone" />
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

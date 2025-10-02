@@ -48,14 +48,27 @@ const formatPhone = (phone?: string): string => {
 };
 
 const formatAddress = (ticket: Ticket): string => {
-  if (!ticket.customer) return 'N/A';
+  // PRIORITY 1: If ticket has a linked service address, use that
+  if (ticket.service_address) {
+    const parts = [
+      ticket.service_address.city,
+      ticket.service_address.state,
+      ticket.service_address.zip_code
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'N/A';
+  }
 
-  const customer = ticket.customer;
-  const parts = [customer.city, customer.state, customer.zip_code].filter(
-    Boolean
-  );
+  // PRIORITY 2: Fall back to customer address data
+  if (ticket.customer) {
+    const parts = [
+      ticket.customer.city,
+      ticket.customer.state,
+      ticket.customer.zip_code
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'N/A';
+  }
 
-  return parts.length > 0 ? parts.join(', ') : 'N/A';
+  return 'N/A';
 };
 
 const formatTicketType = (type: string): string => {
