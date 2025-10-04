@@ -152,14 +152,15 @@ export const getTaskPriorityColor = (priority: TaskPriority): string => {
 
 export const formatTaskDueDateTime = (due_date?: string, due_time?: string): string => {
   if (!due_date) return '';
-  
-  const date = new Date(due_date);
+
+  // Add T00:00:00 to prevent timezone shift
+  const date = new Date(due_date + 'T00:00:00');
   const dateStr = date.toLocaleDateString();
-  
+
   if (due_time) {
     return `${dateStr} at ${due_time}`;
   }
-  
+
   return dateStr;
 };
 
@@ -167,10 +168,11 @@ export const isTaskOverdue = (task: Task): boolean => {
   if (!task.due_date || task.status === 'completed') {
     return false;
   }
-  
+
   const now = new Date();
-  const dueDate = new Date(task.due_date);
-  
+  // Add T00:00:00 to prevent timezone shift
+  const dueDate = new Date(task.due_date + 'T00:00:00');
+
   if (task.due_time) {
     const [hours, minutes] = task.due_time.split(':').map(Number);
     dueDate.setHours(hours, minutes, 0, 0);
@@ -178,7 +180,7 @@ export const isTaskOverdue = (task: Task): boolean => {
     // If no time specified, consider it due at end of day
     dueDate.setHours(23, 59, 59, 999);
   }
-  
+
   return now > dueDate;
 };
 

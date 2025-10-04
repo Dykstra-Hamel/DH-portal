@@ -43,10 +43,30 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
   // Step configuration for leads
   const leadSteps: StepItem[] = [
-    { id: 'qualify', label: 'Qualify', status: 'upcoming' },
-    { id: 'contacting', label: 'Contact', status: 'upcoming' },
-    { id: 'quoted', label: 'Quote', status: 'upcoming' },
-    { id: 'ready_to_schedule', label: 'Ready To Schedule', status: 'disabled' },
+    {
+      id: 'qualify',
+      label: 'Assign Stage',
+      subLabel: 'In Progress',
+      status: 'upcoming',
+    },
+    {
+      id: 'contacting',
+      label: 'Communication Stage',
+      subLabel: 'Pending',
+      status: 'upcoming',
+    },
+    {
+      id: 'quoted',
+      label: 'Quote Stage',
+      subLabel: 'Pending',
+      status: 'upcoming',
+    },
+    {
+      id: 'ready_to_schedule',
+      label: 'Schedule Stage',
+      subLabel: 'Pending',
+      status: 'disabled',
+    },
   ];
 
   // Update step statuses based on current lead status
@@ -57,10 +77,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
     // Map lead status to step IDs
     const statusToStep: { [key: string]: string } = {
-      'unassigned': 'qualify',
-      'contacting': 'contacting',
-      'quoted': 'quoted',
-      'ready_to_schedule': 'ready_to_schedule'
+      unassigned: 'qualify',
+      contacting: 'contacting',
+      quoted: 'quoted',
+      ready_to_schedule: 'ready_to_schedule',
     };
 
     const currentStepId = statusToStep[currentStatus];
@@ -98,16 +118,16 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
     // Map step IDs to lead statuses
     const stepToStatus: { [key: string]: string } = {
-      'qualify': 'unassigned',
-      'contacting': 'contacting',
-      'quoted': 'quoted',
+      qualify: 'unassigned',
+      contacting: 'contacting',
+      quoted: 'quoted',
     };
 
     // Map step IDs to success messages
     const stepToMessage: { [key: string]: string } = {
-      'qualify': 'Lead moved to Qualify stage successfully!',
-      'contacting': 'Lead moved to Contact stage successfully!',
-      'quoted': 'Lead moved to Quote stage successfully!',
+      qualify: 'Lead moved to Qualify stage successfully!',
+      contacting: 'Lead moved to Contact stage successfully!',
+      quoted: 'Lead moved to Quote stage successfully!',
     };
 
     const newStatus = stepToStatus[stepId];
@@ -118,11 +138,11 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       // Update the lead status via API
       if (isAdmin) {
         await adminAPI.updateLead(leadId, {
-          lead_status: newStatus
+          lead_status: newStatus,
         });
       } else {
         await adminAPI.updateUserLead(leadId, {
-          lead_status: newStatus
+          lead_status: newStatus,
         });
       }
 
@@ -148,7 +168,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       handleShowToast(successMessage, 'success');
     } catch (error) {
       console.error('Error updating lead status:', error);
-      handleShowToast('Failed to update lead status. Please try again.', 'error');
+      handleShowToast(
+        'Failed to update lead status. Please try again.',
+        'error'
+      );
     }
   };
 
@@ -179,11 +202,11 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     try {
       if (isAdmin) {
         await adminAPI.updateLead(leadId, {
-          lead_status: newStatus
+          lead_status: newStatus,
         });
       } else {
         await adminAPI.updateUserLead(leadId, {
-          lead_status: newStatus
+          lead_status: newStatus,
         });
       }
 
@@ -208,7 +231,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       handleShowToast(successMessage, 'success');
     } catch (error) {
       console.error('Error updating lead status:', error);
-      handleShowToast('Failed to update lead status. Please try again.', 'error');
+      handleShowToast(
+        'Failed to update lead status. Please try again.',
+        'error'
+      );
     }
   };
 
@@ -219,18 +245,21 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     try {
       if (isAdmin) {
         await adminAPI.updateLead(leadId, {
-          lead_status: 'lost'
+          lead_status: 'lost',
         });
       } else {
         await adminAPI.updateUserLead(leadId, {
-          lead_status: 'lost'
+          lead_status: 'lost',
         });
       }
       await fetchLead();
       handleShowToast('Lead marked as lost successfully!', 'success');
     } catch (error) {
       console.error('Error marking lead as lost:', error);
-      handleShowToast('Failed to mark lead as lost. Please try again.', 'error');
+      handleShowToast(
+        'Failed to mark lead as lost. Please try again.',
+        'error'
+      );
     }
   };
 
@@ -327,18 +356,21 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     try {
       if (isAdmin) {
         await adminAPI.updateLead(leadId, {
-          lead_status: previousStatus
+          lead_status: previousStatus,
         });
       } else {
         await adminAPI.updateUserLead(leadId, {
-          lead_status: previousStatus
+          lead_status: previousStatus,
         });
       }
       await fetchLead();
       handleShowToast(successMessage, 'success');
     } catch (error) {
       console.error('Error moving to previous step:', error);
-      handleShowToast('Failed to move to previous step. Please try again.', 'error');
+      handleShowToast(
+        'Failed to move to previous step. Please try again.',
+        'error'
+      );
     }
   };
 
@@ -350,12 +382,12 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       if (isAdmin) {
         await adminAPI.updateLead(leadId, {
           lead_status: 'lost',
-          archived: true
+          archived: true,
         });
       } else {
         await adminAPI.updateUserLead(leadId, {
           lead_status: 'lost',
-          archived: true
+          archived: true,
         });
       }
       await fetchLead();
@@ -383,7 +415,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       actions.push({
         label: getPrimaryButtonText(),
         onClick: handleProgressStatus,
-        disabled: false
+        disabled: false,
       });
     }
 
@@ -391,18 +423,22 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     actions.push({
       label: 'Reassign Lead',
       onClick: handleReassign,
-      disabled: false
+      disabled: false,
     });
 
     // Move to previous step
     if (canMoveToPrevious()) {
-      const previousStepLabel = lead.lead_status === 'quoted' ? 'Move to Contact' :
-                               lead.lead_status === 'contacting' ? 'Move to Qualify' : '';
+      const previousStepLabel =
+        lead.lead_status === 'quoted'
+          ? 'Move to Contact'
+          : lead.lead_status === 'contacting'
+            ? 'Move to Qualify'
+            : '';
       if (previousStepLabel) {
         actions.push({
           label: previousStepLabel,
           onClick: handleMoveToPrevious,
-          disabled: false
+          disabled: false,
         });
       }
     }
@@ -412,7 +448,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       actions.push({
         label: 'Archive Lead',
         onClick: handleArchiveLead,
-        disabled: false
+        disabled: false,
       });
     }
 
@@ -471,32 +507,35 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  const fetchLead = useCallback(async (updatedLead?: Lead) => {
-    // If we have an updated lead passed in (optimistic update), use it directly
-    if (updatedLead) {
-      setLead(updatedLead);
-      return;
-    }
-
-    // Otherwise fetch from API
-    if (!leadId) return;
-
-    try {
-      setLeadLoading(true);
-      let leadData;
-      if (isAdmin) {
-        leadData = await adminAPI.getLead(leadId);
-      } else {
-        leadData = await adminAPI.getUserLead(leadId);
+  const fetchLead = useCallback(
+    async (updatedLead?: Lead) => {
+      // If we have an updated lead passed in (optimistic update), use it directly
+      if (updatedLead) {
+        setLead(updatedLead);
+        return;
       }
-      setLead(leadData);
-    } catch (error) {
-      console.error('Error fetching lead:', error);
-      setLead(null);
-    } finally {
-      setLeadLoading(false);
-    }
-  }, [leadId, isAdmin]);
+
+      // Otherwise fetch from API
+      if (!leadId) return;
+
+      try {
+        setLeadLoading(true);
+        let leadData;
+        if (isAdmin) {
+          leadData = await adminAPI.getLead(leadId);
+        } else {
+          leadData = await adminAPI.getUserLead(leadId);
+        }
+        setLead(leadData);
+      } catch (error) {
+        console.error('Error fetching lead:', error);
+        setLead(null);
+      } finally {
+        setLeadLoading(false);
+      }
+    },
+    [leadId, isAdmin]
+  );
 
   // Fetch lead when leadId is available
   useEffect(() => {
@@ -504,7 +543,6 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       fetchLead();
     }
   }, [leadId, loading, fetchLead]);
-
 
   const handleBack = () => {
     router.push('/connections/leads');
@@ -553,18 +591,23 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         updatedAt={lead.updated_at}
         steps={getUpdatedSteps()}
         currentStep={
-          lead.lead_status === 'unassigned' ? 'qualify' :
-          lead.lead_status === 'contacting' ? 'contacting' :
-          lead.lead_status === 'quoted' ? 'quoted' :
-          lead.lead_status === 'ready_to_schedule' ? 'ready_to_schedule' :
-          'qualify'
+          lead.lead_status === 'unassigned'
+            ? 'qualify'
+            : lead.lead_status === 'contacting'
+              ? 'contacting'
+              : lead.lead_status === 'quoted'
+                ? 'quoted'
+                : lead.lead_status === 'ready_to_schedule'
+                  ? 'ready_to_schedule'
+                  : 'qualify'
         }
         onStepClick={handleStepClick}
-        disabledSteps={lead.lead_status === 'ready_to_schedule' ? [] : ['ready_to_schedule']}
+        disabledSteps={
+          lead.lead_status === 'ready_to_schedule' ? [] : ['ready_to_schedule']
+        }
         dropdownActions={getDropdownActions()}
         showDropdown={true}
       />
-
 
       <div className={styles.content}>
         <LeadStepContent

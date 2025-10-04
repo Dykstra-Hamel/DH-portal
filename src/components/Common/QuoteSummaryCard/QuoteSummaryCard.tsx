@@ -10,6 +10,7 @@ interface QuoteSummaryCardProps {
   onNotInterested?: () => void;
   onEmailQuote?: () => void;
   onReadyToSchedule?: () => void;
+  hideCard?: boolean;
 }
 
 export function QuoteSummaryCard({
@@ -19,6 +20,7 @@ export function QuoteSummaryCard({
   onNotInterested,
   onEmailQuote,
   onReadyToSchedule,
+  hideCard = false,
 }: QuoteSummaryCardProps) {
   if (!quote) {
     return null;
@@ -44,14 +46,8 @@ export function QuoteSummaryCard({
   // Get total number of line items
   const totalLineItems = quote.line_items?.length || 0;
 
-  return (
-    <InfoCard
-      title={isUpdating ? "Quote Summary (Updating...)" : "Quote Summary"}
-      icon={<FileText />}
-      isCollapsible={true}
-      startExpanded={true}
-    >
-      <div className={`${styles.quoteContent} ${isUpdating ? styles.updating : ''}`}>
+  const cardContent = (
+    <div className={`${styles.quoteContent} ${isUpdating ? styles.updating : ''}`}>
         {/* Service Details Section */}
         <div className={styles.section}>
           <h4 className={styles.sectionTitle}>Service Details:</h4>
@@ -227,6 +223,18 @@ export function QuoteSummaryCard({
           )}
         </div>
       </div>
+  );
+
+  return hideCard ? (
+    cardContent
+  ) : (
+    <InfoCard
+      title={isUpdating ? "Quote Summary (Updating...)" : "Quote Summary"}
+      icon={<FileText />}
+      isCollapsible={true}
+      startExpanded={true}
+    >
+      {cardContent}
     </InfoCard>
   );
 }

@@ -2,10 +2,14 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { Lead } from '@/types/lead';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
+import { TabCard, TabItem } from '@/components/Common/TabCard/TabCard';
 import { QuoteSummaryCard } from '@/components/Common/QuoteSummaryCard/QuoteSummaryCard';
 import { SalesCadenceCard } from '@/components/Common/SalesCadenceCard/SalesCadenceCard';
 import { ContactInformationCard } from '@/components/Common/ContactInformationCard/ContactInformationCard';
 import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
+import { ManageLeadModal } from '@/components/Common/ManageLeadModal/ManageLeadModal';
+import { AssignSuccessModal } from '@/components/Common/AssignSuccessModal/AssignSuccessModal';
+import { CompleteTaskModal } from '@/components/Common/CompleteTaskModal/CompleteTaskModal';
 import CustomerInformation from '@/components/Tickets/TicketContent/CustomerInformation';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
@@ -24,9 +28,7 @@ import {
   AddressComponents,
 } from '@/components/Common/AddressAutocomplete/AddressAutocomplete';
 import { StreetViewImage } from '@/components/Common/StreetViewImage/StreetViewImage';
-import {
-  ServiceAddressData,
-} from '@/lib/service-addresses';
+import { ServiceAddressData } from '@/lib/service-addresses';
 import {
   generateHomeSizeOptions,
   generateYardSizeOptions,
@@ -74,6 +76,18 @@ export function LeadStepContent({
     useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [showCallSummary, setShowCallSummary] = useState(false);
+  const [showManageLeadModal, setShowManageLeadModal] = useState(false);
+  const [showAssignSuccessModal, setShowAssignSuccessModal] = useState(false);
+  const [assignedUserInfo, setAssignedUserInfo] = useState<{
+    name: string;
+    title: string;
+    avatar?: string | null;
+  } | null>(null);
+  const [showCompleteTaskModal, setShowCompleteTaskModal] = useState(false);
+  const [pendingActivity, setPendingActivity] = useState<{
+    type: string;
+    notes: string;
+  } | null>(null);
 
   // Create a ticket-like object for the CustomerInformation component
   // Include lead.customer in dependencies to update when customer data changes
@@ -85,11 +99,18 @@ export function LeadStepContent({
       created_at: lead.created_at,
       updated_at: lead.updated_at,
     } as any;
-  }, [lead.id, lead.customer, lead.company_id, lead.created_at, lead.updated_at]);
+  }, [
+    lead.id,
+    lead.customer,
+    lead.company_id,
+    lead.created_at,
+    lead.updated_at,
+  ]);
 
   // Refs
   const pestDropdownRef = useRef<HTMLDivElement>(null);
   const additionalPestDropdownRef = useRef<HTMLDivElement>(null);
+  const assignmentDropdownRef = useRef<HTMLDivElement>(null);
   const customerChannelRef = useRef<any>(null);
 
   // Service Location form state
@@ -108,23 +129,28 @@ export function LeadStepContent({
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [homeSize, setHomeSize] = useState<number | ''>('');
   const [yardSize, setYardSize] = useState<number | ''>('');
-  const [selectedHomeSizeOption, setSelectedHomeSizeOption] = useState<string>('');
-  const [selectedYardSizeOption, setSelectedYardSizeOption] = useState<string>('');
+  const [selectedHomeSizeOption, setSelectedHomeSizeOption] =
+    useState<string>('');
+  const [selectedYardSizeOption, setSelectedYardSizeOption] =
+    useState<string>('');
 
   // Quote step state
   const [selectedPests, setSelectedPests] = useState<string[]>([]);
   const [additionalPests, setAdditionalPests] = useState<string[]>([]);
   const [isPestDropdownOpen, setIsPestDropdownOpen] = useState(false);
-  const [isAdditionalPestDropdownOpen, setIsAdditionalPestDropdownOpen] = useState(false);
+  const [isAdditionalPestDropdownOpen, setIsAdditionalPestDropdownOpen] =
+    useState(false);
   const [pestOptions, setPestOptions] = useState<any[]>([]);
   const initialLineItemCreatedRef = useRef(false);
   const lineItemCreationLockRef = useRef<Set<number>>(new Set());
-  const [serviceSelections, setServiceSelections] = useState<Array<{
-    id: string;
-    servicePlan: any | null;
-    displayOrder: number;
-  }>>([
-    { id: '1', servicePlan: null, displayOrder: 0 } // First selection always exists
+  const [serviceSelections, setServiceSelections] = useState<
+    Array<{
+      id: string;
+      servicePlan: any | null;
+      displayOrder: number;
+    }>
+  >([
+    { id: '1', servicePlan: null, displayOrder: 0 }, // First selection always exists
   ]);
   const [allServicePlans, setAllServicePlans] = useState<any[]>([]);
   const [loadingPestOptions, setLoadingPestOptions] = useState(false);
@@ -137,14 +163,19 @@ export function LeadStepContent({
   const [preferredTime, setPreferredTime] = useState<string>('');
 
   // Contact Log activity state
-  const [selectedActionType, setSelectedActionType] = useState<string>('live_call');
+  const [selectedActionType, setSelectedActionType] =
+    useState<string>('');
   const [activityNotes, setActivityNotes] = useState<string>('');
   const [isLoggingActivity, setIsLoggingActivity] = useState(false);
   const [nextTask, setNextTask] = useState<any | null>(null);
   const [loadingNextTask, setLoadingNextTask] = useState(false);
-  const [hasActiveCadence, setHasActiveCadence] = useState<boolean | null>(null);
+  const [hasActiveCadence, setHasActiveCadence] = useState<boolean | null>(
+    null
+  );
   const [isStartingCadence, setIsStartingCadence] = useState(false);
-  const [selectedCadenceId, setSelectedCadenceId] = useState<string | null>(null);
+  const [selectedCadenceId, setSelectedCadenceId] = useState<string | null>(
+    null
+  );
 
   const { user } = useUser();
   const { users: assignableUsers } = useAssignableUsers({
@@ -162,7 +193,8 @@ export function LeadStepContent({
   } = useQuoteRealtime({
     leadId: lead.id,
     userId: user?.id,
-    enabled: lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule',
+    enabled:
+      lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule',
   });
 
   // Helper functions for managing service selections
@@ -174,7 +206,7 @@ export function LeadStepContent({
 
     setServiceSelections([
       ...serviceSelections,
-      { id: nextId, servicePlan: null, displayOrder: nextDisplayOrder }
+      { id: nextId, servicePlan: null, displayOrder: nextDisplayOrder },
     ]);
   };
 
@@ -184,16 +216,19 @@ export function LeadStepContent({
 
     // Find the line item to delete
     const lineItemToDelete = quote?.line_items?.find(
-      (item) => item.display_order === displayOrder
+      item => item.display_order === displayOrder
     );
 
     if (lineItemToDelete && quote) {
       try {
         // Delete the quote line item
-        const response = await fetch(`/api/quotes/${quote.id}/line-items/${lineItemToDelete.id}`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-        });
+        const response = await fetch(
+          `/api/quotes/${quote.id}/line-items/${lineItemToDelete.id}`,
+          {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
 
         if (!response.ok) {
           throw new Error('Failed to delete line item');
@@ -214,10 +249,10 @@ export function LeadStepContent({
 
     // Remove from local state and reorder
     const updatedSelections = serviceSelections
-      .filter((sel) => sel.displayOrder !== displayOrder)
+      .filter(sel => sel.displayOrder !== displayOrder)
       .map((sel, index) => ({
         ...sel,
-        displayOrder: index
+        displayOrder: index,
       }));
 
     setServiceSelections(updatedSelections);
@@ -225,11 +260,11 @@ export function LeadStepContent({
 
   const updateServiceSelection = async (displayOrder: number, plan: any) => {
     // Update local state
-    setServiceSelections(serviceSelections.map(sel =>
-      sel.displayOrder === displayOrder
-        ? { ...sel, servicePlan: plan }
-        : sel
-    ));
+    setServiceSelections(
+      serviceSelections.map(sel =>
+        sel.displayOrder === displayOrder ? { ...sel, servicePlan: plan } : sel
+      )
+    );
 
     // Update quote line item
     await createOrUpdateQuoteLineItem(plan, displayOrder);
@@ -286,16 +321,22 @@ export function LeadStepContent({
       ) {
         setIsAdditionalPestDropdownOpen(false);
       }
+      if (
+        assignmentDropdownRef.current &&
+        !assignmentDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsAssignmentDropdownOpen(false);
+      }
     };
 
-    if (isPestDropdownOpen || isAdditionalPestDropdownOpen) {
+    if (isPestDropdownOpen || isAdditionalPestDropdownOpen || isAssignmentDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isPestDropdownOpen, isAdditionalPestDropdownOpen]);
+  }, [isPestDropdownOpen, isAdditionalPestDropdownOpen, isAssignmentDropdownOpen]);
 
   // Pre-fill preferred date and time from lead data
   useEffect(() => {
@@ -318,10 +359,18 @@ export function LeadStepContent({
     }
 
     // Priority 2: Load from service address if no quote data
-    if (!quote?.home_size_range && lead.primary_service_address?.home_size_range && selectedHomeSizeOption === '') {
+    if (
+      !quote?.home_size_range &&
+      lead.primary_service_address?.home_size_range &&
+      selectedHomeSizeOption === ''
+    ) {
       setSelectedHomeSizeOption(lead.primary_service_address.home_size_range);
     }
-    if (!quote?.yard_size_range && lead.primary_service_address?.yard_size_range && selectedYardSizeOption === '') {
+    if (
+      !quote?.yard_size_range &&
+      lead.primary_service_address?.yard_size_range &&
+      selectedYardSizeOption === ''
+    ) {
       setSelectedYardSizeOption(lead.primary_service_address.yard_size_range);
     }
   }, [
@@ -330,7 +379,7 @@ export function LeadStepContent({
     quote?.home_size_range,
     quote?.yard_size_range,
     selectedHomeSizeOption,
-    selectedYardSizeOption
+    selectedYardSizeOption,
   ]);
 
   // Pre-fill service frequency and discount from quote line items
@@ -431,13 +480,19 @@ export function LeadStepContent({
         setLoadingNextTask(true);
 
         // Check if lead has active cadence (authenticatedFetch returns JSON directly, not Response)
-        const cadenceResult = await authenticatedFetch(`/api/leads/${lead.id}/cadence`);
-        const hasActiveCadence = cadenceResult.data !== null && cadenceResult.data.completed_at === null;
+        const cadenceResult = await authenticatedFetch(
+          `/api/leads/${lead.id}/cadence`
+        );
+        const hasActiveCadence =
+          cadenceResult.data !== null &&
+          cadenceResult.data.completed_at === null;
         setHasActiveCadence(hasActiveCadence);
 
         // Only fetch next task if cadence exists
         if (hasActiveCadence) {
-          const taskResult = await authenticatedFetch(`/api/leads/${lead.id}/next-task`);
+          const taskResult = await authenticatedFetch(
+            `/api/leads/${lead.id}/next-task`
+          );
           setNextTask(taskResult.data);
         } else {
           setNextTask(null);
@@ -477,9 +532,10 @@ export function LeadStepContent({
     if (quote?.additional_pests && quote.additional_pests.length > 0) {
       const additionalPestIds = pestOptions
         .filter((pest: any) =>
-          quote.additional_pests?.some((pestName: string) =>
-            pestName.toLowerCase() === pest.name?.toLowerCase() ||
-            pestName.toLowerCase() === pest.custom_label?.toLowerCase()
+          quote.additional_pests?.some(
+            (pestName: string) =>
+              pestName.toLowerCase() === pest.name?.toLowerCase() ||
+              pestName.toLowerCase() === pest.custom_label?.toLowerCase()
           )
         )
         .map((pest: any) => pest.id);
@@ -491,7 +547,9 @@ export function LeadStepContent({
         const primaryPest = prev[0];
         if (primaryPest) {
           // Filter out any duplicates and ensure primary is first
-          const uniqueAdditional = additionalPestIds.filter((id: string) => id !== primaryPest);
+          const uniqueAdditional = additionalPestIds.filter(
+            (id: string) => id !== primaryPest
+          );
           return [primaryPest, ...uniqueAdditional];
         }
         return additionalPestIds;
@@ -506,9 +564,11 @@ export function LeadStepContent({
       const primaryPest = selectedPests[0];
       if (!primaryPest || !lead.company_id) {
         // Clear first selection if no pest
-        setServiceSelections(prev => prev.map((sel, idx) =>
-          idx === 0 ? { ...sel, servicePlan: null } : sel
-        ));
+        setServiceSelections(prev =>
+          prev.map((sel, idx) =>
+            idx === 0 ? { ...sel, servicePlan: null } : sel
+          )
+        );
         return;
       }
 
@@ -520,17 +580,21 @@ export function LeadStepContent({
         );
         if (response.success && response.cheapest_plan) {
           // Cross-reference with allServicePlans to get complete plan data with pest_coverage
-          const fullPlan = allServicePlans.find(p => p.id === response.cheapest_plan.id) || response.cheapest_plan;
+          const fullPlan =
+            allServicePlans.find(p => p.id === response.cheapest_plan.id) ||
+            response.cheapest_plan;
 
           // Update first service selection with complete plan data
-          setServiceSelections(prev => prev.map((sel, idx) =>
-            idx === 0 ? { ...sel, servicePlan: fullPlan } : sel
-          ));
+          setServiceSelections(prev =>
+            prev.map((sel, idx) =>
+              idx === 0 ? { ...sel, servicePlan: fullPlan } : sel
+            )
+          );
 
           // Automatically create or update quote line item if quote exists
           // Always check quote.line_items first (most reliable guard)
           const existingLineItem = quote?.line_items?.find(
-            (item) => item.display_order === 0
+            item => item.display_order === 0
           );
 
           if (quote) {
@@ -540,20 +604,27 @@ export function LeadStepContent({
               initialLineItemCreatedRef.current = true;
             }
             // Case 2: Existing line item with different service plan - update it
-            else if (existingLineItem && existingLineItem.service_plan_id !== fullPlan.id) {
+            else if (
+              existingLineItem &&
+              existingLineItem.service_plan_id !== fullPlan.id
+            ) {
               await createOrUpdateQuoteLineItem(fullPlan, 0);
             }
           }
         } else {
-          setServiceSelections(prev => prev.map((sel, idx) =>
-            idx === 0 ? { ...sel, servicePlan: null } : sel
-          ));
+          setServiceSelections(prev =>
+            prev.map((sel, idx) =>
+              idx === 0 ? { ...sel, servicePlan: null } : sel
+            )
+          );
         }
       } catch (error) {
         console.error('Error loading service plan:', error);
-        setServiceSelections(prev => prev.map((sel, idx) =>
-          idx === 0 ? { ...sel, servicePlan: null } : sel
-        ));
+        setServiceSelections(prev =>
+          prev.map((sel, idx) =>
+            idx === 0 ? { ...sel, servicePlan: null } : sel
+          )
+        );
       } finally {
         setLoadingPlan(false);
       }
@@ -577,7 +648,9 @@ export function LeadStepContent({
 
       try {
         setLoadingServicePlans(true);
-        const response = await fetch(`/api/admin/service-plans/${lead.company_id}`);
+        const response = await fetch(
+          `/api/admin/service-plans/${lead.company_id}`
+        );
         const data = await response.json();
 
         if (data.success && data.data) {
@@ -604,12 +677,13 @@ export function LeadStepContent({
 
     // Use first service selection's plan for size calculations
     const firstPlan = serviceSelections[0]?.servicePlan;
-    const servicePlanPricing = firstPlan?.home_size_pricing && firstPlan?.yard_size_pricing
-      ? {
-          home_size_pricing: firstPlan.home_size_pricing,
-          yard_size_pricing: firstPlan.yard_size_pricing,
-        }
-      : undefined;
+    const servicePlanPricing =
+      firstPlan?.home_size_pricing && firstPlan?.yard_size_pricing
+        ? {
+            home_size_pricing: firstPlan.home_size_pricing,
+            yard_size_pricing: firstPlan.yard_size_pricing,
+          }
+        : undefined;
 
     return generateHomeSizeOptions(pricingSettings, servicePlanPricing);
   }, [pricingSettings, serviceSelections]);
@@ -620,12 +694,13 @@ export function LeadStepContent({
 
     // Use first service selection's plan for size calculations
     const firstPlan = serviceSelections[0]?.servicePlan;
-    const servicePlanPricing = firstPlan?.home_size_pricing && firstPlan?.yard_size_pricing
-      ? {
-          home_size_pricing: firstPlan.home_size_pricing,
-          yard_size_pricing: firstPlan.yard_size_pricing,
-        }
-      : undefined;
+    const servicePlanPricing =
+      firstPlan?.home_size_pricing && firstPlan?.yard_size_pricing
+        ? {
+            home_size_pricing: firstPlan.home_size_pricing,
+            yard_size_pricing: firstPlan.yard_size_pricing,
+          }
+        : undefined;
 
     return generateYardSizeOptions(pricingSettings, servicePlanPricing);
   }, [pricingSettings, serviceSelections]);
@@ -873,19 +948,20 @@ export function LeadStepContent({
       // Check if we have an existing primary service address to update
       if (lead.primary_service_address?.id) {
         // UPDATE existing service address via API
-        const result = await authenticatedFetch(`/api/leads/${lead.id}/service-address`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            serviceAddressId: lead.primary_service_address.id,
-            addressData: serviceLocationData,
-          }),
-        });
+        const result = await authenticatedFetch(
+          `/api/leads/${lead.id}/service-address`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              serviceAddressId: lead.primary_service_address.id,
+              addressData: serviceLocationData,
+            }),
+          }
+        );
 
         if (!result.success) {
-          throw new Error(
-            result.error || 'Failed to update service address'
-          );
+          throw new Error(result.error || 'Failed to update service address');
         }
 
         showSuccessToast('Service address updated successfully');
@@ -893,16 +969,19 @@ export function LeadStepContent({
         // CREATE new service address and link to both customer and lead via API
         const isPrimary = !lead.primary_service_address; // Set as primary if no existing primary address
 
-        const result = await authenticatedFetch(`/api/leads/${lead.id}/service-address`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyId: lead.company_id,
-            customerId: lead.customer.id,
-            isPrimary,
-            addressData: serviceLocationData,
-          }),
-        });
+        const result = await authenticatedFetch(
+          `/api/leads/${lead.id}/service-address`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: lead.company_id,
+              customerId: lead.customer.id,
+              isPrimary,
+              addressData: serviceLocationData,
+            }),
+          }
+        );
 
         if (!result.success) {
           throw new Error(result.error || 'Failed to save service address');
@@ -944,7 +1023,11 @@ export function LeadStepContent({
     });
   };
 
-  const handleUpdateServiceAddressSize = async (field: 'home_size_range' | 'yard_size_range', value: string, label: string) => {
+  const handleUpdateServiceAddressSize = async (
+    field: 'home_size_range' | 'yard_size_range',
+    value: string,
+    label: string
+  ) => {
     if (!lead.primary_service_address?.id || !value) return;
 
     try {
@@ -985,7 +1068,9 @@ export function LeadStepContent({
       setHasActiveCadence(true);
 
       try {
-        const taskResult = await authenticatedFetch(`/api/leads/${lead.id}/next-task`);
+        const taskResult = await authenticatedFetch(
+          `/api/leads/${lead.id}/next-task`
+        );
         if (taskResult && taskResult.data) {
           setNextTask(taskResult.data);
         }
@@ -1001,6 +1086,176 @@ export function LeadStepContent({
     }
   };
 
+  const handleManageLead = () => {
+    // Open modal to choose next step
+    setShowManageLeadModal(true);
+  };
+
+  const handleCompleteTaskConfirm = async () => {
+    if (!pendingActivity) return;
+
+    setIsLoggingActivity(true);
+    setShowCompleteTaskModal(false);
+
+    try {
+      // Log the activity WITH task completion (the trigger will handle auto-progression)
+      const response = await fetch(
+        `/api/leads/${lead.id}/activities`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activity_type: pendingActivity.type,
+            notes: pendingActivity.notes || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to log activity');
+      }
+
+      onShowToast?.('Activity logged and task marked complete', 'success');
+      setActivityNotes('');
+      setSelectedActionType('');
+      setPendingActivity(null);
+      onLeadUpdate?.();
+    } catch (error) {
+      console.error('Error logging activity:', error);
+      onShowToast?.('Failed to log activity', 'error');
+    } finally {
+      setIsLoggingActivity(false);
+    }
+  };
+
+  const handleCompleteTaskSkip = async () => {
+    if (!pendingActivity) return;
+
+    setIsLoggingActivity(true);
+    setShowCompleteTaskModal(false);
+
+    try {
+      // Log the activity WITHOUT task completion
+      // TODO: We need an API parameter to skip auto-progression
+      const response = await fetch(
+        `/api/leads/${lead.id}/activities`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activity_type: pendingActivity.type,
+            notes: pendingActivity.notes || null,
+            skip_task_completion: true, // Add this flag
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to log activity');
+      }
+
+      onShowToast?.('Activity logged successfully', 'success');
+      setActivityNotes('');
+      setSelectedActionType('');
+      setPendingActivity(null);
+      onLeadUpdate?.();
+    } catch (error) {
+      console.error('Error logging activity:', error);
+      onShowToast?.('Failed to log activity', 'error');
+    } finally {
+      setIsLoggingActivity(false);
+    }
+  };
+
+  const handleCompleteTaskCancel = () => {
+    setShowCompleteTaskModal(false);
+    setPendingActivity(null);
+  };
+
+  const handleManageLeadProceed = async (
+    option: 'communication' | 'quote' | 'schedule'
+  ) => {
+    // Handler for when "Myself" is selected - assigns to current user
+    if (!user?.id) {
+      showErrorToast('User information not available');
+      return;
+    }
+
+    setIsAssigning(true);
+
+    try {
+      if (ticketType === 'sales') {
+        // Map option to lead status
+        const statusMap = {
+          communication: 'contacting',
+          quote: 'quoted',
+          schedule: 'ready_to_schedule',
+        };
+
+        const newStatus = statusMap[option];
+
+        // Assign lead to current user and update status
+        if (isAdmin) {
+          await adminAPI.updateLead(lead.id, {
+            assigned_to: user.id,
+            lead_status: newStatus,
+          });
+        } else {
+          await adminAPI.updateUserLead(lead.id, {
+            assigned_to: user.id,
+            lead_status: newStatus,
+          });
+        }
+
+        if (onLeadUpdate) {
+          await onLeadUpdate();
+        }
+        showSuccessToast(
+          `Sales lead assigned to you and moved to ${option === 'communication' ? 'Communication' : option === 'quote' ? 'Quote' : 'Scheduling'} stage`
+        );
+      } else if (ticketType === 'support') {
+        // Create support case assigned to current user
+        const supportCaseData = {
+          customer_id: lead.customer_id,
+          company_id: lead.company_id,
+          issue_type: 'general_inquiry',
+          summary: `Support case for ${lead.customer ? `${lead.customer.first_name} ${lead.customer.last_name}` : 'Customer'}`,
+          description: lead.comments || 'Converted from sales lead',
+          status: 'open',
+          priority: lead.priority,
+          assigned_to: user.id,
+        };
+
+        await adminAPI.supportCases.create(supportCaseData);
+
+        // Archive the lead after creating support case
+        if (isAdmin) {
+          await adminAPI.updateLead(lead.id, {
+            lead_status: 'lost',
+            archived: true,
+          });
+        } else {
+          await adminAPI.updateUserLead(lead.id, {
+            lead_status: 'lost',
+            archived: true,
+          });
+        }
+
+        if (onLeadUpdate) {
+          await onLeadUpdate();
+        }
+        showSuccessToast('Support case created and assigned to you');
+      }
+    } catch (error) {
+      console.error('Error managing ticket:', error);
+      showErrorToast(
+        error instanceof Error ? error.message : 'Failed to manage ticket'
+      );
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   const handleAssignTicket = async () => {
     if (!selectedAssignee) {
       showErrorToast('Please select an assignee');
@@ -1008,6 +1263,8 @@ export function LeadStepContent({
     }
 
     setIsAssigning(true);
+    let shouldShowModal = false;
+    let assigneeInfo = null;
 
     try {
       if (ticketType === 'sales') {
@@ -1025,7 +1282,19 @@ export function LeadStepContent({
               lead_status: 'unassigned',
             });
           }
-          showSuccessToast('Lead assigned to sales team');
+
+          // Show modal for sales team assignment
+          const teamCount = assignableUsers.filter(user =>
+            user.departments.includes('sales')
+          ).length;
+          assigneeInfo = {
+            name: 'Sales Team',
+            title: `${teamCount} members`,
+            avatar: null,
+          };
+          shouldShowModal = true;
+          setAssignedUserInfo(assigneeInfo);
+          setShowAssignSuccessModal(true);
         } else {
           // Assigned to specific person - update to contacting status
           if (isAdmin) {
@@ -1039,9 +1308,23 @@ export function LeadStepContent({
               lead_status: 'contacting',
             });
           }
-          showSuccessToast(
-            'Sales lead assigned and status updated to contacting'
+
+          // Get assignee info for modal
+          const assignedUser = assignableUsers.find(
+            (u) => u.id === selectedAssignee
           );
+          if (assignedUser) {
+            assigneeInfo = {
+              name: assignedUser.display_name,
+              title: assignedUser.email,
+              avatar: assignedUser.avatar_url || null,
+            };
+            shouldShowModal = true;
+
+            // Set assignee info and show modal BEFORE onLeadUpdate
+            setAssignedUserInfo(assigneeInfo);
+            setShowAssignSuccessModal(true);
+          }
         }
       } else if (ticketType === 'support') {
         // Support Case logic - create support case first, then archive lead only if successful
@@ -1093,9 +1376,10 @@ export function LeadStepContent({
         showSuccessToast('Lead marked as junk and archived');
       }
 
-      // Refresh lead data if callback provided
-      if (onLeadUpdate) {
-        onLeadUpdate();
+      // Only call onLeadUpdate if modal is not being shown
+      // The modal's "Return to Leads" button will handle navigation
+      if (!shouldShowModal && onLeadUpdate) {
+        await onLeadUpdate();
       }
     } catch (error) {
       console.error('Error assigning ticket:', error);
@@ -1317,10 +1601,16 @@ export function LeadStepContent({
    * Creates or updates a quote line item with size-based price calculations
    * Uses a lock to prevent concurrent executions for the same display order
    */
-  const createOrUpdateQuoteLineItem = async (servicePlan: any, displayOrder: number, additionalData?: { service_frequency?: string; discount_percentage?: number }) => {
+  const createOrUpdateQuoteLineItem = async (
+    servicePlan: any,
+    displayOrder: number,
+    additionalData?: {
+      service_frequency?: string;
+      discount_percentage?: number;
+    }
+  ) => {
     // Check if already creating/updating this display order
     if (lineItemCreationLockRef.current.has(displayOrder)) {
-      console.log(`Skipping duplicate line item creation for display_order ${displayOrder}`);
       return;
     }
 
@@ -1346,7 +1636,7 @@ export function LeadStepContent({
 
       // Find existing line item at this display order
       const existingLineItem = quote.line_items?.find(
-        (item) => item.display_order === displayOrder
+        item => item.display_order === displayOrder
       );
 
       // Prepare the line item data
@@ -1399,10 +1689,13 @@ export function LeadStepContent({
   };
 
   const getButtonText = () => {
+    // Check if "Myself" is selected (current user)
+    const isMyself = selectedAssignee === user?.id;
+
     if (ticketType === 'sales') {
-      return 'Assign Sales Lead';
+      return isMyself ? 'Manage Sales Lead' : 'Assign Sales Lead';
     } else if (ticketType === 'support') {
-      return 'Assign Support Case';
+      return isMyself ? 'Manage Support Case' : 'Assign Support Case';
     } else if (ticketType === 'junk') {
       return 'Junk It';
     }
@@ -1461,14 +1754,13 @@ export function LeadStepContent({
     <div className={styles.defaultAvatar}>{name.charAt(0).toUpperCase()}</div>
   );
 
-  const renderQualifyContent = () => (
-    <>
-      <div className={styles.contentLeft}>
-        <InfoCard
-          title="Assign Ticket"
-          icon={<Ticket size={20} />}
-          startExpanded={true}
-        >
+  const renderQualifyContent = () => {
+    // Define tabs for the left column
+    const qualifyTabs: TabItem[] = [
+      {
+        id: 'assign',
+        label: 'Assign Ticket',
+        content: (
           <div className={styles.cardContent}>
             {/* Customer Information */}
             <div className={styles.customerSection}>
@@ -1561,7 +1853,7 @@ export function LeadStepContent({
                 >
                   Assign to:
                 </div>
-                <div className={styles.dropdown}>
+                <div className={styles.dropdown} ref={assignmentDropdownRef}>
                   <button
                     className={styles.dropdownButton}
                     onClick={() =>
@@ -1722,7 +2014,7 @@ export function LeadStepContent({
             <div className={styles.actionSection}>
               <button
                 className={styles.assignButton}
-                onClick={handleAssignTicket}
+                onClick={selectedAssignee === user?.id ? handleManageLead : handleAssignTicket}
                 disabled={isAssigning || !selectedAssignee}
               >
                 {isAssigning ? (
@@ -1743,15 +2035,13 @@ export function LeadStepContent({
               </button>
             </div>
           </div>
-        </InfoCard>
-
-        <InfoCard
-          title={
-            lead.lead_type === 'web_form' ? 'Form Details' : 'Call Information'
-          }
-          icon={<ReceiptText size={20} />}
-          startExpanded={true}
-        >
+        ),
+      },
+      {
+        id: 'call',
+        label:
+          lead.lead_type === 'web_form' ? 'Form Details' : 'Call Information',
+        content: (
           <div className={styles.cardContent}>
             {lead.lead_type === 'web_form' ? (
               <>
@@ -2002,9 +2292,7 @@ export function LeadStepContent({
                 {/* Call Recording Section */}
                 {lead.call_record.recording_url && (
                   <div className={styles.recordingSection}>
-                    <h4 className={cardStyles.dataLabel}>
-                      Call Recording
-                    </h4>
+                    <h4 className={cardStyles.dataLabel}>Call Recording</h4>
                     <AudioPlayer
                       src={lead.call_record.recording_url}
                       title={`Call Recording - ${lead.customer?.first_name} ${lead.customer?.last_name}`.trim()}
@@ -2057,10 +2345,17 @@ export function LeadStepContent({
               </div>
             )}
           </div>
-        </InfoCard>
-      </div>
+        ),
+      },
+    ];
 
-      <div className={styles.contentRight}>
+    return (
+      <>
+        <div className={styles.contentLeft}>
+          <TabCard tabs={qualifyTabs} defaultTabId="assign" />
+        </div>
+
+        <div className={styles.contentRight}>
         <InfoCard
           title="Contact Information"
           icon={<SquareUserRound size={20} />}
@@ -2068,7 +2363,7 @@ export function LeadStepContent({
         >
           <CustomerInformation
             ticket={createTicketFromLead}
-            onUpdate={async (updatedCustomer) => {
+            onUpdate={async updatedCustomer => {
               // Update the lead's customer data optimistically
               if (lead.customer && updatedCustomer) {
                 // Merge the updated customer data into the lead
@@ -2101,7 +2396,10 @@ export function LeadStepContent({
               }
 
               if (onShowToast) {
-                onShowToast('Customer information updated successfully.', 'success');
+                onShowToast(
+                  'Customer information updated successfully.',
+                  'success'
+                );
               }
             }}
           />
@@ -2109,7 +2407,7 @@ export function LeadStepContent({
 
         <ServiceLocationCard
           serviceAddress={lead.primary_service_address || null}
-          startExpanded={true}
+          startExpanded={false}
           showSizeInputs
           pricingSettings={pricingSettings || undefined}
           onShowToast={onShowToast}
@@ -2145,17 +2443,16 @@ export function LeadStepContent({
           </div>
         </InfoCard>
       </div>
-    </>
-  );
+      </>
+    );
+  };
 
-  const renderContactingContent = () => (
-    <>
-      <div className={styles.contentLeft}>
-        <InfoCard
-          title="Contact Log"
-          icon={<ArrowRightLeft size={20} />}
-          startExpanded={true}
-        >
+  const renderContactingContent = () => {
+    const contactingTabs: TabItem[] = [
+      {
+        id: 'contact',
+        label: 'Contact Log',
+        content: (
           <div className={styles.cardContent}>
             <div>
               <h4 className={cardStyles.defaultText}>
@@ -2168,7 +2465,9 @@ export function LeadStepContent({
                 nextTask ? (
                   <div className={cadenceStyles.stepItem}>
                     <div className={cadenceStyles.stepIcon}>
-                      {nextTask.action_type === 'live_call' || nextTask.action_type === 'outbound_call' || nextTask.action_type === 'ai_call' ? (
+                      {nextTask.action_type === 'live_call' ||
+                      nextTask.action_type === 'outbound_call' ||
+                      nextTask.action_type === 'ai_call' ? (
                         <Phone size={16} />
                       ) : nextTask.action_type === 'text_message' ? (
                         <MessageSquareMore size={16} />
@@ -2181,38 +2480,75 @@ export function LeadStepContent({
                     <div className={cadenceStyles.stepContent}>
                       <div className={cadenceStyles.stepHeader}>
                         <span className={cardStyles.inputText}>
-                          Day {nextTask.day_number}: {nextTask.time_of_day === 'AM' ? 'Morning' : nextTask.time_of_day === 'PM' ? 'Afternoon' : nextTask.time_of_day} {
-                            nextTask.action_type === 'live_call' ? 'Call' :
-                            nextTask.action_type === 'outbound_call' ? 'Outbound Call' :
-                            nextTask.action_type === 'ai_call' ? 'AI Call' :
-                            nextTask.action_type === 'text_message' ? 'Text' :
-                            nextTask.action_type === 'email' ? 'Email' :
-                            nextTask.action_type
-                          }
+                          Day {nextTask.day_number}:{' '}
+                          {nextTask.time_of_day === 'AM'
+                            ? 'Morning'
+                            : nextTask.time_of_day === 'PM'
+                              ? 'Afternoon'
+                              : nextTask.time_of_day}{' '}
+                          {nextTask.action_type === 'live_call'
+                            ? 'Call'
+                            : nextTask.action_type === 'outbound_call'
+                              ? 'Outbound Call'
+                              : nextTask.action_type === 'ai_call'
+                                ? 'AI Call'
+                                : nextTask.action_type === 'text_message'
+                                  ? 'Text'
+                                  : nextTask.action_type === 'email'
+                                    ? 'Email'
+                                    : nextTask.action_type}
                         </span>
                         <div className={cadenceStyles.priorityIndicator}>
                           <span className={cardStyles.inputText}>
-                            {nextTask.priority.charAt(0).toUpperCase() + nextTask.priority.slice(1)}
+                            {nextTask.priority.charAt(0).toUpperCase() +
+                              nextTask.priority.slice(1)}
                           </span>
-                          <div className={`${cadenceStyles.priorityDot} ${
-                            nextTask.priority === 'urgent' ? cadenceStyles.priorityDotUrgent :
-                            nextTask.priority === 'high' ? cadenceStyles.priorityDotHigh :
-                            nextTask.priority === 'low' ? cadenceStyles.priorityDotLow :
-                            cadenceStyles.priorityDotMedium
-                          }`}>
+                          <div
+                            className={`${cadenceStyles.priorityDot} ${
+                              nextTask.priority === 'urgent'
+                                ? cadenceStyles.priorityDotUrgent
+                                : nextTask.priority === 'high'
+                                  ? cadenceStyles.priorityDotHigh
+                                  : nextTask.priority === 'low'
+                                    ? cadenceStyles.priorityDotLow
+                                    : cadenceStyles.priorityDotMedium
+                            }`}
+                          >
                             <div className={cadenceStyles.priorityDotInner} />
                           </div>
                         </div>
                       </div>
                       {nextTask.due_date && nextTask.due_time ? (
                         <div className={cardStyles.dataLabel}>
-                          Target: {new Date(nextTask.due_date).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' })} | {
-                            new Date(`1970-01-01T${nextTask.due_time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-                          }
+                          Target:{' '}
+                          {new Date(nextTask.due_date + 'T00:00:00').toLocaleDateString(
+                            'en-US',
+                            {
+                              weekday: 'long',
+                              month: 'numeric',
+                              day: 'numeric',
+                            }
+                          )}{' '}
+                          |{' '}
+                          {new Date(
+                            `1970-01-01T${nextTask.due_time}`
+                          ).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                          })}
                         </div>
                       ) : nextTask.due_date ? (
                         <div className={cardStyles.dataLabel}>
-                          Target: {new Date(nextTask.due_date).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' })}
+                          Target:{' '}
+                          {new Date(nextTask.due_date + 'T00:00:00').toLocaleDateString(
+                            'en-US',
+                            {
+                              weekday: 'long',
+                              month: 'numeric',
+                              day: 'numeric',
+                            }
+                          )}
                         </div>
                       ) : null}
                     </div>
@@ -2223,34 +2559,32 @@ export function LeadStepContent({
                   </div>
                 )
               ) : (
-                // No active cadence - show start button
-                <div>
-                  <p className={cardStyles.dataLabel} style={{ marginBottom: '12px' }}>
-                    No active sales cadence. Start a cadence to begin automated follow-up tasks.
-                  </p>
-                  <button
-                    onClick={handleStartCadence}
-                    disabled={isStartingCadence || !lead.assigned_to}
-                    className={styles.primaryButton}
-                  >
-                    {isStartingCadence ? 'Starting...' : 'Start Sales Cadence'}
-                  </button>
-                  {!lead.assigned_to && (
-                    <p className={cardStyles.dataLabel} style={{ marginTop: '8px', color: '#e53e3e' }}>
-                      Lead must be assigned before starting a cadence
-                    </p>
-                  )}
+                <div style={{
+                  padding: '12px 16px',
+                  backgroundColor: '#eff6ff',
+                  border: '1px solid #93c5fd',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="10" cy="10" r="9" stroke="#3b82f6" strokeWidth="2"/>
+                    <path d="M10 6V10M10 14H10.01" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  <span style={{ color: '#3b82f6', fontSize: '14px' }}>
+                    Select a sales cadence to automatically create and schedule your tasks!
+                  </span>
                 </div>
               )}
             </div>
 
             <div>
               <h4 className={cardStyles.defaultText}>
-                Select an action to log:
+                Select activity to log:
               </h4>
               <div className={styles.tabContainer}>
                 {[
-                  { id: 'live_call', label: 'Live Call' },
                   { id: 'outbound_call', label: 'Outbound Call' },
                   { id: 'text_message', label: 'Text Message' },
                   { id: 'ai_call', label: 'AI Call' },
@@ -2260,7 +2594,9 @@ export function LeadStepContent({
                     key={tab.id}
                     onClick={() => setSelectedActionType(tab.id)}
                     className={`${styles.tabButton} ${
-                      selectedActionType === tab.id ? styles.active : styles.inactive
+                      selectedActionType === tab.id
+                        ? styles.active
+                        : styles.inactive
                     } ${index === 0 ? styles.firstTab : ''} ${
                       index === array.length - 1 ? styles.lastTab : ''
                     }`}
@@ -2276,12 +2612,22 @@ export function LeadStepContent({
                 className={cardStyles.inputLabels}
                 style={{ display: 'block' }}
               >
-                Notes <span className={cardStyles.dataLabel}>(optional)</span>
+                Comment <span className={cardStyles.dataLabel}>(optional)</span>
               </label>
               <textarea
                 value={activityNotes}
-                onChange={(e) => setActivityNotes(e.target.value)}
-                placeholder="Add details about this call"
+                onChange={e => setActivityNotes(e.target.value)}
+                placeholder={
+                  selectedActionType === 'outbound_call'
+                    ? 'Add details about this call'
+                    : selectedActionType === 'text_message'
+                      ? 'Add details about this text message'
+                      : selectedActionType === 'ai_call'
+                        ? 'Add details about this AI call'
+                        : selectedActionType === 'email'
+                          ? 'Add details about this email'
+                          : 'Add a comment to ticket history'
+                }
                 style={{
                   width: '100%',
                   minHeight: '80px',
@@ -2296,43 +2642,44 @@ export function LeadStepContent({
               />
             </div>
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '12px',
-              }}
-            >
-              <button
-                onClick={() => {
-                  setActivityNotes('');
-                  setSelectedActionType('live_call');
-                }}
+            {selectedActionType && (
+              <div
                 style={{
-                  padding: '8px 16px',
-                  border: '1px solid var(--gray-300)',
-                  borderRadius: '6px',
-                  backgroundColor: 'white',
-                  color: 'var(--gray-600)',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '12px',
                 }}
               >
-                Clear
-              </button>
-              <button
-                onClick={async () => {
-                  setIsLoggingActivity(true);
-                  try {
-                    const response = await fetch(`/api/leads/${lead.id}/activities`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        activity_type: selectedActionType,
-                        notes: activityNotes || null,
-                      }),
-                    });
+                <button
+                  onClick={async () => {
+                    // Check if this activity matches the next recommended action
+                    const activityMatchesTask = nextTask &&
+                      nextTask.action_type === selectedActionType;
+
+                    if (activityMatchesTask) {
+                      // Show modal to ask if they want to mark task complete
+                      setPendingActivity({
+                        type: selectedActionType,
+                        notes: activityNotes || ''
+                      });
+                      setShowCompleteTaskModal(true);
+                      return;
+                    }
+
+                    // If doesn't match, just log the activity without asking
+                    setIsLoggingActivity(true);
+                    try {
+                      const response = await fetch(
+                        `/api/leads/${lead.id}/activities`,
+                        {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            activity_type: selectedActionType,
+                          notes: activityNotes || null,
+                        }),
+                      }
+                    );
 
                     if (!response.ok) {
                       throw new Error('Failed to log activity');
@@ -2340,7 +2687,7 @@ export function LeadStepContent({
 
                     onShowToast?.('Activity logged successfully', 'success');
                     setActivityNotes('');
-                    setSelectedActionType('live_call');
+                    setSelectedActionType('');
                     onLeadUpdate?.();
                   } catch (error) {
                     console.error('Error logging activity:', error);
@@ -2364,19 +2711,35 @@ export function LeadStepContent({
               >
                 {isLoggingActivity ? 'Logging...' : 'Log Activity'}
               </button>
-            </div>
+              </div>
+            )}
           </div>
-        </InfoCard>
+        ),
+      },
+      {
+        id: 'cadence',
+        label: 'Sales Cadence',
+        content: (
+          <SalesCadenceCard
+            leadId={lead.id}
+            companyId={lead.company_id}
+            leadCreatedAt={lead.created_at}
+            onCadenceSelect={setSelectedCadenceId}
+            onStartCadence={handleStartCadence}
+            isStartingCadence={isStartingCadence}
+            hideCard={true}
+          />
+        ),
+      },
+    ];
 
-        <SalesCadenceCard
-          leadId={lead.id}
-          companyId={lead.company_id}
-          leadCreatedAt={lead.created_at}
-          onCadenceSelect={setSelectedCadenceId}
-        />
-      </div>
+    return (
+      <>
+        <div className={styles.contentLeft}>
+          <TabCard tabs={contactingTabs} defaultTabId="contact" />
+        </div>
 
-      <div className={styles.contentRight}>
+        <div className={styles.contentRight}>
         <InfoCard
           title="Contact Information"
           icon={<SquareUserRound size={20} />}
@@ -2384,7 +2747,7 @@ export function LeadStepContent({
         >
           <CustomerInformation
             ticket={createTicketFromLead}
-            onUpdate={async (updatedCustomer) => {
+            onUpdate={async updatedCustomer => {
               // Update the lead's customer data optimistically
               if (lead.customer && updatedCustomer) {
                 // Merge the updated customer data into the lead
@@ -2417,7 +2780,10 @@ export function LeadStepContent({
               }
 
               if (onShowToast) {
-                onShowToast('Customer information updated successfully.', 'success');
+                onShowToast(
+                  'Customer information updated successfully.',
+                  'success'
+                );
               }
             }}
           />
@@ -2461,148 +2827,63 @@ export function LeadStepContent({
           </div>
         </InfoCard>
       </div>
-    </>
-  );
+      </>
+    );
+  };
 
   const renderQuotedContent = () => {
     const selectedPlan = serviceSelections[0]?.servicePlan;
     const selectedService = selectedPlan?.plan_name || '';
 
-    return (
-      <>
-        <div className={styles.contentLeft}>
-        <InfoCard
-          title="Pest Select"
-          icon={<CopyCheck size={20} />}
-          startExpanded={true}
-        >
-          <div className={styles.cardContent} style={{ position: 'relative' }}>
-            {loadingPlan && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10,
-                  borderRadius: '6px',
-                }}
-              >
-                <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
-                  Updating service plan...
+    const quotedTabs: TabItem[] = [
+      {
+        id: 'pest',
+        label: 'Pest Select',
+        content: (
+          <div
+            className={styles.cardContent}
+            style={{ position: 'relative' }}
+          >
+              {loadingPlan && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10,
+                    borderRadius: '6px',
+                  }}
+                >
+                  <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
+                    Updating service plan...
+                  </div>
                 </div>
-              </div>
-            )}
-            {loadingPestOptions ? (
-              <div className={cardStyles.lightText}>
-                Loading pest options...
-              </div>
-            ) : (
-              <>
-                {/* Primary Pest Section */}
-                <div className={styles.pestSection}>
-                  <label className={cardStyles.inputLabels}>
-                    Primary Pest
-                  </label>
+              )}
+              {loadingPestOptions ? (
+                <div className={cardStyles.lightText}>
+                  Loading pest options...
+                </div>
+              ) : (
+                <>
+                  {/* Primary Pest Section */}
+                  <div className={styles.pestSection}>
+                    <label className={cardStyles.inputLabels}>
+                      Primary Pest
+                    </label>
 
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <div
                       style={{
                         display: 'flex',
-                        justifyContent: 'flex-start',
-                        alignItems: 'center',
                         gap: '8px',
-                        padding: '6px',
-                        border: '1px solid var(--gray-300)',
-                        borderRadius: '6px',
-                        minHeight: '42px',
-                        flex: 1,
+                        alignItems: 'center',
                       }}
                     >
-                      {selectedPests.length > 0 && (
-                        <div className={styles.pestPillsContainer}>
-                          {(() => {
-                            const primaryPestId = selectedPests[0];
-                            const pest = pestOptions.find(p => p.id === primaryPestId);
-                            return (
-                              <div
-                                key={primaryPestId}
-                                className={`${styles.pestPill} ${styles.primary}`}
-                              >
-                                <span>{pest?.custom_label || 'Unknown'}</span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className={styles.pestDropdownContainer} ref={pestDropdownRef}>
-                      <button
-                        className={`${styles.addPestButton} ${isPestDropdownOpen ? styles.open : ''}`}
-                        onClick={() => setIsPestDropdownOpen(!isPestDropdownOpen)}
-                        type="button"
-                      >
-                        {selectedPests.length === 0 ? 'Select Primary Pest' : 'Change Primary Pest'}
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="20"
-                          height="21"
-                          viewBox="0 0 20 21"
-                          fill="none"
-                        >
-                          <path
-                            d="M6 12.2539L10 7.80946L14 12.2539"
-                            stroke="#99A1AF"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
-
-                      {isPestDropdownOpen && (
-                        <div className={styles.pestDropdownMenu}>
-                          {pestOptions.length > 0 ? (
-                            pestOptions.map(pest => (
-                              <button
-                                key={pest.id}
-                                className={styles.pestDropdownOption}
-                                onClick={async () => {
-                                  // Update primary pest
-                                  setSelectedPests([pest.id, ...additionalPests]);
-                                  await updatePrimaryPest(pest.id);
-                                  setIsPestDropdownOpen(false);
-                                }}
-                                type="button"
-                              >
-                                {pest.custom_label}
-                              </button>
-                            ))
-                          ) : (
-                            <div className={cardStyles.lightText} style={{ padding: '12px' }}>
-                              No pest options available
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Pests Section */}
-                {selectedPests.length > 0 && (
-                  <div className={styles.pestSection}>
-                    <label className={cardStyles.inputLabels}>
-                      Additional Pests
-                    </label>
-
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <div
                         style={{
                           display: 'flex',
@@ -2613,52 +2894,43 @@ export function LeadStepContent({
                           border: '1px solid var(--gray-300)',
                           borderRadius: '6px',
                           minHeight: '42px',
-                          flexWrap: 'wrap',
                           flex: 1,
                         }}
                       >
-                        {additionalPests.length > 0 && (
+                        {selectedPests.length > 0 && (
                           <div className={styles.pestPillsContainer}>
-                            {additionalPests.map(pestId => {
-                              const pest = pestOptions.find(p => p.id === pestId);
+                            {(() => {
+                              const primaryPestId = selectedPests[0];
+                              const pest = pestOptions.find(
+                                p => p.id === primaryPestId
+                              );
                               return (
                                 <div
-                                  key={pestId}
-                                  className={styles.pestPill}
-                                  onClick={async () => {
-                                    const newAdditionalPests = additionalPests.filter(id => id !== pestId);
-                                    setAdditionalPests(newAdditionalPests);
-                                    setSelectedPests([selectedPests[0], ...newAdditionalPests]);
-                                    await updateAdditionalPests(newAdditionalPests);
-                                  }}
+                                  key={primaryPestId}
+                                  className={`${styles.pestPill} ${styles.primary}`}
                                 >
                                   <span>{pest?.custom_label || 'Unknown'}</span>
-                                  <div className={styles.pestPillRemoveIcon}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="8" height="9" viewBox="0 0 8 9" fill="none">
-                                      <g clipPath="url(#clip0_1754_15130)">
-                                        <path d="M1 1.25781L7 7.25781M7 1.25781L1 7.25781" stroke="#99A1AF"/>
-                                      </g>
-                                      <defs>
-                                        <clipPath id="clip0_1754_15130">
-                                          <rect width="8" height="8" fill="white" transform="translate(0 0.257812)"/>
-                                        </clipPath>
-                                      </defs>
-                                    </svg>
-                                  </div>
                                 </div>
                               );
-                            })}
+                            })()}
                           </div>
                         )}
                       </div>
 
-                      <div className={styles.pestDropdownContainer} ref={additionalPestDropdownRef}>
+                      <div
+                        className={styles.pestDropdownContainer}
+                        ref={pestDropdownRef}
+                      >
                         <button
-                          className={`${styles.addPestButton} ${isAdditionalPestDropdownOpen ? styles.open : ''}`}
-                          onClick={() => setIsAdditionalPestDropdownOpen(!isAdditionalPestDropdownOpen)}
+                          className={`${styles.addPestButton} ${isPestDropdownOpen ? styles.open : ''}`}
+                          onClick={() =>
+                            setIsPestDropdownOpen(!isPestDropdownOpen)
+                          }
                           type="button"
                         >
-                          {additionalPests.length === 0 ? 'Add Additional Pest' : 'Add More Pests'}
+                          {selectedPests.length === 0
+                            ? 'Select Primary Pest'
+                            : 'Change Primary Pest'}
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
                             width="20"
@@ -2676,29 +2948,33 @@ export function LeadStepContent({
                           </svg>
                         </button>
 
-                        {isAdditionalPestDropdownOpen && (
+                        {isPestDropdownOpen && (
                           <div className={styles.pestDropdownMenu}>
-                            {pestOptions
-                              .filter(pest => !selectedPests.includes(pest.id))
-                              .map(pest => (
+                            {pestOptions.length > 0 ? (
+                              pestOptions.map(pest => (
                                 <button
                                   key={pest.id}
                                   className={styles.pestDropdownOption}
                                   onClick={async () => {
-                                    const newAdditionalPests = [...additionalPests, pest.id];
-                                    setAdditionalPests(newAdditionalPests);
-                                    setSelectedPests([selectedPests[0], ...newAdditionalPests]);
-                                    await updateAdditionalPests(newAdditionalPests);
-                                    setIsAdditionalPestDropdownOpen(false);
+                                    // Update primary pest
+                                    setSelectedPests([
+                                      pest.id,
+                                      ...additionalPests,
+                                    ]);
+                                    await updatePrimaryPest(pest.id);
+                                    setIsPestDropdownOpen(false);
                                   }}
                                   type="button"
                                 >
                                   {pest.custom_label}
                                 </button>
-                              ))}
-                            {pestOptions.filter(pest => !selectedPests.includes(pest.id)).length === 0 && (
-                              <div className={cardStyles.lightText}>
-                                All pests selected
+                              ))
+                            ) : (
+                              <div
+                                className={cardStyles.lightText}
+                                style={{ padding: '12px' }}
+                              >
+                                No pest options available
                               </div>
                             )}
                           </div>
@@ -2706,77 +2982,246 @@ export function LeadStepContent({
                       </div>
                     </div>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        </InfoCard>
 
-        <InfoCard
-          title="Service Selection"
-          icon={<ShieldCheck size={20} />}
-          startExpanded={true}
-        >
-          <div className={styles.cardContent} style={{ position: 'relative' }}>
-            {(loadingPlan || isQuoteUpdating) && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10,
-                  borderRadius: '6px',
-                }}
-              >
-                <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
-                  {loadingPlan ? 'Loading service plan...' : 'Updating...'}
+                  {/* Additional Pests Section */}
+                  {selectedPests.length > 0 && (
+                    <div className={styles.pestSection}>
+                      <label className={cardStyles.inputLabels}>
+                        Additional Pests
+                      </label>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'flex-start',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px',
+                            border: '1px solid var(--gray-300)',
+                            borderRadius: '6px',
+                            minHeight: '42px',
+                            flexWrap: 'wrap',
+                            flex: 1,
+                          }}
+                        >
+                          {additionalPests.length > 0 && (
+                            <div className={styles.pestPillsContainer}>
+                              {additionalPests.map(pestId => {
+                                const pest = pestOptions.find(
+                                  p => p.id === pestId
+                                );
+                                return (
+                                  <div
+                                    key={pestId}
+                                    className={styles.pestPill}
+                                    onClick={async () => {
+                                      const newAdditionalPests =
+                                        additionalPests.filter(
+                                          id => id !== pestId
+                                        );
+                                      setAdditionalPests(newAdditionalPests);
+                                      setSelectedPests([
+                                        selectedPests[0],
+                                        ...newAdditionalPests,
+                                      ]);
+                                      await updateAdditionalPests(
+                                        newAdditionalPests
+                                      );
+                                    }}
+                                  >
+                                    <span>
+                                      {pest?.custom_label || 'Unknown'}
+                                    </span>
+                                    <div className={styles.pestPillRemoveIcon}>
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="8"
+                                        height="9"
+                                        viewBox="0 0 8 9"
+                                        fill="none"
+                                      >
+                                        <g clipPath="url(#clip0_1754_15130)">
+                                          <path
+                                            d="M1 1.25781L7 7.25781M7 1.25781L1 7.25781"
+                                            stroke="#99A1AF"
+                                          />
+                                        </g>
+                                        <defs>
+                                          <clipPath id="clip0_1754_15130">
+                                            <rect
+                                              width="8"
+                                              height="8"
+                                              fill="white"
+                                              transform="translate(0 0.257812)"
+                                            />
+                                          </clipPath>
+                                        </defs>
+                                      </svg>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          className={styles.pestDropdownContainer}
+                          ref={additionalPestDropdownRef}
+                        >
+                          <button
+                            className={`${styles.addPestButton} ${isAdditionalPestDropdownOpen ? styles.open : ''}`}
+                            onClick={() =>
+                              setIsAdditionalPestDropdownOpen(
+                                !isAdditionalPestDropdownOpen
+                              )
+                            }
+                            type="button"
+                          >
+                            {additionalPests.length === 0
+                              ? 'Add Additional Pest'
+                              : 'Add More Pests'}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="20"
+                              height="21"
+                              viewBox="0 0 20 21"
+                              fill="none"
+                            >
+                              <path
+                                d="M6 12.2539L10 7.80946L14 12.2539"
+                                stroke="#99A1AF"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+
+                          {isAdditionalPestDropdownOpen && (
+                            <div className={styles.pestDropdownMenu}>
+                              {pestOptions
+                                .filter(
+                                  pest => !selectedPests.includes(pest.id)
+                                )
+                                .map(pest => (
+                                  <button
+                                    key={pest.id}
+                                    className={styles.pestDropdownOption}
+                                    onClick={async () => {
+                                      const newAdditionalPests = [
+                                        ...additionalPests,
+                                        pest.id,
+                                      ];
+                                      setAdditionalPests(newAdditionalPests);
+                                      setSelectedPests([
+                                        selectedPests[0],
+                                        ...newAdditionalPests,
+                                      ]);
+                                      await updateAdditionalPests(
+                                        newAdditionalPests
+                                      );
+                                      setIsAdditionalPestDropdownOpen(false);
+                                    }}
+                                    type="button"
+                                  >
+                                    {pest.custom_label}
+                                  </button>
+                                ))}
+                              {pestOptions.filter(
+                                pest => !selectedPests.includes(pest.id)
+                              ).length === 0 && (
+                                <div className={cardStyles.lightText}>
+                                  All pests selected
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+        ),
+      },
+      {
+        id: 'service',
+        label: 'Service Selection',
+        content: (
+          <div
+            className={styles.cardContent}
+            style={{ position: 'relative' }}
+          >
+              {(loadingPlan || isQuoteUpdating) && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10,
+                    borderRadius: '6px',
+                  }}
+                >
+                  <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
+                    {loadingPlan ? 'Loading service plan...' : 'Updating...'}
+                  </div>
                 </div>
-              </div>
-            )}
-            {loadingPlan && !selectedPlan ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'var(--gray-500)',
-                }}
-              >
-                Loading service plan...
-              </div>
-            ) : selectedPests.length === 0 ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'var(--gray-500)',
-                }}
-              >
-                Select a pest to view available service plans
-              </div>
-            ) : !selectedPlan ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'var(--gray-500)',
-                }}
-              >
-                No service plans available for selected pest
-              </div>
-            ) : (
-              <>
-                {/* Service Selection Form */}
-                {/* Row 1: Size of Home, Yard Size (2 columns) */}
+              )}
+              {loadingPlan && !selectedPlan ? (
+                <div
+                  style={{
+                    padding: '20px',
+                    textAlign: 'center',
+                    color: 'var(--gray-500)',
+                  }}
+                >
+                  Loading service plan...
+                </div>
+              ) : selectedPests.length === 0 ? (
+                <div
+                  style={{
+                    padding: '20px',
+                    textAlign: 'center',
+                    color: 'var(--gray-500)',
+                  }}
+                >
+                  Select a pest to view available service plans
+                </div>
+              ) : !selectedPlan ? (
+                <div
+                  style={{
+                    padding: '20px',
+                    textAlign: 'center',
+                    color: 'var(--gray-500)',
+                  }}
+                >
+                  No service plans available for selected pest
+                </div>
+              ) : (
+                <>
+                  {/* Service Selection Form */}
+                  {/* Row 1: Size of Home, Yard Size (2 columns) */}
                   <div className={`${styles.gridRow} ${styles.twoColumns}`}>
                     <div className={styles.formField}>
                       <div className={styles.fieldHeader}>
-                        <label className={styles.fieldLabel}>Size of Home</label>
+                        <label className={styles.fieldLabel}>
+                          Size of Home
+                        </label>
                       </div>
                       <select
                         className={styles.selectInput}
@@ -2784,7 +3229,9 @@ export function LeadStepContent({
                         onChange={async e => {
                           const rangeValue = e.target.value;
                           setSelectedHomeSizeOption(rangeValue);
-                          const option = homeSizeOptions.find(opt => opt.value === rangeValue);
+                          const option = homeSizeOptions.find(
+                            opt => opt.value === rangeValue
+                          );
                           if (option) {
                             setHomeSize(option.rangeStart);
                           }
@@ -2792,25 +3239,43 @@ export function LeadStepContent({
                           // Update quote (which will also update service_address via API)
                           if (quote && rangeValue) {
                             try {
-                              const response = await fetch(`/api/quotes/${quote.id}`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ home_size_range: rangeValue }),
-                              });
+                              const response = await fetch(
+                                `/api/quotes/${quote.id}`,
+                                {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    home_size_range: rangeValue,
+                                  }),
+                                }
+                              );
 
                               if (!response.ok) {
-                                throw new Error('Failed to update home size range');
+                                throw new Error(
+                                  'Failed to update home size range'
+                                );
                               }
 
                               const data = await response.json();
 
                               if (data.success && data.data) {
                                 await broadcastQuoteUpdate(data.data);
-                                onShowToast?.('Home size updated successfully', 'success');
+                                onShowToast?.(
+                                  'Home size updated successfully',
+                                  'success'
+                                );
                               }
                             } catch (error) {
-                              console.error('Error updating home size range:', error);
-                              onShowToast?.('Failed to update home size', 'error');
+                              console.error(
+                                'Error updating home size range:',
+                                error
+                              );
+                              onShowToast?.(
+                                'Failed to update home size',
+                                'error'
+                              );
                             }
                           }
                         }}
@@ -2833,7 +3298,9 @@ export function LeadStepContent({
                         onChange={async e => {
                           const rangeValue = e.target.value;
                           setSelectedYardSizeOption(rangeValue);
-                          const option = yardSizeOptions.find(opt => opt.value === rangeValue);
+                          const option = yardSizeOptions.find(
+                            opt => opt.value === rangeValue
+                          );
                           if (option) {
                             setYardSize(option.rangeStart);
                           }
@@ -2841,25 +3308,43 @@ export function LeadStepContent({
                           // Update quote (which will also update service_address via API)
                           if (quote && rangeValue) {
                             try {
-                              const response = await fetch(`/api/quotes/${quote.id}`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ yard_size_range: rangeValue }),
-                              });
+                              const response = await fetch(
+                                `/api/quotes/${quote.id}`,
+                                {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    yard_size_range: rangeValue,
+                                  }),
+                                }
+                              );
 
                               if (!response.ok) {
-                                throw new Error('Failed to update yard size range');
+                                throw new Error(
+                                  'Failed to update yard size range'
+                                );
                               }
 
                               const data = await response.json();
 
                               if (data.success && data.data) {
                                 await broadcastQuoteUpdate(data.data);
-                                onShowToast?.('Yard size updated successfully', 'success');
+                                onShowToast?.(
+                                  'Yard size updated successfully',
+                                  'success'
+                                );
                               }
                             } catch (error) {
-                              console.error('Error updating yard size range:', error);
-                              onShowToast?.('Failed to update yard size', 'error');
+                              console.error(
+                                'Error updating yard size range:',
+                                error
+                              );
+                              onShowToast?.(
+                                'Failed to update yard size',
+                                'error'
+                              );
                             }
                           }
                         }}
@@ -2888,12 +3373,16 @@ export function LeadStepContent({
                           onChange={async e => {
                             const planName = e.target.value;
                             // Update the selected plan when user selects from dropdown
-                            const plan = allServicePlans.find(p => p.plan_name === planName);
+                            const plan = allServicePlans.find(
+                              p => p.plan_name === planName
+                            );
                             if (plan) {
                               // Update the first service selection
                               setServiceSelections(prev =>
                                 prev.map((sel, idx) =>
-                                  idx === 0 ? { ...sel, servicePlan: plan } : sel
+                                  idx === 0
+                                    ? { ...sel, servicePlan: plan }
+                                    : sel
                                 )
                               );
                               // Create or update quote line item with size-based pricing
@@ -2945,11 +3434,18 @@ export function LeadStepContent({
 
                             // Update quote line item if we have a selected service plan
                             if (selectedPlan && newFrequency) {
-                              await createOrUpdateQuoteLineItem(selectedPlan, 0, {
-                                service_frequency: newFrequency,
-                              });
+                              await createOrUpdateQuoteLineItem(
+                                selectedPlan,
+                                0,
+                                {
+                                  service_frequency: newFrequency,
+                                }
+                              );
                             } else if (newFrequency) {
-                              onShowToast?.('Service frequency updated successfully', 'success');
+                              onShowToast?.(
+                                'Service frequency updated successfully',
+                                'success'
+                              );
                             }
                           }}
                         >
@@ -2988,11 +3484,18 @@ export function LeadStepContent({
 
                             // Update quote line item if we have a selected service plan
                             if (selectedPlan && newDiscount !== '') {
-                              await createOrUpdateQuoteLineItem(selectedPlan, 0, {
-                                discount_percentage: parseFloat(newDiscount),
-                              });
+                              await createOrUpdateQuoteLineItem(
+                                selectedPlan,
+                                0,
+                                {
+                                  discount_percentage: parseFloat(newDiscount),
+                                }
+                              );
                             } else if (newDiscount !== '') {
-                              onShowToast?.('Discount updated successfully', 'success');
+                              onShowToast?.(
+                                'Discount updated successfully',
+                                'success'
+                              );
                             }
                           }}
                         >
@@ -3022,630 +3525,650 @@ export function LeadStepContent({
                     </div>
                   </div>
 
-                {/* Pest Concern Coverage Pills */}
-                <div>
-                  <label className={styles.fieldLabel}>
-                    Pest Concern Coverage
-                  </label>
-                  <div className={styles.pestContainer}>
-                    {pestOptions
-                      .filter(pest => selectedPests.includes(pest.id))
-                      .sort((a, b) => {
-                        // Sort by selectedPests order - primary pest (index 0) appears first
-                        const indexA = selectedPests.indexOf(a.id);
-                        const indexB = selectedPests.indexOf(b.id);
-                        return indexA - indexB;
-                      })
-                      .map(pest => {
-                        // Check if this pest is covered by the selected plan
-                        const isCovered = selectedPlan.pest_coverage?.some(
-                          (coverage: any) => coverage.pest_id === pest.id
-                        );
+                  {/* Pest Concern Coverage Pills */}
+                  <div>
+                    <label className={styles.fieldLabel}>
+                      Pest Concern Coverage
+                    </label>
+                    <div className={styles.pestContainer}>
+                      {pestOptions
+                        .filter(pest => selectedPests.includes(pest.id))
+                        .sort((a, b) => {
+                          // Sort by selectedPests order - primary pest (index 0) appears first
+                          const indexA = selectedPests.indexOf(a.id);
+                          const indexB = selectedPests.indexOf(b.id);
+                          return indexA - indexB;
+                        })
+                        .map(pest => {
+                          // Check if this pest is covered by the selected plan
+                          const isCovered = selectedPlan.pest_coverage?.some(
+                            (coverage: any) => coverage.pest_id === pest.id
+                          );
 
-                        return (
-                          <div
-                            key={pest.id}
-                            className={styles.pestBadge}
-                            style={
-                              !isCovered
-                                ? {
-                                    background: '#FFE3E2',
-                                    border: '1px solid #FB2C36',
-                                    color: '#C10007',
-                                  }
-                                : undefined
-                            }
-                          >
-                            {isCovered ? (
-                              <svg
-                                width="8"
-                                height="8"
-                                viewBox="0 0 8 8"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M6.5 2L3 5.5L1.5 4"
-                                  stroke="var(--green-600, #00A63E)"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
+                          return (
+                            <div
+                              key={pest.id}
+                              className={styles.pestBadge}
+                              style={
+                                !isCovered
+                                  ? {
+                                      background: '#FFE3E2',
+                                      border: '1px solid #FB2C36',
+                                      color: '#C10007',
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {isCovered ? (
+                                <svg
+                                  width="8"
+                                  height="8"
+                                  viewBox="0 0 8 8"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M6.5 2L3 5.5L1.5 4"
+                                    stroke="var(--green-600, #00A63E)"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              ) : (
+                                <CircleOff
+                                  size={8}
+                                  style={{ color: '#FB2C36' }}
                                 />
-                              </svg>
-                            ) : (
-                              <CircleOff
-                                size={8}
-                                style={{ color: '#FB2C36' }}
-                              />
-                            )}
-                            {pest.custom_label}
+                              )}
+                              {pest.custom_label}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  {/* Plan Information Section */}
+                  <h4 className={cardStyles.defaultText}>Plan Information</h4>
+                  <div className={styles.planInfoContainer}>
+                    <div className={styles.tabContainer}>
+                      {[
+                        { id: 'overview', label: 'Plan Overview' },
+                        { id: 'pests', label: 'Covered Pests' },
+                        { id: 'pricing', label: 'Pricing' },
+                        { id: 'expect', label: 'What to Expect' },
+                        { id: 'faqs', label: 'FAQs' },
+                      ].map((tab, index, array) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveServiceTab(tab.id)}
+                          className={`${styles.tabButton} ${
+                            activeServiceTab === tab.id
+                              ? styles.active
+                              : styles.inactive
+                          } ${index === 0 ? styles.firstTab : ''} ${
+                            index === array.length - 1 ? styles.lastTab : ''
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className={styles.tabContent}>
+                      {activeServiceTab === 'overview' && (
+                        <div className={styles.tabContentInner}>
+                          <div className={styles.planSection}>
+                            <h4 className={styles.planTitle}>
+                              {selectedPlan.plan_name}
+                              {selectedPlan.highlight_badge && (
+                                <span
+                                  style={{
+                                    marginLeft: '8px',
+                                    padding: '2px 8px',
+                                    backgroundColor: 'var(--action-500)',
+                                    color: 'white',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    borderRadius: '12px',
+                                  }}
+                                >
+                                  {selectedPlan.highlight_badge}
+                                </span>
+                              )}
+                            </h4>
+                            <p
+                              style={{
+                                margin: '0',
+                                color: 'var(--gray-600)',
+                                fontSize: '14px',
+                              }}
+                            >
+                              {selectedPlan.plan_description}
+                            </p>
                           </div>
-                        );
-                      })}
-                  </div>
-                </div>
 
-                {/* Plan Information Section */}
-                <h4
-                  className={cardStyles.defaultText}
-                >
-                  Plan Information
-                </h4>
-                <div className={styles.planInfoContainer}>
-                  <div className={styles.tabContainer}>
-                    {[
-                      { id: 'overview', label: 'Plan Overview' },
-                      { id: 'pests', label: 'Covered Pests' },
-                      { id: 'pricing', label: 'Pricing' },
-                      { id: 'expect', label: 'What to Expect' },
-                      { id: 'faqs', label: 'FAQs' },
-                    ].map((tab, index, array) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveServiceTab(tab.id)}
-                        className={`${styles.tabButton} ${
-                          activeServiceTab === tab.id ? styles.active : styles.inactive
-                        } ${index === 0 ? styles.firstTab : ''} ${
-                          index === array.length - 1 ? styles.lastTab : ''
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Tab Content */}
-                  <div className={styles.tabContent}>
-                    {activeServiceTab === 'overview' && (
-                      <div className={styles.tabContentInner}>
-                        <div className={styles.planSection}>
-                          <h4 className={styles.planTitle}>
-                            {selectedPlan.plan_name}
-                            {selectedPlan.highlight_badge && (
-                              <span
-                                style={{
-                                  marginLeft: '8px',
-                                  padding: '2px 8px',
-                                  backgroundColor: 'var(--action-500)',
-                                  color: 'white',
-                                  fontSize: '12px',
-                                  fontWeight: '500',
-                                  borderRadius: '12px',
-                                }}
-                              >
-                                {selectedPlan.highlight_badge}
-                              </span>
-                            )}
+                          <h4
+                            style={{
+                              margin: '0 0 12px 0',
+                              fontSize: '16px',
+                              fontWeight: '600',
+                              color: 'var(--gray-900)',
+                            }}
+                          >
+                            Plan Features
                           </h4>
-                          <p
-                            style={{
-                              margin: '0',
-                              color: 'var(--gray-600)',
-                              fontSize: '14px',
-                            }}
-                          >
-                            {selectedPlan.plan_description}
-                          </p>
+                          {selectedPlan.plan_features &&
+                          Array.isArray(selectedPlan.plan_features) ? (
+                            <ul
+                              style={{
+                                margin: '0',
+                                paddingLeft: '20px',
+                                color: 'var(--gray-700)',
+                              }}
+                            >
+                              {selectedPlan.plan_features.map(
+                                (feature: string, index: number) => (
+                                  <li key={index}>{feature}</li>
+                                )
+                              )}
+                            </ul>
+                          ) : (
+                            <p
+                              style={{
+                                color: 'var(--gray-500)',
+                                fontStyle: 'italic',
+                              }}
+                            >
+                              No features listed
+                            </p>
+                          )}
                         </div>
+                      )}
 
-                        <h4
-                          style={{
-                            margin: '0 0 12px 0',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: 'var(--gray-900)',
-                          }}
-                        >
-                          Plan Features
-                        </h4>
-                        {selectedPlan.plan_features &&
-                        Array.isArray(selectedPlan.plan_features) ? (
-                          <ul
+                      {activeServiceTab === 'pests' && (
+                        <div className={styles.tabContentInner}>
+                          <h4
                             style={{
-                              margin: '0',
-                              paddingLeft: '20px',
-                              color: 'var(--gray-700)',
+                              margin: '0 0 12px 0',
+                              fontSize: '16px',
+                              fontWeight: '600',
+                              color: 'var(--gray-900)',
                             }}
                           >
-                            {selectedPlan.plan_features.map(
-                              (feature: string, index: number) => (
-                                <li key={index}>
-                                  {feature}
-                                </li>
-                              )
-                            )}
-                          </ul>
-                        ) : (
-                          <p
-                            style={{
-                              color: 'var(--gray-500)',
-                              fontStyle: 'italic',
-                            }}
-                          >
-                            No features listed
-                          </p>
-                        )}
-                      </div>
-                    )}
+                            Covered Pests
+                          </h4>
+                          {selectedPlan.covered_pests &&
+                          selectedPlan.covered_pests.length > 0 ? (
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns:
+                                  'repeat(auto-fill, minmax(150px, 1fr))',
+                                gap: '8px',
+                              }}
+                            >
+                              {selectedPlan.covered_pests.map((pest: any) => (
+                                <div
+                                  key={pest.id}
+                                  style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: 'var(--gray-50)',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    color: 'var(--gray-700)',
+                                    border:
+                                      pest.coverage_level !== 'full'
+                                        ? '1px dashed var(--gray-300)'
+                                        : '1px solid var(--gray-200)',
+                                  }}
+                                >
+                                  {pest.name}
+                                  {pest.coverage_level !== 'full' && (
+                                    <span
+                                      style={{
+                                        display: 'block',
+                                        fontSize: '12px',
+                                        color: 'var(--gray-500)',
+                                        textTransform: 'capitalize',
+                                      }}
+                                    >
+                                      ({pest.coverage_level})
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p
+                              style={{
+                                color: 'var(--gray-500)',
+                                fontStyle: 'italic',
+                              }}
+                            >
+                              No pest coverage information available
+                            </p>
+                          )}
+                        </div>
+                      )}
 
-                    {activeServiceTab === 'pests' && (
-                      <div className={styles.tabContentInner}>
-                        <h4
-                          style={{
-                            margin: '0 0 12px 0',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: 'var(--gray-900)',
-                          }}
-                        >
-                          Covered Pests
-                        </h4>
-                        {selectedPlan.covered_pests &&
-                        selectedPlan.covered_pests.length > 0 ? (
-                          <div
+                      {activeServiceTab === 'pricing' && (
+                        <div className={styles.tabContentInner}>
+                          <h4
                             style={{
-                              display: 'grid',
-                              gridTemplateColumns:
-                                'repeat(auto-fill, minmax(150px, 1fr))',
-                              gap: '8px',
+                              margin: '0 0 12px 0',
+                              fontSize: '16px',
+                              fontWeight: '600',
+                              color: 'var(--gray-900)',
                             }}
                           >
-                            {selectedPlan.covered_pests.map((pest: any) => (
+                            Pricing Details
+                          </h4>
+                          <div style={{ display: 'grid', gap: '12px' }}>
+                            {selectedPlan.initial_price && (
                               <div
-                                key={pest.id}
                                 style={{
-                                  padding: '8px 12px',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '12px',
                                   backgroundColor: 'var(--gray-50)',
                                   borderRadius: '6px',
-                                  fontSize: '14px',
-                                  color: 'var(--gray-700)',
-                                  border:
-                                    pest.coverage_level !== 'full'
-                                      ? '1px dashed var(--gray-300)'
-                                      : '1px solid var(--gray-200)',
                                 }}
                               >
-                                {pest.name}
-                                {pest.coverage_level !== 'full' && (
-                                  <span
-                                    style={{
-                                      display: 'block',
-                                      fontSize: '12px',
-                                      color: 'var(--gray-500)',
-                                      textTransform: 'capitalize',
-                                    }}
-                                  >
-                                    ({pest.coverage_level})
-                                  </span>
-                                )}
+                                <span
+                                  style={{
+                                    fontWeight: '500',
+                                    color: 'var(--gray-700)',
+                                  }}
+                                >
+                                  Initial Service
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '18px',
+                                    fontWeight: '600',
+                                    color: 'var(--gray-900)',
+                                  }}
+                                >
+                                  ${selectedPlan.initial_price}
+                                </span>
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p
-                            style={{
-                              color: 'var(--gray-500)',
-                              fontStyle: 'italic',
-                            }}
-                          >
-                            No pest coverage information available
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {activeServiceTab === 'pricing' && (
-                      <div className={styles.tabContentInner}>
-                        <h4
-                          style={{
-                            margin: '0 0 12px 0',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: 'var(--gray-900)',
-                          }}
-                        >
-                          Pricing Details
-                        </h4>
-                        <div style={{ display: 'grid', gap: '12px' }}>
-                          {selectedPlan.initial_price && (
+                            )}
                             <div
                               style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 padding: '12px',
-                                backgroundColor: 'var(--gray-50)',
+                                backgroundColor: 'var(--action-50)',
                                 borderRadius: '6px',
+                                border: '1px solid var(--action-200)',
                               }}
                             >
                               <span
                                 style={{
                                   fontWeight: '500',
-                                  color: 'var(--gray-700)',
+                                  color: 'var(--action-700)',
                                 }}
                               >
-                                Initial Service
+                                Recurring ({selectedPlan.billing_frequency})
                               </span>
                               <span
                                 style={{
                                   fontSize: '18px',
                                   fontWeight: '600',
-                                  color: 'var(--gray-900)',
+                                  color: 'var(--action-700)',
                                 }}
                               >
-                                ${selectedPlan.initial_price}
+                                ${selectedPlan.recurring_price}
                               </span>
                             </div>
-                          )}
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              padding: '12px',
-                              backgroundColor: 'var(--action-50)',
-                              borderRadius: '6px',
-                              border: '1px solid var(--action-200)',
-                            }}
-                          >
-                            <span
+                            <div
                               style={{
-                                fontWeight: '500',
-                                color: 'var(--action-700)',
+                                fontSize: '14px',
+                                color: 'var(--gray-600)',
                               }}
                             >
-                              Recurring ({selectedPlan.billing_frequency})
-                            </span>
-                            <span
-                              style={{
-                                fontSize: '18px',
-                                fontWeight: '600',
-                                color: 'var(--action-700)',
-                              }}
-                            >
-                              ${selectedPlan.recurring_price}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              fontSize: '14px',
-                              color: 'var(--gray-600)',
-                            }}
-                          >
-                            <p>
-                              <strong>Treatment Frequency:</strong>{' '}
-                              {selectedPlan.treatment_frequency}
-                            </p>
-                            <p>
-                              <strong>Includes Inspection:</strong>{' '}
-                              {selectedPlan.includes_inspection ? 'Yes' : 'No'}
-                            </p>
+                              <p>
+                                <strong>Treatment Frequency:</strong>{' '}
+                                {selectedPlan.treatment_frequency}
+                              </p>
+                              <p>
+                                <strong>Includes Inspection:</strong>{' '}
+                                {selectedPlan.includes_inspection
+                                  ? 'Yes'
+                                  : 'No'}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {activeServiceTab === 'expect' && (
-                      <div className={styles.tabContentInner}>
-                        <h4
-                          style={{
-                            margin: '0 0 12px 0',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: 'var(--gray-900)',
-                          }}
-                        >
-                          What to Expect
-                        </h4>
-                        <div
-                          style={{
-                            color: 'var(--gray-700)',
-                            lineHeight: '1.6',
-                          }}
-                        >
-                          <p>
-                            Treatment frequency:{' '}
-                            <strong>{selectedPlan.treatment_frequency}</strong>
-                          </p>
-                          <p>
-                            Billing cycle:{' '}
-                            <strong>{selectedPlan.billing_frequency}</strong>
-                          </p>
-                          {selectedPlan.includes_inspection && (
-                            <p>✓ Initial inspection included</p>
-                          )}
-                          <div
+                      {activeServiceTab === 'expect' && (
+                        <div className={styles.tabContentInner}>
+                          <h4
                             style={{
-                              marginTop: '16px',
-                              padding: '12px',
-                              backgroundColor: 'var(--blue-50)',
-                              borderRadius: '6px',
-                              border: '1px solid var(--blue-200)',
+                              margin: '0 0 12px 0',
+                              fontSize: '16px',
+                              fontWeight: '600',
+                              color: 'var(--gray-900)',
                             }}
                           >
+                            What to Expect
+                          </h4>
+                          <div
+                            style={{
+                              color: 'var(--gray-700)',
+                              lineHeight: '1.6',
+                            }}
+                          >
+                            <p>
+                              Treatment frequency:{' '}
+                              <strong>
+                                {selectedPlan.treatment_frequency}
+                              </strong>
+                            </p>
+                            <p>
+                              Billing cycle:{' '}
+                              <strong>{selectedPlan.billing_frequency}</strong>
+                            </p>
+                            {selectedPlan.includes_inspection && (
+                              <p>✓ Initial inspection included</p>
+                            )}
+                            <div
+                              style={{
+                                marginTop: '16px',
+                                padding: '12px',
+                                backgroundColor: 'var(--blue-50)',
+                                borderRadius: '6px',
+                                border: '1px solid var(--blue-200)',
+                              }}
+                            >
+                              <p
+                                style={{
+                                  margin: '0',
+                                  fontSize: '14px',
+                                  color: 'var(--blue-700)',
+                                }}
+                              >
+                                Our {selectedPlan.plan_name.toLowerCase()}{' '}
+                                provides comprehensive protection with{' '}
+                                {selectedPlan.treatment_frequency} treatments to
+                                keep your property pest-free year-round.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {activeServiceTab === 'faqs' && (
+                        <div className={styles.tabContentInner}>
+                          <h4
+                            style={{
+                              margin: '0 0 12px 0',
+                              fontSize: '16px',
+                              fontWeight: '600',
+                              color: 'var(--gray-900)',
+                            }}
+                          >
+                            Frequently Asked Questions
+                          </h4>
+                          {selectedPlan.plan_faqs &&
+                          Array.isArray(selectedPlan.plan_faqs) ? (
+                            <div style={{ display: 'grid', gap: '16px' }}>
+                              {selectedPlan.plan_faqs.map(
+                                (faq: any, index: number) => (
+                                  <div
+                                    key={index}
+                                    style={{
+                                      padding: '16px',
+                                      backgroundColor: 'var(--gray-50)',
+                                      borderRadius: '6px',
+                                    }}
+                                  >
+                                    <h5
+                                      style={{
+                                        margin: '0 0 8px 0',
+                                        fontSize: '14px',
+                                        fontWeight: '600',
+                                        color: 'var(--gray-900)',
+                                      }}
+                                    >
+                                      {faq.question}
+                                    </h5>
+                                    <p
+                                      style={{
+                                        margin: '0',
+                                        fontSize: '14px',
+                                        color: 'var(--gray-700)',
+                                        lineHeight: '1.5',
+                                      }}
+                                    >
+                                      {faq.answer}
+                                    </p>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          ) : (
                             <p
                               style={{
-                                margin: '0',
-                                fontSize: '14px',
-                                color: 'var(--blue-700)',
+                                color: 'var(--gray-500)',
+                                fontStyle: 'italic',
                               }}
                             >
-                              Our {selectedPlan.plan_name.toLowerCase()}{' '}
-                              provides comprehensive protection with{' '}
-                              {selectedPlan.treatment_frequency} treatments to
-                              keep your property pest-free year-round.
+                              No FAQs available for this plan
                             </p>
-                          </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-
-                    {activeServiceTab === 'faqs' && (
-                      <div className={styles.tabContentInner}>
-                        <h4
-                          style={{
-                            margin: '0 0 12px 0',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: 'var(--gray-900)',
-                          }}
-                        >
-                          Frequently Asked Questions
-                        </h4>
-                        {selectedPlan.plan_faqs &&
-                        Array.isArray(selectedPlan.plan_faqs) ? (
-                          <div style={{ display: 'grid', gap: '16px' }}>
-                            {selectedPlan.plan_faqs.map(
-                              (faq: any, index: number) => (
-                                <div
-                                  key={index}
-                                  style={{
-                                    padding: '16px',
-                                    backgroundColor: 'var(--gray-50)',
-                                    borderRadius: '6px',
-                                  }}
-                                >
-                                  <h5
-                                    style={{
-                                      margin: '0 0 8px 0',
-                                      fontSize: '14px',
-                                      fontWeight: '600',
-                                      color: 'var(--gray-900)',
-                                    }}
-                                  >
-                                    {faq.question}
-                                  </h5>
-                                  <p
-                                    style={{
-                                      margin: '0',
-                                      fontSize: '14px',
-                                      color: 'var(--gray-700)',
-                                      lineHeight: '1.5',
-                                    }}
-                                  >
-                                    {faq.answer}
-                                  </p>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        ) : (
-                          <p
-                            style={{
-                              color: 'var(--gray-500)',
-                              fontStyle: 'italic',
-                            }}
-                          >
-                            No FAQs available for this plan
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Preferred Date and Time Inputs */}
-                <div className={`${styles.gridRow} ${styles.twoColumns}`}>
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>
-                      Preferred Date
-                    </label>
-                    <input
-                      type="date"
-                      className={styles.selectInput}
-                      value={preferredDate}
-                      onChange={e => {
-                        setPreferredDate(e.target.value);
-                        updateLeadRequestedDate(e.target.value);
-                      }}
-                      placeholder="Enter preferred date"
-                    />
-                  </div>
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>
-                      Preferred Time
-                    </label>
-                    <div className={styles.dropdownWithArrow}>
-                      <select
-                        className={styles.selectInput}
-                        value={preferredTime}
-                        onChange={e => {
-                          setPreferredTime(e.target.value);
-                          updateLeadRequestedTime(e.target.value);
-                        }}
-                      >
-                        <option value="">Enter preferred time</option>
-                        <option value="morning">Morning (8AM - 12PM)</option>
-                        <option value="afternoon">Afternoon (12PM - 5PM)</option>
-                        <option value="evening">Evening (5PM - 8PM)</option>
-                        <option value="anytime">Anytime</option>
-                      </select>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="21"
-                        viewBox="0 0 20 21"
-                        fill="none"
-                        className={styles.dropdownArrow}
-                      >
-                        <path
-                          d="M6 12.2539L10 7.80946L14 12.2539"
-                          stroke="#99A1AF"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                {/* Add Service Button */}
-                {serviceSelections.length < 3 && selectedPlan && (
-                  <button
-                    type="button"
-                    onClick={addServiceSelection}
-                    style={{
-                      width: '131px',
-                      background: 'white',
-                      border: '1px solid var(--gray-300)',
-                      borderRadius: '6px',
-                      padding: '9px 12px',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer',
-                      marginTop: '16px',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: 'var(--gray-700)',
-                    }}
-                  >
-                    <CirclePlus size={16} />
-                    Add Service
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </InfoCard>
+                  {/* Preferred Date and Time Inputs */}
+                  <div className={`${styles.gridRow} ${styles.twoColumns}`}>
+                    <div className={styles.formField}>
+                      <label className={styles.fieldLabel}>
+                        Preferred Date
+                      </label>
+                      <input
+                        type="date"
+                        className={styles.selectInput}
+                        value={preferredDate}
+                        onChange={e => {
+                          setPreferredDate(e.target.value);
+                          updateLeadRequestedDate(e.target.value);
+                        }}
+                        placeholder="Enter preferred date"
+                      />
+                    </div>
+                    <div className={styles.formField}>
+                      <label className={styles.fieldLabel}>
+                        Preferred Time
+                      </label>
+                      <div className={styles.dropdownWithArrow}>
+                        <select
+                          className={styles.selectInput}
+                          value={preferredTime}
+                          onChange={e => {
+                            setPreferredTime(e.target.value);
+                            updateLeadRequestedTime(e.target.value);
+                          }}
+                        >
+                          <option value="">Enter preferred time</option>
+                          <option value="morning">Morning (8AM - 12PM)</option>
+                          <option value="afternoon">
+                            Afternoon (12PM - 5PM)
+                          </option>
+                          <option value="evening">Evening (5PM - 8PM)</option>
+                          <option value="anytime">Anytime</option>
+                        </select>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="21"
+                          viewBox="0 0 20 21"
+                          fill="none"
+                          className={styles.dropdownArrow}
+                        >
+                          <path
+                            d="M6 12.2539L10 7.80946L14 12.2539"
+                            stroke="#99A1AF"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
 
-        <QuoteSummaryCard
-          quote={quote}
-          lead={lead}
-          isUpdating={isQuoteUpdating}
-          onNotInterested={handleMarkAsLost}
-          onReadyToSchedule={handleProgressToReadyToSchedule}
-        />
-      </div>
-
-      <div className={styles.contentRight}>
-        <InfoCard
-          title="Contact Information"
-          icon={<SquareUserRound size={20} />}
-          startExpanded={false}
-        >
-          <CustomerInformation
-            ticket={createTicketFromLead}
-            onUpdate={async (updatedCustomer) => {
-              // Update the lead's customer data optimistically
-              if (lead.customer && updatedCustomer) {
-                // Merge the updated customer data into the lead
-                const updatedLead = {
-                  ...lead,
-                  customer: {
-                    ...lead.customer,
-                    ...updatedCustomer,
-                  },
-                };
-
-                // Call onLeadUpdate with the updated lead data
-                // This will update the parent state without a full page reload
-                if (onLeadUpdate) {
-                  onLeadUpdate(updatedLead);
-                }
-
-                // Broadcast the customer update via realtime channel
-                if (customerChannelRef.current && lead.customer.id) {
-                  await broadcastCustomerUpdate(customerChannelRef.current, {
-                    customer_id: lead.customer.id,
-                    first_name: updatedCustomer.first_name,
-                    last_name: updatedCustomer.last_name,
-                    email: updatedCustomer.email,
-                    phone: updatedCustomer.phone,
-                    updated_by: user?.id,
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-              }
-
-              if (onShowToast) {
-                onShowToast('Customer information updated successfully.', 'success');
-              }
-            }}
+                  {/* Add Service Button */}
+                  {serviceSelections.length < 3 && selectedPlan && (
+                    <button
+                      type="button"
+                      onClick={addServiceSelection}
+                      style={{
+                        width: '131px',
+                        background: 'white',
+                        border: '1px solid var(--gray-300)',
+                        borderRadius: '6px',
+                        padding: '9px 12px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer',
+                        marginTop: '16px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: 'var(--gray-700)',
+                      }}
+                    >
+                      <CirclePlus size={16} />
+                      Add Service
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+        ),
+      },
+      {
+        id: 'quote',
+        label: 'Quote Summary',
+        content: (
+          <QuoteSummaryCard
+            quote={quote}
+            lead={lead}
+            isUpdating={isQuoteUpdating}
+            onNotInterested={handleMarkAsLost}
+            onReadyToSchedule={handleProgressToReadyToSchedule}
+            hideCard={true}
           />
-        </InfoCard>
+        ),
+      },
+    ];
 
-        <ServiceLocationCard
-          serviceAddress={lead.primary_service_address || null}
-          startExpanded={false}
-          showSizeInputs
-          pricingSettings={pricingSettings || undefined}
-          onShowToast={onShowToast}
-          editable={true}
-          onAddressSelect={handleAddressSelect}
-          onSaveAddress={handleSaveAddress}
-          onCancelAddress={handleCancelAddressChanges}
-          hasAddressChanges={hasAddressChanges}
-          isSavingAddress={isSavingAddress}
-          serviceLocationData={serviceLocationData}
-          onServiceLocationChange={handleServiceLocationChange}
-          hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
-          currentFormattedAddress={currentFormattedAddress}
-        />
+    return (
+      <>
+        <div className={styles.contentLeft}>
+          <TabCard tabs={quotedTabs} defaultTabId="pest" />
+        </div>
 
-        <InfoCard
-          title="Activity"
-          icon={<SquareActivity size={20} />}
-          startExpanded={false}
-        >
-          <div className={styles.cardContent}>
-            <p>Lead activity and interaction history will be displayed here.</p>
-          </div>
-        </InfoCard>
+        <div className={styles.contentRight}>
+          <InfoCard
+            title="Contact Information"
+            icon={<SquareUserRound size={20} />}
+            startExpanded={false}
+          >
+            <CustomerInformation
+              ticket={createTicketFromLead}
+              onUpdate={async updatedCustomer => {
+                // Update the lead's customer data optimistically
+                if (lead.customer && updatedCustomer) {
+                  // Merge the updated customer data into the lead
+                  const updatedLead = {
+                    ...lead,
+                    customer: {
+                      ...lead.customer,
+                      ...updatedCustomer,
+                    },
+                  };
 
-        <InfoCard
-          title="Notes"
-          icon={<NotebookPen size={20} />}
-          startExpanded={false}
-        >
-          <div className={styles.cardContent}>
-            <p>Lead notes and comments will be displayed here.</p>
-          </div>
-        </InfoCard>
-      </div>
-    </>
+                  // Call onLeadUpdate with the updated lead data
+                  // This will update the parent state without a full page reload
+                  if (onLeadUpdate) {
+                    onLeadUpdate(updatedLead);
+                  }
+
+                  // Broadcast the customer update via realtime channel
+                  if (customerChannelRef.current && lead.customer.id) {
+                    await broadcastCustomerUpdate(customerChannelRef.current, {
+                      customer_id: lead.customer.id,
+                      first_name: updatedCustomer.first_name,
+                      last_name: updatedCustomer.last_name,
+                      email: updatedCustomer.email,
+                      phone: updatedCustomer.phone,
+                      updated_by: user?.id,
+                      timestamp: new Date().toISOString(),
+                    });
+                  }
+                }
+
+                if (onShowToast) {
+                  onShowToast(
+                    'Customer information updated successfully.',
+                    'success'
+                  );
+                }
+              }}
+            />
+          </InfoCard>
+
+          <ServiceLocationCard
+            serviceAddress={lead.primary_service_address || null}
+            startExpanded={false}
+            showSizeInputs
+            pricingSettings={pricingSettings || undefined}
+            onShowToast={onShowToast}
+            editable={true}
+            onAddressSelect={handleAddressSelect}
+            onSaveAddress={handleSaveAddress}
+            onCancelAddress={handleCancelAddressChanges}
+            hasAddressChanges={hasAddressChanges}
+            isSavingAddress={isSavingAddress}
+            serviceLocationData={serviceLocationData}
+            onServiceLocationChange={handleServiceLocationChange}
+            hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
+            currentFormattedAddress={currentFormattedAddress}
+          />
+
+          <InfoCard
+            title="Activity"
+            icon={<SquareActivity size={20} />}
+            startExpanded={false}
+          >
+            <div className={styles.cardContent}>
+              <p>
+                Lead activity and interaction history will be displayed here.
+              </p>
+            </div>
+          </InfoCard>
+
+          <InfoCard
+            title="Notes"
+            icon={<NotebookPen size={20} />}
+            startExpanded={false}
+          >
+            <div className={styles.cardContent}>
+              <p>Lead notes and comments will be displayed here.</p>
+            </div>
+          </InfoCard>
+        </div>
+      </>
     );
   };
 
@@ -3709,5 +4232,43 @@ export function LeadStepContent({
     }
   };
 
-  return renderContent();
+  const handleReturnToLeads = () => {
+    setShowAssignSuccessModal(false);
+    // Navigate to leads page
+    window.location.href = '/connections/leads';
+  };
+
+  return (
+    <>
+      {renderContent()}
+      <ManageLeadModal
+        isOpen={showManageLeadModal}
+        onClose={() => setShowManageLeadModal(false)}
+        onProceed={handleManageLeadProceed}
+        currentStage={lead.lead_status}
+      />
+      <AssignSuccessModal
+        isOpen={showAssignSuccessModal}
+        onClose={() => setShowAssignSuccessModal(false)}
+        onReturnToPage={handleReturnToLeads}
+        assigneeName={assignedUserInfo?.name || ''}
+        assigneeTitle={assignedUserInfo?.title || ''}
+        assigneeAvatar={assignedUserInfo?.avatar}
+      />
+      <CompleteTaskModal
+        isOpen={showCompleteTaskModal}
+        task={nextTask ? {
+          day_number: nextTask.day_number,
+          action_type: nextTask.action_type,
+          time_of_day: nextTask.time_of_day,
+          due_date: nextTask.due_date,
+          due_time: nextTask.due_time,
+          priority: nextTask.priority
+        } : null}
+        onConfirm={handleCompleteTaskConfirm}
+        onSkip={handleCompleteTaskSkip}
+        onCancel={handleCompleteTaskCancel}
+      />
+    </>
+  );
 }
