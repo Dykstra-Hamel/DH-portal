@@ -43,10 +43,10 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
 
   // Step configuration for support cases
   const supportCaseSteps: StepItem[] = [
-    { id: 'unassigned', label: 'Unassigned', status: 'upcoming' },
-    { id: 'in_progress', label: 'In Progress', status: 'upcoming' },
-    { id: 'awaiting_response', label: 'Awaiting Response', status: 'upcoming' },
-    { id: 'resolved', label: 'Resolved', status: 'upcoming' },
+    { id: 'unassigned', label: 'Unassigned', subLabel: '', status: 'upcoming' },
+    { id: 'in_progress', label: 'In Progress', subLabel: '', status: 'upcoming' },
+    { id: 'awaiting_response', label: 'Awaiting Response', subLabel: '', status: 'upcoming' },
+    { id: 'resolved', label: 'Resolved', subLabel: '', status: 'upcoming' },
   ];
 
   // Update step statuses based on current support case status

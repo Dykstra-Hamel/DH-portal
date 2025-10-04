@@ -1,0 +1,381 @@
+// Modal Styles
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  .modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px;
+    border-bottom: 1px solid #e5e7eb;
+
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #171717;
+      margin: 0;
+    }
+
+    .closeButton {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #6A7282;
+      transition: all 0.2s;
+
+      &:hover:not(:disabled) {
+        background-color: #f3f4f6;
+        color: #171717;
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  .modalContent {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+
+    .errorMessage {
+      padding: 12px 16px;
+      background-color: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      color: #dc2626;
+      margin-bottom: 16px;
+    }
+
+    .formGroup {
+      margin-bottom: 20px;
+
+      label {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        color: #171717;
+        margin-bottom: 8px;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #171717;
+        transition: border-color 0.2s;
+
+        &:focus {
+          outline: none;
+          border-color: #005194;
+        }
+
+        &:disabled {
+          background-color: #f3f4f6;
+          cursor: not-allowed;
+        }
+      }
+
+      textarea {
+        resize: vertical;
+      }
+    }
+
+    .formRow {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+
+      .checkboxGroup {
+        label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          color: #171717;
+          cursor: pointer;
+
+          input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+          }
+        }
+      }
+    }
+
+    .stepsSection {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+
+      .stepsSectionHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+
+        h4 {
+          font-size: 16px;
+          font-weight: 600;
+          color: #171717;
+          margin: 0;
+        }
+
+        .addStepButton {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          background-color: #f3f4f6;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 500;
+          color: #171717;
+          cursor: pointer;
+          transition: all 0.2s;
+
+          &:hover:not(:disabled) {
+            background-color: #e5e7eb;
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+
+      .emptySteps {
+        padding: 32px;
+        text-align: center;
+        background-color: #f9fafb;
+        border-radius: 6px;
+        border: 1px dashed #d1d5db;
+
+        p {
+          color: #6A7282;
+          margin: 0;
+        }
+      }
+
+      .daysList {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+
+        .dayGroup {
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          overflow: hidden;
+
+          .dayHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: #f3f4f6;
+            border-bottom: 1px solid #d1d5db;
+
+            h5 {
+              font-size: 16px;
+              font-weight: 600;
+              color: #171717;
+              margin: 0;
+            }
+
+            .dayActions {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+
+              .stepCount {
+                font-size: 13px;
+                color: #6A7282;
+                font-weight: 500;
+              }
+
+              .addStepToDay {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                padding: 6px 10px;
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 500;
+                color: #171717;
+                cursor: pointer;
+                transition: all 0.2s;
+
+                &:hover:not(:disabled) {
+                  background-color: #e5e7eb;
+                }
+
+                &:disabled {
+                  opacity: 0.5;
+                  cursor: not-allowed;
+                }
+              }
+            }
+          }
+
+          .daySteps {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: white;
+          }
+        }
+
+        .stepFormItem {
+          padding: 16px;
+          background-color: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+
+          .stepFormHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+
+            .stepOrder {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+
+              .timeIndicator {
+                font-size: 14px;
+                font-weight: 600;
+                color: #171717;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+              }
+            }
+
+            .stepOrderControls {
+              display: flex;
+              gap: 4px;
+
+              .removeButton {
+                width: 28px;
+                height: 28px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                cursor: pointer;
+                color: #dc2626;
+                transition: all 0.2s;
+
+                &:hover:not(:disabled) {
+                  background-color: #fef2f2;
+                  border-color: #fecaca;
+                }
+
+                &:disabled {
+                  opacity: 0.3;
+                  cursor: not-allowed;
+                }
+              }
+            }
+          }
+
+          .stepFormGrid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+
+            @media (max-width: 768px) {
+              grid-template-columns: 1fr;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px 24px;
+    border-top: 1px solid #e5e7eb;
+
+    button {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    .cancelButton {
+      background-color: white;
+      color: #171717;
+      border-color: #d1d5db;
+
+      &:hover:not(:disabled) {
+        background-color: #f3f4f6;
+      }
+    }
+
+    .saveButton {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: #005194;
+      color: white;
+
+      &:hover:not(:disabled) {
+        background-color: #003d73;
+      }
+    }
+  }
+}

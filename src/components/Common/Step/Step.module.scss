@@ -5,14 +5,15 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  padding: 16px;
-  border-radius: 8px;
+  padding: 0;
+  border-radius: 7px;
   border: 1px solid var(--slate-300);
   box-shadow:
     0 1px 2px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px 0 rgba(0, 0, 0, 0.08);
   background: white;
   width: 100%;
+  overflow: hidden;
 }
 
 .stepContainer {
@@ -20,13 +21,79 @@
   align-items: center;
   gap: 0;
   width: 100%;
-  height: 40px;
+  background-color: var(--gray-300);
+  overflow: hidden;
 }
 
 .stepItemWrapper {
   display: flex;
   align-items: center;
   flex: 1;
+  padding: 16px 16px 13px 48px;
+  background-color: #fff;
+  margin: 0 0 0 -15px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+
+  &:not(:last-of-type, :first-of-type) {
+    clip-path: polygon(95% 0, 100% 50%, 95% 100%, 0% 100%, 5% 50%, 0% 0%);
+  }
+
+  &:first-of-type {
+    clip-path: polygon(95% 0, 100% 50%, 95% 100%, 0% 100%, 0% 0%);
+    margin-left: 0;
+  }
+
+  &:last-of-type {
+    clip-path: polygon(100% 0, 100% 100%, 0% 100%, 5% 50%, 0% 0%);
+  }
+
+  &.current {
+    border-bottom: 3px solid var(--action-500);
+
+    &:hover {
+      .stepLabel {
+        color: var(--action-600);
+      }
+    }
+  }
+
+  &.completed:hover {
+    .stepNumber {
+      background-color: var(--action-500);
+    }
+
+    .editIcon {
+      opacity: 1;
+    }
+    .checkmark {
+      opacity: 0;
+    }
+  }
+
+  &:not(.disabled):hover {
+    border-bottom: 3px solid var(--action-500);
+
+    .stepLabel {
+      color: var(--action-600);
+    }
+  }
+}
+
+.editIcon {
+  opacity: 0;
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transition: all 0.2s ease-in-out;
+  transform: translate(-50%, -50%);
+}
+
+.checkmark {
+  transition: all 0.2s ease-in-out;
 }
 
 .stepItem {
@@ -34,7 +101,6 @@
   flex-direction: row;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
   border: none;
   background: none;
   cursor: pointer;
@@ -44,10 +110,6 @@
   height: 100%;
   justify-content: flex-start;
 
-  &:hover:not(.disabled) {
-    background-color: var(--primary-50);
-  }
-
   &.disabled {
     cursor: not-allowed;
     opacity: 0.5;
@@ -56,6 +118,7 @@
 
 .stepNumber {
   display: flex;
+  position: relative;
   align-items: center;
   justify-content: center;
   width: 40px;
@@ -63,6 +126,7 @@
   border-radius: 50%;
   font-size: 16px;
   font-weight: 750;
+  border: 2px solid var(--gray-300);
   transition: all 0.2s ease-in-out;
 
   svg {
@@ -72,35 +136,47 @@
 }
 
 .stepLabel {
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
+  display: block;
+  font-size: 14px;
+  line-height: 140%;
+  font-weight: 550;
+  color: var(--gray-900);
+  text-align: left;
   transition: color 0.2s ease-in-out;
+  letter-spacing: 0.14px;
+  width: 100%;
+}
+
+.stepSubLabel {
+  display: block;
+  color: var(--gray-500);
+  font-size: 12px;
+  text-align: left;
+  font-style: normal;
+  font-weight: 450;
+  line-height: 140%;
+  letter-spacing: 0.12px;
+  width: 100%;
 }
 
 // Step status styles
 .upcoming {
   .stepNumber {
     background-color: transparent;
-    border: 2px solid var(--gray-500);
-    color: var(--gray-700);
-  }
 
-  .stepLabel {
-    color: var(--gray-500);
+    color: var(--gray-700);
   }
 }
 
 .current {
   .stepNumber {
-    background-color: var(--action-500);
-    color: white;
-    border: none;
+    color: var(--action-500);
+    border-color: var(--action-500);
   }
 
   .stepLabel {
     color: var(--gray-800);
-    font-weight: 600;
+    font-weight: 650;
   }
 }
 
@@ -117,17 +193,10 @@
 }
 
 .disabled {
-  .stepNumber {
-    background-color: var(--gray-200);
-    color: var(--gray-400);
-  }
-
-  .stepLabel {
-    color: var(--gray-400);
-  }
-
-  &:hover {
-    background-color: transparent !important;
+  .stepNumber,
+  .stepLabel,
+  .stepSubLabel {
+    color: var(--gray-300);
   }
 }
 

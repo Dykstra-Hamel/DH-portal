@@ -47,7 +47,7 @@ export async function POST(
     const supabase = await createClient();
     const body = await request.json();
 
-    const { activity_type, notes } = body;
+    const { activity_type, notes, skip_task_completion } = body;
 
     // Get current user from session
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -75,7 +75,7 @@ export async function POST(
       );
     }
 
-    // Create the activity (trigger will handle cadence progression)
+    // Create the activity (trigger will handle cadence progression unless skip_task_completion is true)
     const { data: newActivity, error: insertError } = await supabase
       .from('lead_activity_log')
       .insert({
@@ -83,6 +83,7 @@ export async function POST(
         user_id: user.id,
         action_type: activity_type,
         notes: notes || null,
+        skip_task_completion: skip_task_completion || false,
       })
       .select(`
         *,
