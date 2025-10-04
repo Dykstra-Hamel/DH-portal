@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   SalesCadenceWithSteps,
+  ACTION_TYPE_LABELS,
   TIME_OF_DAY_LABELS,
   PRIORITY_LABELS,
   PRIORITY_COLORS,

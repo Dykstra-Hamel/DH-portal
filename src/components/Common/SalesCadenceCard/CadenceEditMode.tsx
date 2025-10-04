@@ -66,11 +66,10 @@ export function CadenceEditMode({
   };
 
   const duplicateStep = (index: number) => {
-    const stepToDuplicate = { ...editingSteps[index] };
-    delete stepToDuplicate.id; // Remove ID so a new one is created
+    const { id, ...stepWithoutId } = editingSteps[index];
     setEditingSteps([
       ...editingSteps.slice(0, index + 1),
-      stepToDuplicate,
+      stepWithoutId as SalesCadenceStep,
       ...editingSteps.slice(index + 1),
     ]);
   };
