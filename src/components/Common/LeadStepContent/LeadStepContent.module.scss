@@ -6,7 +6,6 @@
 }
 
 .cardContent {
-  padding: 20px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -65,37 +64,41 @@
     position: absolute;
     opacity: 0;
     cursor: pointer;
+    width: 0;
+    height: 0;
+
+    &:checked + .radioCustom {
+      background: var(--action-600);
+      border-color: var(--action-600);
+
+      &::after {
+        display: block;
+      }
+    }
   }
 }
 
 .radioCustom {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #d1d5db;
-  border-radius: 50%;
   position: relative;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-300);
+  border-radius: 50%;
   background: white;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 
   &::after {
     content: '';
     position: absolute;
+    display: none;
     top: 50%;
     left: 50%;
-    width: 10px;
-    height: 10px;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: var(--action-500);
-    transform: translate(-50%, -50%) scale(0);
-    transition: transform 0.2s ease;
-  }
-
-  input:checked + & {
-    border-color: var(--action-500);
-
-    &::after {
-      transform: translate(-50%, -50%) scale(1);
-    }
+    background: white;
   }
 }
 
@@ -478,6 +481,12 @@
   }
 }
 
+.selectWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .selectInput {
   width: 100%;
   padding: 10px 16px;
@@ -505,6 +514,13 @@
     color: var(--gray-500);
     cursor: not-allowed;
   }
+}
+
+.selectChevron {
+  position: absolute;
+  right: 12px;
+  color: #6b7280;
+  pointer-events: none;
 }
 
 .fieldWithSuffix {
@@ -652,12 +668,19 @@
   border: 1px solid var(--slate-300);
   background: var(--slate-100);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+  .tabContainer {
+    background-color: none;
+    border: none;
+    padding: 0;
+  }
 }
 
 .tabContainer {
   display: flex;
   gap: 0px;
   background-color: var(--gray-100);
+  border: 1px solid var(--gray-300);
   padding: 4px;
   border-radius: 6px;
 }
@@ -667,8 +690,8 @@
   padding: 8px 12px;
   justify-content: center;
   align-items: center;
-  border: none;
-  border-right: 1px solid var(--gray-300);
+  border: 1px solid var(--gray-300);
+  border-right: none;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
@@ -677,7 +700,7 @@
   flex: 1;
 
   &.active {
-    background: #667a99;
+    background: var(--slate-500);
     color: white;
   }
 
@@ -692,12 +715,15 @@
 
   &.lastTab {
     border-radius: 0 6px 6px 0;
-    border-right: none;
+    border-right: 1px solid var(--gray-300);
   }
 }
 
 .tabContent {
   min-height: 200px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-300);
+  overflow: hidden;
 }
 
 .tabContentInner {
@@ -725,6 +751,69 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+}
+
+.pestCoverageRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  margin: 16px 0;
+}
+
+.pestCoverageSection {
+  flex: 1;
+  max-width: 66.666%;
+}
+
+.addServiceButtonContainer {
+  display: flex;
+  align-items: flex-end;
+}
+
+.addServiceButton {
+  width: 131px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  padding: 9px 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+}
+
+.serviceHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.removeServiceButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: none;
+  border: none;
+  color: var(--gray-500);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: #fee2e2;
+    color: #dc2626;
+  }
 }
 
 // Form Field Headers
@@ -989,4 +1078,274 @@
     border-bottom-left-radius: 6px;
     border-bottom-right-radius: 6px;
   }
+}
+
+// Plan Pricing Styles
+.planPricingContainer {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: white;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+// Single Plan Pricing
+.singlePlanPricing {
+  .pricingGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  .pricingColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pricingLabel {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--gray-600);
+  }
+
+  .recurringPrice {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1;
+  }
+
+  .perMonth {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--gray-900);
+  }
+
+  .initialPrice {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .originalPrice {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--gray-500);
+  }
+
+  .frequency {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-900);
+  }
+
+  .inspection {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--gray-500);
+  }
+}
+
+// Multiple Plans Pricing
+.multiplePlansPricing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.planLineItem {
+  padding-bottom: 16px;
+
+  &:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}
+
+.lineItemHeader {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gray-300);
+}
+
+.lineItemPricing {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.lineItemColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lineItemLabel {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--gray-500);
+}
+
+.lineItemRecurringPrice {
+  font-size: 32px;
+  font-weight: 750;
+  color: var(--gray-900);
+  line-height: 1;
+}
+
+.lineItemPerMonth {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--gray-900);
+}
+
+.lineItemInitialPrice {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--gray-900);
+}
+
+.lineItemOriginalPrice {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gray-500);
+}
+
+.lineItemFrequency {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.lineItemInspection {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gray-500);
+}
+
+// Total Cost Section
+.totalCostSection {
+  margin-top: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-300);
+  overflow: hidden;
+}
+
+.totalCostHeader {
+  font-size: 12px;
+  line-height: 100%;
+  font-weight: 550;
+  padding: 8px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-300);
+  color: var(--gray-900);
+  margin-bottom: 12px;
+}
+
+.totalCostGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  padding: 8px;
+}
+
+.totalColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.totalLabel {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--gray-500);
+}
+
+.totalRecurringPrice {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  line-height: 1;
+}
+
+.totalPerMonth {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--gray-900);
+}
+
+.totalInitialPrice {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--gray-900);
+}
+
+.totalSavings {
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--gray-500);
+}
+
+// Plan Information - Multiple Plans Support
+.multiplePlansIndicator {
+  background-color: var(--blue-50);
+  border: 1px solid var(--blue-200);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--blue-700);
+  text-align: center;
+}
+
+.planOverviewScroll {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 8px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: 3px;
+
+    &:hover {
+      background: var(--gray-500);
+    }
+  }
+}
+
+.planNumber {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--gray-500);
+  margin-left: 8px;
+}
+
+// Schedule Stage Styles
+.scheduleTabHeading {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--gray-900);
+}
+
+.scheduleTabText {
+  color: var(--gray-600);
+  line-height: 1.6;
 }

@@ -6,6 +6,7 @@ export interface Customer {
   first_name: string;
   last_name: string;
   phone?: string;
+  alternate_phone?: string;
   email?: string;
   address?: string;
   city?: string;
@@ -72,6 +73,7 @@ export interface CustomerFormData {
   first_name: string;
   last_name: string;
   phone?: string;
+  alternate_phone?: string;
   email?: string;
   address?: string;
   city?: string;

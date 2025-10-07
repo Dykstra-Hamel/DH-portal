@@ -1,5 +1,4 @@
 .quoteContent {
-  padding: 20px;
   position: relative;
   transition: opacity 0.3s ease;
 
@@ -11,21 +10,15 @@
 
 .section {
   margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
-
-  &:last-of-type {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
-  }
 }
 
 .sectionTitle {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 650;
   color: var(--gray-900);
   margin: 0 0 12px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-300);
 }
 
 // Full width field (for Pest Concerns, Service Address)
@@ -42,11 +35,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 16px;
-  margin-bottom: 12px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
+  margin-bottom: 24px;
 }
 
 .gridItem {
@@ -54,21 +43,22 @@
 }
 
 .fieldLabel {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--gray-500);
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
   margin-bottom: 4px;
 }
 
 .fieldValue {
   font-size: 14px;
-  font-weight: 600;
-  color: var(--gray-900);
+  font-weight: 450;
+  color: var(--gray-500);
   word-break: break-word;
 }
 
 .actions {
   display: flex;
+  justify-content: flex-end;
   gap: 12px;
   margin-top: 16px;
 }
@@ -95,7 +85,6 @@
 }
 
 .secondaryButton {
-  flex: 1;
   padding: 8px 16px;
   font-size: 14px;
   font-weight: 500;
@@ -105,6 +94,10 @@
   transition: all 0.2s ease;
   background-color: white;
   color: var(--gray-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 
   &:hover {
     background-color: var(--gray-50);

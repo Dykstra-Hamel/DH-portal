@@ -7,8 +7,9 @@
   background: var(--gray-100);
   border: 1px solid var(--gray-300);
   cursor: pointer;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 140%;
   color: var(--gray-600);
   transition: all 0.2s ease;
   position: relative;
@@ -18,16 +19,15 @@
   }
 
   &:hover {
-    color: var(--action-600);
+    color: var(--action-500);
     background: #f3f4f6;
   }
 
   &.active {
-    color: var(--action-600);
-    // border-top: 4px solid var(--action-500);
+    color: var(--action-500);
     border-bottom: none;
     background: white;
-    border-radius: 2px 2px 0 0;
+    border-radius: 4px 4px 0 0;
     margin-top: -4px;
     overflow: hidden;
 
@@ -42,22 +42,22 @@
   }
 
   &:first-of-type:not(.active) {
-    border-radius: 16px 0 0 0;
+    border-radius: 8px 0 0 0;
   }
 
   &:last-of-type:not(.active) {
-    border-radius: 0 16px 0 0;
+    border-radius: 0 8px 0 0;
   }
 }
 
 .tabLabelWrapper {
-  padding: 16px 20px;
+  padding: 8px 12px;
 }
 
 .tabContent {
   padding: 20px 16px;
   border: 1px solid var(--gray-300);
   border-top: none;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 8px 8px;
   background: #fff;
 }

@@ -70,6 +70,15 @@ export interface EmailVariables {
   // Session and Attribution Variables
   partialLeadSessionId: string;
   pageUrl: string;
+
+  // Quote Variables
+  quoteId: string;
+  quoteTotalInitialPrice: string;
+  quoteTotalRecurringPrice: string;
+  quoteLineItems: string;
+  quotePestConcerns: string;
+  quoteHomeSize: string;
+  quoteYardSize: string;
 }
 
 /**
@@ -144,6 +153,15 @@ export function createSampleVariables(
     // Session and Attribution Variables (sample data)
     partialLeadSessionId: 'session_abc123def456',
     pageUrl: 'https://example.com/services/pest-control',
+
+    // Quote Variables (sample data)
+    quoteId: 'quote_123456',
+    quoteTotalInitialPrice: '$238',
+    quoteTotalRecurringPrice: '$158',
+    quoteLineItems: '<ul><li><strong>Defense Plan</strong> - Quarterly - $119 initial, $79/mo recurring</li><li><strong>Premium Protection</strong> - Monthly - $119 initial, $79/mo recurring</li></ul>',
+    quotePestConcerns: 'Ants, Spiders, Cockroaches',
+    quoteHomeSize: '2000-2500 sq ft',
+    quoteYardSize: '1/4 to 1/2 Acre',
   };
 }
 

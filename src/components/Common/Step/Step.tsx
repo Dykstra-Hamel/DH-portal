@@ -45,7 +45,9 @@ export function Step({
               key={step.id}
               className={`${styles.stepItemWrapper} ${styles[step.status]} ${
                 isCurrent ? styles.active : ''
-              } ${isDisabled ? styles.disabled : ''}`}
+              } ${isDisabled ? styles.disabled : ''} ${
+                step.isEditing ? styles.editing : ''
+              }`}
               disabled={isDisabled}
               type="button"
               onClick={() => handleStepClick(step.id, step.status)}
@@ -53,7 +55,9 @@ export function Step({
               <div
                 className={`${styles.stepItem} ${styles[step.status]} ${
                   isCurrent ? styles.active : ''
-                } ${isDisabled ? styles.disabled : ''}`}
+                } ${isDisabled ? styles.disabled : ''} ${
+                  step.isEditing ? styles.editing : ''
+                }`}
               >
                 <span className={styles.stepNumber}>
                   {step.status === 'completed' ? (

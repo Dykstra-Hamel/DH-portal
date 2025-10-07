@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Update Password - PCOCENTRAL',
-  description: 'Update your password for Dykstra Hamel Portal',
+  title: 'Update Password - PMPCentral',
+  description: 'Follow the instructions to update your PMPCentral password.',
 };
 
 export default function UpdatePasswordLayout({
@@ -12,9 +12,7 @@ export default function UpdatePasswordLayout({
 }) {
   return (
     <div className="pageWrapper">
-      <main className="main">
-        {children}
-      </main>
+      <main className="main">{children}</main>
     </div>
   );
 }

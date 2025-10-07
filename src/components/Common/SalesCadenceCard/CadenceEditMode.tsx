@@ -1,7 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { GripVertical, Trash2, Copy, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  GripVertical,
+  Trash2,
+  Copy,
+  CirclePlus,
+  ChevronDown,
+  SquarePen,
+  Save,
+  CircleX,
+} from 'lucide-react';
 import {
   SalesCadenceStep,
   ACTION_TYPE_LABELS,
@@ -27,7 +36,9 @@ export function CadenceEditMode({
   onCancel,
   onDelete,
 }: CadenceEditModeProps) {
-  const [editingSteps, setEditingSteps] = useState<SalesCadenceStep[]>([...steps]);
+  const [editingSteps, setEditingSteps] = useState<SalesCadenceStep[]>([
+    ...steps,
+  ]);
   const [expandedDays, setExpandedDays] = useState<Set<number>>(
     new Set(Array.from(new Set(steps.map(s => s.day_number))))
   );
@@ -36,7 +47,7 @@ export function CadenceEditMode({
   // Group steps by day
   const groupStepsByDay = () => {
     const grouped: { [key: number]: SalesCadenceStep[] } = {};
-    editingSteps.forEach((step) => {
+    editingSteps.forEach(step => {
       if (!grouped[step.day_number]) {
         grouped[step.day_number] = [];
       }
@@ -55,7 +66,11 @@ export function CadenceEditMode({
     setExpandedDays(newExpanded);
   };
 
-  const updateStep = (index: number, field: keyof SalesCadenceStep, value: any) => {
+  const updateStep = (
+    index: number,
+    field: keyof SalesCadenceStep,
+    value: any
+  ) => {
     const updated = [...editingSteps];
     updated[index] = { ...updated[index], [field]: value };
     setEditingSteps(updated);
@@ -86,9 +101,10 @@ export function CadenceEditMode({
   };
 
   const addNewDay = () => {
-    const maxDay = editingSteps.length > 0
-      ? Math.max(...editingSteps.map(s => s.day_number))
-      : 0;
+    const maxDay =
+      editingSteps.length > 0
+        ? Math.max(...editingSteps.map(s => s.day_number))
+        : 0;
     const newDayNumber = maxDay + 1;
     addStepToDay(newDayNumber);
     setExpandedDays(new Set([...expandedDays, newDayNumber]));
@@ -140,27 +156,38 @@ export function CadenceEditMode({
     <div className={styles.editMode}>
       {/* Warning Banner */}
       <div className={styles.warningBanner}>
-        <span>⚠️</span> Editing a cadence. Make desired changes below.
+        <SquarePen size={18} /> Editing a cadence. Make desired changes below.
       </div>
 
       {/* Edit Steps Section */}
+      <h4 className={styles.editHeading}>Edit Steps:</h4>
       <div className={styles.editStepsSection}>
-        <h4>Edit Steps:</h4>
-
-        {sortedDays.map((dayNumber) => {
+        {sortedDays.map(dayNumber => {
           const daySteps = groupedSteps[dayNumber];
           const isExpanded = expandedDays.has(dayNumber);
 
           return (
             <div key={dayNumber} className={styles.dayGroup}>
-              <div className={styles.dayHeader} onClick={() => toggleDay(dayNumber)}>
+              <div
+                className={styles.dayHeader}
+                onClick={() => toggleDay(dayNumber)}
+              >
                 <div className={styles.dayTitle}>
-                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  <div className={styles.chevronOuterWrapper}>
+                    <div className={styles.chevronInnerWrapper}>
+                      <ChevronDown
+                        size={16}
+                        className={
+                          !isExpanded ? styles.dayChevronCollapsed : ''
+                        }
+                      />
+                    </div>
+                  </div>
                   <span>Day {dayNumber}</span>
                 </div>
                 <button
                   type="button"
-                  onClick={(e) => {
+                  onClick={e => {
                     e.stopPropagation();
                     deleteDay(dayNumber);
                   }}
@@ -181,7 +208,7 @@ export function CadenceEditMode({
                         className={`${styles.stepItem} ${draggedIndex === globalIndex ? styles.dragging : ''}`}
                         draggable
                         onDragStart={() => handleDragStart(globalIndex)}
-                        onDragOver={(e) => handleDragOver(e, globalIndex)}
+                        onDragOver={e => handleDragOver(e, globalIndex)}
                         onDragEnd={handleDragEnd}
                       >
                         <div className={styles.dragHandle}>
@@ -194,13 +221,21 @@ export function CadenceEditMode({
                               <label>Type:</label>
                               <select
                                 value={step.action_type}
-                                onChange={(e) => updateStep(globalIndex, 'action_type', e.target.value as ActionType)}
+                                onChange={e =>
+                                  updateStep(
+                                    globalIndex,
+                                    'action_type',
+                                    e.target.value as ActionType
+                                  )
+                                }
                               >
-                                {Object.entries(ACTION_TYPE_LABELS).map(([value, label]) => (
-                                  <option key={value} value={value}>
-                                    {label}
-                                  </option>
-                                ))}
+                                {Object.entries(ACTION_TYPE_LABELS).map(
+                                  ([value, label]) => (
+                                    <option key={value} value={value}>
+                                      {label}
+                                    </option>
+                                  )
+                                )}
                               </select>
                             </div>
 
@@ -209,7 +244,13 @@ export function CadenceEditMode({
                               <input
                                 type="text"
                                 value={step.description || ''}
-                                onChange={(e) => updateStep(globalIndex, 'description', e.target.value)}
+                                onChange={e =>
+                                  updateStep(
+                                    globalIndex,
+                                    'description',
+                                    e.target.value
+                                  )
+                                }
                               />
                             </div>
                           </div>
@@ -219,7 +260,13 @@ export function CadenceEditMode({
                               <label>Target Time</label>
                               <select
                                 value={step.time_of_day}
-                                onChange={(e) => updateStep(globalIndex, 'time_of_day', e.target.value as TimeOfDay)}
+                                onChange={e =>
+                                  updateStep(
+                                    globalIndex,
+                                    'time_of_day',
+                                    e.target.value as TimeOfDay
+                                  )
+                                }
                               >
                                 <option value="morning">Morning</option>
                                 <option value="afternoon">Afternoon</option>
@@ -230,13 +277,21 @@ export function CadenceEditMode({
                               <label>Priority</label>
                               <select
                                 value={step.priority}
-                                onChange={(e) => updateStep(globalIndex, 'priority', e.target.value as Priority)}
+                                onChange={e =>
+                                  updateStep(
+                                    globalIndex,
+                                    'priority',
+                                    e.target.value as Priority
+                                  )
+                                }
                               >
-                                {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
-                                  <option key={value} value={value}>
-                                    {label}
-                                  </option>
-                                ))}
+                                {Object.entries(PRIORITY_LABELS).map(
+                                  ([value, label]) => (
+                                    <option key={value} value={value}>
+                                      {label}
+                                    </option>
+                                  )
+                                )}
                               </select>
                             </div>
 
@@ -260,7 +315,7 @@ export function CadenceEditMode({
                                 onClick={() => addStepToDay(dayNumber)}
                                 title="Add step"
                               >
-                                <Plus size={14} />
+                                <CirclePlus size={14} />
                               </button>
                             </div>
                           </div>
@@ -275,8 +330,12 @@ export function CadenceEditMode({
         })}
 
         {/* Add Day Button */}
-        <button type="button" onClick={addNewDay} className={styles.addDayButton}>
-          <Plus size={16} /> Add Day
+        <button
+          type="button"
+          onClick={addNewDay}
+          className={styles.addDayButton}
+        >
+          <CirclePlus size={16} /> Add Day
         </button>
       </div>
 
@@ -287,6 +346,7 @@ export function CadenceEditMode({
           onClick={onDelete}
           className={styles.deleteButton}
         >
+          <CircleX size={18} />
           Delete Cadence
         </button>
 
@@ -303,6 +363,7 @@ export function CadenceEditMode({
             onClick={handleSave}
             className={styles.saveButton}
           >
+            <Save size={18} />
             Save As
           </button>
         </div>

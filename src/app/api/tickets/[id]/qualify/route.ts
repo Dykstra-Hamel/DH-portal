@@ -149,6 +149,11 @@ export async function POST(
           updated_at: new Date().toISOString(),
         };
 
+        // If jumping straight to quoted (live call), set furthest_completed_stage to contacting
+        if (customStatus === 'quoted') {
+          updateData.furthest_completed_stage = 'contacting';
+        }
+
         // Add assignment if provided
         if (assignedTo) {
           updateData.assigned_to = assignedTo;
@@ -210,7 +215,7 @@ export async function POST(
       }
 
       // Create a new lead from the ticket
-      const leadInsertData = {
+      const leadInsertData: any = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
         lead_source: ticket.source,
@@ -233,6 +238,11 @@ export async function POST(
         user_agent: ticket.user_agent,
         converted_from_ticket_id: ticket.id, // Required for database trigger validation
       };
+
+      // If jumping straight to quoted (live call), set furthest_completed_stage to contacting
+      if (customStatus === 'quoted') {
+        leadInsertData.furthest_completed_stage = 'contacting';
+      }
 
       // Start a transaction for lead creation and ticket update
       let newLead;

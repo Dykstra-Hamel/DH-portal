@@ -66,7 +66,9 @@ export function SaveCadenceModal({
                 checked={saveOption === 'overwrite'}
                 onChange={() => setSaveOption('overwrite')}
                 disabled={isSaving}
+                className={styles.radioInput}
               />
+              <span className={styles.radioCustom}></span>
               <div className={styles.optionContent}>
                 <strong>Overwrite existing cadence</strong>
                 <span className={styles.optionDescription}>
@@ -83,7 +85,9 @@ export function SaveCadenceModal({
                 checked={saveOption === 'new'}
                 onChange={() => setSaveOption('new')}
                 disabled={isSaving}
+                className={styles.radioInput}
               />
+              <span className={styles.radioCustom}></span>
               <div className={styles.optionContent}>
                 <strong>Save as new cadence</strong>
                 <span className={styles.optionDescription}>

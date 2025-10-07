@@ -1,8 +1,9 @@
 .infoCard {
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--slate-300);
+  overflow: hidden;
 }
 
 .header {
@@ -90,28 +91,20 @@
   transform: rotate(180deg);
 }
 
-.body {
-  // Content will be styled by the parent components
-  // This allows flexibility for different content types
-}
-
 // Reusable text styles for InfoCard content
-.defaultText {
+.defaultText,
+.inputLabels {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 550;
   color: var(--gray-900);
+  line-height: 170%;
+  margin-bottom: 4px;
 }
 
 .lightText {
   font-size: 14px;
   font-weight: 450;
   color: var(--gray-500);
-}
-
-.inputLabels {
-  font-size: 14px;
-  font-weight: 550;
-  color: var(--gray-900);
 }
 
 .inputText {

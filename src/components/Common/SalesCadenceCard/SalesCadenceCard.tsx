@@ -10,6 +10,8 @@ import {
   Check,
   CircleSlash,
   ChevronDown,
+  Plus,
+  SquarePlay,
 } from 'lucide-react';
 import {
   SalesCadenceWithSteps,
@@ -76,9 +78,13 @@ export function SalesCadenceCard({
   const [showCadenceModal, setShowCadenceModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingSteps, setEditingSteps] = useState<SalesCadenceStep[]>([]);
-  const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1, 2, 3]));
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(
+    new Set([1, 2, 3])
+  );
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const [pendingSaveSteps, setPendingSaveSteps] = useState<SalesCadenceStep[]>([]);
+  const [pendingSaveSteps, setPendingSaveSteps] = useState<SalesCadenceStep[]>(
+    []
+  );
   const [showEndModal, setShowEndModal] = useState(false);
 
   useEffect(() => {
@@ -88,7 +94,10 @@ export function SalesCadenceCard({
   // Click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
     };
@@ -321,7 +330,9 @@ export function SalesCadenceCard({
   }
 
   if (!assignment) {
-    const selectedCadence = availableCadences.find(c => c.id === selectedPreviewCadenceId);
+    const selectedCadence = availableCadences.find(
+      c => c.id === selectedPreviewCadenceId
+    );
 
     const noAssignmentContent = (
       <div className={styles.cardContent}>
@@ -329,77 +340,34 @@ export function SalesCadenceCard({
           <>
             <div className={styles.formGroup}>
               <label className={cardStyles.inputLabels}>Active Cadence:</label>
-              <div ref={dropdownRef} style={{ position: 'relative' }}>
+              <div ref={dropdownRef} className={styles.dropdownWrapper}>
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   disabled={changingCadence}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--gray-300)',
-                    borderRadius: '6px',
-                    backgroundColor: 'white',
-                    color: selectedCadence ? 'var(--gray-900)' : 'var(--gray-500)',
-                    fontSize: '14px',
-                    fontWeight: '400',
-                    cursor: changingCadence ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    textAlign: 'left'
-                  }}
+                  className={`${styles.dropdownButton} ${selectedCadence ? styles.hasSelection : styles.placeholder}`}
                 >
-                  <span>{selectedCadence ? selectedCadence.name : 'Select a sales cadence'}</span>
-                  <ChevronDown size={16} style={{ color: 'var(--gray-500)' }} />
+                  <span>
+                    {selectedCadence
+                      ? selectedCadence.name
+                      : 'Select a sales cadence'}
+                  </span>
+                  <ChevronDown size={16} className={styles.dropdownChevron} />
                 </button>
 
                 {isDropdownOpen && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 4px)',
-                    left: 0,
-                    right: 0,
-                    backgroundColor: 'white',
-                    border: '1px solid var(--gray-300)',
-                    borderRadius: '6px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                    zIndex: 10,
-                    maxHeight: '240px',
-                    overflowY: 'auto'
-                  }}>
-                    {availableCadences.map((cadence) => (
+                  <div className={styles.dropdownMenu}>
+                    {availableCadences.map(cadence => (
                       <button
                         key={cadence.id}
                         type="button"
                         onClick={() => handleCadenceSelectChange(cadence.id)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          border: 'none',
-                          backgroundColor: selectedPreviewCadenceId === cadence.id ? '#3b82f6' : 'white',
-                          color: selectedPreviewCadenceId === cadence.id ? 'white' : 'var(--gray-900)',
-                          fontSize: '14px',
-                          fontWeight: '400',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (selectedPreviewCadenceId !== cadence.id) {
-                            e.currentTarget.style.backgroundColor = '#f3f4f6';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedPreviewCadenceId !== cadence.id) {
-                            e.currentTarget.style.backgroundColor = 'white';
-                          }
-                        }}
+                        className={`${styles.dropdownOption} ${selectedPreviewCadenceId === cadence.id ? styles.selected : ''}`}
                       >
                         <span>{cadence.name}</span>
-                        {selectedPreviewCadenceId === cadence.id && <Check size={16} />}
+                        {selectedPreviewCadenceId === cadence.id && (
+                          <Check size={16} />
+                        )}
                       </button>
                     ))}
                   </div>
@@ -412,13 +380,12 @@ export function SalesCadenceCard({
                 {/* Progress Section */}
                 <div className={styles.progressSection}>
                   <div className={styles.progressHeader}>
-                    <span className={cardStyles.defaultText}>0 of {selectedCadence.steps?.length || 0} steps complete</span>
+                    <span className={cardStyles.defaultText}>
+                      0 of {selectedCadence.steps?.length || 0} steps complete
+                    </span>
                   </div>
                   <div className={styles.progressBar}>
-                    <div
-                      className={styles.progressFill}
-                      style={{ width: '0%' }}
-                    />
+                    <div className={styles.progressFill} />
                   </div>
                 </div>
 
@@ -426,7 +393,7 @@ export function SalesCadenceCard({
                 <div className={styles.stepsSection}>
                   <h4 className={cardStyles.defaultText}>Cadence Progress:</h4>
                   <div className={styles.stepsList}>
-                    {selectedCadence.steps?.map((step) => (
+                    {selectedCadence.steps?.map(step => (
                       <div key={step.id} className={styles.stepItem}>
                         <div className={styles.stepIcon}>
                           {getActionIcon(step.action_type)}
@@ -435,8 +402,12 @@ export function SalesCadenceCard({
                         <div className={styles.stepContent}>
                           <div className={styles.stepHeader}>
                             <span className={cardStyles.inputText}>
-                              Day {step.day_number}: {step.time_of_day === 'morning' ? 'Morning' : 'Afternoon'}{' '}
-                              {step.action_type === 'live_call' || step.action_type === 'outbound_call'
+                              Day {step.day_number}:{' '}
+                              {step.time_of_day === 'morning'
+                                ? 'Morning'
+                                : 'Afternoon'}{' '}
+                              {step.action_type === 'live_call' ||
+                              step.action_type === 'outbound_call'
                                 ? 'Call'
                                 : step.action_type === 'ai_call'
                                   ? 'AI Call'
@@ -458,7 +429,8 @@ export function SalesCadenceCard({
                             </div>
                           </div>
                           <div className={cardStyles.dataLabel}>
-                            Target: {step.time_of_day === 'morning' ? '12PM' : '5PM'}
+                            Target:{' '}
+                            {step.time_of_day === 'morning' ? '12PM' : '5PM'}
                           </div>
                         </div>
                       </div>
@@ -467,12 +439,7 @@ export function SalesCadenceCard({
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  marginTop: '16px'
-                }}>
+                <div className={styles.actionButtonsContainer}>
                   <button
                     type="button"
                     onClick={() => {
@@ -481,36 +448,13 @@ export function SalesCadenceCard({
                         setEditingSteps([...selectedCadence.steps]);
                       }
                     }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--gray-700)',
-                      fontSize: '14px',
-                      fontWeight: '400',
-                      cursor: 'pointer',
-                      padding: '0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
+                    className={styles.textButton}
                   >
-                    <span style={{ fontSize: '16px' }}>✎</span> Edit
+                    <span className={styles.textButtonIcon}>✎</span> Edit
                   </button>
 
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button
-                      type="button"
-                      style={{
-                        padding: '8px 16px',
-                        border: '1px solid var(--gray-300)',
-                        borderRadius: '6px',
-                        backgroundColor: 'white',
-                        color: 'var(--gray-600)',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                      }}
-                    >
+                  <div className={styles.actionButtonsRight}>
+                    <button type="button" className={styles.secondaryButton}>
                       Pause Cadence
                     </button>
 
@@ -523,22 +467,10 @@ export function SalesCadenceCard({
                         }
                       }}
                       disabled={isStartingCadence}
-                      style={{
-                        padding: '8px 16px',
-                        border: 'none',
-                        borderRadius: '6px',
-                        backgroundColor: '#3b82f6',
-                        color: 'white',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: isStartingCadence ? 'not-allowed' : 'pointer',
-                        opacity: isStartingCadence ? 0.6 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
+                      className={styles.primaryButton}
                     >
-                      <span style={{ fontSize: '18px' }}>▶</span> {isStartingCadence ? 'Starting...' : 'Start Cadence'}
+                      <SquarePlay size={18} />
+                      {isStartingCadence ? 'Starting...' : 'Start Cadence'}
                     </button>
                   </div>
                 </div>
@@ -550,7 +482,7 @@ export function SalesCadenceCard({
               <CadenceEditMode
                 steps={editingSteps}
                 cadenceName={selectedCadence.name}
-                onSaveClick={(updatedSteps) => {
+                onSaveClick={updatedSteps => {
                   setPendingSaveSteps(updatedSteps);
                   setShowSaveModal(true);
                 }}
@@ -559,7 +491,11 @@ export function SalesCadenceCard({
                   setEditingSteps([]);
                 }}
                 onDelete={async () => {
-                  if (!confirm('Are you sure you want to delete this cadence? This action cannot be undone.')) {
+                  if (
+                    !confirm(
+                      'Are you sure you want to delete this cadence? This action cannot be undone.'
+                    )
+                  ) {
                     return;
                   }
 
@@ -586,49 +522,18 @@ export function SalesCadenceCard({
             )}
 
             {!selectedPreviewCadenceId && (
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginTop: '16px'
-              }}>
+              <div className={styles.actionButtonsContainer}>
                 <button
                   type="button"
                   onClick={() => setShowCadenceModal(true)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--gray-700)',
-                    fontSize: '14px',
-                    fontWeight: '400',
-                    cursor: 'pointer',
-                    padding: '0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
+                  className={styles.textButton}
                 >
-                  <span style={{ fontSize: '16px' }}>+</span> Create New
+                  <Plus size={18} />
+                  Create New
                 </button>
 
-                <button
-                  type="button"
-                  disabled
-                  style={{
-                    padding: '8px 16px',
-                    border: 'none',
-                    borderRadius: '6px',
-                    backgroundColor: 'var(--gray-300)',
-                    color: 'var(--gray-500)',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span style={{ fontSize: '18px' }}>▶</span> Start Cadence
+                <button type="button" disabled className={styles.primaryButton}>
+                  <SquarePlay size={18} /> Start Cadence
                 </button>
               </div>
             )}
@@ -648,7 +553,7 @@ export function SalesCadenceCard({
             cadence={null}
             companyId={companyId}
             onClose={() => setShowCadenceModal(false)}
-            onSuccess={(newCadenceId) => {
+            onSuccess={newCadenceId => {
               setShowCadenceModal(false);
               if (newCadenceId) {
                 // Auto-select the newly created cadence
@@ -665,19 +570,22 @@ export function SalesCadenceCard({
           <SaveCadenceModal
             isOpen={showSaveModal}
             currentCadenceName={selectedCadence.name}
-            onSaveAsNew={async (newName) => {
+            onSaveAsNew={async newName => {
               try {
                 // Create new cadence with the new name
-                const cadenceResponse = await fetch(`/api/companies/${companyId}/sales-cadences`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    name: newName,
-                    description: selectedCadence.description,
-                    is_active: selectedCadence.is_active,
-                    is_default: false, // Never make copies default
-                  }),
-                });
+                const cadenceResponse = await fetch(
+                  `/api/companies/${companyId}/sales-cadences`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      name: newName,
+                      description: selectedCadence.description,
+                      is_active: selectedCadence.is_active,
+                      is_default: false, // Never make copies default
+                    }),
+                  }
+                );
 
                 if (!cadenceResponse.ok) {
                   throw new Error('Failed to create new cadence');
@@ -688,14 +596,17 @@ export function SalesCadenceCard({
                 // Create steps for the new cadence
                 for (let i = 0; i < pendingSaveSteps.length; i++) {
                   const { id, ...stepData } = pendingSaveSteps[i];
-                  await fetch(`/api/companies/${companyId}/sales-cadences/${newCadence.id}/steps`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      ...stepData,
-                      display_order: i,
-                    }),
-                  });
+                  await fetch(
+                    `/api/companies/${companyId}/sales-cadences/${newCadence.id}/steps`,
+                    {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        ...stepData,
+                        display_order: i,
+                      }),
+                    }
+                  );
                 }
 
                 // Reload and select the new cadence
@@ -726,14 +637,17 @@ export function SalesCadenceCard({
                 // Create new steps
                 for (let i = 0; i < pendingSaveSteps.length; i++) {
                   const { id, ...stepData } = pendingSaveSteps[i];
-                  await fetch(`/api/companies/${companyId}/sales-cadences/${selectedPreviewCadenceId}/steps`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      ...stepData,
-                      display_order: i,
-                    }),
-                  });
+                  await fetch(
+                    `/api/companies/${companyId}/sales-cadences/${selectedPreviewCadenceId}/steps`,
+                    {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        ...stepData,
+                        display_order: i,
+                      }),
+                    }
+                  );
                 }
 
                 // Reload and exit edit mode
@@ -782,21 +696,8 @@ export function SalesCadenceCard({
       <div className={styles.progressSection}>
         <div className={styles.progressHeader}>
           <span className={cardStyles.defaultText}>Progress</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {isPaused && (
-              <span
-                style={{
-                  padding: '2px 8px',
-                  backgroundColor: 'var(--gray-300)',
-                  color: 'var(--gray-700)',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  borderRadius: '4px',
-                }}
-              >
-                Paused
-              </span>
-            )}
+          <div className={styles.actionButtonsRight}>
+            {isPaused && <span className={styles.pausedBadge}>Paused</span>}
             <span className={cardStyles.dataLabel}>
               {completedCount} of {totalCount} complete
             </span>
@@ -830,10 +731,7 @@ export function SalesCadenceCard({
       {/* Cadence Steps */}
       <div className={styles.stepsSection}>
         <h4 className={cardStyles.defaultText}>Steps:</h4>
-        <div
-          className={styles.stepsList}
-          style={{ opacity: isPaused ? 0.6 : 1 }}
-        >
+        <div className={isPaused ? styles.stepsListPaused : styles.stepsList}>
           {assignment.cadence.steps.map((step, index) => {
             const isNext = nextStep && nextStep.id === step.id;
 
@@ -902,28 +800,11 @@ export function SalesCadenceCard({
 
       {/* Action Buttons - Only show if cadence is not complete */}
       {!allStepsComplete && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: '12px',
-            marginTop: '16px',
-          }}
-        >
+        <div className={styles.actionButtonsContainer}>
           <button
             onClick={handlePauseCadence}
             disabled={isPausing}
-            style={{
-              padding: '8px 16px',
-              border: '1px solid var(--gray-300)',
-              borderRadius: '6px',
-              backgroundColor: 'white',
-              color: 'var(--gray-600)',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: isPausing ? 'not-allowed' : 'pointer',
-              opacity: isPausing ? 0.6 : 1,
-            }}
+            className={styles.secondaryButton}
           >
             {isPausing
               ? isPaused
@@ -936,20 +817,7 @@ export function SalesCadenceCard({
           <button
             onClick={handleEndCadence}
             disabled={isEnding}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              borderRadius: '6px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: isEnding ? 'not-allowed' : 'pointer',
-              opacity: isEnding ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
+            className={styles.primaryButton}
           >
             <CircleSlash size={16} />
             {isEnding ? 'Ending...' : 'End Cadence'}
@@ -974,7 +842,9 @@ export function SalesCadenceCard({
             setIsEnding(true);
 
             // 1. Get the next incomplete task
-            const nextTaskResponse = await fetch(`/api/leads/${leadId}/next-task`);
+            const nextTaskResponse = await fetch(
+              `/api/leads/${leadId}/next-task`
+            );
             if (nextTaskResponse.ok) {
               const { data: nextTask } = await nextTaskResponse.json();
 
