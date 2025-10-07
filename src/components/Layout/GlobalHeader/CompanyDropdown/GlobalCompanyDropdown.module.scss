@@ -40,7 +40,7 @@
   font-size: 14px;
   font-weight: 760;
   line-height: 20px;
-  color: var(--neutral-600);
+  color: var(--gray-600);
 
   &:hover .chevron {
     color: black;
@@ -61,7 +61,7 @@
 }
 
 .chevron {
-  color: var(--neutral-600);
+  color: var(--gray-600);
   flex-shrink: 0;
   display: flex;
   transition: all 0.3s;
@@ -99,11 +99,11 @@
   font-size: 14px;
   font-weight: 760;
   line-height: 20px;
-  color: var(--neutral-600);
+  color: var(--gray-600);
   text-align: left;
 
   &:hover {
-    background: var(--neutral-100);
+    background: var(--gray-100);
   }
 
   &:first-child {
@@ -117,12 +117,12 @@
   }
 
   &.selected {
-    background: var(--primary-100);
-    color: var(--primary-600);
+    background: var(--action-100);
+    color: var(--action-600);
     font-weight: 760;
 
     &:hover {
-      background: var(--primary-100);
+      background: var(--action-100);
     }
   }
 
@@ -135,7 +135,7 @@
 }
 
 .checkmark {
-  color: var(--primary-600);
+  color: var(--action-600);
   font-weight: bold;
   font-size: 12px;
   flex-shrink: 0;

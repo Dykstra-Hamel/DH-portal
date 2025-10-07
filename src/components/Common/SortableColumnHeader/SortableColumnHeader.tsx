@@ -13,26 +13,26 @@ interface SortableColumnHeaderProps {
   sortable?: boolean;
 }
 
-const SortIcon = ({ 
-  direction, 
-  isActive 
-}: { 
-  direction?: 'asc' | 'desc' | null; 
+const SortIcon = ({
+  direction,
+  isActive,
+}: {
+  direction?: 'asc' | 'desc' | null;
   isActive: boolean;
 }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="16" 
-    height="16" 
-    viewBox="0 0 16 16" 
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
     fill="none"
     className={`${styles.sortIcon} ${isActive ? styles.active : ''} ${direction ? styles[direction] : ''}`}
   >
-    <path 
-      d="M4.66663 10L7.99996 13.3334L11.3333 10M4.66663 6.00002L7.99996 2.66669L11.3333 6.00002" 
-      stroke="#A3A3A3" 
-      strokeWidth="1.33333" 
-      strokeLinecap="round" 
+    <path
+      d="M4.66663 10L7.99996 13.3334L11.3333 10M4.66663 6.00002L7.99996 2.66669L11.3333 6.00002"
+      stroke="var(--brand-gray)"
+      strokeWidth="1.33333"
+      strokeLinecap="round"
       strokeLinejoin="round"
     />
   </svg>
@@ -45,7 +45,7 @@ export default function SortableColumnHeader({
   onSort,
   className,
   width,
-  sortable = true
+  sortable = true,
 }: SortableColumnHeaderProps) {
   const isActive = currentSort?.key === sortKey;
   const direction = isActive ? currentSort?.direction : null;

@@ -35,7 +35,7 @@
     margin: 0;
     font-size: 20px;
     font-weight: 600;
-    color: var(--neutral-800);
+    color: var(--gray-800);
   }
 }
 
@@ -48,18 +48,18 @@
   border: none;
   background: transparent;
   border-radius: 6px;
-  color: var(--neutral-600);
+  color: var(--gray-600);
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--neutral-100);
-    color: var(--neutral-800);
+    background: var(--gray-100);
+    color: var(--gray-800);
   }
 
   &:focus {
     outline: none;
-    background: var(--neutral-100);
+    background: var(--gray-100);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 }
@@ -70,7 +70,7 @@
   justify-content: space-between;
   padding: 16px 24px;
   border-bottom: 1px solid var(--drop-shadow);
-  background: var(--light-gray-bg);
+  background: var(--slate-50);
 }
 
 .filterTabs {
@@ -82,7 +82,7 @@
   padding: 8px 16px;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--neutral-600);
+  color: var(--gray-600);
   font-size: 14px;
   font-weight: 500;
   border-radius: 6px;
@@ -91,13 +91,13 @@
 
   &:hover {
     background: white;
-    color: var(--neutral-800);
+    color: var(--gray-800);
   }
 
   &.active {
     background: white;
-    color: var(--primary-600);
-    border-color: var(--primary-600);
+    color: var(--action-600);
+    border-color: var(--action-600);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
@@ -112,8 +112,8 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border: 1px solid var(--primary-500);
-  background: var(--primary-500);
+  border: 1px solid var(--action-500);
+  background: var(--action-500);
   color: white;
   font-size: 14px;
   font-weight: 500;
@@ -122,8 +122,8 @@
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--primary-600);
-    border-color: var(--primary-600);
+    background: var(--action-600);
+    border-color: var(--action-600);
   }
 
   &:focus {
@@ -150,7 +150,7 @@
 
   p {
     margin: 0 0 16px 0;
-    color: var(--neutral-600);
+    color: var(--gray-600);
     font-size: 16px;
   }
 }
@@ -161,17 +161,17 @@
 
 .retryButton {
   padding: 8px 16px;
-  border: 1px solid var(--neutral-300);
+  border: 1px solid var(--gray-300);
   background: white;
-  color: var(--neutral-700);
+  color: var(--gray-700);
   font-size: 14px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--neutral-100);
-    border-color: var(--neutral-400);
+    background: var(--gray-100);
+    border-color: var(--gray-400);
   }
 }
 
@@ -191,14 +191,14 @@
   }
 
   &:hover {
-    background-color: var(--light-gray-bg);
+    background-color: var(--slate-50);
   }
 
   &.unread {
-    background-color: var(--primary-100);
+    background-color: var(--action-100);
 
     &:hover {
-      background-color: var(--primary-50);
+      background-color: var(--action-50);
     }
   }
 }
@@ -220,7 +220,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   line-height: 1.4;
 }
 
@@ -238,19 +238,19 @@
   height: 28px;
   border: none;
   background: transparent;
-  color: var(--neutral-500);
+  color: var(--gray-500);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--neutral-100);
-    color: var(--neutral-700);
+    background: var(--gray-100);
+    color: var(--gray-700);
   }
 
   &:focus {
     outline: none;
-    background: var(--neutral-100);
+    background: var(--gray-100);
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
   }
 }
@@ -258,7 +258,7 @@
 .notificationMessage {
   margin: 0 0 12px 0;
   font-size: 14px;
-  color: var(--neutral-700);
+  color: var(--gray-700);
   line-height: 1.5;
 }
 
@@ -271,19 +271,19 @@
 
 .notificationTime {
   font-size: 12px;
-  color: var(--neutral-500);
+  color: var(--gray-500);
   font-weight: 500;
 }
 
 .notificationFullDate {
   font-size: 12px;
-  color: var(--neutral-400);
+  color: var(--gray-400);
 }
 
 .notificationReference {
   padding: 2px 8px;
-  background: var(--primary-100);
-  color: var(--primary-600);
+  background: var(--action-100);
+  color: var(--action-600);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;

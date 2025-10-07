@@ -10,7 +10,7 @@
 
     &:hover {
       opacity: 0.8;
-      
+
       .sortIcon {
         opacity: 1;
       }
@@ -23,7 +23,7 @@
 }
 
 .title {
-  color: var(--neutral-800);
+  color: var(--gray-800);
   font-family: var(--font-satoshi);
   font-size: 12px;
   font-style: normal;
@@ -46,20 +46,22 @@
   // Visual states for sort directions
   &.asc {
     path:first-child {
-      stroke: var(--neutral-800);
+      stroke: var(--gray-800);
       stroke-width: 2;
     }
   }
 
   &.desc {
     path:last-child {
-      stroke: var(--neutral-800); 
+      stroke: var(--gray-800);
       stroke-width: 2;
     }
   }
 
   path {
-    transition: stroke 0.2s ease, stroke-width 0.2s ease;
+    transition:
+      stroke 0.2s ease,
+      stroke-width 0.2s ease;
   }
 }
 
@@ -69,7 +71,7 @@
     font-size: 11px;
     line-height: 18px;
   }
-  
+
   .sortIcon {
     width: 14px;
     height: 14px;

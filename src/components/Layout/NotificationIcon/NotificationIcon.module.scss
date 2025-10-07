@@ -11,7 +11,7 @@
   border: none;
   background: transparent;
   border-radius: 8px;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -129,10 +129,10 @@
   }
 
   &.unread {
-    background-color: var(--primary-50);
+    background-color: var(--action-50);
 
     &:hover {
-      background-color: var(--primary-100);
+      background-color: var(--action-100);
     }
   }
 }
@@ -214,13 +214,13 @@
 }
 
 .markAllReadButton {
-  background-color: var(--primary-500);
+  background-color: var(--action-500);
   color: white;
-  border-color: var(--primary-500);
+  border-color: var(--action-500);
 
   &:hover:not(:disabled) {
-    background-color: var(--primary-600);
-    border-color: var(--primary-600);
+    background-color: var(--action-600);
+    border-color: var(--action-600);
   }
 }
 

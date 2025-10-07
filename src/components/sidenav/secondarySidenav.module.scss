@@ -142,7 +142,7 @@
 
     .countBox {
       background: white;
-      color: var(--primary-600);
+      color: var(--action-600);
     }
   }
 
@@ -218,7 +218,7 @@
   &.neutral {
     color: white;
     background-color: transparent;
-    border: 1px solid var(--neutral-600);
+    border: 1px solid var(--gray-600);
   }
 
   &.animating {
@@ -260,11 +260,11 @@
 
 .activeCount {
   background: white;
-  color: var(--primary-600);
+  color: var(--action-600);
 }
 
 .neutral {
-  border: 1px solid var(--neutral-600);
+  border: 1px solid var(--gray-600);
   color: white;
 }
 
@@ -283,7 +283,7 @@
 // Legacy sidebar styles for dashboard mode
 .sidebarLogoSection {
   padding: 0 20px 30px 20px;
-  border-bottom: 1px solid var(--neutral-600);
+  border-bottom: 1px solid var(--gray-600);
   margin-bottom: 20px;
 }
 

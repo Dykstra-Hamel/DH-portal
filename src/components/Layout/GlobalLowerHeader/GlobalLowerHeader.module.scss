@@ -30,7 +30,7 @@
   font-style: normal;
   font-weight: 800;
   line-height: 28px;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   margin: 0;
 }
 
@@ -45,7 +45,7 @@
   font-style: normal;
   font-weight: 500;
   line-height: 20px;
-  color: var(--neutral-500);
+  color: var(--gray-500);
   margin: 0;
 }
 
@@ -66,8 +66,8 @@
   align-items: center;
   gap: 13px;
   min-width: 225px;
-  background: var(--neutral-100);
-  border: 1px solid var(--neutral-100);
+  background: var(--gray-100);
+  border: 1px solid var(--gray-100);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -79,13 +79,13 @@
 
   &:focus {
     outline: none;
-    border-color: var(--primary-600);
+    border-color: var(--action-600);
     box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
   }
 }
 
 .filterText {
-  color: var(--neutral-600);
+  color: var(--gray-600);
   text-align: right;
   font-family:
     'Satoshi Variable',
@@ -101,7 +101,7 @@
 }
 
 .chevron {
-  color: var(--neutral-600);
+  color: var(--gray-600);
   transition: transform 0.2s ease;
   display: flex;
 
@@ -140,7 +140,7 @@
     sans-serif;
   font-size: 14px;
   font-weight: 500;
-  color: var(--neutral-600);
+  color: var(--gray-600);
   transition: background-color 0.2s ease;
 
   &:hover {
@@ -148,8 +148,8 @@
   }
 
   &.selected {
-    background-color: var(--primary-50);
-    color: var(--primary-600);
+    background-color: var(--action-50);
+    color: var(--action-600);
   }
 
   &:focus {
@@ -166,7 +166,7 @@
   align-items: center;
   gap: 4px;
   border-radius: 6px;
-  background: var(--primary-600);
+  background: var(--action-600);
   color: var(--white);
   border: none;
   cursor: pointer;

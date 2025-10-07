@@ -321,7 +321,7 @@ export const getTicketTabs = (
 ): TabDefinition<Ticket>[] => [
   {
     key: 'all',
-    label: 'All Incoming',
+    label: 'All Tickets',
     filter: (tickets: Ticket[]) =>
       tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived),
     getCount: (tickets: Ticket[]) =>

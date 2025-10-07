@@ -157,12 +157,12 @@
 
   &:focus {
     outline: none;
-    border-color: var(--primary-600);
+    border-color: var(--action-600);
     box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
   }
 
   &:hover:not(.disabled) {
-    border-color: var(--primary-600);
+    border-color: var(--action-600);
   }
 
   &.disabled {
@@ -224,7 +224,7 @@
   padding: 8px 12px;
   border: none;
   background: #fff;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
@@ -236,25 +236,25 @@
 
   &.selected {
     background: var(--primary-100, #e0f2fe);
-    color: var(--primary-600);
+    color: var(--action-600);
 
     svg path {
-      stroke: var(--primary-600);
+      stroke: var(--action-600);
     }
 
     // For Lucide icons (they use currentColor)
     svg {
-      color: var(--primary-600);
+      color: var(--action-600);
     }
   }
 
   svg path {
-    stroke: var(--neutral-800);
+    stroke: var(--gray-800);
   }
 
   // For Lucide icons (they use currentColor)
   svg {
-    color: var(--neutral-800);
+    color: var(--gray-800);
   }
 
   // Override for team avatar - keep the Users icon white
@@ -388,7 +388,7 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   transition: all 0.2s ease;
 
   &.disabled {
@@ -469,7 +469,7 @@
 .reasonLabel {
   font-size: 14px;
   font-weight: 500;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   margin-bottom: 4px;
 }
 
