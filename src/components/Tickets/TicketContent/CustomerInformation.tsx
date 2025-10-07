@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Ticket } from '@/types/ticket';
 import { authenticatedFetch } from '@/lib/api-client';
+import { formatPhoneNumber } from '@/lib/display-utils';
 import styles from './CustomerInformation.module.scss';
 
 interface CustomerInformationProps {
@@ -57,6 +58,35 @@ export default function CustomerInformation({
   // Store timeout refs for debouncing
   const timeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
   const successTimeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
+
+  // Format phone progressively as user types
+  const formatPhoneInput = (value: string): string => {
+    // Remove all non-digits
+    const cleaned = value.replace(/\D/g, '');
+
+    // Apply formatting based on length
+    if (cleaned.length <= 3) {
+      return cleaned;
+    } else if (cleaned.length <= 6) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    } else if (cleaned.length <= 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    } else {
+      // Limit to 10 digits
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    }
+  };
+
+  // Validation helpers
+  const isValidPhone = (phone: string): boolean => {
+    const cleaned = phone.replace(/\D/g, '');
+    return cleaned.length === 10;
+  };
+
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim());
+  };
 
   // Update field state helper
   const updateFieldState = (
@@ -125,18 +155,42 @@ export default function CustomerInformation({
 
   // Handle field changes with debouncing
   const handleFieldChange = (fieldName: string, value: string) => {
+    let formattedValue = value;
+
+    // Auto-format phone numbers as user types
+    if (fieldName === 'phone' || fieldName === 'alternate_phone') {
+      formattedValue = formatPhoneInput(value);
+    }
+
     // Update local state immediately for responsive UI
-    updateFieldState(fieldName, { value, showSuccess: false, hasError: false });
+    updateFieldState(fieldName, {
+      value: formattedValue,
+      showSuccess: false,
+      hasError: false,
+    });
 
     // Clear existing timeout
     if (timeoutRefs.current[fieldName]) {
       clearTimeout(timeoutRefs.current[fieldName]);
     }
 
-    // Set new timeout for auto-save (500ms after user stops typing)
-    timeoutRefs.current[fieldName] = setTimeout(() => {
-      autoSave(fieldName, value);
-    }, 500);
+    // Validate before saving
+    let shouldSave = true;
+
+    if (fieldName === 'phone' || fieldName === 'alternate_phone') {
+      // Only save if phone is empty or valid 10-digit number
+      shouldSave = value.trim() === '' || isValidPhone(value);
+    } else if (fieldName === 'email') {
+      // Only save if email is empty or valid format
+      shouldSave = value.trim() === '' || isValidEmail(value);
+    }
+
+    // Set new timeout for auto-save (1000ms after user stops typing)
+    if (shouldSave) {
+      timeoutRefs.current[fieldName] = setTimeout(() => {
+        autoSave(fieldName, formattedValue);
+      }, 1000);
+    }
   };
 
   // Cleanup timeouts on unmount

@@ -130,9 +130,6 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         // (meaning we've been past this stage and came back to edit it)
         // If furthestIndex is -1 (no furthest stage), then we're NOT editing
         const isEditing = furthestIndex >= 0 && furthestIndex >= currentIndex;
-        console.log(
-          `Current step ${step.id}: isEditing=${isEditing}, furthestIndex=${furthestIndex}, currentIndex=${currentIndex}`
-        );
         return { ...step, status: 'current', isEditing };
       }
 
@@ -380,7 +377,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   // Determine if primary button should be shown
   const shouldShowPrimaryButton = () => {
     if (!lead) return false;
-    return ['unassigned', 'contacting', 'quoted', 'ready_to_schedule'].includes(lead.lead_status);
+    return ['unassigned', 'contacting', 'quoted', 'ready_to_schedule'].includes(
+      lead.lead_status
+    );
   };
 
   // Determine if secondary button should be shown
@@ -902,7 +901,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         onPrimaryButtonClick={handlePrimaryAction}
         showPrimaryButton={shouldShowPrimaryButton()}
         secondaryButtonText={
-          lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule' ? (
+          lead.lead_status === 'quoted' ||
+          lead.lead_status === 'ready_to_schedule' ? (
             'Not Interested'
           ) : (
             <>
@@ -912,7 +912,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           )
         }
         onSecondaryButtonClick={
-          lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule' ? handleNotInterested : handleAddTask
+          lead.lead_status === 'quoted' ||
+          lead.lead_status === 'ready_to_schedule'
+            ? handleNotInterested
+            : handleAddTask
         }
         showSecondaryButton={true}
         middleButtonText={
@@ -934,7 +937,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           ) : null
         }
         showMiddleButton={
-          lead.lead_status === 'contacting' || lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule'
+          lead.lead_status === 'contacting' ||
+          lead.lead_status === 'quoted' ||
+          lead.lead_status === 'ready_to_schedule'
         }
         middleButtonDisabled={lead.lead_status === 'contacting'}
         middleButtonTooltip={
@@ -943,9 +948,15 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
             : undefined
         }
         onMiddleButtonClick={
-          lead.lead_status === 'quoted' ? handleEmailQuoteButton : lead.lead_status === 'ready_to_schedule' ? () => window.open('https://pestpac.com', '_blank') : undefined
+          lead.lead_status === 'quoted'
+            ? handleEmailQuoteButton
+            : lead.lead_status === 'ready_to_schedule'
+              ? () => window.open('https://pestpac.com', '_blank')
+              : undefined
         }
-        primaryButtonVariant={lead.lead_status === 'ready_to_schedule' ? 'success' : 'default'}
+        primaryButtonVariant={
+          lead.lead_status === 'ready_to_schedule' ? 'success' : 'default'
+        }
         // dropdownActions={getDropdownActions()}
         // showDropdown={true}
       />

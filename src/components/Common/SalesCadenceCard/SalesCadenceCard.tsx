@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Plus,
   SquarePlay,
+  SquarePen,
 } from 'lucide-react';
 import {
   SalesCadenceWithSteps,
@@ -86,6 +87,8 @@ export function SalesCadenceCard({
     []
   );
   const [showEndModal, setShowEndModal] = useState(false);
+  const [companyTimezone, setCompanyTimezone] =
+    useState<string>('America/New_York');
 
   useEffect(() => {
     loadData();
@@ -127,6 +130,18 @@ export function SalesCadenceCard({
         const { data } = await cadencesRes.json();
         const activeCadences = data.filter((c: any) => c.is_active);
         setAvailableCadences(activeCadences);
+      }
+
+      // Load company timezone
+      const settingsRes = await fetch(`/api/companies/${companyId}/settings`);
+      if (settingsRes.ok) {
+        const { data: settings } = await settingsRes.json();
+        const timezoneSetting = settings?.find(
+          (s: any) => s.setting_key === 'company_timezone'
+        );
+        if (timezoneSetting?.setting_value) {
+          setCompanyTimezone(timezoneSetting.setting_value);
+        }
       }
     } catch (error) {
       console.error('Error loading cadence data:', error);
@@ -221,14 +236,31 @@ export function SalesCadenceCard({
     step: SalesCadenceStep,
     startedAt: string
   ) => {
-    // Extract just the date portion to avoid timezone issues
-    const startDateStr = startedAt.split('T')[0];
-    const startDate = new Date(startDateStr + 'T00:00:00');
-    const targetDate = new Date(startDate);
-    targetDate.setDate(targetDate.getDate() + (step.day_number - 1));
+    // Parse the started_at date
+    const startDate = new Date(startedAt);
 
-    const timeStr = step.time_of_day === 'morning' ? '12PM' : '5PM';
-    const dateStr = targetDate.toLocaleDateString('en-US', {
+    // Calculate the base due date (started_at + day_number - 1 days)
+    const baseDueDate = new Date(startDate);
+    baseDueDate.setDate(baseDueDate.getDate() + (step.day_number - 1));
+
+    // Set the time based on time_of_day (12PM for morning, 5PM for afternoon)
+    const dueHour = step.time_of_day === 'morning' ? 12 : 17;
+    baseDueDate.setHours(dueHour, 0, 0, 0);
+
+    // Check if Day 1 Morning would be in the past
+    // If so, shift the entire cadence forward by 1 day to preserve morning/afternoon pattern
+    const day1Morning = new Date(startDate);
+    day1Morning.setHours(12, 0, 0, 0);
+    const now = new Date();
+
+    const dueDate =
+      day1Morning < now
+        ? new Date(baseDueDate.getTime() + 24 * 60 * 60 * 1000)
+        : baseDueDate;
+
+    // Format the display string
+    const timeStr = dueDate.getHours() === 12 ? '12PM' : '5PM';
+    const dateStr = dueDate.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'numeric',
       day: 'numeric',
@@ -384,16 +416,16 @@ export function SalesCadenceCard({
                       0 of {selectedCadence.steps?.length || 0} steps complete
                     </span>
                   </div>
-                  <div className={styles.progressBar}>
-                    <div className={styles.progressFill} />
-                  </div>
+                  <div className={styles.progressBar}></div>
                 </div>
 
                 {/* Cadence Steps Preview */}
                 <div className={styles.stepsSection}>
                   <h4 className={cardStyles.defaultText}>Cadence Progress:</h4>
                   <div className={styles.stepsList}>
-                    {selectedCadence.steps?.map(step => (
+                    {selectedCadence.steps
+                      ?.sort((a, b) => a.display_order - b.display_order)
+                      .map(step => (
                       <div key={step.id} className={styles.stepItem}>
                         <div className={styles.stepIcon}>
                           {getActionIcon(step.action_type)}
@@ -430,7 +462,10 @@ export function SalesCadenceCard({
                           </div>
                           <div className={cardStyles.dataLabel}>
                             Target:{' '}
-                            {step.time_of_day === 'morning' ? '12PM' : '5PM'}
+                            {calculateTargetDateTime(
+                              step,
+                              new Date().toISOString()
+                            )}
                           </div>
                         </div>
                       </div>
@@ -450,12 +485,21 @@ export function SalesCadenceCard({
                     }}
                     className={styles.textButton}
                   >
-                    <span className={styles.textButtonIcon}>✎</span> Edit
+                    <SquarePen size={18} />
+                    Edit Cadence
                   </button>
 
                   <div className={styles.actionButtonsRight}>
-                    <button type="button" className={styles.secondaryButton}>
-                      Pause Cadence
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPreviewCadenceId(null);
+                        setIsEditMode(false);
+                        onCadenceSelect?.(null);
+                      }}
+                      className={styles.secondaryButton}
+                    >
+                      Cancel
                     </button>
 
                     <button
@@ -593,9 +637,21 @@ export function SalesCadenceCard({
 
                 const { data: newCadence } = await cadenceResponse.json();
 
+                // Sort steps by day_number, then time_of_day before creating
+                const sortedSteps = [...pendingSaveSteps].sort((a, b) => {
+                  if (a.day_number !== b.day_number) {
+                    return a.day_number - b.day_number;
+                  }
+                  if (a.time_of_day === 'morning' && b.time_of_day === 'afternoon')
+                    return -1;
+                  if (a.time_of_day === 'afternoon' && b.time_of_day === 'morning')
+                    return 1;
+                  return 0;
+                });
+
                 // Create steps for the new cadence
-                for (let i = 0; i < pendingSaveSteps.length; i++) {
-                  const { id, ...stepData } = pendingSaveSteps[i];
+                for (let i = 0; i < sortedSteps.length; i++) {
+                  const { id, ...stepData } = sortedSteps[i];
                   await fetch(
                     `/api/companies/${companyId}/sales-cadences/${newCadence.id}/steps`,
                     {
@@ -634,9 +690,21 @@ export function SalesCadenceCard({
                   }
                 }
 
+                // Sort steps by day_number, then time_of_day before creating
+                const sortedSteps = [...pendingSaveSteps].sort((a, b) => {
+                  if (a.day_number !== b.day_number) {
+                    return a.day_number - b.day_number;
+                  }
+                  if (a.time_of_day === 'morning' && b.time_of_day === 'afternoon')
+                    return -1;
+                  if (a.time_of_day === 'afternoon' && b.time_of_day === 'morning')
+                    return 1;
+                  return 0;
+                });
+
                 // Create new steps
-                for (let i = 0; i < pendingSaveSteps.length; i++) {
-                  const { id, ...stepData } = pendingSaveSteps[i];
+                for (let i = 0; i < sortedSteps.length; i++) {
+                  const { id, ...stepData } = sortedSteps[i];
                   await fetch(
                     `/api/companies/${companyId}/sales-cadences/${selectedPreviewCadenceId}/steps`,
                     {
