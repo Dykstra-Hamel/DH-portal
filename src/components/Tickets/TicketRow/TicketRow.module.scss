@@ -26,12 +26,12 @@
   }
 
   &.highlighted {
-    background: var(--primary-50);
-    border: 2px solid var(--primary-500);
+    background: var(--action-50);
+    border: 2px solid var(--action-500);
     animation: highlightPulse 3s ease-in-out;
 
     &:hover {
-      background: var(--primary-100);
+      background: var(--action-100);
     }
   }
 }
@@ -57,7 +57,7 @@
   font-style: normal;
   font-weight: 500;
   line-height: 20px;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -66,7 +66,7 @@
 .inQueue {
   width: 120px;
   flex-shrink: 0;
-  color: var(--neutral-600);
+  color: var(--gray-600);
   font-size: 12px;
 }
 
@@ -85,7 +85,7 @@
 .address {
   width: 250px;
   flex-shrink: 0;
-  color: var(--neutral-700);
+  color: var(--gray-700);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -95,7 +95,7 @@
   width: 100px;
   flex-shrink: 0;
   justify-content: flex-start;
-  color: var(--primary-600);
+  color: var(--action-600);
   font-weight: 600;
   align-items: center;
   gap: 6px;
@@ -108,14 +108,14 @@
 .source {
   width: 120px;
   flex-shrink: 0;
-  color: var(--primary-600);
+  color: var(--action-600);
   font-weight: 600;
 }
 
 .ticketType {
   width: 150px;
   flex-shrink: 0;
-  color: var(--primary-600);
+  color: var(--action-600);
   font-weight: 600;
   text-transform: capitalize;
   align-items: center;
@@ -128,7 +128,7 @@
   vertical-align: middle;
 
   path {
-    stroke: var(--primary-600);
+    stroke: var(--action-600);
   }
 }
 
@@ -136,7 +136,7 @@
   display: inline;
   margin-right: 6px;
   vertical-align: middle;
-  color: var(--primary-600);
+  color: var(--action-600);
 }
 
 .qualifyButton {
@@ -165,11 +165,11 @@
 
   /* Different colors for different formats
   &::has-text('Call') {
-    color: var(--primary-600);
+    color: var(--action-600);
   }
 
   &::has-text('Form') {
-    color: var(--sales-good);
+    color: var(--sales-500);
   }
     */
 }

@@ -15,27 +15,27 @@
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-sm);
   font-size: 14px;
-  color: var(--neutral-100);
+  color: var(--gray-100);
   line-height: 20px;
   background: var(--white);
   transition: all 0.2s ease;
 
   &:focus {
     outline: none;
-    border-color: var(--primary-600);
+    border-color: var(--action-600);
     background: var(--white);
     box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
   }
 
   &::placeholder {
-    color: var(--neutral-500);
+    color: var(--gray-500);
   }
 }
 
 .searchIcon {
   position: absolute;
   right: 12px;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   pointer-events: none;
   z-index: 1;
 }
@@ -49,7 +49,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid var(--drop-shadow);
-  border-top-color: var(--primary-600);
+  border-top-color: var(--action-600);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -76,7 +76,7 @@
 
 .searchResult {
   padding: 12px;
-  border-bottom: 1px solid var(--neutral-100);
+  border-bottom: 1px solid var(--gray-100);
   cursor: pointer;
   transition: background-color 0.15s ease;
 
@@ -86,11 +86,11 @@
 
   &:hover,
   &.selected {
-    background-color: var(--neutral-100);
+    background-color: var(--gray-100);
   }
 
   &.selected {
-    background-color: var(--primary-50);
+    background-color: var(--action-50);
   }
 }
 
@@ -102,18 +102,18 @@
 }
 
 .resultIcon {
-  color: var(--neutral-500);
+  color: var(--gray-500);
   flex-shrink: 0;
 }
 
 .customerName {
   font-weight: 500;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   flex-shrink: 0;
 }
 
 .companyName {
-  color: var(--neutral-500);
+  color: var(--gray-500);
   font-size: 13px;
   margin-left: auto;
   flex-shrink: 1;
@@ -135,7 +135,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--neutral-500);
+  color: var(--gray-500);
 
   svg {
     flex-shrink: 0;
@@ -151,7 +151,7 @@
 .noResults {
   padding: 16px 12px;
   text-align: center;
-  color: var(--neutral-500);
+  color: var(--gray-500);
   font-size: 14px;
 }
 

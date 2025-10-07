@@ -26,7 +26,7 @@ const BreadcrumbArrow = () => (
   >
     <path
       d="M1 1.25L4.65132 5L1 8.75"
-      stroke="#A3A3A3"
+      stroke="var(--brand-gray)"
       strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -395,7 +395,8 @@ export function Breadcrumbs() {
 
         // Only update if the last breadcrumb was a customer name (no href)
         if (lastCrumb && !lastCrumb.href) {
-          const newName = `${payload.first_name || ''} ${payload.last_name || ''}`.trim();
+          const newName =
+            `${payload.first_name || ''} ${payload.last_name || ''}`.trim();
           updated[updated.length - 1] = { label: newName };
         }
 

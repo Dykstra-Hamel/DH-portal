@@ -32,11 +32,11 @@
   cursor: pointer;
 
   &:hover {
-    color: var(--neutral-600);
+    color: var(--gray-600);
   }
 
   &.active {
-    color: var(--primary-600);
+    color: var(--action-600);
   }
 
   &.disabled {
@@ -73,7 +73,7 @@
   align-items: center;
   justify-content: center;
   padding: 0 12px;
-  color: var(--gray);
+  color: var(--brand-black);
 
   svg {
     width: 32px;

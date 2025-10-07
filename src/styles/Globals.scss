@@ -7,50 +7,46 @@
     'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
 
   /* Color Variables */
-  --primary-50: #f0f9ff;
-  --primary-100: #e0f2fe;
-  --primary-500: #0ca8eb;
-  --primary-600: #0284c7;
-  --neutral-100: #f5f5f5;
-  --neutral-300: #d4d4d4;
-  --neutral-700: #404040;
-  --light-gray-bg: #fafafc;
+  --brand-black: #313131;
+  --brand-gray: #a3a3a3;
   --white: #fff;
-  --neutral-800: #262626;
-  --error-500: #ef4444;
-  --neutral-600: #525252;
+
+  /* UI */
+  /* Action/Blues */
+  --action-50: #f0f7ff;
+  --action-100: #d6e9ff;
+  --action-200: #b8d9ff;
+  --action-300: #85c2ff;
+  --action-400: #3d9eff;
+  --action-500: #0080f0;
+  --action-600: #0069e0;
+  --action-700: #0054c2;
+  --action-800: #0041a3;
+  --action-900: #003585;
+  --action-950: #002152;
+
+  --light-blue: #f1f7fb;
+
+  --dark-blue: #4774e7;
+  --darker-blue: #3760ce;
+
+  --highlight-blue-dark: #3190d3;
+
+  /* Grays */
   --gray-light: #979797;
-  --gray: #313131;
   --gray-50: #f9fafb;
-  --gray-100: #f2f2f7;
+  --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
-  --gray-300: #d1d5dc;
-  --gray-500: #6a7282;
-  --gray-600: #4a5565;
-  --gray-800: #252c37;
-  --gray-900: #161a22;
-  --sales-good: #84cc16;
-  --sales-bad: #ef4444;
-  --neutral-400: #a3a3a3;
-  --neutral-500: #737373;
+  --gray-300: #d1d5db;
   --gray-400: #99a1af;
   --gray-500: #6a7282;
+  --gray-600: #4a5565;
   --gray-700: #374152;
   --gray-800: #252c37;
-  --action-500: #0087f5;
-  --action-600: #0069e0;
-  --action-700: #1d4ed8;
-  --success-500: #00c281;
-  --success-700: #089b6a;
-  --success-600: #04ae6a;
-  --emerald-500: #00bc7d;
-  --error-500: #fb2c36;
-  --error-600: #e7000b;
-  --error-700: #c10007;
-  --warning-100: #fefaf5;
-  --warning-500: #fbbc55;
-  --warning-700: #c8811a;
-  --gray-100: #f2f2f7;
+  --gray-900: #161a22;
+  --gray-950: #0c0e12;
+
+  /* Slates */
   --slate-50: #fafafc;
   --slate-100: #f1f3f9;
   --slate-200: #e3e8f2;
@@ -58,21 +54,128 @@
   --slate-400: #95a3bc;
   --slate-500: #667a99;
   --slate-600: #475671;
+  --slate-700: #303f5a;
+  --slate-800: #1f2a42;
+  --slate-900: #0f172b;
+  --slate-950: #020618;
+
+  /* Success/Greens */
+  --success-50: #f6fefa;
+  --success-100: #effdf6;
+  --success-200: #d9f9ea;
+  --success-300: #afeed3;
+  --success-400: #70e1b7;
+  --success-500: #00c281;
+  --success-600: #04ae6a;
+  --success-700: #089b65;
+  --success-800: #0d7754;
+  --success-900: #105b45;
+  --success-950: #114537;
+
+  --green-50: #f0fdf4;
+  --green-100: #dcfce7;
+  --green-200: #b9f8cf;
+  --green-300: #7bf1a8;
+  --green-400: #05df72;
+  --green-500: #00c951;
+  --green-600: #00a63e;
+  --green-700: #008236;
+  --green-800: #016630;
+  --green-900: #0d542b;
+  --green-950: #052e16;
+
+  --green: #2cda78;
+
+  --darker-green: #25b762;
+
+  /* Warning/Oranges */
+  --warning-50: #fffcf5;
+  --warning-100: #fefaf5;
+  --warning-200: #fbf2cb;
+  --warning-300: #fde57e;
+  --warning-400: #ffd16a;
+  --warning-500: #fbbc55;
+  --warning-600: #e9a23b;
+  --warning-700: #c8811a;
+  --warning-800: #a35c00;
+  --warning-900: #8b4400;
+  --warning-950: #78310b;
+
+  --yellow: #fec925;
+  --yellow-dark: #f3ab33;
+
+  --orange: #fa8740;
+  --darker-orange: #f67231;
+
+  /* Error/Reds */
+  --error-50: #fef2f2;
+  --error-100: #ffe2e2;
+  --error-200: #ffc9c9;
+  --error-300: #ffa2a2;
+  --error-400: #ff6467;
+  --error-500: #fb2c36;
+  --error-600: #e7000b;
+  --error-700: #c10007;
+  --error-800: #9f0712;
+  --error-900: #82181a;
+  --error-950: #460809;
+
+  --red-500: var(--error-500);
+
+  --alert-50: #fff0f0;
+  --alert-300: #ffb1a9;
+  --alert-400: #f87171;
+  --alert-500: #fd484f;
+  --alert-700: #b91c1c;
+  --alert-800: #8c2628;
+
+  --destructive-500: #ff2056;
+  --destructive-600: #ec003f;
+
+  /* Misc Colors */
+  --cs-50: #fef7ee;
+  --cs-100: #fdeed7;
+  --cs-200: #fbdaae;
+  --cs-300: #f8c17a;
+  --cs-400: #f4a044;
+  --cs-500: #f1841e;
+  --cs-600: #e26c14;
+  --cs-700: #bb5213;
+  --cs-800: #954217;
+  --cs-900: #793816;
+
+  --sales-50: #f7fee7;
+  --sales-100: #ecfccb;
+  --sales-200: #d9f99d;
+  --sales-300: #bef264;
+  --sales-400: #a3e635;
+  --sales-500: #84cc16;
+  --sales-600: #65a30d;
+  --sales-700: #4d7c0f;
+  --sales-800: #3f6212;
+  --sales-900: #365314;
+
+  --sales-good: var(--sales-500);
+  --sales-bad: #ef4444;
+
+  --purple: #9b57e5;
+  --darker-purple: #7e4dc8;
+
   --drop-shadow: #e8e8ea;
-  --highlight-blue-dark: #3190d3;
   --drop-shadow-hover: #dbdbdd;
+
   --border-color: #d2d2d7;
+
   --live-call-gradient: linear-gradient(90deg, #00529b 5.43%, #001c35 99.55%);
+
   --box-shadow-card: 0 0 11px 0 #e8e8ea;
   --box-shadow-card-hover: 0 4px 12px 0 var(--drop-shadow-hover);
-  --shadow-50: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+  --shadow-50: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
 
   /* Toast and Status Colors */
-  --Misc-Darker-Green: #25b762;
+  --Misc-Darker-Green: var(--darker-green);
   --gradient-dh-gray: linear-gradient(180deg, #252c37 25%, #262626 100%);
-
-  /* Toast and Status Colors */
-  --Misc-Darker-Green: #25b762;
 
   /* Notification Colors */
   --notification-red: #e52c51;
