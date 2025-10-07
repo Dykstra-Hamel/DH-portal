@@ -125,33 +125,47 @@
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
+}
 
-  input[type='radio'] {
-    display: none;
+.radioInput {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 0;
+  height: 0;
+
+  &:checked + .radioCustom {
+    background: var(--action-600);
+    border-color: var(--action-600);
+
+    &::after {
+      display: block;
+    }
   }
 }
 
-.radioIcon {
+.radioCustom {
+  position: relative;
   width: 20px;
   height: 20px;
   border: 2px solid var(--gray-300);
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: white;
+  transition: all 0.2s ease;
   flex-shrink: 0;
 
-  .option.selected & {
-    border-color: var(--action-500);
-    background-color: var(--action-500);
+  &::after {
+    content: '';
+    position: absolute;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
   }
-}
-
-.radioDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #fff;
 }
 
 .optionText {

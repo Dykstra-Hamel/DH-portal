@@ -4,7 +4,16 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import {
+  ArrowLeft,
+  Headset,
+  ChevronRight,
+  RefreshCcwDot,
+  Plus,
+  Mail,
+  ExternalLink,
+  CalendarCheck,
+} from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
 import { Lead } from '@/types/lead';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
@@ -12,6 +21,11 @@ import { StepItem } from '@/components/Common/Step/Step';
 import { LeadStepWrapper } from '@/components/Common/LeadStepWrapper/LeadStepWrapper';
 import { LeadStepContent } from '@/components/Common/LeadStepContent/LeadStepContent';
 import { ReassignModal } from '@/components/Common/ReassignModal/ReassignModal';
+import { LiveCallModal } from '@/components/Common/LiveCallModal/LiveCallModal';
+import { QuickTaskModal } from '@/components/Common/QuickTaskModal/QuickTaskModal';
+import { NotInterestedModal } from '@/components/Common/NotInterestedModal/NotInterestedModal';
+import { ReadyToScheduleModal } from '@/components/Common/ReadyToScheduleModal/ReadyToScheduleModal';
+import { EmailQuoteModal } from '@/components/Common/EmailQuoteModal/EmailQuoteModal';
 import { Toast } from '@/components/Common/Toast';
 import styles from './page.module.scss';
 
@@ -39,6 +53,12 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const [showToast, setShowToast] = useState(false);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showReassignModal, setShowReassignModal] = useState(false);
+  const [showLiveCallModal, setShowLiveCallModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showNotInterestedModal, setShowNotInterestedModal] = useState(false);
+  const [showReadyToScheduleModal, setShowReadyToScheduleModal] =
+    useState(false);
+  const [showEmailQuoteModal, setShowEmailQuoteModal] = useState(false);
   const router = useRouter();
 
   // Step configuration for leads
@@ -74,6 +94,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     if (!lead) return leadSteps;
 
     const currentStatus = lead.lead_status;
+    const furthestStage = lead.furthest_completed_stage;
 
     // Map lead status to step IDs
     const statusToStep: { [key: string]: string } = {
@@ -84,29 +105,49 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     };
 
     const currentStepId = statusToStep[currentStatus];
+    const furthestStepId = furthestStage ? statusToStep[furthestStage] : null;
     const stepOrder = ['qualify', 'contacting', 'quoted', 'ready_to_schedule'];
     const currentIndex = stepOrder.indexOf(currentStepId);
+    const furthestIndex = furthestStepId
+      ? stepOrder.indexOf(furthestStepId)
+      : -1;
+
+    console.log('Step display logic:', {
+      leadId: lead.id,
+      currentStatus,
+      currentStepId,
+      currentIndex,
+      furthestStage,
+      furthestStepId,
+      furthestIndex,
+    });
 
     return leadSteps.map(step => {
       const stepIndex = stepOrder.indexOf(step.id);
 
-      if (step.id === 'ready_to_schedule') {
-        // Ready to Schedule is completed when it's the current status
-        if (currentStatus === 'ready_to_schedule') {
-          return { ...step, status: 'completed' };
-        }
-        return { ...step, status: 'disabled' };
-      }
-
       if (step.id === currentStepId) {
-        return { ...step, status: 'current' };
+        // Current step shows as editing if the furthest completed stage is AT or AFTER current
+        // (meaning we've been past this stage and came back to edit it)
+        // If furthestIndex is -1 (no furthest stage), then we're NOT editing
+        const isEditing = furthestIndex >= 0 && furthestIndex >= currentIndex;
+        console.log(
+          `Current step ${step.id}: isEditing=${isEditing}, furthestIndex=${furthestIndex}, currentIndex=${currentIndex}`
+        );
+        return { ...step, status: 'current', isEditing };
       }
 
+      // Steps before current index - these are "completed" (we've passed them)
       if (stepIndex < currentIndex) {
-        return { ...step, status: 'completed' };
+        return { ...step, status: 'completed', isEditing: false };
       }
 
-      return { ...step, status: 'upcoming' };
+      // Steps after current but at or before furthest completed - show as completed
+      if (stepIndex > currentIndex && stepIndex <= furthestIndex) {
+        return { ...step, status: 'completed', isEditing: false };
+      }
+
+      // Steps we haven't reached yet (including ready_to_schedule if not current)
+      return { ...step, status: 'upcoming', isEditing: false };
     });
   };
 
@@ -269,20 +310,77 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
     switch (lead.lead_status) {
       case 'unassigned':
-        return 'Move To Contact';
       case 'contacting':
-        return 'Move To Quote';
+        return (
+          <>
+            <Headset size={18} />
+            Live Call
+            <ChevronRight size={18} />
+          </>
+        );
       case 'quoted':
-        return 'Ready To Schedule';
+        return (
+          <>
+            Ready to Schedule
+            <ChevronRight size={18} />
+          </>
+        );
+      case 'ready_to_schedule':
+        return (
+          <>
+            <CalendarCheck size={18} />
+            Finalize Sale
+          </>
+        );
       default:
         return 'Next Step';
+    }
+  };
+
+  // Get handler for primary button
+  const handlePrimaryAction = () => {
+    if (!lead) return;
+
+    if (
+      lead.lead_status === 'unassigned' ||
+      lead.lead_status === 'contacting'
+    ) {
+      handleLiveCall();
+    } else if (lead.lead_status === 'quoted') {
+      handleReadyToSchedule();
+    } else if (lead.lead_status === 'ready_to_schedule') {
+      handleFinalizeSale();
+    } else {
+      handleProgressStatus();
+    }
+  };
+
+  // Handle finalize sale
+  const handleFinalizeSale = async () => {
+    if (!leadId) return;
+
+    try {
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, {
+          lead_status: 'won',
+        });
+      } else {
+        await adminAPI.updateUserLead(leadId, {
+          lead_status: 'won',
+        });
+      }
+      handleShowToast('Sale finalized successfully!', 'success');
+      router.push('/connections/leads');
+    } catch (error) {
+      console.error('Error finalizing sale:', error);
+      handleShowToast('Failed to finalize sale. Please try again.', 'error');
     }
   };
 
   // Determine if primary button should be shown
   const shouldShowPrimaryButton = () => {
     if (!lead) return false;
-    return ['unassigned', 'contacting', 'quoted'].includes(lead.lead_status);
+    return ['unassigned', 'contacting', 'quoted', 'ready_to_schedule'].includes(lead.lead_status);
   };
 
   // Determine if secondary button should be shown
@@ -558,6 +656,201 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     setShowToast(false);
   };
 
+  // Handle Add Task button click
+  const handleAddTask = () => {
+    setShowTaskModal(true);
+  };
+
+  // Handle task creation success
+  const handleTaskCreated = () => {
+    handleShowToast('Task created successfully!', 'success');
+  };
+
+  // Handle Live Call button click
+  const handleLiveCall = () => {
+    setShowLiveCallModal(true);
+  };
+
+  // Handle Live Call modal submission
+  const handleLiveCallSubmit = async (option: 'quote' | 'schedule') => {
+    if (!lead || !leadId) return;
+
+    const newStatus = option === 'quote' ? 'quoted' : 'ready_to_schedule';
+    const successMessage =
+      option === 'quote'
+        ? 'Lead jumped to Quote stage successfully!'
+        : 'Lead jumped to Schedule stage successfully!';
+
+    try {
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, {
+          lead_status: newStatus,
+        });
+      } else {
+        await adminAPI.updateUserLead(leadId, {
+          lead_status: newStatus,
+        });
+      }
+
+      // If moving to quoted status, ensure quote exists
+      if (newStatus === 'quoted') {
+        try {
+          const response = await fetch(`/api/leads/${leadId}/quote`, {
+            method: 'GET',
+          });
+          const data = await response.json();
+
+          if (!data.data) {
+            console.log('Quote will be created when Quote step loads');
+          }
+        } catch (error) {
+          console.error('Error checking quote:', error);
+        }
+      }
+
+      await fetchLead();
+      handleShowToast(successMessage, 'success');
+    } catch (error) {
+      console.error('Error in live call:', error);
+      handleShowToast(
+        'Failed to update lead status. Please try again.',
+        'error'
+      );
+    }
+  };
+
+  // Handle Not Interested button
+  const handleNotInterested = () => {
+    setShowNotInterestedModal(true);
+  };
+
+  // Handle Not Interested modal submission
+  const handleNotInterestedSubmit = async (reason: string) => {
+    if (!lead || !leadId) return;
+
+    try {
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, {
+          lead_status: 'lost',
+          lost_reason: reason,
+          lost_stage: lead.lead_status,
+        });
+      } else {
+        await adminAPI.updateUserLead(leadId, {
+          lead_status: 'lost',
+          lost_reason: reason,
+          lost_stage: lead.lead_status,
+        });
+      }
+
+      handleShowToast('Lead marked as not interested', 'success');
+      router.push('/connections/leads');
+    } catch (error) {
+      console.error('Error marking lead as not interested:', error);
+      handleShowToast('Failed to mark lead as not interested', 'error');
+    }
+  };
+
+  // Handle Email Quote button
+  const handleEmailQuoteButton = () => {
+    setShowEmailQuoteModal(true);
+  };
+
+  // Handle Email Quote modal submission
+  const handleEmailQuoteSubmit = async (
+    templateId: string,
+    customerEmail: string
+  ) => {
+    if (!leadId) return;
+
+    try {
+      // First get the quote
+      const quoteResponse = await fetch(`/api/leads/${leadId}/quote`);
+      const quoteData = await quoteResponse.json();
+
+      if (!quoteData.data) {
+        handleShowToast('No quote available to email', 'error');
+        setShowEmailQuoteModal(false);
+        return;
+      }
+
+      const quote = quoteData.data;
+
+      // Send the email with the selected template
+      const emailResponse = await fetch(`/api/quotes/${quote.id}/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          templateId,
+          customerEmail,
+        }),
+      });
+
+      if (!emailResponse.ok) {
+        const errorData = await emailResponse.json();
+        throw new Error(errorData.error || 'Failed to send quote email');
+      }
+
+      setShowEmailQuoteModal(false);
+      handleShowToast('Quote emailed successfully!', 'success');
+    } catch (error) {
+      console.error('Error emailing quote:', error);
+      handleShowToast(
+        error instanceof Error ? error.message : 'Failed to email quote',
+        'error'
+      );
+    }
+  };
+
+  // Handle Ready To Schedule button
+  const handleReadyToSchedule = () => {
+    setShowReadyToScheduleModal(true);
+  };
+
+  // Handle Ready To Schedule modal submission
+  const handleReadyToScheduleSubmit = async (
+    option: 'now' | 'later' | 'someone_else',
+    assignedTo?: string
+  ) => {
+    if (!lead || !leadId) return;
+
+    try {
+      const updateData: any = {
+        lead_status: 'ready_to_schedule',
+      };
+
+      if (option === 'someone_else' && assignedTo) {
+        updateData.assigned_to = assignedTo;
+      }
+
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, updateData);
+      } else {
+        await adminAPI.updateUserLead(leadId, updateData);
+      }
+
+      await fetchLead();
+
+      if (option === 'now') {
+        handleShowToast(
+          'Lead ready to schedule! Proceeding to scheduling...',
+          'success'
+        );
+        // TODO: Navigate to scheduling page when implemented
+      } else if (option === 'later') {
+        handleShowToast('Lead marked as ready to schedule!', 'success');
+        router.push('/connections/leads');
+      } else {
+        handleShowToast('Lead assigned for scheduling!', 'success');
+      }
+    } catch (error) {
+      console.error('Error updating lead to ready to schedule:', error);
+      handleShowToast('Failed to update lead status', 'error');
+    }
+  };
+
   if (loading || leadLoading) {
     return <div className={styles.loading}>Loading lead...</div>;
   }
@@ -605,8 +898,56 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         disabledSteps={
           lead.lead_status === 'ready_to_schedule' ? [] : ['ready_to_schedule']
         }
-        dropdownActions={getDropdownActions()}
-        showDropdown={true}
+        primaryButtonText={getPrimaryButtonText()}
+        onPrimaryButtonClick={handlePrimaryAction}
+        showPrimaryButton={shouldShowPrimaryButton()}
+        secondaryButtonText={
+          lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule' ? (
+            'Not Interested'
+          ) : (
+            <>
+              <Plus size={18} />
+              Add Task
+            </>
+          )
+        }
+        onSecondaryButtonClick={
+          lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule' ? handleNotInterested : handleAddTask
+        }
+        showSecondaryButton={true}
+        middleButtonText={
+          lead.lead_status === 'contacting' ? (
+            <>
+              <RefreshCcwDot size={18} />
+              Convert to Automation
+            </>
+          ) : lead.lead_status === 'quoted' ? (
+            <>
+              <Mail size={18} />
+              Email Quote
+            </>
+          ) : lead.lead_status === 'ready_to_schedule' ? (
+            <>
+              <ExternalLink size={18} />
+              Open PestPac
+            </>
+          ) : null
+        }
+        showMiddleButton={
+          lead.lead_status === 'contacting' || lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule'
+        }
+        middleButtonDisabled={lead.lead_status === 'contacting'}
+        middleButtonTooltip={
+          lead.lead_status === 'contacting'
+            ? 'Functionality Coming Soon'
+            : undefined
+        }
+        onMiddleButtonClick={
+          lead.lead_status === 'quoted' ? handleEmailQuoteButton : lead.lead_status === 'ready_to_schedule' ? () => window.open('https://pestpac.com', '_blank') : undefined
+        }
+        primaryButtonVariant={lead.lead_status === 'ready_to_schedule' ? 'success' : 'default'}
+        // dropdownActions={getDropdownActions()}
+        // showDropdown={true}
       />
 
       <div className={styles.content}>
@@ -639,6 +980,49 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         companyId={lead.company_id}
         currentAssigneeId={lead.assigned_to}
         type="lead"
+      />
+
+      <LiveCallModal
+        isOpen={showLiveCallModal}
+        onClose={() => setShowLiveCallModal(false)}
+        onSubmit={handleLiveCallSubmit}
+      />
+
+      <QuickTaskModal
+        isOpen={showTaskModal}
+        onClose={() => setShowTaskModal(false)}
+        onTaskCreated={handleTaskCreated}
+        companyId={lead.company_id}
+        relatedEntityType="leads"
+        relatedEntityId={lead.id}
+      />
+
+      <NotInterestedModal
+        isOpen={showNotInterestedModal}
+        onClose={() => setShowNotInterestedModal(false)}
+        onSubmit={handleNotInterestedSubmit}
+      />
+
+      <ReadyToScheduleModal
+        isOpen={showReadyToScheduleModal}
+        onClose={() => setShowReadyToScheduleModal(false)}
+        onSubmit={handleReadyToScheduleSubmit}
+        companyId={lead.company_id}
+      />
+
+      <EmailQuoteModal
+        isOpen={showEmailQuoteModal}
+        onClose={() => setShowEmailQuoteModal(false)}
+        onSubmit={handleEmailQuoteSubmit}
+        companyId={lead.company_id}
+        customerEmail={lead.customer?.email || ''}
+        customerName={
+          lead.customer
+            ? `${lead.customer.first_name} ${lead.customer.last_name}`
+            : 'Customer'
+        }
+        customerFirstName={lead.customer?.first_name}
+        customerLastName={lead.customer?.last_name}
       />
     </div>
   );

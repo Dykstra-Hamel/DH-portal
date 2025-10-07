@@ -211,7 +211,9 @@ export default function TicketForm({
                     setFormData(prev => ({ ...prev, customer_id: undefined, service_address_id: undefined }));
                   }
                 }}
+                className={styles.radioInput}
               />
+              <span className={styles.radioCustom}></span>
               Select Existing Customer
             </label>
             <label className={styles.radioLabel}>
@@ -225,7 +227,9 @@ export default function TicketForm({
                   setSelectedCustomer(null);
                   setFormData(prev => ({ ...prev, customer_id: undefined, service_address_id: undefined }));
                 }}
+                className={styles.radioInput}
               />
+              <span className={styles.radioCustom}></span>
               Create New Customer
             </label>
           </div>

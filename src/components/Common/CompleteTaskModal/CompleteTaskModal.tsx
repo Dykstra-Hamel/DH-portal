@@ -137,12 +137,9 @@ export function CompleteTaskModal({
               value="complete"
               checked={selectedOption === 'complete'}
               onChange={() => setSelectedOption('complete')}
+              className={styles.radioInput}
             />
-            <span className={styles.radioIcon}>
-              {selectedOption === 'complete' && (
-                <div className={styles.radioDot} />
-              )}
-            </span>
+            <span className={styles.radioCustom}></span>
             <span className={styles.optionText}>
               Yes, mark this task as complete
             </span>
@@ -157,12 +154,9 @@ export function CompleteTaskModal({
               value="separate"
               checked={selectedOption === 'separate'}
               onChange={() => setSelectedOption('separate')}
+              className={styles.radioInput}
             />
-            <span className={styles.radioIcon}>
-              {selectedOption === 'separate' && (
-                <div className={styles.radioDot} />
-              )}
-            </span>
+            <span className={styles.radioCustom}></span>
             <span className={styles.optionText}>
               No, this activity was separate
             </span>

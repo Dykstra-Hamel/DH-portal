@@ -43,39 +43,48 @@
   cursor: pointer;
   border-radius: 8px;
   transition: background-color 0.2s ease;
+}
 
-  input[type='radio'] {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
+.radioInput {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 0;
+  height: 0;
+
+  &:checked + .radioCustom {
+    background: var(--action-600);
+    border-color: var(--action-600);
+
+    &::after {
+      display: block;
+    }
   }
 }
 
 .radioCustom {
+  position: relative;
   width: 20px;
   height: 20px;
   border: 2px solid var(--gray-300);
   border-radius: 50%;
-  position: relative;
   background: white;
+  transition: all 0.2s ease;
   flex-shrink: 0;
   margin-top: 2px;
-  transition: all 0.2s ease;
 
-  input:checked + & {
-    border-color: var(--action-500);
+  &::after {
+    content: '';
+    position: absolute;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
   }
-}
-
-.radioDot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--action-500);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
 }
 
 .optionContent {

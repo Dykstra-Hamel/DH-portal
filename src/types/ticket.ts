@@ -103,6 +103,7 @@ export interface Ticket {
     last_name: string;
     email?: string;
     phone?: string;
+    alternate_phone?: string;
     address?: string;
     city?: string;
     state?: string;
@@ -183,7 +184,6 @@ export const ticketSourceOptions = [
   { value: 'trade_show', label: 'Trade Show' },
   { value: 'webinar', label: 'Webinar' },
   { value: 'content_marketing', label: 'Content Marketing' },
-  { value: 'widget_submission', label: 'Website' },
   { value: 'internal', label: 'Internal' },
   { value: 'other', label: 'Other' },
 ] as const;

@@ -15,7 +15,7 @@ export default function Home() {
         /> */}
 
         <h1>DYKSTRA|HAMEL</h1>
-        <h2>Welcome to PCOCENTRAL</h2>
+        <h2>Welcome to PMPCentral</h2>
 
         <div className="boxesWrapper">
           <div className="box">

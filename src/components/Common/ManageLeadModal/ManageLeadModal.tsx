@@ -52,12 +52,9 @@ export function ManageLeadModal({
               value="communication"
               checked={selectedOption === 'communication'}
               onChange={() => setSelectedOption('communication')}
+              className={styles.radioInput}
             />
-            <div className={styles.radioCustom}>
-              {selectedOption === 'communication' && (
-                <div className={styles.radioDot} />
-              )}
-            </div>
+            <span className={styles.radioCustom}></span>
             <div className={styles.optionContent}>
               <div className={styles.optionTitle}>
                 I need to work this lead.
@@ -75,12 +72,9 @@ export function ManageLeadModal({
               value="quote"
               checked={selectedOption === 'quote'}
               onChange={() => setSelectedOption('quote')}
+              className={styles.radioInput}
             />
-            <div className={styles.radioCustom}>
-              {selectedOption === 'quote' && (
-                <div className={styles.radioDot} />
-              )}
-            </div>
+            <span className={styles.radioCustom}></span>
             <div className={styles.optionContent}>
               <div className={styles.optionTitle}>
                 I&apos;m ready to quote this lead.
@@ -98,12 +92,9 @@ export function ManageLeadModal({
               value="schedule"
               checked={selectedOption === 'schedule'}
               onChange={() => setSelectedOption('schedule')}
+              className={styles.radioInput}
             />
-            <div className={styles.radioCustom}>
-              {selectedOption === 'schedule' && (
-                <div className={styles.radioDot} />
-              )}
-            </div>
+            <span className={styles.radioCustom}></span>
             <div className={styles.optionContent}>
               <div className={styles.optionTitle}>
                 I&apos;m ready to schedule this lead.

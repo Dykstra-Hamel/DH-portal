@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, CircleCheck, RefreshCcwDot, CircleSlash } from 'lucide-react';
 import styles from './EndCadenceModal.module.scss';
 
 interface EndCadenceModalProps {
@@ -77,10 +77,14 @@ export function EndCadenceModal({
 
   return (
     <div className={styles.modalOverlay} onClick={onCancel}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h3>End this cadence?</h3>
-          <button onClick={onCancel} className={styles.closeButton} disabled={isProcessing}>
+          <button
+            onClick={onCancel}
+            className={styles.closeButton}
+            disabled={isProcessing}
+          >
             <X size={20} />
           </button>
         </div>
@@ -95,7 +99,9 @@ export function EndCadenceModal({
                 checked={selectedOption === 'quote'}
                 onChange={() => setSelectedOption('quote')}
                 disabled={isProcessing}
+                className={styles.radioInput}
               />
+              <span className={styles.radioCustom}></span>
               <div className={styles.optionContent}>
                 <strong>I&apos;m ready to quote this lead.</strong>
                 <span className={styles.optionDescription}>
@@ -112,11 +118,14 @@ export function EndCadenceModal({
                 checked={selectedOption === 'automation'}
                 onChange={() => setSelectedOption('automation')}
                 disabled={isProcessing}
+                className={styles.radioInput}
               />
+              <span className={styles.radioCustom}></span>
               <div className={styles.optionContent}>
                 <strong>This lead is not interested.</strong>
                 <span className={styles.optionDescription}>
-                  Complete current stage and task. Go to automation (coming soon).
+                  Complete current stage and task. Go to automation (coming
+                  soon).
                 </span>
               </div>
             </label>
@@ -129,7 +138,9 @@ export function EndCadenceModal({
                 checked={selectedOption === 'end'}
                 onChange={() => setSelectedOption('end')}
                 disabled={isProcessing}
+                className={styles.radioInput}
               />
+              <span className={styles.radioCustom}></span>
               <div className={styles.optionContent}>
                 <strong>I want to try something else.</strong>
                 <span className={styles.optionDescription}>
@@ -155,6 +166,9 @@ export function EndCadenceModal({
             className={getButtonClass()}
             disabled={!selectedOption || isProcessing}
           >
+            {selectedOption === 'quote' && <CircleCheck size={18} />}
+            {selectedOption === 'automation' && <RefreshCcwDot size={18} />}
+            {selectedOption === 'end' && <CircleSlash size={18} />}
             {getButtonText()}
           </button>
         </div>

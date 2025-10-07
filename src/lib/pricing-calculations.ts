@@ -78,8 +78,42 @@ export function generateHomeSizeOptions(
 }
 
 /**
+ * Convert decimal acres to readable fractional format
+ * Examples: 0.25 -> "1/4", 0.5 -> "1/2", 0.75 -> "3/4", 1.25 -> "1 1/4"
+ * Rounds to nearest quarter: 0.26 -> "1/4", 0.51 -> "1/2", 1.01 -> "1"
+ */
+function formatAcresFractional(acres: number): string {
+  const wholeNumber = Math.floor(acres);
+  const decimal = acres - wholeNumber;
+
+  // Round decimal to nearest quarter (0, 0.25, 0.5, 0.75)
+  const roundedDecimal = Math.round(decimal * 4) / 4;
+
+  // Map rounded decimals to fractions
+  const fractionMap: { [key: number]: string } = {
+    0: '',
+    0.25: '1/4',
+    0.5: '1/2',
+    0.75: '3/4',
+  };
+
+  const fraction = fractionMap[roundedDecimal];
+
+  if (wholeNumber === 0 && roundedDecimal > 0) {
+    return fraction;
+  } else if (wholeNumber > 0 && roundedDecimal > 0) {
+    return `${wholeNumber} ${fraction}`;
+  } else if (wholeNumber > 0 && roundedDecimal === 0) {
+    return `${wholeNumber}`;
+  } else {
+    // Edge case: 0 acres
+    return '0';
+  }
+}
+
+/**
  * Generate yard size dropdown options based on company intervals
- * Example output: "0-0.25 Acres", "0.26-0.50 Acres (+$25 initial, +$15/month)", "2.0+ Acres"
+ * Example output: "Up to 1/4 Acre", "1/4 to 1/2 Acre", "1 to 1 1/4 Acres", "2+ Acres"
  */
 export function generateYardSizeOptions(
   companySettings: CompanyPricingSettings,
@@ -115,17 +149,21 @@ export function generateYardSizeOptions(
         servicePlanPricing.yard_size_pricing.recurring_cost_per_interval
       : 0;
 
-    // Build label
+    // Build label with fractional values
     let label = '';
+    const acreWord = rangeEnd > 1 || isLastInterval ? 'Acres' : 'Acre';
+
     if (currentSize === 0) {
-      // First interval: "0-0.25 Acres"
-      label = `0-${rangeEnd.toFixed(2)} Acres`;
+      // First interval: "Up to 1/4 Acre"
+      label = `Up to ${formatAcresFractional(rangeEnd)} ${acreWord}`;
     } else if (isLastInterval) {
-      // Last interval: "2.0+ Acres"
-      label = `${rangeStart.toFixed(2)}+ Acres`;
+      // Last interval: "2+ Acres"
+      label = `${formatAcresFractional(rangeStart)}+ ${acreWord}`;
     } else {
-      // Middle intervals: "0.26-0.50 Acres"
-      label = `${rangeStart.toFixed(2)}-${rangeEnd.toFixed(2)} Acres`;
+      // Middle intervals: "1/4 to 1/2 Acre" or "1 to 1 1/4 Acres"
+      const startFormatted = formatAcresFractional(rangeStart);
+      const endFormatted = formatAcresFractional(rangeEnd);
+      label = `${startFormatted} to ${endFormatted} ${acreWord}`;
     }
 
     options.push({

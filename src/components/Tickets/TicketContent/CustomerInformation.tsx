@@ -46,6 +46,12 @@ export default function CustomerInformation({
       hasError: false,
       showSuccess: false,
     },
+    alternate_phone: {
+      value: ticket.customer?.alternate_phone || '',
+      isLoading: false,
+      hasError: false,
+      showSuccess: false,
+    },
   });
 
   // Store timeout refs for debouncing
@@ -163,34 +169,64 @@ export default function CustomerInformation({
   return (
     <div className={styles.section}>
       <div className={styles.formGrid}>
-        <div className={styles.formField}>
-          <label>First Name</label>
-          <div className={styles.inputWrapper}>
-            <input
-              type="text"
-              value={fields.first_name.value}
-              onChange={e => handleFieldChange('first_name', e.target.value)}
-              className={`${styles.autoSaveInput} ${fields.first_name.hasError ? styles.hasError : ''}`}
-              placeholder="Enter first name"
-            />
-            <FieldStatusIndicator fieldName="first_name" />
+        <div className={styles.formRow}>
+          <div className={styles.formField}>
+            <label>First Name</label>
+            <div className={styles.inputWrapper}>
+              <input
+                type="text"
+                value={fields.first_name.value}
+                onChange={e => handleFieldChange('first_name', e.target.value)}
+                className={`${styles.autoSaveInput} ${fields.first_name.hasError ? styles.hasError : ''}`}
+                placeholder="Enter first name"
+              />
+              <FieldStatusIndicator fieldName="first_name" />
+            </div>
+          </div>
+          <div className={styles.formField}>
+            <label>Last Name</label>
+            <div className={styles.inputWrapper}>
+              <input
+                type="text"
+                value={fields.last_name.value}
+                onChange={e => handleFieldChange('last_name', e.target.value)}
+                className={`${styles.autoSaveInput} ${fields.last_name.hasError ? styles.hasError : ''}`}
+                placeholder="Enter last name"
+              />
+              <FieldStatusIndicator fieldName="last_name" />
+            </div>
+          </div>
+        </div>
+        <div className={styles.formRow}>
+          <div className={styles.formField}>
+            <label>Cell Phone</label>
+            <div className={styles.inputWrapper}>
+              <input
+                type="tel"
+                value={fields.phone.value}
+                onChange={e => handleFieldChange('phone', e.target.value)}
+                className={`${styles.autoSaveInput} ${fields.phone.hasError ? styles.hasError : ''}`}
+                placeholder="Enter phone number"
+              />
+              <FieldStatusIndicator fieldName="phone" />
+            </div>
+          </div>
+          <div className={styles.formField}>
+            <label>Alternate Phone</label>
+            <div className={styles.inputWrapper}>
+              <input
+                type="tel"
+                value={fields.alternate_phone.value}
+                onChange={e => handleFieldChange('alternate_phone', e.target.value)}
+                className={`${styles.autoSaveInput} ${fields.alternate_phone.hasError ? styles.hasError : ''}`}
+                placeholder="Enter alternate phone"
+              />
+              <FieldStatusIndicator fieldName="alternate_phone" />
+            </div>
           </div>
         </div>
         <div className={styles.formField}>
-          <label>Last Name</label>
-          <div className={styles.inputWrapper}>
-            <input
-              type="text"
-              value={fields.last_name.value}
-              onChange={e => handleFieldChange('last_name', e.target.value)}
-              className={`${styles.autoSaveInput} ${fields.last_name.hasError ? styles.hasError : ''}`}
-              placeholder="Enter last name"
-            />
-            <FieldStatusIndicator fieldName="last_name" />
-          </div>
-        </div>
-        <div className={styles.formField}>
-          <label>Email</label>
+          <label>Email Address</label>
           <div className={styles.inputWrapper}>
             <input
               type="email"
@@ -200,19 +236,6 @@ export default function CustomerInformation({
               placeholder="Enter email address"
             />
             <FieldStatusIndicator fieldName="email" />
-          </div>
-        </div>
-        <div className={styles.formField}>
-          <label>Phone</label>
-          <div className={styles.inputWrapper}>
-            <input
-              type="tel"
-              value={fields.phone.value}
-              onChange={e => handleFieldChange('phone', e.target.value)}
-              className={`${styles.autoSaveInput} ${fields.phone.hasError ? styles.hasError : ''}`}
-              placeholder="Enter phone number"
-            />
-            <FieldStatusIndicator fieldName="phone" />
           </div>
         </div>
       </div>

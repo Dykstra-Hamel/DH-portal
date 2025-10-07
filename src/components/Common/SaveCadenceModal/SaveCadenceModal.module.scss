@@ -94,16 +94,60 @@
   cursor: pointer;
   transition: all 0.2s;
 
-  input[type='radio'] {
-    margin-top: 2px;
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-
   &:has(input[type='radio']:checked) {
     border-color: var(--action-500);
+  }
+}
+
+.radioInput {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 0;
+  height: 0;
+
+  &:checked + .radioCustom {
+    background: var(--action-600);
+    border-color: var(--action-600);
+
+    &::after {
+      display: block;
+    }
+  }
+
+  &:disabled + .radioCustom {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+    cursor: not-allowed;
+
+    &::after {
+      background: var(--gray-400);
+    }
+  }
+}
+
+.radioCustom {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--gray-300);
+  border-radius: 50%;
+  background: white;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 2px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: white;
   }
 }
 

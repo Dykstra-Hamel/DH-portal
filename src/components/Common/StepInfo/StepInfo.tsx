@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, ReactNode } from 'react';
 import { formatDateForDisplay } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
 import styles from './StepInfo.module.scss';
@@ -13,14 +13,20 @@ interface StepInfoProps {
   customerName: string;
   createdAt: string;
   updatedAt: string;
-  primaryButtonText?: string;
-  secondaryButtonText?: string;
+  primaryButtonText?: string | ReactNode;
+  secondaryButtonText?: string | ReactNode;
+  middleButtonText?: string | ReactNode;
   onPrimaryButtonClick?: () => void;
   onSecondaryButtonClick?: () => void;
+  onMiddleButtonClick?: () => void;
   showPrimaryButton?: boolean;
   showSecondaryButton?: boolean;
+  showMiddleButton?: boolean;
+  middleButtonDisabled?: boolean;
+  middleButtonTooltip?: string;
   dropdownActions?: DropdownAction[];
   showDropdown?: boolean;
+  primaryButtonVariant?: 'default' | 'success';
 }
 
 export function StepInfo({
@@ -29,20 +35,30 @@ export function StepInfo({
   updatedAt,
   primaryButtonText,
   secondaryButtonText,
+  middleButtonText,
   onPrimaryButtonClick,
   onSecondaryButtonClick,
+  onMiddleButtonClick,
   showPrimaryButton = true,
   showSecondaryButton = true,
+  showMiddleButton = false,
+  middleButtonDisabled = false,
+  middleButtonTooltip,
   dropdownActions = [],
-  showDropdown = false
+  showDropdown = false,
+  primaryButtonVariant = 'default',
 }: StepInfoProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
     };
@@ -63,19 +79,53 @@ export function StepInfo({
   };
   return (
     <div className={styles.pageHeader}>
-      <h1 className={styles.customerName}>
-        {customerName}
-      </h1>
+      <h1 className={styles.customerName}>{customerName}</h1>
       <div className={styles.timestamps}>
         <span className={styles.timestamp}>
-          Created: {formatDateForDisplay(createdAt)}
+          <span className={styles.timestampLabel}>Created:</span>{' '}
+          {formatDateForDisplay(createdAt)}
         </span>
         <span className={styles.timestamp}>
-          Last Update: {formatDateForDisplay(updatedAt)}
+          <span className={styles.timestampLabel}>Last Update:</span>{' '}
+          {formatDateForDisplay(updatedAt)}
         </span>
       </div>
       <div className={styles.actionButtons}>
-        {showDropdown ? (
+        {showSecondaryButton && (
+          <button
+            className={styles.secondaryButton}
+            onClick={onSecondaryButtonClick}
+          >
+            {secondaryButtonText || '+ Add Task'}
+          </button>
+        )}
+        {showMiddleButton && (
+          <div
+            className={styles.middleButtonContainer}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+          >
+            <button
+              className={`${styles.middleButton} ${middleButtonDisabled ? styles.disabled : ''}`}
+              onClick={onMiddleButtonClick}
+              disabled={middleButtonDisabled}
+            >
+              {middleButtonText || 'Middle Action'}
+            </button>
+            {showTooltip && middleButtonTooltip && (
+              <div className={styles.tooltip}>{middleButtonTooltip}</div>
+            )}
+          </div>
+        )}
+        {showPrimaryButton && (
+          <button
+            className={`${styles.primaryActionButton} ${primaryButtonVariant === 'success' ? styles.successButton : ''}`}
+            onClick={onPrimaryButtonClick}
+          >
+            {primaryButtonText || 'Next Step'}
+          </button>
+        )}
+        {showDropdown && (
           <div className={styles.dropdownContainer} ref={dropdownRef}>
             <button
               className={styles.dropdownButton}
@@ -102,25 +152,6 @@ export function StepInfo({
               </div>
             )}
           </div>
-        ) : (
-          <>
-            {showSecondaryButton && (
-              <button
-                className={styles.secondaryButton}
-                onClick={onSecondaryButtonClick}
-              >
-                {secondaryButtonText || 'Mark as Lost'}
-              </button>
-            )}
-            {showPrimaryButton && (
-              <button
-                className={styles.actionButton}
-                onClick={onPrimaryButtonClick}
-              >
-                {primaryButtonText || 'Next Step'}
-              </button>
-            )}
-          </>
         )}
       </div>
     </div>
