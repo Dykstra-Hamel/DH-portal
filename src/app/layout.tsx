@@ -11,8 +11,9 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: 'PCOCENTRAL',
-  description: 'Home of the Dykstra Hamel Portal',
+  title: 'PMPCentral',
+  description:
+    'Your smart pest control sales lead and customer service platform.',
 };
 
 export default function RootLayout({

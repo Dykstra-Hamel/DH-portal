@@ -9,6 +9,7 @@ export type LeadSource =
   | 'trade_show'
   | 'webinar'
   | 'content_marketing'
+  | 'widget_submission'
   | 'other';
 
 export type LeadType =
@@ -35,6 +36,7 @@ export interface Lead {
   id: string;
   company_id: string;
   customer_id?: string;
+  service_address_id?: string;
   lead_source: LeadSource;
   lead_type: LeadType;
   service_type?: string;
@@ -56,8 +58,36 @@ export interface Lead {
   lost_reason?: string;
   lost_stage?: string;
   archived?: boolean;
+  furthest_completed_stage?: string;
   created_at: string;
   updated_at: string;
+
+  // Widget submission fields
+  pest_type?: string;
+  additional_pests?: string[];
+  requested_date?: string;
+  requested_time?: string;
+  selected_plan_id?: string;
+  recommended_plan_name?: string;
+  attribution_data?: {
+    page_url?: string;
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_term?: string;
+    utm_content?: string;
+    gclid?: string;
+    referrer_url?: string;
+    referrer_domain?: string;
+    traffic_source?: string;
+    user_agent?: string;
+    timestamp?: string;
+    collected_at?: string;
+    cross_domain_data?: any;
+    domain?: string;
+    subdomain?: string;
+    [key: string]: any;
+  };
 
   // Joined data from related tables
   customer?: {
@@ -70,6 +100,12 @@ export interface Lead {
     city?: string;
     state?: string;
     zip_code?: string;
+    latitude?: number;
+    longitude?: number;
+    customer_status: 'active' | 'inactive' | 'archived';
+    notes?: string;
+    created_at: string;
+    updated_at: string;
   };
   assigned_user?: {
     id: string;
@@ -82,6 +118,42 @@ export interface Lead {
     id: string;
     name: string;
     website?: string;
+  };
+  primary_service_address?: {
+    id: string;
+    street_address: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    apartment_unit?: string;
+    address_line_2?: string;
+    latitude?: number;
+    longitude?: number;
+    address_type: 'residential' | 'commercial' | 'industrial' | 'mixed_use';
+    property_notes?: string;
+    home_size?: number; // Square feet
+    yard_size?: number; // Acres (decimal)
+    home_size_range?: string; // Range like "0-1500", "1501-2000"
+    yard_size_range?: string; // Range like "0-0.25", "0.26-0.50"
+  };
+  call_record?: {
+    id: string;
+    call_id: string;
+    phone_number: string;
+    call_status: string;
+    start_timestamp?: string;
+    end_timestamp?: string;
+    duration_seconds?: number;
+    recording_url?: string;
+    transcript?: string;
+    sentiment?: string;
+    pest_issue?: string;
+    preferred_service_time?: string;
+    disconnect_reason?: string;
+    call_analysis?: {
+      call_summary?: string;
+      [key: string]: any;
+    };
   };
 }
 
@@ -115,6 +187,7 @@ export const leadSourceOptions = [
   { value: 'trade_show', label: 'Trade Show' },
   { value: 'webinar', label: 'Webinar' },
   { value: 'content_marketing', label: 'Content Marketing' },
+  { value: 'widget_submission', label: 'Widget Submission' },
   { value: 'other', label: 'Other' },
 ] as const;
 

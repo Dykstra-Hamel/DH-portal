@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from 'react';
 import SortableColumnHeader from '@/components/Common/SortableColumnHeader/SortableColumnHeader';
 import { Toast } from '@/components/Common/Toast';
 import DefaultItemRow from './DefaultItemRow';
@@ -19,16 +25,20 @@ export default function DataTable<T>({
   hasMore = false,
   onLoadMore,
   loadingMore = false,
+  searchEnabled = true,
+  searchPlaceholder = 'Search...',
   customComponents,
   className = '',
   emptyStateMessage = 'No items found for this category.',
   tableType = 'tickets',
   customColumnWidths,
+  defaultSort,
   onShowToast,
 }: DataTableProps<T>) {
   const [activeTab, setActiveTab] = useState<string>(tabs?.[0]?.key || 'all');
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-  
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(defaultSort || null);
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Toast state
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -45,6 +55,33 @@ export default function DataTable<T>({
     return activeTabConfig.filter(data);
   }, [data, activeTab, tabs]);
 
+  // Apply search filter to data
+  const searchedData = useMemo(() => {
+    if (!searchEnabled || !searchQuery.trim()) return filteredData;
+
+    const query = searchQuery.toLowerCase();
+
+    // Recursive function to search through all values in an object
+    const searchInObject = (obj: any): boolean => {
+      if (obj === null || obj === undefined) return false;
+
+      // Handle arrays
+      if (Array.isArray(obj)) {
+        return obj.some(item => searchInObject(item));
+      }
+
+      // Handle objects
+      if (typeof obj === 'object') {
+        return Object.values(obj).some(value => searchInObject(value));
+      }
+
+      // Handle primitive values
+      return String(obj).toLowerCase().includes(query);
+    };
+
+    return filteredData.filter(item => searchInObject(item));
+  }, [filteredData, searchQuery, searchEnabled]);
+
   // Handle sorting
   const handleSort = (key: string) => {
     setSortConfig(prevSort => {
@@ -60,42 +97,44 @@ export default function DataTable<T>({
 
   // Sort data based on current sort configuration
   const sortedData = useMemo(() => {
-    if (!sortConfig) return filteredData;
-    
-    return [...filteredData].sort((a, b) => {
+    if (!sortConfig) return searchedData;
+
+    return [...searchedData].sort((a, b) => {
       const modifier = sortConfig.direction === 'asc' ? 1 : -1;
-      
+
       // Get the column definition to check for custom sort key
-      const column = columns.find(col => col.sortKey === sortConfig.key || col.key === sortConfig.key);
+      const column = columns.find(
+        col => col.sortKey === sortConfig.key || col.key === sortConfig.key
+      );
       const sortKey = column?.sortKey || sortConfig.key;
-      
+
       // Helper function to get nested property value
       const getNestedValue = (obj: any, path: string): any => {
         return path.split('.').reduce((current, key) => current?.[key], obj);
       };
-      
+
       const aValue = getNestedValue(a, String(sortKey));
       const bValue = getNestedValue(b, String(sortKey));
-      
+
       // Handle different data types
       if (typeof aValue === 'string' && typeof bValue === 'string') {
         return aValue.localeCompare(bValue) * modifier;
       }
-      
+
       if (typeof aValue === 'number' && typeof bValue === 'number') {
         return (aValue - bValue) * modifier;
       }
-      
+
       if (aValue instanceof Date && bValue instanceof Date) {
         return (aValue.getTime() - bValue.getTime()) * modifier;
       }
-      
+
       // Convert to string for comparison as fallback
       const aStr = String(aValue || '');
       const bStr = String(bValue || '');
       return aStr.localeCompare(bStr) * modifier;
     });
-  }, [filteredData, sortConfig, columns]);
+  }, [searchedData, sortConfig, columns]);
 
   // Calculate counts for each tab
   const tabsWithCounts = useMemo(() => {
@@ -117,7 +156,7 @@ export default function DataTable<T>({
     if (!infiniteScrollEnabled || !loadMoreRef.current) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
+      entries => {
         const target = entries[0];
         if (target.isIntersecting) {
           handleLoadMore();
@@ -140,11 +179,11 @@ export default function DataTable<T>({
   }, [handleLoadMore, infiniteScrollEnabled]);
 
   // Handle toast
-  const handleShowToast = (message: string) => {
+  const handleShowToast = useCallback((message: string) => {
     setToastMessage(message);
     setShowToast(true);
     onShowToast?.(message);
-  };
+  }, [onShowToast]);
 
   const handleToastClose = () => {
     setShowToast(false);
@@ -183,13 +222,28 @@ export default function DataTable<T>({
         isVisible={showToast}
         onClose={handleToastClose}
       />
-      <div 
+      <div
         className={`${styles.container} ${tableClass} ${className}`}
-        style={customColumnWidths ? { '--table-columns': customColumnWidths } as React.CSSProperties : undefined}
+        style={
+          customColumnWidths
+            ? ({ '--table-columns': customColumnWidths } as React.CSSProperties)
+            : undefined
+        }
       >
         <div className={styles.topContent}>
           <h1 className={styles.pageTitle}>{title}</h1>
-
+          {/* Search Field */}
+          {searchEnabled && (
+            <div className={styles.searchContainer}>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder={searchPlaceholder}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+          )}
           {/* Tab Navigation */}
           {tabs && tabs.length > 0 && (
             <div className={styles.tabsContainer}>
@@ -213,13 +267,11 @@ export default function DataTable<T>({
           {customComponents?.liveBar && (
             <customComponents.liveBar data={data} />
           )}
-          
+
           {loading ? (
             <div className={styles.loading}>Loading...</div>
           ) : sortedData.length === 0 ? (
-            <div className={styles.emptyState}>
-              {emptyStateMessage}
-            </div>
+            <div className={styles.emptyState}>{emptyStateMessage}</div>
           ) : (
             <div className={styles.dataContainer}>
               {/* Header Row */}
@@ -264,10 +316,7 @@ export default function DataTable<T>({
 
                 {/* Infinite Scroll Loading Indicator */}
                 {infiniteScrollEnabled && (
-                  <div
-                    ref={loadMoreRef}
-                    className={styles.loadMoreIndicator}
-                  >
+                  <div ref={loadMoreRef} className={styles.loadMoreIndicator}>
                     {loadingMore && (
                       <div className={styles.loadMoreSpinner}>
                         <div className={styles.spinner}></div>

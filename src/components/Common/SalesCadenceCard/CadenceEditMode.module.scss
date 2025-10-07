@@ -1,0 +1,319 @@
+.editMode {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.warningBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: var(--warning-100);
+  border: 1px solid var(--warning-500);
+  border-radius: 6px;
+  color: var(--warning-700);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.editHeading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.editStepsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--slate-200);
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.dayGroup {
+  border: 1px solid var(--slate-300);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--slate-50);
+}
+
+.dayHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+
+  cursor: pointer;
+  user-select: none;
+}
+
+.dayTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+
+  .chevronOuterWrapper {
+    background: var(--slate-200);
+    border-radius: 6px;
+    padding: 6px;
+    box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.1) inset;
+  }
+
+  .chevronInnerWrapper {
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    padding: 4px;
+  }
+
+  svg {
+    display: block;
+    transition: transform 0.2s ease;
+  }
+}
+
+.dayChevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+.deleteDayButton {
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-900);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: var(--gray-50);
+  }
+}
+
+.daySteps {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stepItem {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background-color: #fff;
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  transition: all 0.2s;
+  box-shadow:
+    0 4px 6px 0 rgba(0, 0, 0, 0.04),
+    0 0 12px 0 rgba(0, 0, 0, 0.06);
+
+  &.dragging {
+    opacity: 0.5;
+    border: 2px dashed var(--action-500);
+  }
+
+  &:hover {
+    border-color: var(--slate-300);
+  }
+}
+
+.dragHandle {
+  display: flex;
+  align-items: flex-start;
+  color: var(--slate-400);
+  cursor: grab;
+  border-right: 1px solid var(--slate-300);
+  padding-right: 6px;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.stepFields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-900);
+  }
+
+  input,
+  select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--slate-300);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--gray-900);
+    background-color: white;
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  select {
+    padding-bottom: 7px;
+  }
+}
+
+.stepActions {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+
+  button {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+    border: 1px solid var(--slate-300);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--gray-900);
+    transition: all 0.2s;
+
+    &:hover {
+      background-color: var(--gray-50);
+    }
+
+    &:first-child:hover {
+      color: #dc2626;
+      border-color: #fecaca;
+      background-color: #fef2f2;
+    }
+  }
+}
+
+.addDayButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--slate-500);
+  background: var(--slate-200);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--slate-600);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: var(--slate-50);
+  }
+}
+
+.actionButtons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+}
+
+.deleteButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  background: white;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background-color: #f3f4f6;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.rightButtons {
+  display: flex;
+  gap: 12px;
+}
+
+.cancelButton {
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background-color: #f3f4f6;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.saveButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: var(--action-500);
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background-color: var(--action-600);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

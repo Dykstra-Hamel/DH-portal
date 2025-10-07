@@ -1,0 +1,190 @@
+.cardContent {
+  padding: 16px;
+}
+
+.callInsightsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.callDetailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+// Service Location Form Styles
+.serviceLocationGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.gridRow {
+  display: grid;
+  gap: 8px;
+
+  &.threeColumns {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  &.twoColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &.oneColumn {
+    grid-template-columns: 1fr;
+  }
+
+  @media (max-width: 768px) {
+    &.threeColumns,
+    &.twoColumns {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fieldLabel {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.textInput {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.selectInput {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+}
+
+.streetViewContainer {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    height: 200px;
+  }
+}
+
+// Address Actions (Save/Cancel buttons)
+.addressActions {
+  background: var(--amber-50);
+  border: 1px solid var(--amber-200);
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.actionButtons {
+  display: flex;
+  justify-content: space-between;
+
+  @media (max-width: 640px) {
+    justify-content: flex-end;
+  }
+}
+
+.button {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 90px;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.saveButton {
+  background: var(--action-500);
+  color: white;
+  border: 1px solid var(--action-500);
+
+  &:hover:not(:disabled) {
+    background: var(--action-600);
+    border-color: var(--action-600);
+  }
+}
+
+.cancelButton {
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+
+  &:hover:not(:disabled) {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+}

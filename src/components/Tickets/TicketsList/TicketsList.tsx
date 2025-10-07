@@ -1,12 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Ticket } from '@/types/ticket';
 import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable } from '@/components/Common/DataTable';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import { getTicketColumns, getTicketTabs } from './TicketsListConfig';
 import { Toast } from '@/components/Common/Toast';
+import {
+  createTicketReviewChannel,
+  subscribeToTicketReviewUpdates,
+  TicketReviewPayload,
+} from '@/lib/realtime/ticket-review-channel';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface TicketsListProps {
   tickets: Ticket[];
@@ -26,12 +32,119 @@ function TicketsList({
   const [qualifyingTicket, setQualifyingTicket] = useState<Ticket | null>(null);
   const [isQualifying, setIsQualifying] = useState(false);
 
+  // Review status tracking
+  const [reviewStatuses, setReviewStatuses] = useState<
+    Map<
+      string,
+      {
+        reviewedBy: string;
+        reviewedByName?: string;
+        reviewedByEmail?: string;
+        reviewedByFirstName?: string;
+        reviewedByLastName?: string;
+        expiresAt: string;
+      }
+    >
+  >(new Map());
+  const reviewChannelRef = useRef<RealtimeChannel | null>(null);
+
   // Toast state for undo functionality
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [showUndoOnToast, setShowUndoOnToast] = useState(false);
   const [previousTicketState, setPreviousTicketState] = useState<any>(null);
   const [isUndoing, setIsUndoing] = useState(false);
+
+  // Load initial review statuses from tickets and subscribe to updates
+  useEffect(() => {
+    // Load initial review statuses from current tickets
+    const initialStatuses = new Map<
+      string,
+      {
+        reviewedBy: string;
+        reviewedByName?: string;
+        reviewedByEmail?: string;
+        reviewedByFirstName?: string;
+        reviewedByLastName?: string;
+        expiresAt: string;
+      }
+    >();
+
+    tickets.forEach(ticket => {
+      if (
+        ticket.reviewed_by &&
+        ticket.review_expires_at &&
+        new Date(ticket.review_expires_at) > new Date()
+      ) {
+        initialStatuses.set(ticket.id, {
+          reviewedBy: ticket.reviewed_by,
+          reviewedByName: ticket.reviewed_by_profile
+            ? `${ticket.reviewed_by_profile.first_name || ''} ${ticket.reviewed_by_profile.last_name || ''}`.trim()
+            : undefined,
+          reviewedByEmail: ticket.reviewed_by_profile?.email,
+          reviewedByFirstName: ticket.reviewed_by_profile?.first_name,
+          reviewedByLastName: ticket.reviewed_by_profile?.last_name,
+          expiresAt: ticket.review_expires_at,
+        });
+      }
+    });
+
+    setReviewStatuses(initialStatuses);
+
+    // Set up realtime channel
+    const channel = createTicketReviewChannel();
+    reviewChannelRef.current = channel;
+
+    subscribeToTicketReviewUpdates(channel, (payload: TicketReviewPayload) => {
+      setReviewStatuses(prev => {
+        const updated = new Map(prev);
+
+        if (payload.reviewed_by && payload.review_expires_at) {
+          // Someone started reviewing
+          updated.set(payload.ticket_id, {
+            reviewedBy: payload.reviewed_by,
+            reviewedByName: payload.reviewed_by_name,
+            reviewedByEmail: payload.reviewed_by_email,
+            reviewedByFirstName: payload.reviewed_by_first_name,
+            reviewedByLastName: payload.reviewed_by_last_name,
+            expiresAt: payload.review_expires_at,
+          });
+        } else {
+          // Review ended
+          updated.delete(payload.ticket_id);
+        }
+
+        return updated;
+      });
+    });
+
+    return () => {
+      // Channel cleanup is handled globally
+    };
+  }, [tickets]);
+
+  // Auto-cleanup expired review statuses
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      setReviewStatuses(prev => {
+        const updated = new Map(prev);
+        const now = Date.now();
+        let hasChanges = false;
+
+        // Remove expired review statuses
+        updated.forEach((status, ticketId) => {
+          if (new Date(status.expiresAt).getTime() < now) {
+            updated.delete(ticketId);
+            hasChanges = true;
+          }
+        });
+
+        return hasChanges ? updated : prev;
+      });
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(cleanupInterval);
+  }, []);
 
   // Handle item actions (qualify, etc.)
   const handleItemAction = (action: string, ticket: Ticket) => {
@@ -50,7 +163,8 @@ function TicketsList({
     const shouldShowUndo =
       message === 'The ticket was successfully assigned.' ||
       message.includes('converted to lead') ||
-      message.includes('converted to support case');
+      message.includes('converted to support case') ||
+      message === 'Ticket has been archived';
 
     if (shouldShowUndo) {
       setShowUndoOnToast(true);
@@ -103,7 +217,10 @@ function TicketsList({
       setPreviousTicketState(null);
 
       setTimeout(() => {
-        setToastMessage('Ticket assignment undone successfully.');
+        const undoMessage = previousTicketState.qualification === 'junk' 
+          ? 'Ticket restored successfully.' 
+          : 'Ticket assignment undone successfully.';
+        setToastMessage(undoMessage);
         setShowToast(true);
         setShowUndoOnToast(false);
       }, 300);
@@ -121,7 +238,8 @@ function TicketsList({
 
   const handleQualify = async (
     qualification: 'sales' | 'customer_service' | 'junk',
-    assignedTo?: string
+    assignedTo?: string,
+    customStatus?: string
   ) => {
     if (!qualifyingTicket) return;
 
@@ -139,7 +257,7 @@ function TicketsList({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ qualification, assignedTo }),
+          body: JSON.stringify({ qualification, assignedTo, customStatus }),
         }
       );
 
@@ -156,13 +274,20 @@ function TicketsList({
       });
 
       onTicketUpdated?.();
-      setShowQualifyModal(false);
-      setQualifyingTicket(null);
-
-      // Show success message from API response
-      if (result.message) {
-        handleShowToast(result.message);
+      
+      // For live calls (customStatus provided), don't auto-close modal or show toast
+      // The modal component will handle these actions
+      if (!customStatus) {
+        setShowQualifyModal(false);
+        setQualifyingTicket(null);
+        
+        // Show success message from API response
+        if (result.message) {
+          handleShowToast(result.message);
+        }
       }
+
+      return result;
     } catch (error) {
       console.error('Error qualifying ticket:', error);
       alert('Failed to qualify ticket. Please try again.');
@@ -188,7 +313,7 @@ function TicketsList({
         data={tickets}
         loading={loading}
         title="Review & Qualify Your Leads"
-        columns={getTicketColumns()}
+        columns={getTicketColumns(reviewStatuses)}
         tabs={getTicketTabs(callRecords)}
         tableType="tickets"
         onItemAction={handleItemAction}

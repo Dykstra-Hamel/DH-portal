@@ -8,17 +8,17 @@ import { User } from '@supabase/supabase-js';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserPageAccess } from '@/hooks/useUserDepartments';
 import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
-import { 
-  Ticket, 
-  Target, 
-  Calendar, 
+import {
+  Ticket,
+  Target,
+  Calendar,
   Headphones,
   CheckSquare,
   ChevronRight,
   TrendingUp,
   TrendingDown,
   Video,
-  HelpCircle
+  HelpCircle,
 } from 'lucide-react';
 import styles from './page.module.scss';
 
@@ -57,7 +57,16 @@ interface MetricCardProps {
   onAddMetric?: () => void;
 }
 
-function DashboardCard({ title, description, count, href, icon, bgImage, showBadge, badgeCount }: DashboardCardProps) {
+function DashboardCard({
+  title,
+  description,
+  count,
+  href,
+  icon,
+  bgImage,
+  showBadge,
+  badgeCount,
+}: DashboardCardProps) {
   const router = useRouter();
 
   const handleClick = () => {
@@ -67,9 +76,7 @@ function DashboardCard({ title, description, count, href, icon, bgImage, showBad
   return (
     <div className={styles.dashboardCard} onClick={handleClick}>
       <div className={styles.cardHeader}>
-        <div className={styles.cardIcon}>
-          {icon}
-        </div>
+        <div className={styles.cardIcon}>{icon}</div>
         {showBadge && badgeCount && badgeCount > 0 && (
           <span className={styles.badge}>{badgeCount}</span>
         )}
@@ -83,11 +90,26 @@ function DashboardCard({ title, description, count, href, icon, bgImage, showBad
         <span className={styles.cardLabel}>All Assigned:</span>
         <div className={styles.assignedIcons}>
           {/* Mock user avatars */}
-          <div className={styles.avatar} style={{ backgroundColor: '#ef4444' }}></div>
-          <div className={styles.avatar} style={{ backgroundColor: '#f59e0b' }}></div>
-          <div className={styles.avatar} style={{ backgroundColor: '#10b981' }}></div>
-          <div className={styles.avatar} style={{ backgroundColor: '#3b82f6' }}></div>
-          <div className={styles.avatar} style={{ backgroundColor: '#8b5cf6' }}></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#ef4444' }}
+          ></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#f59e0b' }}
+          ></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#10b981' }}
+          ></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#3b82f6' }}
+          ></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#8b5cf6' }}
+          ></div>
         </div>
       </div>
       {bgImage && (
@@ -99,7 +121,13 @@ function DashboardCard({ title, description, count, href, icon, bgImage, showBad
   );
 }
 
-function AssignmentCard({ title, description, count, href, showNewItems }: AssignmentCardProps) {
+function AssignmentCard({
+  title,
+  description,
+  count,
+  href,
+  showNewItems,
+}: AssignmentCardProps) {
   const router = useRouter();
 
   const handleClick = () => {
@@ -116,17 +144,35 @@ function AssignmentCard({ title, description, count, href, showNewItems }: Assig
       <div className={styles.assignmentFooter}>
         <span className={styles.assignmentLabel}>All Assigned:</span>
         <div className={styles.assignedIcons}>
-          <div className={styles.avatar} style={{ backgroundColor: '#ef4444' }}></div>
-          <div className={styles.avatar} style={{ backgroundColor: '#f59e0b' }}></div>
-          <div className={styles.avatar} style={{ backgroundColor: '#10b981' }}></div>
-          <div className={styles.avatar} style={{ backgroundColor: '#3b82f6' }}></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#ef4444' }}
+          ></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#f59e0b' }}
+          ></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#10b981' }}
+          ></div>
+          <div
+            className={styles.avatar}
+            style={{ backgroundColor: '#3b82f6' }}
+          ></div>
         </div>
       </div>
     </div>
   );
 }
 
-function MetricCard({ title, value, change, changeLabel, onAddMetric }: MetricCardProps) {
+function MetricCard({
+  title,
+  value,
+  change,
+  changeLabel,
+  onAddMetric,
+}: MetricCardProps) {
   const isPositive = change && change > 0;
   const isNegative = change && change < 0;
 
@@ -138,7 +184,9 @@ function MetricCard({ title, value, change, changeLabel, onAddMetric }: MetricCa
       <div className={styles.metricValue}>{value}</div>
       {change !== undefined && changeLabel && (
         <div className={styles.metricChange}>
-          <div className={`${styles.changeIndicator} ${isPositive ? styles.positive : isNegative ? styles.negative : ''}`}>
+          <div
+            className={`${styles.changeIndicator} ${isPositive ? styles.positive : isNegative ? styles.negative : ''}`}
+          >
             {isPositive ? (
               <TrendingUp className={styles.trendIcon} />
             ) : isNegative ? (
@@ -163,21 +211,25 @@ function FAQSection() {
 
   const faqs = [
     {
-      question: "What is the airspeed velocity of an unladen swallow?",
-      answer: "Revenue based from closing rations for all leads received and leads sold from all combination sources."
+      question: 'What is the airspeed velocity of an unladen swallow?',
+      answer:
+        'Revenue based from closing rations for all leads received and leads sold from all combination sources.',
     },
     {
-      question: "When am I going to get fired based on my performance?",
-      answer: "Performance metrics are evaluated based on multiple factors including lead conversion rates, customer satisfaction, and task completion."
+      question: 'When am I going to get fired based on my performance?',
+      answer:
+        'Performance metrics are evaluated based on multiple factors including lead conversion rates, customer satisfaction, and task completion.',
     },
     {
-      question: "When am I a ticket truly closed out?",
-      answer: "A ticket is considered closed when all resolution steps have been completed and the customer has confirmed satisfaction."
+      question: 'When am I a ticket truly closed out?',
+      answer:
+        'A ticket is considered closed when all resolution steps have been completed and the customer has confirmed satisfaction.',
     },
     {
-      question: "Farm to table, customer to ticket, shiplap to...",
-      answer: "Our process follows industry best practices for customer service and lead management workflows."
-    }
+      question: 'Farm to table, customer to ticket, shiplap to...',
+      answer:
+        'Our process follows industry best practices for customer service and lead management workflows.',
+    },
   ];
 
   return (
@@ -190,14 +242,12 @@ function FAQSection() {
             onClick={() => setOpenFAQ(openFAQ === index ? null : index)}
           >
             <span>{faq.question}</span>
-            <ChevronRight 
-              className={`${styles.faqChevron} ${openFAQ === index ? styles.open : ''}`} 
+            <ChevronRight
+              className={`${styles.faqChevron} ${openFAQ === index ? styles.open : ''}`}
             />
           </button>
           {openFAQ === index && (
-            <div className={styles.faqAnswer}>
-              {faq.answer}
-            </div>
+            <div className={styles.faqAnswer}>{faq.answer}</div>
           )}
         </div>
       ))}
@@ -215,7 +265,8 @@ export default function ConnectionsPage() {
 
   // Access control hooks
   const { hasAccess: hasSalesAccess } = useCurrentUserPageAccess('sales');
-  const { hasAccess: hasSchedulingAccess } = useCurrentUserPageAccess('scheduling');
+  const { hasAccess: hasSchedulingAccess } =
+    useCurrentUserPageAccess('scheduling');
   const { hasAccess: hasSupportAccess } = useCurrentUserPageAccess('support');
 
   // Global admins see everything, otherwise check department access
@@ -269,7 +320,9 @@ export default function ConnectionsPage() {
   if (loading) {
     return (
       <div className={styles.loading}>
-        <div className={styles.loadingText}>Loading connections dashboard...</div>
+        <div className={styles.loadingText}>
+          Loading connections dashboard...
+        </div>
       </div>
     );
   }
@@ -290,7 +343,9 @@ export default function ConnectionsPage() {
     <div className={styles.connectionsPage}>
       {/* Header Section */}
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Qualify, assign and nurture open tickets.</h1>
+        <h1 className={styles.pageTitle}>
+          Qualify, assign and nurture open tickets.
+        </h1>
       </div>
 
       {/* Main Dashboard Cards */}
@@ -346,7 +401,9 @@ export default function ConnectionsPage() {
       <div className={styles.secondaryGrid}>
         {/* Direct Assignments */}
         <div className={styles.assignmentsSection}>
-          <h2 className={styles.sectionTitle}>Direct assignments just for you.</h2>
+          <h2 className={styles.sectionTitle}>
+            Direct assignments just for you.
+          </h2>
           <div className={styles.assignmentGrid}>
             <AssignmentCard
               title="My Tasks"

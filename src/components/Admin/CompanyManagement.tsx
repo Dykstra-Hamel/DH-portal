@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor } from 'lucide-react';
+import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target } from 'lucide-react';
 import Image from 'next/image';
+import PricingSettingsManager from './PricingSettingsManager';
+import SalesConfigManager from './SalesConfigManager';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -44,7 +46,7 @@ interface CompanyManagementProps {
   user: User;
 }
 
-type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page';
+type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pricing-settings' | 'sales-config';
 
 export default function CompanyManagement({ companyId, user }: CompanyManagementProps) {
   const router = useRouter();
@@ -409,6 +411,8 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'google-places', label: 'Google Places', icon: Settings },
     { id: 'login-page', label: 'Login Page', icon: Monitor },
+    { id: 'pricing-settings', label: 'Pricing Settings', icon: DollarSign },
+    { id: 'sales-config', label: 'Sales Config', icon: Target },
   ] as const;
 
   return (
@@ -511,6 +515,12 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
               onSave={() => handleSave('login-page', {})}
               saving={saving}
             />
+          )}
+          {activeSection === 'pricing-settings' && (
+            <PricingSettingsManager companyId={companyId} />
+          )}
+          {activeSection === 'sales-config' && (
+            <SalesConfigManager companyId={companyId} />
           )}
         </div>
       </div>
@@ -716,14 +726,55 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     industry: company.industry || '',
     size: company.size || '',
   });
+  const [timezone, setTimezone] = useState<string>('America/New_York');
+  const [loadingTimezone, setLoadingTimezone] = useState(true);
+
+  useEffect(() => {
+    const loadTimezone = async () => {
+      try {
+        const response = await fetch(`/api/companies/${company.id}/settings`);
+        if (response.ok) {
+          const { settings } = await response.json();
+          setTimezone(settings.company_timezone?.value || 'America/New_York');
+        }
+      } catch (error) {
+        console.error('Error loading timezone:', error);
+      } finally {
+        setLoadingTimezone(false);
+      }
+    };
+    loadTimezone();
+  }, [company.id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Save business info
+    await onSave(formData);
+
+    // Save timezone setting separately
+    try {
+      await fetch(`/api/companies/${company.id}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            company_timezone: {
+              value: timezone,
+              type: 'string'
+            }
+          }
+        }),
+      });
+    } catch (error) {
+      console.error('Error saving timezone:', error);
+    }
+  };
 
   return (
     <div className={styles.section}>
       <h2>Business Information</h2>
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        onSave(formData);
-      }}>
+      <form onSubmit={handleSubmit}>
         <div className={styles.formGroup}>
           <label>Industry:</label>
           <input
@@ -747,6 +798,33 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
             <option value="501-1000">501-1000 employees</option>
             <option value="1000+">1000+ employees</option>
           </select>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Company Timezone:</label>
+          <select
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            disabled={loadingTimezone}
+          >
+            <optgroup label="US Timezones">
+              <option value="America/New_York">Eastern Time (ET)</option>
+              <option value="America/Chicago">Central Time (CT)</option>
+              <option value="America/Denver">Mountain Time (MT)</option>
+              <option value="America/Phoenix">Mountain Time - Arizona (no DST)</option>
+              <option value="America/Los_Angeles">Pacific Time (PT)</option>
+              <option value="America/Anchorage">Alaska Time (AKT)</option>
+              <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
+            </optgroup>
+            <optgroup label="Other Timezones">
+              <option value="UTC">UTC</option>
+              <option value="Europe/London">London (GMT/BST)</option>
+              <option value="Europe/Paris">Paris (CET/CEST)</option>
+              <option value="Asia/Tokyo">Tokyo (JST)</option>
+              <option value="Australia/Sydney">Sydney (AEDT/AEST)</option>
+            </optgroup>
+          </select>
+          <small>This timezone will be used for scheduling tasks and business hours</small>
         </div>
 
         <button type="submit" disabled={saving} className={styles.saveButton}>

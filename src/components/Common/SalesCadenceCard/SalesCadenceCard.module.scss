@@ -1,0 +1,388 @@
+.cardContent {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  background-color: var(--gray-200);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background-color: var(--emerald-500);
+  transition: width 0.3s ease;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selectInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--gray-400);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(0, 135, 245, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+}
+
+.stepsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stepsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stepItem {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.stepIcon {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--gray-200);
+  background: var(--gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  color: var(--gray-700);
+
+  .checkIcon {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--emerald-500);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border: none;
+    padding: 0;
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+.stepContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stepHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.priorityIndicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.priorityDot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 3px;
+}
+
+.priorityDotInner {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+// Low priority
+.priorityDotLow {
+  background: var(--priority-low-outer);
+
+  .priorityDotInner {
+    background: var(--priority-low-inner);
+  }
+}
+
+// Medium priority
+.priorityDotMedium {
+  background: var(--priority-medium-outer);
+
+  .priorityDotInner {
+    background: var(--priority-medium-inner);
+  }
+}
+
+// High priority
+.priorityDotHigh {
+  background: var(--priority-high-outer);
+
+  .priorityDotInner {
+    background: var(--priority-high-inner);
+  }
+}
+
+// Urgent priority (with pulse effect)
+.priorityDotUrgent {
+  background: var(--priority-urgent-outer);
+
+  .priorityDotInner {
+    background: var(--priority-urgent-inner);
+    animation: pulse 1s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
+}
+
+.completedLabel {
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 16px;
+  color: var(--success-700);
+}
+
+// Dropdown styles
+.dropdownWrapper {
+  position: relative;
+}
+
+.dropdownButton {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background-color: white;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  transition: all 0.2s ease;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  &.hasSelection {
+    color: var(--gray-900);
+  }
+
+  &.placeholder {
+    color: var(--gray-500);
+  }
+}
+
+.dropdownChevron {
+  color: var(--gray-500);
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background-color: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 10;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dropdownOption {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background-color: white;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+
+  &.selected {
+    background-color: #3b82f6;
+    color: white;
+
+    &:hover {
+      background-color: #3b82f6;
+    }
+  }
+}
+
+// Paused badge
+.pausedBadge {
+  padding: 2px 8px;
+  background-color: var(--gray-300);
+  color: var(--gray-700);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+// Paused steps list
+.stepsListPaused {
+  opacity: 0.6;
+}
+
+// Action buttons container
+.actionButtonsContainer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.actionButtonsRight {
+  display: flex;
+  gap: 12px;
+}
+
+// Button styles
+.textButton {
+  background: none;
+  border: none;
+  color: var(--gray-900);
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.secondaryButton {
+  padding: 8px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background-color: white;
+  color: var(--gray-600);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background-color: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.primaryButton {
+  padding: 9px 12px;
+  border: none;
+  border-radius: 6px;
+  background-color: #3b82f6;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background-color: #2563eb;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    background-color: var(--gray-400);
+    color: #fff;
+  }
+}

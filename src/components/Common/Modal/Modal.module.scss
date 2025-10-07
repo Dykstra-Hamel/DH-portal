@@ -19,26 +19,21 @@
   background: #fff;
   border-radius: 8px;
   width: 100%;
-  max-width: 1200px;
+  max-width: 764px;
   max-height: 90vh;
-  overflow-y: auto;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   transition: all 0.3s ease;
   opacity: 1;
+  overflow: auto;
   transform: translateY(0);
-
-  &.stepTransition {
-    opacity: 0;
-    transform: translateY(10px);
-  }
 }
 
 // Modal Top Section
 .modalTop {
-  padding: 16px;
+  padding: 24px;
   flex-direction: row;
   display: flex;
   align-items: center;
@@ -164,16 +159,15 @@
 
 // Modal Middle Section
 .modalMiddle {
-  padding: 16px;
+  padding: 24px;
   width: 100%;
   flex: 1;
-  background: var(--light-gray-bg);
-  overflow-y: auto;
+  background: #fff;
 }
 
 // Modal Bottom Section
 .modalBottom {
-  padding: 16px;
+  padding: 0 24px 24px;
   width: 100%;
   border-top: 1px solid #e5e7eb;
   display: flex;
@@ -219,6 +213,8 @@
   align-items: center;
   width: 100%;
   gap: 12px;
+  margin-top: 10px;
+  width: 100%;
 
   @media (max-width: 768px) {
     flex-direction: column;
@@ -242,6 +238,12 @@
   }
 }
 
+.fullWidthButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+}
+
 .primaryButton {
   background: var(--action-500);
   color: white;
@@ -253,6 +255,7 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 8px;
   height: 40px;
@@ -278,18 +281,48 @@
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 8px;
   height: 40px;
+  box-shadow:
+    0 0 0 0 #fff inset,
+    0 0 0 1px #d1d5db inset,
+    0 1px 2px 0 rgba(0, 0, 0, 0.05);
 
   &:hover:not(:disabled) {
-    background: #f9fafb;
+    background: var(--slate-100);
   }
 
   &:disabled {
     background: white;
     color: #9ca3af;
     cursor: not-allowed;
+  }
+
+  &.bluebutton {
+    background: blue;
+  }
+}
+
+.backButton {
+  background: white;
+  color: var(--gray-800);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+
+  &:hover:not(:disabled) {
+    background: var(--slate-100);
   }
 }
 

@@ -761,19 +761,7 @@ async function sendCallSummaryEmailsIfEnabled(
   try {
     // Skip sending emails for call transfers - these are successfully handed off to human agents
     const disconnectionReason = callData.disconnection_reason || callRecord.disconnect_reason;
-    
-    // Debug logging to understand what values we're getting
-    console.log(`[Inbound Call Summary Emails DEBUG] Call ${callId}:`, {
-      callData_disconnection_reason: callData.disconnection_reason,
-      callRecord_disconnect_reason: callRecord.disconnect_reason,
-      final_disconnectionReason: disconnectionReason,
-      callData_call_status: callData.call_status,
-      callRecord_call_status: callRecord.call_status,
-      disconnectionReasonType: typeof disconnectionReason,
-      exactMatch: disconnectionReason === 'call_transfer',
-      caseInsensitiveMatch: disconnectionReason?.toLowerCase() === 'call_transfer'
-    });
-    
+
     // Check for call transfer with multiple possible values
     if (disconnectionReason === 'call_transfer' || 
         disconnectionReason === 'call_transferred' ||

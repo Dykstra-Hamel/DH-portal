@@ -1,5 +1,5 @@
 .ticketModal {
-  max-width: 1200px;
+  max-width: 764px;
   width: 100%;
   transition: all 0.3s ease;
   opacity: 1;
@@ -22,6 +22,103 @@
   }
 }
 
+.ticketSummarySection {
+  display: flex;
+  position: relative;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+
+  p {
+    color: var(--gray-500);
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 450;
+    line-height: 170%;
+  }
+}
+
+.ticketSummaryName {
+  color: var(--gray-900);
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 170%;
+}
+
+.reviewerSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reviewingText {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 550;
+  line-height: 14px;
+  color: var(--action-500);
+}
+
+.reviewerInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatarContainer {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarInitials {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #006bc2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.reviewerName {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.actionsWrapper {
+  display: flex;
+  position: relative;
+  flex-flow: column;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-300);
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.dividerLine {
+  background: var(--gray-200);
+  height: 1px;
+  width: 100%;
+}
+
+.assignActions {
+  display: flex;
+}
+
 .leftColumn {
   display: flex;
   flex-direction: column;
@@ -37,7 +134,7 @@
 .customDropdown {
   position: relative;
   display: inline-block;
-  width: 300px;
+  width: 100%;
 
   @media (max-width: 768px) {
     width: 100%;
@@ -80,7 +177,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--action-500);
 
   svg path {
     stroke: var(--action-500);
@@ -270,4 +366,233 @@
   font-weight: 500;
   color: var(--action-600);
   line-height: 1;
+}
+
+// Radio button styles
+.radioGroup {
+  display: flex;
+  gap: 24px;
+  margin: 16px 0;
+  align-items: center;
+
+  @media (max-width: 768px) {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--neutral-800);
+  transition: all 0.2s ease;
+
+  &.disabled {
+    cursor: not-allowed;
+    color: var(--gray-400);
+  }
+
+  &:hover:not(.disabled) {
+    color: var(--action-600);
+  }
+}
+
+.radioInput {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 0;
+  height: 0;
+
+  &:checked + .radioCustom {
+    background: var(--action-600);
+    border-color: var(--action-600);
+
+    &::after {
+      display: block;
+    }
+  }
+
+  &:disabled + .radioCustom {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+    cursor: not-allowed;
+
+    &::after {
+      background: var(--gray-400);
+    }
+  }
+}
+
+.radioCustom {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-300);
+  border-radius: 50%;
+  background: white;
+  transition: all 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: white;
+  }
+}
+
+.radioLabel {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  user-select: none;
+}
+
+// Reason section styles
+.reasonSection {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reasonLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--neutral-800);
+  margin-bottom: 4px;
+}
+
+// Tabbed interface styles
+.tabbedInterface {
+  display: grid;
+  width: 100%;
+  gap: 0;
+  height: 100%;
+  grid-template-columns: 50% 50%;
+}
+
+.tabNavigation {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--gray-200);
+  background: #fff;
+  padding: 16px 16px 0 0;
+
+  @media (max-width: 768px) {
+    width: 200px;
+  }
+
+  @media (max-width: 480px) {
+    display: none;
+  }
+}
+
+.tabButton {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: var(--gray-900);
+  font-size: 14px;
+  line-height: 24px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  svg {
+    margin-right: 8px;
+
+    &:last-of-type {
+      margin: 0 0 0 auto;
+      opacity: 0;
+      color: var(--gray-400);
+    }
+  }
+
+  &:hover {
+    svg {
+      &:last-of-type {
+        opacity: 1;
+      }
+    }
+  }
+
+  &.active {
+    background: var(--slate-100);
+
+    svg {
+      &:last-of-type {
+        opacity: 1;
+      }
+    }
+  }
+
+  &:first-child {
+    border-top: none;
+  }
+
+  @media (max-width: 768px) {
+    padding: 14px 16px;
+    font-size: 13px;
+  }
+}
+
+.tabContent {
+  flex: 1;
+  padding: 16px 0 0 0;
+  background: white;
+
+  @media (max-width: 480px) {
+    max-height: 400px;
+  }
+}
+
+// Mobile responsive - show tabs horizontally when vertical tabs are hidden
+@media (max-width: 480px) {
+  .tabbedInterface {
+    flex-direction: column;
+  }
+
+  .tabNavigation {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--gray-200);
+    background: #f9fafb;
+    overflow-x: auto;
+  }
+
+  .tabButton {
+    white-space: nowrap;
+    min-width: fit-content;
+    padding: 12px 16px;
+    border-bottom: none;
+    border-right: 1px solid var(--gray-200);
+
+    &.active {
+      border-right: 1px solid var(--gray-200);
+      border-bottom: 3px solid var(--action-600);
+      margin-right: 0;
+      margin-bottom: -1px;
+    }
+
+    &:last-child {
+      border-right: none;
+    }
+  }
 }

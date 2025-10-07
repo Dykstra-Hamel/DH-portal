@@ -5,6 +5,8 @@ import { Ticket } from '@/types/ticket';
 import { CallRecord } from '@/types/call-record';
 import { ColumnDefinition, TabDefinition } from '@/components/Common/DataTable';
 import { ChevronRight } from 'lucide-react';
+import { getCustomerDisplayName, getPhoneDisplay } from '@/lib/display-utils';
+import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import styles from '@/components/Common/DataTable/DataTable.module.scss';
 
 // Helper functions for data formatting (moved from TicketRow)
@@ -28,34 +30,25 @@ const formatTimeInQueue = (createdAt: string): string => {
 };
 
 const formatCustomerName = (ticket: Ticket): string => {
-  if (!ticket.customer) return 'N/A';
-  const firstName = ticket.customer.first_name || '';
-  const lastName = ticket.customer.last_name || '';
-  const fullName = `${firstName} ${lastName}`.trim();
-  return fullName || 'N/A';
+  return getCustomerDisplayName(ticket.customer);
 };
 
 const formatPhone = (phone?: string): string => {
-  if (!phone) return 'N/A';
-
-  const cleaned = phone.replace(/\D/g, '');
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-  } else if (cleaned.length === 11 && cleaned[0] === '1') {
-    return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
-  }
-  return phone;
+  return getPhoneDisplay(phone);
 };
 
 const formatAddress = (ticket: Ticket): string => {
-  if (!ticket.customer) return 'N/A';
+  if (!ticket.customer) return 'Unknown';
 
   const customer = ticket.customer;
-  const parts = [customer.city, customer.state, customer.zip_code].filter(
-    Boolean
-  );
 
-  return parts.length > 0 ? parts.join(', ') : 'N/A';
+  // Build address from components, filtering out "none" values
+  const parts = [customer.city, customer.state, customer.zip_code]
+    .filter(Boolean)
+    .map(part => part?.trim())
+    .filter(part => part && part.toLowerCase() !== 'none');
+
+  return parts.length > 0 ? parts.join(', ') : 'Unknown';
 };
 
 const formatTicketType = (type: string): string => {
@@ -102,7 +95,19 @@ const formatServiceType = (serviceType: string): string => {
 };
 
 // Define columns for tickets table
-export const getTicketColumns = (): ColumnDefinition<Ticket>[] => [
+export const getTicketColumns = (
+  reviewStatuses?: Map<
+    string,
+    {
+      reviewedBy: string;
+      reviewedByName?: string;
+      reviewedByEmail?: string;
+      reviewedByFirstName?: string;
+      reviewedByLastName?: string;
+      expiresAt: string;
+    }
+  >
+): ColumnDefinition<Ticket>[] => [
   {
     key: 'created_at',
     title: 'In Queue',
@@ -270,18 +275,43 @@ export const getTicketColumns = (): ColumnDefinition<Ticket>[] => [
     render: (
       ticket: Ticket,
       onAction?: (action: string, item: Ticket) => void
-    ) => (
-      <button
-        className={styles.actionButton}
-        onClick={e => {
-          e.stopPropagation();
-          onAction?.('qualify', ticket);
-        }}
-      >
-        Review Ticket
-        <ChevronRight size={18} />
-      </button>
-    ),
+    ) => {
+      const reviewStatus = reviewStatuses?.get(ticket.id);
+      // Check if being reviewed - avoid creating new Date on every render
+      const isBeingReviewed = reviewStatus
+        ? Date.now() < new Date(reviewStatus.expiresAt).getTime()
+        : false;
+
+      if (isBeingReviewed && reviewStatus) {
+        // Show "Reviewing" status with avatar
+        return (
+          <div className={styles.reviewingStatus}>
+            <span className={styles.reviewingText}>Reviewing</span>
+            <MiniAvatar
+              firstName={reviewStatus.reviewedByFirstName}
+              lastName={reviewStatus.reviewedByLastName}
+              email={reviewStatus.reviewedByEmail || ''}
+              size="small"
+              showTooltip={true}
+            />
+          </div>
+        );
+      }
+
+      // Show normal "Review Ticket" button
+      return (
+        <button
+          className={styles.actionButton}
+          onClick={e => {
+            e.stopPropagation();
+            onAction?.('qualify', ticket);
+          }}
+        >
+          Review Ticket
+          <ChevronRight size={18} />
+        </button>
+      );
+    },
   },
 ];
 
@@ -291,11 +321,12 @@ export const getTicketTabs = (
 ): TabDefinition<Ticket>[] => [
   {
     key: 'all',
-    label: 'All Tickets',
+    label: 'All Incoming',
     filter: (tickets: Ticket[]) =>
       tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived),
     getCount: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived).length,
+      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived)
+        .length,
   },
   {
     key: 'incoming_calls',
@@ -354,13 +385,5 @@ export const getTicketTabs = (
           !ticket.archived &&
           ticket.type === 'web_form'
       ).length,
-  },
-  {
-    key: 'junk',
-    label: 'Junk',
-    filter: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.archived === true),
-    getCount: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.archived === true).length,
   },
 ];

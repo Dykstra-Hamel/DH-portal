@@ -214,26 +214,39 @@ export async function PUT(
     }
 
     // Clean and validate the data before updating
-    const updateData = {
-      ...body,
-      // Convert empty strings to null and normalize phone
-      email: body.email?.trim() || null,
-      phone: body.phone?.trim()
-        ? normalizePhoneNumber(body.phone.trim()) || body.phone.trim()
-        : null,
-      address: (body.address?.trim() && body.address !== 'none') ? body.address.trim() : null,
-      city: (body.city?.trim() && body.city !== 'none') ? body.city.trim() : null,
-      state: (body.state?.trim() && body.state !== 'none') ? body.state.trim() : null,
-      zip_code: (body.zip_code?.trim() && body.zip_code !== 'none') ? body.zip_code.trim() : null,
-      notes: body.notes?.trim() || null,
-    };
+    // Only include fields that are present in the request body
+    const updateData: any = {};
 
-    // Remove any fields that are undefined
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) {
-        delete updateData[key];
-      }
-    });
+    // Only process fields that were actually sent in the request
+    if ('email' in body) {
+      updateData.email = body.email?.trim() || null;
+    }
+    if ('phone' in body) {
+      updateData.phone = body.phone?.trim()
+        ? normalizePhoneNumber(body.phone.trim()) || body.phone.trim()
+        : null;
+    }
+    if ('first_name' in body) {
+      updateData.first_name = body.first_name?.trim() || null;
+    }
+    if ('last_name' in body) {
+      updateData.last_name = body.last_name?.trim() || null;
+    }
+    if ('address' in body) {
+      updateData.address = (body.address?.trim() && body.address !== 'none') ? body.address.trim() : null;
+    }
+    if ('city' in body) {
+      updateData.city = (body.city?.trim() && body.city !== 'none') ? body.city.trim() : null;
+    }
+    if ('state' in body) {
+      updateData.state = (body.state?.trim() && body.state !== 'none') ? body.state.trim() : null;
+    }
+    if ('zip_code' in body) {
+      updateData.zip_code = (body.zip_code?.trim() && body.zip_code !== 'none') ? body.zip_code.trim() : null;
+    }
+    if ('notes' in body) {
+      updateData.notes = body.notes?.trim() || null;
+    }
 
     console.log('Customer API: Updating customer with data:', updateData);
 

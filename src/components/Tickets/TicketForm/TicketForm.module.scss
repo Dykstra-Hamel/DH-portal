@@ -1,0 +1,167 @@
+.ticketForm {
+  padding: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.formGroup {
+  margin-bottom: 24px;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--gray-700, #374151);
+  font-size: 14px;
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--gray-300, #d1d5db);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--white, #ffffff);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500, #3b82f6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background-color: var(--gray-50, #f9fafb);
+    color: var(--gray-500, #6b7280);
+    cursor: not-allowed;
+  }
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  
+  .formGroup {
+    margin-bottom: 24px;
+  }
+
+  &:has(.formGroup:only-child) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.customerSection {
+  .radioGroup {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 16px;
+
+    .radioLabel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 400;
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+
+    .radioInput {
+      position: absolute;
+      opacity: 0;
+      cursor: pointer;
+      width: 0;
+      height: 0;
+
+      &:checked + .radioCustom {
+        background: var(--action-600);
+        border-color: var(--action-600);
+
+        &::after {
+          display: block;
+        }
+      }
+    }
+
+    .radioCustom {
+      position: relative;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--gray-300);
+      border-radius: 50%;
+      background: white;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+
+      &::after {
+        content: '';
+        position: absolute;
+        display: none;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: white;
+      }
+    }
+  }
+  
+  .newCustomerFields {
+    padding: 16px;
+    background-color: var(--gray-50, #f9fafb);
+    border-radius: 8px;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    
+    .row:last-child {
+      margin-bottom: 0;
+      
+      .formGroup {
+        margin-bottom: 0;
+      }
+    }
+  }
+}
+
+.error {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--red-600, #dc2626);
+  font-weight: 500;
+}
+
+// Three column grid for zip code row
+.row:has(.formGroup:nth-child(3)) {
+  grid-template-columns: 1fr 1fr 120px;
+}
+
+// Handle responsive design
+@media (max-width: 768px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: 0;
+    
+    .formGroup {
+      margin-bottom: 20px;
+    }
+  }
+  
+  .customerSection .radioGroup {
+    flex-direction: column;
+    gap: 12px;
+  }
+}

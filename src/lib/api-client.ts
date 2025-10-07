@@ -536,6 +536,16 @@ export const adminAPI = {
     });
   },
 
+  // Pest Options
+  async getPestOptions(companyId: string) {
+    return authenticatedFetch(`/api/pest-options/${companyId}`);
+  },
+
+  // Service Plans
+  async getServicePlansByPest(companyId: string, pestId: string) {
+    return authenticatedFetch(`/api/service-plans/${companyId}/by-pest/${pestId}`);
+  },
+
   // Branding
   async getBranding(companyId: string) {
     return authenticatedFetch(`/api/admin/brands?company_id=${companyId}`);
@@ -557,6 +567,42 @@ export const adminAPI = {
 
   async deleteBranding(brandId: string) {
     return authenticatedFetch(`/api/admin/brands?id=${brandId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Support Cases (Admin)
+  async getSupportCase(supportCaseId: string) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`);
+  },
+
+  async updateSupportCase(supportCaseId: string, supportCaseData: any) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+      method: 'PUT',
+      body: JSON.stringify(supportCaseData),
+    });
+  },
+
+  async archiveSupportCase(supportCaseId: string) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // User Support Cases (Non-admin methods)
+  async getUserSupportCase(supportCaseId: string) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`);
+  },
+
+  async updateUserSupportCase(supportCaseId: string, supportCaseData: any) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+      method: 'PUT',
+      body: JSON.stringify(supportCaseData),
+    });
+  },
+
+  async archiveUserSupportCase(supportCaseId: string) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
       method: 'DELETE',
     });
   },

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SupportCase } from '@/types/support-case';
 import { DataTable } from '@/components/Common/DataTable';
 import {
@@ -23,15 +24,14 @@ export default function SupportCasesList({
   // Toast state
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const router = useRouter();
 
   // Handle item actions
   const handleItemAction = (action: string, supportCase: SupportCase) => {
     // Handle any support case specific actions here
     if (action === 'view') {
-      // TODO: Implement support case view/edit functionality
-      // For now, prevent default action until view functionality is implemented
-      const caseId = supportCase.id; // Reference to avoid unused parameter warning
-      void caseId; // Acknowledge we're not using it yet
+      // Navigate to the support case detail page
+      router.push(`/connections/customer-service/${supportCase.id}`);
     }
   };
 

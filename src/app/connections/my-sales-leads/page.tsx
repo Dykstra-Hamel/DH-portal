@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { DataTable } from '@/components/Common/DataTable';
-import { getLeadColumns, getLeadTabs } from '@/components/Leads/LeadsList/LeadsListConfig';
+import { getLeadColumns, getUserLeadTabs } from '@/components/Leads/LeadsList/LeadsListConfig';
 import { Lead } from '@/types/lead';
 
 export default function MySalesLeadsPage() {
@@ -13,6 +14,7 @@ export default function MySalesLeadsPage() {
   const [error, setError] = useState<string | null>(null);
   const { user } = useUser();
   const { selectedCompany } = useCompany();
+  const router = useRouter();
 
   // Fetch leads assigned to current user
   const fetchMyLeads = async () => {
@@ -53,6 +55,12 @@ export default function MySalesLeadsPage() {
     fetchMyLeads();
   };
 
+  const handleAction = (action: string, lead: Lead) => {
+    if (action === 'edit') {
+      router.push(`/connections/leads/${lead.id}`);
+    }
+  };
+
   if (!user || !selectedCompany) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -67,10 +75,11 @@ export default function MySalesLeadsPage() {
         data={leads}
         title="My Sales Leads"
         columns={getLeadColumns()}
-        tabs={getLeadTabs()}
+        tabs={getUserLeadTabs()}
         loading={loading}
         emptyStateMessage="No leads assigned to you yet."
         tableType="leads"
+        onItemAction={handleAction}
       />
     </div>
   );

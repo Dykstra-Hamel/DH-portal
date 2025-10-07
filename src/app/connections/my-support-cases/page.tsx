@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { DataTable } from '@/components/Common/DataTable';
-import { getSupportCaseColumns, getSupportCaseTabs } from '@/components/SupportCases/SupportCasesList/SupportCasesListConfig';
+import { getSupportCaseColumns, getUserSupportCaseTabs } from '@/components/SupportCases/SupportCasesList/SupportCasesListConfig';
 import { SupportCase } from '@/types/support-case';
 
 export default function MySupportCasesPage() {
@@ -13,6 +14,7 @@ export default function MySupportCasesPage() {
   const [error, setError] = useState<string | null>(null);
   const { user } = useUser();
   const { selectedCompany } = useCompany();
+  const router = useRouter();
 
   // Fetch support cases assigned to current user
   const fetchMySupportCases = async () => {
@@ -54,6 +56,12 @@ export default function MySupportCasesPage() {
     fetchMySupportCases();
   };
 
+  const handleAction = (action: string, supportCase: SupportCase) => {
+    if (action === 'view' || action === 'edit') {
+      router.push(`/connections/customer-service/${supportCase.id}`);
+    }
+  };
+
   if (!user || !selectedCompany) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -68,10 +76,11 @@ export default function MySupportCasesPage() {
         data={supportCases}
         title="My Support Cases"
         columns={getSupportCaseColumns()}
-        tabs={getSupportCaseTabs()}
+        tabs={getUserSupportCaseTabs()}
         loading={loading}
         emptyStateMessage="No support cases assigned to you yet."
         tableType="supportCases"
+        onItemAction={handleAction}
       />
     </div>
   );

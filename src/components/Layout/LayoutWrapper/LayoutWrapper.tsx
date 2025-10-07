@@ -58,13 +58,12 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             'Review and manage tickets, leads, and customer support cases here.',
           showAddButton: false,
         };
-      case '/tickets':
-      case '/connections/tickets':
+      case '/connections/incoming':
       case '/connections/calls-and-forms':
         return {
-          title: 'Tickets',
+          title: 'Incoming',
           description:
-            'Review, qualify, and assign all your incoming leads here.',
+            'Review, qualify, and assign all your incoming customer communications here.',
           showAddButton: true,
           addButtonText: 'Add Ticket',
         };
@@ -175,10 +174,18 @@ function LayoutContent({ children }: LayoutWrapperProps) {
         };
       // Handle individual record pages (hide lower header)
       default:
+        // Show lower header for lead detail pages
+        if (pathname.match(/^\/connections\/leads\/[^\/]+$/)) {
+          return {
+            title: 'Lead Details',
+            description: 'View and manage this lead information.',
+            showAddButton: false,
+          };
+        }
+
         if (
           pathname.includes('/customers/') ||
-          pathname.includes('/tickets/') ||
-          pathname.includes('/connections/leads/')
+          pathname.includes('/connections/incoming/')
         ) {
           return null; // Don't show lower header on individual record pages
         }

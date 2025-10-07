@@ -3,8 +3,22 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Ticket, ticketSourceOptions, ticketTypeOptions, ticketStatusOptions, ticketPriorityOptions } from '@/types/ticket';
-import { ArrowLeft, Calendar, User, Phone, Mail, MapPin, Trash2 } from 'lucide-react';
+import {
+  Ticket,
+  ticketSourceOptions,
+  ticketTypeOptions,
+  ticketStatusOptions,
+  ticketPriorityOptions,
+} from '@/types/ticket';
+import {
+  ArrowLeft,
+  Calendar,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Trash2,
+} from 'lucide-react';
 import { CallHistory } from '@/components/Calls/CallHistory/CallHistory';
 
 interface TicketDetailPageProps {
@@ -38,11 +52,11 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
       try {
         setLoading(true);
         const response = await fetch(`/api/tickets/${ticketId}`);
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch ticket');
         }
-        
+
         const ticketData = await response.json();
         setTicket(ticketData);
       } catch (err) {
@@ -60,7 +74,9 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
     const checkAdminStatus = async () => {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user) {
           const { data: profile } = await supabase
             .from('profiles')
@@ -138,7 +154,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
       }
 
       // Redirect to tickets page after successful deletion
-      router.push('/tickets');
+      router.push('/connections/incoming');
     } catch (error) {
       console.error('Error deleting ticket:', error);
       alert('Failed to delete ticket. Please try again.');
@@ -171,7 +187,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
         >
           Go Back
@@ -203,18 +219,32 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
             border: '1px solid #d1d5db',
             borderRadius: '6px',
             cursor: 'pointer',
-            marginBottom: '16px'
+            marginBottom: '16px',
           }}
         >
           <ArrowLeft size={16} />
           Back to Tickets
         </button>
-        
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '8px',
+          }}
+        >
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '24px',
+              fontWeight: '600',
+              color: '#1f2937',
+            }}
+          >
             {getTicketDisplayTitle(ticket)}
           </h1>
-          
+
           {isAdmin && (
             <button
               onClick={() => setShowDeleteModal(true)}
@@ -229,7 +259,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '14px',
-                fontWeight: '500'
+                fontWeight: '500',
               }}
             >
               <Trash2 size={16} />
@@ -237,33 +267,35 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
             </button>
           )}
         </div>
-        
+
         {isConverted && (
-          <div style={{ 
-            padding: '12px 16px', 
-            backgroundColor: '#dcfce7', 
-            color: '#166534', 
-            border: '1px solid #22c55e', 
-            borderRadius: '6px', 
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
+          <div
+            style={{
+              padding: '12px 16px',
+              backgroundColor: '#dcfce7',
+              color: '#166534',
+              border: '1px solid #22c55e',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
             <span>✓ This ticket has been converted to a lead</span>
-            <a 
+            <a
               href={`/leads/${ticket.converted_to_lead_id}`}
               style={{
                 color: '#166534',
                 textDecoration: 'none',
-                fontWeight: '600'
+                fontWeight: '600',
               }}
             >
               View Lead →
             </a>
           </div>
         )}
-        
+
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <span
             style={{
@@ -273,12 +305,12 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
               fontSize: '12px',
               fontWeight: '500',
               color: 'white',
-              backgroundColor: getStatusColor(ticket.status)
+              backgroundColor: getStatusColor(ticket.status),
             }}
           >
             {ticketStatusOptions.find(s => s.value === ticket.status)?.label}
           </span>
-          
+
           <span
             style={{
               display: 'inline-block',
@@ -287,62 +319,138 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
               fontSize: '12px',
               fontWeight: '500',
               color: 'white',
-              backgroundColor: getPriorityColor(ticket.priority)
+              backgroundColor: getPriorityColor(ticket.priority),
             }}
           >
-            {ticketPriorityOptions.find(p => p.value === ticket.priority)?.label}
+            {
+              ticketPriorityOptions.find(p => p.value === ticket.priority)
+                ?.label
+            }
           </span>
         </div>
       </div>
 
       {/* Main Content Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+      <div
+        style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}
+      >
         {/* Left Column - Main Details */}
         <div>
           {/* Description */}
           {ticket.description && (
-            <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600' }}>Description</h3>
-              <p style={{ margin: 0, lineHeight: '1.5', color: '#374151' }}>{ticket.description}</p>
+            <div
+              style={{
+                marginBottom: '24px',
+                padding: '16px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '8px',
+              }}
+            >
+              <h3
+                style={{
+                  margin: '0 0 8px 0',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                }}
+              >
+                Description
+              </h3>
+              <p style={{ margin: 0, lineHeight: '1.5', color: '#374151' }}>
+                {ticket.description}
+              </p>
             </div>
           )}
 
           {/* Customer Information */}
           {ticket.customer && (
-            <div style={{ marginBottom: '24px', padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-              <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600' }}>Customer Information</h3>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <div
+              style={{
+                marginBottom: '24px',
+                padding: '16px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+              }}
+            >
+              <h3
+                style={{
+                  margin: '0 0 12px 0',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                }}
+              >
+                Customer Information
+              </h3>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '8px',
+                }}
+              >
                 <User size={16} style={{ color: '#6b7280' }} />
                 <span style={{ fontWeight: '500' }}>
                   {ticket.customer.first_name} {ticket.customer.last_name}
                 </span>
               </div>
-              
+
               {ticket.customer.email && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '8px',
+                  }}
+                >
                   <Mail size={16} style={{ color: '#6b7280' }} />
-                  <a href={`mailto:${ticket.customer.email}`} style={{ color: '#3b82f6' }}>
+                  <a
+                    href={`mailto:${ticket.customer.email}`}
+                    style={{ color: '#3b82f6' }}
+                  >
                     {ticket.customer.email}
                   </a>
                 </div>
               )}
-              
+
               {ticket.customer.phone && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '8px',
+                  }}
+                >
                   <Phone size={16} style={{ color: '#6b7280' }} />
-                  <a href={`tel:${ticket.customer.phone}`} style={{ color: '#3b82f6' }}>
+                  <a
+                    href={`tel:${ticket.customer.phone}`}
+                    style={{ color: '#3b82f6' }}
+                  >
                     {ticket.customer.phone}
                   </a>
                 </div>
               )}
-              
+
               {ticket.customer.address && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '12px' }}>
-                  <MapPin size={16} style={{ color: '#6b7280', marginTop: '2px' }} />
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                    marginTop: '12px',
+                  }}
+                >
+                  <MapPin
+                    size={16}
+                    style={{ color: '#6b7280', marginTop: '2px' }}
+                  />
                   <div>
                     <div>{ticket.customer.address}</div>
-                    {(ticket.customer.city || ticket.customer.state || ticket.customer.zip_code) && (
+                    {(ticket.customer.city ||
+                      ticket.customer.state ||
+                      ticket.customer.zip_code) && (
                       <div style={{ color: '#6b7280' }}>
                         {ticket.customer.city && `${ticket.customer.city}, `}
                         {ticket.customer.state} {ticket.customer.zip_code}
@@ -356,7 +464,14 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
 
           {/* Call History - Only show for phone call tickets */}
           {ticket.type === 'phone_call' && ticketId && (
-            <div style={{ marginBottom: '24px', padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+            <div
+              style={{
+                marginBottom: '24px',
+                padding: '16px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+              }}
+            >
               <CallHistory
                 ticketId={ticketId}
                 refreshTrigger={callHistoryRefresh}
@@ -369,130 +484,275 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
         {/* Right Column - Metadata */}
         <div>
           {/* Ticket Details */}
-          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', marginBottom: '16px' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600' }}>Ticket Details</h3>
-            
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              marginBottom: '16px',
+            }}
+          >
+            <h3
+              style={{
+                margin: '0 0 12px 0',
+                fontSize: '16px',
+                fontWeight: '600',
+              }}
+            >
+              Ticket Details
+            </h3>
+
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Source</div>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  marginBottom: '2px',
+                }}
+              >
+                Source
+              </div>
               <div style={{ fontWeight: '500' }}>
-                {ticketSourceOptions.find(s => s.value === ticket.source)?.label}
+                {
+                  ticketSourceOptions.find(s => s.value === ticket.source)
+                    ?.label
+                }
               </div>
             </div>
-            
+
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Type</div>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  marginBottom: '2px',
+                }}
+              >
+                Type
+              </div>
               <div style={{ fontWeight: '500' }}>
                 {ticketTypeOptions.find(t => t.value === ticket.type)?.label}
               </div>
             </div>
-            
+
             {ticket.service_type && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Service Type</div>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Service Type
+                </div>
                 <div style={{ fontWeight: '500' }}>{ticket.service_type}</div>
               </div>
             )}
-            
+
             {ticket.pest_type && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Pest Type</div>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Pest Type
+                </div>
                 <div style={{ fontWeight: '500' }}>{ticket.pest_type}</div>
               </div>
             )}
-            
+
             {ticket.estimated_value && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Estimated Value</div>
-                <div style={{ fontWeight: '500' }}>${ticket.estimated_value}</div>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Estimated Value
+                </div>
+                <div style={{ fontWeight: '500' }}>
+                  ${ticket.estimated_value}
+                </div>
               </div>
             )}
           </div>
 
           {/* Timestamps */}
-          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600' }}>Timeline</h3>
-            
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+            }}
+          >
+            <h3
+              style={{
+                margin: '0 0 12px 0',
+                fontSize: '16px',
+                fontWeight: '600',
+              }}
+            >
+              Timeline
+            </h3>
+
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Created</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  marginBottom: '2px',
+                }}
+              >
+                Created
+              </div>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
                 <Calendar size={14} style={{ color: '#6b7280' }} />
-                <span style={{ fontSize: '14px' }}>{formatDate(ticket.created_at)}</span>
+                <span style={{ fontSize: '14px' }}>
+                  {formatDate(ticket.created_at)}
+                </span>
               </div>
             </div>
-            
+
             {ticket.last_contacted_at && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Last Contacted</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Last Contacted
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
                   <Calendar size={14} style={{ color: '#6b7280' }} />
-                  <span style={{ fontSize: '14px' }}>{formatDate(ticket.last_contacted_at)}</span>
+                  <span style={{ fontSize: '14px' }}>
+                    {formatDate(ticket.last_contacted_at)}
+                  </span>
                 </div>
               </div>
             )}
-            
+
             {ticket.resolved_at && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Resolved</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Resolved
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
                   <Calendar size={14} style={{ color: '#6b7280' }} />
-                  <span style={{ fontSize: '14px' }}>{formatDate(ticket.resolved_at)}</span>
+                  <span style={{ fontSize: '14px' }}>
+                    {formatDate(ticket.resolved_at)}
+                  </span>
                 </div>
               </div>
             )}
-            
+
             {ticket.next_follow_up_at && (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>Next Follow-up</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    marginBottom: '2px',
+                  }}
+                >
+                  Next Follow-up
+                </div>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
                   <Calendar size={14} style={{ color: '#6b7280' }} />
-                  <span style={{ fontSize: '14px' }}>{formatDate(ticket.next_follow_up_at)}</span>
+                  <span style={{ fontSize: '14px' }}>
+                    {formatDate(ticket.next_follow_up_at)}
+                  </span>
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
-      
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }} onClick={handleDeleteCancel}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            padding: '24px',
-            width: '100%',
-            maxWidth: '400px',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
-          }} onClick={(e) => e.stopPropagation()}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={handleDeleteCancel}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '400px',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
             <div style={{ marginBottom: '16px' }}>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600' }}>Delete Ticket</h3>
+              <h3
+                style={{
+                  margin: '0 0 8px 0',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                }}
+              >
+                Delete Ticket
+              </h3>
               <p style={{ margin: 0, color: '#6b7280', lineHeight: '1.5' }}>
-                Are you sure you want to delete this ticket? This action cannot be undone.
+                Are you sure you want to delete this ticket? This action cannot
+                be undone.
               </p>
-              <div style={{ 
-                marginTop: '12px', 
-                padding: '12px', 
-                backgroundColor: '#f9fafb', 
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}>
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '12px',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                }}
+              >
                 <strong>Ticket:</strong> {getTicketDisplayTitle(ticket)}
                 <br />
                 <strong>Status:</strong> {ticket?.status || 'Unknown'}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end',
+              }}
+            >
               <button
                 onClick={handleDeleteCancel}
                 disabled={isDeleting}
@@ -504,7 +764,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
                   borderRadius: '6px',
                   cursor: isDeleting ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
-                  fontWeight: '500'
+                  fontWeight: '500',
                 }}
               >
                 Cancel
@@ -521,7 +781,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
                   cursor: isDeleting ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: '500',
-                  opacity: isDeleting ? 0.6 : 1
+                  opacity: isDeleting ? 0.6 : 1,
                 }}
               >
                 {isDeleting ? 'Deleting...' : 'Delete Ticket'}

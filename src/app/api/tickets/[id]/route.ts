@@ -38,7 +38,7 @@ export async function GET(
 
     const { id } = await params;
 
-    // Get ticket with customer and company info
+    // Get ticket with customer, company, and service address info
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
       .select(
@@ -59,6 +59,19 @@ export async function GET(
           id,
           name,
           website
+        ),
+        service_address:service_addresses!left(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type,
+          property_notes,
+          home_size_range,
+          yard_size_range
         )
       `
       )
@@ -199,6 +212,19 @@ export async function PUT(
           city,
           state,
           zip_code
+        ),
+        service_address:service_addresses!left(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type,
+          property_notes,
+          home_size_range,
+          yard_size_range
         )
       `)
       .single();

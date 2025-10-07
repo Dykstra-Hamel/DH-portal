@@ -1,0 +1,1351 @@
+.contentLeft,
+.contentRight {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+// Assign Ticket Card Styles
+.customerSection {
+  div {
+    margin-bottom: 4px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.section {
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.sectionLabel {
+  margin-bottom: 12px !important;
+}
+
+// Radio Button Group
+.radioGroup {
+  display: flex;
+  gap: 24px;
+  padding: 12px;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  background: white;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+
+  input[type='radio'] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    width: 0;
+    height: 0;
+
+    &:checked + .radioCustom {
+      background: var(--action-600);
+      border-color: var(--action-600);
+
+      &::after {
+        display: block;
+      }
+    }
+  }
+}
+
+.radioCustom {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-300);
+  border-radius: 50%;
+  background: white;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: white;
+  }
+}
+
+// Dropdown Styles
+.dropdown {
+  position: relative;
+  width: 100%;
+
+  svg {
+    position: absolute;
+    right: 12px;
+    pointer-events: none;
+    transition: transform 0.2s ease;
+  }
+
+  select:focus + svg {
+    transform: translateY(-50%) rotate(0deg);
+  }
+}
+
+.dropdownButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: 4px 12px;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: none;
+  }
+}
+
+.dropdownContent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatarContainer {
+  flex-shrink: 0;
+  display: flex;
+}
+
+.defaultAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.userInfo {
+  flex: 1;
+  text-align: left;
+}
+
+.chevronIcon {
+  color: #6b7280;
+  transition: transform 0.2s ease;
+
+  &.rotated {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdownMenu {
+  position: relative;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  margin-top: 4px;
+}
+
+.dropdownOption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+
+  &:first-child {
+    border-radius: 8px 8px 0 0;
+  }
+
+  &:last-child {
+    border-radius: 0 0 8px 8px;
+  }
+
+  &:first-child:last-child {
+    border-radius: 8px;
+  }
+}
+
+// Team Avatar
+.teamAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--action-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// User Avatar
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+// Selected State
+.selected {
+  background-color: var(--gray-50);
+}
+
+// Action Button
+.actionSection {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.assignButton {
+  background: var(--action-500);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover {
+    background: var(--action-600);
+  }
+
+  &:active {
+    background: var(--action-600);
+  }
+}
+
+.primaryButton {
+  background: var(--action-500);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover:not(:disabled) {
+    background: var(--action-600);
+  }
+
+  &:active:not(:disabled) {
+    background: var(--action-600);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// Call Information Card Styles
+.callInsightsSection {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-300);
+  margin-bottom: 16px;
+}
+
+.callInsightsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+
+.callDetailsHeader {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-300);
+  margin-bottom: 16px;
+}
+
+.callDetailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.transcriptHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.toggleContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggleLabel {
+  color: var(--gray-500);
+  font-size: 12px;
+  font-weight: 550;
+  user-select: none;
+  transition: color 0.2s ease;
+
+  .toggleContainer.active & {
+    color: var(--action-500);
+  }
+}
+
+.transcriptContent {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.transcriptToggle {
+  display: flex;
+  width: 44px;
+  height: 24px;
+  padding: 2px;
+  align-items: flex-start;
+  border-radius: 12px;
+  background: var(--gray-300);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border: none;
+  outline: none;
+
+  &:focus {
+    outline: 2px solid var(--action-200);
+    outline-offset: 2px;
+  }
+}
+
+.toggleCircle {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--White, #fff);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.1),
+    0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+  transform: translateX(0px);
+
+  .transcriptToggle.active & {
+    transform: translateX(20px);
+  }
+}
+
+.noCallData {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+// Service Location Form Styles
+.serviceLocationGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.gridRow {
+  display: grid;
+  gap: 8px;
+
+  &.threeColumns {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  &.twoColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &.oneColumn {
+    grid-template-columns: 1fr;
+  }
+
+  @media (max-width: 768px) {
+    &.threeColumns,
+    &.twoColumns {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.textInput {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.selectWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.selectInput {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+}
+
+.selectChevron {
+  position: absolute;
+  right: 12px;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.fieldWithSuffix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fieldSuffix {
+  position: absolute;
+  right: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-500);
+  pointer-events: none;
+}
+
+.selectInput.withSuffix {
+  padding-right: 60px;
+}
+
+.streetViewContainer {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    height: 200px;
+  }
+}
+
+// Address Actions (Save/Cancel buttons)
+.addressActions {
+  background: var(--amber-50);
+  border: 1px solid var(--amber-200);
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.addressActionsContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+}
+
+.changesMessage {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--amber-700);
+}
+
+.actionButtons {
+  display: flex;
+  justify-content: space-between;
+
+  @media (max-width: 640px) {
+    justify-content: flex-end;
+  }
+}
+
+.button {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 90px;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.saveButton {
+  background: var(--action-500);
+  color: white;
+  border: 1px solid var(--action-500);
+
+  &:hover:not(:disabled) {
+    background: var(--action-600);
+    border-color: var(--action-600);
+  }
+}
+
+.cancelButton {
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+}
+
+// Contact Log Action Buttons
+.actionButton {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-700);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+}
+
+.actionButtonActive {
+  background: var(--slate-100);
+  border-color: var(--slate-300);
+  color: var(--slate-700);
+
+  &:hover {
+    background: var(--slate-200);
+    border-color: var(--slate-400);
+  }
+}
+
+// Plan Information Tabs
+.planInfoContainer {
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--slate-300);
+  background: var(--slate-100);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+  .tabContainer {
+    background-color: none;
+    border: none;
+    padding: 0;
+  }
+}
+
+.tabContainer {
+  display: flex;
+  gap: 0px;
+  background-color: var(--gray-100);
+  border: 1px solid var(--gray-300);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.tabButton {
+  display: flex;
+  padding: 8px 12px;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid var(--gray-300);
+  border-right: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 24px;
+  transition: all 0.2s ease;
+  flex: 1;
+
+  &.active {
+    background: var(--slate-500);
+    color: white;
+  }
+
+  &.inactive {
+    background: white;
+    color: var(--gray-900);
+  }
+
+  &.firstTab {
+    border-radius: 6px 0 0 6px;
+  }
+
+  &.lastTab {
+    border-radius: 0 6px 6px 0;
+    border-right: 1px solid var(--gray-300);
+  }
+}
+
+.tabContent {
+  min-height: 200px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-300);
+  overflow: hidden;
+}
+
+.tabContentInner {
+  background: white;
+  padding: 12px;
+  min-height: 200px;
+}
+
+// Pest Badges
+.pestBadge {
+  border-radius: 6px;
+  border: 1px solid var(--UI-Green-500, #00c951);
+  background: var(--UI-Green-100, #dcfce7);
+  display: flex;
+  padding: 4px 8px;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--green-600, #00a63e);
+}
+
+.pestContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pestCoverageRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  margin: 16px 0;
+}
+
+.pestCoverageSection {
+  flex: 1;
+  max-width: 66.666%;
+}
+
+.addServiceButtonContainer {
+  display: flex;
+  align-items: flex-end;
+}
+
+.addServiceButton {
+  width: 131px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  padding: 9px 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+}
+
+.serviceHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.removeServiceButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: none;
+  border: none;
+  color: var(--gray-500);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: #fee2e2;
+    color: #dc2626;
+  }
+}
+
+// Form Field Headers
+.fieldHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.fieldUnit {
+  font-size: 12px;
+  color: var(--gray-500);
+  font-weight: 500;
+  padding-right: 8px;
+}
+
+// Dropdown with SVG
+.dropdownWithArrow {
+  position: relative;
+}
+
+.dropdownArrow {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%) rotate(180deg);
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+// Plan sections
+.planSection {
+  margin-bottom: 24px;
+}
+
+.planTitle {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.planDescription {
+  margin: 0;
+  color: var(--gray-700);
+  line-height: 1.6;
+}
+
+.planGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.planItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--gray-50);
+  border-radius: 8px;
+}
+
+.planItemLabel {
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.planItemValue {
+  font-weight: 600;
+  color: var(--gray-900);
+  text-align: right;
+}
+
+// Loading states
+.loadingState {
+  padding: 20px;
+  text-align: center;
+  color: var(--gray-500);
+}
+
+.noDataState {
+  padding: 20px;
+  text-align: center;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+// Service selection
+.serviceSection {
+  margin-bottom: 16px;
+}
+
+.pestCoverageList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pestCoverageItem {
+  padding: 8px 12px;
+  background: var(--gray-50);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+}
+
+.pestCoveragePartial {
+  border: 1px dashed var(--gray-300);
+}
+
+.pestCoverageNote {
+  display: block;
+  font-size: 12px;
+  color: var(--gray-500);
+  text-transform: capitalize;
+}
+
+// Multi-Pest Selection Styles
+.pestSection {
+  margin-bottom: 20px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.pestPillsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pestPill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-400);
+  }
+
+  &.primary {
+    cursor: default;
+    background: var(--gray-50);
+
+    &:hover {
+      background: var(--gray-50);
+      border-color: var(--gray-300);
+    }
+  }
+}
+
+.pestPillRemoveIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  height: 9px;
+  cursor: pointer;
+
+  svg {
+    width: 8px;
+    height: 9px;
+  }
+}
+
+.addPestButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+
+  &:active {
+    background: var(--gray-100);
+  }
+
+  svg {
+    transform: rotate(180deg);
+    transition: transform 0.2s ease;
+  }
+
+  &.open svg {
+    transform: rotate(0deg);
+  }
+}
+
+.pestDropdownContainer {
+  position: relative;
+}
+
+.pestDropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 10;
+  margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.pestDropdownOption {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  transition: background-color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--gray-50);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:first-child {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+  }
+
+  &:last-child {
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+  }
+}
+
+// Plan Pricing Styles
+.planPricingContainer {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: white;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+// Single Plan Pricing
+.singlePlanPricing {
+  .pricingGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  .pricingColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pricingLabel {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--gray-600);
+  }
+
+  .recurringPrice {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1;
+  }
+
+  .perMonth {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--gray-900);
+  }
+
+  .initialPrice {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .originalPrice {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--gray-500);
+  }
+
+  .frequency {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-900);
+  }
+
+  .inspection {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--gray-500);
+  }
+}
+
+// Multiple Plans Pricing
+.multiplePlansPricing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.planLineItem {
+  padding-bottom: 16px;
+
+  &:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}
+
+.lineItemHeader {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gray-300);
+}
+
+.lineItemPricing {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.lineItemColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lineItemLabel {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--gray-500);
+}
+
+.lineItemRecurringPrice {
+  font-size: 32px;
+  font-weight: 750;
+  color: var(--gray-900);
+  line-height: 1;
+}
+
+.lineItemPerMonth {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--gray-900);
+}
+
+.lineItemInitialPrice {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--gray-900);
+}
+
+.lineItemOriginalPrice {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gray-500);
+}
+
+.lineItemFrequency {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.lineItemInspection {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gray-500);
+}
+
+// Total Cost Section
+.totalCostSection {
+  margin-top: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-300);
+  overflow: hidden;
+}
+
+.totalCostHeader {
+  font-size: 12px;
+  line-height: 100%;
+  font-weight: 550;
+  padding: 8px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-300);
+  color: var(--gray-900);
+  margin-bottom: 12px;
+}
+
+.totalCostGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  padding: 8px;
+}
+
+.totalColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.totalLabel {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--gray-500);
+}
+
+.totalRecurringPrice {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  line-height: 1;
+}
+
+.totalPerMonth {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--gray-900);
+}
+
+.totalInitialPrice {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--gray-900);
+}
+
+.totalSavings {
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--gray-500);
+}
+
+// Plan Information - Multiple Plans Support
+.multiplePlansIndicator {
+  background-color: var(--blue-50);
+  border: 1px solid var(--blue-200);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--blue-700);
+  text-align: center;
+}
+
+.planOverviewScroll {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 8px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: 3px;
+
+    &:hover {
+      background: var(--gray-500);
+    }
+  }
+}
+
+.planNumber {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--gray-500);
+  margin-left: 8px;
+}
+
+// Schedule Stage Styles
+.scheduleTabHeading {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--gray-900);
+}
+
+.scheduleTabText {
+  color: var(--gray-600);
+  line-height: 1.6;
+}

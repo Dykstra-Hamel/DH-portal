@@ -6,6 +6,7 @@ import { Ticket } from '@/types/ticket';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import LoadingSpinner from '@/components/Common/LoadingSpinner/LoadingSpinner';
+import { getCustomerDisplayName } from '@/lib/display-utils';
 import styles from './LiveCallBar.module.scss';
 
 interface LiveCallBarProps {
@@ -14,19 +15,19 @@ interface LiveCallBarProps {
 }
 
 const NoCallsIcon = () => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="24" 
-    height="25" 
-    viewBox="0 0 24 25" 
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="25"
+    viewBox="0 0 24 25"
     fill="none"
     className={styles.noCallsIcon}
   >
-    <path 
-      d="M20.985 13.1872C20.8912 14.9234 20.2966 16.5952 19.273 18.0006C18.2494 19.406 16.8406 20.4849 15.217 21.1067C13.5933 21.7286 11.8243 21.8668 10.1237 21.5047C8.42318 21.1426 6.86392 20.2957 5.63442 19.0664C4.40493 17.837 3.55785 16.2778 3.19558 14.5773C2.83331 12.8768 2.97136 11.1078 3.59304 9.48402C4.21472 7.86029 5.29342 6.45139 6.69874 5.42764C8.10406 4.40389 9.77583 3.80911 11.512 3.7152C11.917 3.6932 12.129 4.1752 11.914 4.5182C11.1949 5.66876 10.8869 7.02907 11.0405 8.37716C11.194 9.72524 11.7999 10.9815 12.7593 11.9409C13.7187 12.9003 14.9749 13.5062 16.323 13.6597C17.6711 13.8132 19.0314 13.5053 20.182 12.7862C20.526 12.5712 21.007 12.7822 20.985 13.1872Z" 
-      stroke="white" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
+    <path
+      d="M20.985 13.1872C20.8912 14.9234 20.2966 16.5952 19.273 18.0006C18.2494 19.406 16.8406 20.4849 15.217 21.1067C13.5933 21.7286 11.8243 21.8668 10.1237 21.5047C8.42318 21.1426 6.86392 20.2957 5.63442 19.0664C4.40493 17.837 3.55785 16.2778 3.19558 14.5773C2.83331 12.8768 2.97136 11.1078 3.59304 9.48402C4.21472 7.86029 5.29342 6.45139 6.69874 5.42764C8.10406 4.40389 9.77583 3.80911 11.512 3.7152C11.917 3.6932 12.129 4.1752 11.914 4.5182C11.1949 5.66876 10.8869 7.02907 11.0405 8.37716C11.194 9.72524 11.7999 10.9815 12.7593 11.9409C13.7187 12.9003 14.9749 13.5062 16.323 13.6597C17.6711 13.8132 19.0314 13.5053 20.182 12.7862C20.526 12.5712 21.007 12.7822 20.985 13.1872Z"
+      stroke="white"
+      strokeWidth="2"
+      strokeLinecap="round"
       strokeLinejoin="round"
     />
   </svg>
@@ -130,7 +131,10 @@ const ExpandCollapseIcon = ({ isExpanded }: { isExpanded: boolean }) => (
 );
 
 // Helper functions
-const formatDuration = (startTime: string, currentTime: Date = new Date()): string => {
+const formatDuration = (
+  startTime: string,
+  currentTime: Date = new Date()
+): string => {
   const start = new Date(startTime).getTime();
   const now = currentTime.getTime();
   const diffSeconds = Math.floor((now - start) / 1000);
@@ -153,15 +157,20 @@ const formatPhoneNumber = (phone: string): string => {
 };
 
 const formatCallStarted = (startTime: string): string => {
-  return new Date(startTime).toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
-    minute: '2-digit', 
-    hour12: true 
+  return new Date(startTime).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
   });
 };
 
-export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCallBarProps) {
-  const [sortConfig, setSortConfig] = useState<{ direction: 'asc' | 'desc' } | null>(null);
+export default function LiveCallBar({
+  tickets = [],
+  liveCallsData = [],
+}: LiveCallBarProps) {
+  const [sortConfig, setSortConfig] = useState<{
+    direction: 'asc' | 'desc';
+  } | null>(null);
   const [realTimeTickets, setRealTimeTickets] = useState<Ticket[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
   const [useMock, setUseMock] = useState<boolean>(false);
@@ -170,11 +179,13 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
   // Use global company context for real-time filtering
   const { selectedCompany } = useCompany();
 
-
   // Initialize mock mode from localStorage or env (client-side only)
   useEffect(() => {
     try {
-      const ls = typeof window !== 'undefined' ? window.localStorage.getItem('USE_MOCK_LIVE_CALLS') : null;
+      const ls =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem('USE_MOCK_LIVE_CALLS')
+          : null;
       if (ls !== null) {
         setUseMock(ls === 'true');
         return;
@@ -187,7 +198,6 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
     }
   }, []);
 
-
   // Handle real-time ticket changes with customer data enrichment
   const handleTicketChange = useCallback(async (payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
@@ -197,19 +207,32 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
         // Add new ticket to the list with enriched customer data
         if (newRecord && newRecord.status === 'live') {
           try {
-            // Enrich the ticket with customer data since real-time doesn't include joins
+            // Enrich the ticket with customer data and call_records since real-time doesn't include joins
             const supabase = createClient();
             const { data: enrichedTicket } = await supabase
               .from('tickets')
-              .select(`
+              .select(
+                `
                 *,
                 customer:customers!tickets_customer_id_fkey(
                   id,
                   first_name,
                   last_name,
                   phone
+                ),
+                call_records!tickets_call_record_id_fkey(
+                  id,
+                  call_id,
+                  call_status,
+                  phone_number,
+                  from_number,
+                  start_timestamp,
+                  end_timestamp,
+                  duration_seconds,
+                  disconnect_reason
                 )
-              `)
+              `
+              )
               .eq('id', newRecord.id)
               .single();
 
@@ -241,32 +264,49 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
         // Update existing ticket with enriched data
         if (newRecord) {
           try {
-            // Enrich the updated ticket with customer data
+            // Enrich the updated ticket with customer data and call_records
             const supabase = createClient();
             const { data: enrichedTicket } = await supabase
               .from('tickets')
-              .select(`
+              .select(
+                `
                 *,
                 customer:customers!tickets_customer_id_fkey(
                   id,
                   first_name,
                   last_name,
                   phone
+                ),
+                call_records!tickets_call_record_id_fkey(
+                  id,
+                  call_id,
+                  call_status,
+                  phone_number,
+                  from_number,
+                  start_timestamp,
+                  end_timestamp,
+                  duration_seconds,
+                  disconnect_reason
                 )
-              `)
+              `
+              )
               .eq('id', newRecord.id)
               .single();
 
             const ticketToUpdate = enrichedTicket || newRecord;
 
             setRealTimeTickets(prev =>
-              prev.map(ticket => ticket.id === ticketToUpdate.id ? ticketToUpdate : ticket)
+              prev.map(ticket =>
+                ticket.id === ticketToUpdate.id ? ticketToUpdate : ticket
+              )
             );
           } catch (error) {
             console.error('Error enriching updated ticket data:', error);
             // Fallback to raw ticket data
             setRealTimeTickets(prev =>
-              prev.map(ticket => ticket.id === newRecord.id ? newRecord : ticket)
+              prev.map(ticket =>
+                ticket.id === newRecord.id ? newRecord : ticket
+              )
             );
           }
         }
@@ -275,12 +315,13 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
       case 'DELETE':
         // Remove ticket from list
         if (oldRecord) {
-          setRealTimeTickets(prev => prev.filter(ticket => ticket.id !== oldRecord.id));
+          setRealTimeTickets(prev =>
+            prev.filter(ticket => ticket.id !== oldRecord.id)
+          );
         }
         break;
     }
   }, []);
-
 
   // Supabase Realtime subscription for ticket and call_records updates (disabled in mock mode)
   useEffect(() => {
@@ -297,10 +338,9 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
           event: '*',
           schema: 'public',
           table: 'tickets',
-          filter: `company_id=eq.${selectedCompany.id}`
+          filter: `company_id=eq.${selectedCompany.id}`,
         },
-        (payload) => {
-          console.log('LiveCallBar: Ticket update:', payload);
+        payload => {
           handleTicketChange(payload);
         }
       )
@@ -309,21 +349,24 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
         {
           event: '*',
           schema: 'public',
-          table: 'call_records'
+          table: 'call_records',
         },
-        async (payload) => {
-          console.log('LiveCallBar: Call record update:', payload);
+        async payload => {
           const { eventType, new: newRecord } = payload;
 
           // When call_records are created/updated, refresh the ticket data to get the relationship
-          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRecord?.ticket_id) {
+          if (
+            (eventType === 'INSERT' || eventType === 'UPDATE') &&
+            newRecord?.ticket_id
+          ) {
             try {
               const supabase = createClient();
 
               // Fetch the updated ticket with its call_records and customer data
               const { data: updatedTicket } = await supabase
                 .from('tickets')
-                .select(`
+                .select(
+                  `
                   *,
                   customer:customers!tickets_customer_id_fkey(
                     id,
@@ -342,7 +385,8 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                     duration_seconds,
                     disconnect_reason
                   )
-                `)
+                `
+                )
                 .eq('id', newRecord.ticket_id)
                 .single();
 
@@ -355,7 +399,10 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                 );
               }
             } catch (error) {
-              console.error('Error updating ticket with call record data:', error);
+              console.error(
+                'Error updating ticket with call record data:',
+                error
+              );
             }
           }
         }
@@ -376,7 +423,9 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
 
     // Add prop tickets that aren't already in real-time tickets
     tickets.forEach(ticket => {
-      const existsInRealTime = realTimeTickets.some(rtTicket => rtTicket.id === ticket.id);
+      const existsInRealTime = realTimeTickets.some(
+        rtTicket => rtTicket.id === ticket.id
+      );
       if (!existsInRealTime) {
         allTickets.push(ticket);
       }
@@ -384,37 +433,47 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
 
     // Show tickets with 'live' status only - webhook will update status to 'new' when analysis arrives
     allTickets.forEach(ticket => {
-      console.log('LiveCallBar: Processing ticket', ticket.id, 'status:', ticket.status, 'type:', ticket.type);
-
       if (ticket.status === 'live') {
         // Active calls with 'live' status - show immediately, fill in data as it arrives
-        if (ticket.call_records && ticket.call_records.length > 0) {
+        // Handle call_records being either a single object (one-to-one) or array (one-to-many)
+        const hasCallRecords =
+          ticket.call_records &&
+          (Array.isArray(ticket.call_records)
+            ? ticket.call_records.length > 0
+            : (ticket.call_records as any).id);
+
+        if (hasCallRecords) {
           // Use the actual call records from the joined data, attach ticket info for customer name
-          console.log('LiveCallBar: Adding call records:', ticket.call_records.length, 'for ticket:', ticket.id);
-          const enhancedCallRecords = (ticket.call_records as CallRecord[]).map(callRecord => ({
-            ...callRecord,
-            ticketInfo: {
-              customer: ticket.customer
-            }
-          }));
+          // Normalize to array format
+          const callRecordsArray = Array.isArray(ticket.call_records)
+            ? ticket.call_records
+            : [ticket.call_records];
+
+          const enhancedCallRecords = (callRecordsArray as CallRecord[]).map(
+            callRecord => ({
+              ...callRecord,
+              ticketInfo: {
+                customer: ticket.customer,
+              },
+            })
+          );
           liveCalls.push(...enhancedCallRecords);
         } else {
           // Show immediately with fallback data, will update when call_records arrive
-          console.log('LiveCallBar: Adding fallback call record for ticket:', ticket.id);
 
           const fallbackCallRecord: CallRecord & { ticketInfo?: any } = {
             id: `ticket-${ticket.id}`,
             call_id: `ticket-call-${ticket.id}`,
             customer_id: ticket.customer_id,
-            phone_number: ticket.customer?.phone || 'Incoming Call',
-            from_number: ticket.customer?.phone || undefined,
+            phone_number: ticket.customer?.phone || 'Loading...',
+            from_number: ticket.customer?.phone || 'Loading...',
             call_status: 'ongoing',
             start_timestamp: ticket.created_at,
             created_at: ticket.created_at,
             updated_at: ticket.updated_at || ticket.created_at,
             ticketInfo: {
-              customer: ticket.customer
-            }
+              customer: ticket.customer,
+            },
           };
 
           liveCalls.push(fallbackCallRecord);
@@ -426,48 +485,51 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
   }, [tickets, realTimeTickets]);
 
   // Mock data for development styling/testing
-  const mockCalls: CallRecord[] = useMemo(() => [
-    {
-      id: 'mock-1',
-      call_id: 'mock-call-1',
-      customer_id: 'mock-customer-1',
-      phone_number: '(555) 123-4567',
-      from_number: '+15551234567',
-      call_status: 'ongoing',
-      start_timestamp: new Date(Date.now() - 125000).toISOString(), // ~2 minutes ago
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: 'mock-2',
-      call_id: 'mock-call-2',
-      customer_id: 'mock-customer-2',
-      phone_number: '(555) 987-6543',
-      from_number: '+15559876543',
-      call_status: 'processing',
-      start_timestamp: new Date(Date.now() - 45000).toISOString(), // ~45 seconds ago
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: 'mock-3',
-      call_id: 'mock-call-3',
-      customer_id: 'mock-customer-3',
-      phone_number: '(555) 456-7890',
-      from_number: '+15554567890',
-      call_status: 'transferring',
-      start_timestamp: new Date(Date.now() - 15000).toISOString(), // ~15 seconds ago
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  ], []);
+  const mockCalls: CallRecord[] = useMemo(
+    () => [
+      {
+        id: 'mock-1',
+        call_id: 'mock-call-1',
+        customer_id: 'mock-customer-1',
+        phone_number: '(555) 123-4567',
+        from_number: '+15551234567',
+        call_status: 'ongoing',
+        start_timestamp: new Date(Date.now() - 125000).toISOString(), // ~2 minutes ago
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'mock-2',
+        call_id: 'mock-call-2',
+        customer_id: 'mock-customer-2',
+        phone_number: '(555) 987-6543',
+        from_number: '+15559876543',
+        call_status: 'processing',
+        start_timestamp: new Date(Date.now() - 45000).toISOString(), // ~45 seconds ago
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'mock-3',
+        call_id: 'mock-call-3',
+        customer_id: 'mock-customer-3',
+        phone_number: '(555) 456-7890',
+        from_number: '+15554567890',
+        call_status: 'transferring',
+        start_timestamp: new Date(Date.now() - 15000).toISOString(), // ~15 seconds ago
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ],
+    []
+  );
 
   // Priority order: live calls from tickets (includes real-time) > fallback prop data
   const validLiveCalls = useMock
     ? mockCalls
-    : (liveCallsFromTickets.length > 0
+    : liveCallsFromTickets.length > 0
       ? liveCallsFromTickets
-      : liveCallsData);
+      : liveCallsData;
 
   const hasLiveCalls = validLiveCalls.length > 0;
   const liveCallCount = validLiveCalls.length;
@@ -483,10 +545,9 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
     return () => clearInterval(interval);
   }, [hasLiveCalls]);
 
-
   const handleSort = () => {
     setSortConfig(prev => ({
-      direction: prev?.direction === 'asc' ? 'desc' : 'asc'
+      direction: prev?.direction === 'asc' ? 'desc' : 'asc',
     }));
   };
 
@@ -521,7 +582,8 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
           <div className={styles.headerLeft}>
             <RadioIcon />
             <span className={styles.liveCallText}>
-              {liveCallCount} Live Call{liveCallCount > 1 ? 's' : ''} In Progress
+              {liveCallCount} Live Call{liveCallCount > 1 ? 's' : ''} In
+              Progress
             </span>
           </div>
           <div>
@@ -542,7 +604,10 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
                   setUseMock(next);
                   try {
                     if (typeof window !== 'undefined') {
-                      window.localStorage.setItem('USE_MOCK_LIVE_CALLS', String(next));
+                      window.localStorage.setItem(
+                        'USE_MOCK_LIVE_CALLS',
+                        String(next)
+                      );
                     }
                   } catch {}
                 }}
@@ -555,10 +620,12 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
         </div>
 
         {/* Call Details Grid */}
-        <div className={`${styles.callDetailsGrid} ${isExpanded ? styles.expanded : styles.collapsed}`}>
+        <div
+          className={`${styles.callDetailsGrid} ${isExpanded ? styles.expanded : styles.collapsed}`}
+        >
           {/* Grid Header */}
           <div className={styles.gridHeader}>
-            <div 
+            <div
               className={`${styles.gridCell} ${styles.sortableHeader}`}
               onClick={handleSort}
             >
@@ -573,15 +640,19 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
           </div>
 
           {/* Call Data Rows */}
-          {sortedCalls.map((call) => (
+          {sortedCalls.map(call => (
             <div key={call.id} className={styles.gridRow}>
               <div className={styles.gridCell}>
-                {call.start_timestamp ? formatCallStarted(call.start_timestamp) : 'N/A'}
+                {call.start_timestamp
+                  ? formatCallStarted(call.start_timestamp)
+                  : 'N/A'}
               </div>
               <div className={styles.gridCell}>
                 {(() => {
                   // Simple status logic based on webhook events
-                  const enhancedCall = call as CallRecord & { disconnect_reason?: string };
+                  const enhancedCall = call as CallRecord & {
+                    disconnect_reason?: string;
+                  };
 
                   // Processing call (after call_ended webhook)
                   if (call.call_status === 'processing') {
@@ -614,24 +685,21 @@ export default function LiveCallBar({ tickets = [], liveCallsData = [] }: LiveCa
               </div>
               <div className={styles.gridCell}>
                 {(() => {
-                  // Try to get customer name from ticket info, fallback to phone number
-                  const enhancedCall = call as CallRecord & { ticketInfo?: any };
-                  if (enhancedCall.ticketInfo?.customer) {
-                    const { first_name, last_name } = enhancedCall.ticketInfo.customer;
-                    const customerName = `${first_name || ''} ${last_name || ''}`.trim();
-                    if (customerName) {
-                      return customerName;
-                    }
-                  }
-                  // Fallback to formatted phone number
-                  return call.from_number ? formatPhoneNumber(call.from_number) : 'Unknown Caller';
+                  const enhancedCall = call as CallRecord & {
+                    ticketInfo?: any;
+                  };
+                  return getCustomerDisplayName(
+                    enhancedCall.ticketInfo?.customer
+                  );
                 })()}
               </div>
               <div className={styles.gridCell}>
-                {call.from_number ? formatPhoneNumber(call.from_number) : 'N/A'}
+                {formatPhoneNumber(call.from_number || call.phone_number || '')}
               </div>
               <div className={styles.gridCell}>
-                {call.start_timestamp ? formatDuration(call.start_timestamp, currentTime) : '00:00:00'}
+                {call.start_timestamp
+                  ? formatDuration(call.start_timestamp, currentTime)
+                  : '00:00:00'}
               </div>
               <div className={styles.gridCell}>
                 {/* Empty for active calls */}

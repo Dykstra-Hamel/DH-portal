@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
       .from('support_cases')
       .insert([{
         ...supportCaseData,
-        status: supportCaseData.status || 'new',
+        status: supportCaseData.status || 'unassigned',
         priority: supportCaseData.priority || 'medium',
         archived: false,
       }])

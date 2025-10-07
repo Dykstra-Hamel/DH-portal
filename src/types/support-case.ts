@@ -12,7 +12,8 @@ export type SupportCaseStatus =
   | 'unassigned'
   | 'in_progress'
   | 'awaiting_response'
-  | 'resolved';
+  | 'resolved'
+  | 'closed';
 
 export type SupportCasePriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -60,6 +61,22 @@ export interface SupportCase {
     city?: string;
     state?: string;
     zip_code?: string;
+  };
+  primary_service_address?: {
+    id: string;
+    street_address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    latitude?: number;
+    longitude?: number;
+    address_type?: string;
+    home_size?: number;
+    yard_size?: number;
+    apartment_unit?: string;
+    address_line_2?: string;
+    property_notes?: string;
+    hasStreetView?: boolean;
   };
   assigned_user?: {
     id: string;
@@ -112,6 +129,7 @@ export const supportCaseStatusOptions = [
   { value: 'in_progress', label: 'In Progress' },
   { value: 'awaiting_response', label: 'Awaiting Response' },
   { value: 'resolved', label: 'Resolved' },
+  { value: 'closed', label: 'Closed' },
 ] as const;
 
 export const supportCasePriorityOptions = [

@@ -237,3 +237,37 @@ export const getSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
       supportCases.filter(sc => !sc.archived && sc.status === 'resolved').length,
   },
 ];
+
+// User-specific tabs - excludes "unassigned" tab for "My Support Cases" view
+export const getUserSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
+  {
+    key: 'in_progress',
+    label: 'In Progress',
+    filter: (supportCases: SupportCase[]) =>
+      supportCases.filter(sc => !sc.archived && sc.status === 'in_progress'),
+    getCount: (supportCases: SupportCase[]) =>
+      supportCases.filter(sc => !sc.archived && sc.status === 'in_progress').length,
+  },
+  {
+    key: 'awaiting_response',
+    label: 'Awaiting Response',
+    filter: (supportCases: SupportCase[]) =>
+      supportCases.filter(sc => !sc.archived && sc.status === 'awaiting_response'),
+    getCount: (supportCases: SupportCase[]) =>
+      supportCases.filter(sc => !sc.archived && sc.status === 'awaiting_response').length,
+  },
+  {
+    key: 'resolved',
+    label: 'Resolved',
+    filter: (supportCases: SupportCase[]) =>
+      supportCases.filter(sc => !sc.archived && sc.status === 'resolved'),
+    getCount: (supportCases: SupportCase[]) =>
+      supportCases.filter(sc => !sc.archived && sc.status === 'resolved').length,
+  },
+  {
+    key: 'all',
+    label: 'All My Cases',
+    filter: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived),
+    getCount: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived).length,
+  },
+];

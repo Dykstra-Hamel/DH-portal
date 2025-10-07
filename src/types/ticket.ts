@@ -43,6 +43,7 @@ export interface Ticket {
   id: string;
   company_id: string;
   customer_id?: string;
+  service_address_id?: string; // Reference to service address for location-based tickets
   call_record_id?: string; // Direct reference to call record for phone_call tickets
   source: TicketSource;
   type: TicketType;
@@ -79,18 +80,30 @@ export interface Ticket {
   ip_address?: string;
   user_agent?: string;
   
+  // Review tracking - for preventing simultaneous editing conflicts
+  reviewed_by?: string; // User ID currently reviewing this ticket
+  reviewed_at?: string;
+  review_expires_at?: string;
+
   // Metadata
   archived?: boolean;
   created_at: string;
   updated_at: string;
 
   // Joined data from related tables
+  reviewed_by_profile?: {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    email: string;
+  };
   customer?: {
     id: string;
     first_name: string;
     last_name: string;
     email?: string;
     phone?: string;
+    alternate_phone?: string;
     address?: string;
     city?: string;
     state?: string;
@@ -107,6 +120,19 @@ export interface Ticket {
     name: string;
     website?: string;
   };
+  service_address?: {
+    id: string;
+    street_address: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    apartment_unit?: string;
+    address_line_2?: string;
+    address_type: 'residential' | 'commercial' | 'industrial' | 'mixed_use';
+    property_notes?: string;
+    home_size_range?: string;
+    yard_size_range?: string;
+  };
   call_records?: Array<{
     id: string;
     call_id: string;
@@ -119,6 +145,7 @@ export interface Ticket {
 
 export interface TicketFormData {
   customer_id?: string;
+  service_address_id?: string;
   source: TicketSource;
   type: TicketType;
   service_type?: string;
@@ -127,17 +154,8 @@ export interface TicketFormData {
   assigned_to?: string;
   last_contacted_at?: string;
   next_follow_up_at?: string;
-  estimated_value?: number;
   priority: TicketPriority;
   pest_type?: string;
-  
-  // Attribution fields
-  utm_source?: string;
-  utm_medium?: string;
-  utm_campaign?: string;
-  utm_term?: string;
-  utm_content?: string;
-  attribution_data?: Record<string, any>;
 }
 
 // Interface for ticket-to-lead conversion
@@ -166,7 +184,6 @@ export const ticketSourceOptions = [
   { value: 'trade_show', label: 'Trade Show' },
   { value: 'webinar', label: 'Webinar' },
   { value: 'content_marketing', label: 'Content Marketing' },
-  { value: 'widget_submission', label: 'Website' },
   { value: 'internal', label: 'Internal' },
   { value: 'other', label: 'Other' },
 ] as const;

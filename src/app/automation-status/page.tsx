@@ -23,17 +23,17 @@ export default function AutomationStatus() {
   const fetchStats = async () => {
     try {
       const supabase = createClient();
-      
+
       // Get workflows count
       const { data: workflows } = await supabase
         .from('automation_workflows')
         .select('id, is_active');
-      
+
       // Get templates count
       const { data: templates } = await supabase
         .from('email_templates')
         .select('id');
-      
+
       // Get recent executions
       const { data: executions } = await supabase
         .from('automation_executions')

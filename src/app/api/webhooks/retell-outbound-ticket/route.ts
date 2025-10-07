@@ -655,6 +655,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
       .update({
         description: `${callRecord.tickets.description || ''}\n\n${callSummary}`.trim(),
         service_type: extractedData.pest_issue,
+        pest_type: extractedData.pest_issue,
         updated_at: new Date().toISOString(),
       })
       .eq('id', callRecord.tickets.id);
@@ -788,6 +789,9 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
         `${updateData.description}\n\n📞 Outbound Call: No action required - Ticket closed and archived`.trim();
     }
 
+    // Add pest_type from extracted data
+    updateData.pest_type = extractedData.pest_issue;
+
     await supabase
       .from('tickets')
       .update(updateData)
@@ -820,50 +824,64 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
       const customerState = call_analysis.custom_analysis_data.customer_state;
       const customerZip = call_analysis.custom_analysis_data.customer_zip;
 
+      // Helper: Check if a value needs updating (is null, empty, or "none")
+      const needsUpdate = (value: string | null | undefined): boolean => {
+        return !value || value.trim() === '' || value.toLowerCase() === 'none';
+      };
+
+      // Helper: Check if incoming value is valid (not null, empty, or "none")
+      const isValidValue = (value: string | null | undefined): boolean => {
+        return !!(value && value.trim() !== '' && value.toLowerCase() !== 'none');
+      };
+
       // Build update object conditionally
       const customerUpdateData: any = {};
 
       // Name updates: ONLY update if customer still has default placeholder names
       const hasInboundPlaceholder = existingCustomer.first_name === 'Inbound' && existingCustomer.last_name === 'Caller';
       const hasOutboundPlaceholder = existingCustomer.first_name === 'Outbound' && existingCustomer.last_name === 'Call';
+      const shouldUpdateFirstName =
+        hasInboundPlaceholder ||
+        hasOutboundPlaceholder ||
+        needsUpdate(existingCustomer.first_name);
+      const shouldUpdateLastName =
+        hasInboundPlaceholder ||
+        hasOutboundPlaceholder ||
+        needsUpdate(existingCustomer.last_name);
 
-      if (hasInboundPlaceholder || hasOutboundPlaceholder) {
-        if (customerFirstName && customerFirstName.trim() !== '') {
-          customerUpdateData.first_name = customerFirstName.trim();
-        }
-        if (customerLastName && customerLastName.trim() !== '') {
-          customerUpdateData.last_name = customerLastName.trim();
-        }
+      if (shouldUpdateFirstName && isValidValue(customerFirstName)) {
+        customerUpdateData.first_name = customerFirstName.trim();
+      }
+      if (shouldUpdateLastName && isValidValue(customerLastName)) {
+        customerUpdateData.last_name = customerLastName.trim();
       }
 
-      // Address updates: ONLY if customer has NO existing address data
-      if (!hasExistingAddress(existingCustomer)) {
-        if (customerCity && customerCity.trim() !== '') {
-          customerUpdateData.city = customerCity.trim();
-        }
+      // Field-by-field address updates: Update each component independently if it needs updating
+      if (needsUpdate(existingCustomer.city) && isValidValue(customerCity)) {
+        customerUpdateData.city = customerCity.trim();
+      }
 
-        if (customerState && customerState.trim() !== '') {
-          customerUpdateData.state = customerState.trim();
-        }
+      if (needsUpdate(existingCustomer.state) && isValidValue(customerState)) {
+        customerUpdateData.state = customerState.trim();
+      }
 
-        if (customerZip && customerZip.trim() !== '') {
-          customerUpdateData.zip_code = customerZip.trim();
-        }
+      if (needsUpdate(existingCustomer.zip_code) && isValidValue(customerZip)) {
+        customerUpdateData.zip_code = customerZip.trim();
+      }
 
-        // Create formatted address from components and store in address field
-        if (
-          customerStreetAddress ||
-          customerCity ||
-          customerState ||
-          customerZip
-        ) {
-          customerUpdateData.address = formatAddress(
-            customerStreetAddress,
-            customerCity,
-            customerState,
-            customerZip
-          );
-        }
+      // Rebuild formatted address from final values (mix of updated and existing)
+      const finalCity = customerUpdateData.city || existingCustomer.city;
+      const finalState = customerUpdateData.state || existingCustomer.state;
+      const finalZip = customerUpdateData.zip_code || existingCustomer.zip_code;
+
+      // Only build address if we have valid components or street address
+      if (isValidValue(finalCity) || isValidValue(finalState) || isValidValue(finalZip) || isValidValue(customerStreetAddress)) {
+        customerUpdateData.address = formatAddress(
+          customerStreetAddress,
+          finalCity,
+          finalState,
+          finalZip
+        );
       }
 
       // Only update if we have changes to make
@@ -911,34 +929,25 @@ function formatAddress(
 ): string {
   const components = [];
 
-  if (street && street.trim() !== '') {
+  if (street && street.trim() !== '' && street.toLowerCase() !== 'none') {
     components.push(street.trim());
   }
 
-  if (city && city.trim() !== '') {
+  if (city && city.trim() !== '' && city.toLowerCase() !== 'none') {
     components.push(city.trim());
   }
 
-  if (state && state.trim() !== '') {
+  if (state && state.trim() !== '' && state.toLowerCase() !== 'none') {
     components.push(state.trim());
   }
 
-  if (zip && zip.trim() !== '') {
+  if (zip && zip.trim() !== '' && zip.toLowerCase() !== 'none') {
     components.push(zip.trim());
   }
 
   return components.join(', ');
 }
 
-// Check if customer has any existing address data
-function hasExistingAddress(customer: any): boolean {
-  return !!(
-    (customer.address && customer.address.trim() !== '') ||
-    (customer.city && customer.city.trim() !== '') ||
-    (customer.state && customer.state.trim() !== '') ||
-    (customer.zip_code && customer.zip_code.trim() !== '')
-  );
-}
 
 // Extract structured data from call analysis, dynamic variables, and transcript
 function extractCallData(callAnalysis: any, transcript: string | undefined, retellVariables?: any) {

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { sendEvent } from '@/lib/inngest/client';
+import { getCustomerPrimaryServiceAddress } from '@/lib/service-addresses';
 
 export async function GET(
   request: NextRequest,
@@ -49,7 +50,15 @@ export async function GET(
           first_name,
           last_name,
           email,
-          phone
+          phone,
+          address,
+          city,
+          state,
+          zip_code,
+          customer_status,
+          notes,
+          created_at,
+          updated_at
         ),
         company:companies(
           id,
@@ -71,6 +80,15 @@ export async function GET(
         { status: 500 }
       );
     }
+
+    // Get call record separately using lead_id foreign key
+    const { data: callRecord, error: callError } = await supabase
+      .from('call_records')
+      .select('*')
+      .eq('lead_id', id)
+      .single();
+
+    // Note: Call record might not exist, so we don't error on callError
 
     // For session-based auth, verify user has access to this lead's company
     // Bearer token auth relies on RLS policies for access control
@@ -104,11 +122,34 @@ export async function GET(
       }
     }
 
+    // Get customer's primary service address if lead has a customer
+    let primaryServiceAddress = null;
+    if (lead.customer_id) {
+      try {
+        const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
+        primaryServiceAddress = result.serviceAddress;
+      } catch (serviceAddressError) {
+        console.error(
+          'Error fetching primary service address:',
+          serviceAddressError
+        );
+        // Don't fail the API call if service address fetching fails
+      }
+    }
+
     // Enhanced lead object
     const enhancedLead = {
       ...lead,
+      call_record: callRecord || null,
       assigned_user: assignedUser,
+      primary_service_address: primaryServiceAddress,
     };
+
+    console.log('Returning enhanced lead with call record:', {
+      leadId: enhancedLead.id,
+      hasCallRecord: !!enhancedLead.call_record,
+      callRecordId: enhancedLead.call_record?.id
+    });
 
     return NextResponse.json(enhancedLead);
   } catch (error) {
@@ -158,7 +199,7 @@ export async function PUT(
     // First get the lead to check company access and capture current status and assignment
     const { data: existingLead, error: existingLeadError } = await supabase
       .from('leads')
-      .select('company_id, lead_status, assigned_to')
+      .select('company_id, lead_status, assigned_to, furthest_completed_stage')
       .eq('id', id)
       .single();
 
@@ -199,6 +240,66 @@ export async function PUT(
       companyId: existingLead.company_id
     });
 
+    // Track furthest completed stage for editing detection
+    // Stage progression order: new -> unassigned -> contacting -> quoted -> ready_to_schedule -> scheduled -> completed/lost/won
+    const stageOrder: Record<string, number> = {
+      'new': 0,
+      'unassigned': 1,
+      'contacting': 2,
+      'quoted': 3,
+      'ready_to_schedule': 4,
+      'scheduled': 5,
+      'completed': 6,
+      'won': 6, // Won is terminal like completed
+      'lost': 6, // Lost is terminal like completed
+    };
+
+    // If lead_status is being updated, check if we need to update furthest_completed_stage
+    if (body.lead_status && existingLead.lead_status !== body.lead_status) {
+      const currentStageLevel = stageOrder[existingLead.lead_status] || 0;
+      const newStageLevel = stageOrder[body.lead_status] || 0;
+      const furthestStageLevel = stageOrder[existingLead.furthest_completed_stage || 'new'] || 0;
+
+      console.log('Stage tracking update:', {
+        leadId: id,
+        currentStatus: existingLead.lead_status,
+        newStatus: body.lead_status,
+        currentLevel: currentStageLevel,
+        newLevel: newStageLevel,
+        furthestStage: existingLead.furthest_completed_stage,
+        furthestLevel: furthestStageLevel,
+      });
+
+      // Track the furthest stage that has been COMPLETED (moved past)
+      // furthest_completed_stage = one stage BEFORE the furthest point reached
+
+      // Find which stage is one before the new stage
+      const stageEntries = Object.entries(stageOrder).sort((a, b) => a[1] - b[1]);
+      let stageBeforeNew = null;
+      for (let i = 0; i < stageEntries.length; i++) {
+        if (stageEntries[i][1] === newStageLevel && i > 0) {
+          stageBeforeNew = stageEntries[i - 1][0];
+          break;
+        }
+      }
+
+      if (newStageLevel > currentStageLevel && stageBeforeNew) {
+        // Moving forward - the stage BEFORE where we're going is now completed
+        const stageBeforeNewLevel = stageOrder[stageBeforeNew] || 0;
+        if (stageBeforeNewLevel > furthestStageLevel) {
+          body.furthest_completed_stage = stageBeforeNew;
+          console.log('Moving forward - furthest completed is stage before new:', stageBeforeNew);
+        } else if (!body.furthest_completed_stage) {
+          body.furthest_completed_stage = existingLead.furthest_completed_stage;
+        }
+      }
+      // Moving backwards or staying same - keep existing furthest completed
+      else if (!body.furthest_completed_stage) {
+        body.furthest_completed_stage = existingLead.furthest_completed_stage;
+        console.log('Keeping existing furthest completed stage:', existingLead.furthest_completed_stage);
+      }
+    }
+
     // Update the lead
     const { data: lead, error } = await supabase
       .from('leads')
@@ -212,7 +313,15 @@ export async function PUT(
           first_name,
           last_name,
           email,
-          phone
+          phone,
+          address,
+          city,
+          state,
+          zip_code,
+          customer_status,
+          notes,
+          created_at,
+          updated_at
         ),
         company:companies(
           id,
@@ -330,6 +439,15 @@ export async function PUT(
       }
     }
 
+    // Get call record separately using lead_id foreign key
+    const { data: callRecord, error: callError } = await supabase
+      .from('call_records')
+      .select('*')
+      .eq('lead_id', id)
+      .single();
+
+    // Note: Call record might not exist, so we don't error on callError
+
     // Get assigned user profile if lead has one
     let assignedUser = null;
     if (lead.assigned_to) {
@@ -344,11 +462,34 @@ export async function PUT(
       }
     }
 
+    // Get customer's primary service address if lead has a customer
+    let primaryServiceAddress = null;
+    if (lead.customer_id) {
+      try {
+        const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
+        primaryServiceAddress = result.serviceAddress;
+      } catch (serviceAddressError) {
+        console.error(
+          'Error fetching primary service address:',
+          serviceAddressError
+        );
+        // Don't fail the API call if service address fetching fails
+      }
+    }
+
     // Enhanced lead object
     const enhancedLead = {
       ...lead,
+      call_record: callRecord || null,
       assigned_user: assignedUser,
+      primary_service_address: primaryServiceAddress,
     };
+
+    console.log('Returning enhanced lead with call record:', {
+      leadId: enhancedLead.id,
+      hasCallRecord: !!enhancedLead.call_record,
+      callRecordId: enhancedLead.call_record?.id
+    });
 
     return NextResponse.json(enhancedLead);
   } catch (error) {
