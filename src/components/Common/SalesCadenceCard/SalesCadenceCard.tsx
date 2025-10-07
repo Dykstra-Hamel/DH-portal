@@ -240,12 +240,12 @@ export function SalesCadenceCard({
     const startDate = new Date(startedAt);
 
     // Calculate the base due date (started_at + day_number - 1 days)
-    let dueDate = new Date(startDate);
-    dueDate.setDate(dueDate.getDate() + (step.day_number - 1));
+    const baseDueDate = new Date(startDate);
+    baseDueDate.setDate(baseDueDate.getDate() + (step.day_number - 1));
 
     // Set the time based on time_of_day (12PM for morning, 5PM for afternoon)
     const dueHour = step.time_of_day === 'morning' ? 12 : 17;
-    dueDate.setHours(dueHour, 0, 0, 0);
+    baseDueDate.setHours(dueHour, 0, 0, 0);
 
     // Check if Day 1 Morning would be in the past
     // If so, shift the entire cadence forward by 1 day to preserve morning/afternoon pattern
@@ -253,10 +253,10 @@ export function SalesCadenceCard({
     day1Morning.setHours(12, 0, 0, 0);
     const now = new Date();
 
-    if (day1Morning < now) {
-      // Shift the entire cadence forward by 1 day
-      dueDate.setDate(dueDate.getDate() + 1);
-    }
+    const dueDate =
+      day1Morning < now
+        ? new Date(baseDueDate.getTime() + 24 * 60 * 60 * 1000)
+        : baseDueDate;
 
     // Format the display string
     const timeStr = dueDate.getHours() === 12 ? '12PM' : '5PM';
