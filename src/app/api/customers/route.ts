@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const startsWith = searchParams.get('startsWith');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
@@ -70,6 +71,12 @@ export async function GET(request: NextRequest) {
           id,
           lead_status,
           estimated_value
+        ),
+        tickets:tickets!tickets_customer_id_fkey(
+          id
+        ),
+        support_cases:support_cases!support_cases_customer_id_fkey(
+          id
         )
       `
       )
@@ -84,6 +91,10 @@ export async function GET(request: NextRequest) {
       query = query.or(
         `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
       );
+    }
+    if (startsWith) {
+      // Filter by first letter of last name
+      query = query.ilike('last_name', `${startsWith}%`);
     }
 
     // Apply sorting - validate sortBy field exists on customers table
@@ -120,7 +131,9 @@ export async function GET(request: NextRequest) {
     // Calculate lead statistics per customer with better performance
     const enhancedCustomers = customers.map(customer => {
       const leads = customer.leads || [];
-      
+      const tickets = customer.tickets || [];
+      const supportCases = customer.support_cases || [];
+
       const leadCounts = {
         total: leads.length,
         unassigned: leads.filter((l: any) => l.lead_status === 'unassigned').length,
@@ -137,18 +150,20 @@ export async function GET(request: NextRequest) {
 
       // Calculate total estimated value
       const totalEstimatedValue = leads.reduce(
-        (sum: number, lead: any) => sum + (lead.estimated_value || 0), 
+        (sum: number, lead: any) => sum + (lead.estimated_value || 0),
         0
       );
 
-      // Remove the leads array from the response to avoid sending unnecessary data
-      const { leads: _, ...customerWithoutLeads } = customer;
+      // Remove arrays from the response to avoid sending unnecessary data
+      const { leads: _, tickets: __, support_cases: ___, ...customerWithoutRelations } = customer;
 
       return {
-        ...customerWithoutLeads,
+        ...customerWithoutRelations,
         lead_counts: leadCounts,
         active_leads: activeLeads,
         total_leads: leadCounts.total,
+        total_tickets: tickets.length,
+        total_support_cases: supportCases.length,
         total_estimated_value: totalEstimatedValue,
       };
     });

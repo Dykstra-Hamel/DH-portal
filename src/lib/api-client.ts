@@ -198,6 +198,7 @@ export const adminAPI = {
       sortOrder?: string;
       dateFrom?: string;
       dateTo?: string;
+      startsWith?: string | null;
     } = {}
   ) {
     const queryParams = new URLSearchParams();
@@ -208,6 +209,7 @@ export const adminAPI = {
     if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+    if (filters.startsWith) queryParams.append('startsWith', filters.startsWith);
 
     const url = `/api/admin/customers${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
@@ -374,6 +376,7 @@ export const adminAPI = {
     sortOrder?: string;
     dateFrom?: string;
     dateTo?: string;
+    startsWith?: string | null;
   }) {
     const queryParams = new URLSearchParams();
     queryParams.append('companyId', filters.companyId);
@@ -383,6 +386,7 @@ export const adminAPI = {
     if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+    if (filters.startsWith) queryParams.append('startsWith', filters.startsWith);
 
     const url = `/api/customers?${queryParams.toString()}`;
     return authenticatedFetch(url);

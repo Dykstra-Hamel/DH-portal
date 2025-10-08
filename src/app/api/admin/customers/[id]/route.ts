@@ -19,7 +19,7 @@ export async function GET(
     // Use admin client to fetch customer with all related data
     const supabase = createAdminClient();
 
-    // Get customer with company info
+    // Get customer with company info and primary service address
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select(
@@ -28,10 +28,25 @@ export async function GET(
         company:companies(
           id,
           name
+        ),
+        primary_service_address:customer_service_addresses!customer_service_addresses_customer_id_fkey(
+          service_address:service_addresses(
+            id,
+            street_address,
+            apartment_unit,
+            city,
+            state,
+            zip_code,
+            home_size_range,
+            yard_size_range,
+            latitude,
+            longitude
+          )
         )
       `
       )
       .eq('id', id)
+      .eq('customer_service_addresses.is_primary_address', true)
       .single();
 
     if (customerError) {
@@ -80,6 +95,7 @@ export async function GET(
       .from('tickets')
       .select('*')
       .eq('customer_id', id)
+      .neq('status', 'resolved')
       .order('created_at', { ascending: false });
 
     if (ticketsError) {
@@ -156,12 +172,21 @@ export async function GET(
         ['resolved', 'closed', 'won', 'lost', 'unqualified'].includes(t.status)
       ) || [];
 
+    // Flatten primary service address structure
+    const primaryServiceAddress =
+      customer.primary_service_address &&
+      Array.isArray(customer.primary_service_address) &&
+      customer.primary_service_address.length > 0
+        ? customer.primary_service_address[0]?.service_address
+        : null;
+
     // Enhanced customer object
     const enhancedCustomer = {
       ...customer,
       full_name: `${customer.first_name} ${customer.last_name}`,
       leads: leadsWithUsers || [],
       tickets: ticketsWithUsers || [],
+      primary_service_address: primaryServiceAddress,
       active_leads_count: activeLeads.length,
       completed_leads_count: completedLeads.length,
       total_leads: leadsWithUsers?.length || 0,

@@ -21,7 +21,7 @@ export async function GET(
 
     const { id: customerId } = await params;
 
-    // Get customer with company info
+    // Get customer with company info and primary service address
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select(
@@ -31,10 +31,25 @@ export async function GET(
           id,
           name,
           website
+        ),
+        primary_service_address:customer_service_addresses!customer_service_addresses_customer_id_fkey(
+          service_address:service_addresses(
+            id,
+            street_address,
+            apartment_unit,
+            city,
+            state,
+            zip_code,
+            home_size_range,
+            yard_size_range,
+            latitude,
+            longitude
+          )
         )
       `
       )
       .eq('id', customerId)
+      .eq('customer_service_addresses.is_primary_address', true)
       .single();
 
     if (customerError) {
@@ -93,6 +108,7 @@ export async function GET(
       .select('*')
       .eq('customer_id', customerId)
       .eq('archived', false) // Only show non-archived tickets
+      .neq('status', 'resolved')
       .order('created_at', { ascending: false });
 
     if (ticketsError) {
@@ -139,11 +155,20 @@ export async function GET(
           : null,
       })) || [];
 
+    // Flatten primary service address structure
+    const primaryServiceAddress =
+      customer.primary_service_address &&
+      Array.isArray(customer.primary_service_address) &&
+      customer.primary_service_address.length > 0
+        ? customer.primary_service_address[0]?.service_address
+        : null;
+
     // Enhanced customer object
     const enhancedCustomer = {
       ...customer,
       leads: leadsWithUsers || [],
       tickets: ticketsWithUsers || [],
+      primary_service_address: primaryServiceAddress,
     };
 
     return NextResponse.json(enhancedCustomer);

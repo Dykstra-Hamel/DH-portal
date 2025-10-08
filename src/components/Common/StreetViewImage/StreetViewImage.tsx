@@ -52,57 +52,34 @@ export function StreetViewImage({
       setIsLoading(true);
       setError(null);
 
-      // Determine if we should try Street View first
-      // If hasStreetView is explicitly false, skip straight to satellite
-      // If hasStreetView is true or undefined, try Street View first
-      const shouldTryStreetView = hasStreetView !== false && latitude && longitude;
-
       try {
-
-        if (shouldTryStreetView) {
-          // Try Street View first - either we know it's available or we'll check dynamically
-          const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?` +
-            `location=${latitude},${longitude}&` +
-            `size=${width}x${height}&` +
-            `key=${apiKey}&` +
-            `fov=80&` +
-            `heading=0&` +
-            `pitch=0`;
-
-          // Test if Street View image loads successfully
-          const testImage = new window.Image();
-          testImage.onload = () => {
-            // Street View loaded successfully
-            setImageUrl(streetViewUrl);
-            setImageType('streetview');
-            setIsLoading(false);
-          };
-          testImage.onerror = () => {
-            // Street View failed, fall back to satellite if enabled
-            if (fallbackToSatellite && latitude && longitude) {
-              const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?` +
-                `center=${latitude},${longitude}&` +
-                `zoom=18&` +
-                `size=${width}x${height}&` +
-                `maptype=satellite&` +
-                `markers=color:red%7C${latitude},${longitude}&` +
-                `key=${apiKey}`;
-
-              setImageUrl(satelliteUrl);
-              setImageType('satellite');
-            } else {
-              setError('Street View not available for this location');
-              setImageUrl(null);
-              setImageType(null);
-            }
-            setIsLoading(false);
-          };
-          testImage.src = streetViewUrl;
-
-          // Don't set loading to false here - wait for image load/error
+        if (!latitude || !longitude) {
+          setError('Location coordinates not available');
+          setImageUrl(null);
+          setImageType(null);
+          setIsLoading(false);
           return;
-        } else if (fallbackToSatellite && latitude && longitude) {
-          // Use satellite view directly - hasStreetView was explicitly false
+        }
+
+        // Check Street View availability using Metadata API
+        const metadataUrl = `https://maps.googleapis.com/maps/api/streetview/metadata?` +
+          `location=${latitude},${longitude}&` +
+          `key=${apiKey}`;
+
+        const metadataResponse = await fetch(metadataUrl);
+        const metadata = await metadataResponse.json();
+
+        // If Street View is available, use it
+        if (metadata.status === 'OK') {
+          const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?` +
+            `size=${width}x${height}&` +
+            `location=${latitude},${longitude}&` +
+            `key=${apiKey}`;
+
+          setImageUrl(streetViewUrl);
+          setImageType('streetview');
+        } else if (fallbackToSatellite) {
+          // Street View not available, fallback to satellite
           const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?` +
             `center=${latitude},${longitude}&` +
             `zoom=18&` +
@@ -114,20 +91,16 @@ export function StreetViewImage({
           setImageUrl(satelliteUrl);
           setImageType('satellite');
         } else {
-          // No valid coordinates or fallback disabled
-          setError('Location coordinates not available');
+          // No Street View and fallback disabled
+          setError('Street view not available for this location');
           setImageUrl(null);
           setImageType(null);
         }
       } catch (err) {
         setError('Failed to load location image');
         console.error('Error generating location image:', err);
-        setIsLoading(false);
       } finally {
-        // Only set loading to false if we're not waiting for image load test
-        if (!shouldTryStreetView) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     };
 

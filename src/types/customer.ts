@@ -1,3 +1,6 @@
+import { TicketSource, TicketType, TicketStatus, TicketPriority } from './ticket';
+import { LeadSource, LeadType, LeadStatus, LeadPriority } from './lead';
+
 export type CustomerStatus = 'active' | 'inactive' | 'archived';
 
 export interface Customer {
@@ -24,11 +27,12 @@ export interface Customer {
   };
   leads?: {
     id: string;
-    lead_source: string;
-    lead_type: string;
+    company_id: string;
+    lead_source: LeadSource;
+    lead_type: LeadType;
     service_type?: string;
-    lead_status: string;
-    priority: string;
+    lead_status: LeadStatus;
+    priority: LeadPriority;
     estimated_value?: number;
     comments?: string;
     created_at: string;
@@ -42,11 +46,12 @@ export interface Customer {
   }[];
   tickets?: {
     id: string;
-    source: string;
-    type: string;
+    company_id: string;
+    source: TicketSource;
+    type: TicketType;
     service_type?: string;
-    status: string;
-    priority: string;
+    status: TicketStatus;
+    priority: TicketPriority;
     estimated_value?: number;
     description?: string;
     created_at: string;
@@ -58,6 +63,19 @@ export interface Customer {
       email: string;
     };
   }[];
+  primary_service_address?: {
+    id: string;
+    street_address?: string | null;
+    apartment_unit?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip_code?: string | null;
+    home_size_range?: string | null;
+    yard_size_range?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    hasStreetView?: boolean | null;
+  } | null;
 
   // Computed fields
   full_name?: string;
@@ -65,6 +83,7 @@ export interface Customer {
   active_leads?: number;
   total_tickets?: number;
   active_tickets?: number;
+  total_support_cases?: number;
   total_value?: number;
   last_activity?: string;
 }

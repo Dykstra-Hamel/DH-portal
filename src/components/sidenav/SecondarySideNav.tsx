@@ -87,6 +87,7 @@ interface NavItem {
 
 interface NavGroup {
   title?: string;
+  showDivider?: boolean;
   items: NavItem[];
 }
 
@@ -323,6 +324,41 @@ export function SecondarySideNav({
               },
             ],
           },
+          {
+            showDivider: true,
+            items: [
+              {
+                text: 'One Times',
+                href: '/customers/one-times',
+                disabled: true,
+              },
+              {
+                text: 'Monthly Recurring',
+                href: '/customers/monthly-recurring',
+                disabled: true,
+              },
+              {
+                text: 'Termite Customers',
+                href: '/customers/termite',
+                disabled: true,
+              },
+              {
+                text: 'Lost Leads',
+                href: '/customers/lost-leads',
+                disabled: true,
+              },
+              {
+                text: 'Cancelled Customers',
+                href: '/customers/cancelled',
+                disabled: true,
+              },
+              {
+                text: 'Junk/Trash',
+                href: '/customers/junk',
+                disabled: true,
+              },
+            ],
+          },
         ];
       case 'brand':
         return [
@@ -336,7 +372,7 @@ export function SecondarySideNav({
           {
             items: [
               {
-                text: 'Incoming',
+                text: 'New',
                 href: '/connections/incoming',
                 count: counts.tickets,
                 countType: 'tickets',
@@ -455,6 +491,7 @@ export function SecondarySideNav({
         <nav className={styles.contextNav}>
           {navGroups.map((group, groupIndex) => (
             <div key={groupIndex}>
+              {group.showDivider && <div className={styles.divider} />}
               {group.title && (
                 <div className={styles.groupTitleWrapper}>
                   <h3 className={styles.groupTitle}>{group.title}</h3>
@@ -464,6 +501,8 @@ export function SecondarySideNav({
                 {group.items.map(item => {
                   const isActive =
                     pathname === item.href ||
+                    (item.href === '/customers' &&
+                      pathname.startsWith('/customers/')) ||
                     (item.href === '/connections/incoming' &&
                       (pathname.startsWith('/connections/incoming') ||
                         pathname.startsWith('/connections/calls-and-forms'))) ||

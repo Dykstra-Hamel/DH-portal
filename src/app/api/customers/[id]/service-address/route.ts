@@ -129,6 +129,8 @@ export async function POST(
       property_notes: body.property_notes?.trim() || null,
       home_size_range: body.home_size_range || null,
       yard_size_range: body.yard_size_range || null,
+      latitude: body.latitude ?? null,
+      longitude: body.longitude ?? null,
     };
 
     // Validate required fields
@@ -265,6 +267,8 @@ export async function PUT(
       property_notes: body.property_notes?.trim() || null,
       home_size_range: body.home_size_range || null,
       yard_size_range: body.yard_size_range || null,
+      latitude: body.latitude ?? null,
+      longitude: body.longitude ?? null,
     };
 
     // If only updating a single field, preserve existing data
