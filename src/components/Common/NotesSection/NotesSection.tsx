@@ -49,30 +49,20 @@ export function NotesSection({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit on Cmd/Ctrl + Enter
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      handleAddNote();
-    }
-  };
-
   return (
     <div className={styles.notesSection}>
       <textarea
         className={styles.textarea}
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        onKeyDown={handleKeyDown}
         placeholder="Add a note..."
         rows={3}
         disabled={isSubmitting}
       />
       <div className={styles.actions}>
-        <div className={styles.hint}>Press Cmd+Enter to submit</div>
         <button
           type="button"
-          className={styles.addButton}
+          className={styles.secondaryButton}
           onClick={handleAddNote}
           disabled={!note.trim() || isSubmitting}
         >

@@ -191,26 +191,6 @@ export function ReadyToScheduleModal({
             <input
               type="radio"
               name="scheduleOption"
-              value="later"
-              checked={selectedOption === 'later'}
-              onChange={() => setSelectedOption('later')}
-              className={styles.radioInput}
-            />
-            <span className={styles.radioCustom}></span>
-            <div className={styles.radioContent}>
-              <span className={styles.radioLabel}>
-                I want to schedule this later.
-              </span>
-              <span className={styles.radioDescription}>
-                Complete stage and return to Sales Leads.
-              </span>
-            </div>
-          </label>
-
-          <label className={styles.radioOption}>
-            <input
-              type="radio"
-              name="scheduleOption"
               value="someone_else"
               checked={selectedOption === 'someone_else'}
               onChange={() => setSelectedOption('someone_else')}
