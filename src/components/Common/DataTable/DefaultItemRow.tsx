@@ -23,12 +23,16 @@ export default function DefaultItemRow<T>({
     return String(value);
   };
 
+  const handleClick = () => {
+    onAction?.('navigate', item);
+  };
+
   return (
-    <div className={styles.defaultRow}>
+    <div className={styles.defaultRow} onClick={handleClick}>
       {columns.map((column, index) => {
         const value = getNestedValue(item, column.key);
         const cellContent = column.render ? column.render(item, onAction) : formatCellValue(value);
-        
+
         return (
           <div
             key={`${column.key}-${index}`}

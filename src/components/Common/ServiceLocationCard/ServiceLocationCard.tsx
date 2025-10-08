@@ -333,7 +333,6 @@ export function ServiceLocationCard({
                   !currentFormattedAddress && !serviceLocationData?.latitude
                 }
                 fallbackToSatellite={true}
-                hasStreetView={serviceLocationData?.hasStreetView}
               />
             </div>
           </div>

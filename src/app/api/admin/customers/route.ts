@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const startsWith = searchParams.get('startsWith');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
@@ -35,6 +36,12 @@ export async function GET(request: NextRequest) {
           id,
           lead_status,
           estimated_value
+        ),
+        tickets:tickets!tickets_customer_id_fkey(
+          id
+        ),
+        support_cases:support_cases!support_cases_customer_id_fkey(
+          id
         )
       `);
 
@@ -50,6 +57,10 @@ export async function GET(request: NextRequest) {
       query = query.or(
         `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
       );
+    }
+    if (startsWith) {
+      // Filter by first letter of last name
+      query = query.ilike('last_name', `${startsWith}%`);
     }
 
     // Apply sorting with validation - handle company field specially
@@ -97,6 +108,9 @@ export async function GET(request: NextRequest) {
     // Calculate lead statistics efficiently from the joined data
     const enhancedCustomers = customers.map(customer => {
       const customerLeads = customer.leads || [];
+      const customerTickets = customer.tickets || [];
+      const customerSupportCases = customer.support_cases || [];
+
       const activeLeads = customerLeads.filter((l: any) =>
         ['new', 'contacted', 'qualified', 'quoted'].includes(l.lead_status)
       );
@@ -105,14 +119,16 @@ export async function GET(request: NextRequest) {
         0
       );
 
-      // Remove leads array to reduce response size
-      const { leads: _, ...customerWithoutLeads } = customer;
+      // Remove arrays to reduce response size
+      const { leads: _, tickets: __, support_cases: ___, ...customerWithoutRelations } = customer;
 
       return {
-        ...customerWithoutLeads,
+        ...customerWithoutRelations,
         full_name: `${customer.first_name} ${customer.last_name}`,
         total_leads: customerLeads.length,
         active_leads: activeLeads.length,
+        total_tickets: customerTickets.length,
+        total_support_cases: customerSupportCases.length,
         total_value: totalValue,
         last_activity: customer.updated_at,
       };
@@ -196,6 +212,8 @@ export async function POST(request: NextRequest) {
         full_name: `${customer.first_name} ${customer.last_name}`,
         total_leads: 0,
         active_leads: 0,
+        total_tickets: 0,
+        total_support_cases: 0,
         total_value: 0,
         last_activity: customer.updated_at,
       },

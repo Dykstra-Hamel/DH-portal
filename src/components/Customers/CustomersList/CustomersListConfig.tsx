@@ -36,7 +36,6 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
     {
       key: 'customer.name',
       title: 'Customer',
-      width: '200px',
       sortable: true,
       sortKey: 'first_name',
       render: (customer: Customer) => (
@@ -62,19 +61,41 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
     {
       key: 'address',
       title: 'Address',
-      width: '200px',
       sortable: false,
-      render: (customer: Customer) => (
-        <div className={styles.contactRow}>
-          <MapPin size={14} />
-          <span>{formatCustomerAddress(customer)}</span>
-        </div>
-      ),
+      render: (customer: Customer) => {
+        const hasAddress = customer.address || customer.city || customer.state || customer.zip_code;
+        return (
+          <div>
+            {hasAddress ? (
+              <>
+                {customer.address && (
+                  <div className={styles.addressLine}>
+                    <MapPin size={14} />
+                    <span>{customer.address}</span>
+                  </div>
+                )}
+                {(customer.city || customer.state || customer.zip_code) && (
+                  <div className={`${styles.addressLine} ${customer.address ? styles.indented : ''}`}>
+                    {!customer.address && <MapPin size={14} />}
+                    <span>
+                      {[customer.city, customer.state, customer.zip_code].filter(Boolean).join(', ')}
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className={styles.contactRow}>
+                <MapPin size={14} />
+                <span>N/A</span>
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'customer_status',
       title: 'Status',
-      width: '100px',
       sortable: true,
       sortKey: 'customer_status',
       render: (customer: Customer) => (
@@ -93,7 +114,6 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
     columns.splice(3, 0, {
       key: 'company.name',
       title: 'Company',
-      width: '150px',
       sortable: false,
       render: (customer: Customer) => (
         <div className={styles.contactRow}>
@@ -109,7 +129,6 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
     {
       key: 'total_leads',
       title: 'Leads',
-      width: '80px',
       sortable: false,
       render: (customer: Customer) => (
         <span className={styles.activityCell}>
@@ -120,7 +139,6 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
     {
       key: 'total_tickets',
       title: 'Tickets',
-      width: '80px',
       sortable: false,
       render: (customer: Customer) => (
         <span className={styles.activityCell}>
@@ -129,9 +147,18 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
       ),
     },
     {
+      key: 'total_support_cases',
+      title: 'Support Cases',
+      sortable: false,
+      render: (customer: Customer) => (
+        <span className={styles.activityCell}>
+          {customer.total_support_cases || 0}
+        </span>
+      ),
+    },
+    {
       key: 'created_at',
       title: 'Created',
-      width: '100px',
       sortable: true,
       sortKey: 'created_at',
       render: (customer: Customer) => (
@@ -143,7 +170,6 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
     {
       key: 'actions',
       title: '',
-      width: '100px',
       sortable: false,
       render: (
         customer: Customer,

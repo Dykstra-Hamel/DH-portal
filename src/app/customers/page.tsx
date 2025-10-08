@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import CustomersList from '@/components/Customers/CustomersList/CustomersList';
-import SearchBar from '@/components/Common/SearchBar/SearchBar';
+import SearchByLetter from '@/components/Customers/SearchByLetter/SearchByLetter';
 import { adminAPI } from '@/lib/api-client';
 import { Customer, CustomerStatus } from '@/types/customer';
 import { SortDirection } from '@/types/common';
@@ -31,6 +31,8 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
+  const [letterCounts, setLetterCounts] = useState<Record<string, number>>({});
   const router = useRouter();
 
   // Use global company context
@@ -94,6 +96,7 @@ export default function CustomersPage() {
         search: searchQuery,
         sortBy: sortKey,
         sortOrder: sortDirection,
+        startsWith: selectedLetter,
       };
 
       let allCustomers: Customer[] = [];
@@ -132,7 +135,52 @@ export default function CustomersPage() {
       setCustomersLoading(false);
       setLoadingMore(false);
     }
-  }, [selectedCompany, isAdmin, searchQuery, sortKey, sortDirection]);
+  }, [selectedCompany, isAdmin, searchQuery, sortKey, sortDirection, selectedLetter]);
+
+  // Fetch letter counts for the alphabet filter
+  const fetchLetterCounts = useCallback(async () => {
+    if (!selectedCompany && !isAdmin) return;
+
+    try {
+      const filters = {
+        companyId: selectedCompany?.id,
+      };
+
+      let allCustomers: Customer[] = [];
+      if (isAdmin) {
+        allCustomers = await adminAPI.getCustomers(filters);
+      } else if (selectedCompany) {
+        allCustomers = await adminAPI.getUserCustomers({
+          ...filters,
+          companyId: selectedCompany.id,
+        });
+      }
+
+      // Count customers by first letter of last name
+      const counts: Record<string, number> = {};
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(letter => {
+        counts[letter] = 0;
+      });
+
+      allCustomers.forEach(customer => {
+        const firstLetter = customer.last_name?.charAt(0).toUpperCase();
+        if (firstLetter && counts[firstLetter] !== undefined) {
+          counts[firstLetter]++;
+        }
+      });
+
+      setLetterCounts(counts);
+    } catch (error) {
+      console.error('Error fetching letter counts:', error);
+    }
+  }, [selectedCompany, isAdmin]);
+
+  // Fetch letter counts when company changes
+  useEffect(() => {
+    if (!contextLoading && (selectedCompany || isAdmin)) {
+      fetchLetterCounts();
+    }
+  }, [contextLoading, selectedCompany, isAdmin, fetchLetterCounts]);
 
   // Fetch customers when filters change
   useEffect(() => {
@@ -142,7 +190,7 @@ export default function CustomersPage() {
       setHasMore(true);
       fetchCustomers(1);
     }
-  }, [contextLoading, selectedCompany, isAdmin, searchQuery, sortKey, sortDirection, fetchCustomers]);
+  }, [contextLoading, selectedCompany, isAdmin, searchQuery, sortKey, sortDirection, selectedLetter, fetchCustomers]);
 
   // Infinite scroll handler
   const handleLoadMore = () => {
@@ -179,15 +227,13 @@ export default function CustomersPage() {
 
   return (
     <div style={{ width: '100%' }}>
-      {/* Search Bar */}
+      {/* Search By Letter Component */}
       {(selectedCompany || isAdmin) && (
-        <div style={{ marginBottom: '20px' }}>
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search customers by name, phone, or email"
-          />
-        </div>
+        <SearchByLetter
+          letterCounts={letterCounts}
+          selectedLetter={selectedLetter}
+          onLetterSelect={setSelectedLetter}
+        />
       )}
 
       {selectedCompany && (

@@ -176,6 +176,16 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           };
         }
 
+        // Show lower header for customer detail pages
+        if (pathname.match(/^\/customers\/[^\/]+$/)) {
+          return {
+            title: 'Customer Details',
+            description: 'View and manage this customer information.',
+            showAddButton: true,
+            addButtonText: 'Open Tickets',
+          };
+        }
+
         if (
           pathname.includes('/customers/') ||
           pathname.includes('/connections/incoming/')
