@@ -967,6 +967,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           isAdmin={isAdmin}
           onLeadUpdate={fetchLead}
           onShowToast={handleShowToast}
+          onEmailQuote={handleEmailQuoteButton}
         />
       </div>
 
