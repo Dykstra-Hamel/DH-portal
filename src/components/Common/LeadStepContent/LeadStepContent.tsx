@@ -64,6 +64,7 @@ interface LeadStepContentProps {
   isAdmin: boolean;
   onLeadUpdate?: (updatedLead?: Lead) => void;
   onShowToast?: (message: string, type: 'success' | 'error') => void;
+  onEmailQuote?: () => void;
 }
 
 export function LeadStepContent({
@@ -71,6 +72,7 @@ export function LeadStepContent({
   isAdmin,
   onLeadUpdate,
   onShowToast,
+  onEmailQuote,
 }: LeadStepContentProps) {
   const [ticketType, setTicketType] = useState('sales');
   const [selectedAssignee, setSelectedAssignee] = useState('');
@@ -1738,37 +1740,9 @@ export function LeadStepContent({
     }
   };
 
-  // Handle emailing quote to customer
-  const handleEmailQuote = async () => {
-    if (!quote) {
-      onShowToast?.('No quote available to email', 'error');
-      return;
-    }
-
-    if (!lead.customer?.email) {
-      onShowToast?.('Customer email not found', 'error');
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/quotes/${quote.id}/email`, {
-        method: 'POST',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send email');
-      }
-
-      onShowToast?.(`Quote emailed to ${lead.customer.email}`, 'success');
-    } catch (error) {
-      console.error('Failed to email quote:', error);
-      onShowToast?.(
-        error instanceof Error ? error.message : 'Failed to send quote email',
-        'error'
-      );
-    }
+  // Handle emailing quote to customer - triggers parent modal
+  const handleEmailQuote = () => {
+    onEmailQuote?.();
   };
 
   const updateLeadRequestedTime = async (time: string) => {
@@ -3558,14 +3532,13 @@ export function LeadStepContent({
                                   Initial Price
                                 </div>
                                 <div className={styles.initialPrice}>
-                                  $
-                                  {quote?.line_items?.[0]
-                                    ?.final_initial_price || 0}
+                                  ${Math.round(quote?.line_items?.[0]
+                                    ?.final_initial_price || 0)}
                                 </div>
                                 {quote?.line_items?.[0]?.discount_percentage ? (
                                   <div className={styles.originalPrice}>
                                     Originally $
-                                    {quote?.line_items?.[0]?.initial_price || 0}{' '}
+                                    {Math.round(quote?.line_items?.[0]?.initial_price || 0)}{' '}
                                     (-
                                     {
                                       quote?.line_items?.[0]
