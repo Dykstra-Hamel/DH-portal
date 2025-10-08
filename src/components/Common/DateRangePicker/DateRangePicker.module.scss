@@ -1,0 +1,176 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.rangeButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rangeButton {
+  padding: 8px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius-md);
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+
+  &.active {
+    background: var(--action-500);
+    color: var(--white);
+    border-color: var(--action-500);
+
+    &:hover {
+      background: var(--action-600);
+      border-color: var(--action-600);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.customPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius-md);
+  background: var(--gray-50);
+}
+
+.customPickerInputs {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 200px;
+
+  label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-700);
+  }
+}
+
+.dateInput {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius-sm);
+  font-size: 14px;
+  color: var(--gray-800);
+  background: var(--white);
+
+  &:focus {
+    outline: none;
+    border-color: var(--sales-500);
+    box-shadow: 0 0 0 3px rgba(var(--sales-500-rgb), 0.1);
+  }
+}
+
+.customPickerActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cancelButton,
+.applyButton {
+  padding: 8px 16px;
+  border-radius: var(--border-radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancelButton {
+  border: 1px solid var(--gray-300);
+  background: var(--white);
+  color: var(--gray-700);
+
+  &:hover {
+    background: var(--gray-50);
+  }
+}
+
+.applyButton {
+  border: 1px solid var(--sales-500);
+  background: var(--sales-500);
+  color: var(--white);
+
+  &:hover {
+    background: var(--sales-600);
+    border-color: var(--sales-600);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.comparisonToggle {
+  padding-top: 8px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--gray-700);
+  cursor: pointer;
+  user-select: none;
+
+  span {
+    font-weight: 500;
+  }
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--action-500);
+}
+
+@media (max-width: 768px) {
+  .rangeButtons {
+    flex-direction: column;
+  }
+
+  .rangeButton {
+    width: 100%;
+  }
+
+  .customPickerInputs {
+    flex-direction: column;
+  }
+
+  .inputGroup {
+    min-width: 100%;
+  }
+}

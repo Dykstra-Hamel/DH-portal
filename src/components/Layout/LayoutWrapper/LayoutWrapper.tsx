@@ -160,9 +160,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           showAddButton: false,
         };
       case '/reports':
+      case '/connections/reports':
         return {
           title: 'Reports',
-          description: 'Run detailed record reports here.',
+          description: 'View detailed record reports here.',
           showAddButton: false,
         };
       // Handle individual record pages (hide lower header)

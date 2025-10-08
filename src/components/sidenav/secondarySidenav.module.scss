@@ -144,6 +144,12 @@
       background: white;
       color: var(--action-600);
     }
+
+    .navItemIcon {
+      path {
+        stroke: #fff;
+      }
+    }
   }
 
   &.disabled {
