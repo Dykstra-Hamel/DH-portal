@@ -122,13 +122,39 @@ export default function TicketForm({
     }
   };
 
+  // Format phone progressively as user types
+  const formatPhoneInput = (value: string): string => {
+    // Remove all non-digits
+    const cleaned = value.replace(/\D/g, '');
+
+    // Apply formatting based on length
+    if (cleaned.length <= 3) {
+      return cleaned;
+    } else if (cleaned.length <= 6) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    } else if (cleaned.length <= 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    } else {
+      // Limit to 10 digits
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    }
+  };
+
   const handleNewCustomerChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const { name, value } = e.target;
+
+    let formattedValue = value;
+
+    // Auto-format phone number as user types
+    if (name === 'phone') {
+      formattedValue = formatPhoneInput(value);
+    }
+
     setNewCustomerData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: formattedValue,
     }));
   };
 

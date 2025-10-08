@@ -98,6 +98,11 @@
   color: #111827;
 }
 
+.callSummary {
+  color: var(--gray-800);
+  margin: 20px 0;
+}
+
 .actionsWrapper {
   display: flex;
   position: relative;
@@ -555,6 +560,8 @@
   flex: 1;
   padding: 16px 0 0 0;
   background: white;
+  overflow: hidden;
+  transition: height 0.3s ease-in-out;
 
   @media (max-width: 480px) {
     max-height: 400px;
