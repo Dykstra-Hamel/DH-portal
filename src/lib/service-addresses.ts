@@ -2,10 +2,10 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import { createClient } from '@/lib/supabase/client';
 
 export interface ServiceAddressData {
-  street_address: string;
-  city: string;
-  state: string;
-  zip_code: string;
+  street_address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
   apartment_unit?: string;
   address_line_2?: string;
   latitude?: number;
@@ -35,30 +35,48 @@ export async function createOrFindServiceAddress(
   try {
     const supabase = createAdminClient();
 
-    // Normalize address data for comparison
-    const normalizedStreet = addressData.street_address.trim().toLowerCase();
-    const normalizedCity = addressData.city.trim().toLowerCase();
-    const normalizedState = addressData.state.trim().toUpperCase();
-    const normalizedZip = addressData.zip_code.trim();
+    // Normalize address data for comparison (handle empty/missing fields)
+    const normalizedStreet = addressData.street_address?.trim().toLowerCase() || '';
+    const normalizedCity = addressData.city?.trim().toLowerCase() || '';
+    const normalizedState = addressData.state?.trim().toUpperCase() || '';
+    const normalizedZip = addressData.zip_code?.trim() || '';
 
-    // Check for existing service address to prevent duplicates
-    const { data: existingAddress } = await supabase
-      .from('service_addresses')
-      .select('id')
-      .eq('company_id', companyId)
-      .ilike('street_address', normalizedStreet)
-      .ilike('city', normalizedCity)
-      .ilike('state', normalizedState)
-      .eq('zip_code', normalizedZip)
-      .eq('is_active', true)
-      .single();
+    // Only check for duplicates if we have sufficient data to make a meaningful comparison
+    // Require at least street + city OR city + state + zip
+    const hasSufficientDataForDuplicateCheck =
+      (normalizedStreet && normalizedCity) ||
+      (normalizedCity && normalizedState && normalizedZip);
 
-    if (existingAddress) {
-      return {
-        success: true,
-        serviceAddressId: existingAddress.id,
-        isExisting: true
-      };
+    if (hasSufficientDataForDuplicateCheck) {
+      // Build the query dynamically based on what fields we have
+      let query = supabase
+        .from('service_addresses')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('is_active', true);
+
+      if (normalizedStreet) {
+        query = query.ilike('street_address', normalizedStreet);
+      }
+      if (normalizedCity) {
+        query = query.ilike('city', normalizedCity);
+      }
+      if (normalizedState) {
+        query = query.ilike('state', normalizedState);
+      }
+      if (normalizedZip) {
+        query = query.eq('zip_code', normalizedZip);
+      }
+
+      const { data: existingAddress } = await query.single();
+
+      if (existingAddress) {
+        return {
+          success: true,
+          serviceAddressId: existingAddress.id,
+          isExisting: true
+        };
+      }
     }
 
     // Try to match with service areas if coordinates are provided
@@ -91,15 +109,15 @@ export async function createOrFindServiceAddress(
       }
     }
 
-    // Create new service address
+    // Create new service address with whatever data we have
     const { data: newServiceAddress, error: createError } = await supabase
       .from('service_addresses')
       .insert({
         company_id: companyId,
-        street_address: addressData.street_address.trim(),
-        city: addressData.city.trim(),
-        state: addressData.state.trim().toUpperCase(),
-        zip_code: addressData.zip_code.trim(),
+        street_address: addressData.street_address?.trim() || '',
+        city: addressData.city?.trim() || '',
+        state: addressData.state?.trim().toUpperCase() || '',
+        zip_code: addressData.zip_code?.trim() || '',
         apartment_unit: addressData.apartment_unit?.trim() || null,
         address_line_2: addressData.address_line_2?.trim() || null,
         latitude: addressData.latitude || null,
@@ -394,10 +412,10 @@ export async function updateExistingServiceAddress(
     const { error: updateError } = await supabase
       .from('service_addresses')
       .update({
-        street_address: addressData.street_address.trim(),
-        city: addressData.city.trim(),
-        state: addressData.state.trim().toUpperCase(),
-        zip_code: addressData.zip_code.trim(),
+        street_address: addressData.street_address?.trim() || '',
+        city: addressData.city?.trim() || '',
+        state: addressData.state?.trim().toUpperCase() || '',
+        zip_code: addressData.zip_code?.trim() || '',
         apartment_unit: addressData.apartment_unit?.trim() || null,
         address_line_2: addressData.address_line_2?.trim() || null,
         latitude: addressData.latitude || null,

@@ -52,6 +52,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [undoHandler, setUndoHandler] = useState<(() => Promise<void>) | null>(null);
+  const [isUndoing, setIsUndoing] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [showLiveCallModal, setShowLiveCallModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -653,6 +655,23 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
   const handleToastClose = () => {
     setShowToast(false);
+    setUndoHandler(null);
+  };
+
+  const handleRequestUndo = (handler: () => Promise<void>) => {
+    setUndoHandler(() => handler);
+  };
+
+  const handleUndo = async () => {
+    if (!undoHandler) return;
+
+    setIsUndoing(true);
+    try {
+      await undoHandler();
+    } finally {
+      setIsUndoing(false);
+      setUndoHandler(null);
+    }
   };
 
   // Handle Add Task button click
@@ -967,6 +986,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           isAdmin={isAdmin}
           onLeadUpdate={fetchLead}
           onShowToast={handleShowToast}
+          onRequestUndo={handleRequestUndo}
           onEmailQuote={handleEmailQuoteButton}
         />
       </div>
@@ -976,6 +996,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         isVisible={showToast}
         onClose={handleToastClose}
         type={toastType}
+        showUndo={!!undoHandler}
+        onUndo={handleUndo}
+        undoLoading={isUndoing}
       />
 
       <ReassignModal

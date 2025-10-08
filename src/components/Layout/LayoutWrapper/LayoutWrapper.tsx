@@ -21,7 +21,7 @@ interface LayoutWrapperProps {
 function LayoutContent({ children }: LayoutWrapperProps) {
   const pathname = usePathname();
   const [isSidebarActive, setIsSidebarActive] = useState(false);
-  const { getPageAction } = usePageActions();
+  const { getPageAction, pageHeader } = usePageActions();
 
   // Define which routes should show the header and sidebar
   const isPublicPage =
@@ -178,6 +178,15 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
         // Show lower header for customer detail pages
         if (pathname.match(/^\/customers\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise use default
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: true,
+              addButtonText: 'Open Tickets',
+            };
+          }
           return {
             title: 'Customer Details',
             description: 'View and manage this customer information.',

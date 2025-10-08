@@ -20,6 +20,7 @@ import { Toast } from '@/components/Common/Toast';
 import { CustomerTicketsList } from '@/components/Customers/CustomerTicketsList/CustomerTicketsList';
 import { CustomerLeadsList } from '@/components/Customers/CustomerLeadsList/CustomerLeadsList';
 import { CustomerSupportCasesList } from '@/components/Customers/CustomerSupportCasesList/CustomerSupportCasesList';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -33,6 +34,29 @@ interface CustomerPageProps {
   params: Promise<{ id: string }>;
 }
 
+// Helper functions
+const calculateYearsSince = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const years = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+
+  if (years === 0) {
+    return 'Less Than One Year';
+  } else if (years === 1) {
+    return '1 Year';
+  } else {
+    return `${years} Years`;
+  }
+};
+
+const formatDateDDMMYYYY = (dateString: string): string => {
+  const date = new Date(dateString);
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 export default function CustomerDetailPage({ params }: CustomerPageProps) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -42,6 +66,7 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const router = useRouter();
+  const { setPageHeader } = usePageActions();
 
   // Service Location form state
   const [serviceLocationData, setServiceLocationData] = useState<ServiceAddressData>({
@@ -64,6 +89,8 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [undoHandler, setUndoHandler] = useState<(() => Promise<void>) | null>(null);
+  const [isUndoing, setIsUndoing] = useState(false);
 
   // Get pricing settings for home/yard size inputs
   const { settings: pricingSettings } = usePricingSettings(customer?.company_id);
@@ -165,24 +192,63 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
     }
   }, [customerId, loading, isAdmin, fetchCustomer, fetchSupportCases]);
 
+  // Set page header when customer data loads
+  useEffect(() => {
+    if (customer) {
+      const customerName = `${customer.first_name} ${customer.last_name}`;
+      const customerSinceDate = formatDateDDMMYYYY(customer.created_at);
+      const yearsSince = calculateYearsSince(customer.created_at);
+      const headerDescription = `Customer Since ${customerSinceDate} (${yearsSince})`;
+
+      setPageHeader({
+        title: customerName,
+        description: headerDescription,
+      });
+    }
+
+    // Clean up on unmount
+    return () => {
+      setPageHeader(null);
+    };
+  }, [customer, setPageHeader]);
+
   // Initialize service location data from customer
   useEffect(() => {
-    if (originalServiceAddress === null && customer?.primary_service_address) {
-      const addressData: ServiceAddressData = {
-        street_address: customer.primary_service_address.street_address || '',
-        city: customer.primary_service_address.city || '',
-        state: customer.primary_service_address.state || '',
-        zip_code: customer.primary_service_address.zip_code || '',
-        apartment_unit: customer.primary_service_address.apartment_unit || undefined,
-        latitude: customer.primary_service_address.latitude || undefined,
-        longitude: customer.primary_service_address.longitude || undefined,
-        address_type: 'residential',
-      };
+    // Only initialize if we haven't set it yet, OR if customer data just became available
+    const shouldInitialize =
+      originalServiceAddress === null ||
+      (customer && originalServiceAddress &&
+       !originalServiceAddress.street_address &&
+       !originalServiceAddress.city &&
+       customer.primary_service_address);
+
+    if (shouldInitialize) {
+      const addressData: ServiceAddressData = customer?.primary_service_address
+        ? {
+            street_address: customer.primary_service_address.street_address || '',
+            city: customer.primary_service_address.city || '',
+            state: customer.primary_service_address.state || '',
+            zip_code: customer.primary_service_address.zip_code || '',
+            apartment_unit: customer.primary_service_address.apartment_unit || undefined,
+            latitude: customer.primary_service_address.latitude || undefined,
+            longitude: customer.primary_service_address.longitude || undefined,
+            address_type: 'residential',
+          }
+        : {
+            street_address: '',
+            city: '',
+            state: '',
+            zip_code: '',
+            apartment_unit: undefined,
+            latitude: undefined,
+            longitude: undefined,
+            address_type: 'residential',
+          };
 
       setOriginalServiceAddress(addressData);
       setServiceLocationData(addressData);
     }
-  }, [customer?.primary_service_address, originalServiceAddress]);
+  }, [customer, customer?.primary_service_address, originalServiceAddress]);
 
   // State name to abbreviation mapping for address handling
   const stateNameToAbbreviation: Record<string, string> = {
@@ -287,29 +353,50 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
 
   const handleToastClose = () => {
     setShowToast(false);
+    setUndoHandler(null);
+  };
+
+  const handleRequestUndo = (handler: () => Promise<void>) => {
+    setUndoHandler(() => handler);
+  };
+
+  const handleUndo = async () => {
+    if (!undoHandler) return;
+
+    setIsUndoing(true);
+    try {
+      await undoHandler();
+    } finally {
+      setIsUndoing(false);
+      setUndoHandler(null);
+    }
   };
 
   // Computed values for address state
   const hasAddressChanges = useMemo(() => {
     if (!originalServiceAddress) return false;
 
-    const hadExistingAddress = !!(
-      originalServiceAddress.street_address ||
-      originalServiceAddress.city ||
-      originalServiceAddress.state ||
-      originalServiceAddress.zip_code
-    );
-
-    if (!hadExistingAddress) return false;
-
-    return (
+    // Check if any field has changed from the original
+    const hasChanges =
       serviceLocationData.street_address !== originalServiceAddress.street_address ||
       serviceLocationData.city !== originalServiceAddress.city ||
       serviceLocationData.state !== originalServiceAddress.state ||
       serviceLocationData.zip_code !== originalServiceAddress.zip_code ||
       serviceLocationData.apartment_unit !== originalServiceAddress.apartment_unit ||
-      serviceLocationData.address_line_2 !== originalServiceAddress.address_line_2
-    );
+      serviceLocationData.address_line_2 !== originalServiceAddress.address_line_2;
+
+    // Only return true if there are changes AND at least one meaningful value exists
+    if (hasChanges) {
+      const hasMeaningfulData = !!(
+        serviceLocationData.street_address ||
+        serviceLocationData.city ||
+        serviceLocationData.state ||
+        serviceLocationData.zip_code
+      );
+      return hasMeaningfulData;
+    }
+
+    return false;
   }, [serviceLocationData, originalServiceAddress]);
 
   const hasCompleteAddress = useMemo(() => {
@@ -361,27 +448,6 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
       : '';
   }, [serviceLocationData]);
 
-  const calculateYearsSince = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const years = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-
-    if (years === 0) {
-      return 'Less Than A Year';
-    } else if (years === 1) {
-      return '1 Year';
-    } else {
-      return `${years} Years`;
-    }
-  };
-
-  const formatDateDDMMYYYY = (dateString: string): string => {
-    const date = new Date(dateString);
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
 
   const renderOverviewTab = () => {
     if (!customer) return null;
@@ -389,7 +455,14 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
     return (
       <div className={styles.overviewContent}>
         <div className={styles.contentLeft}>
-          <ContactInformationCard customer={customer} startExpanded={true} />
+          <ContactInformationCard
+            customer={customer}
+            startExpanded={true}
+            editable={true}
+            onShowToast={handleShowToast}
+            onRequestUndo={handleRequestUndo}
+            companyId={customer.company_id}
+          />
 
           <InfoCard
             title="Source & Acquisition"
@@ -412,6 +485,7 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
             showSizeInputs={true}
             pricingSettings={pricingSettings || undefined}
             onShowToast={handleShowToast}
+            onRequestUndo={handleRequestUndo}
             onAddressSelect={handleAddressSelect}
             onSaveAddress={handleSaveAddress}
             onCancelAddress={handleCancelAddressChanges}
@@ -507,6 +581,7 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
           showSizeInputs={true}
           pricingSettings={pricingSettings || undefined}
           onShowToast={handleShowToast}
+          onRequestUndo={handleRequestUndo}
           onAddressSelect={handleAddressSelect}
           onSaveAddress={handleSaveAddress}
           onCancelAddress={handleCancelAddressChanges}
@@ -536,11 +611,6 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
       </div>
     );
   }
-
-  const customerName = `${customer.first_name} ${customer.last_name}`;
-  const customerSinceDate = formatDateDDMMYYYY(customer.created_at);
-  const yearsSince = calculateYearsSince(customer.created_at);
-  const headerDescription = `Customer Since ${customerSinceDate} (${yearsSince})`;
 
   const tabs: TabItem[] = [
     {
@@ -580,6 +650,9 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
         isVisible={showToast}
         onClose={handleToastClose}
         type={toastType}
+        showUndo={!!undoHandler}
+        onUndo={handleUndo}
+        undoLoading={isUndoing}
       />
     </div>
   );
