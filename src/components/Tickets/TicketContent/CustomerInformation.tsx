@@ -8,6 +8,8 @@ import styles from './CustomerInformation.module.scss';
 interface CustomerInformationProps {
   ticket: Ticket;
   onUpdate?: (customerData: any) => void;
+  activityEntityType?: 'customer' | 'lead' | 'ticket';
+  activityEntityId?: string;
 }
 
 interface FieldState {
@@ -20,6 +22,8 @@ interface FieldState {
 export default function CustomerInformation({
   ticket,
   onUpdate,
+  activityEntityType,
+  activityEntityId,
 }: CustomerInformationProps) {
   // Initialize form fields with current customer data (contact info only)
   const [fields, setFields] = useState<Record<string, FieldState>>({
@@ -58,6 +62,15 @@ export default function CustomerInformation({
   // Store timeout refs for debouncing
   const timeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
   const successTimeoutRefs = useRef<Record<string, NodeJS.Timeout>>({});
+
+  // Store original database values for accurate activity logging
+  const originalValuesRef = useRef<Record<string, string>>({
+    first_name: ticket.customer?.first_name || '',
+    last_name: ticket.customer?.last_name || '',
+    email: ticket.customer?.email || '',
+    phone: ticket.customer?.phone || '',
+    alternate_phone: ticket.customer?.alternate_phone || '',
+  });
 
   // Format phone progressively as user types
   const formatPhoneInput = (value: string): string => {
@@ -101,7 +114,7 @@ export default function CustomerInformation({
 
   // Auto-save function with debouncing
   const autoSave = useCallback(
-    async (fieldName: string, value: string) => {
+    async (fieldName: string, value: string, oldValue: string) => {
       if (!ticket.customer?.id) return;
 
       try {
@@ -132,6 +145,31 @@ export default function CustomerInformation({
           updateFieldState(fieldName, { showSuccess: false });
         }, 2000);
 
+        // Update original value ref after successful save
+        originalValuesRef.current[fieldName] = value.trim();
+
+        // Log activity for the field change
+        if (ticket.company_id && oldValue !== value.trim()) {
+          try {
+            await fetch('/api/activity', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                company_id: ticket.company_id,
+                entity_type: activityEntityType || 'customer',
+                entity_id: activityEntityId || ticket.customer.id,
+                activity_type: 'field_update',
+                field_name: fieldName,
+                old_value: oldValue || null,
+                new_value: value.trim() || null,
+              }),
+            });
+          } catch (activityError) {
+            console.error('Error logging activity:', activityError);
+            // Don't fail the main operation if activity logging fails
+          }
+        }
+
         // Call parent update callback
         if (onUpdate) {
           onUpdate(updatedCustomer);
@@ -150,11 +188,14 @@ export default function CustomerInformation({
         }, 3000);
       }
     },
-    [ticket.customer?.id, onUpdate]
+    [ticket.customer?.id, ticket.company_id, onUpdate]
   );
 
   // Handle field changes with debouncing
   const handleFieldChange = (fieldName: string, value: string) => {
+    // Get the original database value for activity logging
+    const oldValue = originalValuesRef.current[fieldName];
+
     let formattedValue = value;
 
     // Auto-format phone numbers as user types
@@ -188,10 +229,21 @@ export default function CustomerInformation({
     // Set new timeout for auto-save (1000ms after user stops typing)
     if (shouldSave) {
       timeoutRefs.current[fieldName] = setTimeout(() => {
-        autoSave(fieldName, formattedValue);
+        autoSave(fieldName, formattedValue, oldValue);
       }, 1000);
     }
   };
+
+  // Update original values ref when customer data changes from props
+  useEffect(() => {
+    originalValuesRef.current = {
+      first_name: ticket.customer?.first_name || '',
+      last_name: ticket.customer?.last_name || '',
+      email: ticket.customer?.email || '',
+      phone: ticket.customer?.phone || '',
+      alternate_phone: ticket.customer?.alternate_phone || '',
+    };
+  }, [ticket.customer]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {

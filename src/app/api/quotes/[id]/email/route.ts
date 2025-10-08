@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { createClient } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 export async function POST(
   request: NextRequest,
@@ -207,6 +209,30 @@ export async function POST(
     }
 
     const emailResult = await emailResponse.json();
+
+    // Log activity for quote emailed
+    try {
+      const userSupabase = await createClient();
+      const { data: { user } } = await userSupabase.auth.getUser();
+
+      await logActivity({
+        company_id: lead.company_id,
+        entity_type: 'lead',
+        entity_id: lead.id,
+        activity_type: 'contact_made',
+        user_id: user?.id || null,
+        notes: `Quote emailed to ${lead.customer.email}`,
+        metadata: {
+          contact_type: 'email',
+          quote_id: quote.id,
+          email_template_id: template.id,
+          recipient_email: lead.customer.email,
+        },
+      });
+    } catch (activityError) {
+      console.error('Error logging quote email activity:', activityError);
+      // Don't fail the API call if activity logging fails
+    }
 
     return NextResponse.json({
       success: true,

@@ -1,0 +1,119 @@
+.activityFeed {
+  width: 100%;
+  padding: 20px 16px;
+}
+
+.loading,
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--slate-500);
+  font-size: 14px;
+}
+
+.timeline {
+  position: relative;
+  padding-left: 0;
+}
+
+.activityItem {
+  display: flex;
+  gap: 12px;
+  position: relative;
+  padding: 12px 0;
+
+  &:last-child {
+    padding-bottom: 0;
+  }
+}
+
+.avatarContainer {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  position: relative;
+  top: -7px;
+  z-index: 1;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.avatarFallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--action-500) 0%,
+    var(--action-700) 100%
+  );
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.activityContent {
+  flex: 1;
+  padding-top: 2px;
+}
+
+.activityRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.activityText {
+  font-size: 14px;
+  color: var(--slate-700);
+  line-height: 1.6;
+  flex: 1;
+
+  strong {
+    font-weight: 600;
+    color: var(--slate-900);
+  }
+}
+
+.userName {
+  color: var(--action-600);
+  font-weight: 600;
+}
+
+.changeDetail {
+  margin-top: 4px;
+  padding: 8px 12px 8px 0;
+  font-size: 13px;
+  color: var(--slate-600);
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+}
+
+.noteContent {
+  margin-top: 6px;
+  padding: 8px 12px 8px 0;
+  font-size: 13px;
+  color: var(--slate-700);
+  font-style: italic;
+}
+
+.timestamp {
+  font-size: 12px;
+  color: var(--slate-500);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
