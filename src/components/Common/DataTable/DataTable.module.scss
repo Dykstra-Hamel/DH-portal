@@ -198,17 +198,19 @@
   );
   padding: 16px;
   border-top: 1px solid var(--gray-200);
+  border-left: 2px solid transparent;
+  border-right: 2px solid transparent;
   align-items: center;
   background: var(--white);
-  cursor: pointer;
   animation: slideInFromTop 0.5s ease-out;
   transition:
     box-shadow 0.2s ease,
-    transform 0.1s ease;
+    transform 0.1s ease,
+    border-color 0.2s ease;
 
   &:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-    transform: translateY(-1px);
+    border-right-color: var(--action-500);
+    border-left-color: var(--action-500);
   }
 
   &:last-child {

@@ -126,7 +126,8 @@ export default function TicketReviewModal({
   const [isReasonDropdownOpen, setIsReasonDropdownOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'customer' | 'details' | 'insights' | 'location'
-  >('insights');
+  >('details');
+  const tabContentRef = useRef<HTMLDivElement>(null);
 
   // Get assignable users based on selected qualification type
   const {
@@ -149,7 +150,8 @@ export default function TicketReviewModal({
   const reviewChannelRef = useRef<any>(null);
 
   // Get current authenticated user
-  const { getDisplayName, getAvatarUrl, getInitials, user, profile } = useUser();
+  const { getDisplayName, getAvatarUrl, getInitials, user, profile } =
+    useUser();
   const router = useRouter();
 
   // Initialize selectedAssignee with current user ID when user is available
@@ -158,6 +160,56 @@ export default function TicketReviewModal({
       setSelectedAssignee(user.id);
     }
   }, [user?.id, selectedAssignee]);
+
+  // Update tab content height for smooth transitions
+  useEffect(() => {
+    const content = tabContentRef.current;
+    if (!content) return;
+
+    const updateHeight = () => {
+      // Get current height
+      const currentHeight = content.offsetHeight;
+
+      // Temporarily disable transition to measure natural height
+      content.style.transition = 'none';
+      content.style.height = 'auto';
+
+      // Get the natural content height
+      const newHeight = content.scrollHeight;
+
+      // Set back to current height (starting point for transition)
+      content.style.height = `${currentHeight}px`;
+
+      // Use requestAnimationFrame to ensure the browser has painted
+      requestAnimationFrame(() => {
+        // Re-enable transition
+        content.style.transition = '';
+
+        // Trigger transition to new height
+        content.style.height = `${newHeight}px`;
+      });
+    };
+
+    // Update height after a brief delay to ensure content is rendered
+    const timeoutId = setTimeout(updateHeight, 100);
+
+    // Use MutationObserver to detect when content is fully loaded (e.g., when loading states change)
+    const observer = new MutationObserver(() => {
+      // Debounce the height updates
+      clearTimeout(timeoutId);
+      setTimeout(updateHeight, 100);
+    });
+
+    observer.observe(content, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, [activeTab]);
 
   const currentUser = {
     name: getDisplayName(),
@@ -247,10 +299,13 @@ export default function TicketReviewModal({
         // Set up heartbeat to keep review status alive (every 60 seconds)
         heartbeatIntervalRef.current = setInterval(async () => {
           try {
-            await authenticatedFetch(`/api/tickets/${ticket.id}/review-status`, {
-              method: 'PUT',
-              body: JSON.stringify({ action: 'heartbeat' }),
-            });
+            await authenticatedFetch(
+              `/api/tickets/${ticket.id}/review-status`,
+              {
+                method: 'PUT',
+                body: JSON.stringify({ action: 'heartbeat' }),
+              }
+            );
           } catch (error) {
             console.error('Error sending review heartbeat:', error);
           }
@@ -261,7 +316,7 @@ export default function TicketReviewModal({
         reviewChannelRef.current = channel;
 
         // Subscribe to updates from other users
-        subscribeToTicketReviewUpdates(channel, (payload) => {
+        subscribeToTicketReviewUpdates(channel, payload => {
           // Channel will be used by TicketsList to update UI
         });
 
@@ -994,7 +1049,10 @@ export default function TicketReviewModal({
               <>
                 <p>{ticket.service_address.street_address}</p>
                 <p>
-                  {ticket.service_address.city}, {ticket.service_address.state}{' '}
+                  {ticket.service_address.city && (
+                    <>{ticket.service_address.city}, </>
+                  )}{' '}
+                  {ticket.service_address.state}{' '}
                   {ticket.service_address.zip_code}
                 </p>
               </>
@@ -1002,7 +1060,7 @@ export default function TicketReviewModal({
               <>
                 <p>{ticket.customer?.address || 'Address not provided'}</p>
                 <p>
-                  {ticket.customer?.city}
+                  {ticket.customer?.city && <>{ticket.customer?.city}, </>}{' '}
                   {ticket.customer?.state} {ticket.customer?.zip_code}
                 </p>
               </>
@@ -1030,6 +1088,11 @@ export default function TicketReviewModal({
             </div>
           </div>
         </div>
+        {callRecord && (
+          <div className={styles.callSummary}>
+            <p>Call summary: {callRecord.call_analysis?.call_summary}</p>
+          </div>
+        )}
         <div className={styles.actionsWrapper}>
           {renderRadioButtons()}
           <div className={styles.dividerLine}></div>
@@ -1045,7 +1108,7 @@ export default function TicketReviewModal({
                 onSecondaryAction={handleApprove}
                 secondaryButtonText={`Assign ${getQualificationLabel()}`}
                 primaryButtonDisabled={false}
-                primaryButtonText={'Take Live Call'}
+                primaryButtonText={'Take It'}
                 showSecondaryButton={true}
                 primaryButtonPosition="left"
                 isLoading={isQualifying}
@@ -1080,6 +1143,14 @@ export default function TicketReviewModal({
               <div className={styles.tabbedInterface}>
                 <div className={styles.tabNavigation}>
                   <button
+                    className={`${styles.tabButton} ${activeTab === 'details' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('details')}
+                  >
+                    <ReceiptText size={20} />
+                    Call Details
+                    <ChevronRight size={20} />
+                  </button>
+                  <button
                     className={`${styles.tabButton} ${activeTab === 'insights' ? styles.active : ''}`}
                     onClick={() => setActiveTab('insights')}
                   >
@@ -1103,14 +1174,6 @@ export default function TicketReviewModal({
                   </button>
 
                   <button
-                    className={`${styles.tabButton} ${activeTab === 'details' ? styles.active : ''}`}
-                    onClick={() => setActiveTab('details')}
-                  >
-                    <ReceiptText size={20} />
-                    Call Details
-                    <ChevronRight size={20} />
-                  </button>
-                  <button
                     className={`${styles.tabButton} ${activeTab === 'customer' ? styles.active : ''}`}
                     onClick={() => setActiveTab('customer')}
                   >
@@ -1127,7 +1190,7 @@ export default function TicketReviewModal({
                     <ChevronRight size={20} />
                   </button>
                 </div>
-                <div className={styles.tabContent}>
+                <div className={styles.tabContent} ref={tabContentRef}>
                   {activeTab === 'customer' && (
                     <CustomerInformation
                       ticket={ticket}
