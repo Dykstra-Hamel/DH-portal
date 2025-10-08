@@ -59,6 +59,8 @@ export interface Lead {
   lost_stage?: string;
   archived?: boolean;
   furthest_completed_stage?: string;
+  scheduled_date?: string;
+  scheduled_time?: string;
   created_at: string;
   updated_at: string;
 
