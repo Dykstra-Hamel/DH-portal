@@ -14,6 +14,8 @@ import { PestSelection } from '@/components/Common/PestSelection/PestSelection';
 import { AdditionalPestsSelection } from '@/components/Common/AdditionalPestsSelection/AdditionalPestsSelection';
 import { CustomDropdown } from '@/components/Common/CustomDropdown/CustomDropdown';
 import CustomerInformation from '@/components/Tickets/TicketContent/CustomerInformation';
+import { ActivityFeed } from '@/components/Common/ActivityFeed/ActivityFeed';
+import { NotesSection } from '@/components/Common/NotesSection/NotesSection';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
@@ -2501,6 +2503,8 @@ export function LeadStepContent({
           >
             <CustomerInformation
               ticket={createTicketFromLead}
+              activityEntityType="lead"
+              activityEntityId={lead.id}
               onUpdate={async updatedCustomer => {
                 // Update the lead's customer data optimistically
                 if (lead.customer && updatedCustomer) {
@@ -2566,11 +2570,11 @@ export function LeadStepContent({
             icon={<SquareActivity size={20} />}
             startExpanded={false}
           >
-            <div className={styles.cardContent}>
-              <p>
-                Lead activity and interaction history will be displayed here.
-              </p>
-            </div>
+            <ActivityFeed
+              entityType="lead"
+              entityId={lead.id}
+              companyId={lead.company_id}
+            />
           </InfoCard>
 
           <InfoCard
@@ -2578,9 +2582,12 @@ export function LeadStepContent({
             icon={<NotebookPen size={20} />}
             startExpanded={false}
           >
-            <div className={styles.cardContent}>
-              <p>Lead notes and comments will be displayed here.</p>
-            </div>
+            <NotesSection
+              entityType="lead"
+              entityId={lead.id}
+              companyId={lead.company_id}
+              userId={user?.id || ''}
+            />
           </InfoCard>
         </div>
       </>
@@ -2905,6 +2912,8 @@ export function LeadStepContent({
           >
             <CustomerInformation
               ticket={createTicketFromLead}
+              activityEntityType="lead"
+              activityEntityId={lead.id}
               onUpdate={async updatedCustomer => {
                 // Update the lead's customer data optimistically
                 if (lead.customer && updatedCustomer) {
@@ -2970,11 +2979,11 @@ export function LeadStepContent({
             icon={<SquareActivity size={20} />}
             startExpanded={false}
           >
-            <div className={styles.cardContent}>
-              <p>
-                Lead activity and interaction history will be displayed here.
-              </p>
-            </div>
+            <ActivityFeed
+              entityType="lead"
+              entityId={lead.id}
+              companyId={lead.company_id}
+            />
           </InfoCard>
 
           <InfoCard
@@ -2982,9 +2991,12 @@ export function LeadStepContent({
             icon={<NotebookPen size={20} />}
             startExpanded={false}
           >
-            <div className={styles.cardContent}>
-              <p>Lead notes and comments will be displayed here.</p>
-            </div>
+            <NotesSection
+              entityType="lead"
+              entityId={lead.id}
+              companyId={lead.company_id}
+              userId={user?.id || ''}
+            />
           </InfoCard>
         </div>
       </>
@@ -4140,6 +4152,8 @@ export function LeadStepContent({
           >
             <CustomerInformation
               ticket={createTicketFromLead}
+              activityEntityType="lead"
+              activityEntityId={lead.id}
               onUpdate={async updatedCustomer => {
                 // Update the lead's customer data optimistically
                 if (lead.customer && updatedCustomer) {
@@ -4205,11 +4219,11 @@ export function LeadStepContent({
             icon={<SquareActivity size={20} />}
             startExpanded={false}
           >
-            <div className={styles.cardContent}>
-              <p>
-                Lead activity and interaction history will be displayed here.
-              </p>
-            </div>
+            <ActivityFeed
+              entityType="lead"
+              entityId={lead.id}
+              companyId={lead.company_id}
+            />
           </InfoCard>
 
           <InfoCard
@@ -4217,9 +4231,12 @@ export function LeadStepContent({
             icon={<NotebookPen size={20} />}
             startExpanded={false}
           >
-            <div className={styles.cardContent}>
-              <p>Lead notes and comments will be displayed here.</p>
-            </div>
+            <NotesSection
+              entityType="lead"
+              entityId={lead.id}
+              companyId={lead.company_id}
+              userId={user?.id || ''}
+            />
           </InfoCard>
         </div>
       </>

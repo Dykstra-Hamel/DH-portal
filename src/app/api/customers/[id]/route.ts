@@ -226,6 +226,11 @@ export async function PUT(
         ? normalizePhoneNumber(body.phone.trim()) || body.phone.trim()
         : null;
     }
+    if ('alternate_phone' in body) {
+      updateData.alternate_phone = body.alternate_phone?.trim()
+        ? normalizePhoneNumber(body.alternate_phone.trim()) || body.alternate_phone.trim()
+        : null;
+    }
     if ('first_name' in body) {
       updateData.first_name = body.first_name?.trim() || null;
     }

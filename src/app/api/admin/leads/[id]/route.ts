@@ -3,6 +3,7 @@ import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendEvent } from '@/lib/inngest/client';
 import { getCustomerPrimaryServiceAddress } from '@/lib/service-addresses';
+import { logFieldChanges } from '@/lib/activity-logger';
 
 export async function GET(
   request: NextRequest,
@@ -133,10 +134,10 @@ export async function PUT(
     // Use admin client to update lead
     const supabase = createAdminClient();
 
-    // Get the existing lead to capture old status before update
+    // Get the existing lead to capture old values before update (for activity logging)
     const { data: existingLead, error: existingLeadError } = await supabase
       .from('leads')
-      .select('lead_status, company_id')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -223,6 +224,21 @@ export async function PUT(
         },
         { status: 500 }
       );
+    }
+
+    // Log all field changes to activity log
+    try {
+      await logFieldChanges({
+        entityType: 'lead',
+        entityId: id,
+        companyId: existingLead.company_id,
+        oldData: existingLead,
+        newData: body,
+        userId: user.id,
+      });
+    } catch (activityError) {
+      console.error('Error logging activity:', activityError);
+      // Don't fail the API call if activity logging fails
     }
 
     // Check if lead status changed and trigger automation

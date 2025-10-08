@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logActivity } from '@/lib/activity-logger';
 
 // POST /api/leads/[id]/cadence - Start sales cadence for a lead (manual start)
 export async function POST(
@@ -57,12 +58,13 @@ export async function POST(
 
     // Use selected cadence or get the default cadence for this company
     let cadenceId: string;
+    let cadenceName: string;
 
     if (selectedCadenceId) {
       // Verify the selected cadence exists and is active
       const { data: selectedCadence, error: selectedError } = await supabase
         .from('sales_cadences')
-        .select('id')
+        .select('id, name')
         .eq('id', selectedCadenceId)
         .eq('company_id', lead.company_id)
         .eq('is_active', true)
@@ -76,11 +78,12 @@ export async function POST(
       }
 
       cadenceId = selectedCadence.id;
+      cadenceName = selectedCadence.name;
     } else {
       // Get the default cadence
       const { data: defaultCadence, error: cadenceError } = await supabase
         .from('sales_cadences')
-        .select('id')
+        .select('id, name')
         .eq('company_id', lead.company_id)
         .eq('is_active', true)
         .eq('is_default', true)
@@ -96,6 +99,7 @@ export async function POST(
       }
 
       cadenceId = defaultCadence.id;
+      cadenceName = defaultCadence.name;
     }
 
     // Create the cadence assignment
@@ -117,6 +121,24 @@ export async function POST(
         { error: 'Failed to start cadence' },
         { status: 500 }
       );
+    }
+
+    // Log cadence started activity
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await logActivity({
+        company_id: lead.company_id,
+        entity_type: 'lead',
+        entity_id: leadId,
+        activity_type: 'cadence_started',
+        user_id: user?.id || null,
+        metadata: {
+          cadence_id: cadenceId,
+          cadence_name: cadenceName,
+        },
+      });
+    } catch (activityError) {
+      console.error('Error logging cadence started activity:', activityError);
     }
 
     return NextResponse.json({
@@ -338,6 +360,23 @@ export async function PATCH(
         .not('cadence_step_id', 'is', null)
         .eq('status', 'pending');
 
+      // Log cadence paused activity
+      try {
+        const { data: lead } = await supabase.from('leads').select('company_id').eq('id', leadId).single();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (lead) {
+          await logActivity({
+            company_id: lead.company_id,
+            entity_type: 'lead',
+            entity_id: leadId,
+            activity_type: 'cadence_paused',
+            user_id: user?.id || null,
+          });
+        }
+      } catch (activityError) {
+        console.error('Error logging cadence paused activity:', activityError);
+      }
+
     } else if (action === 'unpause') {
       // Unpause the cadence
       const { error: unpauseError } = await supabase
@@ -424,6 +463,23 @@ export async function DELETE(
       .from('lead_cadence_progress')
       .delete()
       .eq('lead_id', leadId);
+
+    // Log cadence ended activity
+    try {
+      const { data: lead } = await supabase.from('leads').select('company_id').eq('id', leadId).single();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (lead) {
+        await logActivity({
+          company_id: lead.company_id,
+          entity_type: 'lead',
+          entity_id: leadId,
+          activity_type: 'cadence_ended',
+          user_id: user?.id || null,
+        });
+      }
+    } catch (activityError) {
+      console.error('Error logging cadence ended activity:', activityError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

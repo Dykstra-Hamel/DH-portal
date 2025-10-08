@@ -10,13 +10,15 @@ export async function GET(
     const { id: leadId } = await params;
     const supabase = await createClient();
 
+    // Use the new unified activity_log table
     const { data: activities, error } = await supabase
-      .from('lead_activity_log')
+      .from('activity_log')
       .select(`
         *,
-        user:profiles!user_id(id, first_name, last_name, email)
+        user:profiles!activity_log_user_id_fkey(id, first_name, last_name, email)
       `)
-      .eq('lead_id', leadId)
+      .eq('entity_type', 'lead')
+      .eq('entity_id', leadId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -47,7 +49,7 @@ export async function POST(
     const supabase = await createClient();
     const body = await request.json();
 
-    const { activity_type, notes, skip_task_completion } = body;
+    const { activity_type, notes } = body;
 
     // Get current user from session
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -55,6 +57,20 @@ export async function POST(
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
+      );
+    }
+
+    // Get the lead to get company_id
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('company_id')
+      .eq('id', leadId)
+      .single();
+
+    if (leadError || !lead) {
+      return NextResponse.json(
+        { error: 'Lead not found' },
+        { status: 404 }
       );
     }
 
@@ -66,28 +82,36 @@ export async function POST(
       );
     }
 
-    // Validate activity_type
-    const validActionTypes = ['live_call', 'outbound_call', 'text_message', 'ai_call', 'email'];
-    if (!validActionTypes.includes(activity_type)) {
-      return NextResponse.json(
-        { error: 'Invalid activity_type' },
-        { status: 400 }
-      );
-    }
+    // Map old activity types to new unified activity type
+    // Old: live_call, outbound_call, text_message, ai_call, email
+    // New: contact_made (with metadata to specify type)
+    const activityTypeMapping: Record<string, string> = {
+      'live_call': 'contact_made',
+      'outbound_call': 'contact_made',
+      'text_message': 'contact_made',
+      'ai_call': 'contact_made',
+      'email': 'contact_made',
+    };
 
-    // Create the activity (trigger will handle cadence progression unless skip_task_completion is true)
+    const mappedActivityType = activityTypeMapping[activity_type] || 'contact_made';
+
+    // Create the activity using the new unified activity_log table
     const { data: newActivity, error: insertError } = await supabase
-      .from('lead_activity_log')
+      .from('activity_log')
       .insert({
-        lead_id: leadId,
+        company_id: lead.company_id,
+        entity_type: 'lead',
+        entity_id: leadId,
+        activity_type: mappedActivityType,
         user_id: user.id,
-        action_type: activity_type,
         notes: notes || null,
-        skip_task_completion: skip_task_completion || false,
+        metadata: {
+          contact_type: activity_type, // Store original type in metadata
+        },
       })
       .select(`
         *,
-        user:profiles!user_id(id, first_name, last_name, email)
+        user:profiles!activity_log_user_id_fkey(id, first_name, last_name, email)
       `)
       .single();
 
