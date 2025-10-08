@@ -74,8 +74,6 @@ export async function GET(
       `
       )
       .eq('customer_id', customerId)
-      .eq('archived', false)
-      .neq('status', 'resolved')
       .order('created_at', { ascending: false });
 
     if (supportCasesError) {

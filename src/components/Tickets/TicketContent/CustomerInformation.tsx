@@ -8,6 +8,8 @@ import styles from './CustomerInformation.module.scss';
 interface CustomerInformationProps {
   ticket: Ticket;
   onUpdate?: (customerData: any) => void;
+  onShowToast?: (message: string, type: 'success' | 'error') => void;
+  onRequestUndo?: (undoHandler: () => Promise<void>) => void;
   activityEntityType?: 'customer' | 'lead' | 'ticket';
   activityEntityId?: string;
 }
@@ -22,6 +24,8 @@ interface FieldState {
 export default function CustomerInformation({
   ticket,
   onUpdate,
+  onShowToast,
+  onRequestUndo,
   activityEntityType,
   activityEntityId,
 }: CustomerInformationProps) {
@@ -174,6 +178,61 @@ export default function CustomerInformation({
         if (onUpdate) {
           onUpdate(updatedCustomer);
         }
+
+        // Show success toast
+        if (onShowToast) {
+          onShowToast('Field updated successfully', 'success');
+        }
+
+        // Provide undo handler
+        if (onRequestUndo && ticket.customer?.id) {
+          const customerId = ticket.customer.id;
+          const entityId = activityEntityId || ticket.customer.id;
+          const undoHandler = async () => {
+            try {
+              // Revert to old value in UI
+              updateFieldState(fieldName, { value: oldValue });
+
+              // Revert in database
+              await authenticatedFetch(`/api/customers/${customerId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [fieldName]: oldValue || null }),
+              });
+
+              // Update original value ref back to old value
+              originalValuesRef.current[fieldName] = oldValue;
+
+              // Log undo activity
+              if (ticket.company_id) {
+                try {
+                  await fetch('/api/activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      company_id: ticket.company_id,
+                      entity_type: activityEntityType || 'customer',
+                      entity_id: entityId,
+                      activity_type: 'field_update',
+                      field_name: fieldName,
+                      old_value: value.trim() || null,
+                      new_value: oldValue || null,
+                    }),
+                  });
+                } catch (activityError) {
+                  console.error('Error logging undo activity:', activityError);
+                }
+              }
+
+              onShowToast?.('Change undone', 'success');
+            } catch (error) {
+              console.error('Error undoing change:', error);
+              onShowToast?.('Failed to undo change', 'error');
+            }
+          };
+
+          onRequestUndo(undoHandler);
+        }
       } catch (error) {
         console.error(`Error updating ${fieldName}:`, error);
         updateFieldState(fieldName, {
@@ -188,7 +247,7 @@ export default function CustomerInformation({
         }, 3000);
       }
     },
-    [ticket.customer?.id, ticket.company_id, onUpdate]
+    [ticket.customer?.id, ticket.company_id, onUpdate, onShowToast, onRequestUndo, activityEntityType, activityEntityId]
   );
 
   // Handle field changes with debouncing

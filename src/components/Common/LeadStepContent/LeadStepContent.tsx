@@ -64,6 +64,7 @@ interface LeadStepContentProps {
   isAdmin: boolean;
   onLeadUpdate?: (updatedLead?: Lead) => void;
   onShowToast?: (message: string, type: 'success' | 'error') => void;
+  onRequestUndo?: (undoHandler: () => Promise<void>) => void;
   onEmailQuote?: () => void;
 }
 
@@ -72,6 +73,7 @@ export function LeadStepContent({
   isAdmin,
   onLeadUpdate,
   onShowToast,
+  onRequestUndo,
   onEmailQuote,
 }: LeadStepContentProps) {
   const [ticketType, setTicketType] = useState('sales');
@@ -437,8 +439,10 @@ export function LeadStepContent({
   useEffect(() => {
     // Only pre-fill if we haven't already set the service location data
     if (originalServiceAddress === null) {
+      let addressData: ServiceAddressData;
+
       if (lead.primary_service_address) {
-        const addressData: ServiceAddressData = {
+        addressData = {
           street_address: lead.primary_service_address.street_address || '',
           city: lead.primary_service_address.city || '',
           state: lead.primary_service_address.state || '',
@@ -451,17 +455,9 @@ export function LeadStepContent({
             lead.primary_service_address.address_type || 'residential',
           property_notes: lead.primary_service_address.property_notes,
         };
-
-        // Store original service address for change detection
-        setOriginalServiceAddress(addressData);
-
-        setServiceLocationData(prev => ({
-          ...prev,
-          ...addressData,
-        }));
       } else if (lead.customer) {
         // Fallback to customer address if no primary service address exists
-        const customerAddressData: ServiceAddressData = {
+        addressData = {
           street_address: lead.customer?.address || '',
           city: lead.customer?.city || '',
           state: lead.customer?.state || '',
@@ -470,15 +466,28 @@ export function LeadStepContent({
           longitude: lead.customer?.longitude,
           address_type: 'residential',
         };
-
-        // Store original customer address for change detection
-        setOriginalServiceAddress(customerAddressData);
-
-        setServiceLocationData(prev => ({
-          ...prev,
-          ...customerAddressData,
-        }));
+      } else {
+        // No existing address - initialize with empty values
+        addressData = {
+          street_address: '',
+          city: '',
+          state: '',
+          zip_code: '',
+          apartment_unit: undefined,
+          address_line_2: undefined,
+          latitude: undefined,
+          longitude: undefined,
+          address_type: 'residential',
+        };
       }
+
+      // Store original service address for change detection
+      setOriginalServiceAddress(addressData);
+
+      setServiceLocationData(prev => ({
+        ...prev,
+        ...addressData,
+      }));
     }
   }, [lead.primary_service_address, lead.customer, originalServiceAddress]);
 
@@ -856,21 +865,11 @@ export function LeadStepContent({
   }, [serviceLocationData]);
 
   // Detect address changes by comparing current serviceLocationData with originalServiceAddress
-  // Only show save/cancel buttons if there's an original address AND it has been changed
   const hasAddressChanges = useMemo(() => {
     if (!originalServiceAddress) return false;
 
-    // Don't show buttons if the original address was empty (new address entry)
-    const hadExistingAddress = !!(
-      originalServiceAddress.street_address ||
-      originalServiceAddress.city ||
-      originalServiceAddress.state ||
-      originalServiceAddress.zip_code
-    );
-
-    if (!hadExistingAddress) return false;
-
-    return (
+    // Check if any field has changed from the original
+    const hasChanges =
       serviceLocationData.street_address !==
         originalServiceAddress.street_address ||
       serviceLocationData.city !== originalServiceAddress.city ||
@@ -879,8 +878,20 @@ export function LeadStepContent({
       serviceLocationData.apartment_unit !==
         originalServiceAddress.apartment_unit ||
       serviceLocationData.address_line_2 !==
-        originalServiceAddress.address_line_2
-    );
+        originalServiceAddress.address_line_2;
+
+    // Only return true if there are changes AND at least one meaningful value exists
+    if (hasChanges) {
+      const hasMeaningfulData = !!(
+        serviceLocationData.street_address ||
+        serviceLocationData.city ||
+        serviceLocationData.state ||
+        serviceLocationData.zip_code
+      );
+      return hasMeaningfulData;
+    }
+
+    return false;
   }, [serviceLocationData, originalServiceAddress]);
 
   const currentUser = user
@@ -2536,6 +2547,8 @@ export function LeadStepContent({
               ticket={createTicketFromLead}
               activityEntityType="lead"
               activityEntityId={lead.id}
+              onShowToast={onShowToast}
+              onRequestUndo={onRequestUndo}
               onUpdate={async updatedCustomer => {
                 // Update the lead's customer data optimistically
                 if (lead.customer && updatedCustomer) {
@@ -2584,6 +2597,7 @@ export function LeadStepContent({
             showSizeInputs
             pricingSettings={pricingSettings || undefined}
             onShowToast={onShowToast}
+            onRequestUndo={onRequestUndo}
             editable={true}
             onAddressSelect={handleAddressSelect}
             onSaveAddress={handleSaveAddress}
@@ -2945,6 +2959,8 @@ export function LeadStepContent({
               ticket={createTicketFromLead}
               activityEntityType="lead"
               activityEntityId={lead.id}
+              onShowToast={onShowToast}
+              onRequestUndo={onRequestUndo}
               onUpdate={async updatedCustomer => {
                 // Update the lead's customer data optimistically
                 if (lead.customer && updatedCustomer) {
@@ -2993,6 +3009,7 @@ export function LeadStepContent({
             showSizeInputs
             pricingSettings={pricingSettings || undefined}
             onShowToast={onShowToast}
+            onRequestUndo={onRequestUndo}
             editable={true}
             onAddressSelect={handleAddressSelect}
             onSaveAddress={handleSaveAddress}
@@ -3179,6 +3196,9 @@ export function LeadStepContent({
                       options={homeSizeOptions}
                       value={selectedHomeSizeOption}
                       onChange={async rangeValue => {
+                        const oldValue = selectedHomeSizeOption;
+                        const oldHomeSize = homeSize;
+
                         setSelectedHomeSizeOption(rangeValue);
                         const option = homeSizeOptions.find(
                           opt => opt.value === rangeValue
@@ -3217,6 +3237,47 @@ export function LeadStepContent({
                                 'Home size updated successfully',
                                 'success'
                               );
+
+                              // Provide undo handler
+                              if (onRequestUndo) {
+                                const undoHandler = async () => {
+                                  try {
+                                    // Revert UI state
+                                    setSelectedHomeSizeOption(oldValue);
+                                    setHomeSize(oldHomeSize);
+
+                                    // Revert in database
+                                    const revertResponse = await fetch(
+                                      `/api/quotes/${quote.id}`,
+                                      {
+                                        method: 'PUT',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                          home_size_range: oldValue || null,
+                                        }),
+                                      }
+                                    );
+
+                                    if (!revertResponse.ok) {
+                                      throw new Error('Failed to undo change');
+                                    }
+
+                                    const revertData = await revertResponse.json();
+                                    if (revertData.success && revertData.data) {
+                                      await broadcastQuoteUpdate(revertData.data);
+                                    }
+
+                                    onShowToast?.('Change undone', 'success');
+                                  } catch (error) {
+                                    console.error('Error undoing change:', error);
+                                    onShowToast?.('Failed to undo change', 'error');
+                                  }
+                                };
+
+                                onRequestUndo(undoHandler);
+                              }
                             }
                           } catch (error) {
                             console.error(
@@ -3241,6 +3302,9 @@ export function LeadStepContent({
                       options={yardSizeOptions}
                       value={selectedYardSizeOption}
                       onChange={async rangeValue => {
+                        const oldValue = selectedYardSizeOption;
+                        const oldYardSize = yardSize;
+
                         setSelectedYardSizeOption(rangeValue);
                         const option = yardSizeOptions.find(
                           opt => opt.value === rangeValue
@@ -3279,6 +3343,47 @@ export function LeadStepContent({
                                 'Yard size updated successfully',
                                 'success'
                               );
+
+                              // Provide undo handler
+                              if (onRequestUndo) {
+                                const undoHandler = async () => {
+                                  try {
+                                    // Revert UI state
+                                    setSelectedYardSizeOption(oldValue);
+                                    setYardSize(oldYardSize);
+
+                                    // Revert in database
+                                    const revertResponse = await fetch(
+                                      `/api/quotes/${quote.id}`,
+                                      {
+                                        method: 'PUT',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                          yard_size_range: oldValue || null,
+                                        }),
+                                      }
+                                    );
+
+                                    if (!revertResponse.ok) {
+                                      throw new Error('Failed to undo change');
+                                    }
+
+                                    const revertData = await revertResponse.json();
+                                    if (revertData.success && revertData.data) {
+                                      await broadcastQuoteUpdate(revertData.data);
+                                    }
+
+                                    onShowToast?.('Change undone', 'success');
+                                  } catch (error) {
+                                    console.error('Error undoing change:', error);
+                                    onShowToast?.('Failed to undo change', 'error');
+                                  }
+                                };
+
+                                onRequestUndo(undoHandler);
+                              }
                             }
                           } catch (error) {
                             console.error(
@@ -4184,6 +4289,8 @@ export function LeadStepContent({
               ticket={createTicketFromLead}
               activityEntityType="lead"
               activityEntityId={lead.id}
+              onShowToast={onShowToast}
+              onRequestUndo={onRequestUndo}
               onUpdate={async updatedCustomer => {
                 // Update the lead's customer data optimistically
                 if (lead.customer && updatedCustomer) {
@@ -4232,6 +4339,7 @@ export function LeadStepContent({
             showSizeInputs
             pricingSettings={pricingSettings || undefined}
             onShowToast={onShowToast}
+            onRequestUndo={onRequestUndo}
             editable={true}
             onAddressSelect={handleAddressSelect}
             onSaveAddress={handleSaveAddress}
@@ -4358,6 +4466,8 @@ export function LeadStepContent({
         >
           <CustomerInformation
             ticket={createTicketFromLead}
+            onShowToast={onShowToast}
+            onRequestUndo={onRequestUndo}
             onUpdate={async updatedCustomer => {
               // Update the lead's customer data optimistically
               if (lead.customer && updatedCustomer) {
@@ -4405,6 +4515,7 @@ export function LeadStepContent({
           showSizeInputs
           pricingSettings={pricingSettings || undefined}
           onShowToast={onShowToast}
+          onRequestUndo={onRequestUndo}
         />
 
         <InfoCard

@@ -67,7 +67,22 @@ const formatTicketType = (type: string): string => {
   return typeMap[type] || type;
 };
 
-const formatSource = (source: string): string => {
+const formatSource = (ticket: Ticket): string => {
+  // For phone calls, show call direction
+  if (ticket.type === 'phone_call') {
+    if (ticket.call_direction === 'inbound') {
+      return 'Inbound';
+    } else if (ticket.call_direction === 'outbound') {
+      return 'Outbound';
+    }
+  }
+
+  // For web forms, show "Widget"
+  if (ticket.type === 'web_form') {
+    return 'Widget';
+  }
+
+  // For other types, use the source mapping
   const sourceMap: { [key: string]: string } = {
     organic: 'Organic',
     referral: 'Referral',
@@ -82,7 +97,7 @@ const formatSource = (source: string): string => {
     internal: 'Internal',
     other: 'Other',
   };
-  return sourceMap[source] || source;
+  return sourceMap[ticket.source] || ticket.source;
 };
 
 const formatServiceType = (serviceType: string): string => {
@@ -204,7 +219,7 @@ export const getTicketColumns = (
     sortable: true,
     sortKey: 'source',
     render: (ticket: Ticket) => (
-      <span className={styles.sourceCell}>{formatSource(ticket.source)}</span>
+      <span className={styles.sourceCell}>{formatSource(ticket)}</span>
     ),
   },
   {

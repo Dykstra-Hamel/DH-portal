@@ -102,13 +102,12 @@ export async function GET(
       [];
     let assignedUsers: any[] = [];
 
-    // Get all tickets for this customer
+    // Get new tickets for this customer
     const { data: tickets, error: ticketsError } = await supabase
       .from('tickets')
       .select('*')
       .eq('customer_id', customerId)
-      .eq('archived', false) // Only show non-archived tickets
-      .neq('status', 'resolved')
+      .eq('status', 'new')
       .order('created_at', { ascending: false });
 
     if (ticketsError) {
@@ -276,6 +275,9 @@ export async function PUT(
     }
     if ('notes' in body) {
       updateData.notes = body.notes?.trim() || null;
+    }
+    if ('customer_status' in body) {
+      updateData.customer_status = body.customer_status?.trim() || null;
     }
 
     console.log('Customer API: Updating customer with data:', updateData);

@@ -2,16 +2,24 @@
 
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
+interface PageHeaderConfig {
+  title: string;
+  description: string;
+}
+
 interface PageActionsContextType {
   registerPageAction: (actionType: string, handler: () => void) => void;
   unregisterPageAction: (actionType: string) => void;
   getPageAction: (actionType: string) => (() => void) | null;
+  setPageHeader: (config: PageHeaderConfig | null) => void;
+  pageHeader: PageHeaderConfig | null;
 }
 
 const PageActionsContext = createContext<PageActionsContextType | undefined>(undefined);
 
 export function PageActionsProvider({ children }: { children: ReactNode }) {
   const [pageActions, setPageActions] = useState<{ [key: string]: () => void }>({});
+  const [pageHeader, setPageHeader] = useState<PageHeaderConfig | null>(null);
 
   const registerPageAction = useCallback((actionType: string, handler: () => void) => {
     setPageActions(prev => ({
@@ -33,11 +41,13 @@ export function PageActionsProvider({ children }: { children: ReactNode }) {
   }, [pageActions]);
 
   return (
-    <PageActionsContext.Provider 
-      value={{ 
-        registerPageAction, 
-        unregisterPageAction, 
-        getPageAction 
+    <PageActionsContext.Provider
+      value={{
+        registerPageAction,
+        unregisterPageAction,
+        getPageAction,
+        setPageHeader,
+        pageHeader
       }}
     >
       {children}

@@ -90,12 +90,12 @@ export async function GET(
       [];
     let assignedUsers: any[] = [];
 
-    // Get all tickets for this customer (including archived ones for admin)
+    // Get new tickets for this customer
     const { data: tickets, error: ticketsError } = await supabase
       .from('tickets')
       .select('*')
       .eq('customer_id', id)
-      .neq('status', 'resolved')
+      .eq('status', 'new')
       .order('created_at', { ascending: false });
 
     if (ticketsError) {

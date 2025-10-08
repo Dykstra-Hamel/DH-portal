@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
           estimated_value
         ),
         tickets:tickets!tickets_customer_id_fkey(
-          id
+          id,
+          status
         ),
         support_cases:support_cases!support_cases_customer_id_fkey(
           id
@@ -111,6 +112,9 @@ export async function GET(request: NextRequest) {
       const customerTickets = customer.tickets || [];
       const customerSupportCases = customer.support_cases || [];
 
+      // Filter tickets to only count "new" status
+      const newTickets = customerTickets.filter((t: any) => t.status === 'new');
+
       const activeLeads = customerLeads.filter((l: any) =>
         ['new', 'contacted', 'qualified', 'quoted'].includes(l.lead_status)
       );
@@ -127,7 +131,7 @@ export async function GET(request: NextRequest) {
         full_name: `${customer.first_name} ${customer.last_name}`,
         total_leads: customerLeads.length,
         active_leads: activeLeads.length,
-        total_tickets: customerTickets.length,
+        total_tickets: newTickets.length,
         total_support_cases: customerSupportCases.length,
         total_value: totalValue,
         last_activity: customer.updated_at,

@@ -31,6 +31,7 @@ interface ServiceLocationCardProps {
   showSizeInputs?: boolean;
   pricingSettings?: CompanyPricingSettings;
   onShowToast?: (message: string, type: 'success' | 'error') => void;
+  onRequestUndo?: (undoHandler: () => Promise<void>) => void;
   editable?: boolean;
   onAddressSelect?: (addressComponents: AddressComponents) => void;
   onSaveAddress?: () => void;
@@ -49,6 +50,7 @@ export function ServiceLocationCard({
   showSizeInputs = false,
   pricingSettings,
   onShowToast,
+  onRequestUndo,
   editable = false,
   onAddressSelect,
   onSaveAddress,
@@ -91,6 +93,7 @@ export function ServiceLocationCard({
     if (!serviceAddress?.id || !value) return;
 
     const fieldLabel = field === 'home_size_range' ? 'Home size' : 'Yard size';
+    const oldValue = serviceAddress[field] || '';
 
     try {
       await authenticatedFetch(`/api/service-addresses/${serviceAddress.id}`, {
@@ -100,6 +103,34 @@ export function ServiceLocationCard({
       });
 
       onShowToast?.(`${fieldLabel} updated successfully`, 'success');
+
+      // Provide undo handler
+      if (onRequestUndo) {
+        const undoHandler = async () => {
+          try {
+            // Revert in database
+            await authenticatedFetch(`/api/service-addresses/${serviceAddress.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ [field]: oldValue || null }),
+            });
+
+            // Revert UI state
+            if (field === 'home_size_range') {
+              setSelectedHomeSizeOption(oldValue);
+            } else {
+              setSelectedYardSizeOption(oldValue);
+            }
+
+            onShowToast?.('Change undone', 'success');
+          } catch (error) {
+            console.error('Error undoing change:', error);
+            onShowToast?.('Failed to undo change', 'error');
+          }
+        };
+
+        onRequestUndo(undoHandler);
+      }
     } catch (error) {
       console.error(`Error updating ${field}:`, error);
       onShowToast?.(`Failed to update ${fieldLabel.toLowerCase()}`, 'error');

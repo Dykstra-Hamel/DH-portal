@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createOrFindServiceAddress, linkCustomerToServiceAddress } from '@/lib/service-addresses';
+import { geocodeCustomerAddress } from '@/lib/geocoding';
 
 export async function GET(request: NextRequest) {
   try {
@@ -73,7 +75,8 @@ export async function GET(request: NextRequest) {
           estimated_value
         ),
         tickets:tickets!tickets_customer_id_fkey(
-          id
+          id,
+          status
         ),
         support_cases:support_cases!support_cases_customer_id_fkey(
           id
@@ -134,6 +137,9 @@ export async function GET(request: NextRequest) {
       const tickets = customer.tickets || [];
       const supportCases = customer.support_cases || [];
 
+      // Filter tickets to only count "new" status
+      const newTickets = tickets.filter((t: any) => t.status === 'new');
+
       const leadCounts = {
         total: leads.length,
         unassigned: leads.filter((l: any) => l.lead_status === 'unassigned').length,
@@ -162,7 +168,7 @@ export async function GET(request: NextRequest) {
         lead_counts: leadCounts,
         active_leads: activeLeads,
         total_leads: leadCounts.total,
-        total_tickets: tickets.length,
+        total_tickets: newTickets.length,
         total_support_cases: supportCases.length,
         total_estimated_value: totalEstimatedValue,
       };
@@ -246,6 +252,76 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create customer', details: insertError.message },
         { status: 500 }
       );
+    }
+
+    // If any address data is provided, create a primary service address
+    const hasAddressData =
+      customerFields.address ||
+      customerFields.city ||
+      customerFields.state ||
+      customerFields.zip_code;
+
+    if (hasAddressData && customer?.id) {
+      try {
+        // Attempt to geocode the address if we have at least city + state
+        let latitude = customerFields.latitude;
+        let longitude = customerFields.longitude;
+        let hasStreetView = false;
+
+        if (customerFields.city && customerFields.state) {
+          const geocodeResult = await geocodeCustomerAddress({
+            street: customerFields.address,
+            city: customerFields.city,
+            state: customerFields.state,
+            zip: customerFields.zip_code,
+          });
+
+          if (geocodeResult.success && geocodeResult.coordinates) {
+            latitude = geocodeResult.coordinates.lat;
+            longitude = geocodeResult.coordinates.lng;
+            hasStreetView = geocodeResult.coordinates.hasStreetView || false;
+            console.log(`Geocoded address for customer ${customer.id}: ${latitude}, ${longitude}`);
+          } else {
+            console.warn(`Geocoding failed for customer ${customer.id}:`, geocodeResult.error);
+          }
+        }
+
+        // Build service address data from customer fields with geocoded coordinates
+        const serviceAddressData = {
+          street_address: customerFields.address || '',
+          city: customerFields.city || '',
+          state: customerFields.state || '',
+          zip_code: customerFields.zip_code || '',
+          latitude,
+          longitude,
+          hasStreetView,
+          address_type: 'residential' as const,
+        };
+
+        // Create service address with whatever data we have
+        // (createOrFindServiceAddress will handle validation internally)
+        const serviceAddressResult = await createOrFindServiceAddress(
+          company_id,
+          serviceAddressData
+        );
+
+        if (serviceAddressResult.success && serviceAddressResult.serviceAddressId) {
+          // Link it as the customer's primary service address
+          await linkCustomerToServiceAddress(
+            customer.id,
+            serviceAddressResult.serviceAddressId,
+            'owner',
+            true // isPrimary
+          );
+
+          console.log(`Created/linked primary service address for customer ${customer.id}`);
+        } else {
+          console.warn('Failed to create service address:', serviceAddressResult.error);
+        }
+      } catch (addressError) {
+        // Log but don't fail the customer creation if address creation fails
+        console.error('Error creating service address for new customer:', addressError);
+      }
     }
 
     return NextResponse.json(customer, { status: 201 });
