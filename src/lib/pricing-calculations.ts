@@ -82,7 +82,7 @@ export function generateHomeSizeOptions(
  * Examples: 0.25 -> "1/4", 0.5 -> "1/2", 0.75 -> "3/4", 1.25 -> "1 1/4"
  * Rounds to nearest quarter: 0.26 -> "1/4", 0.51 -> "1/2", 1.01 -> "1"
  */
-function formatAcresFractional(acres: number): string {
+export function formatAcresFractional(acres: number): string {
   const wholeNumber = Math.floor(acres);
   const decimal = acres - wholeNumber;
 

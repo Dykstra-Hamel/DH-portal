@@ -10,6 +10,7 @@ import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/Ser
 import { ManageLeadModal } from '@/components/Common/ManageLeadModal/ManageLeadModal';
 import { AssignSuccessModal } from '@/components/Common/AssignSuccessModal/AssignSuccessModal';
 import { CompleteTaskModal } from '@/components/Common/CompleteTaskModal/CompleteTaskModal';
+import { ServiceConfirmationModal } from '@/components/Common/ServiceConfirmationModal/ServiceConfirmationModal';
 import { PestSelection } from '@/components/Common/PestSelection/PestSelection';
 import { AdditionalPestsSelection } from '@/components/Common/AdditionalPestsSelection/AdditionalPestsSelection';
 import { CustomDropdown } from '@/components/Common/CustomDropdown/CustomDropdown';
@@ -52,6 +53,7 @@ import {
   Phone,
   Mail,
   X,
+  CalendarCheck,
 } from 'lucide-react';
 import styles from './LeadStepContent.module.scss';
 import cadenceStyles from '../SalesCadenceCard/SalesCadenceCard.module.scss';
@@ -88,6 +90,12 @@ export function LeadStepContent({
     type: string;
     notes: string;
   } | null>(null);
+
+  // Service Confirmation state
+  const [showServiceConfirmationModal, setShowServiceConfirmationModal] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<string>(lead.scheduled_date || '');
+  const [scheduledTime, setScheduledTime] = useState<string>(lead.scheduled_time || '');
+  const [confirmationNote, setConfirmationNote] = useState<string>('');
 
   // Create a ticket-like object for the CustomerInformation component
   // Include lead.customer in dependencies to update when customer data changes
@@ -1678,6 +1686,55 @@ export function LeadStepContent({
     } catch (error) {
       console.error('Failed to progress lead:', error);
       onShowToast?.('Failed to update lead status', 'error');
+    }
+  };
+
+  // Handle confirming service and finalizing sale
+  const handleConfirmAndFinalize = async (
+    confirmedDate: string,
+    confirmedTime: string,
+    note: string
+  ) => {
+    try {
+      // Update lead status to won and save scheduled date/time
+      if (isAdmin) {
+        await adminAPI.updateLead(lead.id, {
+          lead_status: 'won',
+          scheduled_date: confirmedDate,
+          scheduled_time: confirmedTime,
+        });
+      } else {
+        await adminAPI.updateUserLead(lead.id, {
+          lead_status: 'won',
+          scheduled_date: confirmedDate,
+          scheduled_time: confirmedTime,
+        });
+      }
+
+      // If there's a note, add it to activity log
+      if (note.trim()) {
+        await fetch('/api/activity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_id: lead.company_id,
+            entity_type: 'lead',
+            entity_id: lead.id,
+            activity_type: 'note_added',
+            user_id: user?.id,
+            notes: note.trim(),
+          }),
+        });
+      }
+
+      onShowToast?.('Sale finalized successfully!', 'success');
+
+      // Redirect to All Leads page
+      window.location.href = '/connections/leads';
+    } catch (error) {
+      console.error('Failed to finalize sale:', error);
+      onShowToast?.('Failed to finalize sale', 'error');
+      throw error;
     }
   };
 
@@ -4261,16 +4318,55 @@ export function LeadStepContent({
         ),
       },
       {
-        id: 'thank_you',
-        label: 'What To Expect / Thank You',
+        id: 'service_confirmation',
+        label: 'Service Confirmation',
         content: (
           <div className={styles.cardContent}>
             <h3 className={styles.scheduleTabHeading}>
-              What To Expect / Thank You
+              Service Confirmation
             </h3>
-            <p className={styles.scheduleTabText}>
-              Thank you message and expectations content will be displayed here.
-            </p>
+            <div className={styles.confirmationForm}>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Scheduled Date</label>
+                  <input
+                    type="date"
+                    className={styles.formInput}
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Scheduled Time</label>
+                  <input
+                    type="time"
+                    className={styles.formInput}
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Notes</label>
+                <textarea
+                  className={styles.formTextarea}
+                  placeholder="Add any notes about the scheduled service..."
+                  rows={4}
+                  value={confirmationNote}
+                  onChange={(e) => setConfirmationNote(e.target.value)}
+                />
+              </div>
+              <div className={styles.formActions}>
+                <button
+                  type="button"
+                  className={styles.finalizeSaleButton}
+                  onClick={() => setShowServiceConfirmationModal(true)}
+                >
+                  <CalendarCheck size={18} />
+                  Finalize Sale
+                </button>
+              </div>
+            </div>
           </div>
         ),
       },
@@ -4343,9 +4439,11 @@ export function LeadStepContent({
           icon={<SquareActivity size={20} />}
           startExpanded={false}
         >
-          <div className={styles.cardContent}>
-            <p>Lead activity and interaction history will be displayed here.</p>
-          </div>
+          <ActivityFeed
+            entityType="lead"
+            entityId={lead.id}
+            companyId={lead.company_id}
+          />
         </InfoCard>
 
         <InfoCard
@@ -4353,9 +4451,12 @@ export function LeadStepContent({
           icon={<NotebookPen size={20} />}
           startExpanded={false}
         >
-          <div className={styles.cardContent}>
-            <p>Lead notes and comments will be displayed here.</p>
-          </div>
+          <NotesSection
+            entityType="lead"
+            entityId={lead.id}
+            companyId={lead.company_id}
+            userId={user?.id || ''}
+          />
         </InfoCard>
       </div>
     </>
@@ -4418,6 +4519,17 @@ export function LeadStepContent({
         onConfirm={handleCompleteTaskConfirm}
         onSkip={handleCompleteTaskSkip}
         onCancel={handleCompleteTaskCancel}
+      />
+      <ServiceConfirmationModal
+        isOpen={showServiceConfirmationModal}
+        onClose={() => setShowServiceConfirmationModal(false)}
+        onConfirm={handleConfirmAndFinalize}
+        scheduledDate={scheduledDate}
+        scheduledTime={scheduledTime}
+        confirmationNote={confirmationNote}
+        onScheduledDateChange={setScheduledDate}
+        onScheduledTimeChange={setScheduledTime}
+        onConfirmationNoteChange={setConfirmationNote}
       />
     </>
   );

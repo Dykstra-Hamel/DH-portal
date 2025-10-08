@@ -341,15 +341,6 @@ export function CadenceEditMode({
 
       {/* Action Buttons */}
       <div className={styles.actionButtons}>
-        <button
-          type="button"
-          onClick={onDelete}
-          className={styles.deleteButton}
-        >
-          <CircleX size={18} />
-          Delete Cadence
-        </button>
-
         <div className={styles.rightButtons}>
           <button
             type="button"

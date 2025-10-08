@@ -62,19 +62,10 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 16px;
+  padding: 16px 16px 0 16px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-
-  &:hover {
-    border-color: var(--action-400);
-    background: var(--action-50);
-  }
-
-  &:has(input:checked) {
-    background: var(--action-50);
-  }
 }
 
 .radioInput {
@@ -159,9 +150,9 @@
 .assignmentButton {
   width: 100%;
   padding: 12px;
-  border: 2px solid var(--action-500);
+  border: 1px solid var(--gray-300);
   border-radius: 8px;
-  background: var(--action-50);
+  background: var(--white);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -169,7 +160,7 @@
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--action-100);
+    background: var(--gray-100);
   }
 }
 
@@ -269,10 +260,6 @@
 
   &:hover {
     background: var(--gray-50);
-  }
-
-  &.selected {
-    background: var(--action-50);
   }
 
   &:not(:last-child) {

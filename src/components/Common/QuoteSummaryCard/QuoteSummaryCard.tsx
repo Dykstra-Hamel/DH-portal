@@ -2,6 +2,7 @@ import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { Quote } from '@/types/quote';
 import styles from './QuoteSummaryCard.module.scss';
 import { FileText, Mail } from 'lucide-react';
+import { formatAcresFractional } from '@/lib/pricing-calculations';
 
 interface QuoteSummaryCardProps {
   quote: Quote | null;
@@ -32,6 +33,22 @@ export function QuoteSummaryCard({
       currency: 'USD',
       minimumFractionDigits: 2,
     }).format(amount);
+  };
+
+  // Format yard size range from decimal to fractional display
+  const formatYardSizeRange = (range: string): string => {
+    // Parse range like "0.26-0.50" or "2.00+"
+    if (range.includes('+')) {
+      const startValue = parseFloat(range.replace('+', ''));
+      return `${formatAcresFractional(startValue)}+ acre`;
+    } else if (range.includes('-')) {
+      const [start, end] = range.split('-').map(parseFloat);
+      const startFormatted = formatAcresFractional(start);
+      const endFormatted = formatAcresFractional(end);
+      const acreWord = end > 1 ? 'acres' : 'acre';
+      return `${startFormatted}-${endFormatted} ${acreWord}`;
+    }
+    return range;
   };
 
   // Format pest concerns from quote (single source of truth)
@@ -198,7 +215,7 @@ export function QuoteSummaryCard({
             <div className={styles.gridItem}>
               <div className={styles.fieldLabel}>Yard Size</div>
               <div className={styles.fieldValue}>
-                {quote.yard_size_range} acre
+                {formatYardSizeRange(quote.yard_size_range)}
               </div>
             </div>
           )}
