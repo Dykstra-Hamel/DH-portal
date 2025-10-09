@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -62,6 +62,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     useState(false);
   const [showEmailQuoteModal, setShowEmailQuoteModal] = useState(false);
   const router = useRouter();
+
+  // Ref to store the finalize sale modal trigger function from LeadStepContent
+  const finalizeSaleModalTrigger = useRef<(() => void) | null>(null);
 
   // Step configuration for leads
   const leadSteps: StepItem[] = [
@@ -354,25 +357,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     }
   };
 
-  // Handle finalize sale
-  const handleFinalizeSale = async () => {
-    if (!leadId) return;
-
-    try {
-      if (isAdmin) {
-        await adminAPI.updateLead(leadId, {
-          lead_status: 'won',
-        });
-      } else {
-        await adminAPI.updateUserLead(leadId, {
-          lead_status: 'won',
-        });
-      }
-      handleShowToast('Sale finalized successfully!', 'success');
-      router.push('/connections/leads');
-    } catch (error) {
-      console.error('Error finalizing sale:', error);
-      handleShowToast('Failed to finalize sale. Please try again.', 'error');
+  // Handle finalize sale - triggers the modal from LeadStepContent
+  const handleFinalizeSale = () => {
+    if (finalizeSaleModalTrigger.current) {
+      finalizeSaleModalTrigger.current();
     }
   };
 
@@ -840,7 +828,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       };
 
       if (option === 'someone_else' && assignedTo) {
-        updateData.assigned_to = assignedTo;
+        // Handle team assignment (null) vs individual assignment (UUID)
+        updateData.assigned_to = assignedTo === 'scheduling_team' ? null : assignedTo;
       }
 
       if (isAdmin) {
@@ -862,6 +851,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         router.push('/connections/leads');
       } else {
         handleShowToast('Lead assigned for scheduling!', 'success');
+        router.push('/connections/leads');
       }
     } catch (error) {
       console.error('Error updating lead to ready to schedule:', error);
@@ -988,6 +978,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           onShowToast={handleShowToast}
           onRequestUndo={handleRequestUndo}
           onEmailQuote={handleEmailQuoteButton}
+          onFinalizeSale={(trigger) => {
+            finalizeSaleModalTrigger.current = trigger;
+          }}
         />
       </div>
 

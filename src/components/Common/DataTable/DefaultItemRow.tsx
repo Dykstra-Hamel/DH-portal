@@ -7,9 +7,8 @@ import styles from './DataTable.module.scss';
 export default function DefaultItemRow<T>({
   item,
   columns,
-  onAction
+  onAction,
 }: DefaultItemRowProps<T>) {
-  
   // Helper function to get nested property value
   const getNestedValue = (obj: any, path: string): any => {
     return path.split('.').reduce((current, key) => current?.[key], obj);
@@ -31,14 +30,12 @@ export default function DefaultItemRow<T>({
     <div className={styles.defaultRow} onClick={handleClick}>
       {columns.map((column, index) => {
         const value = getNestedValue(item, column.key);
-        const cellContent = column.render ? column.render(item, onAction) : formatCellValue(value);
+        const cellContent = column.render
+          ? column.render(item, onAction)
+          : formatCellValue(value);
 
         return (
-          <div
-            key={`${column.key}-${index}`}
-            className={styles.defaultCell}
-            style={column.width ? { width: column.width } : undefined}
-          >
+          <div key={`${column.key}-${index}`} className={styles.defaultCell}>
             {cellContent}
           </div>
         );

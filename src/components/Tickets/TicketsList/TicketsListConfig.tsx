@@ -70,9 +70,12 @@ const formatTicketType = (type: string): string => {
 const formatSource = (ticket: Ticket): string => {
   // For phone calls, show call direction
   if (ticket.type === 'phone_call') {
-    if (ticket.call_direction === 'inbound') {
+    if (ticket.call_direction === 'inbound' || ticket.source === 'inbound') {
       return 'Inbound';
-    } else if (ticket.call_direction === 'outbound') {
+    } else if (
+      ticket.call_direction === 'outbound' ||
+      ticket.source === 'outbound'
+    ) {
       return 'Outbound';
     }
   }

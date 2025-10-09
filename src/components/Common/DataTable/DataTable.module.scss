@@ -198,8 +198,8 @@
   );
   padding: 16px;
   border-top: 1px solid var(--gray-200);
-  border-left: 2px solid transparent;
-  border-right: 2px solid transparent;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
   align-items: center;
   background: var(--white);
   animation: slideInFromTop 0.5s ease-out;
@@ -230,6 +230,11 @@
   color: var(--gray-800);
   text-overflow: ellipsis;
   min-width: 0; // Allow flex items to shrink below content size
+
+  &:last-of-type {
+    justify-content: flex-end;
+    width: 100%;
+  }
 }
 
 // Cell type specific styling
@@ -458,31 +463,31 @@
 
 // Table-specific column configurations
 .ticketTable {
-  --table-columns: 120px 180px 140px 250px 100px 120px 150px 150px;
+  --table-columns: 120px 180px 140px 250px 100px 120px 150px 1fr;
 }
 
 .supportCaseTable {
-  --table-columns: 120px 180px 140px 250px 120px 120px 170px 100px;
+  --table-columns: 120px 180px 140px 250px 120px 120px 170px 1fr;
 }
 
 .leadTable {
-  --table-columns: 180px 180px 250px 270px 170px 140px;
+  --table-columns: 180px 180px 200px 220px 170px 1fr;
 }
 
 .callTable {
-  --table-columns: 180px 180px 150px 100px 100px 120px 100px 290px;
+  --table-columns: 180px 180px 150px 100px 100px 120px 100px 1fr;
 }
 
 .customerTable {
-  --table-columns: 220px 200px 120px 100px 100px 120px 150px 150px;
+  --table-columns: 220px 200px 120px 100px 100px 120px 150px 1fr;
 }
 
 .customerTableWithCompany {
-  --table-columns: 200px 180px 120px 140px 100px 100px 120px 120px 180px;
+  --table-columns: 200px 180px 120px 140px 100px 100px 120px 120px 1fr;
 }
 
 .taskTable {
-  --table-columns: 1fr 100px 90px 150px 150px 400px;
+  --table-columns: 1fr 100px 90px 150px 150px 1fr;
 }
 
 .taskActions {
