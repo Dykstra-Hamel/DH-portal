@@ -10,7 +10,11 @@ export type TicketSource =
   | 'webinar'
   | 'content_marketing'
   | 'internal'
-  | 'other';
+  | 'other'
+  | 'inbound'
+  | 'outbound'
+  | 'widget'
+  | 'website';
 
 export type TicketType =
   | 'phone_call'
@@ -59,12 +63,12 @@ export interface Ticket {
   pest_type?: string;
   resolved_at?: string;
   is_qualified?: boolean | null;
-  
+
   // Conversion tracking fields
   converted_to_lead_id?: string;
   converted_to_customer_id?: string;
   converted_at?: string;
-  
+
   // Attribution fields
   partial_lead_id?: string;
   gclid?: string;
@@ -74,12 +78,12 @@ export interface Ticket {
   utm_campaign?: string;
   utm_term?: string;
   utm_content?: string;
-  
+
   // Technical tracking
   referrer_url?: string;
   ip_address?: string;
   user_agent?: string;
-  
+
   // Review tracking - for preventing simultaneous editing conflicts
   reviewed_by?: string; // User ID currently reviewing this ticket
   reviewed_at?: string;

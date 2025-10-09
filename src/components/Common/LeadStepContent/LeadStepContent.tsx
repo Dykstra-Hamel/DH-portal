@@ -66,6 +66,7 @@ interface LeadStepContentProps {
   onShowToast?: (message: string, type: 'success' | 'error') => void;
   onRequestUndo?: (undoHandler: () => Promise<void>) => void;
   onEmailQuote?: () => void;
+  onFinalizeSale?: (handler: () => void) => void;
 }
 
 export function LeadStepContent({
@@ -75,6 +76,7 @@ export function LeadStepContent({
   onShowToast,
   onRequestUndo,
   onEmailQuote,
+  onFinalizeSale,
 }: LeadStepContentProps) {
   const [ticketType, setTicketType] = useState('sales');
   const [selectedAssignee, setSelectedAssignee] = useState('');
@@ -747,6 +749,14 @@ export function LeadStepContent({
   }, [lead.company_id]);
 
   // Quote is now managed by useQuoteRealtime hook - removed manual fetch
+
+  // Expose finalize sale modal trigger to parent
+  useEffect(() => {
+    if (onFinalizeSale) {
+      // Pass a function to the parent that opens the modal
+      onFinalizeSale(() => setShowServiceConfirmationModal(true));
+    }
+  }, [onFinalizeSale]);
 
   // Generate home size dropdown options
   const homeSizeOptions = useMemo(() => {

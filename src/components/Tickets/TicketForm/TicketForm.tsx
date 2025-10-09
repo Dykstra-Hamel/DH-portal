@@ -1,13 +1,27 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { TicketFormData, ticketSourceOptions, ticketTypeOptions, ticketStatusOptions, ticketPriorityOptions } from '@/types/ticket';
-import { SearchableDropdown, SearchableDropdownItem } from '@/components/Common/SearchableDropdown';
+import {
+  TicketFormData,
+  TicketSource,
+  TicketType,
+  ticketStatusOptions,
+  ticketPriorityOptions,
+} from '@/types/ticket';
+import {
+  SearchableDropdown,
+  SearchableDropdownItem,
+} from '@/components/Common/SearchableDropdown';
 import styles from './TicketForm.module.scss';
 
 interface TicketFormProps {
   companyId: string;
-  assignableUsers?: Array<{ id: string; first_name: string; last_name: string; email: string }>;
+  assignableUsers?: Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  }>;
   onFormDataChange?: (data: TicketFormData | null) => void;
   loading?: boolean;
 }
@@ -19,8 +33,8 @@ export default function TicketForm({
   loading = false,
 }: TicketFormProps) {
   const [formData, setFormData] = useState<TicketFormData>({
-    source: 'other',
-    type: 'other',
+    source: 'inbound',
+    type: 'phone_call',
     status: 'new',
     priority: 'medium',
     description: '',
@@ -29,9 +43,34 @@ export default function TicketForm({
     assigned_to: undefined,
   });
 
-  const [errors, setErrors] = useState<Partial<Record<keyof TicketFormData, string>>>({});
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof TicketFormData, string>>
+  >({});
+
+  // Get source options based on format (type) selection
+  const getSourceOptions = () => {
+    switch (formData.type) {
+      case 'phone_call':
+        return [
+          { value: 'inbound', label: 'Inbound' },
+          { value: 'outbound', label: 'Outbound' },
+        ];
+      case 'web_form':
+        return [
+          { value: 'widget', label: 'Widget' },
+          { value: 'website', label: 'Website' },
+          { value: 'other', label: 'Other' },
+        ];
+      case 'email':
+      case 'in_person':
+      case 'other':
+      default:
+        return [{ value: 'other', label: 'Other' }];
+    }
+  };
   const [customers, setCustomers] = useState<SearchableDropdownItem[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<SearchableDropdownItem | null>(null);
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<SearchableDropdownItem | null>(null);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomerData, setNewCustomerData] = useState({
@@ -56,13 +95,15 @@ export default function TicketForm({
 
     setLoadingCustomers(true);
     try {
-      const response = await fetch(`/api/customers/search?q=${encodeURIComponent(query)}&companyId=${companyId}`);
+      const response = await fetch(
+        `/api/customers/search?q=${encodeURIComponent(query)}&companyId=${companyId}`
+      );
       if (response.ok) {
         const data = await response.json();
         const customerList = (data.customers || []).map((customer: any) => ({
           id: customer.id,
           displayName: `${customer.first_name} ${customer.last_name} - ${customer.email || customer.phone}`,
-          ...customer
+          ...customer,
         }));
         setCustomers(customerList);
       } else {
@@ -79,16 +120,20 @@ export default function TicketForm({
 
   const handleCustomerSelect = (customer: SearchableDropdownItem | null) => {
     setSelectedCustomer(customer);
-    
+
     // Extract primary service address ID if available
     let serviceAddressId = undefined;
-    if (customer?.primary_service_address && Array.isArray(customer.primary_service_address) && customer.primary_service_address.length > 0) {
+    if (
+      customer?.primary_service_address &&
+      Array.isArray(customer.primary_service_address) &&
+      customer.primary_service_address.length > 0
+    ) {
       const primaryAddress = customer.primary_service_address[0];
       if (primaryAddress?.service_address?.id) {
         serviceAddressId = primaryAddress.service_address.id;
       }
     }
-    
+
     setFormData(prev => ({
       ...prev,
       customer_id: customer?.id || undefined,
@@ -105,13 +150,26 @@ export default function TicketForm({
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value === '' ? undefined : value,
-    }));
+
+    // If format (type) changes, reset source to the first available option for that format
+    if (name === 'type') {
+      const newSourceOptions = getSourceOptionsForType(value);
+      setFormData(prev => ({
+        ...prev,
+        type: value as TicketType,
+        source: (newSourceOptions[0]?.value || 'other') as TicketSource,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value === '' ? undefined : value,
+      }));
+    }
 
     // Clear error when user starts typing
     if (errors[name as keyof TicketFormData]) {
@@ -119,6 +177,28 @@ export default function TicketForm({
         ...prev,
         [name]: undefined,
       }));
+    }
+  };
+
+  // Helper function to get source options for a given type (used in handleInputChange)
+  const getSourceOptionsForType = (type: string) => {
+    switch (type) {
+      case 'call':
+        return [
+          { value: 'inbound', label: 'Inbound' },
+          { value: 'outbound', label: 'Outbound' },
+        ];
+      case 'form':
+        return [
+          { value: 'widget', label: 'Widget' },
+          { value: 'website', label: 'Website' },
+          { value: 'other', label: 'Other' },
+        ];
+      case 'email':
+      case 'in_person':
+      case 'other':
+      default:
+        return [{ value: 'other', label: 'Other' }];
     }
   };
 
@@ -140,9 +220,7 @@ export default function TicketForm({
     }
   };
 
-  const handleNewCustomerChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleNewCustomerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
     let formattedValue = value;
@@ -195,10 +273,12 @@ export default function TicketForm({
   useEffect(() => {
     if (onFormDataChange) {
       const isValid = validateForm(false);
-      const dataToSend = { 
+
+      const dataToSend = {
         ...formData,
+        // Map format to database type
         // Include customer data if creating new customer
-        ...(showNewCustomer && { 
+        ...(showNewCustomer && {
           newCustomerData: {
             first_name: newCustomerData.first_name,
             last_name: newCustomerData.last_name,
@@ -208,8 +288,8 @@ export default function TicketForm({
             city: newCustomerData.city || undefined,
             state: newCustomerData.state || undefined,
             zip_code: newCustomerData.zip_code || undefined,
-          }
-        })
+          },
+        }),
       };
       onFormDataChange(isValid ? dataToSend : null);
     }
@@ -234,7 +314,11 @@ export default function TicketForm({
                   // Reset customer selection when switching back to existing
                   if (showNewCustomer) {
                     setSelectedCustomer(null);
-                    setFormData(prev => ({ ...prev, customer_id: undefined, service_address_id: undefined }));
+                    setFormData(prev => ({
+                      ...prev,
+                      customer_id: undefined,
+                      service_address_id: undefined,
+                    }));
                   }
                 }}
                 className={styles.radioInput}
@@ -251,7 +335,11 @@ export default function TicketForm({
                   setShowNewCustomer(true);
                   // Clear any selected customer when switching to new customer
                   setSelectedCustomer(null);
-                  setFormData(prev => ({ ...prev, customer_id: undefined, service_address_id: undefined }));
+                  setFormData(prev => ({
+                    ...prev,
+                    customer_id: undefined,
+                    service_address_id: undefined,
+                  }));
                 }}
                 className={styles.radioInput}
               />
@@ -382,11 +470,33 @@ export default function TicketForm({
             </div>
           )}
         </div>
-        {errors.customer_id && <div className={styles.error}>{errors.customer_id}</div>}
+        {errors.customer_id && (
+          <div className={styles.error}>{errors.customer_id}</div>
+        )}
       </div>
 
-      {/* Source and Type */}
+      {/* Format and Source */}
       <div className={styles.row}>
+        <div className={styles.formGroup}>
+          <label htmlFor="type" className={styles.label}>
+            Format *
+          </label>
+          <select
+            name="type"
+            value={formData.type}
+            onChange={handleInputChange}
+            className={styles.select}
+            required
+          >
+            <option value="phone_call">Call</option>
+            <option value="web_form">Form</option>
+            <option value="email">Email</option>
+            <option value="in_person">In Person</option>
+            <option value="other">Other</option>
+          </select>
+          {errors.type && <div className={styles.error}>{errors.type}</div>}
+        </div>
+
         <div className={styles.formGroup}>
           <label htmlFor="source" className={styles.label}>
             Source *
@@ -398,33 +508,13 @@ export default function TicketForm({
             className={styles.select}
             required
           >
-            {ticketSourceOptions.map(option => (
+            {getSourceOptions().map(option => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
           {errors.source && <div className={styles.error}>{errors.source}</div>}
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="type" className={styles.label}>
-            Type *
-          </label>
-          <select
-            name="type"
-            value={formData.type}
-            onChange={handleInputChange}
-            className={styles.select}
-            required
-          >
-            {ticketTypeOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {errors.type && <div className={styles.error}>{errors.type}</div>}
         </div>
       </div>
 
@@ -467,7 +557,9 @@ export default function TicketForm({
               </option>
             ))}
           </select>
-          {errors.priority && <div className={styles.error}>{errors.priority}</div>}
+          {errors.priority && (
+            <div className={styles.error}>{errors.priority}</div>
+          )}
         </div>
       </div>
 
@@ -491,20 +583,22 @@ export default function TicketForm({
         </select>
       </div>
 
-      {/* Service and Pest Type */}
+      {/* Ticket Type and Pest Type */}
       <div className={styles.row}>
         <div className={styles.formGroup}>
           <label htmlFor="service_type" className={styles.label}>
-            Service Type
+            Ticket Type
           </label>
-          <input
-            type="text"
+          <select
             name="service_type"
             value={formData.service_type || ''}
             onChange={handleInputChange}
-            className={styles.input}
-            placeholder="e.g., Pest Control, Lawn Care"
-          />
+            className={styles.select}
+          >
+            <option value="">Select ticket type</option>
+            <option value="sales">Sales</option>
+            <option value="support">Support</option>
+          </select>
         </div>
 
         <div className={styles.formGroup}>
