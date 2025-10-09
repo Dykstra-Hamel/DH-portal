@@ -344,6 +344,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       phone_number: customerPhone, // Use normalized phone for consistency
       from_number: rawCustomerPhone, // Keep original format from Retell
       call_status: 'in-progress',
+      call_direction: 'inbound',
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),

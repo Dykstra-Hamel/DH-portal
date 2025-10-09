@@ -224,6 +224,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
       phone_number: to_number,
       from_number,
       call_status: 'in-progress',
+      call_direction: 'outbound',
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
@@ -377,6 +378,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
         phone_number: to_number,
         from_number,
         call_status: 'processing', // Set to processing to show loading state until analysis
+        call_direction: 'outbound',
         start_timestamp: start_timestamp
           ? new Date(start_timestamp).toISOString()
           : null,
