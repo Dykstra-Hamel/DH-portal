@@ -34,60 +34,65 @@ async function getReportMetrics(
     0
   );
 
-  // Get call metrics from tickets
-  const { count: outboundCalls } = await supabase
-    .from('tickets')
-    .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId)
-    .eq('call_direction', 'outbound')
-    .eq('archived', false)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate);
-
-  const { count: inboundCalls } = await supabase
-    .from('tickets')
-    .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId)
-    .eq('call_direction', 'inbound')
-    .eq('archived', false)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate);
-
-  // Get total calls from call_records via leads
+  // Get call metrics from call_records (using call_records as source of truth)
+  // First, get all company leads and customers to filter call_records
   const { data: companyLeadIds } = await supabase
     .from('leads')
     .select('id')
     .eq('company_id', companyId);
 
-  let totalCalls = 0;
-  if (companyLeadIds && companyLeadIds.length > 0) {
-    const leadIdArray = companyLeadIds.map((lead: { id: string }) => lead.id);
-    const { count } = await supabase
-      .from('call_records')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', startDate)
-      .lte('created_at', endDate)
-      .in('lead_id', leadIdArray);
-
-    totalCalls = count || 0;
-  }
-
-  // Get calls from customers as well
   const { data: companyCustomerIds } = await supabase
     .from('customers')
     .select('id')
     .eq('company_id', companyId);
 
-  if (companyCustomerIds && companyCustomerIds.length > 0) {
-    const customerIdArray = companyCustomerIds.map((customer: { id: string }) => customer.id);
+  // Get all call_records for this company within the date range
+  const leadIdArray = companyLeadIds?.map((lead: { id: string }) => lead.id) || [];
+  const customerIdArray = companyCustomerIds?.map((customer: { id: string }) => customer.id) || [];
+
+  let inboundCalls = 0;
+  let outboundCalls = 0;
+  let totalCalls = 0;
+
+  if (leadIdArray.length > 0 || customerIdArray.length > 0) {
+    const orFilter =
+      leadIdArray.length > 0 && customerIdArray.length > 0
+        ? `lead_id.in.(${leadIdArray.join(',')}),customer_id.in.(${customerIdArray.join(',')})`
+        : leadIdArray.length > 0
+        ? `lead_id.in.(${leadIdArray.join(',')})`
+        : `customer_id.in.(${customerIdArray.join(',')})`;
+
+    // Count inbound calls directly from call_records
+    const { count: inboundCount } = await supabase
+      .from('call_records')
+      .select('id', { count: 'exact', head: true })
+      .eq('call_direction', 'inbound')
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+      .or(orFilter);
+
+    inboundCalls = inboundCount || 0;
+
+    // Count outbound calls directly from call_records
+    const { count: outboundCount } = await supabase
+      .from('call_records')
+      .select('id', { count: 'exact', head: true })
+      .eq('call_direction', 'outbound')
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+      .or(orFilter);
+
+    outboundCalls = outboundCount || 0;
+
+    // Get total calls from call_records
     const { count } = await supabase
       .from('call_records')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', startDate)
       .lte('created_at', endDate)
-      .in('customer_id', customerIdArray);
+      .or(orFilter);
 
-    totalCalls += count || 0;
+    totalCalls = count || 0;
   }
 
   return {
@@ -96,8 +101,8 @@ async function getReportMetrics(
     leadsLost,
     winRate,
     pipelineValue,
-    outboundCalls: outboundCalls || 0,
-    inboundCalls: inboundCalls || 0,
+    outboundCalls,
+    inboundCalls,
     totalCalls,
   };
 }

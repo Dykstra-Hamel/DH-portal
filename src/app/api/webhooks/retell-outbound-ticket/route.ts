@@ -353,6 +353,7 @@ async function findOrCreateCallRecord(supabase: any, callData: any) {
       phone_number: customerPhone, // TO number (customer being called)
       from_number: agentPhoneNumber, // FROM number (agent's phone number)
       call_status: 'not_connected', // Default for unanswered calls
+      call_direction: 'outbound',
       agent_id: agentIdValue, // Store the agent_id for call direction tracking
       start_timestamp: start_timestamp ? new Date(start_timestamp).toISOString() : new Date().toISOString(),
       retell_variables: retell_llm_dynamic_variables,
@@ -536,6 +537,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
       phone_number: customerPhone, // TO number (customer being called)
       from_number: agentPhoneNumber, // FROM number (agent's phone number)
       call_status: 'in-progress',
+      call_direction: 'outbound',
       agent_id: agentIdValue, // Store the agent_id for call direction tracking
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
