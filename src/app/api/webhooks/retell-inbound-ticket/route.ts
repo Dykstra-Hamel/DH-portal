@@ -489,6 +489,31 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
   // Extract data from call analysis, transcript, and dynamic variables
   const extractedData = extractCallData(call_analysis, transcript, retell_llm_dynamic_variables);
 
+  // Check if we need to send to external webhook for specific agents
+  const agentId = callData.agent_id || callData.retell_llm_id || callData.llm_id;
+  const targetAgents = ['agent_df8001afec216b4940ef4a515c', 'agent_a88d99054de578962c43714b13'];
+
+  if (agentId && targetAgents.includes(agentId)) {
+    try {
+      console.log(`[External Webhook] Sending payload for agent ${agentId} to Tadabase`);
+      const response = await fetch('https://catchtemp.tadabase.io/webhook/RBe3G7c8eL', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(callData),
+      });
+
+      if (response.ok) {
+        console.log(`[External Webhook] Successfully sent payload for call ${call_id}`);
+      } else {
+        console.warn(`[External Webhook] Failed to send payload for call ${call_id}: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error(`[External Webhook] Error sending payload for call ${call_id}:`, error instanceof Error ? error.message : error);
+    }
+  }
+
   // Update call record with analysis data
   const { data: callRecord, error: updateError } = await supabase
     .from('call_records')

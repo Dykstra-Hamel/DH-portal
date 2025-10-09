@@ -686,6 +686,31 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
   // Extract data from call analysis, transcript, and dynamic variables
   const extractedData = extractCallData(call_analysis, transcript, retell_llm_dynamic_variables);
 
+  // Check if we need to send to external webhook for specific agent
+  const agentId = callData.agent_id || callData.retell_llm_id || callData.llm_id;
+  const targetAgent = 'agent_e8b7d7fad725ae4a44cd5ee3d0';
+
+  if (agentId && agentId === targetAgent) {
+    try {
+      console.log(`[External Webhook] Sending payload for agent ${agentId} to Tadabase`);
+      const response = await fetch('https://catchtemp.tadabase.io/webhook/RBe3G7c8eL', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(callData),
+      });
+
+      if (response.ok) {
+        console.log(`[External Webhook] Successfully sent payload for call ${call_id}`);
+      } else {
+        console.warn(`[External Webhook] Failed to send payload for call ${call_id}: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error(`[External Webhook] Error sending payload for call ${call_id}:`, error instanceof Error ? error.message : error);
+    }
+  }
+
   // Find or create call record (handles unanswered calls where call_started wasn't sent)
   let callRecord;
   try {
