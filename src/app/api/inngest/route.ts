@@ -16,6 +16,7 @@ import { callOutcomeTracker, retellCallWebhookHandler } from '@/lib/inngest/func
 import { workflowCancellationHandler } from '@/lib/inngest/functions/workflow-cancel';
 import { partialLeadCreated } from '@/lib/inngest/functions/partial-lead-created';
 import { inboundCallTransfer } from '@/lib/inngest/functions/inbound-call-transfer';
+import { cleanupStaleLiveTickets } from '@/lib/inngest/functions/cleanup-stale-live-tickets';
 
 // Create the handler
 export const { GET, POST, PUT } = serve({
@@ -37,6 +38,7 @@ export const { GET, POST, PUT } = serve({
     callOutcomeTracker,
     retellCallWebhookHandler,
     workflowCancellationHandler,
+    cleanupStaleLiveTickets,
   ],
   streaming: false, // Disable streaming for compatibility
 });
