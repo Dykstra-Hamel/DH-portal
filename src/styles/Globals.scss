@@ -242,24 +242,3 @@ body {
 a {
   text-decoration: none;
 }
-
-.mobileMenuButton {
-  display: none;
-  position: absolute;
-  bottom: 1rem;
-  right: 1rem;
-  padding: 0.5rem;
-  background: #353535;
-  border-radius: 50%;
-  z-index: 9999;
-
-  svg {
-    display: block;
-    width: 100%;
-    color: #fff;
-  }
-
-  @media screen and (width <= 600px) {
-    display: block;
-  }
-}
