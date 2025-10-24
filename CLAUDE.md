@@ -93,6 +93,22 @@ When creating a new migration file, ALWAYS use the following naming convention:
 - Environment variable required: `GOOGLE_PLACES_API_KEY`
 - Configure in widget settings to enable/disable address autocomplete
 
+## Form Submission Webhook
+
+- **Universal Form Endpoint**: `/api/webhooks/form-submit`
+- **Security**: Uses widget domain whitelisting (only domains in `widget_domains` table can submit)
+- **Supported Content Types**:
+  - `application/json` (modern JavaScript forms)
+  - `application/x-www-form-urlencoded` (traditional HTML forms)
+- **AI Processing**: Uses Google Gemini AI to normalize flexible form field names into standardized schema
+- **Auto-Creation**: Automatically creates customer records and tickets from form submissions
+- **Environment variable required**: `GEMINI_API_KEY` (get from https://aistudio.google.com/app/apikey)
+- **Expected Schema** (flexible field names normalized by AI):
+  - `first_name`, `last_name`, `email`, `phone_number`
+  - `street_address`, `city`, `state`, `zip`
+  - `pest_issue`, `own_or_rent`, `additional_comments`
+- **Database**: All submissions stored in `form_submissions` table with raw + normalized data
+
 ## Database Changes
 
 - Create migration: `npx supabase migration new <name>`
