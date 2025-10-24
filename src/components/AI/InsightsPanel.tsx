@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useAI } from '@/contexts/AIContext';
 import styles from './InsightsPanel.module.scss';
 import {
@@ -175,7 +175,7 @@ export default function InsightsPanel({ autoLoad = true, dateRange }: InsightsPa
 
 interface InsightCardProps {
   insight: Insight;
-  getIcon: (type: InsightType) => JSX.Element;
+  getIcon: (type: InsightType) => React.ReactElement;
   getPriorityClass: (priority: InsightPriority) => string;
   getTypeClass: (type: InsightType) => string;
 }
