@@ -339,6 +339,27 @@ export const adminAPI = {
     return authenticatedFetch(url);
   },
 
+  // Form Submissions (admin and regular users)
+  async getAllFormSubmissions(filters: { companyId?: string; page?: number; limit?: number } = {}) {
+    const queryParams = new URLSearchParams();
+    if (filters.companyId) queryParams.append('companyId', filters.companyId);
+    if (filters.page) queryParams.append('page', filters.page.toString());
+    if (filters.limit) queryParams.append('limit', filters.limit.toString());
+
+    const url = `/api/admin/form-submissions${queryParams.toString() ? `?${queryParams}` : ''}`;
+    return authenticatedFetch(url);
+  },
+
+  async getUserFormSubmissions(filters: { companyId?: string; page?: number; limit?: number } = {}) {
+    const queryParams = new URLSearchParams();
+    if (filters.companyId) queryParams.append('companyId', filters.companyId);
+    if (filters.page) queryParams.append('page', filters.page.toString());
+    if (filters.limit) queryParams.append('limit', filters.limit.toString());
+
+    const url = `/api/admin/form-submissions${queryParams.toString() ? `?${queryParams}` : ''}`;
+    return authenticatedFetch(url);
+  },
+
   // Non-admin project endpoints
   async getUserProjects(companyId: string) {
     return authenticatedFetch(`/api/projects?companyId=${companyId}`);

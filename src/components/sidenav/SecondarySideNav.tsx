@@ -466,6 +466,11 @@ export function SecondarySideNav({
                 icon: <CallsIcon />,
               },
               {
+                text: 'Forms',
+                href: '/connections/form-submissions',
+                icon: <CallsIcon />,
+              },
+              {
                 text: 'Customer Library',
                 href: '/customers',
                 icon: <CustomerLibraryIcon />,

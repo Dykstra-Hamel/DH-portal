@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { Ticket } from '@/types/ticket';
 import { CallRecord } from '@/types/call-record';
+import { FormSubmission } from '@/types/form-submission';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
@@ -122,6 +123,8 @@ export default function TicketReviewModal({
   >(getInitialQualification());
   const [selectedAssignee, setSelectedAssignee] = useState<string>('');
   const [callRecord, setCallRecord] = useState<CallRecord | undefined>();
+  const [formSubmission, setFormSubmission] = useState<FormSubmission | undefined>();
+  const [localTicket, setLocalTicket] = useState<Ticket>(ticket);
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [isReasonDropdownOpen, setIsReasonDropdownOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -153,6 +156,11 @@ export default function TicketReviewModal({
   const { getDisplayName, getAvatarUrl, getInitials, user, profile } =
     useUser();
   const router = useRouter();
+
+  // Update localTicket when ticket prop changes
+  useEffect(() => {
+    setLocalTicket(ticket);
+  }, [ticket]);
 
   // Initialize selectedAssignee with current user ID when user is available
   useEffect(() => {
@@ -244,12 +252,43 @@ export default function TicketReviewModal({
     }
   }, [ticket.id, ticket.type]);
 
+  const fetchFormSubmission = useCallback(async () => {
+    // Only fetch form submissions for web forms
+    if (ticket.type !== 'web_form') {
+      return;
+    }
+
+    try {
+      const data = await authenticatedFetch(`/api/tickets/${ticket.id}/form-submission`);
+      if (data.formSubmission) {
+        setFormSubmission(data.formSubmission);
+      }
+    } catch (error) {
+      console.error('Error fetching form submission:', error);
+    }
+  }, [ticket.id, ticket.type]);
+
+  const refetchTicket = useCallback(async () => {
+    try {
+      const data = await authenticatedFetch(
+        `/api/tickets?companyId=${ticket.company_id}`
+      );
+      const updatedTicket = data.find((t: Ticket) => t.id === ticket.id);
+      if (updatedTicket) {
+        setLocalTicket(updatedTicket);
+      }
+    } catch (error) {
+      console.error('Error refetching ticket:', error);
+    }
+  }, [ticket.id, ticket.company_id]);
+
   // Fetch data when modal opens
   useEffect(() => {
     if (isOpen && ticket.company_id) {
       fetchCallRecord();
+      fetchFormSubmission();
     }
-  }, [isOpen, ticket.company_id, fetchCallRecord]);
+  }, [isOpen, ticket.company_id, fetchCallRecord, fetchFormSubmission]);
 
   // Reset selected assignee when qualification changes (since available users change)
   useEffect(() => {
@@ -1039,29 +1078,29 @@ export default function TicketReviewModal({
         <div className={styles.ticketSummarySection}>
           <div className={styles.ticketSummary}>
             <h2 className={styles.ticketSummaryName}>
-              {ticket.customer
-                ? `${ticket.customer.first_name} ${ticket.customer.last_name}`
+              {localTicket.customer
+                ? `${localTicket.customer.first_name} ${localTicket.customer.last_name}`
                 : 'Unknown Customer'}
             </h2>
-            <p>{ticket.customer?.phone || 'Phone not provided'}</p>
+            <p>{localTicket.customer?.phone || 'Phone not provided'}</p>
             {/* Show service address if available, otherwise fall back to customer address */}
-            {ticket.service_address ? (
+            {localTicket.service_address ? (
               <>
-                <p>{ticket.service_address.street_address}</p>
+                <p>{localTicket.service_address.street_address}</p>
                 <p>
-                  {ticket.service_address.city && (
-                    <>{ticket.service_address.city}, </>
+                  {localTicket.service_address.city && (
+                    <>{localTicket.service_address.city}, </>
                   )}{' '}
-                  {ticket.service_address.state}{' '}
-                  {ticket.service_address.zip_code}
+                  {localTicket.service_address.state}{' '}
+                  {localTicket.service_address.zip_code}
                 </p>
               </>
             ) : (
               <>
-                <p>{ticket.customer?.address || 'Address not provided'}</p>
+                <p>{localTicket.customer?.address || 'Address not provided'}</p>
                 <p>
-                  {ticket.customer?.city && <>{ticket.customer?.city}, </>}{' '}
-                  {ticket.customer?.state} {ticket.customer?.zip_code}
+                  {localTicket.customer?.city && <>{localTicket.customer?.city}, </>}{' '}
+                  {localTicket.customer?.state} {localTicket.customer?.zip_code}
                 </p>
               </>
             )}
@@ -1147,7 +1186,7 @@ export default function TicketReviewModal({
                     onClick={() => setActiveTab('details')}
                   >
                     <ReceiptText size={20} />
-                    Call Details
+                    {localTicket.type === 'web_form' ? 'Form Details' : 'Call Details'}
                     <ChevronRight size={20} />
                   </button>
                   <button
@@ -1169,7 +1208,7 @@ export default function TicketReviewModal({
                         strokeLinejoin="round"
                       />
                     </svg>
-                    Call Insights
+                    {localTicket.type === 'web_form' ? 'Form Insights' : 'Call Insights'}
                     <ChevronRight size={20} />
                   </button>
 
@@ -1193,7 +1232,7 @@ export default function TicketReviewModal({
                 <div className={styles.tabContent} ref={tabContentRef}>
                   {activeTab === 'customer' && (
                     <CustomerInformation
-                      ticket={ticket}
+                      ticket={localTicket}
                       onUpdate={_customerData => {
                         if (onSuccess) {
                           onSuccess(
@@ -1205,7 +1244,11 @@ export default function TicketReviewModal({
                   )}
                   {activeTab === 'details' && (
                     <>
-                      <CallDetails ticket={ticket} callRecord={callRecord} />
+                      <CallDetails
+                        ticket={localTicket}
+                        callRecord={callRecord}
+                        formSubmission={formSubmission}
+                      />
                       {loadingCallRecord && (
                         <div className={styles.loadingMessage}>
                           Loading call details...
@@ -1214,12 +1257,19 @@ export default function TicketReviewModal({
                     </>
                   )}
                   {activeTab === 'insights' && (
-                    <CallInsights ticket={ticket} callRecord={callRecord} />
+                    <CallInsights
+                      ticket={localTicket}
+                      callRecord={callRecord}
+                      formSubmission={formSubmission}
+                    />
                   )}
                   {activeTab === 'location' && (
                     <ServiceLocation
-                      ticket={ticket}
-                      onUpdate={serviceAddressData => {
+                      ticket={localTicket}
+                      onUpdate={async serviceAddressData => {
+                        // Refetch ticket to get updated service_address
+                        await refetchTicket();
+
                         if (onSuccess) {
                           if (serviceAddressData?.serviceAddress) {
                             onSuccess(
