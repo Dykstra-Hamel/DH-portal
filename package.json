@@ -29,6 +29,7 @@
     "stopstart": "supabase stop && supabase start"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@slack/web-api": "^7.9.3",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.4",

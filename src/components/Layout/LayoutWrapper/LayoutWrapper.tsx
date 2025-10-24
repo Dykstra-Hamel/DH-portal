@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu } from 'lucide-react';
 import { GlobalHeader } from '../GlobalHeader/GlobalHeader';
 import { Sidebar } from '@/components/sidenav/Sidebar';
 import { NavigationProvider } from '@/contexts/NavigationContext';
@@ -232,15 +231,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
   return (
     <div className={styles.layoutWrapper}>
-      {/* Mobile Menu Button */}
-      <div className="mobileMenuButton" onClick={toggleSidebar}>
-        <Menu size={32} />
-      </div>
-
       <div className={styles.contentWrapper}>
         <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
         <div className={styles.rightContent}>
-          <GlobalHeader />
+          <GlobalHeader onMenuToggle={toggleSidebar} />
           {pageConfig && (
             <GlobalLowerHeader
               title={pageConfig.title}
