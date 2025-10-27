@@ -36,19 +36,7 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || '';
     const referer = request.headers.get('referer') || '';
 
-    // Step 1: Validate origin using widget whitelist and get company info
-    const corsValidation = await validateOrigin(request, 'widget');
-    if (!corsValidation.isValid) {
-      return corsValidation.response || NextResponse.json(
-        { error: 'Origin not allowed' },
-        { status: 403 }
-      );
-    }
-
-    // Get company info from CORS validation
-    const companyId = corsValidation.companyId || null;
-
-    // Step 2: Parse request body based on Content-Type
+    // Step 1: Parse request body based on Content-Type
     const contentType = request.headers.get('content-type') || '';
     let rawPayload: Record<string, any>;
 
@@ -85,16 +73,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Step 2: Validate origin using widget whitelist and get company info
+    // Pass sourceUrl (pageUrl from Webflow) as fallback when headers are missing
+    const corsValidation = await validateOrigin(request, 'widget', sourceUrl);
+
+    if (!corsValidation.isValid) {
+      return corsValidation.response || NextResponse.json(
+        { error: 'Origin not allowed' },
+        { status: 403 }
+      );
+    }
+
+    // Get company info from CORS validation
+    const companyId = corsValidation.companyId || null;
+
     // Step 3: Determine source URL for tracking
     const supabase = createAdminClient();
     let lookupUrl: string | null = null;
 
     // Priority order for determining the source URL:
     // 1. pageUrl from payload (Webflow, etc.)
-    // 2. Origin header
-    // 3. Referer header
+    // 2. In dev with ngrok: Referer (actual form domain) over Origin (ngrok URL)
+    // 3. In production: Origin header
+    // 4. Referer header as fallback
+    const isNgrokInDev = process.env.NODE_ENV === 'development' && origin?.includes('.ngrok');
+
     if (sourceUrl) {
       lookupUrl = sourceUrl;
+    } else if (isNgrokInDev) {
+      // For ngrok testing, use referer (actual domain) over origin (ngrok URL)
+      lookupUrl = referer || origin;
     } else if (origin) {
       lookupUrl = origin;
     } else if (referer) {

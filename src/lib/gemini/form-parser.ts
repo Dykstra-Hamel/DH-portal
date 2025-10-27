@@ -11,6 +11,56 @@ import type { GeminiParseResult, NormalizedFormData, TicketMetadata } from '@/ty
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000; // Start with 1 second
+
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry wrapper with exponential backoff for Gemini API calls
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  retries: number = MAX_RETRIES
+): Promise<T> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+
+      // Check if error is retryable (503, 429, network errors)
+      const isRetryable =
+        error?.status === 503 || // Service Unavailable
+        error?.status === 429 || // Too Many Requests
+        error?.message?.includes('overloaded') ||
+        error?.message?.includes('timeout') ||
+        error?.message?.includes('network');
+
+      // If not retryable or no more retries, throw immediately
+      if (!isRetryable || attempt === retries) {
+        throw error;
+      }
+
+      // Calculate exponential backoff delay: 1s, 2s, 4s, 8s...
+      const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+      console.log(`⏳ Gemini API retry ${attempt + 1}/${retries} after ${delay}ms...`);
+
+      await sleep(delay);
+    }
+  }
+
+  throw lastError;
+}
+
 /**
  * Parse a form submission using Gemini AI to normalize field names and extract structured data
  *
@@ -44,12 +94,17 @@ YOUR TASK:
    - additional_comments (string)
 
 2. Generate ticket metadata:
-   - title (concise, 3-8 words summarizing the issue)
    - description (1-2 sentences describing the service request)
    - priority (low/medium/high/urgent based on urgency indicators)
-   - service_type (e.g., "Pest Control", "Termite Inspection", "Rodent Removal")
+   - service_type (MUST be either "Support" or "Sales" - this is for department routing)
+   - pest_type (e.g., "Rodent Control", "Mosquito Control", "Bed Bug Control", "Termite Control", "General Pest Control")
 
-3. Calculate a confidence score (0.0-1.0) based on:
+3. Determine service_type (department routing) based on form content:
+   - "Sales" indicators: new customer inquiry, requesting quote, asking about pricing, "interested in service", first-time contact, comparing services
+   - "Support" indicators: existing customer issues, reporting problems, complaints, service follow-ups, requesting support, technical issues
+   - DEFAULT to "Support" when unclear or insufficient information
+
+4. Calculate a confidence score (0.0-1.0) based on:
    - How much data was successfully extracted
    - Quality of field matching
    - Completeness of information
@@ -79,10 +134,10 @@ RESPONSE FORMAT (valid JSON only):
     "additional_comments": "extracted value or null"
   },
   "ticket": {
-    "title": "generated title",
     "description": "generated description",
     "priority": "low|medium|high|urgent",
-    "service_type": "service type"
+    "service_type": "Support|Sales",
+    "pest_type": "Rodent Control|Mosquito Control|Bed Bug Control|etc"
   },
   "confidence": 0.85
 }
@@ -94,7 +149,11 @@ IMPORTANT:
 - If address is combined (e.g., "123 Main St, Austin, TX 78701"), parse it into separate fields
 - Phone numbers: accept any format, normalize to (XXX) XXX-XXXX if possible`;
 
-    const result = await model.generateContent(prompt);
+    // Retry Gemini API call with exponential backoff
+    const result = await retryWithBackoff(async () => {
+      return await model.generateContent(prompt);
+    });
+
     const responseText = result.response.text();
 
     // Clean the response (remove markdown code blocks if present)
@@ -146,9 +205,9 @@ function generateFallbackTicket(payload: Record<string, any>): TicketMetadata {
   const issue = payload.pest_issue || payload.issue || payload.problem || 'Service Request';
 
   return {
-    title: `New Form Submission: ${issue}`,
     description: `Form submission received with issue: ${issue}. Please review the submission details.`,
     priority: 'medium',
-    service_type: 'Pest Control',
+    service_type: 'Support', // Default to Support when AI fails
+    pest_type: 'General Pest Control', // Default pest type
   };
 }
