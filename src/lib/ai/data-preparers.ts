@@ -139,22 +139,21 @@ export async function prepareCallMetrics(
 ): Promise<CallMetrics> {
   const supabase = createAdminClient();
 
-  // Get all company leads and customers to filter call_records
-  const { data: companyLeadIds } = await supabase
-    .from('leads')
-    .select('id')
-    .eq('company_id', companyId);
+  // Fetch call records directly by company_id
+  const { data: calls, error } = await supabase
+    .from('call_records')
+    .select('*')
+    .eq('company_id', companyId)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
 
-  const { data: companyCustomerIds } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('company_id', companyId);
+  if (error) {
+    console.error('Error fetching calls:', error);
+    throw new Error('Failed to fetch call data');
+  }
 
-  const leadIdArray = companyLeadIds?.map((l: { id: string }) => l.id) || [];
-  const customerIdArray = companyCustomerIds?.map((c: { id: string }) => c.id) || [];
-
-  if (leadIdArray.length === 0 && customerIdArray.length === 0) {
-    // No data
+  // Handle no data case
+  if (!calls || calls.length === 0) {
     return {
       totalCalls: 0,
       inboundCalls: 0,
@@ -167,27 +166,6 @@ export async function prepareCallMetrics(
       answerRate: 0,
       conversionRate: 0,
     };
-  }
-
-  // Build OR filter
-  const orFilter =
-    leadIdArray.length > 0 && customerIdArray.length > 0
-      ? `lead_id.in.(${leadIdArray.join(',')}),customer_id.in.(${customerIdArray.join(',')})`
-      : leadIdArray.length > 0
-      ? `lead_id.in.(${leadIdArray.join(',')})`
-      : `customer_id.in.(${customerIdArray.join(',')})`;
-
-  // Fetch call records
-  const { data: calls, error } = await supabase
-    .from('call_records')
-    .select('*')
-    .gte('created_at', startDate)
-    .lte('created_at', endDate)
-    .or(orFilter);
-
-  if (error || !calls) {
-    console.error('Error fetching calls:', error);
-    throw new Error('Failed to fetch call data');
   }
 
   const totalCalls = calls.length;
@@ -560,22 +538,10 @@ export async function fetchRecentLeads(companyId: string, limit: number = 10) {
 export async function fetchRecentCalls(companyId: string, limit: number = 10) {
   const supabase = createAdminClient();
 
-  // Get company leads
-  const { data: companyLeadIds } = await supabase
-    .from('leads')
-    .select('id')
-    .eq('company_id', companyId);
-
-  const leadIdArray = companyLeadIds?.map((l: { id: string }) => l.id) || [];
-
-  if (leadIdArray.length === 0) {
-    return [];
-  }
-
   const { data: calls, error } = await supabase
     .from('call_records')
     .select('*')
-    .in('lead_id', leadIdArray)
+    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .limit(limit);
 
