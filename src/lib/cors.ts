@@ -48,34 +48,40 @@ function getGlobalWhitelistedDomains(): string[] {
 }
 
 /**
- * Get allowed widget origins (base + all active widget domains)
+ * Get allowed widget origins (base + all domains from companies.website)
  */
 async function getWidgetOrigins(): Promise<string[]> {
   try {
-    // Get from new widget_domains table
+    // Get domains from companies.website JSONB array
     const supabase = createAdminClient();
-    
-    const { data: domains, error } = await supabase
-      .from('widget_domains')
-      .select('domain')
-      .eq('is_active', true);
+
+    const { data: companies, error } = await supabase
+      .from('companies')
+      .select('website');
 
     let widgetDomains: string[] = [];
-    
-    if (!error && domains) {
-      widgetDomains = domains.map(d => d.domain).filter(Boolean);
+
+    if (!error && companies) {
+      // Extract all domains from all companies' website arrays
+      companies.forEach(company => {
+        if (company.website && Array.isArray(company.website)) {
+          widgetDomains.push(...company.website);
+        }
+      });
+      // Remove duplicates
+      widgetDomains = [...new Set(widgetDomains)].filter(Boolean);
     } else {
-      console.error('Failed to fetch widget domains:', error);
+      console.error('Failed to fetch company domains:', error);
       // Fall back to environment variable
       widgetDomains = getGlobalWhitelistedDomains();
     }
 
     const allOrigins = [...BASE_WIDGET_ORIGINS, ...widgetDomains];
-    
+
 
     return allOrigins;
   } catch (error) {
-    console.error('Failed to fetch widget domains:', error);
+    console.error('Failed to fetch company domains:', error);
     // Fall back to environment variable only
     return [...BASE_WIDGET_ORIGINS, ...getGlobalWhitelistedDomains()];
   }
@@ -196,20 +202,54 @@ export async function createCorsErrorResponse(
 }
 
 /**
+ * Find company by origin from companies.website JSONB array
+ */
+async function findCompanyByOrigin(origin: string): Promise<{
+  companyId: string | null;
+  companyName: string | null;
+}> {
+  try {
+    const supabase = createAdminClient();
+
+    // Query companies table where website JSONB array contains the domain
+    const { data: companies, error } = await supabase
+      .from('companies')
+      .select('id, name, website')
+      .filter('website', 'cs', JSON.stringify([origin]));
+
+    if (error || !companies || companies.length === 0) {
+      return { companyId: null, companyName: null };
+    }
+
+    // Return the first matching company
+    return {
+      companyId: companies[0].id,
+      companyName: companies[0].name
+    };
+  } catch (error) {
+    console.error('Failed to find company by origin:', error);
+    return { companyId: null, companyName: null };
+  }
+}
+
+/**
  * Middleware function to validate origin before processing request
  */
 export async function validateOrigin(request: NextRequest, configType: CorsConfigType): Promise<{
   isValid: boolean;
   origin: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
   response?: NextResponse;
 }> {
   const origin = request.headers.get('origin');
-  
+  const referer = request.headers.get('referer');
+
   // Webhook endpoints don't need origin validation
   if (configType === 'webhook') {
     return { isValid: true, origin };
   }
-  
+
   if (!(await isOriginAllowed(origin, configType))) {
     return {
       isValid: false,
@@ -217,8 +257,25 @@ export async function validateOrigin(request: NextRequest, configType: CorsConfi
       response: await createCorsErrorResponse('Unauthorized origin', origin, configType, 403)
     };
   }
-  
-  return { isValid: true, origin };
+
+  // For widget endpoints, also return the company info if needed
+  let companyId: string | null = null;
+  let companyName: string | null = null;
+
+  if (configType === 'widget') {
+    // Use origin first, fallback to referer if origin is empty
+    const lookupUrl = origin || referer || null;
+
+    if (lookupUrl) {
+      // Extract origin from URL
+      const urlOrigin = lookupUrl.startsWith('http') ? new URL(lookupUrl).origin : lookupUrl;
+      const companyInfo = await findCompanyByOrigin(urlOrigin);
+      companyId = companyInfo.companyId;
+      companyName = companyInfo.companyName;
+    }
+  }
+
+  return { isValid: true, origin, companyId, companyName };
 }
 
 /**

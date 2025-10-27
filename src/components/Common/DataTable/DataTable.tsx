@@ -204,6 +204,8 @@ export default function DataTable<T>({
         return styles.leadTable;
       case 'calls':
         return styles.callTable;
+      case 'form_submissions':
+        return styles.callTable; // Reuse call table styling
       case 'customers':
         return styles.customerTable;
       case 'tasks':

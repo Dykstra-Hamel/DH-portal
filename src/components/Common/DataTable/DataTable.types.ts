@@ -65,7 +65,7 @@ export interface DataTableProps<T> {
   // Styling
   className?: string;
   emptyStateMessage?: string;
-  tableType?: 'tickets' | 'supportCases' | 'leads' | 'calls' | 'customers' | 'customersWithCompany' | 'tasks'; // Determines column layout
+  tableType?: 'tickets' | 'supportCases' | 'leads' | 'calls' | 'customers' | 'customersWithCompany' | 'tasks' | 'form_submissions'; // Determines column layout
   customColumnWidths?: string; // Custom CSS grid template columns (e.g., "1fr 120px 100px 200px")
 
   // Sorting

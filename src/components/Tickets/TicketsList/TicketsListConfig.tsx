@@ -80,12 +80,7 @@ const formatSource = (ticket: Ticket): string => {
     }
   }
 
-  // For web forms, show "Widget"
-  if (ticket.type === 'web_form') {
-    return 'Widget';
-  }
-
-  // For other types, use the source mapping
+  // For all types, use the source mapping
   const sourceMap: { [key: string]: string } = {
     organic: 'Organic',
     referral: 'Referral',
@@ -98,6 +93,8 @@ const formatSource = (ticket: Ticket): string => {
     webinar: 'Webinar',
     content_marketing: 'Content',
     internal: 'Internal',
+    widget: 'Widget',
+    website: 'Website',
     other: 'Other',
   };
   return sourceMap[ticket.source] || ticket.source;
