@@ -104,9 +104,14 @@ export async function isOriginAllowed(origin: string | null, configType: CorsCon
     // This is common for same-origin requests from localhost
     return true;
   }
-  
+
+  // In development, allow ngrok tunnels for testing
+  if (process.env.NODE_ENV === 'development' && origin.includes('.ngrok')) {
+    return true;
+  }
+
   let allowedOrigins: string[];
-  
+
   if (configType === 'widget') {
     // For widget endpoints, get dynamic list from database
     allowedOrigins = await getWidgetOrigins();
@@ -114,13 +119,13 @@ export async function isOriginAllowed(origin: string | null, configType: CorsCon
     // For other endpoints, use static configuration
     allowedOrigins = STATIC_ORIGIN_CONFIGS[configType];
   }
-  
+
   const isAllowed = allowedOrigins.some(allowedOrigin => {
     // Exact match
     if (allowedOrigin === origin) {
       return true;
     }
-    
+
     // Subdomain match (for widget integrations)
     if (configType === 'widget') {
       const domain = allowedOrigin.replace(/^https?:\/\//, '');
@@ -235,7 +240,11 @@ async function findCompanyByOrigin(origin: string): Promise<{
 /**
  * Middleware function to validate origin before processing request
  */
-export async function validateOrigin(request: NextRequest, configType: CorsConfigType): Promise<{
+export async function validateOrigin(
+  request: NextRequest,
+  configType: CorsConfigType,
+  payloadPageUrl?: string | null
+): Promise<{
   isValid: boolean;
   origin: string | null;
   companyId?: string | null;
@@ -263,15 +272,34 @@ export async function validateOrigin(request: NextRequest, configType: CorsConfi
   let companyName: string | null = null;
 
   if (configType === 'widget') {
-    // Use origin first, fallback to referer if origin is empty
-    const lookupUrl = origin || referer || null;
+    // Priority order for company lookup:
+    // 1. payloadPageUrl (from Webflow or other platforms)
+    // 2. In dev with ngrok: Referer (actual form domain) over Origin (ngrok URL)
+    // 3. Origin header
+    // 4. Referer header
+    const isNgrokInDev = process.env.NODE_ENV === 'development' && origin?.includes('.ngrok');
+
+    let lookupUrl: string | null = null;
+    if (payloadPageUrl) {
+      lookupUrl = payloadPageUrl;
+    } else if (isNgrokInDev) {
+      lookupUrl = referer || origin;
+    } else {
+      lookupUrl = origin || referer || null;
+    }
 
     if (lookupUrl) {
       // Extract origin from URL
       const urlOrigin = lookupUrl.startsWith('http') ? new URL(lookupUrl).origin : lookupUrl;
+
       const companyInfo = await findCompanyByOrigin(urlOrigin);
       companyId = companyInfo.companyId;
       companyName = companyInfo.companyName;
+
+      // Log when company lookup fails (helpful for debugging production issues)
+      if (!companyId) {
+        console.warn(`⚠️ [CORS] No company found for origin: ${urlOrigin}`);
+      }
     }
   }
 
