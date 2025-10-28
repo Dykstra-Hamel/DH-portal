@@ -1,0 +1,115 @@
+.pressureGauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+
+  &.small {
+    .gaugeSvg {
+      width: 120px;
+      height: 72px;
+    }
+
+    .valueText {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .labelText {
+      font-size: 10px;
+    }
+  }
+
+  &.medium {
+    .gaugeSvg {
+      width: 200px;
+      height: 120px;
+    }
+
+    .valueText {
+      font-size: 36px;
+      font-weight: 700;
+    }
+
+    .labelText {
+      font-size: 12px;
+    }
+  }
+
+  &.large {
+    .gaugeSvg {
+      width: 280px;
+      height: 168px;
+    }
+
+    .valueText {
+      font-size: 48px;
+      font-weight: 700;
+    }
+
+    .labelText {
+      font-size: 14px;
+    }
+  }
+}
+
+.gaugeSvg {
+  display: block;
+}
+
+.valueText {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.labelText {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.animatedStroke {
+  transition: stroke-dasharray 1s ease-out, stroke 0.3s ease;
+}
+
+.animatedNeedle {
+  transition: transform 1s ease-out;
+  transform-origin: center;
+}
+
+.comparison {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.comparisonLabel {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.comparisonValue {
+  font-weight: 700;
+  font-size: 1rem;
+
+  &.increasing {
+    color: #ef4444;
+  }
+
+  &.decreasing {
+    color: #10b981;
+  }
+}
+
+.externalLabel {
+  font-size: 0.875rem;
+  color: #374151;
+  font-weight: 600;
+  text-align: center;
+}

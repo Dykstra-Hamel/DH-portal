@@ -25,6 +25,7 @@
     "seed-tickets": "node scripts/seed-tickets-support-cases.js",
     "seed-leads-addresses": "node scripts/seed-service-addresses.js",
     "seed-all": "npm run seed-with-users && npm run seed-tickets-support-cases && npm run seed-service-addresses && npm run seed-automations",
+    "backfill-pest-pressure": "npx tsx scripts/backfill-pest-pressure.ts",
     "restartdb": "supabase db reset --local",
     "stopstart": "supabase stop && supabase start"
   },

@@ -1,0 +1,11 @@
+.pageContainer {
+  padding: 2rem;
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+@media (max-width: 768px) {
+  .pageContainer {
+    padding: 1rem;
+  }
+}
