@@ -9,6 +9,7 @@ import {
   InsightsResponse,
   PredictionsResponse,
   AIUsageSummary,
+  PestPressurePredictionV2,
 } from '@/lib/ai/types';
 
 interface AIContextType {
@@ -39,6 +40,16 @@ interface AIContextType {
   usageStats: AIUsageSummary | null;
   isLoadingUsage: boolean;
   fetchUsageStats: (startDate: string, endDate: string) => Promise<void>;
+
+  // Pest pressure predictions (V2)
+  pestPressurePredictions: PestPressurePredictionV2[];
+  isLoadingPestPressure: boolean;
+  pestPressureError: string | null;
+  fetchPestPressurePredictions: (
+    pestType?: string,
+    location?: { city?: string; state?: string }
+  ) => Promise<void>;
+  anomalyAlerts: PestPressurePredictionV2[];
 }
 
 const AIContext = createContext<AIContextType | undefined>(undefined);
@@ -69,6 +80,14 @@ export function AIProvider({ children }: AIProviderProps) {
   // Usage stats
   const [usageStats, setUsageStats] = useState<AIUsageSummary | null>(null);
   const [isLoadingUsage, setIsLoadingUsage] = useState(false);
+
+  // Pest pressure predictions (V2)
+  const [pestPressurePredictions, setPestPressurePredictions] = useState<
+    PestPressurePredictionV2[]
+  >([]);
+  const [isLoadingPestPressure, setIsLoadingPestPressure] = useState(false);
+  const [pestPressureError, setPestPressureError] = useState<string | null>(null);
+  const [anomalyAlerts, setAnomalyAlerts] = useState<PestPressurePredictionV2[]>([]);
 
   /**
    * Send a chat message and get AI response
@@ -216,7 +235,35 @@ export function AIProvider({ children }: AIProviderProps) {
 
       const data: PredictionsResponse = await response.json();
 
-      setPredictions(data.predictions);
+      // Transform snake_case to camelCase if pest_pressure predictions
+      if (predictionType === 'pest_pressure' && data.predictions) {
+        const transformed = data.predictions.map((p: any) => ({
+          id: p.id,
+          companyId: p.company_id,
+          pestType: p.pest_type,
+          locationCity: p.location_city,
+          locationState: p.location_state,
+          predictionWindow: p.prediction_window,
+          currentPressure: p.current_pressure,
+          predictedPressure: p.predicted_pressure,
+          confidenceScore: p.confidence_score,
+          trend: p.trend,
+          trendPercentage: p.trend_percentage,
+          anomalyDetected: p.anomaly_detected,
+          anomalySeverity: p.anomaly_severity,
+          anomalyDescription: p.anomaly_description,
+          contributingFactors: p.contributing_factors,
+          recommendations: p.recommendations,
+          modelVersion: p.model_version,
+          dataPointsUsed: p.data_points_used,
+          weatherInfluenceScore: p.weather_influence_score,
+          generatedAt: p.generated_at,
+          validUntil: p.valid_until,
+        }));
+        setPredictions(transformed);
+      } else {
+        setPredictions(data.predictions);
+      }
     } catch (error: any) {
       console.error('Predictions error:', error);
       setPredictionsError(error.message || 'An error occurred');
@@ -253,6 +300,83 @@ export function AIProvider({ children }: AIProviderProps) {
     }
   };
 
+  /**
+   * Fetch pest pressure predictions (V2)
+   */
+  const fetchPestPressurePredictions = async (
+    pestType?: string,
+    location?: { city?: string; state?: string }
+  ) => {
+    if (!selectedCompany) {
+      setPestPressureError('No company selected');
+      return;
+    }
+
+    setIsLoadingPestPressure(true);
+    setPestPressureError(null);
+
+    try {
+      const response = await fetch('/api/ai/predictions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyId: selectedCompany.id,
+          predictionType: 'pest_pressure',
+          parameters: {
+            pestType,
+            location,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch pest pressure predictions');
+      }
+
+      const data = await response.json();
+
+      // Extract and transform predictions from response (API returns snake_case, we need camelCase)
+      const rawPredictions = data.predictions || [];
+      const predictions: PestPressurePredictionV2[] = rawPredictions.map((p: any) => ({
+        id: p.id,
+        companyId: p.company_id,
+        pestType: p.pest_type,
+        locationCity: p.location_city,
+        locationState: p.location_state,
+        predictionWindow: p.prediction_window,
+        currentPressure: p.current_pressure,
+        predictedPressure: p.predicted_pressure,
+        confidenceScore: p.confidence_score,
+        trend: p.trend,
+        trendPercentage: p.trend_percentage,
+        anomalyDetected: p.anomaly_detected,
+        anomalySeverity: p.anomaly_severity,
+        anomalyDescription: p.anomaly_description,
+        contributingFactors: p.contributing_factors,
+        recommendations: p.recommendations,
+        modelVersion: p.model_version,
+        dataPointsUsed: p.data_points_used,
+        weatherInfluenceScore: p.weather_influence_score,
+        generatedAt: p.generated_at,
+        validUntil: p.valid_until,
+      }));
+
+      setPestPressurePredictions(predictions);
+
+      // Extract anomaly alerts (predictions with anomaly_detected = true)
+      const alerts = predictions.filter((p) => p.anomalyDetected === true);
+      setAnomalyAlerts(alerts);
+    } catch (error: any) {
+      console.error('Pest pressure predictions error:', error);
+      setPestPressureError(error.message || 'An error occurred');
+    } finally {
+      setIsLoadingPestPressure(false);
+    }
+  };
+
   return (
     <AIContext.Provider
       value={{
@@ -273,6 +397,11 @@ export function AIProvider({ children }: AIProviderProps) {
         usageStats,
         isLoadingUsage,
         fetchUsageStats,
+        pestPressurePredictions,
+        isLoadingPestPressure,
+        pestPressureError,
+        fetchPestPressurePredictions,
+        anomalyAlerts,
       }}
     >
       {children}

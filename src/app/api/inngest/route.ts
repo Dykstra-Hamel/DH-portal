@@ -18,6 +18,13 @@ import { partialLeadCreated } from '@/lib/inngest/functions/partial-lead-created
 import { inboundCallTransfer } from '@/lib/inngest/functions/inbound-call-transfer';
 import { cleanupStaleLiveTickets } from '@/lib/inngest/functions/cleanup-stale-live-tickets';
 
+// Pest Pressure Prediction System functions
+import { aggregatePestPressureData } from '@/lib/inngest/functions/aggregate-pest-pressure-data';
+import { syncWeatherData } from '@/lib/inngest/functions/sync-weather-data';
+import { trainPestPressureModels } from '@/lib/inngest/functions/train-pest-pressure-models';
+import { generatePestPredictions } from '@/lib/inngest/functions/generate-pest-predictions';
+import { detectPestAnomalies } from '@/lib/inngest/functions/detect-pest-anomalies';
+
 // Create the handler
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -39,6 +46,12 @@ export const { GET, POST, PUT } = serve({
     retellCallWebhookHandler,
     workflowCancellationHandler,
     cleanupStaleLiveTickets,
+    // Pest Pressure Prediction System
+    aggregatePestPressureData,
+    syncWeatherData,
+    trainPestPressureModels,
+    generatePestPredictions,
+    detectPestAnomalies,
   ],
   streaming: false, // Disable streaming for compatibility
 });
