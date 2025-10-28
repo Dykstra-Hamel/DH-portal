@@ -169,7 +169,7 @@ async function fetchFromOpenMeteo(
 
     // Calculate average temperature
     const tempAvg =
-      tempMax != null && tempMin != null ? (tempMax + tempMin) / 2 : null;
+      tempMax != null && tempMin != null ? (tempMax + tempMin) / 2 : undefined;
 
     weatherData.push({
       lat,
@@ -177,11 +177,11 @@ async function fetchFromOpenMeteo(
       city,
       state,
       date,
-      temp_max_f: tempMax,
-      temp_min_f: tempMin,
+      temp_max_f: tempMax ?? undefined,
+      temp_min_f: tempMin ?? undefined,
       temp_avg_f: tempAvg,
-      precipitation_inches: precip,
-      humidity_avg_percent: humidity,
+      precipitation_inches: precip ?? undefined,
+      humidity_avg_percent: humidity ?? undefined,
       data_source: 'open-meteo',
       fetched_at: new Date().toISOString(),
     });

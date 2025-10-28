@@ -64,7 +64,7 @@ export const detectPestAnomalies = inngest.createFunction(
           console.log(`[Inngest] Checking anomalies for company ${companyId}`);
 
           // Load anomaly detection model
-          const anomalyModel = await loadActiveModel(companyId, 'anomaly_detection', null);
+          const anomalyModel = await loadActiveModel(companyId, 'anomaly_detection', undefined);
 
           if (!anomalyModel) {
             console.warn(`[Inngest] No active anomaly model for company ${companyId}`);
@@ -171,7 +171,7 @@ export const detectPestAnomalies = inngest.createFunction(
 
     const anomaliesDetected = anomalyResults.filter((r) => r.anomaly_detected).length;
     const criticalAnomalies = anomalyResults.filter(
-      (r) => r.anomaly_detected && r.severity === 'critical'
+      (r) => r.anomaly_detected && (r as any).severity === 'critical'
     ).length;
 
     console.log('[Inngest] Anomaly detection completed', {
@@ -188,8 +188,8 @@ export const detectPestAnomalies = inngest.createFunction(
         companies_checked: companies.length,
         anomalies_detected: anomaliesDetected,
         critical_anomalies: criticalAnomalies,
-        high_anomalies: anomalyResults.filter((r) => r.anomaly_detected && r.severity === 'high').length,
-        medium_anomalies: anomalyResults.filter((r) => r.anomaly_detected && r.severity === 'medium').length,
+        high_anomalies: anomalyResults.filter((r) => r.anomaly_detected && (r as any).severity === 'high').length,
+        medium_anomalies: anomalyResults.filter((r) => r.anomaly_detected && (r as any).severity === 'medium').length,
       },
       results: anomalyResults.filter((r) => r.anomaly_detected), // Only return anomalies
       duration,

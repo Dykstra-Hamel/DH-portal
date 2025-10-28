@@ -12,7 +12,7 @@ import { aggregatePestPressureData } from '@/lib/ai/pest-pressure/data-aggregato
  *
  * Implements waterfall deduplication logic to prevent double-counting.
  */
-export const aggregatePestPressureData = inngest.createFunction(
+export const aggregatePestPressureDataJob = inngest.createFunction(
   {
     id: 'aggregate-pest-pressure-data',
     name: 'Aggregate Pest Pressure Data',

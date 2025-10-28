@@ -73,6 +73,9 @@ export async function aggregatePestPressureData(
         // Analyze transcript for pest mentions
         const analysis = await analyzeTranscriptForPests(call.transcript!);
 
+        // Extract customer data (Supabase returns single object for many-to-one relations)
+        const customer = Array.isArray(call.customers) ? call.customers[0] : call.customers;
+
         // Create a data point for each pest type found
         for (const pest of analysis.pest_types) {
           const dataPoint: PestPressureDataPoint = {
@@ -81,9 +84,9 @@ export async function aggregatePestPressureData(
             source_id: call.id,
             pest_type: pest.pest_type,
             pest_mentions_count: pest.mentions_count,
-            city: call.customers?.city,
-            state: call.customers?.state,
-            zip_code: call.customers?.zip_code,
+            city: customer?.city,
+            state: customer?.state,
+            zip_code: customer?.zip_code,
             urgency_level: analysis.urgency_level,
             infestation_severity: analysis.infestation_severity,
             ai_extracted_context: analysis.extracted_context,
@@ -305,8 +308,9 @@ export async function getAggregationStats(companyId: string): Promise<{
   let latest: string | null = null;
 
   for (const point of dataPoints) {
-    // Count by source
-    bySource[point.source_type] = (bySource[point.source_type] || 0) + 1;
+    // Count by source (type cast since Supabase returns untyped data)
+    const sourceType = point.source_type as SourceType;
+    bySource[sourceType] = (bySource[sourceType] || 0) + 1;
 
     // Count by pest type
     byPestType[point.pest_type] = (byPestType[point.pest_type] || 0) + 1;

@@ -19,7 +19,7 @@ import { inboundCallTransfer } from '@/lib/inngest/functions/inbound-call-transf
 import { cleanupStaleLiveTickets } from '@/lib/inngest/functions/cleanup-stale-live-tickets';
 
 // Pest Pressure Prediction System functions
-import { aggregatePestPressureData } from '@/lib/inngest/functions/aggregate-pest-pressure-data';
+import { aggregatePestPressureDataJob } from '@/lib/inngest/functions/aggregate-pest-pressure-data';
 import { syncWeatherData } from '@/lib/inngest/functions/sync-weather-data';
 import { trainPestPressureModels } from '@/lib/inngest/functions/train-pest-pressure-models';
 import { generatePestPredictions } from '@/lib/inngest/functions/generate-pest-predictions';
@@ -47,7 +47,7 @@ export const { GET, POST, PUT } = serve({
     workflowCancellationHandler,
     cleanupStaleLiveTickets,
     // Pest Pressure Prediction System
-    aggregatePestPressureData,
+    aggregatePestPressureDataJob,
     syncWeatherData,
     trainPestPressureModels,
     generatePestPredictions,

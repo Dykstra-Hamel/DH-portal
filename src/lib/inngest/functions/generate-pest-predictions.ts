@@ -69,7 +69,7 @@ export const generatePestPredictions = inngest.createFunction(
           console.log(`[Inngest] Generating predictions for company ${companyId}`);
 
           // Load active model
-          const seasonalModel = await loadActiveModel(companyId, 'seasonal_forecast', null);
+          const seasonalModel = await loadActiveModel(companyId, 'seasonal_forecast', undefined);
 
           if (!seasonalModel) {
             console.warn(`[Inngest] No active seasonal model for company ${companyId}`);
@@ -209,7 +209,7 @@ Return JSON:
     const duration = Date.now() - startTime;
 
     const successCount = predictionResults.filter((r) => r.success).length;
-    const totalPredictions = predictionResults.reduce((sum, r) => sum + (r.predictions_count || 0), 0);
+    const totalPredictions = predictionResults.reduce((sum, r) => sum + ((r as any).predictions_count || 0), 0);
 
     console.log('[Inngest] Prediction generation completed', {
       companiesProcessed: companies.length,
