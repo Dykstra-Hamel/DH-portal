@@ -17,7 +17,7 @@
  *
  * Environment Variables Required (in .env.local):
  *   NEXT_PUBLIC_SUPABASE_URL       Your production Supabase URL
- *   SUPABASE_SERVICE_ROLE_KEY      Your production service role key
+ *   PROD_SUPABASE_SERVICE_KEY      Your production service role key
  *   GEMINI_API_KEY                 Google Gemini API key for AI analysis
  *
  * Safety:
@@ -78,10 +78,16 @@ function parseArgs(): BackfillArgs {
 
   // Validation
   if (!companyId && !all) {
-    console.error('❌ Error: Must specify either --companyId=<uuid> or --all\n');
+    console.error(
+      '❌ Error: Must specify either --companyId=<uuid> or --all\n'
+    );
     console.error('Usage:');
-    console.error('  npm run backfill-pest-pressure -- --companyId=<uuid> --startDate=2024-01-01');
-    console.error('  npm run backfill-pest-pressure -- --all --startDate=2024-01-01 --endDate=2024-12-31');
+    console.error(
+      '  npm run backfill-pest-pressure -- --companyId=<uuid> --startDate=2024-01-01'
+    );
+    console.error(
+      '  npm run backfill-pest-pressure -- --all --startDate=2024-01-01 --endDate=2024-12-31'
+    );
     process.exit(1);
   }
 
@@ -95,8 +101,12 @@ function parseArgs(): BackfillArgs {
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
     console.error('❌ Error: Dates must be in YYYY-MM-DD format\n');
-    console.error(`  startDate: ${startDate} ${dateRegex.test(startDate) ? '✅' : '❌'}`);
-    console.error(`  endDate: ${endDate} ${dateRegex.test(endDate) ? '✅' : '❌'}`);
+    console.error(
+      `  startDate: ${startDate} ${dateRegex.test(startDate) ? '✅' : '❌'}`
+    );
+    console.error(
+      `  endDate: ${endDate} ${dateRegex.test(endDate) ? '✅' : '❌'}`
+    );
     process.exit(1);
   }
 
@@ -118,13 +128,17 @@ function parseArgs(): BackfillArgs {
  */
 function validateEnvironment() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseKey = process.env.PROD_SUPABASE_SERVICE_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (!supabaseUrl || !supabaseKey || !geminiKey) {
     console.error('❌ Missing required environment variables in .env.local:\n');
-    console.error(`  NEXT_PUBLIC_SUPABASE_URL: ${supabaseUrl ? '✅' : '❌ MISSING'}`);
-    console.error(`  SUPABASE_SERVICE_ROLE_KEY: ${supabaseKey ? '✅' : '❌ MISSING'}`);
+    console.error(
+      `  NEXT_PUBLIC_SUPABASE_URL: ${supabaseUrl ? '✅' : '❌ MISSING'}`
+    );
+    console.error(
+      `  PROD_SUPABASE_SERVICE_KEY: ${supabaseKey ? '✅' : '❌ MISSING'}`
+    );
     console.error(`  GEMINI_API_KEY: ${geminiKey ? '✅' : '❌ MISSING'}`);
     console.error('\nPlease set these in your .env.local file');
     process.exit(1);
@@ -142,12 +156,18 @@ async function backfillCompany(
   startDate: string,
   endDate: string
 ): Promise<CompanyResult> {
-  console.log(`\n[${companyName}] Starting backfill from ${startDate} to ${endDate}...`);
+  console.log(
+    `\n[${companyName}] Starting backfill from ${startDate} to ${endDate}...`
+  );
 
   const startTime = Date.now();
 
   try {
-    const result = await aggregatePestPressureData(companyId, startDate, endDate);
+    const result = await aggregatePestPressureData(
+      companyId,
+      startDate,
+      endDate
+    );
 
     const duration = parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
 
@@ -197,8 +217,8 @@ function printSummary(
   console.log(`Date Range: ${startDate} to ${endDate}`);
   console.log(`Total Duration: ${totalDuration.toFixed(2)}s`);
   console.log(`\nCompanies Processed: ${results.length}`);
-  console.log(`  ✅ Successful: ${results.filter((r) => r.success).length}`);
-  console.log(`  ❌ Failed: ${results.filter((r) => !r.success).length}`);
+  console.log(`  ✅ Successful: ${results.filter(r => r.success).length}`);
+  console.log(`  ❌ Failed: ${results.filter(r => !r.success).length}`);
 
   const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0);
   const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
@@ -214,9 +234,11 @@ function printSummary(
     console.log(`\n📋 Per-Company Breakdown:`);
     results
       .sort((a, b) => b.inserted - a.inserted)
-      .forEach((r) => {
+      .forEach(r => {
         if (r.success) {
-          console.log(`  ${r.companyName}: ${r.inserted} inserted, ${r.skipped} skipped`);
+          console.log(
+            `  ${r.companyName}: ${r.inserted} inserted, ${r.skipped} skipped`
+          );
         } else {
           console.log(`  ${r.companyName}: ❌ ${r.error}`);
         }
@@ -224,10 +246,10 @@ function printSummary(
   }
 
   // Show failed companies if any
-  const failed = results.filter((r) => !r.success);
+  const failed = results.filter(r => !r.success);
   if (failed.length > 0) {
     console.log(`\n❌ Failed Companies:`);
-    failed.forEach((f) => {
+    failed.forEach(f => {
       console.log(`  - ${f.companyName}: ${f.error}`);
     });
   }
@@ -248,6 +270,10 @@ async function main() {
   // Validate environment
   const { supabaseUrl, supabaseKey } = validateEnvironment();
 
+  // Set service role key for createAdminClient() to use
+  // (aggregatePestPressureData internally uses createAdminClient which reads SUPABASE_SERVICE_ROLE_KEY)
+  process.env.SUPABASE_SERVICE_ROLE_KEY = supabaseKey;
+
   // Create Supabase client
   const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: {
@@ -263,12 +289,11 @@ async function main() {
   let companies: { id: string; name: string }[] = [];
 
   if (args.all) {
-    console.log('🔍 Fetching all active companies...');
+    console.log('🔍 Fetching all companies...');
 
     const { data, error } = await supabase
       .from('companies')
       .select('id, name')
-      .eq('is_active', true)
       .order('name');
 
     if (error) {
@@ -277,7 +302,7 @@ async function main() {
     }
 
     companies = data || [];
-    console.log(`   Found ${companies.length} active companies\n`);
+    console.log(`   Found ${companies.length} companies\n`);
   } else if (args.companyId) {
     console.log(`🔍 Fetching company ${args.companyId}...`);
 
@@ -303,12 +328,14 @@ async function main() {
   }
 
   // Confirmation prompt
-  console.log('⚠️  WARNING: This will process historical data and may take a while.');
+  console.log(
+    '⚠️  WARNING: This will process historical data and may take a while.'
+  );
   console.log(`   Companies to process: ${companies.length}`);
   console.log(`   Date range: ${args.startDate} to ${args.endDate}`);
   console.log('   Press Ctrl+C to cancel, or wait 3 seconds to continue...\n');
 
-  await new Promise((resolve) => setTimeout(resolve, 3000));
+  await new Promise(resolve => setTimeout(resolve, 3000));
 
   // Process each company
   const scriptStartTime = Date.now();
@@ -329,19 +356,21 @@ async function main() {
   printSummary(results, args.startDate, args.endDate, totalDuration);
 
   // Next steps
-  if (results.some((r) => r.inserted > 0)) {
+  if (results.some(r => r.inserted > 0)) {
     console.log('📋 Next Steps:\n');
     console.log('1. Train ML models for companies with new data:');
     console.log('   POST /api/ai/pest-pressure/train');
     console.log('\n2. Generate predictions:');
-    console.log('   POST /api/ai/predictions (predictionType: "pest_pressure")\n');
+    console.log(
+      '   POST /api/ai/predictions (predictionType: "pest_pressure")\n'
+    );
   }
 }
 
 // Run main and handle errors
 main()
   .then(() => process.exit(0))
-  .catch((error) => {
+  .catch(error => {
     console.error('\n💥 Fatal error:', error);
     process.exit(1);
   });

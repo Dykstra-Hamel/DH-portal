@@ -47,8 +47,6 @@ export async function aggregatePestPressureData(
     .select(`
       id,
       transcript,
-      summary,
-      duration,
       customer_id,
       created_at,
       customers (
