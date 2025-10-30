@@ -12,6 +12,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { analyzeTranscriptForPests } from './transcript-analyzer';
+import { normalizeStateToAbbreviation } from '@/lib/utils/state-normalizer';
 import type {
   PestPressureDataPoint,
   SourceLookupResult,
@@ -65,11 +66,22 @@ export async function aggregatePestPressureData(
     console.error('[Pest Pressure Aggregator] Error fetching call records:', callsError);
   } else if (callRecords && callRecords.length > 0) {
     console.log(`[Pest Pressure Aggregator] Processing ${callRecords.length} inbound calls`);
+    console.log('[Pest Pressure Aggregator] Rate limiting: 15 requests/min (4 sec between calls)');
 
-    for (const call of callRecords) {
+    for (let i = 0; i < callRecords.length; i++) {
+      const call = callRecords[i];
       try {
+        // Progress logging every 10 calls
+        if (i > 0 && i % 10 === 0) {
+          console.log(`[Pest Pressure Aggregator] Progress: ${i}/${callRecords.length} calls processed`);
+        }
+
         // Analyze transcript for pest mentions
         const analysis = await analyzeTranscriptForPests(call.transcript!);
+
+        // Rate limiting: Gemini free tier = 15 RPM = 4 seconds between requests
+        // This prevents quota exceeded errors
+        await new Promise(resolve => setTimeout(resolve, 4000));
 
         // Extract customer data (Supabase returns single object for many-to-one relations)
         const customer = Array.isArray(call.customers) ? call.customers[0] : call.customers;
@@ -83,7 +95,7 @@ export async function aggregatePestPressureData(
             pest_type: pest.pest_type,
             pest_mentions_count: pest.mentions_count,
             city: customer?.city,
-            state: customer?.state,
+            state: normalizeStateToAbbreviation(customer?.state),
             zip_code: customer?.zip_code,
             urgency_level: analysis.urgency_level,
             infestation_severity: analysis.infestation_severity,
@@ -148,7 +160,7 @@ export async function aggregatePestPressureData(
         // Get location from normalized_data
         const location = {
           city: form.normalized_data?.city,
-          state: form.normalized_data?.state,
+          state: normalizeStateToAbbreviation(form.normalized_data?.state),
           zip_code: form.normalized_data?.zip,
         };
 
