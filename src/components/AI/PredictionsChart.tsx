@@ -15,7 +15,7 @@ import {
   Cell,
 } from 'recharts';
 import { TrendingUp, Loader, AlertCircle, RefreshCw } from 'lucide-react';
-import { PestPressurePrediction } from '@/lib/ai/types';
+import { PestPressurePrediction, PestPressurePredictionV2 } from '@/lib/ai/types';
 
 interface PredictionsChartProps {
   autoLoad?: boolean;
@@ -52,17 +52,38 @@ export default function PredictionsChart({
     fetchPredictions(type, parameters);
   };
 
+  // Check if predictions are V2 format (0-10 scale) or legacy format (low/medium/high/extreme)
+  const isV2Format =
+    predictions.length > 0 &&
+    predictions[0] &&
+    typeof (predictions[0] as any).currentPressure === 'number';
+
   // Transform pest pressure data for chart
   const chartData =
     selectedPredictionType === 'pest_pressure' && predictions.length > 0
-      ? (predictions as PestPressurePrediction[]).map((prediction) => ({
-          name: prediction.pestType,
-          current: getPressureValue(prediction.currentPressure),
-          predicted: getPressureValue(prediction.predictedPressure),
-          confidence: prediction.confidenceScore,
-        }))
+      ? isV2Format
+        ? (predictions as PestPressurePredictionV2[]).map((prediction) => ({
+            name: formatPestType(prediction.pestType),
+            current: prediction.currentPressure || 0,
+            predicted: prediction.predictedPressure || 0,
+            confidence: prediction.confidenceScore || 0,
+          }))
+        : (predictions as PestPressurePrediction[]).map((prediction) => ({
+            name: prediction.pestType,
+            current: getPressureValue(prediction.currentPressure),
+            predicted: getPressureValue(prediction.predictedPressure),
+            confidence: prediction.confidenceScore,
+          }))
       : [];
 
+  function formatPestType(pestType: string): string {
+    return pestType
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  // Legacy format (low/medium/high/extreme) to numeric
   function getPressureValue(pressure: string): number {
     switch (pressure) {
       case 'low':
@@ -78,33 +99,53 @@ export default function PredictionsChart({
     }
   }
 
+  // Get label for both V2 (0-10) and legacy (1-4) scales
   function getPressureLabel(value: number): string {
-    switch (value) {
-      case 1:
-        return 'Low';
-      case 2:
-        return 'Medium';
-      case 3:
-        return 'High';
-      case 4:
-        return 'Extreme';
-      default:
-        return 'Unknown';
+    if (isV2Format) {
+      // 0-10 scale labels
+      if (value <= 2.5) return 'Low';
+      if (value <= 5) return 'Moderate';
+      if (value <= 7.5) return 'High';
+      return 'Critical';
+    } else {
+      // Legacy 1-4 scale labels
+      switch (value) {
+        case 1:
+          return 'Low';
+        case 2:
+          return 'Medium';
+        case 3:
+          return 'High';
+        case 4:
+          return 'Extreme';
+        default:
+          return 'Unknown';
+      }
     }
   }
 
+  // Get color for both V2 (0-10) and legacy (1-4) scales
   function getBarColor(value: number): string {
-    switch (value) {
-      case 1:
-        return '#10b981'; // green
-      case 2:
-        return '#f59e0b'; // yellow
-      case 3:
-        return '#ef4444'; // red
-      case 4:
-        return '#7f1d1d'; // dark red
-      default:
-        return '#9ca3af';
+    if (isV2Format) {
+      // 0-10 scale colors
+      if (value <= 2.5) return '#10b981'; // green
+      if (value <= 5) return '#f59e0b'; // yellow
+      if (value <= 7.5) return '#fb923c'; // orange
+      return '#ef4444'; // red
+    } else {
+      // Legacy 1-4 scale colors
+      switch (value) {
+        case 1:
+          return '#10b981'; // green
+        case 2:
+          return '#f59e0b'; // yellow
+        case 3:
+          return '#ef4444'; // red
+        case 4:
+          return '#7f1d1d'; // dark red
+        default:
+          return '#9ca3af';
+      }
     }
   }
 
@@ -210,8 +251,9 @@ export default function PredictionsChart({
                   <YAxis
                     stroke="#6b7280"
                     style={{ fontSize: '12px' }}
-                    ticks={[1, 2, 3, 4]}
+                    ticks={isV2Format ? [0, 2.5, 5, 7.5, 10] : [1, 2, 3, 4]}
                     tickFormatter={getPressureLabel}
+                    domain={isV2Format ? [0, 10] : [0, 4]}
                   />
                   <Tooltip
                     content={<CustomTooltip />}
@@ -243,11 +285,21 @@ export default function PredictionsChart({
             </div>
 
             {/* Prediction details */}
-            <div className={styles.predictionsList}>
-              {(predictions as PestPressurePrediction[]).map((prediction, index) => (
-                <PredictionCard key={index} prediction={prediction} />
-              ))}
-            </div>
+            {!isV2Format && (
+              <div className={styles.predictionsList}>
+                {(predictions as PestPressurePrediction[]).map((prediction, index) => (
+                  <PredictionCard key={index} prediction={prediction} />
+                ))}
+              </div>
+            )}
+            {isV2Format && (
+              <div className={styles.v2Notice}>
+                <p>
+                  Showing ML-powered predictions with 0-10 pressure scale.{' '}
+                  <a href="/ai-assistant/pest-pressure">View detailed pest pressure dashboard →</a>
+                </p>
+              </div>
+            )}
           </>
         )}
 

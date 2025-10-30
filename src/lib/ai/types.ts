@@ -275,6 +275,31 @@ export interface PestPressurePrediction {
   recommendations: string[];
 }
 
+// V2: New ML-powered pest pressure prediction (0-10 scale)
+export interface PestPressurePredictionV2 {
+  id?: string;
+  companyId: string;
+  pestType: string;
+  locationCity?: string;
+  locationState?: string;
+  predictionWindow: '7d' | '30d' | '90d';
+  currentPressure?: number; // 0-10 scale
+  predictedPressure?: number; // 0-10 scale
+  confidenceScore?: number; // 0-100
+  trend?: 'increasing' | 'stable' | 'decreasing' | 'spike';
+  trendPercentage?: number;
+  anomalyDetected?: boolean;
+  anomalySeverity?: 'low' | 'medium' | 'high' | 'critical';
+  anomalyDescription?: string;
+  contributingFactors?: string[];
+  recommendations?: string[];
+  modelVersion?: string;
+  dataPointsUsed?: number;
+  weatherInfluenceScore?: number;
+  generatedAt?: string;
+  validUntil?: string;
+}
+
 export interface LeadVolumePrediction {
   period: string; // e.g., "Q2 2025", "June 2025"
   predictedLeads: number;
