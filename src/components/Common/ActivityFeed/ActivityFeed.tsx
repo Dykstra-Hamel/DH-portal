@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import type { Activity, EntityType } from '@/types/activity';
 import { FIELD_LABELS } from '@/types/activity';
+import {
+  createActivityChannel,
+  subscribeToActivityUpdates,
+  removeActivityChannel,
+  type ActivityUpdatePayload,
+} from '@/lib/realtime/activity-channel';
 import styles from './ActivityFeed.module.scss';
 
 interface ActivityFeedProps {
@@ -13,6 +18,7 @@ interface ActivityFeedProps {
 export function ActivityFeed({
   entityType,
   entityId,
+  companyId,
 }: ActivityFeedProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,26 +48,47 @@ export function ActivityFeed({
   };
 
   const subscribeToActivities = () => {
-    const supabase = createClient();
+    const channel = createActivityChannel(companyId);
 
-    const channel = supabase
-      .channel(`activity_log:${entityId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'activity_log',
-          filter: `entity_id=eq.${entityId}`,
-        },
-        payload => {
-          setActivities(prev => [payload.new as Activity, ...prev]);
+    subscribeToActivityUpdates(channel, async (payload: ActivityUpdatePayload) => {
+      // Only process updates for the current entity
+      if (payload.entity_id !== entityId) {
+        return;
+      }
+
+      // Handle INSERT: Fetch the new activity and add to the list
+      if (payload.action === 'INSERT') {
+        try {
+          const url = new URL('/api/activity', window.location.origin);
+          url.searchParams.set('entity_type', entityType);
+          url.searchParams.set('entity_id', entityId);
+          url.searchParams.set('activity_id', payload.record_id);
+
+          const response = await fetch(url.toString());
+          if (!response.ok) throw new Error('Failed to fetch new activity');
+
+          const { data } = await response.json();
+          if (data && data.length > 0) {
+            setActivities(prev => [data[0], ...prev]);
+          }
+        } catch (error) {
+          console.error('Error fetching new activity:', error);
         }
-      )
-      .subscribe();
+      }
+
+      // Handle UPDATE: Refetch all activities to ensure consistency
+      else if (payload.action === 'UPDATE') {
+        loadActivities();
+      }
+
+      // Handle DELETE: Remove the activity from the list
+      else if (payload.action === 'DELETE') {
+        setActivities(prev => prev.filter(a => a.id !== payload.record_id));
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      removeActivityChannel(channel);
     };
   };
 

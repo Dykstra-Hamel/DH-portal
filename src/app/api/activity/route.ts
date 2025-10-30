@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const entityType = searchParams.get('entity_type');
     const entityId = searchParams.get('entity_id');
+    const activityId = searchParams.get('activity_id');
     const activityType = searchParams.get('activity_type');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
@@ -49,9 +50,15 @@ export async function GET(request: NextRequest) {
       `
       )
       .eq('entity_type', entityType)
-      .eq('entity_id', entityId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .eq('entity_id', entityId);
+
+    // Optional filter by specific activity ID (for realtime updates)
+    if (activityId) {
+      query = query.eq('id', activityId);
+    } else {
+      // Only apply ordering and pagination if not fetching a specific activity
+      query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    }
 
     // Optional filter by activity type
     if (activityType) {

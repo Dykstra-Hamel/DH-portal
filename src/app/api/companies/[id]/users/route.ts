@@ -27,8 +27,10 @@ export async function GET(
       return accessCheck; // Return error response
     }
 
-    // Use appropriate client based on admin status
-    const queryClient = getSupabaseClient(isGlobalAdmin, supabase);
+    // Use service role client for fetching company users to bypass RLS issues
+    // This is safe because we've already verified the user has access to this company
+    // The service role client allows us to fetch all users in the company without RLS blocking
+    const queryClient = getSupabaseClient(true, supabase);
 
     // First, get all user IDs associated with this company
     const { data: companyUsers, error: fetchError } = await queryClient
@@ -143,7 +145,6 @@ export async function GET(
       departments: userDepartments[profile.id] || [],
       roles: userRoles[profile.id] || []
     }));
-
 
     return createSuccessResponse({ users });
 

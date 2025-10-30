@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/hooks/useUser';
@@ -17,9 +17,12 @@ export function useNotifications() {
   const { selectedCompany, isLoading: companyLoading } = useCompany();
   const userId = user?.id;
   const companyId = selectedCompany?.id;
-  // Note: Supabase client is now created directly in useEffect to ensure fresh auth context
 
-  // Fetch notifications from API
+  // Request deduplication: prevent multiple concurrent fetches
+  const fetchInProgressRef = useRef(false);
+  const lastFetchParamsRef = useRef<string>('');
+
+  // Fetch notifications from API with deduplication
   const fetchNotifications = useCallback(async () => {
     // Wait for CompanyContext to finish loading before making decisions
     if (companyLoading) {
@@ -34,7 +37,15 @@ export function useNotifications() {
       return;
     }
 
+    // Deduplicate requests: check if same params are already being fetched
+    const fetchParams = `${user.id}-${companyId}`;
+    if (fetchInProgressRef.current && lastFetchParamsRef.current === fetchParams) {
+      return; // Skip duplicate request
+    }
+
     try {
+      fetchInProgressRef.current = true;
+      lastFetchParamsRef.current = fetchParams;
       setLoading(true);
       setError(null);
 
@@ -57,6 +68,7 @@ export function useNotifications() {
       );
     } finally {
       setLoading(false);
+      fetchInProgressRef.current = false;
     }
   }, [user, companyId, companyLoading]);
 
@@ -142,14 +154,15 @@ export function useNotifications() {
         }
       });
 
-    // Initial fetch
+    // Initial fetch - call directly instead of using from dependency
     fetchNotifications();
 
     // Cleanup subscription
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, companyId, companyLoading, fetchNotifications]); // Depend on both user ID and company ID for proper filtering
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, companyId, companyLoading]); // Removed fetchNotifications to prevent cascade
 
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId: string) => {

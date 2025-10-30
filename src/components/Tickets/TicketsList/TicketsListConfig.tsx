@@ -42,13 +42,23 @@ const formatAddress = (ticket: Ticket): string => {
 
   const customer = ticket.customer;
 
-  // Build address from components, filtering out "none" values
-  const parts = [customer.city, customer.state, customer.zip_code]
+  // Build address from city, state, zip - filtering out "none" values
+  const cityStateParts = [customer.city, customer.state, customer.zip_code]
     .filter(Boolean)
     .map(part => part?.trim())
     .filter(part => part && part.toLowerCase() !== 'none');
 
-  return parts.length > 0 ? parts.join(', ') : 'Unknown';
+  // If we have city/state info, use it
+  if (cityStateParts.length > 0) {
+    return cityStateParts.join(', ');
+  }
+
+  // If no city/state, show street address if available
+  if (customer.address && customer.address.trim() && customer.address.toLowerCase() !== 'none') {
+    return customer.address.trim();
+  }
+
+  return 'Unknown';
 };
 
 const formatTicketType = (type: string): string => {
@@ -332,52 +342,56 @@ export const getTicketColumns = (
 
 // Define tabs for tickets filtering
 export const getTicketTabs = (
-  callRecords: CallRecord[] = []
+  callRecords: CallRecord[] = [],
+  tabCounts?: { all: number; incoming: number; outbound: number; forms: number }
 ): TabDefinition<Ticket>[] => [
   {
     key: 'all',
     label: 'All Tickets',
     filter: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived),
+      tickets.filter(ticket => ticket.status !== 'live' && ticket.status !== 'closed' && !ticket.archived),
     getCount: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.status !== 'live' && !ticket.archived)
-        .length,
+      tabCounts?.all ?? tickets.filter(ticket => ticket.status !== 'live' && ticket.status !== 'closed' && !ticket.archived).length,
   },
   {
-    key: 'incoming_calls',
+    key: 'incoming',
     label: 'Incoming Calls',
     filter: (tickets: Ticket[]) =>
       tickets.filter(
         ticket =>
           ticket.status !== 'live' &&
+          ticket.status !== 'closed' &&
           !ticket.archived &&
           ticket.type === 'phone_call' &&
           ticket.call_direction === 'inbound'
       ),
     getCount: (tickets: Ticket[]) =>
-      tickets.filter(
+      tabCounts?.incoming ?? tickets.filter(
         ticket =>
           ticket.status !== 'live' &&
+          ticket.status !== 'closed' &&
           !ticket.archived &&
           ticket.type === 'phone_call' &&
           ticket.call_direction === 'inbound'
       ).length,
   },
   {
-    key: 'outbound_calls',
+    key: 'outbound',
     label: 'Outbound Calls',
     filter: (tickets: Ticket[]) =>
       tickets.filter(
         ticket =>
           ticket.status !== 'live' &&
+          ticket.status !== 'closed' &&
           !ticket.archived &&
           ticket.type === 'phone_call' &&
           ticket.call_direction === 'outbound'
       ),
     getCount: (tickets: Ticket[]) =>
-      tickets.filter(
+      tabCounts?.outbound ?? tickets.filter(
         ticket =>
           ticket.status !== 'live' &&
+          ticket.status !== 'closed' &&
           !ticket.archived &&
           ticket.type === 'phone_call' &&
           ticket.call_direction === 'outbound'
@@ -390,13 +404,15 @@ export const getTicketTabs = (
       tickets.filter(
         ticket =>
           ticket.status !== 'live' &&
+          ticket.status !== 'closed' &&
           !ticket.archived &&
           ticket.type === 'web_form'
       ),
     getCount: (tickets: Ticket[]) =>
-      tickets.filter(
+      tabCounts?.forms ?? tickets.filter(
         ticket =>
           ticket.status !== 'live' &&
+          ticket.status !== 'closed' &&
           !ticket.archived &&
           ticket.type === 'web_form'
       ).length,

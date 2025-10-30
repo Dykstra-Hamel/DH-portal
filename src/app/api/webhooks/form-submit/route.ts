@@ -324,6 +324,65 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', submissionId);
 
+    // Step 10.5: Send to Tadabase for Northwest Exterminating
+    // COMMENTED OUT - Not currently in use
+    /*
+    const nweDomains = ['nwexterminating.com', 'www.nwexterminating.com'];
+
+    if (sourceDomain && nweDomains.some(domain => sourceDomain.includes(domain))) {
+      try {
+        console.log(`[Tadabase] Sending form submission ${submissionId} for Northwest Exterminating to Tadabase`);
+
+        // Build complete payload matching call integration format
+        const tadabasePayload = {
+          // Form submission identifiers
+          submission_id: submissionId,
+          ticket_id: ticketId,
+          customer_id: customerId,
+
+          // Raw and normalized data
+          raw_payload: rawPayload,
+          normalized_data: geminiResult.normalized,
+
+          // AI analysis (similar to call_analysis in call integration)
+          ai_analysis: {
+            confidence: geminiResult.confidence,
+            description: geminiResult.ticket.description,
+            priority: geminiResult.ticket.priority,
+            service_type: geminiResult.ticket.service_type,
+            pest_type: geminiResult.ticket.pest_type,
+          },
+
+          // Metadata
+          source_url: lookupUrl,
+          source_domain: sourceDomain,
+          ip_address: ipAddress,
+          submitted_at: new Date().toISOString(),
+
+          // Processing status
+          processing_status: geminiResult.success ? 'processed' : 'failed',
+        };
+
+        const tadabaseResponse = await fetch('https://catchtemp.tadabase.io/webhook/RBe3G7c8eL', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(tadabasePayload),
+        });
+
+        if (tadabaseResponse.ok) {
+          console.log(`[Tadabase] Successfully sent form submission ${submissionId} to Tadabase`);
+        } else {
+          console.warn(`[Tadabase] Failed to send form submission ${submissionId}: ${tadabaseResponse.status} ${tadabaseResponse.statusText}`);
+        }
+      } catch (error) {
+        console.error(`[Tadabase] Error sending form submission ${submissionId}:`, error instanceof Error ? error.message : error);
+        // Don't throw - continue with normal response even if Tadabase fails
+      }
+    }
+    */
+
     // Step 11: Return success response
     const response: FormSubmissionResponse = {
       success: true,

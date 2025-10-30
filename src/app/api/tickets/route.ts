@@ -8,6 +8,43 @@ import {
   createSuccessResponse
 } from '@/lib/api-utils';
 
+/**
+ * Helper function to get ticket counts for all tabs
+ * Uses optimized RPC function with fallback to individual queries
+ */
+async function getTicketTabCounts(
+  companyId: string,
+  includeArchived: boolean
+): Promise<{ all: number; incoming: number; outbound: number; forms: number }> {
+  const adminSupabase = createAdminClient();
+
+  // Try to use the optimized RPC function first
+  const { data: countsData } = await adminSupabase.rpc('get_ticket_tab_counts', {
+    p_company_id: companyId,
+    p_include_archived: includeArchived
+  });
+
+  // Return RPC results if available
+  if (countsData) {
+    return countsData;
+  }
+
+  // Fallback: Use parallel queries if RPC doesn't exist yet
+  const [allCount, incomingCount, outboundCount, formsCount] = await Promise.all([
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).neq('status', 'live').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'inbound').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'outbound').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'web_form').or('archived.is.null,archived.eq.false'),
+  ]);
+
+  return {
+    all: allCount.count || 0,
+    incoming: incomingCount.count || 0,
+    outbound: outboundCount.count || 0,
+    forms: formsCount.count || 0,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Get authenticated user
@@ -15,13 +52,20 @@ export async function GET(request: NextRequest) {
     if (authResult instanceof NextResponse) {
       return authResult;
     }
-    
+
     const { user, isGlobalAdmin, supabase } = authResult;
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
     const includeArchived = searchParams.get('includeArchived') === 'true';
+    const countOnly = searchParams.get('countOnly') === 'true';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '25', 10);
+    const sortBy = searchParams.get('sortBy') || 'created_at';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const search = searchParams.get('search') || '';
+    const tabFilter = searchParams.get('tab') || 'all';
 
     if (!companyId) {
       return createErrorResponse('Company ID is required', 400);
@@ -31,6 +75,12 @@ export async function GET(request: NextRequest) {
     const accessCheck = await verifyCompanyAccess(supabase, user.id, companyId, isGlobalAdmin);
     if (accessCheck instanceof NextResponse) {
       return accessCheck;
+    }
+
+    // If count only, return counts for all tabs using optimized helper
+    if (countOnly) {
+      const counts = await getTicketTabCounts(companyId, includeArchived);
+      return createSuccessResponse({ counts });
     }
 
     // Build query based on whether archived tickets are requested
@@ -69,22 +119,48 @@ export async function GET(request: NextRequest) {
           last_name,
           email
         )
-      `
+      `,
+        { count: 'exact' }
       )
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false });
+      .eq('company_id', companyId);
 
     if (includeArchived) {
-      // If including archived, only show archived tickets
       query = query.eq('archived', true);
     } else {
-      // Default behavior: show active tickets (exclude archived)
       query = query
         .in('status', ['live', 'new', 'contacted', 'qualified', 'quoted', 'in_progress', 'resolved', 'unqualified'])
         .or('archived.is.null,archived.eq.false');
     }
 
-    const { data: tickets, error } = await query;
+    // Apply tab filter
+    if (tabFilter === 'incoming') {
+      query = query.eq('type', 'phone_call').eq('call_direction', 'inbound');
+    } else if (tabFilter === 'outbound') {
+      query = query.eq('type', 'phone_call').eq('call_direction', 'outbound');
+    } else if (tabFilter === 'forms') {
+      query = query.eq('type', 'web_form');
+    } else if (tabFilter === 'all') {
+      query = query.neq('status', 'live');
+    }
+
+    // Apply search filter
+    if (search) {
+      query = query.or(
+        `customer.first_name.ilike.%${search}%,customer.last_name.ilike.%${search}%,customer.email.ilike.%${search}%,customer.phone.ilike.%${search}%,pest_issue.ilike.%${search}%`
+      );
+    }
+
+    // Apply sorting
+    const ascending = sortOrder === 'asc';
+    query = query.order(sortBy, { ascending });
+
+    // Apply pagination
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+    query = query.range(from, to);
+
+    // Execute query - count is already included from line 105
+    const { data: tickets, error, count: totalCount } = await query;
 
     if (error) {
       console.error('Error fetching tickets:', error);
@@ -92,7 +168,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (!tickets || tickets.length === 0) {
-      return createSuccessResponse([]);
+      return createSuccessResponse({
+        tickets: [],
+        pagination: {
+          page,
+          limit,
+          total: totalCount || 0,
+          totalPages: Math.ceil((totalCount || 0) / limit),
+          hasMore: false,
+        },
+      });
     }
 
     // Fetch call_records for all tickets if any exist
@@ -178,7 +263,20 @@ export async function GET(request: NextRequest) {
       call_records: callRecordsMap.get(ticket.id) || [],
     }));
 
-    return createSuccessResponse(enhancedTickets);
+    // Get tab counts using the optimized helper function
+    const counts = await getTicketTabCounts(companyId, includeArchived);
+
+    return createSuccessResponse({
+      tickets: enhancedTickets,
+      pagination: {
+        page,
+        limit,
+        total: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit),
+        hasMore: page < Math.ceil((totalCount || 0) / limit),
+      },
+      counts
+    });
   } catch (error) {
     console.error('Error in tickets API:', error);
     return createErrorResponse('Internal server error');

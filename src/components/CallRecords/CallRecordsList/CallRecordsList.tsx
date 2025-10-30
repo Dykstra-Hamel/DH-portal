@@ -13,6 +13,7 @@ interface CallRecordsListProps {
   loadingMore?: boolean;
   onCallUpdated?: () => void;
   onViewDetails?: (call: CallRecordWithDirection) => void;
+  tabCounts?: { all: number; inbound: number; outbound: number };
 }
 
 function CallRecordsList({
@@ -23,6 +24,7 @@ function CallRecordsList({
   loadingMore = false,
   onCallUpdated,
   onViewDetails,
+  tabCounts,
 }: CallRecordsListProps) {
 
   // Handle item actions
@@ -39,7 +41,7 @@ function CallRecordsList({
       loading={loading}
       title="Call Records"
       columns={getCallRecordColumns()}
-      tabs={getCallRecordTabs()}
+      tabs={getCallRecordTabs(tabCounts)}
       tableType="calls"
       onItemAction={handleItemAction}
       onDataUpdated={onCallUpdated}

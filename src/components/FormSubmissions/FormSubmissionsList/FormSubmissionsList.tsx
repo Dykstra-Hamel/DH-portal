@@ -12,6 +12,7 @@ interface FormSubmissionsListProps {
   loadingMore?: boolean;
   onSubmissionUpdated?: () => void;
   onViewDetails?: (submission: FormSubmissionWithCustomer) => void;
+  tabCounts?: { all: number; processed: number; pending: number; failed: number };
 }
 
 function FormSubmissionsList({
@@ -22,6 +23,7 @@ function FormSubmissionsList({
   loadingMore = false,
   onSubmissionUpdated,
   onViewDetails,
+  tabCounts,
 }: FormSubmissionsListProps) {
 
   // Build grid template columns from column widths
@@ -42,7 +44,7 @@ function FormSubmissionsList({
       loading={loading}
       title="Form Submissions"
       columns={formSubmissionsColumns}
-      tabs={getFormSubmissionTabs()}
+      tabs={getFormSubmissionTabs(tabCounts)}
       tableType="form_submissions"
       customColumnWidths={customColumnWidths}
       onItemAction={handleItemAction}

@@ -33,6 +33,7 @@ export default function CustomersPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [letterCounts, setLetterCounts] = useState<Record<string, number>>({});
+  const [tabCounts, setTabCounts] = useState<{ all: number; active: number; inactive: number; archived: number }>({ all: 0, active: 0, inactive: 0, archived: 0 });
   const router = useRouter();
 
   // Use global company context
@@ -99,23 +100,31 @@ export default function CustomersPage() {
         startsWith: selectedLetter,
       };
 
-      let allCustomers: Customer[] = [];
+      let response: { customers: Customer[]; counts: { all: number; active: number; inactive: number; archived: number } };
       if (isAdmin) {
         // Admin users use admin API
-        allCustomers = await adminAPI.getCustomers(filters);
+        response = await adminAPI.getCustomers(filters);
       } else if (selectedCompany) {
         // Regular users use user-specific API and must have a selected company
-        allCustomers = await adminAPI.getUserCustomers({
+        response = await adminAPI.getUserCustomers({
           ...filters,
           companyId: selectedCompany.id,
         });
+      } else {
+        response = { customers: [], counts: { all: 0, active: 0, inactive: 0, archived: 0 } };
       }
+
+      const allCustomers = response.customers || [];
+      const counts = response.counts || { all: 0, active: 0, inactive: 0, archived: 0 };
+
+      // Update tab counts
+      setTabCounts(counts);
 
       // Client-side pagination for infinite scroll
       const limit = 20;
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + limit;
-      const paginatedCustomers = (allCustomers || []).slice(startIndex, endIndex);
+      const paginatedCustomers = allCustomers.slice(startIndex, endIndex);
 
       if (isLoadMore) {
         setCustomers(prev => [...prev, ...paginatedCustomers]);
@@ -124,7 +133,7 @@ export default function CustomersPage() {
       }
 
       // Check if there are more customers to load
-      setHasMore(endIndex < (allCustomers || []).length);
+      setHasMore(endIndex < allCustomers.length);
       setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -146,15 +155,19 @@ export default function CustomersPage() {
         companyId: selectedCompany?.id,
       };
 
-      let allCustomers: Customer[] = [];
+      let response: { customers: Customer[]; counts: { all: number; active: number; inactive: number; archived: number } };
       if (isAdmin) {
-        allCustomers = await adminAPI.getCustomers(filters);
+        response = await adminAPI.getCustomers(filters);
       } else if (selectedCompany) {
-        allCustomers = await adminAPI.getUserCustomers({
+        response = await adminAPI.getUserCustomers({
           ...filters,
           companyId: selectedCompany.id,
         });
+      } else {
+        response = { customers: [], counts: { all: 0, active: 0, inactive: 0, archived: 0 } };
       }
+
+      const allCustomers = response.customers || [];
 
       // Count customers by first letter of last name
       const counts: Record<string, number> = {};
@@ -245,6 +258,7 @@ export default function CustomersPage() {
           loadingMore={loadingMore}
           onCustomerClick={handleCustomerClick}
           showCompanyColumn={isAdmin && !selectedCompany}
+          tabCounts={tabCounts}
         />
       )}
 
@@ -263,6 +277,7 @@ export default function CustomersPage() {
           loadingMore={loadingMore}
           onCustomerClick={handleCustomerClick}
           showCompanyColumn={true}
+          tabCounts={tabCounts}
         />
       )}
     </div>

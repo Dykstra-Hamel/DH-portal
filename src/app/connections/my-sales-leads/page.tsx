@@ -7,6 +7,12 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { DataTable } from '@/components/Common/DataTable';
 import { getLeadColumns, getUserLeadTabs } from '@/components/Leads/LeadsList/LeadsListConfig';
 import { Lead } from '@/types/lead';
+import { createClient } from '@/lib/supabase/client';
+import {
+  createLeadChannel,
+  subscribeToLeadUpdates,
+  LeadUpdatePayload,
+} from '@/lib/realtime/lead-channel';
 
 export default function MySalesLeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -50,6 +56,109 @@ export default function MySalesLeadsPage() {
   useEffect(() => {
     fetchMyLeads();
   }, [user?.id, selectedCompany?.id]);
+
+  // Real-time subscription for lead updates
+  useEffect(() => {
+    if (!selectedCompany?.id || !user?.id) return;
+
+    const channel = createLeadChannel(selectedCompany.id);
+
+    subscribeToLeadUpdates(channel, async (payload: LeadUpdatePayload) => {
+      const { company_id, action, record_id } = payload;
+
+      // Verify this is for our selected company
+      if (company_id !== selectedCompany.id) return;
+
+      if (action === 'INSERT') {
+        // Fetch full lead data - only add if assigned to current user
+        try {
+          const supabase = createClient();
+          const { data: fullLead } = await supabase
+            .from('leads')
+            .select(`
+              *,
+              customer:customers(
+                id,
+                first_name,
+                last_name,
+                email,
+                phone
+              ),
+              company:companies(
+                id,
+                name
+              )
+            `)
+            .eq('id', record_id)
+            .eq('assigned_to', user.id) // Filter by current user
+            .single();
+
+          if (fullLead) {
+            setLeads(prev => {
+              const exists = prev.some(lead => lead.id === fullLead.id);
+              if (!exists) {
+                return [fullLead, ...prev];
+              }
+              return prev;
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching new lead:', error);
+        }
+      } else if (action === 'UPDATE') {
+        // Fetch updated lead data
+        try {
+          const supabase = createClient();
+          const { data: updatedLead } = await supabase
+            .from('leads')
+            .select(`
+              *,
+              customer:customers(
+                id,
+                first_name,
+                last_name,
+                email,
+                phone
+              ),
+              company:companies(
+                id,
+                name
+              )
+            `)
+            .eq('id', record_id)
+            .single();
+
+          if (updatedLead) {
+            // Check if it&apos;s still assigned to this user
+            if (updatedLead.assigned_to === user.id) {
+              setLeads(prev => {
+                const exists = prev.some(lead => lead.id === updatedLead.id);
+                if (exists) {
+                  return prev.map(lead =>
+                    lead.id === updatedLead.id ? updatedLead : lead
+                  );
+                } else {
+                  // Lead was reassigned to this user
+                  return [updatedLead, ...prev];
+                }
+              });
+            } else {
+              // Remove if no longer assigned to this user
+              setLeads(prev => prev.filter(lead => lead.id !== record_id));
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching updated lead:', error);
+        }
+      } else if (action === 'DELETE') {
+        setLeads(prev => prev.filter(lead => lead.id !== record_id));
+      }
+    });
+
+    return () => {
+      createClient().removeChannel(channel);
+    };
+  }, [selectedCompany?.id, user?.id]);
 
   const handleRefresh = () => {
     fetchMyLeads();

@@ -21,6 +21,11 @@ import { CustomerTicketsList } from '@/components/Customers/CustomerTicketsList/
 import { CustomerLeadsList } from '@/components/Customers/CustomerLeadsList/CustomerLeadsList';
 import { CustomerSupportCasesList } from '@/components/Customers/CustomerSupportCasesList/CustomerSupportCasesList';
 import { usePageActions } from '@/contexts/PageActionsContext';
+import {
+  createSupportCaseChannel,
+  subscribeToSupportCaseUpdates,
+  SupportCaseUpdatePayload,
+} from '@/lib/realtime/support-case-channel';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -191,6 +196,32 @@ export default function CustomerDetailPage({ params }: CustomerPageProps) {
       fetchSupportCases();
     }
   }, [customerId, loading, isAdmin, fetchCustomer, fetchSupportCases]);
+
+  // Real-time subscription for support case updates
+  useEffect(() => {
+    if (!customer?.company_id || !customerId) return;
+
+    const channel = createSupportCaseChannel(customer.company_id);
+
+    subscribeToSupportCaseUpdates(channel, async (payload: SupportCaseUpdatePayload) => {
+      const { company_id, action, record_id } = payload;
+
+      // Verify this is for the customer&apos;s company
+      if (company_id !== customer.company_id) return;
+
+      if (action === 'INSERT' || action === 'UPDATE') {
+        // Refetch all support cases for this customer to ensure we have the latest data
+        await fetchSupportCases();
+      } else if (action === 'DELETE') {
+        // Remove from state immediately
+        setSupportCases(prev => prev.filter(sc => sc.id !== record_id));
+      }
+    });
+
+    return () => {
+      createClient().removeChannel(channel);
+    };
+  }, [customer?.company_id, customerId, fetchSupportCases]);
 
   // Set page header when customer data loads
   useEffect(() => {

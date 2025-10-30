@@ -8,6 +8,11 @@ import LeadsList from '@/components/Leads/LeadsList/LeadsList';
 import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
 import { getSchedulingLeadTabs } from '@/components/Leads/LeadsList/SchedulingLeadsListConfig';
+import {
+  createLeadChannel,
+  subscribeToLeadUpdates,
+  LeadUpdatePayload,
+} from '@/lib/realtime/lead-channel';
 
 interface Profile {
   id: string;
@@ -111,6 +116,34 @@ export default function SchedulingPage() {
     if (selectedCompany?.id) {
       fetchSchedulingLeads();
     }
+  }, [selectedCompany?.id, fetchSchedulingLeads]);
+
+  // Real-time subscription for lead updates
+  useEffect(() => {
+    if (!selectedCompany?.id) {
+      return;
+    }
+
+    const channel = createLeadChannel(selectedCompany.id);
+
+    subscribeToLeadUpdates(channel, async (payload: LeadUpdatePayload) => {
+      const { company_id, action } = payload;
+
+      // Verify this is for our selected company
+      if (company_id !== selectedCompany.id) {
+        return;
+      }
+
+      // Refetch the list whenever a lead changes
+      // This is simpler than trying to update individual leads since we filter client-side
+      if (action === 'INSERT' || action === 'UPDATE' || action === 'DELETE') {
+        fetchSchedulingLeads();
+      }
+    });
+
+    return () => {
+      createClient().removeChannel(channel);
+    };
   }, [selectedCompany?.id, fetchSchedulingLeads]);
 
   if (loading) {

@@ -2,6 +2,50 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 
+/**
+ * Helper function to get form submission counts for all tabs
+ */
+async function getFormSubmissionTabCounts(
+  companyId: string | null,
+  companyIds: string[] | null,
+  isGlobalAdmin: boolean
+): Promise<{ all: number; processed: number; pending: number; failed: number }> {
+  const adminSupabase = createAdminClient();
+
+  // Build base query
+  let allQuery = adminSupabase.from('form_submissions').select('id', { count: 'exact', head: true });
+  let processedQuery = adminSupabase.from('form_submissions').select('id', { count: 'exact', head: true }).eq('processing_status', 'processed');
+  let pendingQuery = adminSupabase.from('form_submissions').select('id', { count: 'exact', head: true }).eq('processing_status', 'pending');
+  let failedQuery = adminSupabase.from('form_submissions').select('id', { count: 'exact', head: true }).eq('processing_status', 'failed');
+
+  // Apply company filtering
+  if (companyId) {
+    allQuery = allQuery.eq('company_id', companyId);
+    processedQuery = processedQuery.eq('company_id', companyId);
+    pendingQuery = pendingQuery.eq('company_id', companyId);
+    failedQuery = failedQuery.eq('company_id', companyId);
+  } else if (!isGlobalAdmin && companyIds && companyIds.length > 0) {
+    allQuery = allQuery.in('company_id', companyIds);
+    processedQuery = processedQuery.in('company_id', companyIds);
+    pendingQuery = pendingQuery.in('company_id', companyIds);
+    failedQuery = failedQuery.in('company_id', companyIds);
+  }
+
+  const [allCount, processedCount, pendingCount, failedCount] = await Promise.all([
+    allQuery,
+    processedQuery,
+    pendingQuery,
+    failedQuery,
+  ]);
+
+  return {
+    all: allCount.count || 0,
+    processed: processedCount.count || 0,
+    pending: pendingCount.count || 0,
+    failed: failedCount.count || 0,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -34,6 +78,9 @@ export async function GET(request: NextRequest) {
 
     // Use admin client for broader access
     const adminSupabase = createAdminClient();
+
+    // Store company IDs for tab counts
+    let userCompanyIds: string[] | null = null;
 
     // Build query
     let query = adminSupabase
@@ -89,8 +136,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json([]);
       }
 
-      const companyIds = userCompanies.map(uc => uc.company_id);
-      query = query.in('company_id', companyIds);
+      userCompanyIds = userCompanies.map(uc => uc.company_id);
+      query = query.in('company_id', userCompanyIds);
     }
 
     // Apply pagination
@@ -108,12 +155,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get tab counts for all submission statuses
+    const counts = await getFormSubmissionTabCounts(companyId, userCompanyIds, isGlobalAdmin);
+
     return NextResponse.json({
       formSubmissions: formSubmissions || [],
       total: count || 0,
       page,
       limit,
       hasMore: count ? (page * limit) < count : false,
+      counts,
     });
   } catch (error) {
     console.error('Error in form submissions API:', error);

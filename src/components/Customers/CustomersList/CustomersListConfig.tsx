@@ -193,29 +193,29 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
 };
 
 // Define tabs for customers filtering
-export const getCustomerTabs = (): TabDefinition<Customer>[] => [
+export const getCustomerTabs = (tabCounts?: { all: number; active: number; inactive: number; archived: number }): TabDefinition<Customer>[] => [
   {
     key: 'all',
     label: 'All Customers',
     filter: (customers: Customer[]) => customers,
-    getCount: (customers: Customer[]) => customers.length,
+    getCount: (customers: Customer[]) => tabCounts?.all ?? customers.length,
   },
   {
     key: 'active',
     label: 'Active',
     filter: (customers: Customer[]) => customers.filter(customer => customer.customer_status === 'active'),
-    getCount: (customers: Customer[]) => customers.filter(customer => customer.customer_status === 'active').length,
+    getCount: (customers: Customer[]) => tabCounts?.active ?? customers.filter(customer => customer.customer_status === 'active').length,
   },
   {
     key: 'inactive',
     label: 'Inactive',
     filter: (customers: Customer[]) => customers.filter(customer => customer.customer_status === 'inactive'),
-    getCount: (customers: Customer[]) => customers.filter(customer => customer.customer_status === 'inactive').length,
+    getCount: (customers: Customer[]) => tabCounts?.inactive ?? customers.filter(customer => customer.customer_status === 'inactive').length,
   },
   {
     key: 'archived',
     label: 'Archived',
     filter: (customers: Customer[]) => customers.filter(customer => customer.customer_status === 'archived'),
-    getCount: (customers: Customer[]) => customers.filter(customer => customer.customer_status === 'archived').length,
+    getCount: (customers: Customer[]) => tabCounts?.archived ?? customers.filter(customer => customer.customer_status === 'archived').length,
   },
 ];

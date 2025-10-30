@@ -239,12 +239,12 @@ export const getCallRecordColumns = (): ColumnDefinition<CallRecordWithDirection
 ];
 
 // Define tabs for call records filtering - simplified as requested
-export const getCallRecordTabs = (): TabDefinition<CallRecordWithDirection>[] => [
+export const getCallRecordTabs = (tabCounts?: { all: number; inbound: number; outbound: number }): TabDefinition<CallRecordWithDirection>[] => [
   {
     key: 'all',
     label: 'All Calls',
     filter: (calls: CallRecordWithDirection[]) => calls.filter(call => !call.archived),
-    getCount: (calls: CallRecordWithDirection[]) => calls.filter(call => !call.archived).length,
+    getCount: (calls: CallRecordWithDirection[]) => tabCounts?.all ?? calls.filter(call => !call.archived).length,
   },
   {
     key: 'inbound',
@@ -252,7 +252,7 @@ export const getCallRecordTabs = (): TabDefinition<CallRecordWithDirection>[] =>
     filter: (calls: CallRecordWithDirection[]) =>
       calls.filter(call => !call.archived && call.call_direction === 'inbound'),
     getCount: (calls: CallRecordWithDirection[]) =>
-      calls.filter(call => !call.archived && call.call_direction === 'inbound').length,
+      tabCounts?.inbound ?? calls.filter(call => !call.archived && call.call_direction === 'inbound').length,
   },
   {
     key: 'outbound',
@@ -260,7 +260,7 @@ export const getCallRecordTabs = (): TabDefinition<CallRecordWithDirection>[] =>
     filter: (calls: CallRecordWithDirection[]) =>
       calls.filter(call => !call.archived && call.call_direction === 'outbound'),
     getCount: (calls: CallRecordWithDirection[]) =>
-      calls.filter(call => !call.archived && call.call_direction === 'outbound').length,
+      tabCounts?.outbound ?? calls.filter(call => !call.archived && call.call_direction === 'outbound').length,
   },
 ];
 
