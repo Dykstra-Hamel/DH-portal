@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAI } from '@/contexts/AIContext';
 import PestPressureCard from './PestPressureCard';
 import AnomalyAlertBanner from './AnomalyAlertBanner';
+import AdminControls from './AdminControls';
 import styles from './PestPressureDashboard.module.scss';
 import { Loader, AlertCircle, RefreshCw, Filter, Bug } from 'lucide-react';
 
@@ -110,6 +111,9 @@ export default function PestPressureDashboard({
           <span>Refresh</span>
         </button>
       </div>
+
+      {/* Admin Controls */}
+      <AdminControls onComplete={handleRefresh} />
 
       {/* Anomaly Alerts */}
       {anomalyAlerts.length > 0 && <AnomalyAlertBanner anomalies={anomalyAlerts} />}
