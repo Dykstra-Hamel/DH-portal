@@ -31,15 +31,14 @@ export const aggregatePestPressureDataJob = inngest.createFunction(
 
       const { data, error } = await supabase
         .from('companies')
-        .select('id, name')
-        .eq('is_active', true);
+        .select('id, name');
 
       if (error) {
         console.error('[Inngest] Error fetching companies:', error);
         throw new Error(`Failed to fetch companies: ${error.message}`);
       }
 
-      console.log(`[Inngest] Found ${data?.length || 0} active companies`);
+      console.log(`[Inngest] Found ${data?.length || 0} companies`);
 
       return data || [];
     });
