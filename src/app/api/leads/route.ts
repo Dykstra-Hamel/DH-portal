@@ -60,12 +60,33 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Build query based on whether archived leads are requested
+    // Build query - specify only needed columns to reduce data transfer
     let query = supabase
       .from('leads')
       .select(
         `
-        *,
+        id,
+        company_id,
+        customer_id,
+        service_address_id,
+        lead_source,
+        lead_type,
+        service_type,
+        lead_status,
+        comments,
+        assigned_to,
+        last_contacted_at,
+        next_follow_up_at,
+        estimated_value,
+        priority,
+        lost_reason,
+        lost_stage,
+        archived,
+        furthest_completed_stage,
+        scheduled_date,
+        scheduled_time,
+        created_at,
+        updated_at,
         customer:customers(
           id,
           first_name,

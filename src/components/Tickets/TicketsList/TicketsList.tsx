@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Ticket } from '@/types/ticket';
 import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable } from '@/components/Common/DataTable';
@@ -16,16 +16,45 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface TicketsListProps {
   tickets: Ticket[];
+  liveTickets: Ticket[]; // Live tickets for LiveCallBar
   callRecords?: any[]; // For hang-up calls filtering
   loading?: boolean;
   onTicketUpdated?: () => void;
+  // Infinite scroll props
+  infiniteScrollEnabled?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  loadingMore?: boolean;
+  // Tab counts
+  tabCounts?: { all: number; incoming: number; outbound: number; forms: number };
+  // Filter/sort handlers
+  onTabChange?: (tab: string) => void;
+  onSortChange?: (field: string, order: 'asc' | 'desc') => void;
+  onSearchChange?: (query: string) => void;
+  currentTab?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  searchQuery?: string;
 }
 
 function TicketsList({
   tickets,
+  liveTickets,
   callRecords = [],
   loading = false,
   onTicketUpdated,
+  infiniteScrollEnabled = false,
+  hasMore = false,
+  onLoadMore,
+  loadingMore = false,
+  tabCounts,
+  onTabChange,
+  onSortChange,
+  onSearchChange,
+  currentTab = 'all',
+  sortBy = 'created_at',
+  sortOrder = 'desc',
+  searchQuery = '',
 }: TicketsListProps) {
   // Qualify modal state
   const [showQualifyModal, setShowQualifyModal] = useState(false);
@@ -274,13 +303,13 @@ function TicketsList({
       });
 
       onTicketUpdated?.();
-      
+
       // For live calls (customStatus provided), don't auto-close modal or show toast
       // The modal component will handle these actions
       if (!customStatus) {
         setShowQualifyModal(false);
         setQualifyingTicket(null);
-        
+
         // Show success message from API response
         if (result.message) {
           handleShowToast(result.message);
@@ -295,6 +324,11 @@ function TicketsList({
       setIsQualifying(false);
     }
   };
+
+  // Memoize customComponents to prevent LiveCallBar from unmounting/remounting
+  const customComponentsMemo = useMemo(() => ({
+    liveBar: (_props: { data: Ticket[] }) => <LiveCallBar liveTickets={liveTickets} />,
+  }), [liveTickets]);
 
   return (
     <>
@@ -314,15 +348,18 @@ function TicketsList({
         loading={loading}
         title="Review & Qualify Your Leads"
         columns={getTicketColumns(reviewStatuses)}
-        tabs={getTicketTabs(callRecords)}
+        tabs={getTicketTabs(callRecords, tabCounts)}
         tableType="tickets"
         onItemAction={handleItemAction}
         onDataUpdated={onTicketUpdated}
-        customComponents={{
-          liveBar: ({ data }) => <LiveCallBar tickets={data} />,
-        }}
+        customComponents={customComponentsMemo}
         emptyStateMessage="No tickets found for this category."
         onShowToast={handleShowToast}
+        // Infinite scroll props
+        infiniteScrollEnabled={infiniteScrollEnabled}
+        hasMore={hasMore}
+        onLoadMore={onLoadMore}
+        loadingMore={loadingMore}
       />
 
       {/* Qualification Modal */}

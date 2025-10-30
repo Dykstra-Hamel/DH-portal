@@ -154,12 +154,12 @@ export const formSubmissionsColumns: ColumnDefinition<FormSubmissionWithCustomer
   ];
 
 // Define tabs for form submissions filtering
-export const getFormSubmissionTabs = () => [
+export const getFormSubmissionTabs = (tabCounts?: { all: number; processed: number; pending: number; failed: number }) => [
   {
     key: 'all',
     label: 'All Submissions',
     filter: (submissions: FormSubmissionWithCustomer[]) => submissions,
-    getCount: (submissions: FormSubmissionWithCustomer[]) => submissions.length,
+    getCount: (submissions: FormSubmissionWithCustomer[]) => tabCounts?.all ?? submissions.length,
   },
   {
     key: 'processed',
@@ -167,7 +167,7 @@ export const getFormSubmissionTabs = () => [
     filter: (submissions: FormSubmissionWithCustomer[]) =>
       submissions.filter(s => s.processing_status === 'processed'),
     getCount: (submissions: FormSubmissionWithCustomer[]) =>
-      submissions.filter(s => s.processing_status === 'processed').length,
+      tabCounts?.processed ?? submissions.filter(s => s.processing_status === 'processed').length,
   },
   {
     key: 'pending',
@@ -175,7 +175,7 @@ export const getFormSubmissionTabs = () => [
     filter: (submissions: FormSubmissionWithCustomer[]) =>
       submissions.filter(s => s.processing_status === 'pending'),
     getCount: (submissions: FormSubmissionWithCustomer[]) =>
-      submissions.filter(s => s.processing_status === 'pending').length,
+      tabCounts?.pending ?? submissions.filter(s => s.processing_status === 'pending').length,
   },
   {
     key: 'failed',
@@ -183,7 +183,7 @@ export const getFormSubmissionTabs = () => [
     filter: (submissions: FormSubmissionWithCustomer[]) =>
       submissions.filter(s => s.processing_status === 'failed'),
     getCount: (submissions: FormSubmissionWithCustomer[]) =>
-      submissions.filter(s => s.processing_status === 'failed').length,
+      tabCounts?.failed ?? submissions.filter(s => s.processing_status === 'failed').length,
   },
 ];
 

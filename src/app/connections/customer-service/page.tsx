@@ -10,6 +10,11 @@ import {
   MetricsCard,
   styles as metricsStyles,
 } from '@/components/Common/MetricsCard';
+import {
+  createSupportCaseChannel,
+  subscribeToSupportCaseUpdates,
+  SupportCaseUpdatePayload,
+} from '@/lib/realtime/support-case-channel';
 import styles from './page.module.scss';
 
 interface SupportCaseMetrics {
@@ -188,142 +193,6 @@ export default function CustomerServicePage() {
     } as SupportCaseMetrics;
   }, []);
 
-  // Handle support case changes for real-time updates
-  const handleSupportCaseChange = useCallback(
-    (payload: any) => {
-      const { eventType, new: newRecord, old: oldRecord } = payload;
-
-      console.log('Support case change:', eventType, newRecord);
-
-      switch (eventType) {
-        case 'INSERT':
-          if (newRecord && selectedCompany?.id) {
-            // Add new support case to the list
-            const supabase = createClient();
-            supabase
-              .from('support_cases')
-              .select(
-                `
-              *,
-              customer:customers(
-                id,
-                first_name,
-                last_name,
-                email,
-                phone,
-                address,
-                city,
-                state,
-                zip_code
-              ),
-              company:companies(
-                id,
-                name,
-                website
-              ),
-              ticket:tickets(
-                id,
-                type,
-                source,
-                created_at
-              )
-            `
-              )
-              .eq('id', newRecord.id)
-              .single()
-              .then(({ data: fullSupportCase, error }) => {
-                if (error) {
-                  console.error(
-                    'Error fetching full support case data:',
-                    error
-                  );
-                  setSupportCases(prev => {
-                    const exists = prev.some(sc => sc.id === newRecord.id);
-                    if (!exists) {
-                      return [newRecord, ...prev];
-                    }
-                    return prev;
-                  });
-                } else if (fullSupportCase) {
-                  setSupportCases(prev => {
-                    const exists = prev.some(
-                      sc => sc.id === fullSupportCase.id
-                    );
-                    if (!exists) {
-                      return [fullSupportCase, ...prev];
-                    }
-                    return prev;
-                  });
-                }
-              });
-          }
-          break;
-
-        case 'UPDATE':
-          if (newRecord && selectedCompany?.id) {
-            // Update existing support case
-            const supabase = createClient();
-            supabase
-              .from('support_cases')
-              .select(
-                `
-              *,
-              customer:customers(
-                id,
-                first_name,
-                last_name,
-                email,
-                phone,
-                address,
-                city,
-                state,
-                zip_code
-              ),
-              company:companies(
-                id,
-                name,
-                website
-              ),
-              ticket:tickets(
-                id,
-                type,
-                source,
-                created_at
-              )
-            `
-              )
-              .eq('id', newRecord.id)
-              .single()
-              .then(({ data: fullSupportCase, error }) => {
-                if (error) {
-                  console.error(
-                    'Error fetching full support case data:',
-                    error
-                  );
-                  setSupportCases(prev =>
-                    prev.map(sc => (sc.id === newRecord.id ? newRecord : sc))
-                  );
-                } else if (fullSupportCase) {
-                  setSupportCases(prev =>
-                    prev.map(sc =>
-                      sc.id === newRecord.id ? fullSupportCase : sc
-                    )
-                  );
-                }
-              });
-          }
-          break;
-
-        case 'DELETE':
-          if (oldRecord) {
-            setSupportCases(prev => prev.filter(sc => sc.id !== oldRecord.id));
-          }
-          break;
-      }
-    },
-    [selectedCompany?.id]
-  );
-
   useEffect(() => {
     if (selectedCompany?.id) {
       fetchSupportCases(selectedCompany.id);
@@ -341,33 +210,127 @@ export default function CustomerServicePage() {
     }
   }, [supportCases, loading, calculateMetrics]);
 
-  // Supabase Realtime subscription for live updates
+  // Supabase Realtime broadcast subscription for live updates
   useEffect(() => {
     if (!selectedCompany?.id) return;
 
-    const supabase = createClient();
+    const channel = createSupportCaseChannel(selectedCompany.id);
 
-    const channel = supabase
-      .channel('support-cases-live-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'support_cases',
-          filter: `company_id=eq.${selectedCompany.id}`,
-        },
-        payload => {
-          console.log('Support case realtime update:', payload);
-          handleSupportCaseChange(payload);
+    subscribeToSupportCaseUpdates(channel, async (payload: SupportCaseUpdatePayload) => {
+      const { company_id, action, record_id } = payload;
+
+      // Verify this is for our selected company
+      if (company_id !== selectedCompany.id) {
+        return;
+      }
+
+      if (action === 'INSERT') {
+        // Fetch full support case data with joins
+        try {
+          const supabase = createClient();
+          const { data: fullSupportCase, error } = await supabase
+            .from('support_cases')
+            .select(`
+              *,
+              customer:customers(
+                id,
+                first_name,
+                last_name,
+                email,
+                phone,
+                address,
+                city,
+                state,
+                zip_code
+              ),
+              company:companies(
+                id,
+                name,
+                website
+              ),
+              ticket:tickets!ticket_id(
+                id,
+                type,
+                source,
+                created_at
+              )
+            `)
+            .eq('id', record_id)
+            .single();
+
+          if (error) {
+            console.error('❌ Supabase error fetching support case:', error);
+          }
+
+          if (fullSupportCase) {
+            setSupportCases(prev => {
+              const exists = prev.some(sc => sc.id === fullSupportCase.id);
+              if (!exists) {
+                return [fullSupportCase, ...prev];
+              }
+              return prev;
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error fetching new support case:', error);
         }
-      )
-      .subscribe();
+      } else if (action === 'UPDATE') {
+        // Fetch updated support case data
+        try {
+          const supabase = createClient();
+          const { data: updatedSupportCase, error } = await supabase
+            .from('support_cases')
+            .select(`
+              *,
+              customer:customers(
+                id,
+                first_name,
+                last_name,
+                email,
+                phone,
+                address,
+                city,
+                state,
+                zip_code
+              ),
+              company:companies(
+                id,
+                name,
+                website
+              ),
+              ticket:tickets!ticket_id(
+                id,
+                type,
+                source,
+                created_at
+              )
+            `)
+            .eq('id', record_id)
+            .single();
+
+          if (error) {
+            console.error('❌ Supabase error fetching updated support case:', error);
+          }
+
+          if (updatedSupportCase) {
+            setSupportCases(prev =>
+              prev.map(sc =>
+                sc.id === updatedSupportCase.id ? updatedSupportCase : sc
+              )
+            );
+          }
+        } catch (error) {
+          console.error('❌ Error fetching updated support case:', error);
+        }
+      } else if (action === 'DELETE') {
+        setSupportCases(prev => prev.filter(sc => sc.id !== record_id));
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      createClient().removeChannel(channel);
     };
-  }, [selectedCompany?.id, handleSupportCaseChange]);
+  }, [selectedCompany?.id]);
 
   return (
     <div className={styles.container}>

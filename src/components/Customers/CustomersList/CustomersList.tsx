@@ -13,6 +13,7 @@ interface CustomersListProps {
   loadingMore?: boolean;
   onCustomerClick?: (customer: Customer) => void;
   showCompanyColumn?: boolean;
+  tabCounts?: { all: number; active: number; inactive: number; archived: number };
 }
 
 function CustomersList({
@@ -23,6 +24,7 @@ function CustomersList({
   loadingMore = false,
   onCustomerClick,
   showCompanyColumn = false,
+  tabCounts,
 }: CustomersListProps) {
   // Handle item actions
   const handleItemAction = (action: string, customer: Customer) => {
@@ -37,7 +39,7 @@ function CustomersList({
       loading={loading}
       title="Customers Overview"
       columns={getCustomerColumns(showCompanyColumn)}
-      tabs={getCustomerTabs()}
+      tabs={getCustomerTabs(tabCounts)}
       tableType={showCompanyColumn ? "customersWithCompany" : "customers"}
       onItemAction={handleItemAction}
       emptyStateMessage="No customers found for this category."

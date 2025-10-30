@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  Suspense,
+  useMemo,
+} from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { adminAPI } from '@/lib/api-client';
 import TicketsList from '@/components/Tickets/TicketsList/TicketsList';
@@ -9,21 +16,52 @@ import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
-import { MetricsCard, styles as metricsStyles } from '@/components/Common/MetricsCard';
+import {
+  MetricsCard,
+  styles as metricsStyles,
+} from '@/components/Common/MetricsCard';
 import { MetricsResponse } from '@/services/metricsService';
 import { CallRecord } from '@/types/call-record';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
-import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
+import {
+  Modal,
+  ModalTop,
+  ModalMiddle,
+  ModalBottom,
+} from '@/components/Common/Modal/Modal';
 import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
 import TicketForm from '@/components/Tickets/TicketForm/TicketForm';
+import {
+  createTicketChannel,
+  subscribeToTicketUpdates,
+  TicketUpdatePayload,
+} from '@/lib/realtime/ticket-channel';
 import styles from './page.module.scss';
 
 function TicketsPageContent() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [callRecords, setCallRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [tabCounts, setTabCounts] = useState({
+    all: 0,
+    incoming: 0,
+    outbound: 0,
+    forms: 0,
+  });
+
+  // Filter/sort state
+  const [currentTab, setCurrentTab] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Modal state for URL parameter handling
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -35,15 +73,28 @@ function TicketsPageContent() {
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<TicketFormData | null>(null);
 
+  // Ref to track subscription state and prevent duplicate subscriptions
+  const subscriptionActiveRef = useRef(false);
+  const currentChannelRef = useRef<any>(null);
+  const isFetchingRef = useRef(false);
+
   // Use global company context
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, isLoading: companyLoading } = useCompany();
+
+  // Keep company ref in sync to prevent stale closures in broadcast callback
+  const selectedCompanyRef = useRef(selectedCompany);
+  useEffect(() => {
+    selectedCompanyRef.current = selectedCompany;
+  }, [selectedCompany]);
 
   // Clean up any stale review statuses on page load
   useEffect(() => {
     const cleanupStaleReviews = async () => {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
         if (!user || !selectedCompany?.id) return;
 
@@ -89,120 +140,211 @@ function TicketsPageContent() {
     }
   }, [ticketIdFromUrl, tickets]);
 
-  const fetchTickets = useCallback(async (companyId: string) => {
+  // Function to refetch tab counts only (for real-time updates)
+  const refetchTabCounts = useCallback(async (companyId: string) => {
     if (!companyId) return;
-    
-    setLoading(true);
+
     try {
-      // Fetch tickets (non-archived only for the new view)
-      const ticketsData = await adminAPI.tickets.list({
-        companyId,
-        includeArchived: false
-      });
-      
-      // Fetch call records for hang-up filtering
-      const callsData = await adminAPI.getUserCalls({ companyId });
-      
-      setTickets(ticketsData);
-      setCallRecords(callsData);
+      const response = await fetch(
+        `/api/tickets?companyId=${companyId}&countOnly=true`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setTabCounts(
+          data.counts || { all: 0, incoming: 0, outbound: 0, forms: 0 }
+        );
+      }
     } catch (error) {
-      console.error('Error fetching tickets:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error refetching tab counts:', error);
     }
   }, []);
 
+  const fetchTickets = useCallback(
+    async (companyId: string, page: number = 1, append: boolean = false) => {
+      if (!companyId) return;
+
+      isFetchingRef.current = true;
+
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      try {
+        // Build query parameters
+        const params = new URLSearchParams({
+          companyId,
+          includeArchived: 'false',
+          page: page.toString(),
+          limit: '25',
+          sortBy,
+          sortOrder,
+          tab: currentTab,
+        });
+
+        if (searchQuery) {
+          params.append('search', searchQuery);
+        }
+
+        // Fetch paginated tickets
+        const response = await fetch(`/api/tickets?${params}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch tickets');
+        }
+
+        const data = await response.json();
+
+        // Fetch call records for hang-up filtering
+        const callsData = await adminAPI.getUserCalls({ companyId });
+
+        if (append) {
+          setTickets(prev => [...prev, ...(data.tickets || [])]);
+        } else {
+          setTickets(data.tickets || []);
+        }
+
+        setCallRecords(callsData);
+        setHasMore(data.pagination?.hasMore || false);
+        setTotalCount(data.pagination?.total || 0);
+        setTabCounts(
+          data.counts || { all: 0, incoming: 0, outbound: 0, forms: 0 }
+        );
+        setCurrentPage(page);
+      } catch (error) {
+        console.error('Error fetching tickets:', error);
+      } finally {
+        isFetchingRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [currentTab, sortBy, sortOrder, searchQuery]
+  );
+
+  // Load more tickets for infinite scroll
+  const handleLoadMore = useCallback(() => {
+    if (!selectedCompany?.id || loadingMore || !hasMore) return;
+    fetchTickets(selectedCompany.id, currentPage + 1, true);
+  }, [selectedCompany?.id, loadingMore, hasMore, currentPage, fetchTickets]);
+
+  // Handle filter changes (reset to page 1)
+  const handleTabChange = useCallback((tab: string) => {
+    setCurrentTab(tab);
+    setCurrentPage(1);
+  }, []);
+
+  const handleSortChange = useCallback(
+    (field: string, order: 'asc' | 'desc') => {
+      setSortBy(field);
+      setSortOrder(order);
+      setCurrentPage(1);
+    },
+    []
+  );
+
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  }, []);
 
   // Granular update handlers for real-time changes (no full page refreshes)
-  const handleCallRecordChange = useCallback(async (payload: any) => {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
+  const handleCallRecordChange = useCallback(
+    async (payload: any) => {
+      const { eventType, new: newRecord, old: oldRecord } = payload;
 
-    // Check if this call record belongs to the current company
-    // We need to verify through the lead relationship
-    if (newRecord?.lead_id && selectedCompany?.id) {
-      try {
-        const supabase = createClient();
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('company_id')
-          .eq('id', newRecord.lead_id)
-          .single();
+      // Check if this call record belongs to the current company
+      // We need to verify through the lead relationship
+      if (newRecord?.lead_id && selectedCompany?.id) {
+        try {
+          const supabase = createClient();
+          const { data: lead } = await supabase
+            .from('leads')
+            .select('company_id')
+            .eq('id', newRecord.lead_id)
+            .single();
 
-        // Only process if this call belongs to the current company
-        if (lead?.company_id !== selectedCompany.id) {
+          // Only process if this call belongs to the current company
+          if (lead?.company_id !== selectedCompany.id) {
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking call company association:', error);
           return;
         }
-      } catch (error) {
-        console.error('Error checking call company association:', error);
-        return;
       }
-    }
 
-    // Update specific ticket's call records instead of full refresh
-    const updateTicketCallRecords = async (ticketId: string) => {
-      if (!ticketId) return;
+      // Update specific ticket's call records instead of full refresh
+      const updateTicketCallRecords = async (ticketId: string) => {
+        if (!ticketId) return;
 
-      try {
-        const supabase = createClient();
-        const { data: updatedCallRecords, error } = await supabase
-          .from('call_records')
-          .select('id, call_id, call_status, start_timestamp, end_timestamp, duration_seconds')
-          .eq('ticket_id', ticketId);
+        try {
+          const supabase = createClient();
+          const { data: updatedCallRecords, error } = await supabase
+            .from('call_records')
+            .select(
+              'id, call_id, call_status, start_timestamp, end_timestamp, duration_seconds'
+            )
+            .eq('ticket_id', ticketId);
 
-        if (error) {
-          console.error('Error fetching updated call records:', error);
-          return;
+          if (error) {
+            console.error('Error fetching updated call records:', error);
+            return;
+          }
+
+          // Update the specific ticket's call records in state
+          setTickets(prev =>
+            prev.map(ticket =>
+              ticket.id === ticketId
+                ? { ...ticket, call_records: updatedCallRecords || [] }
+                : ticket
+            )
+          );
+        } catch (error) {
+          console.error('Error updating ticket call records:', error);
         }
+      };
 
-        // Update the specific ticket's call records in state
-        setTickets(prev =>
-          prev.map(ticket =>
-            ticket.id === ticketId
-              ? { ...ticket, call_records: updatedCallRecords || [] }
-              : ticket
-          )
-        );
-      } catch (error) {
-        console.error('Error updating ticket call records:', error);
+      switch (eventType) {
+        case 'INSERT':
+          if (newRecord?.ticket_id) {
+            await updateTicketCallRecords(newRecord.ticket_id);
+          }
+          break;
+
+        case 'UPDATE':
+          if (newRecord?.ticket_id) {
+            await updateTicketCallRecords(newRecord.ticket_id);
+          }
+          break;
+
+        case 'DELETE':
+          if (oldRecord?.ticket_id) {
+            await updateTicketCallRecords(oldRecord.ticket_id);
+          }
+          break;
       }
-    };
+    },
+    [selectedCompany?.id]
+  );
 
-    switch (eventType) {
-      case 'INSERT':
-        if (newRecord?.ticket_id) {
-          await updateTicketCallRecords(newRecord.ticket_id);
-        }
-        break;
+  const handleTicketChange = useCallback(
+    (payload: any) => {
+      const { eventType, new: newRecord, old: oldRecord } = payload;
 
-      case 'UPDATE':
-        if (newRecord?.ticket_id) {
-          await updateTicketCallRecords(newRecord.ticket_id);
-        }
-        break;
-
-      case 'DELETE':
-        if (oldRecord?.ticket_id) {
-          await updateTicketCallRecords(oldRecord.ticket_id);
-        }
-        break;
-    }
-  }, [selectedCompany?.id]);
-
-  const handleTicketChange = useCallback((payload: any) => {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-
-    switch (eventType) {
-      case 'INSERT':
-        // Add new ticket to the list - fetch full data with joins
-        if (newRecord && selectedCompany?.id) {
-          // Check if already exists to prevent duplicates
-          const exists = tickets.some(ticket => ticket.id === newRecord.id);
-          if (!exists) {
-            // Fetch the full ticket data with joins
-            const supabase = createClient();
-            supabase
-              .from('tickets')
-              .select(`
+      switch (eventType) {
+        case 'INSERT':
+          // Prepend new ticket to the top of the list - fetch full data with joins
+          if (newRecord && selectedCompany?.id) {
+            // Check if already exists to prevent duplicates
+            const exists = tickets.some(ticket => ticket.id === newRecord.id);
+            if (!exists) {
+              // Fetch the full ticket data with joins
+              const supabase = createClient();
+              supabase
+                .from('tickets')
+                .select(
+                  `
                 *,
                 customer:customers!tickets_customer_id_fkey(
                   id,
@@ -223,48 +365,69 @@ function TicketsPageContent() {
                   end_timestamp,
                   duration_seconds
                 )
-              `)
-              .eq('id', newRecord.id)
-              .single()
-              .then(({ data: fullTicket, error }) => {
-                if (error) {
-                  console.error('Error fetching full ticket data:', error);
-                  // Fallback to basic insert
-                  setTickets(prev => {
-                    const exists = prev.some(ticket => ticket.id === newRecord.id);
-                    if (!exists) {
-                      return [newRecord, ...prev];
+              `
+                )
+                .eq('id', newRecord.id)
+                .single()
+                .then(({ data: fullTicket, error }) => {
+                  if (error) {
+                    console.error('Error fetching full ticket data:', error);
+                    // Fallback to basic insert - prepend to top (unless closed)
+                    setTickets(prev => {
+                      const exists = prev.some(
+                        ticket => ticket.id === newRecord.id
+                      );
+                      // Don't add if ticket is closed
+                      if (!exists && newRecord.status !== 'closed') {
+                        return [newRecord, ...prev];
+                      }
+                      return prev;
+                    });
+                  } else if (fullTicket) {
+                    // Prepend new ticket to top of list (unless closed)
+                    // Don't add closed tickets to the list
+                    if (fullTicket.status === 'closed') {
+                      return;
                     }
-                    return prev;
-                  });
-                } else if (fullTicket) {
-                  setTickets(prev => {
-                    const exists = prev.some(ticket => ticket.id === fullTicket.id);
-                    if (!exists) {
-                      return [fullTicket, ...prev];
-                    }
-                    return prev;
-                  });
-                }
-              });
-          }
-        }
-        break;
-        
-      case 'UPDATE':
-        // Update existing ticket - fetch full data with joins for real-time updates
-        if (newRecord && selectedCompany?.id) {
-          // If ticket becomes archived or resolved (from qualification), remove it from active view
-          if (newRecord.archived === true || newRecord.status === 'resolved') {
-            setTickets(prev => prev.filter(ticket => ticket.id !== newRecord.id));
-            break;
-          }
 
-          // For non-archived updates, fetch full data with joins
-          const supabase = createClient();
-          supabase
-            .from('tickets')
-            .select(`
+                    setTickets(prev => {
+                      const exists = prev.some(
+                        ticket => ticket.id === fullTicket.id
+                      );
+                      if (!exists) {
+                        return [fullTicket, ...prev];
+                      }
+                      return prev;
+                    });
+                    // Update count
+                    setTotalCount(prev => prev + 1);
+                  }
+                });
+            }
+          }
+          break;
+
+        case 'UPDATE':
+          // Update existing ticket - fetch full data with joins for real-time updates
+          if (newRecord && selectedCompany?.id) {
+            // If ticket becomes archived, resolved, or closed, remove it from active view
+            if (
+              newRecord.archived === true ||
+              newRecord.status === 'resolved' ||
+              newRecord.status === 'closed'
+            ) {
+              setTickets(prev =>
+                prev.filter(ticket => ticket.id !== newRecord.id)
+              );
+              break;
+            }
+
+            // For non-archived updates, fetch full data with joins
+            const supabase = createClient();
+            supabase
+              .from('tickets')
+              .select(
+                `
               *,
               customer:customers!tickets_customer_id_fkey(
                 id,
@@ -285,43 +448,63 @@ function TicketsPageContent() {
                 end_timestamp,
                 duration_seconds
               )
-            `)
-            .eq('id', newRecord.id)
-            .single()
-            .then(({ data: fullTicket, error }) => {
-              if (error) {
-                console.error('Error fetching full ticket data for update:', error);
-                // If ticket no longer exists or is archived, remove it
-                if (error.code === 'PGRST116') { // No rows returned
-                  setTickets(prev => prev.filter(ticket => ticket.id !== newRecord.id));
-                } else {
-                  // Fallback to basic update for other errors
-                  setTickets(prev =>
-                    prev.map(ticket => ticket.id === newRecord.id ? newRecord : ticket)
+            `
+              )
+              .eq('id', newRecord.id)
+              .single()
+              .then(({ data: fullTicket, error }) => {
+                if (error) {
+                  console.error(
+                    'Error fetching full ticket data for update:',
+                    error
                   );
+                  // If ticket no longer exists or is archived, remove it
+                  if (error.code === 'PGRST116') {
+                    // No rows returned
+                    setTickets(prev =>
+                      prev.filter(ticket => ticket.id !== newRecord.id)
+                    );
+                  } else {
+                    // Fallback to basic update for other errors
+                    setTickets(prev =>
+                      prev.map(ticket =>
+                        ticket.id === newRecord.id ? newRecord : ticket
+                      )
+                    );
+                  }
+                } else if (fullTicket) {
+                  // Check again if the full ticket data shows it should be removed
+                  if (
+                    fullTicket.archived === true ||
+                    fullTicket.status === 'resolved'
+                  ) {
+                    setTickets(prev =>
+                      prev.filter(ticket => ticket.id !== fullTicket.id)
+                    );
+                  } else {
+                    setTickets(prev =>
+                      prev.map(ticket =>
+                        ticket.id === newRecord.id ? fullTicket : ticket
+                      )
+                    );
+                  }
                 }
-              } else if (fullTicket) {
-                // Check again if the full ticket data shows it should be removed
-                if (fullTicket.archived === true || fullTicket.status === 'resolved') {
-                  setTickets(prev => prev.filter(ticket => ticket.id !== fullTicket.id));
-                } else {
-                  setTickets(prev =>
-                    prev.map(ticket => ticket.id === newRecord.id ? fullTicket : ticket)
-                  );
-                }
-              }
-            });
-        }
-        break;
-        
-      case 'DELETE':
-        // Remove ticket from list
-        if (oldRecord) {
-          setTickets(prev => prev.filter(ticket => ticket.id !== oldRecord.id));
-        }
-        break;
-    }
-  }, [selectedCompany?.id]);
+              });
+          }
+          break;
+
+        case 'DELETE':
+          // Remove ticket from list
+          if (oldRecord) {
+            setTickets(prev =>
+              prev.filter(ticket => ticket.id !== oldRecord.id)
+            );
+          }
+          break;
+      }
+    },
+    [selectedCompany?.id]
+  );
 
   const fetchMetrics = useCallback(async (companyId: string) => {
     if (!companyId) return;
@@ -329,7 +512,7 @@ function TicketsPageContent() {
     setMetricsLoading(true);
     try {
       const params = new URLSearchParams({
-        companyId
+        companyId,
       });
 
       const response = await fetch(`/api/metrics?${params}`);
@@ -357,203 +540,403 @@ function TicketsPageContent() {
   }, [router]);
 
   // Handle ticket qualification
-  const handleQualify = useCallback(async (
-    qualification: 'sales' | 'customer_service' | 'junk',
-    assignedTo?: string
-  ) => {
-    if (!selectedTicket) return;
+  const handleQualify = useCallback(
+    async (
+      qualification: 'sales' | 'customer_service' | 'junk',
+      assignedTo?: string
+    ) => {
+      if (!selectedTicket) return;
 
-    setIsQualifying(true);
-    try {
-      const response = await fetch(
-        `/api/tickets/${selectedTicket.id}/qualify`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            qualification,
-            assignedTo,
-          }),
+      setIsQualifying(true);
+      try {
+        const response = await fetch(
+          `/api/tickets/${selectedTicket.id}/qualify`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              qualification,
+              assignedTo,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to qualify ticket');
         }
-      );
 
-      if (!response.ok) {
-        throw new Error('Failed to qualify ticket');
+        // Refresh the tickets list
+        if (selectedCompany?.id) {
+          fetchTickets(selectedCompany.id);
+        }
+
+        handleModalClose();
+      } catch (error) {
+        console.error('Error qualifying ticket:', error);
+        alert('Failed to qualify ticket. Please try again.');
+      } finally {
+        setIsQualifying(false);
       }
+    },
+    [
+      selectedTicket,
+      selectedCompany,
+      fetchTickets,
+      fetchMetrics,
+      handleModalClose,
+    ]
+  );
 
-      // Refresh the tickets list
-      if (selectedCompany?.id) {
-        fetchTickets(selectedCompany.id);
-        fetchMetrics(selectedCompany.id);
-      }
+  const handleCreateTicket = useCallback(
+    async (formData: TicketFormData & { newCustomerData?: any }) => {
+      if (!selectedCompany?.id) return;
 
-      handleModalClose();
-    } catch (error) {
-      console.error('Error qualifying ticket:', error);
-      alert('Failed to qualify ticket. Please try again.');
-    } finally {
-      setIsQualifying(false);
-    }
-  }, [selectedTicket, selectedCompany, fetchTickets, fetchMetrics, handleModalClose]);
+      setSubmitting(true);
+      try {
+        let customerId = formData.customer_id;
 
-  const handleCreateTicket = useCallback(async (formData: TicketFormData & { newCustomerData?: any }) => {
-    if (!selectedCompany?.id) return;
+        // If creating a new customer, create customer first
+        if (formData.newCustomerData && !customerId) {
+          const customerResponse = await fetch('/api/customers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...formData.newCustomerData,
+              company_id: selectedCompany.id,
+            }),
+          });
 
-    setSubmitting(true);
-    try {
-      let customerId = formData.customer_id;
+          if (customerResponse.ok) {
+            const newCustomer = await customerResponse.json();
+            customerId = newCustomer.id;
+          } else {
+            const errorData = await customerResponse.json().catch(() => ({}));
+            console.error('Customer creation failed:', {
+              status: customerResponse.status,
+              statusText: customerResponse.statusText,
+              errorData,
+            });
+            throw new Error(errorData.error || 'Failed to create customer');
+          }
+        }
 
-      // If creating a new customer, create customer first
-      if (formData.newCustomerData && !customerId) {
-        console.log('Creating new customer with data:', formData.newCustomerData);
-        
-        const customerResponse = await fetch('/api/customers', {
+        // Create the ticket data, filtering out undefined values and non-API fields
+        const { newCustomerData, ...cleanFormData } = formData;
+
+        // Filter out undefined values
+        const ticketData = Object.fromEntries(
+          Object.entries({
+            ...cleanFormData,
+            customer_id: customerId,
+            company_id: selectedCompany.id,
+          }).filter(
+            ([_, value]) =>
+              value !== undefined && value !== null && value !== ''
+          )
+        );
+
+        const response = await fetch('/api/tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData.newCustomerData,
-            company_id: selectedCompany.id,
-          }),
+          body: JSON.stringify(ticketData),
         });
 
-        if (customerResponse.ok) {
-          const newCustomer = await customerResponse.json();
-          customerId = newCustomer.id;
+        if (response.ok) {
+          await response.json();
+          setShowCreateForm(false);
+          setFormData(null);
+          if (selectedCompany?.id) {
+            await fetchTickets(selectedCompany.id);
+          }
         } else {
-          const errorData = await customerResponse.json().catch(() => ({}));
-          console.error('Customer creation failed:', {
-            status: customerResponse.status,
-            statusText: customerResponse.statusText,
-            errorData
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Ticket creation failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            errorData,
+            sentData: ticketData,
           });
-          throw new Error(errorData.error || 'Failed to create customer');
+          throw new Error(
+            errorData.error || `Failed to create ticket (${response.status})`
+          );
         }
+      } catch (error) {
+        console.error('Error creating ticket:', error);
+        alert('Failed to create ticket. Please try again.');
+      } finally {
+        setSubmitting(false);
       }
-
-      // Create the ticket data, filtering out undefined values and non-API fields
-      const { newCustomerData, ...cleanFormData } = formData;
-      
-      // Filter out undefined values
-      const ticketData = Object.fromEntries(
-        Object.entries({
-          ...cleanFormData,
-          customer_id: customerId,
-          company_id: selectedCompany.id,
-        }).filter(([_, value]) => value !== undefined && value !== null && value !== '')
-      );
-
-      const response = await fetch('/api/tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ticketData),
-      });
-
-      if (response.ok) {
-        await response.json();
-        setShowCreateForm(false);
-        setFormData(null);
-        if (selectedCompany?.id) {
-          await fetchTickets(selectedCompany.id);
-          await fetchMetrics(selectedCompany.id);
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Ticket creation failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorData,
-          sentData: ticketData
-        });
-        throw new Error(errorData.error || `Failed to create ticket (${response.status})`);
-      }
-    } catch (error) {
-      console.error('Error creating ticket:', error);
-      alert('Failed to create ticket. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  }, [selectedCompany, fetchTickets, fetchMetrics]);
+    },
+    [selectedCompany, fetchTickets, fetchMetrics]
+  );
 
   const handleCancelForm = useCallback(() => {
     setShowCreateForm(false);
     setFormData(null);
   }, []);
 
+  // Fetch tickets when company or filters change
   useEffect(() => {
     if (selectedCompany?.id) {
-      fetchTickets(selectedCompany.id);
+      fetchTickets(selectedCompany.id, 1, false);
       fetchMetrics(selectedCompany.id);
     }
-  }, [selectedCompany?.id, fetchTickets, fetchMetrics]);
+  }, [
+    selectedCompany?.id,
+    currentTab,
+    sortBy,
+    sortOrder,
+    searchQuery,
+    fetchMetrics,
+  ]);
 
-  // Supabase Realtime subscription for live updates
+  // Supabase Realtime broadcast subscription for live updates
   useEffect(() => {
-    if (!selectedCompany?.id) return;
+    if (!selectedCompany?.id) {
+      return;
+    }
 
-    const supabase = createClient();
-    
-    const channel = supabase
-      .channel('live-updates')
-      .on(
-        'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'tickets',
-          filter: `company_id=eq.${selectedCompany.id}`
-        },
-        (payload) => {
-          const newTicket = payload.new as any;
-          const oldTicket = payload.old as any;
+    // Prevent duplicate subscriptions during Fast Refresh
+    if (subscriptionActiveRef.current && currentChannelRef.current) {
+      return;
+    }
 
-          console.log('Ticket realtime update received:', {
-            eventType: payload.eventType,
-            ticketId: newTicket?.id || oldTicket?.id,
-            companyId: selectedCompany.id,
-            timestamp: new Date().toISOString(),
-            oldData: oldTicket,
-            newData: newTicket
-          });
-          handleTicketChange(payload);
+    const channel = createTicketChannel(selectedCompany.id);
+    currentChannelRef.current = channel;
 
-          // Refresh metrics on ticket changes since they affect aggregates
-          if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE' ||
-              (payload.eventType === 'UPDATE' && (newTicket?.archived !== oldTicket?.archived))) {
-            fetchMetrics(selectedCompany.id);
+    subscribeToTicketUpdates(channel, async (payload: TicketUpdatePayload) => {
+
+      const { table, company_id, action, record_id, ticket_id } = payload;
+
+      // Verify this is for our selected company (use ref to avoid stale closure)
+      // Allow broadcasts with ticket_id but missing company_id (call_records edge case)
+      const currentCompany = selectedCompanyRef.current;
+      if (
+        company_id &&
+        currentCompany?.id &&
+        company_id !== currentCompany.id
+      ) {
+        return;
+      }
+
+      // Skip updates if we're actively fetching to avoid race conditions
+      if (isFetchingRef.current) {
+        return;
+      }
+
+      if (table === 'tickets') {
+        // Handle ticket updates
+        if (action === 'INSERT') {
+          // Fetch full ticket data with joins
+          try {
+            const supabase = createClient();
+            const { data: fullTicket, error: fetchError } = await supabase
+              .from('tickets')
+              .select(
+                `
+                *,
+                customer:customers!tickets_customer_id_fkey(
+                  id,
+                  first_name,
+                  last_name,
+                  email,
+                  phone,
+                  address,
+                  city,
+                  state,
+                  zip_code
+                ),
+                call_records:call_records!call_records_ticket_id_fkey(
+                  id,
+                  call_id,
+                  call_status,
+                  start_timestamp,
+                  end_timestamp,
+                  duration_seconds
+                )
+              `
+              )
+              .eq('id', record_id)
+              .single();
+
+            if (fetchError) {
+              return;
+            }
+
+            if (fullTicket) {
+              let wasAdded = false;
+              setTickets(prev => {
+                const exists = prev.some(ticket => ticket.id === fullTicket.id);
+                if (!exists) {
+                  wasAdded = true;
+                  const newTickets = [fullTicket, ...prev];
+                  return newTickets;
+                }
+                return prev;
+              });
+              if (wasAdded) {
+                setTotalCount(prev => prev + 1);
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching new ticket:', error);
+          }
+
+          // Refetch tab counts after INSERT
+          const currentCompany = selectedCompanyRef.current;
+          if (currentCompany?.id) {
+            refetchTabCounts(currentCompany.id);
+          }
+        } else if (action === 'UPDATE') {
+          // Fetch updated ticket data
+          try {
+            const supabase = createClient();
+            const { data: updatedTicket, error: fetchError } = await supabase
+              .from('tickets')
+              .select(
+                `
+                *,
+                customer:customers!tickets_customer_id_fkey(
+                  id,
+                  first_name,
+                  last_name,
+                  email,
+                  phone,
+                  address,
+                  city,
+                  state,
+                  zip_code
+                ),
+                call_records:call_records!call_records_ticket_id_fkey(
+                  id,
+                  call_id,
+                  call_status,
+                  start_timestamp,
+                  end_timestamp,
+                  duration_seconds
+                )
+              `
+              )
+              .eq('id', record_id)
+              .single();
+
+            if (fetchError) {
+              return;
+            }
+
+            if (updatedTicket) {
+              // If ticket becomes archived or resolved, remove it from active view
+              if (
+                updatedTicket.archived === true ||
+                updatedTicket.status === 'resolved'
+              ) {
+                setTickets(prev =>
+                  prev.filter(ticket => ticket.id !== record_id)
+                );
+              } else {
+                setTickets(prev =>
+                  prev.map(ticket =>
+                    ticket.id === updatedTicket.id ? updatedTicket : ticket
+                  )
+                );
+              }
+            }
+          } catch (error) {
+            console.error('Error updating ticket:', error);
+          }
+
+          // Refetch tab counts after UPDATE
+          const currentCompanyUpdate = selectedCompanyRef.current;
+          if (currentCompanyUpdate?.id) {
+            refetchTabCounts(currentCompanyUpdate.id);
+          }
+        } else if (action === 'DELETE') {
+          setTickets(prev =>
+            prev.filter(ticket => ticket.id !== record_id)
+          );
+
+          // Refetch tab counts after DELETE
+          const currentCompanyDelete = selectedCompanyRef.current;
+          if (currentCompanyDelete?.id) {
+            refetchTabCounts(currentCompanyDelete.id);
           }
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'call_records'
-        },
-        (payload) => {
-          handleCallRecordChange(payload);
-          
-          // Refresh metrics if call status affects aggregations
-          if (payload.eventType === 'UPDATE' && 
-              (payload.new?.end_timestamp !== payload.old?.end_timestamp)) {
-            fetchMetrics(selectedCompany.id);
+      } else if (table === 'call_records' && ticket_id) {
+        // Handle call_record updates - refresh the parent ticket
+        // Also refresh callRecords state for hang-up filtering
+        const currentCompany = selectedCompanyRef.current;
+        if (currentCompany?.id) {
+          try {
+            const callsData = await adminAPI.getUserCalls({
+              companyId: currentCompany.id,
+            });
+            setCallRecords(callsData);
+          } catch (error) {
+            console.error('Error refreshing call records:', error);
           }
         }
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime tickets subscription error');
-        } else if (status === 'TIMED_OUT') {
-          console.warn('Realtime tickets subscription timed out');
+
+        try {
+          const supabase = createClient();
+          const { data: updatedTicket, error: fetchError } = await supabase
+            .from('tickets')
+            .select(
+              `
+              *,
+              customer:customers!tickets_customer_id_fkey(
+                id,
+                first_name,
+                last_name,
+                email,
+                phone,
+                address,
+                city,
+                state,
+                zip_code
+              ),
+              call_records:call_records!call_records_ticket_id_fkey(
+                id,
+                call_id,
+                call_status,
+                start_timestamp,
+                end_timestamp,
+                duration_seconds
+              )
+            `
+            )
+            .eq('id', ticket_id)
+            .single();
+
+          if (fetchError) {
+            return;
+          }
+
+          if (updatedTicket) {
+            setTickets(prev =>
+              prev.map(ticket =>
+                ticket.id === updatedTicket.id ? updatedTicket : ticket
+              )
+            );
+          }
+        } catch (error) {
+          console.error('Error updating ticket with call record:', error);
         }
-      });
+      }
+    });
+
+    // Mark subscription as active
+    subscriptionActiveRef.current = true;
 
     return () => {
-      supabase.removeChannel(channel);
+      subscriptionActiveRef.current = false;
+      if (currentChannelRef.current) {
+        createClient().removeChannel(currentChannelRef.current);
+        currentChannelRef.current = null;
+      }
     };
-  }, [selectedCompany?.id, handleTicketChange, handleCallRecordChange, fetchMetrics]);
+  }, [selectedCompany?.id]);
 
   // Register the add action for the global header button
   useEffect(() => {
@@ -561,12 +944,16 @@ function TicketsPageContent() {
     return () => unregisterPageAction('add');
   }, [registerPageAction, unregisterPageAction]);
 
+  // Filter live tickets for LiveCallBar component
+  const liveTickets = useMemo(
+    () => tickets.filter(ticket => ticket.status === 'live'),
+    [tickets]
+  );
+
   return (
     <div style={{ width: '100%' }}>
-
       {selectedCompany && (
         <>
-
           {/* Metrics Cards */}
           <div className={metricsStyles.metricsCardWrapper}>
             {metrics && !metricsLoading ? (
@@ -603,7 +990,9 @@ function TicketsPageContent() {
                   title={metrics.customerServiceCalls.title}
                   value={metrics.customerServiceCalls.value}
                   comparisonValue={metrics.customerServiceCalls.comparisonValue}
-                  comparisonPeriod={metrics.customerServiceCalls.comparisonPeriod}
+                  comparisonPeriod={
+                    metrics.customerServiceCalls.comparisonPeriod
+                  }
                   trend={metrics.customerServiceCalls.trend}
                 />
               </>
@@ -658,17 +1047,80 @@ function TicketsPageContent() {
       {selectedCompany && (
         <TicketsList
           tickets={tickets}
+          liveTickets={liveTickets}
           callRecords={callRecords}
           loading={loading}
           onTicketUpdated={() => {
-            fetchTickets(selectedCompany.id);
-            fetchMetrics(selectedCompany.id);
+            fetchTickets(selectedCompany.id, 1, false);
           }}
+          // Infinite scroll props
+          infiniteScrollEnabled={true}
+          hasMore={hasMore}
+          onLoadMore={handleLoadMore}
+          loadingMore={loadingMore}
+          // Tab counts
+          tabCounts={tabCounts}
+          // Filter/sort handlers
+          onTabChange={handleTabChange}
+          onSortChange={handleSortChange}
+          onSearchChange={handleSearchChange}
+          currentTab={currentTab}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          searchQuery={searchQuery}
         />
       )}
 
-      {!selectedCompany && (
-        <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
+      {/* Show loading state while company is being loaded */}
+      {companyLoading && (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '800px',
+              margin: '0 auto',
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }}
+          >
+            <div
+              style={{
+                height: '60px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '16px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '12px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '12px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {!selectedCompany && !companyLoading && (
+        <div
+          style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}
+        >
           Please select a company to view tickets.
         </div>
       )}
@@ -686,10 +1138,7 @@ function TicketsPageContent() {
 
       {/* Create Ticket Modal */}
       <Modal isOpen={showCreateForm} onClose={handleCancelForm}>
-        <ModalTop
-          title="Create New Ticket"
-          onClose={handleCancelForm}
-        />
+        <ModalTop title="Create New Ticket" onClose={handleCancelForm} />
         <ModalMiddle>
           <TicketForm
             companyId={selectedCompany?.id || ''}

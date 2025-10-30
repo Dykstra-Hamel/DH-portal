@@ -21,13 +21,34 @@ export async function GET(request: NextRequest) {
     // Use admin client to fetch leads
     const supabase = createAdminClient();
 
-    // Build query to include customer and company data directly
+    // Build query - specify only needed columns to reduce data transfer
     // For assigned users, we'll need to fetch profiles separately since assigned_to references auth.users
     let query = supabase
       .from('leads')
       .select(
         `
-        *,
+        id,
+        company_id,
+        customer_id,
+        service_address_id,
+        lead_source,
+        lead_type,
+        service_type,
+        lead_status,
+        comments,
+        assigned_to,
+        last_contacted_at,
+        next_follow_up_at,
+        estimated_value,
+        priority,
+        lost_reason,
+        lost_stage,
+        archived,
+        furthest_completed_stage,
+        scheduled_date,
+        scheduled_time,
+        created_at,
+        updated_at,
         customer:customers(
           id,
           first_name,

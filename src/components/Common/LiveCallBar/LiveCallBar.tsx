@@ -1,17 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CallRecord } from '@/types/call-record';
 import { Ticket } from '@/types/ticket';
-import { createClient } from '@/lib/supabase/client';
-import { useCompany } from '@/contexts/CompanyContext';
 import LoadingSpinner from '@/components/Common/LoadingSpinner/LoadingSpinner';
 import { getCustomerDisplayName } from '@/lib/display-utils';
 import styles from './LiveCallBar.module.scss';
 
+type EnhancedCallRecord = CallRecord & { ticketInfo?: any };
+
 interface LiveCallBarProps {
-  tickets?: Ticket[];
-  liveCallsData?: CallRecord[]; // Keep for backward compatibility - will be deprecated
+  liveTickets: Ticket[]; // Live tickets passed from parent (with status='live')
 }
 
 const NoCallsIcon = () => (
@@ -164,275 +163,29 @@ const formatCallStarted = (startTime: string): string => {
   });
 };
 
-export default function LiveCallBar({
-  tickets = [],
-  liveCallsData = [],
-}: LiveCallBarProps) {
+export default function LiveCallBar({ liveTickets }: LiveCallBarProps) {
   const [sortConfig, setSortConfig] = useState<{
     direction: 'asc' | 'desc';
   } | null>(null);
-  const [realTimeTickets, setRealTimeTickets] = useState<Ticket[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
-  const [useMock, setUseMock] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [displayedCalls, setDisplayedCalls] = useState<EnhancedCallRecord[]>(
+    []
+  );
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const displayedCallsRef = useRef<EnhancedCallRecord[]>([]);
 
-  // Use global company context for real-time filtering
-  const { selectedCompany } = useCompany();
-
-  // Initialize mock mode from localStorage or env (client-side only)
+  // Keep ref in sync with state for stable access
   useEffect(() => {
-    try {
-      const ls =
-        typeof window !== 'undefined'
-          ? window.localStorage.getItem('USE_MOCK_LIVE_CALLS')
-          : null;
-      if (ls !== null) {
-        setUseMock(ls === 'true');
-        return;
-      }
-    } catch {}
-
-    // Fallback to env flag (inlined at build time in Next.js)
-    if (process.env.NEXT_PUBLIC_USE_MOCK_LIVE_CALLS === 'true') {
-      setUseMock(true);
-    }
-  }, []);
-
-  // Handle real-time ticket changes with customer data enrichment
-  const handleTicketChange = useCallback(async (payload: any) => {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-
-    switch (eventType) {
-      case 'INSERT':
-        // Add new ticket to the list with enriched customer data
-        if (newRecord && newRecord.status === 'live') {
-          try {
-            // Enrich the ticket with customer data and call_records since real-time doesn't include joins
-            const supabase = createClient();
-            const { data: enrichedTicket } = await supabase
-              .from('tickets')
-              .select(
-                `
-                *,
-                customer:customers!tickets_customer_id_fkey(
-                  id,
-                  first_name,
-                  last_name,
-                  phone
-                ),
-                call_records!tickets_call_record_id_fkey(
-                  id,
-                  call_id,
-                  call_status,
-                  phone_number,
-                  from_number,
-                  start_timestamp,
-                  end_timestamp,
-                  duration_seconds,
-                  disconnect_reason
-                )
-              `
-              )
-              .eq('id', newRecord.id)
-              .single();
-
-            const ticketToAdd = enrichedTicket || newRecord;
-
-            setRealTimeTickets(prev => {
-              // Check if already exists to prevent duplicates
-              const exists = prev.some(ticket => ticket.id === ticketToAdd.id);
-              if (!exists) {
-                return [ticketToAdd, ...prev]; // Add to beginning for newest first
-              }
-              return prev;
-            });
-          } catch (error) {
-            console.error('Error enriching ticket data:', error);
-            // Fallback to raw ticket data
-            setRealTimeTickets(prev => {
-              const exists = prev.some(ticket => ticket.id === newRecord.id);
-              if (!exists) {
-                return [newRecord, ...prev];
-              }
-              return prev;
-            });
-          }
-        }
-        break;
-
-      case 'UPDATE':
-        // Update existing ticket with enriched data
-        if (newRecord) {
-          try {
-            // Enrich the updated ticket with customer data and call_records
-            const supabase = createClient();
-            const { data: enrichedTicket } = await supabase
-              .from('tickets')
-              .select(
-                `
-                *,
-                customer:customers!tickets_customer_id_fkey(
-                  id,
-                  first_name,
-                  last_name,
-                  phone
-                ),
-                call_records!tickets_call_record_id_fkey(
-                  id,
-                  call_id,
-                  call_status,
-                  phone_number,
-                  from_number,
-                  start_timestamp,
-                  end_timestamp,
-                  duration_seconds,
-                  disconnect_reason
-                )
-              `
-              )
-              .eq('id', newRecord.id)
-              .single();
-
-            const ticketToUpdate = enrichedTicket || newRecord;
-
-            setRealTimeTickets(prev =>
-              prev.map(ticket =>
-                ticket.id === ticketToUpdate.id ? ticketToUpdate : ticket
-              )
-            );
-          } catch (error) {
-            console.error('Error enriching updated ticket data:', error);
-            // Fallback to raw ticket data
-            setRealTimeTickets(prev =>
-              prev.map(ticket =>
-                ticket.id === newRecord.id ? newRecord : ticket
-              )
-            );
-          }
-        }
-        break;
-
-      case 'DELETE':
-        // Remove ticket from list
-        if (oldRecord) {
-          setRealTimeTickets(prev =>
-            prev.filter(ticket => ticket.id !== oldRecord.id)
-          );
-        }
-        break;
-    }
-  }, []);
-
-  // Supabase Realtime subscription for ticket and call_records updates (disabled in mock mode)
-  useEffect(() => {
-    if (useMock) return; // Skip realtime when mocking
-    if (!selectedCompany?.id) return;
-
-    const supabase = createClient();
-
-    const channel = supabase
-      .channel('live-call-bar-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tickets',
-          filter: `company_id=eq.${selectedCompany.id}`,
-        },
-        payload => {
-          handleTicketChange(payload);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'call_records',
-        },
-        async payload => {
-          const { eventType, new: newRecord } = payload;
-
-          // When call_records are created/updated, refresh the ticket data to get the relationship
-          if (
-            (eventType === 'INSERT' || eventType === 'UPDATE') &&
-            newRecord?.ticket_id
-          ) {
-            try {
-              const supabase = createClient();
-
-              // Fetch the updated ticket with its call_records and customer data
-              const { data: updatedTicket } = await supabase
-                .from('tickets')
-                .select(
-                  `
-                  *,
-                  customer:customers!tickets_customer_id_fkey(
-                    id,
-                    first_name,
-                    last_name,
-                    phone
-                  ),
-                  call_records!tickets_call_record_id_fkey(
-                    id,
-                    call_id,
-                    call_status,
-                    phone_number,
-                    from_number,
-                    start_timestamp,
-                    end_timestamp,
-                    duration_seconds,
-                    disconnect_reason
-                  )
-                `
-                )
-                .eq('id', newRecord.ticket_id)
-                .single();
-
-              if (updatedTicket && updatedTicket.status === 'live') {
-                // Update the ticket in our real-time list
-                setRealTimeTickets(prev =>
-                  prev.map(ticket =>
-                    ticket.id === updatedTicket.id ? updatedTicket : ticket
-                  )
-                );
-              }
-            } catch (error) {
-              console.error(
-                'Error updating ticket with call record data:',
-                error
-              );
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedCompany?.id, handleTicketChange, useMock]);
+    displayedCallsRef.current = displayedCalls;
+  }, [displayedCalls]);
 
   // Extract live calls from tickets with 'live' status only, along with ticket info for customer names
   const liveCallsFromTickets = useMemo(() => {
-    const liveCalls: (CallRecord & { ticketInfo?: any })[] = [];
-
-    // Combine real-time tickets with prop tickets (real-time takes precedence)
-    const allTickets = [...realTimeTickets];
-
-    // Add prop tickets that aren't already in real-time tickets
-    tickets.forEach(ticket => {
-      const existsInRealTime = realTimeTickets.some(
-        rtTicket => rtTicket.id === ticket.id
-      );
-      if (!existsInRealTime) {
-        allTickets.push(ticket);
-      }
-    });
+    const liveCalls: EnhancedCallRecord[] = [];
 
     // Show tickets with 'live' status only - webhook will update status to 'new' when analysis arrives
-    allTickets.forEach(ticket => {
+    liveTickets.forEach(ticket => {
       if (ticket.status === 'live') {
         // Active calls with 'live' status - show immediately, fill in data as it arrives
         // Handle call_records being either a single object (one-to-one) or array (one-to-many)
@@ -482,57 +235,46 @@ export default function LiveCallBar({
     });
 
     return liveCalls;
-  }, [tickets, realTimeTickets]);
+  }, [liveTickets]);
 
-  // Mock data for development styling/testing
-  const mockCalls: CallRecord[] = useMemo(
-    () => [
-      {
-        id: 'mock-1',
-        call_id: 'mock-call-1',
-        customer_id: 'mock-customer-1',
-        phone_number: '(555) 123-4567',
-        from_number: '+15551234567',
-        call_status: 'ongoing',
-        start_timestamp: new Date(Date.now() - 125000).toISOString(), // ~2 minutes ago
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: 'mock-2',
-        call_id: 'mock-call-2',
-        customer_id: 'mock-customer-2',
-        phone_number: '(555) 987-6543',
-        from_number: '+15559876543',
-        call_status: 'processing',
-        start_timestamp: new Date(Date.now() - 45000).toISOString(), // ~45 seconds ago
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: 'mock-3',
-        call_id: 'mock-call-3',
-        customer_id: 'mock-customer-3',
-        phone_number: '(555) 456-7890',
-        from_number: '+15554567890',
-        call_status: 'transferring',
-        start_timestamp: new Date(Date.now() - 15000).toISOString(), // ~15 seconds ago
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ],
-    []
-  );
+  // Use live calls derived from tickets prop
+  const validLiveCalls: EnhancedCallRecord[] = liveCallsFromTickets;
 
-  // Priority order: live calls from tickets (includes real-time) > fallback prop data
-  const validLiveCalls = useMock
-    ? mockCalls
-    : liveCallsFromTickets.length > 0
-      ? liveCallsFromTickets
-      : liveCallsData;
+  useEffect(() => {
+    if (validLiveCalls.length > 0) {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      setDisplayedCalls(validLiveCalls);
+      return;
+    }
 
-  const hasLiveCalls = validLiveCalls.length > 0;
-  const liveCallCount = validLiveCalls.length;
+    // Use ref instead of state to avoid feedback loop
+    if (displayedCallsRef.current.length === 0) {
+      return;
+    }
+
+    if (!hideTimerRef.current) {
+      hideTimerRef.current = setTimeout(() => {
+        setDisplayedCalls([]);
+        hideTimerRef.current = null;
+      }, 600);
+    }
+
+    return () => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+    };
+  }, [validLiveCalls]);
+
+  const callsToRender =
+    validLiveCalls.length > 0 ? validLiveCalls : displayedCalls;
+
+  const hasLiveCalls = callsToRender.length > 0;
+  const liveCallCount = callsToRender.length;
 
   // Update current time every second when there are live calls
   useEffect(() => {
@@ -552,14 +294,20 @@ export default function LiveCallBar({
   };
 
   // Sort calls by start time using valid calls only
-  const sortedCalls = [...validLiveCalls].sort((a, b) => {
-    if (!sortConfig) return 0;
+  const sortedCalls = useMemo(() => {
+    if (!sortConfig) {
+      return callsToRender;
+    }
 
-    const aTime = new Date(a.start_timestamp || '').getTime();
-    const bTime = new Date(b.start_timestamp || '').getTime();
+    const sorted = [...callsToRender].sort((a, b) => {
+      const aTime = new Date(a.start_timestamp || '').getTime();
+      const bTime = new Date(b.start_timestamp || '').getTime();
 
-    return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
-  });
+      return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
+    });
+
+    return sorted;
+  }, [callsToRender, sortConfig]);
 
   if (!hasLiveCalls) {
     // No live calls state
@@ -594,26 +342,6 @@ export default function LiveCallBar({
               >
                 <span>{isExpanded ? 'Hide All' : 'View All'}</span>
                 <ExpandCollapseIcon isExpanded={isExpanded} />
-              </button>
-            )}
-            {process.env.NODE_ENV !== 'production' && (
-              <button
-                className={styles.expandCollapseButton}
-                onClick={() => {
-                  const next = !useMock;
-                  setUseMock(next);
-                  try {
-                    if (typeof window !== 'undefined') {
-                      window.localStorage.setItem(
-                        'USE_MOCK_LIVE_CALLS',
-                        String(next)
-                      );
-                    }
-                  } catch {}
-                }}
-                title={useMock ? 'Switch to live data' : 'Switch to mock data'}
-              >
-                <span>{useMock ? 'Use Live Data' : 'Use Mock Data'}</span>
               </button>
             )}
           </div>

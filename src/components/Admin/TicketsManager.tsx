@@ -6,6 +6,11 @@ import TicketsTable from '@/components/Tickets/TicketsTable/TicketsTable';
 import CompanyDropdown from '@/components/Common/CompanyDropdown/CompanyDropdown';
 import { Ticket } from '@/types/ticket';
 import { createClient } from '@/lib/supabase/client';
+import {
+  createTicketChannel,
+  subscribeToTicketUpdates,
+  TicketUpdatePayload,
+} from '@/lib/realtime/ticket-channel';
 import styles from './AdminDashboard.module.scss';
 
 export default function TicketsManager() {
@@ -44,54 +49,26 @@ export default function TicketsManager() {
     }
   }, [selectedCompanyId, fetchTickets]);
 
-  // Supabase Realtime subscription for live updates
+  // Supabase Realtime broadcast subscription for live updates
   useEffect(() => {
     if (!selectedCompanyId) return;
 
-    const supabase = createClient();
-    
-    // Subscribe to tickets table changes for this company
-    const ticketsSubscription = supabase
-      .channel('tickets-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'tickets',
-          filter: `company_id=eq.${selectedCompanyId}`,
-        },
-        (payload) => {
-          // Refresh tickets data when changes occur
-          fetchTickets(selectedCompanyId, false);
-          fetchTickets(selectedCompanyId, true);
-        }
-      )
-      .subscribe();
+    const channel = createTicketChannel(selectedCompanyId);
 
-    // Subscribe to call_records table changes to detect status updates
-    const callRecordsSubscription = supabase
-      .channel('call-records-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'call_records',
-        },
-        (payload) => {
-          // Check if this call record is associated with a ticket for this company
-          // Refresh tickets to get updated call status
-          fetchTickets(selectedCompanyId, false);
-          fetchTickets(selectedCompanyId, true);
-        }
-      )
-      .subscribe();
+    subscribeToTicketUpdates(channel, async (payload: TicketUpdatePayload) => {
+      const { company_id } = payload;
 
-    // Cleanup subscriptions on unmount
+      // Verify this is for our selected company
+      if (company_id !== selectedCompanyId) return;
+
+      // Refresh both active and archived tickets when any change occurs
+      // This ensures we always have the latest data
+      fetchTickets(selectedCompanyId, false);
+      fetchTickets(selectedCompanyId, true);
+    });
+
     return () => {
-      supabase.removeChannel(ticketsSubscription);
-      supabase.removeChannel(callRecordsSubscription);
+      createClient().removeChannel(channel);
     };
   }, [selectedCompanyId, fetchTickets]);
 

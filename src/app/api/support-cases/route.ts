@@ -30,8 +30,6 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
 
-    console.log('Support cases API called with params:', { companyId, status, issueType, priority, assignedTo, includeArchived, dateFrom, dateTo });
-
     // If companyId is provided, verify access
     if (companyId) {
       // Verify user has access to this company (admins have access to all companies)
@@ -115,7 +113,6 @@ export async function GET(request: NextRequest) {
       query = query.lte('created_at', dateTo);
     }
 
-    console.log('Executing query...');
     const { data: supportCases, error } = await query;
 
     if (error) {
@@ -124,7 +121,6 @@ export async function GET(request: NextRequest) {
     }
 
     if (!supportCases || supportCases.length === 0) {
-      console.log('Support cases fetched successfully: 0 cases');
       return NextResponse.json([]);
     }
 
@@ -169,7 +165,6 @@ export async function GET(request: NextRequest) {
         : null,
     }));
 
-    console.log('Support cases fetched successfully:', enhancedSupportCases.length, 'cases');
     return NextResponse.json(enhancedSupportCases);
   } catch (error) {
     console.error('Unexpected error in support cases GET:', error);

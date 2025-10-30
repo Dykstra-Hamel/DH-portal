@@ -209,9 +209,9 @@ export function useRealtimeCounts() {
         myCasesResponse,
         myTasksResponse,
       ] = await Promise.allSettled([
-        // Active tickets
+        // Active tickets - use count-only endpoint for performance
         fetch(
-          `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false`
+          `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false&countOnly=true`
         ),
         // Active leads (unassigned, contacting, quoted)
         fetch(
@@ -263,7 +263,13 @@ export function useRealtimeCounts() {
       // Process tickets
       if (ticketsResponse.status === 'fulfilled' && ticketsResponse.value.ok) {
         const ticketsData = await ticketsResponse.value.json();
-        newCounts.tickets = Array.isArray(ticketsData) ? ticketsData.length : 0;
+        // Handle new paginated response format
+        if (ticketsData.counts) {
+          newCounts.tickets = ticketsData.counts.all || 0;
+        } else {
+          // Fallback for old format (array)
+          newCounts.tickets = Array.isArray(ticketsData) ? ticketsData.length : 0;
+        }
       }
 
       // Process leads
@@ -416,13 +422,14 @@ export function useRealtimeCounts() {
           switch (table) {
             case 'tickets':
               const ticketsResponse = await fetch(
-                `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false`
+                `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false&countOnly=true`
               );
               if (ticketsResponse.ok) {
                 const ticketsData = await ticketsResponse.json();
+                // Handle new paginated response format
                 updateCount(
                   'tickets',
-                  Array.isArray(ticketsData) ? ticketsData.length : 0
+                  ticketsData.counts?.all || 0
                 );
               }
               break;

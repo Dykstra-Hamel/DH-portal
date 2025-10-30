@@ -25,6 +25,12 @@ import {
   styles as metricsStyles,
 } from '@/components/Common/MetricsCard';
 import { isTaskOverdue } from '@/types/task';
+import { createClient } from '@/lib/supabase/client';
+import {
+  createTaskChannel,
+  subscribeToTaskUpdates,
+  TaskUpdatePayload,
+} from '@/lib/realtime/task-channel';
 
 export default function MyTasksPage() {
   const router = useRouter();
@@ -92,6 +98,107 @@ export default function MyTasksPage() {
   useEffect(() => {
     fetchMyTasks();
   }, [user?.id, selectedCompany?.id]);
+
+  // Real-time subscription for task updates
+  useEffect(() => {
+    if (!selectedCompany?.id || !user?.id) return;
+
+    const channel = createTaskChannel(selectedCompany.id);
+
+    subscribeToTaskUpdates(channel, async (payload: TaskUpdatePayload) => {
+      const { company_id, action, record_id } = payload;
+
+      // Verify this is for our selected company
+      if (company_id !== selectedCompany.id) return;
+
+      if (action === 'INSERT') {
+        // Fetch full task data - only add if assigned to current user
+        try {
+          const supabase = createClient();
+          const { data: fullTask } = await supabase
+            .from('tasks')
+            .select(`
+              *,
+              company:companies(
+                id,
+                name
+              ),
+              assigned_user:profiles!tasks_assigned_to_fkey(
+                id,
+                first_name,
+                last_name,
+                email
+              )
+            `)
+            .eq('id', record_id)
+            .eq('assigned_to', user.id) // Filter by current user
+            .single();
+
+          if (fullTask) {
+            setTasks(prev => {
+              const exists = prev.some(task => task.id === fullTask.id);
+              if (!exists) {
+                return [fullTask, ...prev];
+              }
+              return prev;
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching new task:', error);
+        }
+      } else if (action === 'UPDATE') {
+        // Fetch updated task data
+        try {
+          const supabase = createClient();
+          const { data: updatedTask } = await supabase
+            .from('tasks')
+            .select(`
+              *,
+              company:companies(
+                id,
+                name
+              ),
+              assigned_user:profiles!tasks_assigned_to_fkey(
+                id,
+                first_name,
+                last_name,
+                email
+              )
+            `)
+            .eq('id', record_id)
+            .single();
+
+          if (updatedTask) {
+            // Check if it&apos;s still assigned to this user
+            if (updatedTask.assigned_to === user.id) {
+              setTasks(prev => {
+                const exists = prev.some(task => task.id === updatedTask.id);
+                if (exists) {
+                  return prev.map(task =>
+                    task.id === updatedTask.id ? updatedTask : task
+                  );
+                } else {
+                  // Task was reassigned to this user
+                  return [updatedTask, ...prev];
+                }
+              });
+            } else {
+              // Remove if no longer assigned to this user
+              setTasks(prev => prev.filter(task => task.id !== record_id));
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching updated task:', error);
+        }
+      } else if (action === 'DELETE') {
+        setTasks(prev => prev.filter(task => task.id !== record_id));
+      }
+    });
+
+    return () => {
+      createClient().removeChannel(channel);
+    };
+  }, [selectedCompany?.id, user?.id]);
 
   // Register the add action for the global header button
   useEffect(() => {

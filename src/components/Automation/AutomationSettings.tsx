@@ -86,14 +86,14 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
       const supabase = createClient();
 
       // Fetch company information
-      const { data: company } = await supabase
+      const { data: companyData } = await supabase
         .from('companies')
         .select('*')
         .eq('id', companyId)
         .single();
 
-      if (company) {
-        setCompanyName(company.name || '');
+      if (companyData) {
+        setCompanyName(companyData.name || '');
       }
 
       // Fetch workflows

@@ -13,6 +13,11 @@ import {
   styles as metricsStyles,
 } from '@/components/Common/MetricsCard';
 import { MetricsResponse } from '@/services/metricsService';
+import {
+  createLeadChannel,
+  subscribeToLeadUpdates,
+  LeadUpdatePayload,
+} from '@/lib/realtime/lead-channel';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -143,6 +148,97 @@ export default function LeadsPage() {
       fetchMetrics(selectedCompany.id);
     }
   }, [selectedCompany, isAdmin, fetchLeads, fetchMetrics]);
+
+  // Real-time subscription for lead updates
+  useEffect(() => {
+    if (!selectedCompany?.id) {
+      return;
+    }
+
+    const channel = createLeadChannel(selectedCompany.id);
+
+    subscribeToLeadUpdates(channel, async (payload: LeadUpdatePayload) => {
+      const { company_id, action, record_id } = payload;
+
+      // Verify this is for our selected company
+      if (company_id !== selectedCompany.id) {
+        return;
+      }
+
+      if (action === 'INSERT') {
+        // Fetch the new lead with all its relationships
+        try {
+          const supabase = createClient();
+          const { data: newLead } = await supabase
+            .from('leads')
+            .select(
+              `
+              *,
+              customer:customers(
+                id,
+                first_name,
+                last_name,
+                email,
+                phone
+              ),
+              company:companies(
+                id,
+                name
+              )
+            `
+            )
+            .eq('id', record_id)
+            .single();
+
+          if (newLead) {
+            setLeads(prev => [newLead, ...prev]);
+          }
+        } catch (error) {
+          console.error('Error fetching new lead:', error);
+        }
+      } else if (action === 'UPDATE') {
+        // Fetch the updated lead
+        try {
+          const supabase = createClient();
+          const { data: updatedLead } = await supabase
+            .from('leads')
+            .select(
+              `
+              *,
+              customer:customers(
+                id,
+                first_name,
+                last_name,
+                email,
+                phone
+              ),
+              company:companies(
+                id,
+                name
+              )
+            `
+            )
+            .eq('id', record_id)
+            .single();
+
+          if (updatedLead) {
+            setLeads(prev =>
+              prev.map(lead => (lead.id === updatedLead.id ? updatedLead : lead))
+            );
+          }
+        } catch (error) {
+          console.error('Error fetching updated lead:', error);
+        }
+      } else if (action === 'DELETE') {
+        // Remove the lead from the list
+        setLeads(prev => prev.filter(lead => lead.id !== record_id));
+      }
+    });
+
+    return () => {
+      createClient().removeChannel(channel);
+    };
+  }, [selectedCompany?.id]);
 
   if (loading) {
     return <div>Loading...</div>;

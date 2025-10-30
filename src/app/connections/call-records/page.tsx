@@ -25,6 +25,7 @@ export default function CallRecordsPage() {
   const [selectedCall, setSelectedCall] = useState<CallRecordWithDirection | null>(null);
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [tabCounts, setTabCounts] = useState<{ all: number; inbound: number; outbound: number }>({ all: 0, inbound: 0, outbound: 0 });
 
 
   const loadCalls = useCallback(
@@ -64,6 +65,14 @@ export default function CallRecordsPage() {
 
         // Filter out archived calls on the client side
         const nonArchivedCalls = (allCalls || []).filter(call => !call.archived);
+
+        // Compute tab counts from all non-archived calls
+        const counts = {
+          all: nonArchivedCalls.length,
+          inbound: nonArchivedCalls.filter(call => call.call_direction === 'inbound').length,
+          outbound: nonArchivedCalls.filter(call => call.call_direction === 'outbound').length,
+        };
+        setTabCounts(counts);
 
         // Client-side pagination for infinite scroll
         const limit = 20;
@@ -275,6 +284,7 @@ export default function CallRecordsPage() {
           loadingMore={loadingMore}
           onCallUpdated={handleCallUpdated}
           onViewDetails={handleViewDetails}
+          tabCounts={tabCounts}
         />
       )}
 

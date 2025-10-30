@@ -62,23 +62,20 @@ export async function GET(request: NextRequest) {
     }
 
     // First test basic table access
-    console.log('Testing basic tasks table access...');
     const { data: testData, error: testError } = await supabase
       .from('tasks')
       .select('*')
       .eq('company_id', companyId)
       .limit(1);
-    
+
     if (testError) {
       console.error('Basic table access failed:', testError);
-      return NextResponse.json({ 
-        error: 'Tasks table access failed', 
+      return NextResponse.json({
+        error: 'Tasks table access failed',
         details: testError.message,
-        code: testError.code 
+        code: testError.code
       }, { status: 500 });
     }
-    
-    console.log('Basic table access successful, found', testData?.length || 0, 'tasks');
 
     // Build the query with proper joins using explicit constraint names
     let query = supabase
@@ -208,9 +205,8 @@ export async function GET(request: NextRequest) {
     );
 
     const finalTasks = tasksWithRelatedData || [];
-    console.log('Returning', finalTasks.length, 'tasks');
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       tasks: finalTasks,
       total: finalTasks.length,
       message: finalTasks.length === 0 ? 'No tasks found' : undefined

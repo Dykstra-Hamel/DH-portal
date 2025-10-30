@@ -24,6 +24,7 @@ function FormSubmissionsContent() {
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmissionWithCustomer | null>(null);
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [tabCounts, setTabCounts] = useState<{ all: number; processed: number; pending: number; failed: number }>({ all: 0, processed: 0, pending: 0, failed: 0 });
 
   const loadSubmissions = useCallback(
     async (page: number = 1, isLoadMore: boolean = false) => {
@@ -65,6 +66,10 @@ function FormSubmissionsContent() {
         }
 
         const newSubmissions = response.formSubmissions || [];
+        const counts = response.counts || { all: 0, processed: 0, pending: 0, failed: 0 };
+
+        // Update tab counts
+        setTabCounts(counts);
 
         if (isLoadMore) {
           setSubmissions(prev => [...prev, ...newSubmissions]);
@@ -230,6 +235,7 @@ function FormSubmissionsContent() {
           loadingMore={loadingMore}
           onSubmissionUpdated={handleSubmissionUpdated}
           onViewDetails={handleViewDetails}
+          tabCounts={tabCounts}
         />
       )}
 

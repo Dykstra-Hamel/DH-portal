@@ -3,6 +3,29 @@ import { createClient } from '@/lib/supabase/server';
 import { createOrFindServiceAddress, linkCustomerToServiceAddress } from '@/lib/service-addresses';
 import { geocodeCustomerAddress } from '@/lib/geocoding';
 
+/**
+ * Helper function to get customer counts for all tabs
+ */
+async function getCustomerTabCounts(
+  companyId: string,
+  supabase: any
+): Promise<{ all: number; active: number; inactive: number; archived: number }> {
+  // Use parallel queries to get all counts at once
+  const [allCount, activeCount, inactiveCount, archivedCount] = await Promise.all([
+    supabase.from('customers').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+    supabase.from('customers').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('customer_status', 'active'),
+    supabase.from('customers').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('customer_status', 'inactive'),
+    supabase.from('customers').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('customer_status', 'archived'),
+  ]);
+
+  return {
+    all: allCount.count || 0,
+    active: activeCount.count || 0,
+    inactive: inactiveCount.count || 0,
+    archived: archivedCount.count || 0,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -127,8 +150,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get tab counts for all customer statuses
+    const counts = await getCustomerTabCounts(companyId, supabase);
+
     if (!customers || customers.length === 0) {
-      return NextResponse.json([]);
+      return NextResponse.json({
+        customers: [],
+        counts
+      });
     }
 
     // Calculate lead statistics per customer with better performance
@@ -174,7 +203,10 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json(enhancedCustomers);
+    return NextResponse.json({
+      customers: enhancedCustomers,
+      counts
+    });
   } catch (error) {
     console.error('Error in customers API:', error);
     return NextResponse.json(
