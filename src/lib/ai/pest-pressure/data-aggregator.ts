@@ -13,6 +13,7 @@
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { analyzeTranscriptForPests } from './transcript-analyzer';
 import { normalizeStateToAbbreviation } from '@/lib/utils/state-normalizer';
+import { geocodeCustomerAddress } from '@/lib/geocoding';
 import type {
   PestPressureDataPoint,
   SourceLookupResult,
@@ -51,6 +52,7 @@ export async function aggregatePestPressureData(
       customer_id,
       created_at,
       customers (
+        address,
         city,
         state,
         zip_code
@@ -86,6 +88,29 @@ export async function aggregatePestPressureData(
         // Extract customer data (Supabase returns single object for many-to-one relations)
         const customer = Array.isArray(call.customers) ? call.customers[0] : call.customers;
 
+        // Geocode customer address for weather correlation
+        const normalizedState = normalizeStateToAbbreviation(customer?.state);
+        let coordinates: { lat: number; lng: number } | undefined;
+
+        if (customer?.city && normalizedState) {
+          const geocodeResult = await geocodeCustomerAddress({
+            street: customer.address,
+            city: customer.city,
+            state: normalizedState,
+            zip: customer.zip_code,
+          });
+
+          if (geocodeResult.success && geocodeResult.coordinates) {
+            coordinates = {
+              lat: geocodeResult.coordinates.lat,
+              lng: geocodeResult.coordinates.lng,
+            };
+          }
+
+          // Rate limiting: Google Geocoding API free tier = 15 RPM = 4 seconds between requests
+          await new Promise(resolve => setTimeout(resolve, 4000));
+        }
+
         // Create a data point for each pest type found
         for (const pest of analysis.pest_types) {
           const dataPoint: PestPressureDataPoint = {
@@ -95,8 +120,10 @@ export async function aggregatePestPressureData(
             pest_type: pest.pest_type,
             pest_mentions_count: pest.mentions_count,
             city: customer?.city,
-            state: normalizeStateToAbbreviation(customer?.state),
+            state: normalizedState,
             zip_code: customer?.zip_code,
+            lat: coordinates?.lat,
+            lng: coordinates?.lng,
             urgency_level: analysis.urgency_level,
             infestation_severity: analysis.infestation_severity,
             ai_extracted_context: analysis.extracted_context,
@@ -158,11 +185,34 @@ export async function aggregatePestPressureData(
         }
 
         // Get location from normalized_data
+        const normalizedState = normalizeStateToAbbreviation(form.normalized_data?.state);
         const location = {
           city: form.normalized_data?.city,
-          state: normalizeStateToAbbreviation(form.normalized_data?.state),
+          state: normalizedState,
           zip_code: form.normalized_data?.zip,
         };
+
+        // Geocode form address for weather correlation
+        let coordinates: { lat: number; lng: number } | undefined;
+
+        if (location.city && normalizedState) {
+          const geocodeResult = await geocodeCustomerAddress({
+            street: form.normalized_data?.street_address,
+            city: location.city,
+            state: normalizedState,
+            zip: location.zip_code,
+          });
+
+          if (geocodeResult.success && geocodeResult.coordinates) {
+            coordinates = {
+              lat: geocodeResult.coordinates.lat,
+              lng: geocodeResult.coordinates.lng,
+            };
+          }
+
+          // Rate limiting: Google Geocoding API free tier = 15 RPM = 4 seconds between requests
+          await new Promise(resolve => setTimeout(resolve, 4000));
+        }
 
         // Create a data point for each pest type
         for (const pestType of pestTypes) {
@@ -175,6 +225,8 @@ export async function aggregatePestPressureData(
             city: location.city,
             state: location.state,
             zip_code: location.zip_code,
+            lat: coordinates?.lat,
+            lng: coordinates?.lng,
             observed_at: form.created_at,
           };
 
