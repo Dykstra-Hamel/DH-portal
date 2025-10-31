@@ -318,37 +318,15 @@ async function findOrCreateCallRecord(supabase: any, callData: any) {
     }
   }
 
-  // Create ticket for outbound calls with DEFAULT status of CLOSED
-  const { data: newTicket, error: ticketError } = await supabase
-    .from('tickets')
-    .insert({
-      company_id: companyId,
-      customer_id: customerId,
-      source: 'cold_call',
-      type: 'phone_call',
-      call_direction: 'outbound', // Set direction for filtering
-      status: 'closed', // DEFAULT STATUS FOR OUTBOUND
-      priority: 'medium',
-      description: `📞 Outbound call started at ${new Date().toISOString()} (fallback creation)`,
-      created_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
-
-  if (ticketError) {
-    console.error(`❌ [${requestId}] Ticket creation failed during fallback:`, ticketError.message);
-    throw new Error('Failed to create ticket during fallback');
-  }
-
   // Extract data (will be mostly empty until call_analyzed event)
   const extractedData = extractCallData(undefined, undefined, retell_llm_dynamic_variables);
 
-  // Create call record
+  // Create call record WITHOUT ticket (ticket will be created later if action_required=true)
   const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
     .insert({
       call_id,
-      ticket_id: newTicket.id, // Link to ticket instead of lead
+      ticket_id: null, // No ticket yet - will be created on call_analyzed if needed
       customer_id: customerId,
       phone_number: customerPhone, // TO number (customer being called)
       from_number: agentPhoneNumber, // FROM number (agent's phone number)
@@ -365,11 +343,30 @@ async function findOrCreateCallRecord(supabase: any, callData: any) {
       street_address: customerAddress || extractedData.street_address, // Use customer address if available
       preferred_service_time: extractedData.preferred_service_time,
       created_at: new Date().toISOString(),
+      // Store company_id for later ticket creation
+      company_id: companyId,
     })
-    .select('*, tickets!call_records_ticket_id_fkey(id, description)')
+    .select()
     .single();
 
   if (insertError) {
+    // Handle race condition: if another request already created this call record, fetch it
+    if (insertError.code === '23505' && insertError.message.includes('call_records_call_id_key')) {
+      console.log(`🔄 [${requestId}] Race condition detected, fetching existing call record for ${call_id}`);
+      const { data: existingRecord, error: fetchError } = await supabase
+        .from('call_records')
+        .select()
+        .eq('call_id', call_id)
+        .single();
+
+      if (existingRecord && !fetchError) {
+        return { data: existingRecord, created: false };
+      }
+
+      console.error(`❌ [${requestId}] Failed to fetch existing call record after race condition:`, fetchError);
+      throw new Error('Failed to fetch existing call record after duplicate key error');
+    }
+
     console.error(`❌ [${requestId}] Call record creation failed during fallback:`, insertError.message);
     throw new Error('Failed to create call record during fallback');
   }
@@ -499,40 +496,15 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
     }
   }
 
-  // Create ticket for outbound calls with DEFAULT status of CLOSED
-  const { data: newTicket, error: ticketError } = await supabase
-    .from('tickets')
-    .insert({
-      company_id: companyId,
-      customer_id: customerId,
-      source: 'cold_call',
-      type: 'phone_call',
-      call_direction: 'outbound', // Set direction for filtering
-      status: 'closed', // DEFAULT STATUS FOR OUTBOUND
-      priority: 'medium',
-      description: `📞 Outbound call started at ${new Date().toISOString()}`,
-      created_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
-
-  if (ticketError) {
-    console.error(`❌ [${requestId}] Ticket creation failed:`, ticketError.message);
-    return NextResponse.json(
-      { error: 'Failed to create ticket' },
-      { status: 500 }
-    );
-  }
-
   // Extract data (will be mostly empty until call_analyzed event)
   const extractedData = extractCallData(undefined, undefined, retell_llm_dynamic_variables);
 
-  // Create call record
+  // Create call record WITHOUT ticket (ticket will be created later if action_required=true)
   const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
     .insert({
       call_id,
-      ticket_id: newTicket.id, // Link to ticket instead of lead
+      ticket_id: null, // No ticket yet - will be created on call_analyzed if needed
       customer_id: customerId,
       phone_number: customerPhone, // TO number (customer being called)
       from_number: agentPhoneNumber, // FROM number (agent's phone number)
@@ -551,11 +523,38 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
       street_address: customerAddress || extractedData.street_address, // Use customer address if available
       preferred_service_time: extractedData.preferred_service_time,
       created_at: new Date().toISOString(),
+      // Store company_id for later ticket creation
+      company_id: companyId,
     })
     .select()
     .single();
 
   if (insertError) {
+    // Handle race condition: if another event already created this call record, fetch it
+    if (insertError.code === '23505' && insertError.message.includes('call_records_call_id_key')) {
+      console.log(`🔄 [${requestId}] Race condition detected in call_started, fetching existing call record for ${call_id}`);
+      const { data: existingRecord, error: fetchError } = await supabase
+        .from('call_records')
+        .select()
+        .eq('call_id', call_id)
+        .single();
+
+      if (existingRecord && !fetchError) {
+        return NextResponse.json({
+          success: true,
+          call_record_id: existingRecord.id,
+          action: 'outbound_call_started',
+          note: 'Call record already exists',
+        });
+      }
+
+      console.error(`❌ [${requestId}] Failed to fetch existing call record after race condition:`, fetchError);
+      return NextResponse.json(
+        { error: 'Failed to fetch existing call record after duplicate key error' },
+        { status: 500 }
+      );
+    }
+
     console.error(
       `❌ [${requestId}] Call record creation failed:`,
       insertError.message
@@ -570,8 +569,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
   return NextResponse.json({
     success: true,
     call_record_id: callRecord.id,
-    ticket_id: newTicket.id,
-    action: 'outbound_ticket_created',
+    action: 'outbound_call_started',
   });
 }
 
@@ -761,70 +759,91 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
   // Use updated record for subsequent operations
   callRecord = updatedCallRecord;
 
-  // Update ticket with analysis info and handle action_required logic
-  if (callRecord.tickets) {
-    const updateData: any = {
-      description: callRecord.tickets.description || '',
-      updated_at: new Date().toISOString(),
-    };
+  // Check action_required and disconnect reason to determine if ticket should be created/updated
+  const actionRequired = call_analysis?.custom_analysis_data?.action_required;
+  const disconnectReason = callData.disconnection_reason || callRecord.disconnect_reason;
+  const wasTransferred = disconnectReason === 'call_transfer';
 
-    // Add analysis summary if available
+  // Determine if we should create/update a ticket
+  const shouldHaveTicket = actionRequired === 'true' || actionRequired === true || wasTransferred;
+
+  // Handle ticket creation or update based on action_required
+  if (shouldHaveTicket) {
+    // Build ticket description
+    let description = `📞 Outbound call on ${new Date().toISOString()}`;
+
     if (extractedData.summary) {
-      updateData.description =
-        `${updateData.description}\n\n📊 Outbound Call Analysis: ${extractedData.summary}`.trim();
+      description = `${description}\n\n📊 Call Analysis: ${extractedData.summary}`;
     }
 
     // Set service_type based on AI qualification
+    let serviceType = null;
     const isQualified = call_analysis?.custom_analysis_data?.is_qualified;
     if (isQualified === 'true' || isQualified === true) {
-      updateData.service_type = 'Sales';
-      updateData.description =
-        `${updateData.description}\n\n✅ AI Qualification: QUALIFIED - Category set to Sales`.trim();
+      serviceType = 'Sales';
+      description = `${description}\n\n✅ AI Qualification: QUALIFIED - Category set to Sales`;
     } else if (isQualified === 'false' || isQualified === false) {
-      updateData.service_type = 'Customer Service';
-      updateData.description =
-        `${updateData.description}\n\n❌ AI Qualification: UNQUALIFIED - Category set to Customer Service`.trim();
+      serviceType = 'Customer Service';
+      description = `${description}\n\n❌ AI Qualification: UNQUALIFIED - Category set to Customer Service`;
     }
 
-    // OUTBOUND-SPECIFIC LOGIC: Check action_required and disconnect reason
-    const actionRequired = call_analysis?.custom_analysis_data?.action_required;
-    const disconnectReason = callData.disconnection_reason || callRecord.disconnect_reason;
-
-    // Check if call was transferred - if so, always create active ticket
-    const wasTransferred = disconnectReason === 'call_transfer';
-
-    if (actionRequired === 'true' || actionRequired === true || wasTransferred) {
-      if (wasTransferred) {
-        updateData.status = 'new'; // Change from closed to new
-        updateData.archived = false; // Unarchive for follow-up
-        updateData.description =
-          `${updateData.description}\n\n📞 Call Transferred: Ticket reopened for follow-up (${disconnectReason})`.trim();
-      } else {
-        updateData.status = 'new'; // Change from closed to new
-        updateData.archived = false; // Unarchive for follow-up
-        updateData.description =
-          `${updateData.description}\n\n🔄 Action Required: TRUE - Ticket reopened for follow-up`.trim();
-      }
-    } else if (actionRequired === 'false' || actionRequired === false) {
-      updateData.status = 'closed'; // Keep closed
-      updateData.archived = true; // Archive by default
-      updateData.description =
-        `${updateData.description}\n\n🔒 Action Required: FALSE - Ticket closed and archived`.trim();
+    // Add action reason to description
+    if (wasTransferred) {
+      description = `${description}\n\n📞 Call Transferred: Ticket created for follow-up (${disconnectReason})`;
     } else {
-      updateData.status = 'closed'; // Default closed for outbound
-      updateData.archived = true; // Archive by default
-      updateData.description =
-        `${updateData.description}\n\n📞 Outbound Call: No action required - Ticket closed and archived`.trim();
+      description = `${description}\n\n🔄 Action Required: TRUE - Ticket created for follow-up`;
     }
 
-    // Add pest_type from extracted data
-    updateData.pest_type = extractedData.pest_issue;
+    // Check if ticket already exists (shouldn't happen with new flow, but handle for safety)
+    if (callRecord.tickets) {
+      // Update existing ticket
+      await supabase
+        .from('tickets')
+        .update({
+          description: description.trim(),
+          service_type: serviceType,
+          pest_type: extractedData.pest_issue,
+          status: 'new',
+          archived: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', callRecord.tickets.id);
+    } else {
+      // Create new ticket since action is required
+      const { data: newTicket, error: ticketError } = await supabase
+        .from('tickets')
+        .insert({
+          company_id: callRecord.company_id,
+          customer_id: callRecord.customer_id,
+          source: 'cold_call',
+          type: 'phone_call',
+          call_direction: 'outbound',
+          status: 'new',
+          priority: 'medium',
+          description: description.trim(),
+          service_type: serviceType,
+          pest_type: extractedData.pest_issue,
+          archived: false,
+          created_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
 
-    await supabase
-      .from('tickets')
-      .update(updateData)
-      .eq('id', callRecord.tickets.id);
+      if (ticketError) {
+        console.error(`❌ [${requestId}] Ticket creation failed:`, ticketError.message);
+      } else if (newTicket) {
+        // Link the ticket to the call record
+        await supabase
+          .from('call_records')
+          .update({ ticket_id: newTicket.id })
+          .eq('call_id', call_id);
+
+        // Update callRecord reference for email notification logic below
+        callRecord.tickets = newTicket;
+      }
+    }
   }
+  // If action_required is false or undefined, no ticket is created (call record exists but no ticket)
 
   // Update customer data conditionally - only update if customer doesn't have existing data
   if (callRecord && call_analysis?.custom_analysis_data) {
@@ -929,12 +948,8 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
   }
 
   // Send ticket notification emails if action_required is true OR call was transferred
-  const actionRequired = call_analysis?.custom_analysis_data?.action_required;
-  const disconnectReason = callData.disconnection_reason || callRecord.disconnect_reason;
-  const wasTransferred = disconnectReason === 'call_transfer';
-
   try {
-    if (actionRequired === 'true' || actionRequired === true || wasTransferred) {
+    if (shouldHaveTicket) {
       await sendTicketNotificationEmailsIfEnabled(supabase, callRecord, callData, extractedData);
     }
   } catch (error) {
