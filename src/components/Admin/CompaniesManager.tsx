@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api-client';
 import { useRouter } from 'next/navigation';
 import styles from './AdminManager.module.scss';
+import { generateSlug } from '@/lib/slug-utils';
 
 interface GooglePlaceListing {
   id?: string;
@@ -46,6 +47,7 @@ export default function CompaniesManager() {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    slug: '',
     description: '',
     website: [] as string[],
     email: '',
@@ -122,6 +124,7 @@ export default function CompaniesManager() {
 
       setFormData({
         name: '',
+        slug: '',
         description: '',
         website: [],
         email: '',
@@ -165,6 +168,7 @@ export default function CompaniesManager() {
         .filter((url: string) => url && url.trim().length > 0);
       await adminAPI.updateCompany(editingCompany.id, {
         name: companyData.name,
+        slug: companyData.slug,
         description: companyData.description,
         website: websitesToSubmit,
         email: companyData.email,
@@ -379,9 +383,31 @@ export default function CompaniesManager() {
         <input
           type="text"
           value={formData.name}
-          onChange={e => setFormData({ ...formData, name: e.target.value })}
+          onChange={e => {
+            const newName = e.target.value;
+            setFormData({
+              ...formData,
+              name: newName,
+              // Auto-generate slug from name if slug hasn't been manually edited
+              slug: generateSlug(newName)
+            });
+          }}
           required
         />
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>Slug (URL identifier) *:</label>
+        <input
+          type="text"
+          value={formData.slug}
+          onChange={e => setFormData({ ...formData, slug: e.target.value })}
+          placeholder="company-name"
+          required
+        />
+        <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+          Used for company login page: yoursite.com/login/{formData.slug || 'slug'}
+        </small>
       </div>
 
       <div className={styles.formGroup}>
@@ -488,6 +514,7 @@ export default function CompaniesManager() {
             setWebsites([]);
             setFormData({
               name: '',
+              slug: '',
               description: '',
               website: [],
               email: '',
@@ -528,6 +555,20 @@ export default function CompaniesManager() {
           onChange={e => setEditingCompany({ ...company, name: e.target.value })}
           required
         />
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>Slug (URL identifier) *:</label>
+        <input
+          type="text"
+          value={company.slug}
+          onChange={e => setEditingCompany({ ...company, slug: e.target.value })}
+          placeholder="company-name"
+          required
+        />
+        <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+          Used for company login page: yoursite.com/login/{company.slug || 'slug'}
+        </small>
       </div>
 
       <div className={styles.formGroup}>
