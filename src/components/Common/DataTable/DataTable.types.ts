@@ -73,6 +73,11 @@ export interface DataTableProps<T> {
 
   // Toast integration
   onShowToast?: (message: string) => void;
+
+  // Callbacks for parent to handle data fetching
+  onTabChange?: (tab: string) => void; // Called when user changes tab
+  onSortChange?: (field: string, order: 'asc' | 'desc') => void; // Called when user changes sort
+  onSearchChange?: (query: string) => void; // Called when user searches
 }
 
 // Default item row props for simple rendering

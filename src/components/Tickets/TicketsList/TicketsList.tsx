@@ -27,14 +27,10 @@ interface TicketsListProps {
   loadingMore?: boolean;
   // Tab counts
   tabCounts?: { all: number; incoming: number; outbound: number; forms: number };
-  // Filter/sort handlers
+  // Callbacks for data fetching
   onTabChange?: (tab: string) => void;
   onSortChange?: (field: string, order: 'asc' | 'desc') => void;
   onSearchChange?: (query: string) => void;
-  currentTab?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  searchQuery?: string;
 }
 
 function TicketsList({
@@ -51,10 +47,6 @@ function TicketsList({
   onTabChange,
   onSortChange,
   onSearchChange,
-  currentTab = 'all',
-  sortBy = 'created_at',
-  sortOrder = 'desc',
-  searchQuery = '',
 }: TicketsListProps) {
   // Qualify modal state
   const [showQualifyModal, setShowQualifyModal] = useState(false);
@@ -360,6 +352,10 @@ function TicketsList({
         hasMore={hasMore}
         onLoadMore={onLoadMore}
         loadingMore={loadingMore}
+        // Callbacks only - DataTable manages its own UI state
+        onTabChange={onTabChange}
+        onSortChange={onSortChange}
+        onSearchChange={onSearchChange}
       />
 
       {/* Qualification Modal */}

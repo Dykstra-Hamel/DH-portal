@@ -57,11 +57,11 @@ function TicketsPageContent() {
     forms: 0,
   });
 
-  // Filter/sort state
-  const [currentTab, setCurrentTab] = useState('all');
-  const [sortBy, setSortBy] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [searchQuery, setSearchQuery] = useState('');
+  // Filter/sort refs - store current values without causing re-renders
+  const currentTabRef = useRef('all');
+  const sortByRef = useRef('created_at');
+  const sortOrderRef = useRef<'asc' | 'desc'>('desc');
+  const searchQueryRef = useRef('');
 
   // Modal state for URL parameter handling
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -172,19 +172,19 @@ function TicketsPageContent() {
       }
 
       try {
-        // Build query parameters
+        // Build query parameters using current ref values
         const params = new URLSearchParams({
           companyId,
           includeArchived: 'false',
           page: page.toString(),
           limit: '25',
-          sortBy,
-          sortOrder,
-          tab: currentTab,
+          sortBy: sortByRef.current,
+          sortOrder: sortOrderRef.current,
+          tab: currentTabRef.current,
         });
 
-        if (searchQuery) {
-          params.append('search', searchQuery);
+        if (searchQueryRef.current) {
+          params.append('search', searchQueryRef.current);
         }
 
         // Fetch paginated tickets
@@ -219,7 +219,7 @@ function TicketsPageContent() {
         setLoadingMore(false);
       }
     },
-    [currentTab, sortBy, sortOrder, searchQuery]
+    [] // No dependencies - uses refs instead
   );
 
   // Load more tickets for infinite scroll
@@ -228,25 +228,31 @@ function TicketsPageContent() {
     fetchTickets(selectedCompany.id, currentPage + 1, true);
   }, [selectedCompany?.id, loadingMore, hasMore, currentPage, fetchTickets]);
 
-  // Handle filter changes (reset to page 1)
+  // Handle filter changes - update refs and fetch new data
   const handleTabChange = useCallback((tab: string) => {
-    setCurrentTab(tab);
+    if (!selectedCompany?.id) return;
+    currentTabRef.current = tab;
     setCurrentPage(1);
-  }, []);
+    fetchTickets(selectedCompany.id, 1, false);
+  }, [selectedCompany?.id, fetchTickets]);
 
   const handleSortChange = useCallback(
     (field: string, order: 'asc' | 'desc') => {
-      setSortBy(field);
-      setSortOrder(order);
+      if (!selectedCompany?.id) return;
+      sortByRef.current = field;
+      sortOrderRef.current = order;
       setCurrentPage(1);
+      fetchTickets(selectedCompany.id, 1, false);
     },
-    []
+    [selectedCompany?.id, fetchTickets]
   );
 
   const handleSearchChange = useCallback((query: string) => {
-    setSearchQuery(query);
+    if (!selectedCompany?.id) return;
+    searchQueryRef.current = query;
     setCurrentPage(1);
-  }, []);
+    fetchTickets(selectedCompany.id, 1, false);
+  }, [selectedCompany?.id, fetchTickets]);
 
   // Granular update handlers for real-time changes (no full page refreshes)
   const handleCallRecordChange = useCallback(
@@ -677,20 +683,13 @@ function TicketsPageContent() {
     setFormData(null);
   }, []);
 
-  // Fetch tickets when company or filters change
+  // Fetch tickets when company changes (initial load only)
   useEffect(() => {
     if (selectedCompany?.id) {
       fetchTickets(selectedCompany.id, 1, false);
       fetchMetrics(selectedCompany.id);
     }
-  }, [
-    selectedCompany?.id,
-    currentTab,
-    sortBy,
-    sortOrder,
-    searchQuery,
-    fetchMetrics,
-  ]);
+  }, [selectedCompany?.id, fetchTickets, fetchMetrics]);
 
   // Supabase Realtime broadcast subscription for live updates
   useEffect(() => {
@@ -1060,14 +1059,10 @@ function TicketsPageContent() {
           loadingMore={loadingMore}
           // Tab counts
           tabCounts={tabCounts}
-          // Filter/sort handlers
+          // Callbacks for data fetching
           onTabChange={handleTabChange}
           onSortChange={handleSortChange}
           onSearchChange={handleSearchChange}
-          currentTab={currentTab}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          searchQuery={searchQuery}
         />
       )}
 
