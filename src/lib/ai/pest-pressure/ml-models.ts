@@ -32,9 +32,9 @@ export async function trainSeasonalForecastModel(
     `[ML Models] Training seasonal forecast model for company ${companyId}, pest: ${pestType || 'all'}`
   );
 
-  if (features.length < 30) {
+  if (features.length < 14) {
     throw new Error(
-      `Insufficient data for training: ${features.length} data points (minimum 30 required)`
+      `Insufficient data for training: ${features.length} data points (minimum 14 required)`
     );
   }
 
