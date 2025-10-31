@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       .select(
         `
         *,
-        customers(
+        customer:customers!form_submissions_customer_id_fkey(
           id,
           first_name,
           last_name,
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
           phone,
           company_id
         ),
-        tickets(
+        ticket:tickets!form_submissions_ticket_id_fkey(
           id,
           status
         )
@@ -133,7 +133,14 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id);
 
       if (!userCompanies || userCompanies.length === 0) {
-        return NextResponse.json([]);
+        return NextResponse.json({
+          formSubmissions: [],
+          total: 0,
+          page,
+          limit,
+          hasMore: false,
+          counts: { all: 0, processed: 0, pending: 0, failed: 0 },
+        });
       }
 
       userCompanyIds = userCompanies.map(uc => uc.company_id);

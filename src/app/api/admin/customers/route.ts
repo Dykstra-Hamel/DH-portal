@@ -3,6 +3,43 @@ import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { normalizePhoneNumber } from '@/lib/utils';
 
+/**
+ * Helper function to get customer counts for all tabs
+ */
+async function getCustomerTabCounts(
+  companyId: string | null
+): Promise<{ all: number; active: number; inactive: number; archived: number }> {
+  const supabase = createAdminClient();
+
+  // Build base queries
+  let allQuery = supabase.from('customers').select('id', { count: 'exact', head: true });
+  let activeQuery = supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_status', 'active');
+  let inactiveQuery = supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_status', 'inactive');
+  let archivedQuery = supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_status', 'archived');
+
+  // Apply company filtering if specified
+  if (companyId) {
+    allQuery = allQuery.eq('company_id', companyId);
+    activeQuery = activeQuery.eq('company_id', companyId);
+    inactiveQuery = inactiveQuery.eq('company_id', companyId);
+    archivedQuery = archivedQuery.eq('company_id', companyId);
+  }
+
+  const [allCount, activeCount, inactiveCount, archivedCount] = await Promise.all([
+    allQuery,
+    activeQuery,
+    inactiveQuery,
+    archivedQuery,
+  ]);
+
+  return {
+    all: allCount.count || 0,
+    active: activeCount.count || 0,
+    inactive: inactiveCount.count || 0,
+    archived: archivedCount.count || 0,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
 
@@ -102,8 +139,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get tab counts for all customer statuses
+    const counts = await getCustomerTabCounts(companyId);
+
     if (!customers || customers.length === 0) {
-      return NextResponse.json([]);
+      return NextResponse.json({
+        customers: [],
+        counts
+      });
     }
 
     // Calculate lead statistics efficiently from the joined data
@@ -148,7 +191,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(enhancedCustomers);
+    return NextResponse.json({
+      customers: enhancedCustomers,
+      counts
+    });
   } catch (error) {
     console.error('Admin Customers API: Internal error:', error);
     return NextResponse.json(

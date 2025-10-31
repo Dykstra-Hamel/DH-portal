@@ -163,7 +163,15 @@ export default function DataTable<T>({
 
   // Infinite scroll intersection observer
   const handleLoadMore = useCallback(() => {
+    console.log('[DEBUG DataTable handleLoadMore]', {
+      infiniteScrollEnabled,
+      hasMore,
+      loadingMore,
+      hasOnLoadMore: !!onLoadMore,
+      willCall: infiniteScrollEnabled && hasMore && !loadingMore && onLoadMore
+    });
     if (infiniteScrollEnabled && hasMore && !loadingMore && onLoadMore) {
+      console.log('[DEBUG DataTable] Calling onLoadMore()');
       onLoadMore();
     }
   }, [infiniteScrollEnabled, hasMore, loadingMore, onLoadMore]);
@@ -171,10 +179,17 @@ export default function DataTable<T>({
   useEffect(() => {
     if (!infiniteScrollEnabled || !loadMoreRef.current) return;
 
+    console.log('[DEBUG DataTable] Creating IntersectionObserver');
+
     const observer = new IntersectionObserver(
       entries => {
         const target = entries[0];
+        console.log('[DEBUG DataTable IntersectionObserver]', {
+          isIntersecting: target.isIntersecting,
+          boundingRect: target.boundingClientRect
+        });
         if (target.isIntersecting) {
+          console.log('[DEBUG DataTable] Element is intersecting, calling handleLoadMore');
           handleLoadMore();
         }
       },
@@ -186,8 +201,33 @@ export default function DataTable<T>({
 
     const currentLoadMoreRef = loadMoreRef.current;
     observer.observe(currentLoadMoreRef);
+    console.log('[DEBUG DataTable] Observer attached to element');
+
+    // Check if element is already in viewport after observer creation
+    // This handles the case where tab changes result in the trigger being already visible
+    const checkIfInViewport = setTimeout(() => {
+      if (!currentLoadMoreRef) return;
+
+      const rect = currentLoadMoreRef.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const isInViewport = rect.top >= 0 && rect.bottom <= viewportHeight;
+
+      console.log('[DEBUG DataTable] Manual viewport check', {
+        isInViewport,
+        rectTop: rect.top,
+        rectBottom: rect.bottom,
+        viewportHeight
+      });
+
+      if (isInViewport) {
+        console.log('[DEBUG DataTable] Element already in viewport, triggering handleLoadMore');
+        handleLoadMore();
+      }
+    }, 150); // Small delay to ensure state has updated
 
     return () => {
+      console.log('[DEBUG DataTable] Cleaning up IntersectionObserver');
+      clearTimeout(checkIfInViewport);
       if (currentLoadMoreRef) {
         observer.unobserve(currentLoadMoreRef);
       }
