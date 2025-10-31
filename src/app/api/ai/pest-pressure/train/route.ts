@@ -83,10 +83,10 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to check training data availability');
     }
 
-    if (!count || count < 30) {
+    if (!count || count < 20) {
       return NextResponse.json(
         {
-          error: `Insufficient data for training. Found ${count || 0} data points, need at least 30.`,
+          error: `Insufficient data for training. Found ${count || 0} data points, need at least 20.`,
           suggestion:
             'Run data aggregation first using the Inngest job or wait for more pest pressure data to accumulate.',
         },
@@ -99,10 +99,10 @@ export async function POST(request: NextRequest) {
     // Build features for training
     const features = await buildFeatures(companyId, pestType, startDate, endDate, location);
 
-    if (features.length < 30) {
+    if (features.length < 14) {
       return NextResponse.json(
         {
-          error: `Insufficient feature vectors. Built ${features.length} features, need at least 30.`,
+          error: `Insufficient feature vectors. Built ${features.length} features, need at least 14.`,
           suggestion: 'Ensure data points have location coordinates for weather correlation.',
         },
         { status: 400 }
