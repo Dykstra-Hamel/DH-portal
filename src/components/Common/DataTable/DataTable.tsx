@@ -34,10 +34,26 @@ export default function DataTable<T>({
   customColumnWidths,
   defaultSort,
   onShowToast,
+  // Callbacks
+  onTabChange,
+  onSortChange,
+  onSearchChange,
 }: DataTableProps<T>) {
+  // Internal state - DataTable manages its own UI state
   const [activeTab, setActiveTab] = useState<string>(tabs?.[0]?.key || 'all');
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(defaultSort || null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Handler functions - update internal state AND notify parent
+  const handleTabChange = useCallback((newTab: string) => {
+    setActiveTab(newTab);
+    onTabChange?.(newTab); // Notify parent to fetch new data
+  }, [onTabChange]);
+
+  const handleSearchChange = useCallback((newQuery: string) => {
+    setSearchQuery(newQuery);
+    onSearchChange?.(newQuery); // Notify parent to fetch filtered data
+  }, [onSearchChange]);
 
   // Toast state
   const [toastMessage, setToastMessage] = useState('');
@@ -242,7 +258,7 @@ export default function DataTable<T>({
                 className={styles.searchInput}
                 placeholder={searchPlaceholder}
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => handleSearchChange(e.target.value)}
               />
             </div>
           )}
@@ -253,7 +269,7 @@ export default function DataTable<T>({
                 <button
                   key={tab.key}
                   className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => handleTabChange(tab.key)}
                 >
                   <span className={styles.tabText}>{tab.label}</span>
                   <span className={styles.tabCount}>{tab.count}</span>

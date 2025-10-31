@@ -348,73 +348,25 @@ export const getTicketTabs = (
   {
     key: 'all',
     label: 'All Tickets',
-    filter: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.status !== 'live' && ticket.status !== 'closed' && !ticket.archived),
-    getCount: (tickets: Ticket[]) =>
-      tabCounts?.all ?? tickets.filter(ticket => ticket.status !== 'live' && ticket.status !== 'closed' && !ticket.archived).length,
+    filter: (tickets: Ticket[]) => tickets, // API already filters - no client-side filtering needed
+    getCount: (tickets: Ticket[]) => tabCounts?.all ?? tickets.length,
   },
   {
     key: 'incoming',
     label: 'Incoming Calls',
-    filter: (tickets: Ticket[]) =>
-      tickets.filter(
-        ticket =>
-          ticket.status !== 'live' &&
-          ticket.status !== 'closed' &&
-          !ticket.archived &&
-          ticket.type === 'phone_call' &&
-          ticket.call_direction === 'inbound'
-      ),
-    getCount: (tickets: Ticket[]) =>
-      tabCounts?.incoming ?? tickets.filter(
-        ticket =>
-          ticket.status !== 'live' &&
-          ticket.status !== 'closed' &&
-          !ticket.archived &&
-          ticket.type === 'phone_call' &&
-          ticket.call_direction === 'inbound'
-      ).length,
+    filter: (tickets: Ticket[]) => tickets, // API already filters - no client-side filtering needed
+    getCount: (tickets: Ticket[]) => tabCounts?.incoming ?? tickets.length,
   },
   {
     key: 'outbound',
     label: 'Outbound Calls',
-    filter: (tickets: Ticket[]) =>
-      tickets.filter(
-        ticket =>
-          ticket.status !== 'live' &&
-          ticket.status !== 'closed' &&
-          !ticket.archived &&
-          ticket.type === 'phone_call' &&
-          ticket.call_direction === 'outbound'
-      ),
-    getCount: (tickets: Ticket[]) =>
-      tabCounts?.outbound ?? tickets.filter(
-        ticket =>
-          ticket.status !== 'live' &&
-          ticket.status !== 'closed' &&
-          !ticket.archived &&
-          ticket.type === 'phone_call' &&
-          ticket.call_direction === 'outbound'
-      ).length,
+    filter: (tickets: Ticket[]) => tickets, // API already filters - no client-side filtering needed
+    getCount: (tickets: Ticket[]) => tabCounts?.outbound ?? tickets.length,
   },
   {
     key: 'forms',
     label: 'Forms',
-    filter: (tickets: Ticket[]) =>
-      tickets.filter(
-        ticket =>
-          ticket.status !== 'live' &&
-          ticket.status !== 'closed' &&
-          !ticket.archived &&
-          ticket.type === 'web_form'
-      ),
-    getCount: (tickets: Ticket[]) =>
-      tabCounts?.forms ?? tickets.filter(
-        ticket =>
-          ticket.status !== 'live' &&
-          ticket.status !== 'closed' &&
-          !ticket.archived &&
-          ticket.type === 'web_form'
-      ).length,
+    filter: (tickets: Ticket[]) => tickets, // API already filters - no client-side filtering needed
+    getCount: (tickets: Ticket[]) => tabCounts?.forms ?? tickets.length,
   },
 ];
