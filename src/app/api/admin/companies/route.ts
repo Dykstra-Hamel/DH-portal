@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { generateSlug } from '@/lib/slug-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,18 +70,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate slug if not provided
+    let slug = companyData.slug?.trim();
+    if (!slug) {
+      slug = generateSlug(companyData.name);
+    }
+
+    // Ensure slug uniqueness by checking existing slugs
+    const { data: existingCompany } = await supabase
+      .from('companies')
+      .select('slug')
+      .eq('slug', slug)
+      .single();
+
+    if (existingCompany) {
+      // Append a number to make slug unique
+      let counter = 1;
+      let uniqueSlug = `${slug}-${counter}`;
+
+      while (true) {
+        const { data: checkDuplicate } = await supabase
+          .from('companies')
+          .select('slug')
+          .eq('slug', uniqueSlug)
+          .single();
+
+        if (!checkDuplicate) break;
+
+        counter++;
+        uniqueSlug = `${slug}-${counter}`;
+      }
+
+      slug = uniqueSlug;
+    }
+
     // Sanitize and prepare data
     const sanitizedData = {
       ...companyData,
       name: companyData.name.trim(),
+      slug: slug,
       country: companyData.country || 'United States',
       // Handle website as either array (new format) or string (backward compatibility)
-      website: Array.isArray(companyData.website) 
+      website: Array.isArray(companyData.website)
         ? companyData.website
             .filter((url: string) => url && typeof url === 'string' && url.trim().length > 0)
-            .map((url: string) => url.trim())
+            .map((url: string) => url.trim().replace(/\/+$/, '')) // Strip trailing slashes
         : companyData.website && typeof companyData.website === 'string' && companyData.website.trim()
-          ? [companyData.website.trim()]
+          ? [companyData.website.trim().replace(/\/+$/, '')] // Strip trailing slashes
           : []
     };
 
