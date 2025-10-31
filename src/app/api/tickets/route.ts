@@ -31,10 +31,10 @@ async function getTicketTabCounts(
 
   // Fallback: Use parallel queries if RPC doesn't exist yet
   const [allCount, incomingCount, outboundCount, formsCount] = await Promise.all([
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).neq('status', 'live').or('archived.is.null,archived.eq.false'),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'inbound').or('archived.is.null,archived.eq.false'),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'outbound').or('archived.is.null,archived.eq.false'),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'web_form').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'inbound').neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'outbound').neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'web_form').neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
   ]);
 
   return {
@@ -128,19 +128,31 @@ export async function GET(request: NextRequest) {
       query = query.eq('archived', true);
     } else {
       query = query
-        .in('status', ['live', 'new', 'contacted', 'qualified', 'quoted', 'in_progress', 'resolved', 'unqualified'])
         .or('archived.is.null,archived.eq.false');
     }
 
-    // Apply tab filter
+    // Apply tab filter with status exclusions
     if (tabFilter === 'incoming') {
-      query = query.eq('type', 'phone_call').eq('call_direction', 'inbound');
+      query = query
+        .eq('type', 'phone_call')
+        .eq('call_direction', 'inbound')
+        .neq('status', 'live')
+        .neq('status', 'closed');
     } else if (tabFilter === 'outbound') {
-      query = query.eq('type', 'phone_call').eq('call_direction', 'outbound');
+      query = query
+        .eq('type', 'phone_call')
+        .eq('call_direction', 'outbound')
+        .neq('status', 'live')
+        .neq('status', 'closed');
     } else if (tabFilter === 'forms') {
-      query = query.eq('type', 'web_form');
+      query = query
+        .eq('type', 'web_form')
+        .neq('status', 'live')
+        .neq('status', 'closed');
     } else if (tabFilter === 'all') {
-      query = query.neq('status', 'live');
+      query = query
+        .neq('status', 'live')
+        .neq('status', 'closed');
     }
 
     // Apply search filter

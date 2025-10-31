@@ -12,20 +12,27 @@ BEGIN
   SELECT json_build_object(
     'all', COUNT(*) FILTER (
       WHERE status != 'live'
+      AND status != 'closed'
       AND (archived IS NULL OR archived = false)
     ),
     'incoming', COUNT(*) FILTER (
       WHERE type = 'phone_call'
       AND call_direction = 'inbound'
+      AND status != 'live'
+      AND status != 'closed'
       AND (archived IS NULL OR archived = false)
     ),
     'outbound', COUNT(*) FILTER (
       WHERE type = 'phone_call'
       AND call_direction = 'outbound'
+      AND status != 'live'
+      AND status != 'closed'
       AND (archived IS NULL OR archived = false)
     ),
     'forms', COUNT(*) FILTER (
       WHERE type = 'web_form'
+      AND status != 'live'
+      AND status != 'closed'
       AND (archived IS NULL OR archived = false)
     )
   ) INTO result
