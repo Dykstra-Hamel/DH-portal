@@ -3,41 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import styles from './Brand.module.scss';
-
-interface ColorInfo {
-  hex: string;
-  cmyk: string;
-  pantone: string;
-  name?: string;
-}
-
-interface BrandData {
-  id: string;
-  company_id: string;
-  brand_guidelines?: string;
-  brand_strategy?: string;
-  personality?: string;
-  logo_url?: string;
-  logo_description?: string;
-  primary_color_hex?: string;
-  primary_color_cmyk?: string;
-  primary_color_pantone?: string;
-  secondary_color_hex?: string;
-  secondary_color_cmyk?: string;
-  secondary_color_pantone?: string;
-  alternative_colors?: ColorInfo[];
-  font_primary_name?: string;
-  font_primary_example?: string;
-  font_primary_url?: string;
-  font_secondary_name?: string;
-  font_secondary_example?: string;
-  font_secondary_url?: string;
-  font_tertiary_name?: string;
-  font_tertiary_example?: string;
-  font_tertiary_url?: string;
-  photography_description?: string;
-  photography_images?: Array<{ url: string; description: string }>;
-}
+import { Toast } from '@/components/Common/Toast/Toast';
+import { BrandData, ColorInfo, LogoInfo } from '@/types/branding';
 
 interface BrandProps {
   brandData: BrandData;
@@ -49,6 +16,9 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [primaryFontLoaded, setPrimaryFontLoaded] = useState<string | null>(null);
   const [fontLoading, setFontLoading] = useState<boolean>(false);
+  const [copiedColor, setCopiedColor] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   const getGradientStyle = () => {
     const primaryColor = brandData.primary_color_hex || '#A8B5C8';
@@ -70,6 +40,85 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
     return {
       color: primaryColor,
     };
+  };
+
+  const getDownloadButtonStyle = () => {
+    const primaryColor = brandData.primary_color_hex || '#000000';
+    return {
+      backgroundColor: `${primaryColor}CC`, // 80% opacity
+    };
+  };
+
+  // Helper functions to determine if sections have content
+  const hasStrategyContent = () => {
+    return !!(brandData.brand_strategy && brandData.brand_strategy.trim());
+  };
+
+  const hasPersonalityContent = () => {
+    return !!(brandData.personality && brandData.personality.trim());
+  };
+
+  const hasLogoContent = () => {
+    return !!(
+      (brandData.logo_description && brandData.logo_description.trim()) ||
+      (brandData.logo_url && brandData.logo_url.trim()) ||
+      (brandData.alternate_logos && brandData.alternate_logos.length > 0)
+    );
+  };
+
+  const hasColorContent = () => {
+    return !!(
+      brandData.primary_color_hex ||
+      brandData.secondary_color_hex ||
+      (brandData.alternative_colors && brandData.alternative_colors.length > 0)
+    );
+  };
+
+  const hasTypographyContent = () => {
+    return !!(
+      brandData.font_primary_name ||
+      brandData.font_secondary_name ||
+      brandData.font_tertiary_name
+    );
+  };
+
+  const hasPhotographyContent = () => {
+    return !!(
+      (brandData.photography_description && brandData.photography_description.trim()) ||
+      (brandData.photography_images && brandData.photography_images.length > 0) ||
+      (brandData.photography_google_drive_link && brandData.photography_google_drive_link.trim())
+    );
+  };
+
+  const hasGuidelinesContent = () => {
+    return !!(brandData.brand_guidelines && brandData.brand_guidelines.trim());
+  };
+
+  // Build dynamic section list with their numbers
+  const getVisibleSections = () => {
+    const sections = [];
+    let sectionNumber = 1;
+
+    if (hasStrategyContent()) {
+      sections.push({ id: 'brand-strategy', title: 'Brand Strategy', number: sectionNumber++ });
+    }
+    if (hasPersonalityContent()) {
+      sections.push({ id: 'personality', title: 'Personality', number: sectionNumber++ });
+    }
+    if (hasLogoContent()) {
+      sections.push({ id: 'logo', title: 'Logo', number: sectionNumber++ });
+    }
+    if (hasColorContent()) {
+      sections.push({ id: 'color', title: 'Color', number: sectionNumber++ });
+    }
+    if (hasTypographyContent()) {
+      sections.push({ id: 'typography', title: 'Typography', number: sectionNumber++ });
+    }
+    if (hasPhotographyContent()) {
+      sections.push({ id: 'photography', title: 'Photography', number: sectionNumber++ });
+    }
+
+    return sections;
   };
 
   const getBrandContainerFontStyle = () => {
@@ -113,6 +162,70 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
   const handleLightboxClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       closeLightbox();
+    }
+  };
+
+  const handleDownload = async (imageUrl: string, index: number) => {
+    try {
+      // Extract filename from URL
+      const urlParts = imageUrl.split('/');
+      const filename = urlParts[urlParts.length - 1] || `photography-${index + 1}.jpg`;
+
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = decodeURIComponent(filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  };
+
+  const handleLogoDownload = async (logoUrl: string, logoName?: string) => {
+    try {
+      // Extract filename from URL
+      const urlParts = logoUrl.split('/');
+      const urlFilename = urlParts[urlParts.length - 1];
+
+      // Use logo name if provided, otherwise use filename from URL
+      const filename = logoName
+        ? `${logoName.toLowerCase().replace(/\s+/g, '-')}.${urlFilename.split('.').pop() || 'png'}`
+        : urlFilename || 'logo.png';
+
+      const response = await fetch(logoUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = decodeURIComponent(filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Logo download failed:', error);
+    }
+  };
+
+  const copyColorToClipboard = async (value: string, colorId: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedColor(colorId);
+      setToastMessage(`Copied ${value} to clipboard`);
+      setToastVisible(true);
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setCopiedColor(null);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy color:', error);
+      setToastMessage('Failed to copy color');
+      setToastVisible(true);
     }
   };
 
@@ -290,48 +403,114 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
     hex?: string,
     cmyk?: string,
     pantone?: string,
-    name?: string
+    name?: string,
+    colorId?: string
   ) => {
     if (!hex) return null;
+
+    const uniqueId = colorId || `color-${hex}`;
 
     return (
       <div className={styles.colorItem}>
         <div className={styles.colorGroup}>
-          {/* Main Color */}
+          {/* Main Color - clickable */}
           <div
-            className={styles.colorCircle}
+            className={`${styles.colorCircle} ${styles.clickable}`}
             style={{ backgroundColor: hex }}
+            onClick={() => copyColorToClipboard(hex, `${uniqueId}-hex`)}
+            title="Click to copy hex value"
           />
-          {/* 50% Transparent */}
+          {/* 50% Transparent - clickable */}
           <div
-            className={styles.colorCircle}
+            className={`${styles.colorCircle} ${styles.clickable}`}
             style={{ backgroundColor: hexToRgba(hex, 0.5) }}
+            onClick={() => copyColorToClipboard(hexToRgba(hex, 0.5), `${uniqueId}-50`)}
+            title="Click to copy 50% transparency value"
           />
-          {/* 25% Transparent */}
+          {/* 25% Transparent - clickable */}
           <div
-            className={styles.colorCircle}
+            className={`${styles.colorCircle} ${styles.clickable}`}
             style={{ backgroundColor: hexToRgba(hex, 0.25) }}
+            onClick={() => copyColorToClipboard(hexToRgba(hex, 0.25), `${uniqueId}-25`)}
+            title="Click to copy 25% transparency value"
           />
         </div>
         <div className={styles.colorInfo}>
           <h4>{name || 'Color'}</h4>
-          <p>Hex: {hex}</p>
-          {cmyk && <p>CMYK: {cmyk}</p>}
-          {pantone && <p>Pantone: {pantone}</p>}
+          <p
+            className={styles.clickableText}
+            onClick={() => copyColorToClipboard(hex, `${uniqueId}-hex-text`)}
+            title="Click to copy"
+          >
+            Hex: <span className={styles.colorValue}>{hex}</span>
+            {copiedColor === `${uniqueId}-hex-text` && (
+              <span className={styles.copiedIndicator}>✓ Copied!</span>
+            )}
+          </p>
+          {cmyk && (
+            <p
+              className={styles.clickableText}
+              onClick={() => copyColorToClipboard(cmyk, `${uniqueId}-cmyk`)}
+              title="Click to copy"
+            >
+              CMYK: <span className={styles.colorValue}>{cmyk}</span>
+              {copiedColor === `${uniqueId}-cmyk` && (
+                <span className={styles.copiedIndicator}>✓ Copied!</span>
+              )}
+            </p>
+          )}
+          {pantone && (
+            <p
+              className={styles.clickableText}
+              onClick={() => copyColorToClipboard(pantone, `${uniqueId}-pantone`)}
+              title="Click to copy"
+            >
+              Pantone: <span className={styles.colorValue}>{pantone}</span>
+              {copiedColor === `${uniqueId}-pantone` && (
+                <span className={styles.copiedIndicator}>✓ Copied!</span>
+              )}
+            </p>
+          )}
           <div className={styles.transparencyInfo}>
-            <p>50%: {hexToRgba(hex, 0.5)}</p>
-            <p>25%: {hexToRgba(hex, 0.25)}</p>
+            <p
+              className={styles.clickableText}
+              onClick={() => copyColorToClipboard(hexToRgba(hex, 0.5), `${uniqueId}-50-text`)}
+              title="Click to copy"
+            >
+              50%: <span className={styles.colorValue}>{hexToRgba(hex, 0.5)}</span>
+              {copiedColor === `${uniqueId}-50-text` && (
+                <span className={styles.copiedIndicator}>✓</span>
+              )}
+            </p>
+            <p
+              className={styles.clickableText}
+              onClick={() => copyColorToClipboard(hexToRgba(hex, 0.25), `${uniqueId}-25-text`)}
+              title="Click to copy"
+            >
+              25%: <span className={styles.colorValue}>{hexToRgba(hex, 0.25)}</span>
+              {copiedColor === `${uniqueId}-25-text` && (
+                <span className={styles.copiedIndicator}>✓</span>
+              )}
+            </p>
           </div>
         </div>
       </div>
     );
   };
 
-  const renderTypography = (name?: string, example?: string, url?: string) => {
+  const renderTypography = (
+    name?: string,
+    example?: string,
+    url?: string,
+    googleUrl?: string
+  ) => {
     if (!name) return null;
 
     // Load the font if URL is provided
     const fontFamily = url ? loadFont(name, url) : name;
+
+    // Use Google Font URL for "View Font" link if available, otherwise use direct URL
+    const viewFontUrl = googleUrl || url;
 
     return (
       <div className={styles.fontItem}>
@@ -348,28 +527,30 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
             {example}
           </div>
         )}
-        {url && (
+        {viewFontUrl && (
           <div className={styles.fontLinks}>
             <a
-              href={url}
+              href={viewFontUrl}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.fontLink}
             >
               View Font
             </a>
-            {url && (
+            {viewFontUrl && (
               <span className={styles.fontStatus}>
-                {url.includes('fonts.googleapis.com')
+                {viewFontUrl.includes('fonts.google.com')
                   ? '(Google Fonts)'
-                  : url.includes('fonts.adobe.com') ||
-                      url.includes('typekit.net')
-                    ? '(Adobe Fonts)'
-                    : url.includes('.woff') ||
-                        url.includes('.ttf') ||
-                        url.includes('.otf')
-                      ? '(Web Font)'
-                      : '(External)'}
+                  : viewFontUrl.includes('fonts.googleapis.com')
+                    ? '(Google Fonts)'
+                    : viewFontUrl.includes('fonts.adobe.com') ||
+                        viewFontUrl.includes('typekit.net')
+                      ? '(Adobe Fonts)'
+                      : viewFontUrl.includes('.woff') ||
+                          viewFontUrl.includes('.ttf') ||
+                          viewFontUrl.includes('.otf')
+                        ? '(Web Font)'
+                        : '(External)'}
               </span>
             )}
           </div>
@@ -417,270 +598,384 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
         </div>
       </div>
 
-      {/* Brand Guidelines Overview */}
-      <div
-        className={styles.contentSection}
-        data-section="overview"
-        ref={setSectionRef('overview')}
-      >
-        <div className={styles.sectionHeader}>
-          <h1>Brand Guidelines</h1>
-          <p className={styles.sectionDescription}>
-            This guide defines the visual language, design style, and principles
-            that shape a clear and consistent brand experience, no matter the
-            team or area of expertise.
-          </p>
-        </div>
+      {/* Brand Guidelines Overview - Only show if has guidelines or other sections */}
+      {(hasGuidelinesContent() || getVisibleSections().length > 0) && (
+        <div
+          className={styles.contentSection}
+          data-section="overview"
+          ref={setSectionRef('overview')}
+        >
+          {hasGuidelinesContent() && (
+            <div className={styles.sectionHeader}>
+              <h1>Brand Guidelines</h1>
+              <p className={styles.sectionDescription}>
+                This guide defines the visual language, design style, and principles
+                that shape a clear and consistent brand experience, no matter the
+                team or area of expertise.
+              </p>
+            </div>
+          )}
 
-        {brandData.brand_guidelines && (
-          <div className={styles.guidelinesContent}>
-            <p>{brandData.brand_guidelines}</p>
+          {brandData.brand_guidelines && (
+            <div className={styles.guidelinesContent}>
+              <p>{brandData.brand_guidelines}</p>
+            </div>
+          )}
+
+          {/* Table of Contents - Only show if there are sections with content */}
+          {getVisibleSections().length > 0 && (
+            <div className={styles.contents}>
+              <h2>Content</h2>
+              <ul className={styles.contentsList}>
+                {getVisibleSections().map((section) => (
+                  <li key={section.id}>
+                    <a href={`#${section.id}`} className={styles.contentLink}>
+                      <span className={styles.number} style={getNumberStyle()}>
+                        {String(section.number).padStart(2, '0')}
+                      </span>{' '}
+                      {section.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Brand Strategy - Only show if has content */}
+      {hasStrategyContent() && (
+        <div
+          id="brand-strategy"
+          className={styles.contentSection}
+          data-section="brand-strategy"
+          ref={setSectionRef('brand-strategy')}
+        >
+          <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
+            {String(getVisibleSections().find(s => s.id === 'brand-strategy')?.number || 1).padStart(2, '0')}
           </div>
-        )}
-
-        {/* Table of Contents */}
-        <div className={styles.contents}>
-          <h2>Content</h2>
-          <ul className={styles.contentsList}>
-            <li>
-              <a href="#brand-strategy" className={styles.contentLink}>
-                <span className={styles.number} style={getNumberStyle()}>
-                  01
-                </span>{' '}
-                Brand Strategy
-              </a>
-            </li>
-            <li>
-              <a href="#personality" className={styles.contentLink}>
-                <span className={styles.number} style={getNumberStyle()}>
-                  02
-                </span>{' '}
-                Personality
-              </a>
-            </li>
-            <li>
-              <a href="#logo" className={styles.contentLink}>
-                <span className={styles.number} style={getNumberStyle()}>
-                  03
-                </span>{' '}
-                Logo
-              </a>
-            </li>
-            <li>
-              <a href="#color" className={styles.contentLink}>
-                <span className={styles.number} style={getNumberStyle()}>
-                  04
-                </span>{' '}
-                Color
-              </a>
-            </li>
-            <li>
-              <a href="#typography" className={styles.contentLink}>
-                <span className={styles.number} style={getNumberStyle()}>
-                  05
-                </span>{' '}
-                Typography
-              </a>
-            </li>
-            <li>
-              <a href="#photography" className={styles.contentLink}>
-                <span className={styles.number} style={getNumberStyle()}>
-                  06
-                </span>{' '}
-                Photography
-              </a>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      {/* Brand Strategy */}
-      <div
-        id="brand-strategy"
-        className={styles.contentSection}
-        data-section="brand-strategy"
-        ref={setSectionRef('brand-strategy')}
-      >
-        <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
-          01
-        </div>
-        <h2>Brand Strategy</h2>
-        {brandData.brand_strategy && (
+          <h2>Brand Strategy</h2>
           <div className={styles.strategyContent}>
             <p>{brandData.brand_strategy}</p>
           </div>
-        )}
-      </div>
-
-      {/* Personality */}
-      <div
-        id="personality"
-        className={styles.contentSection}
-        data-section="personality"
-        ref={setSectionRef('personality')}
-      >
-        <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
-          02
         </div>
-        <h2>Personality</h2>
-        {brandData.personality && (
+      )}
+
+      {/* Personality - Only show if has content */}
+      {hasPersonalityContent() && (
+        <div
+          id="personality"
+          className={styles.contentSection}
+          data-section="personality"
+          ref={setSectionRef('personality')}
+        >
+          <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
+            {String(getVisibleSections().find(s => s.id === 'personality')?.number || 1).padStart(2, '0')}
+          </div>
+          <h2>Personality</h2>
           <div className={styles.personalityContent}>
             <p>{brandData.personality}</p>
           </div>
-        )}
-      </div>
-
-      {/* Logo */}
-      <div
-        id="logo"
-        className={styles.contentSection}
-        data-section="logo"
-        ref={setSectionRef('logo')}
-      >
-        <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
-          03
         </div>
-        <h2>Logo</h2>
-        {brandData.logo_description && (
-          <div className={styles.logoDescription}>
-            <p>{brandData.logo_description}</p>
+      )}
+
+      {/* Logo - Only show if has content */}
+      {hasLogoContent() && (
+        <div
+          id="logo"
+          className={styles.contentSection}
+          data-section="logo"
+          ref={setSectionRef('logo')}
+        >
+          <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
+            {String(getVisibleSections().find(s => s.id === 'logo')?.number || 1).padStart(2, '0')}
           </div>
-        )}
-        {brandData.logo_url && brandData.logo_url.trim() && (
-          <div className={styles.logoShowcase}>
-            <div className={styles.logoContainer}>
-              <Image
-                src={brandData.logo_url}
-                alt={`${companyName} Logo`}
-                width={400}
-                height={200}
-                style={{ maxWidth: '100%', height: 'auto' }}
-              />
+          <h2>Logo</h2>
+          {brandData.logo_description && (
+            <div className={styles.logoDescription}>
+              <p>{brandData.logo_description}</p>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+          {brandData.logo_url && brandData.logo_url.trim() && (
+            <div className={styles.logoShowcase}>
+              <div className={styles.logoWrapper}>
+                <div className={styles.logoContainer}>
+                  <Image
+                    src={brandData.logo_url}
+                    alt={`${companyName} Logo`}
+                    width={400}
+                    height={200}
+                    style={{ maxWidth: '100%', height: 'auto' }}
+                  />
+                </div>
+                <button
+                  className={styles.downloadButton}
+                  style={getDownloadButtonStyle()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleLogoDownload(brandData.logo_url!, 'primary-logo');
+                  }}
+                  title="Download logo"
+                  type="button"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
 
-      {/* Color */}
-      <div
-        id="color"
-        className={styles.contentSection}
-        data-section="color"
-        ref={setSectionRef('color')}
-      >
-        <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
-          04
-        </div>
-        <h2>Color</h2>
-
-        {/* Primary Palette */}
-        <div className={styles.colorSection}>
-          <h3>Primary Palette</h3>
-          <div className={styles.colorGrid}>
-            {renderColorCircle(
-              brandData.primary_color_hex,
-              brandData.primary_color_cmyk,
-              brandData.primary_color_pantone,
-              'Primary Color'
-            )}
-            {renderColorCircle(
-              brandData.secondary_color_hex,
-              brandData.secondary_color_cmyk,
-              brandData.secondary_color_pantone,
-              'Secondary Color'
-            )}
-          </div>
-        </div>
-
-        {/* Alternative Colors */}
-        {brandData.alternative_colors &&
-          brandData.alternative_colors.length > 0 && (
-            <div className={styles.colorSection}>
-              <h3>Alternative Colors</h3>
-              <div className={styles.colorGrid}>
-                {brandData.alternative_colors.map((color, index) => (
-                  <div key={index}>
-                    {renderColorCircle(
-                      color.hex,
-                      color.cmyk,
-                      color.pantone,
-                      color.name
+          {/* Alternate Logos */}
+          {brandData.alternate_logos && brandData.alternate_logos.length > 0 && (
+            <div className={styles.alternateLogosSection}>
+              <h3>Alternate Logos</h3>
+              <div className={styles.alternateLogosGrid}>
+                {brandData.alternate_logos.map((logo, index) => (
+                  <div key={index} className={styles.alternateLogoItem}>
+                    {logo.name && (
+                      <h4 className={styles.alternateLogoName}>{logo.name}</h4>
+                    )}
+                    {logo.url && logo.url.trim() && (
+                      <div className={styles.logoWrapper}>
+                        <div className={styles.logoContainer}>
+                          <Image
+                            src={logo.url}
+                            alt={logo.name || `Alternate Logo ${index + 1}`}
+                            width={300}
+                            height={150}
+                            style={{ maxWidth: '100%', height: 'auto' }}
+                          />
+                        </div>
+                        <button
+                          className={styles.downloadButton}
+                          style={getDownloadButtonStyle()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLogoDownload(logo.url, logo.name || `alternate-logo-${index + 1}`);
+                          }}
+                          title="Download logo"
+                          type="button"
+                        >
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                    {logo.description && (
+                      <p className={styles.alternateLogoDescription}>
+                        {logo.description}
+                      </p>
                     )}
                   </div>
                 ))}
               </div>
             </div>
           )}
-      </div>
+        </div>
+      )}
 
-      {/* Typography */}
-      <div
-        id="typography"
-        className={styles.contentSection}
-        data-section="typography"
-        ref={setSectionRef('typography')}
-      >
-        <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
-          05
-        </div>
-        <h2>Typography</h2>
-        <div className={styles.typographyGrid}>
-          {renderTypography(
-            brandData.font_primary_name,
-            brandData.font_primary_example,
-            brandData.font_primary_url
-          )}
-          {renderTypography(
-            brandData.font_secondary_name,
-            brandData.font_secondary_example,
-            brandData.font_secondary_url
-          )}
-          {renderTypography(
-            brandData.font_tertiary_name,
-            brandData.font_tertiary_example,
-            brandData.font_tertiary_url
-          )}
-        </div>
-      </div>
-
-      {/* Photography */}
-      <div
-        id="photography"
-        className={styles.contentSection}
-        data-section="photography"
-        ref={setSectionRef('photography')}
-      >
-        <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
-          06
-        </div>
-        <h2>Photography</h2>
-        {brandData.photography_description && (
-          <div className={styles.photographyDescription}>
-            <p>{brandData.photography_description}</p>
+      {/* Color - Only show if has content */}
+      {hasColorContent() && (
+        <div
+          id="color"
+          className={styles.contentSection}
+          data-section="color"
+          ref={setSectionRef('color')}
+        >
+          <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
+            {String(getVisibleSections().find(s => s.id === 'color')?.number || 1).padStart(2, '0')}
           </div>
-        )}
-        {brandData.photography_images &&
-          brandData.photography_images.length > 0 && (
-            <div className={styles.photographyGrid}>
-              {brandData.photography_images
-                .filter(image => image && image.url && image.url.trim())
-                .map((image, index) => (
-                  <Image
-                    key={index}
-                    src={image.url}
-                    alt={
-                      image.description || `Photography example ${index + 1}`
-                    }
-                    className={styles.photographyImage}
-                    width={600}
-                    height={400}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => openLightbox(image.url)}
-                  />
-                ))}
+          <h2>Color</h2>
+
+          {/* Primary Palette */}
+          {(brandData.primary_color_hex || brandData.secondary_color_hex) && (
+            <div className={styles.colorSection}>
+              <h3>Primary Palette</h3>
+              <div className={styles.colorGrid}>
+                {renderColorCircle(
+                  brandData.primary_color_hex,
+                  brandData.primary_color_cmyk,
+                  brandData.primary_color_pantone,
+                  'Primary Color',
+                  'primary'
+                )}
+                {renderColorCircle(
+                  brandData.secondary_color_hex,
+                  brandData.secondary_color_cmyk,
+                  brandData.secondary_color_pantone,
+                  'Secondary Color',
+                  'secondary'
+                )}
+              </div>
             </div>
           )}
-      </div>
+
+          {/* Alternative Colors */}
+          {brandData.alternative_colors &&
+            brandData.alternative_colors.length > 0 && (
+              <div className={styles.colorSection}>
+                <h3>Alternative Colors</h3>
+                <div className={styles.colorGrid}>
+                  {brandData.alternative_colors.map((color, index) => (
+                    <div key={index}>
+                      {renderColorCircle(
+                        color.hex,
+                        color.cmyk,
+                        color.pantone,
+                        color.name,
+                        `alt-${index}`
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+        </div>
+      )}
+
+      {/* Typography - Only show if has content */}
+      {hasTypographyContent() && (
+        <div
+          id="typography"
+          className={styles.contentSection}
+          data-section="typography"
+          ref={setSectionRef('typography')}
+        >
+          <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
+            {String(getVisibleSections().find(s => s.id === 'typography')?.number || 1).padStart(2, '0')}
+          </div>
+          <h2>Typography</h2>
+          <div className={styles.typographyGrid}>
+            {renderTypography(
+              brandData.font_primary_name,
+              brandData.font_primary_example,
+              brandData.font_primary_url,
+              brandData.font_primary_google_url
+            )}
+            {renderTypography(
+              brandData.font_secondary_name,
+              brandData.font_secondary_example,
+              brandData.font_secondary_url,
+              brandData.font_secondary_google_url
+            )}
+            {renderTypography(
+              brandData.font_tertiary_name,
+              brandData.font_tertiary_example,
+              brandData.font_tertiary_url,
+              brandData.font_tertiary_google_url
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Photography - Only show if has content */}
+      {hasPhotographyContent() && (
+        <div
+          id="photography"
+          className={styles.contentSection}
+          data-section="photography"
+          ref={setSectionRef('photography')}
+        >
+          <div className={styles.sectionNumber} style={getSectionNumberStyle()}>
+            {String(getVisibleSections().find(s => s.id === 'photography')?.number || 1).padStart(2, '0')}
+          </div>
+          <h2>Photography</h2>
+          {brandData.photography_description && (
+            <div className={styles.photographyDescription}>
+              <p>{brandData.photography_description}</p>
+            </div>
+          )}
+          {brandData.photography_images &&
+            brandData.photography_images.length > 0 && (
+              <div className={styles.photographyGrid}>
+                {brandData.photography_images
+                  .filter(imageUrl => imageUrl && imageUrl.trim())
+                  .map((imageUrl, index) => (
+                    <div key={index} className={styles.photographyImageWrapper}>
+                      <Image
+                        src={imageUrl}
+                        alt={`Photography example ${index + 1}`}
+                        className={styles.photographyImage}
+                        width={600}
+                        height={400}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => openLightbox(imageUrl)}
+                      />
+                      <button
+                        className={styles.downloadButton}
+                        style={getDownloadButtonStyle()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(imageUrl, index);
+                        }}
+                        title="Download image"
+                        type="button"
+                      >
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="7 10 12 15 17 10" />
+                          <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          {brandData.photography_google_drive_link && (
+            <div className={styles.driveLink}>
+              <a
+                href={brandData.photography_google_drive_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.photographyLink}
+                style={{ color: brandData.primary_color_hex || '#F5A623' }}
+              >
+                <img
+                  src="/google-drive.svg"
+                  alt="Google Drive"
+                  className={styles.driveIcon}
+                  width="20"
+                  height="20"
+                />
+                <span>View All Photos</span>
+              </a>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightboxImage && (
@@ -705,6 +1000,15 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
           </div>
         </div>
       )}
+
+      {/* Toast notification */}
+      <Toast
+        message={toastMessage}
+        isVisible={toastVisible}
+        onClose={() => setToastVisible(false)}
+        type="success"
+        duration={2000}
+      />
     </div>
   );
 };
