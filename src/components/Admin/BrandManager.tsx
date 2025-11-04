@@ -5,7 +5,8 @@ import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import styles from './AdminManager.module.scss';
 import { Company } from '@/contexts/CompanyContext';
-import { BrandData, ColorInfo } from '@/types/branding';
+import { BrandData, ColorInfo, LogoInfo } from '@/types/branding';
+import { Toast } from '@/components/Common/Toast/Toast';
 
 export default function BrandManager() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -13,10 +14,9 @@ export default function BrandManager() {
   const [brandData, setBrandData] = useState<BrandData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const supabase = createClient();
 
   const fetchCompanies = useCallback(async () => {
@@ -30,7 +30,9 @@ export default function BrandManager() {
       setCompanies(data || []);
     } catch (error) {
       console.error('Error fetching companies:', error);
-      setMessage({ type: 'error', text: 'Failed to load companies' });
+      setToastMessage('Failed to load companies');
+      setToastType('error');
+      setToastVisible(true);
     } finally {
       setLoading(false);
     }
@@ -57,22 +59,21 @@ export default function BrandManager() {
         data || {
           company_id: companyId,
           alternative_colors: [],
+          alternate_logos: [],
           photography_images: [],
         }
       );
     } catch (error) {
       console.error('Error fetching brand data:', error);
-      setMessage({
-        type: 'error',
-        text: `Failed to load brand data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      });
+      setToastMessage(`Failed to load brand data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setToastType('error');
+      setToastVisible(true);
     }
   };
 
   const handleCompanySelect = (company: Company) => {
     setSelectedCompany(company);
     fetchBrandData(company.id);
-    setMessage(null);
   };
 
   const handleInputChange = (field: keyof BrandData, value: string) => {
@@ -118,6 +119,79 @@ export default function BrandManager() {
       const updated = prev.alternative_colors.filter((_, i) => i !== index);
       return { ...prev, alternative_colors: updated };
     });
+  };
+
+  const addAlternateLogo = () => {
+    setBrandData(prev => {
+      if (!prev) return null;
+      const newLogo: LogoInfo = { name: '', url: '', description: '' };
+      return {
+        ...prev,
+        alternate_logos: [...(prev.alternate_logos || []), newLogo],
+      };
+    });
+  };
+
+  const updateAlternateLogo = (
+    index: number,
+    field: keyof LogoInfo,
+    value: string
+  ) => {
+    setBrandData(prev => {
+      if (!prev || !prev.alternate_logos) return prev;
+      const updated = [...prev.alternate_logos];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, alternate_logos: updated };
+    });
+  };
+
+  const removeAlternateLogo = async (index: number) => {
+    if (!brandData?.alternate_logos) return;
+
+    // Confirm deletion
+    if (
+      !confirm(
+        'Are you sure you want to delete this logo? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    const logoToDelete = brandData.alternate_logos[index];
+
+    // Delete from storage if URL exists
+    if (logoToDelete.url) {
+      await deleteFileFromStorage(logoToDelete.url);
+    }
+
+    // Remove from brand data
+    setBrandData(prev => {
+      if (!prev || !prev.alternate_logos) return prev;
+      return {
+        ...prev,
+        alternate_logos: prev.alternate_logos.filter((_, i) => i !== index),
+      };
+    });
+  };
+
+  const handleAlternateLogoUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    index: number
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // If there's an existing logo, delete it from storage first
+    if (brandData?.alternate_logos?.[index]?.url) {
+      await deleteFileFromStorage(brandData.alternate_logos[index].url);
+    }
+
+    const url = await uploadFile(file, 'brand-assets', 'alternate-logos');
+    if (url) {
+      updateAlternateLogo(index, 'url', url);
+      // Clear the input so the same file can be selected again if needed
+      event.target.value = '';
+    }
   };
 
   const createAssetPath = (
@@ -298,12 +372,13 @@ export default function BrandManager() {
           ),
         };
       });
-      setMessage({ type: 'success', text: 'Image deleted successfully' });
+      setToastMessage('Image deleted successfully');
+      setToastType('success');
+      setToastVisible(true);
     } else {
-      setMessage({
-        type: 'error',
-        text: 'Failed to delete image file from storage',
-      });
+      setToastMessage('Failed to delete image file from storage');
+      setToastType('error');
+      setToastVisible(true);
     }
   };
 
@@ -311,20 +386,23 @@ export default function BrandManager() {
     if (!brandData || !selectedCompany) return;
 
     setSaving(true);
-    setMessage(null);
 
     try {
       const { error } = await supabase.from('brands').upsert(brandData);
 
       if (error) throw error;
 
-      setMessage({ type: 'success', text: 'Brand data saved successfully!' });
+      setToastMessage('Brand data saved successfully!');
+      setToastType('success');
+      setToastVisible(true);
 
       // Refresh data
       await fetchBrandData(selectedCompany.id);
     } catch (error) {
       console.error('Error saving brand data:', error);
-      setMessage({ type: 'error', text: 'Failed to save brand data' });
+      setToastMessage('Failed to save brand data');
+      setToastType('error');
+      setToastVisible(true);
     } finally {
       setSaving(false);
     }
@@ -340,12 +418,6 @@ export default function BrandManager() {
         <h2>Brand Management</h2>
         <p>Create and edit brand guidelines for companies</p>
       </div>
-
-      {message && (
-        <div className={`${styles.message} ${styles[message.type]}`}>
-          {message.text}
-        </div>
-      )}
 
       <div className={styles.content}>
         <div className={styles.sidebar}>
@@ -508,6 +580,85 @@ export default function BrandManager() {
                     className={styles.textarea}
                     rows={2}
                   />
+                </div>
+
+                {/* Alternate Logos Section */}
+                <div className={styles.logoSection}>
+                  <div className={styles.sectionHeader}>
+                    <h5>Alternate Logos</h5>
+                    <button
+                      onClick={addAlternateLogo}
+                      className={styles.addButton}
+                    >
+                      Add Logo
+                    </button>
+                  </div>
+                  <p className={styles.sectionDescription}>
+                    Add additional logo variations with custom labels
+                  </p>
+                  {brandData.alternate_logos?.map((logo, index) => (
+                    <div key={index} className={styles.alternateLogo}>
+                      <div className={styles.logoInputGroup}>
+                        <input
+                          type="text"
+                          value={logo.name || ''}
+                          onChange={e =>
+                            updateAlternateLogo(index, 'name', e.target.value)
+                          }
+                          placeholder="Logo name (e.g., 'Horizontal', 'Stacked', 'White Version')"
+                          className={styles.input}
+                        />
+                        <div className={styles.uploadInfo}>
+                          <small>
+                            Files will be organized:{' '}
+                            <code>
+                              {selectedCompany?.name
+                                .toLowerCase()
+                                .replace(/[^a-z0-9\s-]/g, '')
+                                .replace(/\s+/g, '-')}
+                              /alternate-logos/
+                            </code>
+                          </small>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={e => handleAlternateLogoUpload(e, index)}
+                          className={styles.fileInput}
+                        />
+                        {logo.url && logo.url.trim() && (
+                          <div className={styles.logoPreview}>
+                            <Image
+                              src={logo.url}
+                              alt={`${logo.name || 'Alternate'} logo preview`}
+                              width={200}
+                              height={100}
+                              style={{ maxWidth: '100%', height: 'auto' }}
+                            />
+                          </div>
+                        )}
+                        <textarea
+                          value={logo.description || ''}
+                          onChange={e =>
+                            updateAlternateLogo(
+                              index,
+                              'description',
+                              e.target.value
+                            )
+                          }
+                          placeholder="Logo description..."
+                          className={styles.textarea}
+                          rows={2}
+                        />
+                        <button
+                          onClick={() => removeAlternateLogo(index)}
+                          className={styles.removeButton}
+                        >
+                          Remove Logo
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -683,109 +834,202 @@ export default function BrandManager() {
 
               <div className={styles.formSection}>
                 <h4>Typography</h4>
+                <p className={styles.sectionDescription}>
+                  Configure fonts for your brand. Provide Google Fonts URLs for easy reference and direct font URLs for loading/displaying fonts.
+                </p>
 
+                {/* Primary Font */}
                 <div className={styles.fontSection}>
                   <h5>Primary Font</h5>
-                  <div className={styles.fontInputs}>
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>Font Name</label>
                     <input
                       type="text"
                       value={brandData.font_primary_name || ''}
                       onChange={e =>
                         handleInputChange('font_primary_name', e.target.value)
                       }
-                      placeholder="Font name"
+                      placeholder="e.g., Roboto, Open Sans, Lato"
                       className={styles.input}
                     />
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>
+                      Google Fonts URL
+                    </label>
+                    <input
+                      type="url"
+                      value={brandData.font_primary_google_url || ''}
+                      onChange={e =>
+                        handleInputChange('font_primary_google_url', e.target.value)
+                      }
+                      placeholder="https://fonts.google.com/specimen/Roboto"
+                      className={styles.input}
+                    />
+                    <small className={styles.fontHelpText}>
+                      Link to the font&apos;s page on Google Fonts (for &quot;View Font&quot; link)
+                    </small>
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>
+                      Direct Font URL
+                    </label>
                     <input
                       type="url"
                       value={brandData.font_primary_url || ''}
                       onChange={e =>
                         handleInputChange('font_primary_url', e.target.value)
                       }
-                      placeholder="Font URL"
+                      placeholder="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700"
                       className={styles.input}
                     />
+                    <small className={styles.fontHelpText}>
+                      Direct link to font file or embed URL (for loading/displaying the font)
+                    </small>
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>Example Text</label>
                     <textarea
                       value={brandData.font_primary_example || ''}
                       onChange={e =>
-                        handleInputChange(
-                          'font_primary_example',
-                          e.target.value
-                        )
+                        handleInputChange('font_primary_example', e.target.value)
                       }
-                      placeholder="Example text"
+                      placeholder="The quick brown fox jumps over the lazy dog"
                       className={styles.textarea}
                       rows={2}
                     />
                   </div>
                 </div>
 
+                {/* Secondary Font */}
                 <div className={styles.fontSection}>
                   <h5>Secondary Font</h5>
-                  <div className={styles.fontInputs}>
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>Font Name</label>
                     <input
                       type="text"
                       value={brandData.font_secondary_name || ''}
                       onChange={e =>
                         handleInputChange('font_secondary_name', e.target.value)
                       }
-                      placeholder="Font name"
+                      placeholder="e.g., Montserrat, Raleway, Poppins"
                       className={styles.input}
                     />
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>
+                      Google Fonts URL
+                    </label>
+                    <input
+                      type="url"
+                      value={brandData.font_secondary_google_url || ''}
+                      onChange={e =>
+                        handleInputChange('font_secondary_google_url', e.target.value)
+                      }
+                      placeholder="https://fonts.google.com/specimen/..."
+                      className={styles.input}
+                    />
+                    <small className={styles.fontHelpText}>
+                      Link to the font&apos;s page on Google Fonts (for &quot;View Font&quot; link)
+                    </small>
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>
+                      Direct Font URL
+                    </label>
                     <input
                       type="url"
                       value={brandData.font_secondary_url || ''}
                       onChange={e =>
                         handleInputChange('font_secondary_url', e.target.value)
                       }
-                      placeholder="Font URL"
+                      placeholder="https://fonts.googleapis.com/css2?family=..."
                       className={styles.input}
                     />
+                    <small className={styles.fontHelpText}>
+                      Direct link to font file or embed URL (for loading/displaying the font)
+                    </small>
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>Example Text</label>
                     <textarea
                       value={brandData.font_secondary_example || ''}
                       onChange={e =>
-                        handleInputChange(
-                          'font_secondary_example',
-                          e.target.value
-                        )
+                        handleInputChange('font_secondary_example', e.target.value)
                       }
-                      placeholder="Example text"
+                      placeholder="The quick brown fox jumps over the lazy dog"
                       className={styles.textarea}
                       rows={2}
                     />
                   </div>
                 </div>
 
+                {/* Tertiary Font */}
                 <div className={styles.fontSection}>
                   <h5>Tertiary Font</h5>
-                  <div className={styles.fontInputs}>
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>Font Name</label>
                     <input
                       type="text"
                       value={brandData.font_tertiary_name || ''}
                       onChange={e =>
                         handleInputChange('font_tertiary_name', e.target.value)
                       }
-                      placeholder="Font name"
+                      placeholder="e.g., Playfair Display, Merriweather"
                       className={styles.input}
                     />
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>
+                      Google Fonts URL
+                    </label>
+                    <input
+                      type="url"
+                      value={brandData.font_tertiary_google_url || ''}
+                      onChange={e =>
+                        handleInputChange('font_tertiary_google_url', e.target.value)
+                      }
+                      placeholder="https://fonts.google.com/specimen/..."
+                      className={styles.input}
+                    />
+                    <small className={styles.fontHelpText}>
+                      Link to the font&apos;s page on Google Fonts (for &quot;View Font&quot; link)
+                    </small>
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>
+                      Direct Font URL
+                    </label>
                     <input
                       type="url"
                       value={brandData.font_tertiary_url || ''}
                       onChange={e =>
                         handleInputChange('font_tertiary_url', e.target.value)
                       }
-                      placeholder="Font URL"
+                      placeholder="https://fonts.googleapis.com/css2?family=..."
                       className={styles.input}
                     />
+                    <small className={styles.fontHelpText}>
+                      Direct link to font file or embed URL (for loading/displaying the font)
+                    </small>
+                  </div>
+
+                  <div className={styles.fontFieldGroup}>
+                    <label className={styles.fontFieldLabel}>Example Text</label>
                     <textarea
                       value={brandData.font_tertiary_example || ''}
                       onChange={e =>
-                        handleInputChange(
-                          'font_tertiary_example',
-                          e.target.value
-                        )
+                        handleInputChange('font_tertiary_example', e.target.value)
                       }
-                      placeholder="Example text"
+                      placeholder="The quick brown fox jumps over the lazy dog"
                       className={styles.textarea}
                       rows={2}
                     />
@@ -857,6 +1101,22 @@ export default function BrandManager() {
                       </div>
                     )}
                 </div>
+
+                <div className={styles.formGroup}>
+                  <label>Google Drive Link</label>
+                  <input
+                    type="url"
+                    value={brandData.photography_google_drive_link || ''}
+                    onChange={e =>
+                      handleInputChange('photography_google_drive_link', e.target.value)
+                    }
+                    placeholder="https://drive.google.com/drive/folders/..."
+                    className={styles.input}
+                  />
+                  <p className={styles.helpText}>
+                    Link to a Google Drive folder with additional photography resources
+                  </p>
+                </div>
               </div>
 
               <div className={styles.formFooter}>
@@ -888,6 +1148,14 @@ export default function BrandManager() {
           )}
         </div>
       </div>
+
+      <Toast
+        message={toastMessage}
+        isVisible={toastVisible}
+        onClose={() => setToastVisible(false)}
+        type={toastType}
+        duration={3000}
+      />
     </div>
   );
 }
