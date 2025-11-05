@@ -1,6 +1,7 @@
 .brandContainer {
   margin: 0 auto;
   padding: 0;
+  width: 1240px;
   background: white;
   font-family: var(--font-satoshi);
 
@@ -477,6 +478,10 @@
 @media (max-width: 768px) {
   .contentSection {
     padding: 40px 20px;
+  }
+
+  .brandContainer {
+    width: 100%;
   }
 
   .sectionHeader h1 {
