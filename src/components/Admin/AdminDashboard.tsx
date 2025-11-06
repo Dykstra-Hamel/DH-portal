@@ -38,7 +38,8 @@ type AnalyticsSubsection =
   | 'attribution'
   | 'forms'
   | 'call-records'
-  | 'partial-leads';
+  | 'partial-leads'
+  | 'pest-pressure';
 type AutomationSubsection = 'templates' | 'executions';
 type SystemSubsection =
   | 'widgets'
@@ -69,7 +70,8 @@ type AdminSection =
   | 'pest-management'
   | 'template-library'
   | 'workflow-executions'
-  | 'sms-testing';
+  | 'sms-testing'
+  | 'admin-pest-pressure';
 
 interface Company {
   id: string;
@@ -134,6 +136,11 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
         id: 'partial-leads',
         label: 'Partial Leads',
         legacySection: 'partial-leads',
+      },
+      {
+        id: 'pest-pressure',
+        label: 'Pest Pressure (Cross-Company)',
+        legacySection: 'admin-pest-pressure',
       },
     ],
   },
@@ -266,6 +273,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         );
       case 'sms-testing':
         return <SMSTestManager />;
+      case 'admin-pest-pressure':
+        return (
+          <div>
+            <p>Navigate to <a href="/admin/pest-pressure" style={{ color: 'var(--primary-color)' }}>/admin/pest-pressure</a> to view the cross-company pest pressure dashboard.</p>
+          </div>
+        );
       default:
         return <UsersManager />;
     }
