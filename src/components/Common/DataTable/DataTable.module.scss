@@ -448,7 +448,9 @@
 .phoneIcon,
 .phoneIcon path,
 .formIcon,
-.formIcon path {
+.formIcon path,
+.bulkIcon,
+.bulkIcon path {
   stroke: var(--gray-900);
 }
 
@@ -470,7 +472,7 @@
 }
 
 .leadTable {
-  --table-columns: 180px 180px 200px 220px 170px 1fr;
+  --table-columns: 180px 180px 200px 220px 180px 90px 1fr;
 }
 
 .callTable {
@@ -600,4 +602,10 @@
   &.statusUnassigned {
     color: #ef4444;
   }
+}
+
+.sourceBadge {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
 }

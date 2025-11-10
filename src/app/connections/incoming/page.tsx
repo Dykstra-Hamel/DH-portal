@@ -163,12 +163,6 @@ function TicketsPageContent() {
     async (companyId: string, page: number = 1, append: boolean = false) => {
       if (!companyId) return;
 
-      console.log('[DEBUG fetchTickets] Called', {
-        page,
-        append,
-        currentTab: currentTabRef.current
-      });
-
       isFetchingRef.current = true;
 
       if (append) {
@@ -201,14 +195,6 @@ function TicketsPageContent() {
 
         const data = await response.json();
 
-        console.log('[DEBUG fetchTickets] API Response', {
-          ticketsCount: data.tickets?.length || 0,
-          page: data.pagination?.page,
-          total: data.pagination?.total,
-          hasMore: data.pagination?.hasMore,
-          currentTab: currentTabRef.current
-        });
-
         // Fetch call records for hang-up filtering
         const callsData = await adminAPI.getUserCalls({ companyId });
 
@@ -220,7 +206,6 @@ function TicketsPageContent() {
 
         setCallRecords(callsData);
         const newHasMore = data.pagination?.hasMore || false;
-        console.log('[DEBUG fetchTickets] Setting hasMore to:', newHasMore);
         setHasMore(newHasMore);
         setTotalCount(data.pagination?.total || 0);
         setTabCounts(
@@ -240,22 +225,13 @@ function TicketsPageContent() {
 
   // Load more tickets for infinite scroll
   const handleLoadMore = () => {
-    console.log('[DEBUG handleLoadMore] Called', {
-      hasCompany: !!selectedCompany?.id,
-      loadingMore,
-      hasMore,
-      currentPage,
-      willFetch: !!selectedCompany?.id && !loadingMore && hasMore
-    });
     if (!selectedCompany?.id || loadingMore || !hasMore) return;
-    console.log('[DEBUG handleLoadMore] Calling fetchTickets for page', currentPage + 1);
     fetchTickets(selectedCompany.id, currentPage + 1, true);
   };
 
   // Handle filter changes - update refs and fetch new data
   const handleTabChange = useCallback((tab: string) => {
     if (!selectedCompany?.id) return;
-    console.log('[DEBUG handleTabChange] Tab changed to:', tab);
     currentTabRef.current = tab;
     setCurrentPage(1);
     fetchTickets(selectedCompany.id, 1, false);
@@ -314,7 +290,7 @@ function TicketsPageContent() {
           const { data: updatedCallRecords, error } = await supabase
             .from('call_records')
             .select(
-              'id, call_id, call_status, start_timestamp, end_timestamp, duration_seconds'
+              'id, call_id, call_status, start_timestamp, end_timestamp, duration_seconds, phone_number, from_number'
             )
             .eq('ticket_id', ticketId);
 
@@ -394,7 +370,9 @@ function TicketsPageContent() {
                   call_status,
                   start_timestamp,
                   end_timestamp,
-                  duration_seconds
+                  duration_seconds,
+                  phone_number,
+                  from_number
                 )
               `
                 )
@@ -778,7 +756,9 @@ function TicketsPageContent() {
                   call_status,
                   start_timestamp,
                   end_timestamp,
-                  duration_seconds
+                  duration_seconds,
+                  phone_number,
+                  from_number
                 )
               `
               )
@@ -839,7 +819,9 @@ function TicketsPageContent() {
                   call_status,
                   start_timestamp,
                   end_timestamp,
-                  duration_seconds
+                  duration_seconds,
+                  phone_number,
+                  from_number
                 )
               `
               )
@@ -926,7 +908,9 @@ function TicketsPageContent() {
                 call_status,
                 start_timestamp,
                 end_timestamp,
-                duration_seconds
+                duration_seconds,
+                phone_number,
+                from_number
               )
             `
             )

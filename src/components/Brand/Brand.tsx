@@ -15,6 +15,8 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [primaryFontLoaded, setPrimaryFontLoaded] = useState<string | null>(null);
+  const [secondaryFontLoaded, setSecondaryFontLoaded] = useState<string | null>(null);
+  const [tertiaryFontLoaded, setTertiaryFontLoaded] = useState<string | null>(null);
   const [fontLoading, setFontLoading] = useState<boolean>(false);
   const [copiedColor, setCopiedColor] = useState<string | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
@@ -130,24 +132,72 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
     return {};
   };
 
-  // Load primary brand font when component mounts
+  // Load all brand fonts when component mounts
   useEffect(() => {
-    if (brandData.font_primary_name && brandData.font_primary_url) {
+    const loadFonts = async () => {
       setFontLoading(true);
-      loadFont(brandData.font_primary_name, brandData.font_primary_url)
-        .then(fontFamily => {
-          if (fontFamily) {
-            setPrimaryFontLoaded(fontFamily);
-          }
-        })
-        .catch(error => {
-          console.warn('Failed to load brand font:', error);
-        })
-        .finally(() => {
-          setFontLoading(false);
-        });
-    }
-  }, [brandData.font_primary_name, brandData.font_primary_url]);
+
+      const fontPromises = [];
+
+      // Load primary font
+      if (brandData.font_primary_name && brandData.font_primary_url) {
+        fontPromises.push(
+          loadFont(brandData.font_primary_name, brandData.font_primary_url)
+            .then(fontFamily => {
+              if (fontFamily) {
+                setPrimaryFontLoaded(fontFamily);
+              }
+            })
+            .catch(error => {
+              console.warn('Failed to load primary font:', error);
+            })
+        );
+      }
+
+      // Load secondary font
+      if (brandData.font_secondary_name && brandData.font_secondary_url) {
+        fontPromises.push(
+          loadFont(brandData.font_secondary_name, brandData.font_secondary_url)
+            .then(fontFamily => {
+              if (fontFamily) {
+                setSecondaryFontLoaded(fontFamily);
+              }
+            })
+            .catch(error => {
+              console.warn('Failed to load secondary font:', error);
+            })
+        );
+      }
+
+      // Load tertiary font
+      if (brandData.font_tertiary_name && brandData.font_tertiary_url) {
+        fontPromises.push(
+          loadFont(brandData.font_tertiary_name, brandData.font_tertiary_url)
+            .then(fontFamily => {
+              if (fontFamily) {
+                setTertiaryFontLoaded(fontFamily);
+              }
+            })
+            .catch(error => {
+              console.warn('Failed to load tertiary font:', error);
+            })
+        );
+      }
+
+      // Wait for all fonts to load
+      await Promise.all(fontPromises);
+      setFontLoading(false);
+    };
+
+    loadFonts();
+  }, [
+    brandData.font_primary_name,
+    brandData.font_primary_url,
+    brandData.font_secondary_name,
+    brandData.font_secondary_url,
+    brandData.font_tertiary_name,
+    brandData.font_tertiary_url,
+  ]);
 
   const openLightbox = (imageUrl: string) => {
     setLightboxImage(imageUrl);
@@ -502,12 +552,13 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
     name?: string,
     example?: string,
     url?: string,
-    googleUrl?: string
+    googleUrl?: string,
+    loadedFontFamily?: string | null
   ) => {
     if (!name) return null;
 
-    // Load the font if URL is provided
-    const fontFamily = url ? loadFont(name, url) : name;
+    // Use the loaded font family from state, or fallback to the font name
+    const fontFamily = loadedFontFamily || name;
 
     // Use Google Font URL for "View Font" link if available, otherwise use direct URL
     const viewFontUrl = googleUrl || url;
@@ -874,19 +925,22 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
               brandData.font_primary_name,
               brandData.font_primary_example,
               brandData.font_primary_url,
-              brandData.font_primary_google_url
+              brandData.font_primary_google_url,
+              primaryFontLoaded
             )}
             {renderTypography(
               brandData.font_secondary_name,
               brandData.font_secondary_example,
               brandData.font_secondary_url,
-              brandData.font_secondary_google_url
+              brandData.font_secondary_google_url,
+              secondaryFontLoaded
             )}
             {renderTypography(
               brandData.font_tertiary_name,
               brandData.font_tertiary_example,
               brandData.font_tertiary_url,
-              brandData.font_tertiary_google_url
+              brandData.font_tertiary_google_url,
+              tertiaryFontLoaded
             )}
           </div>
         </div>

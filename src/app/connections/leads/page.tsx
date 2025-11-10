@@ -8,6 +8,7 @@ import LeadsList from '@/components/Leads/LeadsList/LeadsList';
 import { adminAPI } from '@/lib/api-client';
 import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import {
   MetricsCard,
   styles as metricsStyles,
@@ -18,6 +19,7 @@ import {
   subscribeToLeadUpdates,
   LeadUpdatePayload,
 } from '@/lib/realtime/lead-channel';
+import { AddLeadModal } from '@/components/Leads/AddLeadModal/AddLeadModal';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -36,10 +38,20 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
   const router = useRouter();
 
   // Use global company context
   const { selectedCompany, isAdmin } = useCompany();
+
+  // Register page action for Add Lead button
+  const { registerPageAction } = usePageActions();
+
+  useEffect(() => {
+    registerPageAction('add', () => {
+      setIsAddLeadModalOpen(true);
+    });
+  }, [registerPageAction]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -363,6 +375,19 @@ export default function LeadsPage() {
         >
           Please select a company to view leads.
         </div>
+      )}
+
+      {/* Add Lead Modal */}
+      {selectedCompany && (
+        <AddLeadModal
+          isOpen={isAddLeadModalOpen}
+          onClose={() => setIsAddLeadModalOpen(false)}
+          companyId={selectedCompany.id}
+          onSuccess={() => {
+            fetchLeads();
+            fetchMetrics(selectedCompany.id);
+          }}
+        />
       )}
     </div>
   );

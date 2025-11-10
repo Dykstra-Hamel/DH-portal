@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useCompany } from '@/contexts/CompanyContext';
 import { adminAPI } from '@/lib/api-client';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { createClient } from '@/lib/supabase/client';
@@ -48,11 +49,6 @@ interface CallRecord {
   };
 }
 
-interface Company {
-  id: string;
-  name: string;
-}
-
 interface CompanySetting {
   value: any;
   type: string;
@@ -64,17 +60,18 @@ interface CompanySettings {
 }
 
 export default function CallsManager() {
-  // Tab and Company State
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
+  // Tab State
   const [activeTab, setActiveTab] = useState<'records' | 'settings'>('records');
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
-  
+
   // Call Records State
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [callsLoading, setCallsLoading] = useState(false);
   const [callsError, setCallsError] = useState<string | null>(null);
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
-  
+
   // Call Settings State
   const [settings, setSettings] = useState<CompanySettings>({});
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -92,50 +89,30 @@ export default function CallsManager() {
   const [callToDelete, setCallToDelete] = useState<CallRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const loadCompanies = useCallback(async () => {
-    try {
-      const companiesData = await adminAPI.getCompanies();
-      setCompanies(companiesData);
-      
-      // Auto-select first company if none is selected
-      if (companiesData && companiesData.length > 0 && !selectedCompanyId) {
-        const firstCompany = companiesData[0];
-        setSelectedCompanyId(firstCompany.id);
-      }
-    } catch (err) {
-      console.error('Failed to load companies:', err);
-    }
-  }, [selectedCompanyId]);
-
-  useEffect(() => {
-    loadCompanies();
-  }, [loadCompanies]);
-
-  const loadCalls = async (companyId?: string) => {
+  const loadCalls = useCallback(async (companyId: string) => {
     try {
       setCallsLoading(true);
       setCallsError(null);
-      
-      // Use server-side filtering by company (no date filter)
-      const filters = companyId ? { companyId } : {};
-      const data = await adminAPI.getAllCalls(filters);
-      
+
+      // Use server-side filtering by company
+      const data = await adminAPI.getAllCalls({ companyId });
+
       setCalls(data);
     } catch (err) {
       setCallsError(err instanceof Error ? err.message : 'Failed to load calls');
     } finally {
       setCallsLoading(false);
     }
-  };
+  }, []);
 
-  const loadSettings = async (companyId: string) => {
+  const loadSettings = useCallback(async (companyId: string) => {
     if (!companyId) return;
-    
+
     try {
       setSettingsLoading(true);
       setSettingsError(null);
       const response = await fetch(`/api/companies/${companyId}/settings`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch settings');
       }
@@ -148,26 +125,21 @@ export default function CallsManager() {
     } finally {
       setSettingsLoading(false);
     }
-  };
+  }, []);
 
-  const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
-    
-    if (activeTab === 'records') {
-      loadCalls(companyId);
-    } else if (activeTab === 'settings' && companyId) {
-      loadSettings(companyId);
+  // Load data when company or tab changes
+  useEffect(() => {
+    if (!contextLoading && selectedCompany) {
+      if (activeTab === 'records') {
+        loadCalls(selectedCompany.id);
+      } else if (activeTab === 'settings') {
+        loadSettings(selectedCompany.id);
+      }
     }
-  };
+  }, [contextLoading, selectedCompany, activeTab, loadCalls, loadSettings]);
 
   const handleTabChange = (tab: 'records' | 'settings') => {
     setActiveTab(tab);
-    
-    if (tab === 'records' && selectedCompanyId) {
-      loadCalls(selectedCompanyId);
-    } else if (tab === 'settings' && selectedCompanyId && selectedCompanyId !== 'all') {
-      loadSettings(selectedCompanyId);
-    }
   };
 
   const handleSettingChange = (key: string, value: any) => {
@@ -181,11 +153,11 @@ export default function CallsManager() {
   };
 
   const handleSaveSettings = async () => {
-    if (!selectedCompanyId) return;
+    if (!selectedCompany) return;
 
     try {
       setSettingsSaving(true);
-      const response = await fetch(`/api/companies/${selectedCompanyId}/settings`, {
+      const response = await fetch(`/api/companies/${selectedCompany.id}/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings }),
@@ -238,7 +210,9 @@ export default function CallsManager() {
       }
 
       // Refresh the calls list
-      loadCalls(selectedCompanyId);
+      if (selectedCompany) {
+        loadCalls(selectedCompany.id);
+      }
 
       setShowDeleteModal(false);
       setCallToDelete(null);
@@ -312,7 +286,9 @@ export default function CallsManager() {
     <div className={styles.adminManager}>
       <div className={styles.header}>
         <h2>Call Management</h2>
-        
+        {selectedCompany && <p>Managing calls for {selectedCompany.name}</p>}
+        <small>Use the company dropdown in the header to switch companies.</small>
+
         {/* Tab Navigation */}
         <div className={styles.tabNavigation}>
           <button
@@ -330,30 +306,10 @@ export default function CallsManager() {
         </div>
       </div>
 
-      {/* Company Dropdown */}
-      <div className={styles.companySelector}>
-        <label htmlFor="company-select" className={styles.selectorLabel}>
-          Select Company:
-        </label>
-        <select
-          id="company-select"
-          value={selectedCompanyId}
-          onChange={(e) => handleCompanyChange(e.target.value)}
-          className={styles.companySelect}
-        >
-          <option value="">-- Select a Company --</option>
-          {companies.map(company => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Tab Content */}
       {activeTab === 'records' && (
         <div className={styles.tabContent}>
-          {!selectedCompanyId ? (
+          {!selectedCompany ? (
             <div className={styles.noSelection}>
               <p>Please select a company to view call records.</p>
             </div>
@@ -459,9 +415,9 @@ export default function CallsManager() {
       {/* Call Settings Tab */}
       {activeTab === 'settings' && (
         <div className={styles.tabContent}>
-          {!selectedCompanyId ? (
+          {!selectedCompany ? (
             <div className={styles.noSelection}>
-              <p>Please select a specific company to manage call settings.</p>
+              <p>Please select a company from the header dropdown to manage call settings.</p>
             </div>
           ) : settingsLoading ? (
             <div className={styles.loading}>Loading settings...</div>

@@ -48,6 +48,15 @@ interface CompanyManagementProps {
 
 type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pricing-settings' | 'sales-config';
 
+// URL normalization utility function
+function normalizeWebsiteUrl(url: string): string {
+  if (!url || !url.trim()) return '';
+  // Strip http:// or https:// (case-insensitive), trim, and remove trailing slashes
+  const normalized = url.replace(/^https?:\/\//i, '').trim().replace(/\/+$/, '');
+  // Add https:// prefix
+  return normalized ? `https://${normalized}` : '';
+}
+
 export default function CompanyManagement({ companyId, user }: CompanyManagementProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -617,10 +626,16 @@ function ContactSection({
           {websites.map((website, index) => (
             <div key={index} className={styles.websiteRow}>
               <input
-                type="url"
+                type="text"
                 placeholder="https://example.com"
                 value={website}
                 onChange={(e) => onWebsiteUpdate(index, e.target.value)}
+                onBlur={(e) => {
+                  const normalized = normalizeWebsiteUrl(e.target.value);
+                  if (normalized !== e.target.value) {
+                    onWebsiteUpdate(index, normalized);
+                  }
+                }}
               />
               <button type="button" onClick={() => onWebsiteRemove(index)}>
                 Remove

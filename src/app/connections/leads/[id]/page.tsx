@@ -117,16 +117,6 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       ? stepOrder.indexOf(furthestStepId)
       : -1;
 
-    console.log('Step display logic:', {
-      leadId: lead.id,
-      currentStatus,
-      currentStepId,
-      currentIndex,
-      furthestStage,
-      furthestStepId,
-      furthestIndex,
-    });
-
     return leadSteps.map(step => {
       const stepIndex = stepOrder.indexOf(step.id);
 
@@ -198,9 +188,6 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           const data = await response.json();
 
           // If no quote exists, the ensureQuoteExists will be called on the Quote step load
-          if (!data.data) {
-            console.log('Quote will be created when Quote step loads');
-          }
         } catch (error) {
           console.error('Error checking quote:', error);
         }
@@ -262,9 +249,6 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           const data = await response.json();
 
           // If no quote exists, the ensureQuoteExists will be called on the Quote step load
-          if (!data.data) {
-            console.log('Quote will be created when Quote step loads');
-          }
         } catch (error) {
           console.error('Error checking quote:', error);
         }

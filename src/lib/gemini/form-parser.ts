@@ -52,8 +52,6 @@ async function retryWithBackoff<T>(
 
       // Calculate exponential backoff delay: 1s, 2s, 4s, 8s...
       const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-      console.log(`⏳ Gemini API retry ${attempt + 1}/${retries} after ${delay}ms...`);
-
       await sleep(delay);
     }
   }
@@ -71,8 +69,10 @@ export async function parseFormSubmission(
   rawPayload: Record<string, any>
 ): Promise<GeminiParseResult> {
   try {
-    // Use Gemini 2.0 Flash for fast, efficient parsing
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    // Use Gemini model from environment variable with fallback
+    const model = genAI.getGenerativeModel({
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite'
+    });
 
     const prompt = `You are a data extraction AI for a pest control service company. Extract and normalize form submission data.
 

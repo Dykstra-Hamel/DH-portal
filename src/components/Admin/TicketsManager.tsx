@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useCompany } from '@/contexts/CompanyContext';
 import { adminAPI } from '@/lib/api-client';
 import TicketsTable from '@/components/Tickets/TicketsTable/TicketsTable';
-import CompanyDropdown from '@/components/Common/CompanyDropdown/CompanyDropdown';
 import { Ticket } from '@/types/ticket';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -14,22 +14,24 @@ import {
 import styles from './AdminDashboard.module.scss';
 
 export default function TicketsManager() {
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [archivedTickets, setArchivedTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
 
   const fetchTickets = useCallback(async (companyId: string, includeArchived: boolean = false) => {
     if (!companyId) return;
-    
+
     setLoading(true);
     try {
-      const ticketsData = await adminAPI.tickets.list({ 
-        companyId, 
-        includeArchived 
+      const ticketsData = await adminAPI.tickets.list({
+        companyId,
+        includeArchived
       });
-      
+
       if (includeArchived) {
         setArchivedTickets(ticketsData);
       } else {
@@ -43,41 +45,41 @@ export default function TicketsManager() {
   }, []);
 
   useEffect(() => {
-    if (selectedCompanyId) {
-      fetchTickets(selectedCompanyId, false);
-      fetchTickets(selectedCompanyId, true);
+    if (!contextLoading && selectedCompany) {
+      fetchTickets(selectedCompany.id, false);
+      fetchTickets(selectedCompany.id, true);
     }
-  }, [selectedCompanyId, fetchTickets]);
+  }, [contextLoading, selectedCompany, fetchTickets]);
 
   // Supabase Realtime broadcast subscription for live updates
   useEffect(() => {
-    if (!selectedCompanyId) return;
+    if (!selectedCompany) return;
 
-    const channel = createTicketChannel(selectedCompanyId);
+    const channel = createTicketChannel(selectedCompany.id);
 
     subscribeToTicketUpdates(channel, async (payload: TicketUpdatePayload) => {
       const { company_id } = payload;
 
       // Verify this is for our selected company
-      if (company_id !== selectedCompanyId) return;
+      if (company_id !== selectedCompany.id) return;
 
       // Refresh both active and archived tickets when any change occurs
       // This ensures we always have the latest data
-      fetchTickets(selectedCompanyId, false);
-      fetchTickets(selectedCompanyId, true);
+      fetchTickets(selectedCompany.id, false);
+      fetchTickets(selectedCompany.id, true);
     });
 
     return () => {
       createClient().removeChannel(channel);
     };
-  }, [selectedCompanyId, fetchTickets]);
+  }, [selectedCompany, fetchTickets]);
 
   const handleArchiveTicket = async (ticketId: string) => {
     try {
       await adminAPI.tickets.archive(ticketId);
-      if (selectedCompanyId) {
-        fetchTickets(selectedCompanyId, false);
-        fetchTickets(selectedCompanyId, true);
+      if (selectedCompany) {
+        fetchTickets(selectedCompany.id, false);
+        fetchTickets(selectedCompany.id, true);
       }
     } catch (error) {
       console.error('Error archiving ticket:', error);
@@ -87,9 +89,9 @@ export default function TicketsManager() {
   const handleUnarchiveTicket = async (ticketId: string) => {
     try {
       await adminAPI.tickets.update(ticketId, { archived: false });
-      if (selectedCompanyId) {
-        fetchTickets(selectedCompanyId, false);
-        fetchTickets(selectedCompanyId, true);
+      if (selectedCompany) {
+        fetchTickets(selectedCompany.id, false);
+        fetchTickets(selectedCompany.id, true);
       }
     } catch (error) {
       console.error('Error unarchiving ticket:', error);
@@ -97,9 +99,9 @@ export default function TicketsManager() {
   };
 
   const handleTicketUpdated = () => {
-    if (selectedCompanyId) {
-      fetchTickets(selectedCompanyId, false);
-      fetchTickets(selectedCompanyId, true);
+    if (selectedCompany) {
+      fetchTickets(selectedCompany.id, false);
+      fetchTickets(selectedCompany.id, true);
     }
   };
 
@@ -115,18 +117,17 @@ export default function TicketsManager() {
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <h2>Tickets Manager</h2>
-        <p>View and manage tickets across companies</p>
+        {selectedCompany ? (
+          <>
+            <p>Managing tickets for {selectedCompany.name}</p>
+            <small>Use the company dropdown in the header to switch companies.</small>
+          </>
+        ) : (
+          <p>Select a company from the header dropdown to view tickets</p>
+        )}
       </div>
 
-      <div className={styles.controls}>
-        <CompanyDropdown
-          selectedCompanyId={selectedCompanyId}
-          onCompanyChange={setSelectedCompanyId}
-          placeholder="Select a company to view tickets"
-        />
-      </div>
-
-      {selectedCompanyId && (
+      {selectedCompany && (
         <>
           {/* Tab Navigation */}
           <div className={styles.tabNavigation}>

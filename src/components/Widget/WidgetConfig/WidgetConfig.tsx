@@ -189,9 +189,8 @@ interface WidgetConfigData {
   };
 }
 interface WidgetConfigProps {
-  companies: Company[];
-  selectedCompanyId?: string;
-  onCompanyChange?: (companyId: string) => void;
+  companyId: string;
+  companyName: string;
 }
 
 // Collapsible Section Component - moved outside to prevent re-creation on renders
@@ -232,11 +231,10 @@ const CollapsibleSection: React.FC<{
   );
 };
 const WidgetConfig: React.FC<WidgetConfigProps> = ({
-  companies,
-  selectedCompanyId,
-  onCompanyChange,
+  companyId,
+  companyName,
 }) => {
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [companyDetails, setCompanyDetails] = useState<Company | null>(null);
   const [config, setConfig] = useState<WidgetConfigData>({
     branding: {
       companyName: '',
@@ -750,24 +748,34 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   }, []);
 
-  // Load company data when selected company changes
+  // Load company data when companyId changes
   useEffect(() => {
-    if (selectedCompanyId) {
-      const company = companies.find(c => c.id === selectedCompanyId);
-      if (company) {
-        setSelectedCompany(company);
-        loadCompanyConfig(company);
-        fetchBrandColors(selectedCompanyId);
-        loadServiceAreas(selectedCompanyId);
-        loadPestOptions(selectedCompanyId);
-        loadServicePlans(selectedCompanyId);
-        geocodeCompanyAddress(company);
-        loadDomainConfiguration(selectedCompanyId);
+    const loadCompanyData = async () => {
+      if (companyId) {
+        try {
+          // Fetch company details
+          const companies = await adminAPI.getCompanies();
+          const company = companies.find((c: Company) => c.id === companyId);
+
+          if (company) {
+            setCompanyDetails(company);
+            loadCompanyConfig(company);
+            fetchBrandColors(companyId);
+            loadServiceAreas(companyId);
+            loadPestOptions(companyId);
+            loadServicePlans(companyId);
+            geocodeCompanyAddress(company);
+            loadDomainConfiguration(companyId);
+          }
+        } catch (error) {
+          console.error('Error loading company data:', error);
+        }
       }
-    }
+    };
+
+    loadCompanyData();
   }, [
-    selectedCompanyId,
-    companies,
+    companyId,
     loadCompanyConfig,
     fetchBrandColors,
     loadServiceAreas,
@@ -779,14 +787,14 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
   // Create or update domain
   const handleDomainSubmit = async () => {
-    if (!selectedCompany || !domainForm.domain.trim()) return;
+    if (!companyDetails || !domainForm.domain.trim()) return;
 
     setDomainLoading(true);
     setDomainError(null);
 
     try {
       const response = await fetch(
-        `/api/companies/${selectedCompany.id}/settings`,
+        `/api/companies/${companyDetails.id}/settings`,
         {
           method: 'POST',
           headers: {
@@ -826,14 +834,14 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
   // Verify domain
   const handleDomainVerify = async () => {
-    if (!selectedCompany || !domainConfig.resendDomainId) return;
+    if (!companyDetails || !domainConfig.resendDomainId) return;
 
     setDomainLoading(true);
     setDomainError(null);
 
     try {
       const response = await fetch(
-        `/api/companies/${selectedCompany.id}/settings`,
+        `/api/companies/${companyDetails.id}/settings`,
         {
           method: 'POST',
           headers: {
@@ -866,7 +874,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
   // Delete domain configuration
   const handleDomainDelete = async () => {
-    if (!selectedCompany || !domainConfig.configured) return;
+    if (!companyDetails || !domainConfig.configured) return;
 
     if (
       !confirm(
@@ -881,7 +889,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
     try {
       const response = await fetch(
-        `/api/companies/${selectedCompany.id}/settings`,
+        `/api/companies/${companyDetails.id}/settings`,
         {
           method: 'POST',
           headers: {
@@ -949,7 +957,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
   const savePestOptions = useCallback(
     async (pestOptions: CompanyPestOption[]) => {
-      if (!selectedCompany) return;
+      if (!companyDetails) return;
       try {
         const updateData = {
           pestOptions: pestOptions.map((option, index) => ({
@@ -964,7 +972,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         };
 
         const response = await fetch(
-          `/api/admin/pest-options/${selectedCompany.id}`,
+          `/api/admin/pest-options/${companyDetails.id}`,
           {
             method: 'POST',
             headers: {
@@ -987,7 +995,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         setTimeout(() => setSaveStatus('idle'), 2000);
       }
     },
-    [selectedCompany, setSaveStatus, setCompanyPestOptions]
+    [companyDetails, setSaveStatus, setCompanyPestOptions]
   );
 
   const addPestOption = (pestType: PestType) => {
@@ -1168,10 +1176,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
   // Service Plans Management Functions
   const createServicePlan = async (planData: Partial<ServicePlan>) => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
     try {
       const response = await fetch(
-        `/api/admin/service-plans/${selectedCompany.id}`,
+        `/api/admin/service-plans/${companyDetails.id}`,
         {
           method: 'POST',
           headers: {
@@ -1183,7 +1191,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
       const data = await response.json();
       if (data.success) {
-        await loadServicePlans(selectedCompany.id);
+        await loadServicePlans(companyDetails.id);
         setShowPlanModal(false);
         setEditingPlan(null);
         setSaveStatus('success');
@@ -1197,10 +1205,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const updateServicePlan = async (planData: Partial<ServicePlan>) => {
-    if (!selectedCompany || !editingPlan) return;
+    if (!companyDetails || !editingPlan) return;
     try {
       const response = await fetch(
-        `/api/admin/service-plans/${selectedCompany.id}`,
+        `/api/admin/service-plans/${companyDetails.id}`,
         {
           method: 'PUT',
           headers: {
@@ -1215,7 +1223,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
       const data = await response.json();
       if (data.success) {
-        await loadServicePlans(selectedCompany.id);
+        await loadServicePlans(companyDetails.id);
         setShowPlanModal(false);
         setEditingPlan(null);
         setSaveStatus('success');
@@ -1230,13 +1238,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
   const deleteServicePlan = async (planId: string) => {
     if (
-      !selectedCompany ||
+      !companyDetails ||
       !confirm('Are you sure you want to delete this service plan?')
     )
       return;
     try {
       const response = await fetch(
-        `/api/admin/service-plans/${selectedCompany.id}?id=${planId}`,
+        `/api/admin/service-plans/${companyDetails.id}?id=${planId}`,
         {
           method: 'DELETE',
         }
@@ -1244,7 +1252,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
       const data = await response.json();
       if (data.success) {
-        await loadServicePlans(selectedCompany.id);
+        await loadServicePlans(companyDetails.id);
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }
@@ -1261,9 +1269,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const saveServiceAreas = async (areas: any[]) => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
     try {
-      const response = await fetch(`/api/service-areas/${selectedCompany.id}`, {
+      const response = await fetch(`/api/service-areas/${companyDetails.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1306,17 +1314,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             : prev.colorOverrides?.secondary,
         },
       }));
-    }
-  };
-  const handleCompanySelect = (companyId: string) => {
-    if (onCompanyChange) {
-      onCompanyChange(companyId);
-    } else {
-      const company = companies.find(c => c.id === companyId);
-      if (company) {
-        setSelectedCompany(company);
-        loadCompanyConfig(company);
-      }
     }
   };
   const handleConfigChange = (
@@ -1475,12 +1472,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     bucket: string,
     category: string
   ): Promise<string | null> => {
-    if (!selectedCompany) return null;
+    if (!companyDetails) return null;
 
     try {
       const supabase = createClient();
       const filePath = createAssetPath(
-        selectedCompany.name,
+        companyDetails.name,
         category,
         file.name
       );
@@ -1900,11 +1897,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const saveConfig = async () => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
     setIsSaving(true);
     setSaveStatus('idle');
     try {
-      await adminAPI.updateCompany(selectedCompany.id, {
+      await adminAPI.updateCompany(companyDetails.id, {
         widget_config: config,
       });
       setSaveStatus('success');
@@ -1918,10 +1915,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
   const generateFullEmbedCode = () => {
-    if (!selectedCompany) return '';
+    if (!companyDetails) return '';
     let embedCode = `<script 
   src="${window.location.origin}/widget.js"
-  data-company-id="${selectedCompany.id}"
+  data-company-id="${companyDetails.id}"
   data-base-url="${window.location.origin}"`;
     // Add all configuration as data attributes
     if (config.headers.headerText) {
@@ -1968,7 +1965,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     return embedCode;
   };
   const generateMinimalEmbedCode = () => {
-    if (!selectedCompany) return '';
+    if (!companyDetails) return '';
 
     // New minimal embed code without company-id or base-url
     // Widget will automatically detect company from domain
@@ -1978,11 +1975,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const generateButtonEmbedCode = () => {
-    if (!selectedCompany) return '';
+    if (!companyDetails) return '';
 
     let embedCode = `<script 
   src="${window.location.origin}/widget.js"
-  data-company-id="${selectedCompany.id}"
+  data-company-id="${companyDetails.id}"
   data-base-url="${window.location.origin}"
   data-display-mode="button"`;
 
@@ -2026,7 +2023,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const copyFullEmbedCode = async () => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
 
     setCopyStatusFull('copying');
     try {
@@ -2042,7 +2039,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
   const copyMinimalEmbedCode = async () => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
     setCopyStatusMinimal('copying');
     try {
       await navigator.clipboard.writeText(generateMinimalEmbedCode());
@@ -2058,7 +2055,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const copyButtonEmbedCode = async () => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
 
     setCopyStatusButton('copying');
 
@@ -2076,23 +2073,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
 
-  if (!selectedCompany) {
+  if (!companyDetails) {
     return (
       <div className={styles.container}>
         <div className={styles.header}>
           <h2>Widget Configuration</h2>
-          <p>Select a company to configure their AI-powered widget.</p>
-        </div>
-        <div className={styles.companySelector}>
-          <label>Select Company:</label>
-          <select onChange={e => handleCompanySelect(e.target.value)} value="">
-            <option value="">Choose a company...</option>
-            {companies.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
+          <p>Loading widget configuration...</p>
         </div>
       </div>
     );
@@ -2102,7 +2088,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     <div className={styles.container}>
       <div className={styles.header}>
         <h2>Widget Configuration</h2>
-        <p>Configure the AI-powered widget for {selectedCompany.name}</p>
+        <p>Configure the AI-powered widget for {companyDetails.name}</p>
+        <small>Use the company dropdown in the header to switch companies.</small>
         <div className={styles.headerActions}>
           <button
             type="button"
@@ -2126,20 +2113,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             {isSaving ? 'Saving...' : 'Save Configuration'}
           </button>
         </div>
-      </div>
-      <div className={styles.companySelector}>
-        <label>Select Company:</label>
-        <select
-          onChange={e => handleCompanySelect(e.target.value)}
-          value={selectedCompany.id}
-        >
-          <option value="">Choose a company...</option>
-          {companies.map(company => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
       </div>
       {saveStatus !== 'idle' && (
         <div className={`${styles.statusMessage} ${styles[saveStatus]}`}>
@@ -3394,7 +3367,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               <div className={styles.geographicSection}>
                 {googleApiKey ? (
                   <ServiceAreaMap
-                    companyId={selectedCompany.id}
+                    companyId={companyDetails.id}
                     existingAreas={serviceAreas}
                     onAreasChange={setServiceAreas}
                     onSave={saveServiceAreas}
@@ -3930,7 +3903,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           <div className={styles.previewSection}>
             <h3>Widget Preview</h3>
             <div className={styles.previewContainer}>
-              <EmbedPreview companyId={selectedCompany.id} />
+              <EmbedPreview companyId={companyDetails.id} />
             </div>
           </div>
         )}

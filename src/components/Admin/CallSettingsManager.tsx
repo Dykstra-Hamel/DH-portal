@@ -2,15 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp, Settings, Phone } from 'lucide-react';
-import { adminAPI } from '@/lib/api-client';
+import { useCompany } from '@/contexts/CompanyContext';
 import AgentsManager from '@/components/Agents/AgentsManager';
 import TestCalling from './TestCalling';
 import styles from './AdminManager.module.scss';
-
-interface Company {
-  id: string;
-  name: string;
-}
 
 interface CompanySetting {
   value: any;
@@ -23,9 +18,10 @@ interface CompanySettings {
 }
 
 export default function CallSettingsManager() {
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
   // State
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [settings, setSettings] = useState<CompanySettings>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,26 +35,19 @@ export default function CallSettingsManager() {
   const [activeTab, setActiveTab] = useState<'settings' | 'agents' | 'test-calling'>('settings');
 
   useEffect(() => {
-    loadCompanies();
-  }, []);
-
-  const loadCompanies = async () => {
-    try {
-      const companiesData = await adminAPI.getCompanies();
-      setCompanies(companiesData);
-    } catch (err) {
-      console.error('Failed to load companies:', err);
+    if (!contextLoading && selectedCompany) {
+      loadSettings(selectedCompany.id);
     }
-  };
+  }, [contextLoading, selectedCompany]);
 
   const loadSettings = async (companyId: string) => {
     if (!companyId) return;
-    
+
     try {
       setLoading(true);
       setError(null);
       const response = await fetch(`/api/companies/${companyId}/settings`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch settings');
       }
@@ -73,13 +62,6 @@ export default function CallSettingsManager() {
     }
   };
 
-  const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
-    if (companyId) {
-      loadSettings(companyId);
-    }
-  };
-
   const handleSettingChange = (key: string, value: any) => {
     setSettings(prev => ({
       ...prev,
@@ -91,11 +73,11 @@ export default function CallSettingsManager() {
   };
 
   const handleSaveSettings = async () => {
-    if (!selectedCompanyId) return;
+    if (!selectedCompany) return;
 
     try {
       setSaving(true);
-      const response = await fetch(`/api/companies/${selectedCompanyId}/settings`, {
+      const response = await fetch(`/api/companies/${selectedCompany.id}/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings }),
@@ -120,30 +102,12 @@ export default function CallSettingsManager() {
     <div className={styles.adminManager}>
       <div className={styles.header}>
         <h2>Call Settings & Agent Management</h2>
-      </div>
-
-      {/* Company Dropdown */}
-      <div className={styles.companySelector}>
-        <label htmlFor="company-select" className={styles.selectorLabel}>
-          Select Company:
-        </label>
-        <select
-          id="company-select"
-          value={selectedCompanyId}
-          onChange={(e) => handleCompanyChange(e.target.value)}
-          className={styles.companySelect}
-        >
-          <option value="">-- Select a Company --</option>
-          {companies.map(company => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
+        {selectedCompany && <p>Managing settings for {selectedCompany.name}</p>}
+        <small>Use the company dropdown in the header to switch companies.</small>
       </div>
 
       {/* Tabs */}
-      {selectedCompanyId && (
+      {selectedCompany && (
         <div className={styles.tabContainer}>
           <div className={styles.tabList}>
             <button 
@@ -173,17 +137,17 @@ export default function CallSettingsManager() {
 
       {/* Content */}
       <div className={styles.tabContent}>
-        {!selectedCompanyId ? (
+        {!selectedCompany ? (
           <div className={styles.noSelection}>
-            <p>Please select a company to manage call settings and agents.</p>
+            <p>Please select a company from the header dropdown to manage call settings and agents.</p>
           </div>
         ) : activeTab === 'agents' ? (
           <div className={styles.agentsTab}>
-            <AgentsManager companyId={selectedCompanyId} />
+            <AgentsManager companyId={selectedCompany.id} />
           </div>
         ) : activeTab === 'test-calling' ? (
           <div className={styles.testCallingTab}>
-            <TestCalling companyId={selectedCompanyId} />
+            <TestCalling companyId={selectedCompany.id} />
           </div>
         ) : loading ? (
           <div className={styles.loading}>Loading settings...</div>

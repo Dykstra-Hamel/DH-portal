@@ -273,11 +273,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   return (
     <div className={styles.adminDashboard}>
-      <div className={styles.header}>
-        <h1>Admin Dashboard</h1>
-        <p>Welcome, {user.email}</p>
-      </div>
-
       {/* Primary Navigation - Main Categories */}
       <nav className={styles.primaryNavigation}>
         {ADMIN_CATEGORIES.map(category => {
