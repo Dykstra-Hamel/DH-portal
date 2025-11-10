@@ -162,17 +162,33 @@ async function backfillCoordinates() {
   // Query all data points without coordinates
   console.log('[Backfill Coordinates] Fetching records without coordinates...');
 
-  const { data: dataPoints, error: fetchError } = await supabase
-    .from('pest_pressure_data_points')
-    .select('id, city, state, zip_code, lat, lng')
-    .is('lat', null);
+  // Fetch all records using pagination (Supabase has a 1000 row default limit)
+  let dataPoints: DataPoint[] = [];
+  let from = 0;
+  const pageSize = 1000;
 
-  if (fetchError) {
-    console.error('[Backfill Coordinates] Error fetching data points:', fetchError);
-    process.exit(1);
+  while (true) {
+    const { data, error: fetchError } = await supabase
+      .from('pest_pressure_data_points')
+      .select('id, city, state, zip_code, lat, lng')
+      .is('lat', null)
+      .range(from, from + pageSize - 1);
+
+    if (fetchError) {
+      console.error('[Backfill Coordinates] Error fetching data points:', fetchError);
+      process.exit(1);
+    }
+
+    if (!data || data.length === 0) break;
+
+    dataPoints = dataPoints.concat(data as DataPoint[]);
+    console.log(`[Backfill Coordinates] Fetched ${dataPoints.length} records so far...`);
+
+    if (data.length < pageSize) break; // Last page
+    from += pageSize;
   }
 
-  if (!dataPoints || dataPoints.length === 0) {
+  if (dataPoints.length === 0) {
     console.log('[Backfill Coordinates] No records found without coordinates. Exiting.');
     return;
   }
