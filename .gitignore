@@ -46,3 +46,6 @@ next-env.d.ts
 # Database export/import files (contain sensitive connection strings and data)
 company-data-import*.sql
 EXPORT-INSTRUCTIONS.md
+
+# Shell scripts (may contain secrets)
+scripts/*.sh

@@ -9,10 +9,6 @@
  *
  * Usage:
  *   PROD_SUPABASE_URL=<url> PROD_SUPABASE_SERVICE_KEY=<key> GOOGLE_PLACES_API_KEY=<key> tsx scripts/backfill-coordinates.ts
- *
- * Rate Limiting:
- *   - Google Geocoding API free tier: 15 requests/min
- *   - Script uses 4 second delays between requests (same as aggregator)
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -194,7 +190,6 @@ async function backfillCoordinates() {
   }
 
   console.log(`[Backfill Coordinates] Found ${dataPoints.length} records to geocode`);
-  console.log('[Backfill Coordinates] Rate limiting: 15 requests/min (4 sec between calls)');
 
   let updated = 0;
   let skipped = 0;
@@ -226,9 +221,6 @@ async function backfillCoordinates() {
 
       // Geocode the address
       const result = await geocodeAddress(addressString, googleApiKey);
-
-      // Rate limiting: 15 RPM = 4 seconds between requests
-      await new Promise(resolve => setTimeout(resolve, 4000));
 
       if (!result.success || !result.coordinates) {
         console.warn(`[Backfill Coordinates] Failed to geocode ${point.id}: ${result.error}`);
