@@ -28,7 +28,6 @@ async function main() {
   const { data: companies, error: companyError } = await supabase
     .from('companies')
     .select('id, name')
-    .eq('is_active', true)
     .limit(1);
 
   if (companyError || !companies || companies.length === 0) {

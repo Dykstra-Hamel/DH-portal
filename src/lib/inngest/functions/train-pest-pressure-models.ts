@@ -45,8 +45,7 @@ export const trainPestPressureModels = inngest.createFunction(
 
         const { data: allCompanies, error: companiesError } = await supabase
           .from('companies')
-          .select('id, name')
-          .eq('is_active', true);
+          .select('id, name');
 
         if (companiesError) {
           throw new Error(`Failed to fetch companies: ${companiesError.message}`);
