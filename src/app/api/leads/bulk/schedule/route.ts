@@ -68,6 +68,15 @@ export async function POST(request: NextRequest) {
 
     // Trigger Inngest event
     try {
+      // DEBUG: Log environment state
+      console.log('DEBUG - Environment check:', {
+        hasEventKey: !!process.env.INNGEST_EVENT_KEY,
+        eventKeyLength: process.env.INNGEST_EVENT_KEY?.length || 0,
+        inngestDev: process.env.INNGEST_DEV,
+        nodeEnv: process.env.NODE_ENV,
+        dataSize: JSON.stringify(parsedData).length,
+      });
+
       await sendEvent({
         name: 'bulk-lead-upload/scheduled',
         data: {
