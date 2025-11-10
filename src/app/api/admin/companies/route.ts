@@ -40,7 +40,6 @@ export async function POST(request: NextRequest) {
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
     if (authError || !user || !(await isAuthorizedAdmin(user))) {
-      console.error('Authorization failed:', { authError });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -60,10 +59,6 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!companyData.name || typeof companyData.name !== 'string' || companyData.name.trim().length === 0) {
-      console.error('Validation failed: missing or invalid company name', { 
-        hasName: !!companyData.name, 
-        nameType: typeof companyData.name 
-      });
       return NextResponse.json(
         { error: 'Company name is required and must be a non-empty string' },
         { status: 400 }
@@ -114,9 +109,13 @@ export async function POST(request: NextRequest) {
       website: Array.isArray(companyData.website)
         ? companyData.website
             .filter((url: string) => url && typeof url === 'string' && url.trim().length > 0)
-            .map((url: string) => url.trim().replace(/\/+$/, '')) // Strip trailing slashes
+            .map((url: string) => {
+              // Normalize URL: strip http/https, trim, remove trailing slashes, add https://
+              const normalized = url.replace(/^https?:\/\//i, '').trim().replace(/\/+$/, '');
+              return `https://${normalized}`;
+            })
         : companyData.website && typeof companyData.website === 'string' && companyData.website.trim()
-          ? [companyData.website.trim().replace(/\/+$/, '')] // Strip trailing slashes
+          ? [companyData.website.replace(/^https?:\/\//i, '').trim().replace(/\/+$/, '')].map(url => `https://${url}`)
           : []
     };
 

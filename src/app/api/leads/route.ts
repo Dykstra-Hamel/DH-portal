@@ -194,3 +194,205 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    // Get authenticated user
+    const authResult = await getAuthenticatedUser();
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
+    const { user, isGlobalAdmin, supabase } = authResult;
+
+    // Parse request body
+    const body = await request.json();
+    const {
+      companyId,
+      customerId: providedCustomerId, // New: accept existing customer ID
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      streetAddress,
+      city,
+      state,
+      zip,
+      pestType,
+      comments,
+      leadSource,
+      priority,
+      estimatedValue,
+      serviceType,
+    } = body;
+
+    // Validate required fields
+    if (!companyId) {
+      return NextResponse.json(
+        { error: 'Company ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // If customerId provided but no customer fields, validate customerId only
+    if (providedCustomerId && !firstName && !lastName) {
+      // Using existing customer - verify it exists
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('id', providedCustomerId)
+        .eq('company_id', companyId)
+        .single();
+
+      if (!existingCustomer) {
+        return NextResponse.json(
+          { error: 'Customer not found' },
+          { status: 404 }
+        );
+      }
+    } else if (!providedCustomerId && (!firstName || !lastName)) {
+      // Creating new customer - require name fields
+      return NextResponse.json(
+        { error: 'First name and last name are required when creating a new customer' },
+        { status: 400 }
+      );
+    }
+
+    // Verify user has access to this company
+    if (!isGlobalAdmin) {
+      const { data: userCompany } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .single();
+
+      if (!userCompany) {
+        return NextResponse.json(
+          { error: 'Access denied to this company' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Determine customer ID
+    let customerId: string | null = providedCustomerId || null;
+
+    // If no customerId provided, check for existing customer by email or phone
+    if (!customerId && (email || phoneNumber)) {
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('company_id', companyId)
+        .or(email ? `email.eq.${email}` : `phone.eq.${phoneNumber}`)
+        .maybeSingle();
+
+      customerId = existingCustomer?.id || null;
+    }
+
+    // Create customer if not found and we have customer data
+    if (!customerId && firstName && lastName) {
+      const { data: newCustomer, error: customerError } = await supabase
+        .from('customers')
+        .insert([
+          {
+            company_id: companyId,
+            first_name: firstName,
+            last_name: lastName,
+            email,
+            phone: phoneNumber,
+            address: streetAddress, // Legacy address field on customers table
+            city: city,
+            state: state,
+            zip_code: zip,
+          },
+        ])
+        .select('id')
+        .single();
+
+      if (customerError) {
+        console.error('Error creating customer:', customerError);
+        return NextResponse.json(
+          { error: 'Failed to create customer' },
+          { status: 500 }
+        );
+      }
+
+      customerId = newCustomer.id;
+    }
+
+    // Final validation: must have a customer ID
+    if (!customerId) {
+      return NextResponse.json(
+        { error: 'Failed to determine customer' },
+        { status: 400 }
+      );
+    }
+
+    // Create service address if we have address data
+    let serviceAddressId: string | null = null;
+
+    if (streetAddress || city || state || zip) {
+      const { data: newAddress, error: addressError } = await supabase
+        .from('service_addresses')
+        .insert([
+          {
+            company_id: companyId,
+            street_address: streetAddress || '',
+            city: city || '',
+            state: state || '',
+            zip_code: zip || '', // DB uses zip_code, not zip
+          },
+        ])
+        .select('id')
+        .single();
+
+      if (addressError) {
+        console.error('Error creating address:', addressError);
+      } else {
+        serviceAddressId = newAddress.id;
+      }
+    }
+
+    // Create lead
+    const { data: newLead, error: leadError } = await supabase
+      .from('leads')
+      .insert([
+        {
+          company_id: companyId,
+          customer_id: customerId,
+          service_address_id: serviceAddressId,
+          lead_type: 'web_form',
+          lead_source: leadSource || 'other',
+          lead_status: 'unassigned',
+          priority: priority || 'medium',
+          pest_type: pestType,
+          comments,
+          service_type: serviceType,
+          estimated_value: estimatedValue,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single();
+
+    if (leadError) {
+      console.error('Error creating lead:', leadError);
+      return NextResponse.json(
+        { error: 'Failed to create lead' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: true, lead: newLead },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error('Error in POST leads API:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

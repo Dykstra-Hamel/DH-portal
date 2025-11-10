@@ -15,7 +15,7 @@
 
 export interface GeminiConfig {
   apiKey: string;
-  model: 'gemini-1.5-flash' | 'gemini-1.5-pro' | 'gemini-2.0-flash-exp';
+  model: 'gemini-1.5-flash' | 'gemini-1.5-pro' | 'gemini-2.0-flash-exp' | 'gemini-2.5-flash-lite';
   maxDailyRequests?: number;
   enableCache?: boolean;
   cacheTTL?: number; // seconds

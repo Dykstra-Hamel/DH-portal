@@ -25,6 +25,64 @@ import {
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
 
+/**
+ * Check for recent duplicate form submissions
+ * @param supabase - Supabase client
+ * @param companyId - Company ID to check within
+ * @param email - Email address from normalized data
+ * @param phone - Phone number from normalized data
+ * @param windowSeconds - Time window in seconds to check for duplicates (default: 30)
+ * @returns true if a duplicate is found, false otherwise
+ */
+async function checkForRecentDuplicate(
+  supabase: any,
+  companyId: string,
+  currentSubmissionId: string,
+  email: string | null,
+  phone: string | null,
+  windowSeconds: number = 30
+): Promise<boolean> {
+  // Don't check if we have neither email nor phone
+  if (!email && !phone) {
+    return false;
+  }
+
+  const cutoffTime = new Date(Date.now() - windowSeconds * 1000);
+
+  const { data, error } = await supabase
+    .from('form_submissions')
+    .select('id, normalized_data, created_at')
+    .eq('company_id', companyId)
+    .neq('id', currentSubmissionId)
+    .gte('created_at', cutoffTime.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (error || !data || data.length === 0) {
+    return false;
+  }
+
+  // Check if any recent submission matches email or phone
+  return data.some((submission: any) => {
+    const normalizedData = submission.normalized_data as any;
+    if (!normalizedData) return false;
+
+    // Match by email (case-insensitive)
+    if (email && normalizedData.email) {
+      if (normalizedData.email.toLowerCase() === email.toLowerCase()) {
+        return true;
+      }
+    }
+
+    // Match by phone number
+    if (phone && normalizedData.phone_number === phone) {
+      return true;
+    }
+
+    return false;
+  });
+}
+
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPrelight(request, 'widget');
 }
@@ -184,9 +242,47 @@ export async function POST(request: NextRequest) {
       console.error('⚠️ Failed to update form submission with Gemini data:', updateError);
     }
 
+    // Step 6.5: Check for duplicate submissions (within 30 second window)
+    const { normalized } = geminiResult;
+    const isDuplicate = await checkForRecentDuplicate(
+      supabase,
+      companyId,
+      submissionId,
+      normalized.email || null,
+      normalized.phone_number || null,
+      30
+    );
+
+    if (isDuplicate) {
+      // Update form submission to mark as duplicate
+      await supabase
+        .from('form_submissions')
+        .update({
+          processing_status: 'failed',
+          processing_error: 'Duplicate submission detected within 30 seconds',
+        })
+        .eq('id', submissionId);
+
+      console.log('🔄 Duplicate form submission detected:', {
+        submissionId,
+        companyId,
+        email: normalized.email ? '***@' + normalized.email.split('@')[1] : null,
+        phone: normalized.phone_number ? '***' + normalized.phone_number.slice(-4) : null,
+      });
+
+      return createCorsResponse(
+        {
+          success: true,
+          message: 'Form submission received (duplicate detected)',
+          duplicate: true,
+        },
+        origin,
+        'widget'
+      );
+    }
+
     // Step 7: Lookup or create customer
     let customerId: string | null = null;
-    const { normalized } = geminiResult;
 
     // Try to find existing customer by email first, then phone
     if (normalized.email) {
@@ -294,7 +390,10 @@ export async function POST(request: NextRequest) {
       priority: geminiResult.ticket.priority || 'medium',
       service_type: geminiResult.ticket.service_type || 'Pest Control',
       status: 'new',
-      pest_type: normalized.pest_issue || null,
+      // pest_type: AI-categorized pest control type (e.g., "Rodent Control", "Termite Control")
+      // normalized.pest_issue: Raw user description (kept in ticket description)
+      pest_type: geminiResult.ticket.pest_type || 'General Pest Control',
+      form_submission_id: submissionId,
     };
 
     const { data: ticket, error: ticketError } = await supabase

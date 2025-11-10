@@ -45,9 +45,15 @@ export async function PUT(
       if (Array.isArray(sanitizedData.website)) {
         sanitizedData.website = sanitizedData.website
           .filter((url: string) => url && typeof url === 'string' && url.trim().length > 0)
-          .map((url: string) => url.trim().replace(/\/+$/, '')); // Strip trailing slashes
+          .map((url: string) => {
+            // Normalize URL: strip http/https, trim, remove trailing slashes, add https://
+            const normalized = url.replace(/^https?:\/\//i, '').trim().replace(/\/+$/, '');
+            return `https://${normalized}`;
+          });
       } else if (typeof sanitizedData.website === 'string') {
-        sanitizedData.website = sanitizedData.website.trim() ? [sanitizedData.website.trim().replace(/\/+$/, '')] : []; // Strip trailing slashes
+        sanitizedData.website = sanitizedData.website.trim()
+          ? [sanitizedData.website.replace(/^https?:\/\//i, '').trim().replace(/\/+$/, '')].map(url => `https://${url}`)
+          : [];
       } else {
         sanitizedData.website = [];
       }

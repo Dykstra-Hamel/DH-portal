@@ -15,6 +15,7 @@ export type LeadSource =
 export type LeadType =
   | 'phone_call'
   | 'web_form'
+  | 'bulk_add'
   | 'email'
   | 'chat'
   | 'social_media'
@@ -196,6 +197,7 @@ export const leadSourceOptions = [
 export const leadTypeOptions = [
   { value: 'phone_call', label: 'Phone Call' },
   { value: 'web_form', label: 'Web Form' },
+  { value: 'bulk_add', label: 'Bulk Add' },
   { value: 'email', label: 'Email' },
   { value: 'chat', label: 'Chat' },
   { value: 'social_media', label: 'Social Media' },

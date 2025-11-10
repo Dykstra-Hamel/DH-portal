@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { createClient } from '@/lib/supabase/client';
+import { useCompany } from '@/contexts/CompanyContext';
 import { Trash2 } from 'lucide-react';
 import styles from './AdminManager.module.scss';
 
@@ -55,15 +56,16 @@ interface Company {
 }
 
 export default function CallRecordsManager() {
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
   // State
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
-  
-  
+
+
   // Delete State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [callToDelete, setCallToDelete] = useState<CallRecord | null>(null);
@@ -76,37 +78,12 @@ export default function CallRecordsManager() {
   const [reportError, setReportError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadCompanies();
-  }, []);
-
-  const loadCompanies = async () => {
-    try {
-      const supabase = createClient();
-      const { data: session } = await supabase.auth.getSession();
-      
-      if (!session.session?.access_token) {
-        throw new Error('No authentication session');
-      }
-      
-      const response = await fetch('/api/admin/companies', {
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch companies');
-      }
-      
-      const companiesData = await response.json();
-      setCompanies(companiesData);
-    } catch (err) {
-      setError('Failed to load companies. Please refresh and try again.');
+    if (!contextLoading && selectedCompany) {
+      loadCalls(selectedCompany.id);
     }
-  };
+  }, [contextLoading, selectedCompany]);
 
-  const loadCalls = async (companyId?: string) => {
+  const loadCalls = async (companyId: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -148,11 +125,6 @@ export default function CallRecordsManager() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
-    loadCalls(companyId);
   };
 
   const formatDuration = (seconds: number) => {
@@ -248,7 +220,9 @@ export default function CallRecordsManager() {
       }
 
       // Refresh the calls list
-      loadCalls(selectedCompanyId);
+      if (selectedCompany) {
+        loadCalls(selectedCompany.id);
+      }
 
       setShowDeleteModal(false);
       setCallToDelete(null);
@@ -297,8 +271,8 @@ export default function CallRecordsManager() {
     setReportError(null);
 
     // Validation
-    if (!selectedCompanyId || selectedCompanyId === 'all') {
-      setReportError('Please select a specific company for the billing report.');
+    if (!selectedCompany) {
+      setReportError('Please select a company from the header dropdown.');
       return;
     }
 
@@ -317,16 +291,16 @@ export default function CallRecordsManager() {
 
     try {
       setIsGeneratingReport(true);
-      
+
       const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
-      
+
       if (!session.session?.access_token) {
         throw new Error('No authentication session');
       }
 
       const queryParams = new URLSearchParams({
-        companyId: selectedCompanyId,
+        companyId: selectedCompany.id,
         startDate: reportStartDate,
         endDate: reportEndDate,
       });
@@ -369,31 +343,12 @@ export default function CallRecordsManager() {
     <div className={styles.adminManager}>
       <div className={styles.header}>
         <h2>Call Records</h2>
-      </div>
-
-      {/* Company Dropdown */}
-      <div className={styles.companySelector}>
-        <label htmlFor="company-select" className={styles.selectorLabel}>
-          Select Company:
-        </label>
-        <select
-          id="company-select"
-          value={selectedCompanyId}
-          onChange={(e) => handleCompanyChange(e.target.value)}
-          className={styles.companySelect}
-        >
-          <option value="">-- Select a Company --</option>
-          <option value="all">All Companies</option>
-          {companies.map(company => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
+        {selectedCompany && <p>Viewing call records for {selectedCompany.name}</p>}
+        <small>Use the company dropdown in the header to switch companies.</small>
       </div>
 
       {/* Billing Report Section */}
-      {selectedCompanyId && selectedCompanyId !== 'all' && (
+      {selectedCompany && (
         <div className={styles.reportSection}>
           <h3>Generate Billing Report</h3>
           <div className={styles.reportControls}>
@@ -437,9 +392,9 @@ export default function CallRecordsManager() {
 
       {/* Content */}
       <div className={styles.tabContent}>
-        {!selectedCompanyId ? (
+        {!selectedCompany ? (
           <div className={styles.noSelection}>
-            <p>Please select a company to view call records.</p>
+            <p>Please select a company from the header dropdown to view call records.</p>
           </div>
         ) : loading ? (
           <div className={styles.loading}>Loading call records...</div>
