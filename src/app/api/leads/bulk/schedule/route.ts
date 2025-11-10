@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/api-utils';
-import { inngest } from '@/lib/inngest/client';
+import { sendEvent } from '@/lib/inngest/client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Trigger Inngest event
     try {
-      await inngest.send({
+      await sendEvent({
         name: 'bulk-lead-upload/scheduled',
         data: {
           uploadId: upload.id,
