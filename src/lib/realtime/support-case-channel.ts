@@ -18,6 +18,7 @@
 
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { simpleSubscriptionHandler } from './channel-helpers';
 
 /**
  * Payload structure broadcast by database triggers when support cases change
@@ -86,11 +87,7 @@ export function subscribeToSupportCaseUpdates(
       callback(payload as SupportCaseUpdatePayload);
     })
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.error('Support case broadcast channel error');
-      } else if (status === 'TIMED_OUT') {
-        console.error('Support case broadcast channel timed out');
-      }
+      simpleSubscriptionHandler(status, 'support_cases');
     });
 }
 

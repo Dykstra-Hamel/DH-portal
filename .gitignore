@@ -49,3 +49,6 @@ EXPORT-INSTRUCTIONS.md
 
 # Shell scripts (may contain secrets)
 scripts/*.sh
+
+# Migration backups (historical data migrations already run in production)
+backups/

@@ -18,6 +18,7 @@
 
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { simpleSubscriptionHandler } from './channel-helpers';
 
 /**
  * Payload structure broadcast by database triggers when tickets or call_records change
@@ -86,11 +87,7 @@ export function subscribeToTicketUpdates(
       callback(payload as TicketUpdatePayload);
     })
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.error('[TICKET-CHANNEL] ❌ Channel error!');
-      } else if (status === 'TIMED_OUT') {
-        console.error('[TICKET-CHANNEL] ⏱️ Channel timed out!');
-      }
+      simpleSubscriptionHandler(status, 'tickets');
     });
 }
 

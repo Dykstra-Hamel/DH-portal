@@ -18,6 +18,7 @@
 
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { simpleSubscriptionHandler } from './channel-helpers';
 
 /**
  * Payload structure broadcast by database triggers when activity_log changes
@@ -88,11 +89,7 @@ export function subscribeToActivityUpdates(
       callback(payload as ActivityUpdatePayload);
     })
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.error('Activity broadcast channel error');
-      } else if (status === 'TIMED_OUT') {
-        console.error('Activity broadcast channel timed out');
-      }
+      simpleSubscriptionHandler(status, 'activity');
     });
 }
 

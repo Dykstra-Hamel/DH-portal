@@ -1,6 +1,7 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { Quote } from '@/types/quote';
+import { simpleSubscriptionHandler } from './channel-helpers';
 
 export interface QuoteUpdatePayload {
   lead_id: string;
@@ -58,13 +59,7 @@ export function subscribeToQuoteUpdates(
       callback(payload as QuoteUpdatePayload);
     })
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log(`Subscribed to quote updates for channel: ${channel.topic}`);
-      } else if (status === 'CHANNEL_ERROR') {
-        console.warn('Realtime channel error - quote updates may not sync in real-time. This can happen if Realtime is not enabled in Supabase.');
-      } else if (status === 'TIMED_OUT') {
-        console.warn('Quote channel subscription timed out - quote updates may not sync in real-time.');
-      }
+      simpleSubscriptionHandler(status, `quote:${channel.topic}`);
     });
 }
 

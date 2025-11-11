@@ -401,181 +401,239 @@ export function useRealtimeCounts() {
     if (!selectedCompany?.id || !user?.id) return;
 
     const channelName = `company:${selectedCompany.id}:counts`;
+    const isDevelopment = process.env.NODE_ENV === 'development';
 
-    const supabase = createClient();
-    const channel = supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: true, ack: true },
-        },
-      })
-      .on('broadcast', { event: 'count_update' }, async payload => {
-        const { table, company_id, action } = payload.payload;
+    // Track subscription state to prevent duplicate subscriptions
+    let isSubscribed = true;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 3;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
 
-        // Verify this is for our company
-        if (company_id !== selectedCompany.id) {
-          return;
-        }
+    const setupChannel = () => {
+      if (!isSubscribed) return null;
 
-        try {
-          // Update counts based on which table changed
-          switch (table) {
-            case 'tickets':
-              const ticketsResponse = await fetch(
-                `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false&countOnly=true`
-              );
-              if (ticketsResponse.ok) {
-                const ticketsData = await ticketsResponse.json();
-                // Handle new paginated response format
-                updateCount(
-                  'tickets',
-                  ticketsData.counts?.all || 0
+      const supabase = createClient();
+      const channel = supabase
+        .channel(channelName, {
+          config: {
+            broadcast: { self: true, ack: true },
+          },
+        })
+        .on('broadcast', { event: 'count_update' }, async payload => {
+          const { table, company_id } = payload.payload;
+
+          // Verify this is for our company
+          if (company_id !== selectedCompany.id) {
+            return;
+          }
+
+          try {
+            // Update counts based on which table changed
+            switch (table) {
+              case 'tickets':
+                const ticketsResponse = await fetch(
+                  `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false&countOnly=true`
                 );
-              }
-              break;
+                if (ticketsResponse.ok) {
+                  const ticketsData = await ticketsResponse.json();
+                  // Handle new paginated response format
+                  updateCount(
+                    'tickets',
+                    ticketsData.counts?.all || 0
+                  );
+                }
+                break;
 
-            case 'leads':
-              const [
-                activeLeadsResponse,
-                unassignedLeadsResponse,
-                schedulingLeadsResponse,
-                myLeadsResponse,
-              ] = await Promise.all([
-                fetch(
-                  `/api/leads?companyId=${selectedCompany.id}&status=unassigned,contacting,quoted`
-                ),
-                fetch(
-                  `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=unassigned,contacting,quoted`
-                ),
-                fetch(
-                  `/api/leads?companyId=${selectedCompany.id}&status=ready_to_schedule,scheduled`
-                ),
-                fetch(
-                  `/api/leads?companyId=${selectedCompany.id}&assignedTo=${user.id}`
-                ),
-              ]);
-
-              if (activeLeadsResponse.ok) {
-                const activeLeadsData = await activeLeadsResponse.json();
-                updateCount(
-                  'leads',
-                  Array.isArray(activeLeadsData) ? activeLeadsData.length : 0
-                );
-              }
-              if (unassignedLeadsResponse.ok) {
-                const unassignedLeadsData =
-                  await unassignedLeadsResponse.json();
-                updateCount(
-                  'unassigned_leads',
-                  Array.isArray(unassignedLeadsData)
-                    ? unassignedLeadsData.length
-                    : 0
-                );
-              }
-              if (schedulingLeadsResponse.ok) {
-                const schedulingLeadsData =
-                  await schedulingLeadsResponse.json();
-                updateCount(
-                  'scheduling',
-                  Array.isArray(schedulingLeadsData)
-                    ? schedulingLeadsData.length
-                    : 0
-                );
-              }
-              if (myLeadsResponse.ok) {
-                const myLeadsData = await myLeadsResponse.json();
-                updateCount(
-                  'my_leads',
-                  Array.isArray(myLeadsData) ? myLeadsData.length : 0
-                );
-              }
-              break;
-
-            case 'support_cases':
-              const [casesResponse, unassignedCasesResponse, myCasesResponse] =
-                await Promise.all([
+              case 'leads':
+                const [
+                  activeLeadsResponse,
+                  unassignedLeadsResponse,
+                  schedulingLeadsResponse,
+                  myLeadsResponse,
+                ] = await Promise.all([
                   fetch(
-                    `/api/support-cases?companyId=${selectedCompany.id}&includeArchived=false`
+                    `/api/leads?companyId=${selectedCompany.id}&status=unassigned,contacting,quoted`
                   ),
                   fetch(
-                    `/api/support-cases?companyId=${selectedCompany.id}&status=new`
+                    `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=unassigned,contacting,quoted`
                   ),
                   fetch(
-                    `/api/support-cases?companyId=${selectedCompany.id}&assignedTo=${user.id}`
+                    `/api/leads?companyId=${selectedCompany.id}&status=ready_to_schedule,scheduled`
+                  ),
+                  fetch(
+                    `/api/leads?companyId=${selectedCompany.id}&assignedTo=${user.id}`
                   ),
                 ]);
 
-              if (casesResponse.ok) {
-                const casesData = await casesResponse.json();
-                updateCount(
-                  'cases',
-                  Array.isArray(casesData) ? casesData.length : 0
-                );
-              }
-              if (unassignedCasesResponse.ok) {
-                const unassignedCasesData =
-                  await unassignedCasesResponse.json();
-                updateCount(
-                  'unassigned_cases',
-                  Array.isArray(unassignedCasesData)
-                    ? unassignedCasesData.length
-                    : 0
-                );
-              }
-              if (myCasesResponse.ok) {
-                const myCasesData = await myCasesResponse.json();
-                updateCount(
-                  'my_cases',
-                  Array.isArray(myCasesData) ? myCasesData.length : 0
-                );
-              }
-              break;
+                if (activeLeadsResponse.ok) {
+                  const activeLeadsData = await activeLeadsResponse.json();
+                  updateCount(
+                    'leads',
+                    Array.isArray(activeLeadsData) ? activeLeadsData.length : 0
+                  );
+                }
+                if (unassignedLeadsResponse.ok) {
+                  const unassignedLeadsData =
+                    await unassignedLeadsResponse.json();
+                  updateCount(
+                    'unassigned_leads',
+                    Array.isArray(unassignedLeadsData)
+                      ? unassignedLeadsData.length
+                      : 0
+                  );
+                }
+                if (schedulingLeadsResponse.ok) {
+                  const schedulingLeadsData =
+                    await schedulingLeadsResponse.json();
+                  updateCount(
+                    'scheduling',
+                    Array.isArray(schedulingLeadsData)
+                      ? schedulingLeadsData.length
+                      : 0
+                  );
+                }
+                if (myLeadsResponse.ok) {
+                  const myLeadsData = await myLeadsResponse.json();
+                  updateCount(
+                    'my_leads',
+                    Array.isArray(myLeadsData) ? myLeadsData.length : 0
+                  );
+                }
+                break;
 
-            case 'customers':
-              const customersResponse = await fetch(
-                `/api/customers?companyId=${selectedCompany.id}`
-              );
-              if (customersResponse.ok) {
-                const customersData = await customersResponse.json();
-                updateCount(
-                  'customers',
-                  Array.isArray(customersData) ? customersData.length : 0
+              case 'support_cases':
+                const [casesResponse, unassignedCasesResponse, myCasesResponse] =
+                  await Promise.all([
+                    fetch(
+                      `/api/support-cases?companyId=${selectedCompany.id}&includeArchived=false`
+                    ),
+                    fetch(
+                      `/api/support-cases?companyId=${selectedCompany.id}&status=new`
+                    ),
+                    fetch(
+                      `/api/support-cases?companyId=${selectedCompany.id}&assignedTo=${user.id}`
+                    ),
+                  ]);
+
+                if (casesResponse.ok) {
+                  const casesData = await casesResponse.json();
+                  updateCount(
+                    'cases',
+                    Array.isArray(casesData) ? casesData.length : 0
+                  );
+                }
+                if (unassignedCasesResponse.ok) {
+                  const unassignedCasesData =
+                    await unassignedCasesResponse.json();
+                  updateCount(
+                    'unassigned_cases',
+                    Array.isArray(unassignedCasesData)
+                      ? unassignedCasesData.length
+                      : 0
+                  );
+                }
+                if (myCasesResponse.ok) {
+                  const myCasesData = await myCasesResponse.json();
+                  updateCount(
+                    'my_cases',
+                    Array.isArray(myCasesData) ? myCasesData.length : 0
+                  );
+                }
+                break;
+
+              case 'customers':
+                const customersResponse = await fetch(
+                  `/api/customers?companyId=${selectedCompany.id}`
                 );
-              }
-              break;
+                if (customersResponse.ok) {
+                  const customersData = await customersResponse.json();
+                  updateCount(
+                    'customers',
+                    Array.isArray(customersData) ? customersData.length : 0
+                  );
+                }
+                break;
 
-            case 'tasks':
-              const tasksResponse = await fetch(
-                `/api/tasks?companyId=${selectedCompany.id}&assignedTo=${user.id}&includeArchived=false`
-              );
-              if (tasksResponse.ok) {
-                const tasksData = await tasksResponse.json();
-                const activeTasks = Array.isArray(tasksData.tasks)
-                  ? tasksData.tasks.filter(
-                      (task: any) => task.status !== 'completed'
-                    )
-                  : [];
-                updateCount('my_tasks', activeTasks.length);
-              }
-              break;
+              case 'tasks':
+                const tasksResponse = await fetch(
+                  `/api/tasks?companyId=${selectedCompany.id}&assignedTo=${user.id}&includeArchived=false`
+                );
+                if (tasksResponse.ok) {
+                  const tasksData = await tasksResponse.json();
+                  const activeTasks = Array.isArray(tasksData.tasks)
+                    ? tasksData.tasks.filter(
+                        (task: any) => task.status !== 'completed'
+                      )
+                    : [];
+                  updateCount('my_tasks', activeTasks.length);
+                }
+                break;
 
-            default:
-              // Unknown table - no action needed
+              default:
+                // Unknown table - no action needed
+            }
+          } catch (error) {
+            // Only log in development, suppress in production to reduce noise
+            if (isDevelopment) {
+              console.error(`Error updating ${table} count:`, error);
+            }
           }
-        } catch (error) {
-          console.error(`Error updating ${table} count:`, error);
-        }
-      })
-      .subscribe(status => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime counts subscription error:', channelName);
-        } else if (status === 'TIMED_OUT') {
-          console.error('Realtime counts subscription timed out:', channelName);
-        }
-      });
+        })
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') {
+            // Successfully subscribed, reset reconnect attempts
+            reconnectAttempts = 0;
+            if (isDevelopment) {
+              console.log(`✅ Realtime counts subscribed: ${channelName}`);
+            }
+          } else if (status === 'CHANNEL_ERROR') {
+            // Only log error once in development, not repeatedly
+            if (isDevelopment && reconnectAttempts === 0) {
+              console.warn(`⚠️ Realtime counts channel error: ${channelName}`);
+            }
+
+            // Attempt to reconnect with exponential backoff
+            if (reconnectAttempts < maxReconnectAttempts && isSubscribed) {
+              reconnectAttempts++;
+              const backoffDelay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+
+              if (isDevelopment) {
+                console.log(`🔄 Reconnecting in ${backoffDelay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+              }
+
+              reconnectTimeout = setTimeout(() => {
+                if (isSubscribed) {
+                  supabase.removeChannel(channel);
+                  setupChannel();
+                }
+              }, backoffDelay);
+            }
+          } else if (status === 'TIMED_OUT') {
+            // Only log timeout once in development
+            if (isDevelopment && reconnectAttempts === 0) {
+              console.warn(`⏱️ Realtime counts timed out: ${channelName}`);
+            }
+          } else if (status === 'CLOSED') {
+            if (isDevelopment) {
+              console.log(`🔌 Realtime counts channel closed: ${channelName}`);
+            }
+          }
+        });
+
+      return channel;
+    };
+
+    const channel = setupChannel();
 
     return () => {
-      supabase.removeChannel(channel);
+      isSubscribed = false;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (channel) {
+        const supabase = createClient();
+        supabase.removeChannel(channel);
+      }
     };
   }, [selectedCompany?.id, user?.id, companyLoading]);
 
