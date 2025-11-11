@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useNavigation, PrimaryNavItem } from '@/contexts/NavigationContext';
@@ -20,7 +21,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     href: string;
     disabled: boolean;
     superAdminOnly?: boolean;
-    icon: JSX.Element;
+    icon: React.ReactElement;
     text: string;
   }> = [
     {
