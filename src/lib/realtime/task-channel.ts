@@ -18,6 +18,7 @@
 
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { simpleSubscriptionHandler } from './channel-helpers';
 
 /**
  * Payload structure broadcast by database triggers when tasks change
@@ -86,11 +87,7 @@ export function subscribeToTaskUpdates(
       callback(payload as TaskUpdatePayload);
     })
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.error('Task broadcast channel error');
-      } else if (status === 'TIMED_OUT') {
-        console.error('Task broadcast channel timed out');
-      }
+      simpleSubscriptionHandler(status, 'tasks');
     });
 }
 

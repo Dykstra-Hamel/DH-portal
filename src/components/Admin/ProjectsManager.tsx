@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { adminAPI } from '@/lib/api-client';
@@ -22,6 +23,7 @@ interface ProjectsManagerProps {
 }
 
 const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
+  const searchParams = useSearchParams();
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [currentUserProfile, setCurrentUserProfile] = useState<User | null>(
@@ -70,6 +72,18 @@ const ProjectsManager: React.FC<ProjectsManagerProps> = ({ user }) => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Handle edit modal from URL parameter (e.g., ?edit=project-id)
+  useEffect(() => {
+    const editId = searchParams?.get('edit');
+    if (editId && projects.length > 0) {
+      const projectToEdit = projects.find(p => p.id === editId);
+      if (projectToEdit) {
+        setEditingProject(projectToEdit);
+        setIsModalOpen(true);
+      }
+    }
+  }, [searchParams, projects]);
 
   const handleSubmit = async (formData: ProjectFormData) => {
     try {

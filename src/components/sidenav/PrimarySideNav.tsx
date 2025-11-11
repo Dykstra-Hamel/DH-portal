@@ -1,8 +1,10 @@
 'use client';
 
+import React from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useNavigation, PrimaryNavItem } from '@/contexts/NavigationContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import styles from './PrimarySideNav.module.scss';
 
 interface PrimarySideNavProps {
@@ -12,8 +14,16 @@ interface PrimarySideNavProps {
 export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const pathname = usePathname();
   const { setActivePrimaryNav } = useNavigation();
+  const { isAdmin, isHydrating } = useCompany();
 
-  const menuItems = [
+  const menuItems: Array<{
+    id: PrimaryNavItem;
+    href: string;
+    disabled: boolean;
+    superAdminOnly?: boolean;
+    icon: React.ReactElement;
+    text: string;
+  }> = [
     {
       id: 'dashboard' as PrimaryNavItem,
       href: '/dashboard',
@@ -112,9 +122,10 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       text: 'Customers',
     },
     {
-      id: 'tasks' as PrimaryNavItem,
-      href: '/connections/incoming',
-      disabled: true,
+      id: 'project-management' as PrimaryNavItem,
+      href: '/project-management',
+      disabled: false,
+      superAdminOnly: true, // Only visible to super admins
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -235,10 +246,21 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     return pathname.startsWith(href);
   };
 
+  // Filter menu items based on super admin status
+  // Hide super-admin-only items by default until we confirm user is admin
+  const visibleMenuItems = menuItems.filter(item => {
+    // For super-admin-only items, only show after hydration completes AND user is admin
+    if (item.superAdminOnly) {
+      return !isHydrating && isAdmin;
+    }
+    // All other items are always visible
+    return true;
+  });
+
   return (
     <div className={`${styles.primarySideNav} ${className || ''}`}>
       <nav className={styles.navigation}>
-        {menuItems.map(item =>
+        {visibleMenuItems.map(item =>
           item.disabled ? (
             <div
               key={item.id}

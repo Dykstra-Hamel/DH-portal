@@ -17,3 +17,8 @@ WHERE source_id IS NOT NULL;
 
 -- Update comments
 COMMENT ON COLUMN pest_pressure_data_points.source_id IS 'ID of source record (call_record, form_submission, or lead). NULL for backfilled historical data.';
+
+-- NOTE: Historical data backfill migrations (20251106214336 through 20251107203708) were
+-- run directly in production and have been moved to backups/ directory. These migrations
+-- contained ~8MB of INSERT statements for pest_pressure_data_points and are not needed
+-- for local development. The data exists in production only.

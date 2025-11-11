@@ -18,6 +18,7 @@
 
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { simpleSubscriptionHandler } from './channel-helpers';
 
 /**
  * Payload structure broadcast by database triggers when leads change
@@ -86,11 +87,7 @@ export function subscribeToLeadUpdates(
       callback(payload as LeadUpdatePayload);
     })
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.error('Lead broadcast channel error');
-      } else if (status === 'TIMED_OUT') {
-        console.error('Lead broadcast channel timed out');
-      }
+      simpleSubscriptionHandler(status, 'leads');
     });
 }
 

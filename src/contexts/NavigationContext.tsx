@@ -14,7 +14,8 @@ export type PrimaryNavItem =
   | 'connections'
   | 'customers'
   | 'tasks'
-  | 'brand';
+  | 'brand'
+  | 'project-management';
 
 interface NavigationContextType {
   activePrimaryNav: PrimaryNavItem;
@@ -44,6 +45,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       setActivePrimaryNav('customers');
     } else if (pathname.startsWith('/brand')) {
       setActivePrimaryNav('brand');
+    } else if (pathname.startsWith('/project-management')) {
+      setActivePrimaryNav('project-management');
     } else if (pathname.startsWith('/dashboard')) {
       setActivePrimaryNav('dashboard');
     } else {
