@@ -1,0 +1,199 @@
+.pageContainer {
+  padding: 0 16px;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+
+  @media (min-width: 769px) {
+    padding: 0;
+  }
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 750;
+  color: var(--gray-800);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--action-500);
+  color: white;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 650;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 40px;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(:disabled) {
+    background: #0070d4;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.filterHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.toggleSwitch {
+  display: inline-flex;
+  background: var(--gray-100);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.toggleButton {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 550;
+  font-family: var(--font-satoshi);
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(.active) {
+    color: var(--gray-700);
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  &.active {
+    background: white;
+    color: var(--action-600);
+    font-weight: 650;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+}
+
+.taskCount {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-600);
+  font-family: var(--font-satoshi);
+}
+
+.viewTabsContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 2px solid var(--gray-200);
+  margin-bottom: 24px;
+}
+
+.viewTabs {
+  display: flex;
+  gap: 4px;
+}
+
+.viewTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 550;
+  font-family: var(--font-satoshi);
+  color: var(--gray-500);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  position: relative;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(.active) {
+    color: var(--gray-700);
+    background: var(--gray-50);
+  }
+
+  &.active {
+    color: var(--action-500);
+    border-bottom-color: var(--action-500);
+    font-weight: 650;
+
+    svg {
+      color: var(--action-500);
+    }
+  }
+}
+
+.viewContent {
+  min-height: 400px;
+}
+
+@media (max-width: 768px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .headerActions {
+    width: 100%;
+
+    .primaryButton {
+      flex: 1;
+    }
+  }
+
+  .viewTabsContainer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .viewTabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .viewTab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .toggleSwitch {
+    width: 100%;
+  }
+}
