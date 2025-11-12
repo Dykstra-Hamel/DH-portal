@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
-import ProjectDetail from '@/components/Projects/ProjectDetail/ProjectDetail';
+import ProjectDetailWithTasks from '@/components/Projects/ProjectDetailWithTasks/ProjectDetailWithTasks';
 import { Project } from '@/types/project';
 
 interface ProjectDetailPageProps {
@@ -131,5 +131,5 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     return <div style={{ padding: '2rem' }}>Redirecting...</div>;
   }
 
-  return <ProjectDetail project={project} user={user} />;
+  return <ProjectDetailWithTasks project={project} user={user} />;
 }

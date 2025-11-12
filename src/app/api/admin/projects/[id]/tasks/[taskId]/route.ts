@@ -107,17 +107,6 @@ export async function PUT(
     // Parse request body
     const body = await request.json();
 
-    // Process labels if provided as comma-separated string
-    let labels = body.labels;
-    if (typeof labels === 'string' && labels.trim()) {
-      labels = labels
-        .split(',')
-        .map((l: string) => l.trim())
-        .filter((l: string) => l.length > 0);
-    } else if (!Array.isArray(labels)) {
-      labels = null;
-    }
-
     // Prepare update data
     const updateData: any = {};
 
@@ -125,12 +114,12 @@ export async function PUT(
     if (body.title !== undefined) updateData.title = body.title;
     if (body.description !== undefined) updateData.description = body.description || null;
     if (body.notes !== undefined) updateData.notes = body.notes || null;
-    if (body.status !== undefined) {
-      updateData.status = body.status;
-      // Auto-set completed_at when status changes to completed
-      if (body.status === 'completed' && !body.completed_at) {
+    if (body.is_completed !== undefined) {
+      updateData.is_completed = body.is_completed;
+      // Auto-set completed_at when task is marked as completed
+      if (body.is_completed && !body.completed_at) {
         updateData.completed_at = new Date().toISOString();
-      } else if (body.status !== 'completed') {
+      } else if (!body.is_completed) {
         updateData.completed_at = null;
       }
     }
@@ -141,29 +130,14 @@ export async function PUT(
     if (body.completed_at !== undefined) updateData.completed_at = body.completed_at || null;
     if (body.progress_percentage !== undefined) {
       updateData.progress_percentage = body.progress_percentage;
-      // Auto-complete if progress reaches 100%
-      if (body.progress_percentage === 100 && body.status !== 'completed') {
-        updateData.status = 'completed';
-        updateData.completed_at = new Date().toISOString();
-      }
-    }
-    if (body.estimated_hours !== undefined) {
-      updateData.estimated_hours = body.estimated_hours ? parseFloat(body.estimated_hours) : null;
     }
     if (body.actual_hours !== undefined) {
       updateData.actual_hours = body.actual_hours ? parseFloat(body.actual_hours) : null;
-    }
-    if (body.labels !== undefined) updateData.labels = labels;
-    if (body.milestone !== undefined) updateData.milestone = body.milestone || null;
-    if (body.sprint !== undefined) updateData.sprint = body.sprint || null;
-    if (body.story_points !== undefined) {
-      updateData.story_points = body.story_points ? parseInt(body.story_points, 10) : null;
     }
     if (body.blocked_by !== undefined) updateData.blocked_by = body.blocked_by;
     if (body.blocking !== undefined) updateData.blocking = body.blocking;
     if (body.blocker_reason !== undefined) updateData.blocker_reason = body.blocker_reason || null;
     if (body.display_order !== undefined) updateData.display_order = body.display_order;
-    if (body.kanban_column !== undefined) updateData.kanban_column = body.kanban_column || null;
     if (body.parent_task_id !== undefined) updateData.parent_task_id = body.parent_task_id || null;
 
     // Update task

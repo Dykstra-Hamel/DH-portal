@@ -10,6 +10,9 @@ import {
   Company,
   statusOptions,
   priorityOptions,
+  projectTypeOptions,
+  printSubtypes,
+  digitalSubtypes,
 } from '@/types/project';
 import styles from './ProjectForm.module.scss';
 
@@ -44,20 +47,22 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     name: editingProject?.name || '',
     description: editingProject?.description || '',
     project_type: editingProject?.project_type || '',
+    project_subtype: editingProject?.project_subtype || '',
     requested_by: editingProject?.requested_by_profile?.id || currentUser.id,
     company_id: editingProject?.company?.id || userActiveCompany?.id || '',
     assigned_to: editingProject?.assigned_to_profile?.id || '',
-    status: editingProject?.status || 'pending',
+    status: editingProject?.status || 'coming_up',
     priority: editingProject?.priority || 'medium',
     due_date: editingProject?.due_date || '',
     start_date: editingProject?.start_date || '',
     completion_date: editingProject?.completion_date || '',
-    estimated_hours: editingProject?.estimated_hours?.toString() || '',
-    actual_hours: editingProject?.actual_hours?.toString() || '',
-    budget_amount: editingProject?.budget_amount?.toString() || '',
+    is_billable: editingProject?.is_billable ? 'true' : 'false',
+    quoted_price: editingProject?.quoted_price?.toString() || '',
     tags: editingProject?.tags?.join(', ') || '',
     notes: editingProject?.notes || '',
   });
+
+  const [customSubtype, setCustomSubtype] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -68,40 +73,50 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         name: editingProject.name || '',
         description: editingProject.description || '',
         project_type: editingProject.project_type || '',
+        project_subtype: editingProject.project_subtype || '',
         requested_by: editingProject.requested_by_profile?.id || currentUser.id,
         company_id: editingProject.company?.id || userActiveCompany?.id || '',
         assigned_to: editingProject.assigned_to_profile?.id || '',
-        status: editingProject.status || 'pending',
+        status: editingProject.status || 'coming_up',
         priority: editingProject.priority || 'medium',
         due_date: editingProject.due_date || '',
         start_date: editingProject.start_date || '',
         completion_date: editingProject.completion_date || '',
-        estimated_hours: editingProject.estimated_hours?.toString() || '',
-        actual_hours: editingProject.actual_hours?.toString() || '',
-        budget_amount: editingProject.budget_amount?.toString() || '',
+        is_billable: editingProject.is_billable ? 'true' : 'false',
+        quoted_price: editingProject.quoted_price?.toString() || '',
         tags: editingProject.tags?.join(', ') || '',
         notes: editingProject.notes || '',
       });
+      // Handle custom subtype
+      const isPrint = editingProject.project_type === 'print';
+      const isDigital = editingProject.project_type === 'digital';
+      const subtypes = isPrint ? printSubtypes : isDigital ? digitalSubtypes : [];
+      const isOther = editingProject.project_subtype &&
+        !subtypes.find(s => s.value === editingProject.project_subtype);
+      if (isOther) {
+        setCustomSubtype(editingProject.project_subtype || '');
+      }
     } else {
       // Reset form for new project
       setFormData({
         name: '',
         description: '',
         project_type: '',
+        project_subtype: '',
         requested_by: currentUser.id,
         company_id: userActiveCompany?.id || '',
         assigned_to: '',
-        status: 'pending',
+        status: 'coming_up',
         priority: 'medium',
         due_date: '',
         start_date: '',
         completion_date: '',
-        estimated_hours: '',
-        actual_hours: '',
-        budget_amount: '',
+        is_billable: 'false',
+        quoted_price: '',
         tags: '',
         notes: '',
       });
+      setCustomSubtype('');
     }
   }, [editingProject, currentUser.id, userActiveCompany?.id]);
 
@@ -110,7 +125,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
     try {
       setIsSubmitting(true);
-      await onSubmit(formData);
+      // If "other" is selected, use custom subtype
+      const submitData = {
+        ...formData,
+        project_subtype: formData.project_subtype === 'other' ? customSubtype : formData.project_subtype,
+      };
+      await onSubmit(submitData);
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -119,25 +139,30 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     }
   };
 
+  // Get current subtypes based on project type
+  const currentSubtypes = formData.project_type === 'print' ? printSubtypes :
+    formData.project_type === 'digital' ? digitalSubtypes : [];
+
   const handleClose = () => {
     setFormData({
       name: '',
       description: '',
       project_type: '',
+      project_subtype: '',
       requested_by: currentUser.id,
       company_id: userActiveCompany?.id || '',
       assigned_to: '',
-      status: 'pending',
+      status: 'coming_up',
       priority: 'medium',
       due_date: '',
       start_date: '',
       completion_date: '',
-      estimated_hours: '',
-      actual_hours: '',
-      budget_amount: '',
+      is_billable: 'false',
+      quoted_price: '',
       tags: '',
       notes: '',
     });
+    setCustomSubtype('');
     onClose();
   };
 
@@ -175,16 +200,58 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
             <div className={styles.formGroup}>
               <label>Project Type *</label>
-              <input
-                type="text"
+              <select
                 value={formData.project_type}
-                onChange={e =>
-                  setFormData({ ...formData, project_type: e.target.value })
-                }
-                placeholder="e.g., Web Design, Logo Design, Marketing Campaign"
+                onChange={e => {
+                  setFormData({ ...formData, project_type: e.target.value, project_subtype: '' });
+                  setCustomSubtype('');
+                }}
                 required
-              />
+              >
+                <option value="">Select Project Type</option>
+                {projectTypeOptions.map(type => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            {formData.project_type && (
+              <div className={styles.formGroup}>
+                <label>Project Subtype *</label>
+                <select
+                  value={formData.project_subtype}
+                  onChange={e => {
+                    setFormData({ ...formData, project_subtype: e.target.value });
+                    if (e.target.value !== 'other') {
+                      setCustomSubtype('');
+                    }
+                  }}
+                  required
+                >
+                  <option value="">Select Subtype</option>
+                  {currentSubtypes.map(subtype => (
+                    <option key={subtype.value} value={subtype.value}>
+                      {subtype.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {formData.project_subtype === 'other' && (
+              <div className={styles.formGroup}>
+                <label>Custom Subtype *</label>
+                <input
+                  type="text"
+                  value={customSubtype}
+                  onChange={e => setCustomSubtype(e.target.value)}
+                  placeholder="Enter custom project subtype"
+                  required
+                />
+              </div>
+            )}
 
             <div className={styles.formGroup}>
               <label>Company *</label>
@@ -346,46 +413,41 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 </div>
 
                 <div className={styles.formGroup}>
-                  <label>Estimated Hours</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formData.estimated_hours}
-                    onChange={e =>
-                      setFormData({
-                        ...formData,
-                        estimated_hours: e.target.value,
-                      })
-                    }
-                  />
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_billable === 'true'}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          is_billable: e.target.checked ? 'true' : 'false',
+                          quoted_price: e.target.checked ? formData.quoted_price : '',
+                        })
+                      }
+                      style={{ marginRight: '8px' }}
+                    />
+                    Is Billable?
+                  </label>
                 </div>
 
-                <div className={styles.formGroup}>
-                  <label>Actual Hours</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formData.actual_hours}
-                    onChange={e =>
-                      setFormData({ ...formData, actual_hours: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>Budget Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.budget_amount}
-                    onChange={e =>
-                      setFormData({
-                        ...formData,
-                        budget_amount: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+                {formData.is_billable === 'true' && (
+                  <div className={styles.formGroup}>
+                    <label>Quoted Price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.quoted_price}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          quoted_price: e.target.value,
+                        })
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>
