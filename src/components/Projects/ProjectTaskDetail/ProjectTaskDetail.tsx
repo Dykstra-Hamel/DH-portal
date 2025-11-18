@@ -7,11 +7,10 @@ import {
   Trash2,
   User as UserIcon,
   Calendar,
-  Clock,
-  Target,
   MessageSquare,
   CheckSquare,
   Plus,
+  Activity as ActivityIcon,
 } from 'lucide-react';
 import { ProjectTask, taskPriorityOptions } from '@/types/project';
 import styles from './ProjectTaskDetail.module.scss';
@@ -19,25 +18,35 @@ import styles from './ProjectTaskDetail.module.scss';
 interface ProjectTaskDetailProps {
   task: ProjectTask | null;
   onClose: () => void;
-  onEdit: () => void;
+  onUpdate: (taskId: string, updates: Partial<ProjectTask>) => Promise<void>;
   onDelete: () => void;
   onAddComment: (comment: string) => Promise<void>;
   onCreateSubtask: () => void;
   onUpdateProgress: (progress: number) => Promise<void>;
+  users: any[]; // List of users for assignment dropdown
 }
 
 export default function ProjectTaskDetail({
   task,
   onClose,
-  onEdit,
+  onUpdate,
   onDelete,
   onAddComment,
   onCreateSubtask,
   onUpdateProgress,
+  users,
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [progressValue, setProgressValue] = useState(task?.progress_percentage || 0);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: task?.title || '',
+    description: task?.description || '',
+    priority: task?.priority || 'medium',
+    assigned_to: task?.assigned_to || null,
+    due_date: task?.due_date || '',
+    start_date: task?.start_date || '',
+  });
 
   if (!task) return null;
 
@@ -58,14 +67,68 @@ export default function ProjectTaskDetail({
     });
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const getRelativeTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+    return formatDateTime(dateString);
+  };
+
+  const getActivityMessage = (activity: any): string => {
+    const priorityLabel = (priority: string) => taskPriorityOptions.find(p => p.value === priority)?.label || priority;
+
+    switch (activity.action_type) {
+      case 'created':
+        return 'created this task';
+      case 'completed':
+        return 'marked this task as complete';
+      case 'uncompleted':
+        return 'reopened this task';
+      case 'title_changed':
+        return `changed title from "${activity.old_value}" to "${activity.new_value}"`;
+      case 'description_changed':
+        return 'updated the description';
+      case 'notes_changed':
+        return 'updated the notes';
+      case 'priority_changed':
+        return `changed priority from ${priorityLabel(activity.old_value)} to ${priorityLabel(activity.new_value)}`;
+      case 'due_date_changed':
+        if (!activity.old_value && activity.new_value) {
+          return `set due date to ${new Date(activity.new_value).toLocaleDateString()}`;
+        } else if (activity.old_value && !activity.new_value) {
+          return 'removed the due date';
+        }
+        return `changed due date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`;
+      case 'assigned':
+      case 'unassigned':
+        if (activity.action_type === 'unassigned') {
+          return 'unassigned this task';
+        }
+        return 'assigned this task';
+      default:
+        return activity.action_type.replace(/_/g, ' ');
+    }
   };
 
   const handleSubmitComment = async (e: React.FormEvent) => {
@@ -83,20 +146,36 @@ export default function ProjectTaskDetail({
     }
   };
 
-  const handleProgressChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
-    setProgressValue(value);
-  };
-
-  const handleProgressBlur = async () => {
-    if (progressValue !== task.progress_percentage) {
-      await onUpdateProgress(progressValue);
-    }
-  };
-
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this task? This will also delete all subtasks and comments.')) {
       onDelete();
+    }
+  };
+
+  const handleEdit = () => {
+    // Initialize form data when entering edit mode
+    setEditFormData({
+      title: task.title,
+      description: task.description || '',
+      priority: task.priority,
+      assigned_to: task.assigned_to || null,
+      due_date: task.due_date || '',
+      start_date: task.start_date || '',
+    });
+    setIsEditMode(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      await onUpdate(task.id, editFormData);
+      setIsEditMode(false);
+    } catch (error) {
+      console.error('Error updating task:', error);
+      alert('Failed to update task. Please try again.');
     }
   };
 
@@ -107,12 +186,27 @@ export default function ProjectTaskDetail({
         <div className={styles.header}>
           <div className={styles.headerTop}>
             <div className={styles.badges}>
-              <span
-                className={styles.priorityBadge}
-                style={{ backgroundColor: getPriorityColor(task.priority) }}
-              >
-                {getPriorityLabel(task.priority)}
-              </span>
+              {isEditMode ? (
+                <select
+                  className={styles.editSelect}
+                  value={editFormData.priority}
+                  onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
+                  style={{ backgroundColor: getPriorityColor(editFormData.priority), color: 'white' }}
+                >
+                  {taskPriorityOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span
+                  className={styles.priorityBadge}
+                  style={{ backgroundColor: getPriorityColor(task.priority) }}
+                >
+                  {getPriorityLabel(task.priority)}
+                </span>
+              )}
               {task.is_completed && (
                 <span className={styles.completedBadge}>
                   <CheckSquare size={14} />
@@ -124,57 +218,74 @@ export default function ProjectTaskDetail({
               <X size={20} />
             </button>
           </div>
-          <h2 className={styles.title}>{task.title}</h2>
+          <div className={styles.titleRow}>
+            {!isEditMode && (
+              <input
+                type="checkbox"
+                checked={task.is_completed}
+                onChange={(e) => onUpdate(task.id, { is_completed: e.target.checked })}
+                className={styles.completeCheckbox}
+              />
+            )}
+            {isEditMode ? (
+              <input
+                type="text"
+                className={styles.editTitleInput}
+                value={editFormData.title}
+                onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+              />
+            ) : (
+              <h2 className={`${styles.title} ${task.is_completed ? styles.completed : ''}`}>
+                {task.title}
+              </h2>
+            )}
+          </div>
           <div className={styles.headerActions}>
-            <button onClick={onEdit} className={styles.editButton}>
-              <Edit size={16} />
-              Edit
-            </button>
-            <button onClick={handleDelete} className={styles.deleteButton}>
-              <Trash2 size={16} />
-              Delete
-            </button>
+            {isEditMode ? (
+              <>
+                <button onClick={handleSaveEdit} className={styles.saveButton}>
+                  <CheckSquare size={16} />
+                  Save
+                </button>
+                <button onClick={handleCancelEdit} className={styles.cancelEditButton}>
+                  <X size={16} />
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={handleEdit} className={styles.editButton}>
+                  <Edit size={16} />
+                  Edit
+                </button>
+                <button onClick={handleDelete} className={styles.deleteButton}>
+                  <Trash2 size={16} />
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* Content */}
         <div className={styles.content}>
           {/* Description */}
-          {task.description && (
+          {(task.description || isEditMode) && (
             <div className={styles.section}>
               <h3 className={styles.sectionTitle}>Description</h3>
-              <p className={styles.description}>{task.description}</p>
+              {isEditMode ? (
+                <textarea
+                  className={styles.editTextarea}
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  rows={4}
+                  placeholder="Add a description..."
+                />
+              ) : (
+                <p className={styles.description}>{task.description}</p>
+              )}
             </div>
           )}
-
-          {/* Progress */}
-          <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>
-              <Target size={16} />
-              Progress
-            </h3>
-            <div className={styles.progressSection}>
-              <div className={styles.progressBar}>
-                <div
-                  className={styles.progressFill}
-                  style={{ width: `${progressValue}%` }}
-                ></div>
-              </div>
-              <div className={styles.progressControls}>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={progressValue}
-                  onChange={handleProgressChange}
-                  onMouseUp={handleProgressBlur}
-                  onTouchEnd={handleProgressBlur}
-                  className={styles.progressSlider}
-                />
-                <span className={styles.progressText}>{progressValue}%</span>
-              </div>
-            </div>
-          </div>
 
           {/* Details Grid */}
           <div className={styles.section}>
@@ -185,15 +296,30 @@ export default function ProjectTaskDetail({
                   <UserIcon size={14} />
                   Assigned To
                 </div>
-                <div className={styles.detailValue}>
-                  {task.assigned_to_profile ? (
-                    <>
-                      {task.assigned_to_profile.first_name} {task.assigned_to_profile.last_name}
-                    </>
-                  ) : (
-                    <span className={styles.unassigned}>Unassigned</span>
-                  )}
-                </div>
+                {isEditMode ? (
+                  <select
+                    className={styles.editSelect}
+                    value={editFormData.assigned_to || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, assigned_to: e.target.value || null })}
+                  >
+                    <option value="">Unassigned</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.profiles?.first_name} {user.profiles?.last_name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className={styles.detailValue}>
+                    {task.assigned_to_profile ? (
+                      <>
+                        {task.assigned_to_profile.first_name} {task.assigned_to_profile.last_name}
+                      </>
+                    ) : (
+                      <span className={styles.unassigned}>Unassigned</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className={styles.detailItem}>
@@ -217,9 +343,18 @@ export default function ProjectTaskDetail({
                   <Calendar size={14} />
                   Due Date
                 </div>
-                <div className={styles.detailValue}>
-                  {formatDate(task.due_date)}
-                </div>
+                {isEditMode ? (
+                  <input
+                    type="date"
+                    className={styles.editInput}
+                    value={editFormData.due_date || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
+                  />
+                ) : (
+                  <div className={styles.detailValue}>
+                    {formatDate(task.due_date)}
+                  </div>
+                )}
               </div>
 
               <div className={styles.detailItem}>
@@ -227,19 +362,18 @@ export default function ProjectTaskDetail({
                   <Calendar size={14} />
                   Start Date
                 </div>
-                <div className={styles.detailValue}>
-                  {formatDate(task.start_date)}
-                </div>
-              </div>
-
-              <div className={styles.detailItem}>
-                <div className={styles.detailLabel}>
-                  <Clock size={14} />
-                  Actual Hours
-                </div>
-                <div className={styles.detailValue}>
-                  {task.actual_hours ? `${task.actual_hours}h` : 'Not tracked'}
-                </div>
+                {isEditMode ? (
+                  <input
+                    type="date"
+                    className={styles.editInput}
+                    value={editFormData.start_date || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, start_date: e.target.value })}
+                  />
+                ) : (
+                  <div className={styles.detailValue}>
+                    {formatDate(task.start_date)}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -340,6 +474,39 @@ export default function ProjectTaskDetail({
               </div>
             )}
           </div>
+
+          {/* Activity Log */}
+          {task.activity && task.activity.length > 0 && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>
+                <ActivityIcon size={16} />
+                Activity
+              </h3>
+              <div className={styles.activityFeed}>
+                {task.activity.map(activity => (
+                  <div key={activity.id} className={styles.activityItem}>
+                    <div className={styles.activityAvatar}>
+                      {activity.user_profile?.first_name?.[0]}
+                      {activity.user_profile?.last_name?.[0]}
+                    </div>
+                    <div className={styles.activityContent}>
+                      <div className={styles.activityText}>
+                        <span className={styles.activityUser}>
+                          {activity.user_profile?.first_name} {activity.user_profile?.last_name}
+                        </span>{' '}
+                        <span className={styles.activityAction}>
+                          {getActivityMessage(activity)}
+                        </span>
+                      </div>
+                      <div className={styles.activityTime}>
+                        {getRelativeTime(activity.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Metadata */}
           <div className={styles.metadata}>

@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect, DragEvent } from 'react';
-import { Project, ProjectPhase, getClientById } from '@/types/taskManagement';
+import { Project } from '@/types/project';
 import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
 import styles from './ProjectKanbanView.module.scss';
+
+type ProjectStatus = 'coming_up' | 'design' | 'development' | 'out_to_client' | 'waiting_on_client' | 'bill_client';
 
 interface ProjectKanbanViewProps {
   projects: Project[];
@@ -10,45 +12,45 @@ interface ProjectKanbanViewProps {
 }
 
 interface Column {
-  id: ProjectPhase;
+  id: ProjectStatus;
   title: string;
   color: string;
 }
 
 const columns: Column[] = [
-  { id: 'coming-up', title: 'Coming Up', color: '#6b7280' },
+  { id: 'coming_up', title: 'Coming Up', color: '#6b7280' },
   { id: 'design', title: 'Design', color: '#8b5cf6' },
   { id: 'development', title: 'Development', color: '#3b82f6' },
-  { id: 'out-to-client', title: 'Out To Client', color: '#f59e0b' },
-  { id: 'waiting-on-client', title: 'Waiting On Client', color: '#ef4444' },
-  { id: 'bill-client', title: 'Bill Client', color: '#10b981' },
+  { id: 'out_to_client', title: 'Out To Client', color: '#f59e0b' },
+  { id: 'waiting_on_client', title: 'Waiting On Client', color: '#ef4444' },
+  { id: 'bill_client', title: 'Bill Client', color: '#10b981' },
 ];
 
 export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }: ProjectKanbanViewProps) {
   const [draggedProject, setDraggedProject] = useState<Project | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<ProjectPhase | null>(null);
-  const [columnScrollStates, setColumnScrollStates] = useState<Record<ProjectPhase, boolean>>({
-    'coming-up': false,
+  const [dragOverColumn, setDragOverColumn] = useState<ProjectStatus | null>(null);
+  const [columnScrollStates, setColumnScrollStates] = useState<Record<ProjectStatus, boolean>>({
+    'coming_up': false,
     'design': false,
     'development': false,
-    'out-to-client': false,
-    'waiting-on-client': false,
-    'bill-client': false,
+    'out_to_client': false,
+    'waiting_on_client': false,
+    'bill_client': false,
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const columnRefs = useRef<Record<ProjectPhase, HTMLDivElement | null>>({
-    'coming-up': null,
+  const columnRefs = useRef<Record<ProjectStatus, HTMLDivElement | null>>({
+    'coming_up': null,
     'design': null,
     'development': null,
-    'out-to-client': null,
-    'waiting-on-client': null,
-    'bill-client': null,
+    'out_to_client': null,
+    'waiting_on_client': null,
+    'bill_client': null,
   });
   const scrollAnimationRef = useRef<number | null>(null);
 
-  const getProjectsByPhase = (phase: ProjectPhase): Project[] => {
-    return projects.filter(project => project.phase === phase);
+  const getProjectsByStatus = (status: ProjectStatus): Project[] => {
+    return projects.filter(project => project.status === status);
   };
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>, project: Project) => {
@@ -111,7 +113,7 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
     }
   };
 
-  const checkColumnScroll = (columnId: ProjectPhase) => {
+  const checkColumnScroll = (columnId: ProjectStatus) => {
     const columnContent = columnRefs.current[columnId];
     if (!columnContent) return;
 
@@ -145,8 +147,8 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDragEnter = (phase: ProjectPhase) => {
-    setDragOverColumn(phase);
+  const handleDragEnter = (status: ProjectStatus) => {
+    setDragOverColumn(status);
   };
 
   const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
@@ -155,13 +157,13 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
     }
   };
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>, newPhase: ProjectPhase) => {
+  const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: ProjectStatus) => {
     e.preventDefault();
 
-    if (draggedProject && draggedProject.phase !== newPhase) {
+    if (draggedProject && draggedProject.status !== newStatus) {
       const updatedProject: Project = {
         ...draggedProject,
-        phase: newPhase,
+        status: newStatus,
         updated_at: new Date().toISOString(),
       };
 
@@ -192,7 +194,7 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
     <div ref={containerRef} className={styles.kanbanContainer}>
       <div className={styles.kanbanBoard}>
         {columns.map((column) => {
-          const columnProjects = getProjectsByPhase(column.id);
+          const columnProjects = getProjectsByStatus(column.id);
           const isDragOver = dragOverColumn === column.id;
 
           return (
@@ -217,8 +219,6 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
                 onScroll={() => checkColumnScroll(column.id)}
               >
                 {columnProjects.map((project) => {
-                  const client = getClientById(project.client_id);
-
                   return (
                     <div
                       key={project.id}
@@ -234,37 +234,23 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
                           <h3 className={styles.projectName}>{project.name}</h3>
                           <ProjectBadge
                             projectName={project.name}
-                            projectType={project.type}
+                            projectType={project.project_type}
                             size="small"
                           />
                         </div>
 
                         <div className={styles.projectClient}>
-                          {client?.company || 'Unknown Client'}
-                        </div>
-
-                        <div className={styles.projectProgress}>
-                          <div className={styles.progressBar}>
-                            <div
-                              className={styles.progressFill}
-                              style={{ width: `${project.progress}%` }}
-                            />
-                          </div>
-                          <span className={styles.progressText}>{project.progress}%</span>
+                          {project.company.name}
                         </div>
 
                         <div className={styles.projectFooter}>
-                          <div className={styles.projectStatus}>
-                            <span
-                              className={styles.statusDot}
-                              style={{ backgroundColor: getStatusColor(project.status) }}
-                            />
-                            <span className={styles.statusText}>
-                              {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                          <div className={styles.projectPriority}>
+                            <span className={styles.priorityText}>
+                              {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
                             </span>
                           </div>
                           <div className={styles.projectDeadline}>
-                            Due: {formatDate(project.deadline)}
+                            Due: {formatDate(project.due_date)}
                           </div>
                         </div>
                       </div>

@@ -217,7 +217,6 @@ export default function ProjectTaskList({
                     </span>
                   )}
                 </th>
-                <th className={styles.progressCol}>Progress</th>
                 <th className={styles.actionsCol}>Actions</th>
               </tr>
             </thead>
@@ -272,17 +271,6 @@ export default function ProjectTaskList({
                       <Clock size={14} />
                       {formatDate(task.due_date)}
                     </div>
-                  </td>
-                  <td className={styles.progressCell}>
-                    <div className={styles.progressBar}>
-                      <div
-                        className={styles.progressFill}
-                        style={{ width: `${task.progress_percentage}%` }}
-                      ></div>
-                    </div>
-                    <span className={styles.progressText}>
-                      {task.progress_percentage}%
-                    </span>
                   </td>
                   <td className={styles.actionsCell}>
                     <button

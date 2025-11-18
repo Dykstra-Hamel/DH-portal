@@ -37,6 +37,10 @@ export async function GET(
         comments:project_task_comments(
           *,
           user_profile:profiles(id, first_name, last_name, email)
+        ),
+        activity:project_task_activity(
+          *,
+          user_profile:profiles(id, first_name, last_name, email)
         )
       `
       )
@@ -65,9 +69,17 @@ export async function GET(
       .eq('parent_task_id', taskId)
       .order('display_order', { ascending: true });
 
+    // Sort activity by created_at descending (most recent first)
+    const sortedActivity = task.activity
+      ? task.activity.sort((a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+      : [];
+
     const taskWithSubtasks = {
       ...task,
       subtasks: subtasks || [],
+      activity: sortedActivity,
     };
 
     return NextResponse.json(taskWithSubtasks);
@@ -139,6 +151,14 @@ export async function PUT(
     if (body.blocker_reason !== undefined) updateData.blocker_reason = body.blocker_reason || null;
     if (body.display_order !== undefined) updateData.display_order = body.display_order;
     if (body.parent_task_id !== undefined) updateData.parent_task_id = body.parent_task_id || null;
+
+    // Recurring task fields
+    if (body.recurring_frequency !== undefined) {
+      updateData.recurring_frequency = body.recurring_frequency || null;
+      updateData.is_recurring_template = body.recurring_frequency && body.recurring_frequency !== 'none';
+    }
+    if (body.recurring_end_date !== undefined) updateData.recurring_end_date = body.recurring_end_date || null;
+    if (body.next_recurrence_date !== undefined) updateData.next_recurrence_date = body.next_recurrence_date || null;
 
     // Update task
     const { data: task, error } = await supabase

@@ -1,0 +1,258 @@
+.wideModal {
+  max-width: 900px !important;
+}
+
+.modalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.searchInput,
+.typeFilter {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  color: var(--gray-800);
+  background: white;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
+  }
+}
+
+.searchInput {
+  flex: 1;
+}
+
+.typeFilter {
+  min-width: 180px;
+  cursor: pointer;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+
+  p {
+    color: var(--gray-600);
+    font-size: 14px;
+  }
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--action-500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+
+  p {
+    color: var(--gray-600);
+    font-size: 14px;
+  }
+}
+
+.clearFiltersButton {
+  padding: 8px 16px;
+  background: white;
+  color: var(--gray-800);
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 550;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--slate-100);
+  }
+}
+
+.templateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.templateCard {
+  background: white;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--action-500);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.templateName {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.templateMeta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.typeLabel,
+.subtypeLabel {
+  padding: 4px 10px;
+  background: var(--action-50);
+  color: var(--action-700);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.subtypeLabel {
+  background: var(--slate-100);
+  color: var(--gray-700);
+}
+
+.templateDescription {
+  font-size: 13px;
+  color: var(--gray-600);
+  line-height: 1.5;
+  margin: 0;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.taskCount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gray-600);
+  font-weight: 550;
+
+  svg {
+    color: var(--gray-500);
+  }
+}
+
+.selectButton {
+  padding: 6px 14px;
+  background: var(--action-500);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: #0070d4;
+    transform: translateY(-1px);
+  }
+}
+
+.modalBottom {
+  display: flex;
+  justify-content: flex-end;
+  border-top: none !important;
+  padding-top: 0 !important;
+}
+
+.cancelButton {
+  background: white;
+  color: var(--gray-800);
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 40px;
+
+  &:hover {
+    background: var(--slate-100);
+  }
+}
+
+@media (max-width: 768px) {
+  .templateGrid {
+    grid-template-columns: 1fr;
+    max-height: 400px;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .typeFilter {
+    min-width: 100%;
+  }
+}

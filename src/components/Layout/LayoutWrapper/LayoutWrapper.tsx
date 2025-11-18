@@ -54,6 +54,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               onClick: getPageAction('add-project') || (() => {}),
             },
             {
+              text: 'Create from Template',
+              onClick: getPageAction('create-from-template') || (() => {}),
+            },
+            {
               text: 'New Task',
               onClick: getPageAction('add-task') || (() => {}),
             },

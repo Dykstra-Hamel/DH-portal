@@ -2,18 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import {
   Project,
-  ProjectTemplate,
   ProjectType,
-  PROJECT_TEMPLATES,
-  DUMMY_CLIENTS,
   DUMMY_USERS,
   PROJECT_TAGS,
   TaskPriority,
   ProjectStatus,
 } from '@/types/taskManagement';
+import { ProjectTemplate } from '@/types/project';
 import { useUser } from '@/hooks/useUser';
 import { TagSelector } from '@/components/Common/TagSelector/TagSelector';
 import styles from './ProjectModal.module.scss';
+
+interface Company {
+  id: string;
+  name: string;
+}
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -43,6 +46,54 @@ export function ProjectModal({ isOpen, onClose, onSave, project }: ProjectModalP
   });
 
   const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate | undefined>();
+  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+
+  // Fetch templates when modal opens
+  useEffect(() => {
+    if (isOpen && !project) {
+      fetchTemplates();
+    }
+  }, [isOpen, project]);
+
+  // Fetch companies when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchCompanies();
+    }
+  }, [isOpen]);
+
+  const fetchTemplates = async () => {
+    setIsLoadingTemplates(true);
+    try {
+      const response = await fetch('/api/admin/project-templates?is_active=true');
+      if (response.ok) {
+        const data = await response.json();
+        setTemplates(data);
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
+  const fetchCompanies = async () => {
+    setIsLoadingCompanies(true);
+    try {
+      const response = await fetch('/api/admin/companies');
+      if (response.ok) {
+        const data = await response.json();
+        setCompanies(data);
+      }
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  };
 
   useEffect(() => {
     if (project) {
@@ -84,9 +135,10 @@ export function ProjectModal({ isOpen, onClose, onSave, project }: ProjectModalP
   }, [project, isOpen]);
 
   useEffect(() => {
-    const template = PROJECT_TEMPLATES.find(t => t.type === formData.type);
+    // Find template by ID stored in formData.type (template dropdown stores template ID)
+    const template = templates.find(t => t.id === formData.type);
     setSelectedTemplate(template);
-  }, [formData.type]);
+  }, [formData.type, templates]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,19 +207,22 @@ export function ProjectModal({ isOpen, onClose, onSave, project }: ProjectModalP
 
             <div className={styles.formGroup}>
               <label htmlFor="type" className={styles.label}>
-                Project Type <span className={styles.required}>*</span>
+                Project Template <span className={styles.required}>*</span>
               </label>
               <select
                 id="type"
                 className={styles.select}
                 value={formData.type}
                 onChange={(e) => setFormData({ ...formData, type: e.target.value as ProjectType })}
-                disabled={!!project}
+                disabled={!!project || isLoadingTemplates}
                 required
               >
-                {PROJECT_TEMPLATES.map((template) => (
-                  <option key={template.type} value={template.type}>
-                    {template.name}
+                <option value="">
+                  {isLoadingTemplates ? 'Loading templates...' : 'Select a template'}
+                </option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} ({template.project_type})
                   </option>
                 ))}
               </select>
@@ -182,14 +237,14 @@ export function ProjectModal({ isOpen, onClose, onSave, project }: ProjectModalP
                   <span>{selectedTemplate.description}</span>
                 </div>
               )}
-              {selectedTemplate && !project && (
+              {selectedTemplate && selectedTemplate.tasks && selectedTemplate.tasks.length > 0 && !project && (
                 <div className={styles.templateTasks}>
                   <div className={styles.templateTasksHeader}>
-                    This project will automatically create {selectedTemplate.defaultTasks.length} tasks:
+                    This project will automatically create {selectedTemplate.tasks.length} tasks:
                   </div>
                   <ul className={styles.templateTasksList}>
-                    {selectedTemplate.defaultTasks.map((task, index) => (
-                      <li key={index}>{task.title}</li>
+                    {selectedTemplate.tasks.map((task) => (
+                      <li key={task.id}>{task.title}</li>
                     ))}
                   </ul>
                 </div>
@@ -205,12 +260,15 @@ export function ProjectModal({ isOpen, onClose, onSave, project }: ProjectModalP
                 className={styles.select}
                 value={formData.client_id}
                 onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                disabled={isLoadingCompanies}
                 required
               >
-                <option value="">Select a client</option>
-                {DUMMY_CLIENTS.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.company} ({client.name})
+                <option value="">
+                  {isLoadingCompanies ? 'Loading companies...' : 'Select a company'}
+                </option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
                   </option>
                 ))}
               </select>

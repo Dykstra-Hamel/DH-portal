@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import { Task, TaskStatus, TaskPriority, DUMMY_USERS, DUMMY_CLIENTS, DUMMY_PROJECTS } from '@/types/taskManagement';
+import { recurringFrequencyOptions } from '@/types/project';
 import styles from './TaskModal.module.scss';
 
 interface TaskModalProps {
@@ -309,13 +310,15 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task }: TaskModal
                 value={formData.recurring_frequency}
                 onChange={(e) => setFormData({ ...formData, recurring_frequency: e.target.value as import('@/types/taskManagement').RecurringFrequency })}
               >
-                <option value="none">Does Not Repeat</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="bimonthly">Bi-Monthly (Every 2 Months)</option>
-                <option value="quarterly">Quarterly (Every 3 Months)</option>
-                <option value="yearly">Yearly</option>
+                {recurringFrequencyOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
+              <small className={styles.helpText}>
+                Recurring tasks will automatically create new instances based on the schedule
+              </small>
             </div>
 
             {formData.recurring_frequency !== 'none' && (
@@ -331,6 +334,9 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task }: TaskModal
                   onChange={(e) => setFormData({ ...formData, recurring_end_date: e.target.value })}
                   min={formData.due_date}
                 />
+                <small className={styles.helpText}>
+                  Leave blank to repeat indefinitely
+                </small>
               </div>
             )}
           </div>

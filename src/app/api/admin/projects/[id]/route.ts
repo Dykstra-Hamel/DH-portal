@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
@@ -9,7 +10,7 @@ export async function GET(
     const supabase = createAdminClient();
     const { id } = await params;
 
-    const { data: project, error } = await supabase
+    const { data: project, error} = await supabase
       .from('projects')
       .select(
         `
@@ -17,6 +18,10 @@ export async function GET(
         company:companies(
           id,
           name
+        ),
+        activity:project_activity(
+          *,
+          user_profile:profiles(id, first_name, last_name, email)
         )
       `
       )
@@ -27,6 +32,13 @@ export async function GET(
       console.error('Error fetching project:', error);
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
+
+    // Sort activity by created_at descending
+    const sortedActivity = project.activity
+      ? project.activity.sort((a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+      : [];
 
     // Get profiles for the users involved in this project
     const userIds = [project.requested_by];
@@ -55,6 +67,7 @@ export async function GET(
       assigned_to_profile: project.assigned_to
         ? profileMap.get(project.assigned_to) || null
         : null,
+      activity: sortedActivity,
     };
 
     return NextResponse.json(enhancedProject);
@@ -75,7 +88,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createAdminClient();
+    // Use authenticated client so auth.uid() works in triggers
+    const supabase = await createClient();
     const { id } = await params;
     const body = await request.json();
 

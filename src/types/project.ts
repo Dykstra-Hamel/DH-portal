@@ -11,6 +11,9 @@ export interface Project {
   completion_date: string | null;
   is_billable: boolean;
   quoted_price: number | null;
+  budget_amount?: number | null;
+  estimated_hours?: number | null;
+  actual_hours?: number | null;
   tags: string[] | null;
   notes: string | null;
   primary_file_path: string | null;
@@ -32,6 +35,8 @@ export interface Project {
     id: string;
     name: string;
   };
+  comments?: ProjectComment[];
+  activity?: ProjectActivity[];
 }
 
 export interface ProjectFormData {
@@ -154,6 +159,13 @@ export interface ProjectTask {
   // Order & Display
   display_order: number;
 
+  // Recurring Fields
+  recurring_frequency: RecurringFrequency | null;
+  recurring_end_date: string | null;
+  parent_recurring_task_id: string | null;
+  is_recurring_template: boolean;
+  next_recurrence_date: string | null;
+
   // Metadata
   created_at: string;
   updated_at: string;
@@ -173,6 +185,7 @@ export interface ProjectTask {
   };
   subtasks?: ProjectTask[];
   comments?: ProjectTaskComment[];
+  activity?: ProjectTaskActivity[];
 }
 
 export interface ProjectTaskFormData {
@@ -184,6 +197,8 @@ export interface ProjectTaskFormData {
   due_date: string;
   start_date: string;
   parent_task_id: string;
+  recurring_frequency: string;
+  recurring_end_date: string;
 }
 
 export interface ProjectTaskComment {
@@ -193,6 +208,24 @@ export interface ProjectTaskComment {
   comment: string;
   created_at: string;
   updated_at: string;
+  user_profile?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+export interface ProjectTaskActivity {
+  id: string;
+  task_id: string;
+  user_id: string;
+  action_type: 'created' | 'edited' | 'completed' | 'uncompleted' | 'assigned' | 'unassigned' | 'priority_changed' | 'due_date_changed' | 'title_changed' | 'description_changed' | 'notes_changed';
+  field_changed: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  metadata: any | null;
+  created_at: string;
   user_profile?: {
     id: string;
     first_name: string;
@@ -222,4 +255,99 @@ export const taskPriorityOptions = [
   { value: 'medium', label: 'Medium', color: '#f59e0b' },
   { value: 'high', label: 'High', color: '#f97316' },
   { value: 'critical', label: 'Critical', color: '#ef4444' },
+];
+
+export interface ProjectComment {
+  id: string;
+  project_id: string;
+  user_id: string;
+  comment: string;
+  created_at: string;
+  updated_at: string;
+  user_profile?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+export interface ProjectActivity {
+  id: string;
+  project_id: string;
+  user_id: string;
+  action_type: 'created' | 'status_changed' | 'priority_changed' | 'assigned' | 'unassigned' |
+                'name_changed' | 'description_changed' | 'notes_changed' | 'due_date_changed' |
+                'start_date_changed' | 'completion_date_changed' | 'budget_changed' |
+                'estimated_hours_changed' | 'actual_hours_changed' | 'tags_changed' |
+                'project_type_changed' | 'project_subtype_changed';
+  field_changed: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  metadata: any | null;
+  created_at: string;
+  user_profile?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+// Project Template Types
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  project_type: string;
+  project_subtype: string | null;
+  is_active: boolean;
+  template_data: Record<string, any> | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  tasks?: ProjectTemplateTask[];
+}
+
+export interface ProjectTemplateTask {
+  id: string;
+  template_id: string;
+  title: string;
+  description: string | null;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  due_date_offset_days: number;
+  display_order: number;
+  tags: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectTemplateFormData {
+  name: string;
+  description: string;
+  project_type: string;
+  project_subtype: string;
+  is_active: string;
+  template_data: string;
+  tasks: Array<{
+    title: string;
+    description: string;
+    priority: string;
+    due_date_offset_days: string;
+    display_order: string;
+    tags: string;
+  }>;
+}
+
+// Recurring Task Types
+export type RecurringFrequency = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export const recurringFrequencyOptions = [
+  { value: 'none', label: 'Does Not Repeat' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every 2 Weeks' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly (Every 3 Months)' },
+  { value: 'yearly', label: 'Yearly' },
 ];

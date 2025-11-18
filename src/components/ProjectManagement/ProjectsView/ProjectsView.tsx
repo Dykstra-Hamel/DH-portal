@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Project, Task, ProjectStatus, ProjectType, getClientById, getTasksByProject } from '@/types/taskManagement';
+import { Project } from '@/types/project';
+import { Task } from '@/types/taskManagement';
 import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
 import styles from './ProjectsView.module.scss';
+
+type ProjectStatus = 'coming_up' | 'design' | 'development' | 'out_to_client' | 'waiting_on_client' | 'bill_client';
 
 interface ProjectsViewProps {
   projects: Project[];
@@ -12,7 +15,7 @@ interface ProjectsViewProps {
 
 export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }: ProjectsViewProps) {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
-  const [typeFilter, setTypeFilter] = useState<ProjectType | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Calculate project task counts
@@ -32,39 +35,39 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
         }
 
         // Type filter
-        if (typeFilter !== 'all' && project.type !== typeFilter) {
+        if (typeFilter !== 'all' && project.project_type !== typeFilter) {
           return false;
         }
 
         // Search filter
         if (searchQuery.trim()) {
           const query = searchQuery.toLowerCase();
-          const client = getClientById(project.client_id);
           return (
             project.name.toLowerCase().includes(query) ||
-            client?.company.toLowerCase().includes(query)
+            project.company.name.toLowerCase().includes(query)
           );
         }
 
         return true;
       })
-      .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
   }, [projects, statusFilter, typeFilter, searchQuery]);
 
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const getStatusBadge = (status: ProjectStatus) => {
-    const statusConfig = {
-      planning: { color: '#f3f4f6', textColor: '#6b7280', label: 'Planning' },
-      active: { color: '#dbeafe', textColor: '#1e40af', label: 'Active' },
-      'on-hold': { color: '#fef3c7', textColor: '#b45309', label: 'On Hold' },
-      completed: { color: '#d1fae5', textColor: '#065f46', label: 'Completed' },
-      archived: { color: '#f3f4f6', textColor: '#9ca3af', label: 'Archived' },
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { color: string; textColor: string; label: string }> = {
+      coming_up: { color: '#f3f4f6', textColor: '#6b7280', label: 'Coming Up' },
+      design: { color: '#ddd6fe', textColor: '#5b21b6', label: 'Design' },
+      development: { color: '#dbeafe', textColor: '#1e40af', label: 'Development' },
+      out_to_client: { color: '#fef3c7', textColor: '#b45309', label: 'Out To Client' },
+      waiting_on_client: { color: '#fee2e2', textColor: '#991b1b', label: 'Waiting On Client' },
+      bill_client: { color: '#d1fae5', textColor: '#065f46', label: 'Bill Client' },
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status] || statusConfig.coming_up;
     return (
       <span
         className={styles.statusBadge}
@@ -115,23 +118,22 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
           onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | 'all')}
         >
           <option value="all">All Status</option>
-          <option value="planning">Planning</option>
-          <option value="active">Active</option>
-          <option value="on-hold">On Hold</option>
-          <option value="completed">Completed</option>
-          <option value="archived">Archived</option>
+          <option value="coming_up">Coming Up</option>
+          <option value="design">Design</option>
+          <option value="development">Development</option>
+          <option value="out_to_client">Out To Client</option>
+          <option value="waiting_on_client">Waiting On Client</option>
+          <option value="bill_client">Bill Client</option>
         </select>
 
         <select
           className={styles.filterSelect}
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as ProjectType | 'all')}
+          onChange={(e) => setTypeFilter(e.target.value)}
         >
           <option value="all">All Types</option>
-          <option value="new-client-onboarding">New Client Onboarding</option>
-          <option value="monthly-marketing">Monthly Marketing</option>
-          <option value="website-redesign">Website Redesign</option>
-          <option value="seasonal-campaign">Seasonal Campaign</option>
+          <option value="print">Print</option>
+          <option value="digital">Digital</option>
         </select>
       </div>
 
@@ -166,8 +168,8 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
             </div>
           ) : (
             filteredProjects.map((project) => {
-              const client = getClientById(project.client_id);
               const taskStats = getProjectTaskCount(project.id);
+              const progress = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0;
 
               return (
                 <div key={project.id} className={styles.tableRow}>
@@ -175,10 +177,10 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
                     <div className={styles.projectName}>{project.name}</div>
                   </div>
                   <div className={styles.cell}>
-                    <div className={styles.clientName}>{client?.company || 'Unknown'}</div>
+                    <div className={styles.clientName}>{project.company.name}</div>
                   </div>
                   <div className={styles.cell}>
-                    <ProjectBadge projectName={project.type} projectType={project.type} size="small" />
+                    <ProjectBadge projectName={project.project_type} projectType={project.project_type} size="small" />
                   </div>
                   <div className={styles.cell}>
                     {getStatusBadge(project.status)}
@@ -188,10 +190,10 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
                       <div className={styles.progressBar}>
                         <div
                           className={styles.progressFill}
-                          style={{ width: `${project.progress}%` }}
+                          style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <span className={styles.progressText}>{project.progress}%</span>
+                      <span className={styles.progressText}>{progress}%</span>
                     </div>
                   </div>
                   <div className={styles.cell}>
@@ -200,7 +202,7 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
                     </div>
                   </div>
                   <div className={styles.cell}>
-                    <div className={styles.deadline}>{formatDate(project.deadline)}</div>
+                    <div className={styles.deadline}>{formatDate(project.due_date)}</div>
                   </div>
                   <div className={styles.cell}>
                     <div className={styles.actions}>

@@ -19,6 +19,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
   const supabase = createClient();
 
@@ -109,7 +110,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     });
 
     return () => subscription.unsubscribe();
-  }, [projectId, router, supabase]);
+  }, [projectId, router, supabase, refreshKey]);
+
+  const handleProjectUpdate = () => {
+    setRefreshKey(prev => prev + 1);
+  };
 
   if (loading) {
     return <div style={{ padding: '2rem' }}>Loading project...</div>;
@@ -131,5 +136,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     return <div style={{ padding: '2rem' }}>Redirecting...</div>;
   }
 
-  return <ProjectDetailWithTasks project={project} user={user} />;
+  return (
+    <ProjectDetailWithTasks
+      project={project}
+      user={user}
+      onProjectUpdate={handleProjectUpdate}
+    />
+  );
 }

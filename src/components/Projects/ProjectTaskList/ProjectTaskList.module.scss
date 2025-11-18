@@ -201,6 +201,31 @@
 
 .taskRow {
   cursor: pointer;
+
+  &.completed {
+    opacity: 0.6;
+    background: var(--gray-50, #f9fafb);
+
+    &:hover {
+      opacity: 0.75;
+    }
+
+    .taskTitle span {
+      text-decoration: line-through;
+      color: var(--text-secondary, #9ca3af);
+    }
+
+    .priorityBadge,
+    .assignee,
+    .dueDate {
+      opacity: 0.7;
+    }
+  }
+}
+
+.completedText {
+  text-decoration: line-through;
+  color: var(--text-secondary, #9ca3af);
 }
 
 .sortIndicator {

@@ -63,8 +63,18 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   });
 
   const [customSubtype, setCustomSubtype] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const PRESET_PROJECT_TAGS = [
+    'seo', 'social-media', 'content', 'design', 'development',
+    'ppc', 'google-ads', 'facebook-ads', 'email', 'analytics',
+    'branding', 'website', 'blog', 'video', 'photography',
+    'local-seo', 'gmb', 'reviews', 'reporting', 'strategy',
+    'print', 'digital', 'billboard', 'business-cards',
+    'door-hangers', 'vehicle-wrap',
+  ];
 
   // Update form data when editingProject changes
   useEffect(() => {
@@ -87,6 +97,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         tags: editingProject.tags?.join(', ') || '',
         notes: editingProject.notes || '',
       });
+      // Set selected tags from editing project
+      setSelectedTags(editingProject.tags || []);
       // Handle custom subtype
       const isPrint = editingProject.project_type === 'print';
       const isDigital = editingProject.project_type === 'digital';
@@ -116,6 +128,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         tags: '',
         notes: '',
       });
+      setSelectedTags([]);
       setCustomSubtype('');
     }
   }, [editingProject, currentUser.id, userActiveCompany?.id]);
@@ -129,6 +142,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       const submitData = {
         ...formData,
         project_subtype: formData.project_subtype === 'other' ? customSubtype : formData.project_subtype,
+        tags: selectedTags.join(', '), // Convert tags array to comma-separated string
       };
       await onSubmit(submitData);
       onClose();
@@ -136,6 +150,14 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       console.error('Error submitting form:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleTag = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter(t => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
     }
   };
 
@@ -162,6 +184,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       tags: '',
       notes: '',
     });
+    setSelectedTags([]);
     setCustomSubtype('');
     onClose();
   };
@@ -464,13 +487,22 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           </div>
 
           <div className={styles.formGroup}>
-            <label>Tags (comma separated)</label>
-            <input
-              type="text"
-              value={formData.tags}
-              onChange={e => setFormData({ ...formData, tags: e.target.value })}
-              placeholder="business cards, website images, postcard design"
-            />
+            <label>Tags</label>
+            <div className={styles.presetTagsContainer}>
+              {PRESET_PROJECT_TAGS.map((tag) => {
+                const isSelected = selectedTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    className={`${styles.presetTag} ${isSelected ? styles.selected : ''}`}
+                    onClick={() => handleToggleTag(tag)}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {mode === 'full' && (

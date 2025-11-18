@@ -119,6 +119,10 @@ export async function POST(
       due_date: body.due_date || null,
       start_date: body.start_date || null,
       display_order: body.display_order || 0,
+      recurring_frequency: body.recurring_frequency || null,
+      recurring_end_date: body.recurring_end_date || null,
+      is_recurring_template: body.recurring_frequency && body.recurring_frequency !== 'none' ? true : false,
+      next_recurrence_date: body.recurring_frequency && body.recurring_frequency !== 'none' && body.due_date ? body.due_date : null,
     };
 
     // Insert task

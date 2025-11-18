@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Project, getClientById } from '@/types/taskManagement';
-import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
+import { Project } from '@/types/project';
 import styles from './ProjectCalendarView.module.scss';
 
 interface ProjectCalendarViewProps {
@@ -43,7 +42,7 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
 
   const getProjectsForDate = (date: Date): Project[] => {
     return projects.filter(project => {
-      const deadlineDate = new Date(project.deadline);
+      const deadlineDate = new Date(project.due_date);
       return (
         deadlineDate.getDate() === date.getDate() &&
         deadlineDate.getMonth() === date.getMonth() &&
@@ -78,16 +77,16 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
   const days = getDaysInMonth(currentDate);
   const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  const getPhaseColor = (phase: string) => {
-    const phaseColors: { [key: string]: string } = {
-      'coming-up': '#6b7280',
+  const getStatusColor = (status: string) => {
+    const statusColors: { [key: string]: string } = {
+      'coming_up': '#6b7280',
       'design': '#8b5cf6',
       'development': '#3b82f6',
-      'out-to-client': '#f59e0b',
-      'waiting-on-client': '#ef4444',
-      'bill-client': '#10b981',
+      'out_to_client': '#f59e0b',
+      'waiting_on_client': '#ef4444',
+      'bill_client': '#10b981',
     };
-    return phaseColors[phase] || '#6b7280';
+    return statusColors[status] || '#6b7280';
   };
 
   return (
@@ -128,17 +127,16 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
               <div className={styles.dayNumber}>{date.getDate()}</div>
               <div className={styles.projectsList}>
                 {dayProjects.map(project => {
-                  const client = getClientById(project.client_id);
                   return (
                     <div
                       key={project.id}
                       className={styles.projectItem}
                       onClick={() => onProjectClick(project)}
-                      style={{ borderLeftColor: getPhaseColor(project.phase) }}
+                      style={{ borderLeftColor: getStatusColor(project.status) }}
                     >
                       <div className={styles.projectItemName}>{project.name}</div>
                       <div className={styles.projectItemClient}>
-                        {client?.company}
+                        {project.company.name}
                       </div>
                     </div>
                   );

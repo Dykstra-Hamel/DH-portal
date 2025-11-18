@@ -14,15 +14,17 @@ import styles from './ProjectDetailWithTasks.module.scss';
 interface ProjectDetailWithTasksProps {
   project: Project;
   user: User;
+  onProjectUpdate?: () => void;
 }
 
-export default function ProjectDetailWithTasks({ project, user }: ProjectDetailWithTasksProps) {
+export default function ProjectDetailWithTasks({ project, user, onProjectUpdate }: ProjectDetailWithTasksProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'tasks'>('details');
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
   const [users, setUsers] = useState<ProjectUser[]>([]);
+  const [projectKey, setProjectKey] = useState(0);
 
   const {
     tasks,
@@ -136,6 +138,15 @@ export default function ProjectDetailWithTasks({ project, user }: ProjectDetailW
     handleCreateTask();
   };
 
+  const handleProjectUpdate = () => {
+    // Trigger refresh of project data if callback provided
+    if (onProjectUpdate) {
+      onProjectUpdate();
+    }
+    // Force re-render of ProjectDetail component with updated data
+    setProjectKey(prev => prev + 1);
+  };
+
   // Get only top-level tasks for parent task selector
   const parentTasks = tasks.filter(t => !t.parent_task_id);
 
@@ -163,7 +174,12 @@ export default function ProjectDetailWithTasks({ project, user }: ProjectDetailW
       {/* Content */}
       <div className={styles.content}>
         {activeTab === 'details' ? (
-          <ProjectDetail project={project} user={user} />
+          <ProjectDetail
+            key={projectKey}
+            project={project}
+            user={user}
+            onProjectUpdate={handleProjectUpdate}
+          />
         ) : (
           <>
             {error && (
@@ -205,11 +221,18 @@ export default function ProjectDetailWithTasks({ project, user }: ProjectDetailW
           setIsTaskDetailOpen(false);
           setSelectedTask(null);
         }}
-        onEdit={() => handleEditTask()}
+        onUpdate={async (taskId, updates) => {
+          await updateTask(project.id, taskId, updates);
+          // Refresh the task details to show updated data
+          const response = await fetch(`/api/admin/projects/${project.id}/tasks/${taskId}`);
+          const updatedTask = await response.json();
+          setSelectedTask(updatedTask);
+        }}
         onDelete={() => handleDeleteTask()}
         onAddComment={handleAddComment}
         onCreateSubtask={handleCreateSubtask}
         onUpdateProgress={handleUpdateProgress}
+        users={users}
       />
     </div>
   );

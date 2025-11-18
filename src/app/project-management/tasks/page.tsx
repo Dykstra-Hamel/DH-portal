@@ -4,19 +4,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useUser } from '@/hooks/useUser';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
-import { KanbanView } from '@/components/TaskManagement/KanbanView/KanbanView';
 import { CalendarView } from '@/components/TaskManagement/CalendarView/CalendarView';
 import { ArchiveView } from '@/components/TaskManagement/ArchiveView/ArchiveView';
 import { TaskListView } from '@/components/TaskManagement/TaskListView/TaskListView';
 import {
-  DUMMY_TASKS,
-  DUMMY_PROJECTS,
   Task,
   Project,
 } from '@/types/taskManagement';
 import styles from '../projectManagement.module.scss';
 
-type ViewType = 'kanban' | 'list' | 'calendar' | 'archive';
+type ViewType = 'list' | 'calendar' | 'archive';
 
 export default function TasksPage() {
   const { registerPageAction } = usePageActions();
@@ -26,9 +23,10 @@ export default function TasksPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | undefined>();
 
-  // Local state for dummy data (will be replaced with API calls later)
-  const [tasks, setTasks] = useState<Task[]>(DUMMY_TASKS);
-  const [projects, setProjects] = useState<Project[]>(DUMMY_PROJECTS);
+  // State for API data
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Filter tasks based on My Tasks toggle
   const filteredTasks = useMemo(() => {
@@ -105,17 +103,6 @@ export default function TasksPage() {
       <div className={styles.viewTabsContainer}>
         <div className={styles.viewTabs}>
         <button
-          className={`${styles.viewTab} ${currentView === 'kanban' ? styles.active : ''}`}
-          onClick={() => setCurrentView('kanban')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <rect x="2" y="3" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
-            <rect x="7" y="3" width="4" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-            <rect x="12" y="3" width="2" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
-          </svg>
-          Kanban
-        </button>
-        <button
           className={`${styles.viewTab} ${currentView === 'list' ? styles.active : ''}`}
           onClick={() => setCurrentView('list')}
         >
@@ -164,33 +151,35 @@ export default function TasksPage() {
 
       {/* View Content */}
       <div className={styles.viewContent}>
-        {currentView === 'kanban' && (
-          <KanbanView
-            tasks={filteredTasks}
-            onTaskClick={handleTaskClick}
-            onUpdateTask={handleUpdateTask}
-          />
-        )}
-        {currentView === 'list' && (
-          <TaskListView
-            tasks={filteredTasks}
-            projects={projects}
-            onTaskClick={handleTaskClick}
-            onDeleteTask={handleDeleteTask}
-          />
-        )}
-        {currentView === 'calendar' && (
-          <CalendarView
-            tasks={filteredTasks}
-            onTaskClick={handleTaskClick}
-          />
-        )}
-        {currentView === 'archive' && (
-          <ArchiveView
-            tasks={filteredTasks.filter(t => t.status === 'completed')}
-            projects={projects.filter(p => p.status === 'completed')}
-            onTaskClick={handleTaskClick}
-          />
+        {isLoading ? (
+          <div className={styles.loading}>
+            <div className={styles.spinner} />
+            <p>Loading tasks...</p>
+          </div>
+        ) : (
+          <>
+            {currentView === 'list' && (
+              <TaskListView
+                tasks={filteredTasks}
+                projects={projects}
+                onTaskClick={handleTaskClick}
+                onDeleteTask={handleDeleteTask}
+              />
+            )}
+            {currentView === 'calendar' && (
+              <CalendarView
+                tasks={filteredTasks}
+                onTaskClick={handleTaskClick}
+              />
+            )}
+            {currentView === 'archive' && (
+              <ArchiveView
+                tasks={filteredTasks.filter(t => t.status === 'completed')}
+                projects={projects.filter(p => p.status === 'completed')}
+                onTaskClick={handleTaskClick}
+              />
+            )}
+          </>
         )}
       </div>
 
