@@ -1,0 +1,49 @@
+<svg width="420" height="600" viewBox="0 0 420 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <rect width="420" height="600" fill="url(#gradient)"/>
+
+  <!-- Gradient definition -->
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="420" y2="600" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#1e293b" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Decorative circles -->
+  <circle cx="350" cy="100" r="80" fill="#3b82f6" opacity="0.1"/>
+  <circle cx="80" cy="450" r="60" fill="#1e293b" opacity="0.08"/>
+  <circle cx="300" cy="520" r="100" fill="#3b82f6" opacity="0.06"/>
+
+  <!-- Shield icon representing protection -->
+  <g transform="translate(140, 200)">
+    <path d="M70 0 L140 30 L140 90 C140 120 120 145 70 160 C20 145 0 120 0 90 L0 30 Z"
+          fill="#3b82f6" opacity="0.15"/>
+    <path d="M70 20 L120 40 L120 85 C120 105 108 120 70 130 C32 120 20 105 20 85 L20 40 Z"
+          fill="white" opacity="0.3"/>
+    <path d="M55 75 L65 85 L85 60"
+          stroke="#3b82f6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"
+          fill="none" opacity="0.4"/>
+  </g>
+
+  <!-- Decorative dots pattern -->
+  <g opacity="0.1">
+    <circle cx="60" cy="80" r="3" fill="#1e293b"/>
+    <circle cx="80" cy="90" r="3" fill="#1e293b"/>
+    <circle cx="100" cy="70" r="3" fill="#1e293b"/>
+    <circle cx="340" cy="480" r="3" fill="#3b82f6"/>
+    <circle cx="360" cy="470" r="3" fill="#3b82f6"/>
+    <circle cx="380" cy="490" r="3" fill="#3b82f6"/>
+  </g>
+
+  <!-- House icon representing home protection -->
+  <g transform="translate(200, 380)">
+    <path d="M50 20 L10 55 L10 100 L90 100 L90 55 Z"
+          fill="white" opacity="0.2"/>
+    <path d="M50 5 L5 45 L15 45 L15 105 L85 105 L85 45 L95 45 Z"
+          fill="#3b82f6" opacity="0.15"/>
+    <rect x="35" y="70" width="30" height="35" fill="#1e293b" opacity="0.2"/>
+    <rect x="20" y="60" width="15" height="15" fill="white" opacity="0.25"/>
+    <rect x="65" y="60" width="15" height="15" fill="white" opacity="0.25"/>
+  </g>
+</svg>

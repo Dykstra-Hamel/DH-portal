@@ -1,7 +1,7 @@
 import { CallSummaryEmailData } from './types';
 import { generateCallSummaryEmailTemplate } from './templates/call-summary';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from './index';
+import { MAILERSEND_API_TOKEN, getCompanyFromEmail } from './index';
 import { validateEmails } from './lead-notifications';
 
 export async function sendCallSummaryNotifications(
@@ -27,14 +27,14 @@ export async function sendCallSummaryNotifications(
       };
     }
 
-    // Use MailerSend with hard-coded from email
-    const fromEmail = MAILERSEND_FROM_EMAIL;
+    // Get company's from email (custom domain if verified, otherwise fallback)
+    const fromEmail = companyId ? await getCompanyFromEmail(companyId) : await getCompanyFromEmail('');
     let fromName = callData.companyName || 'Call Management System';
 
     if (companyId) {
       try {
         const supabase = createAdminClient();
-        
+
         // Get company name
         const { data: company } = await supabase
           .from('companies')

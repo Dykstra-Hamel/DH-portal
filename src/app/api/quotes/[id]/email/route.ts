@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { createClient } from '@/lib/supabase/server';
 import { logActivity } from '@/lib/activity-logger';
+import { generateQuoteUrl, generateQuoteToken, getFullQuoteUrl } from '@/lib/quote-utils';
 
 export async function POST(
   request: NextRequest,
@@ -65,7 +66,7 @@ export async function POST(
     // Get company information
     const { data: company, error: companyError } = await supabase
       .from('companies')
-      .select('id, name, email, phone, website')
+      .select('id, name, slug, email, phone, website')
       .eq('id', lead.company_id)
       .single();
 
@@ -75,6 +76,30 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    // Generate quote URL path if it doesn't already exist (fallback for older quotes)
+    let quoteUrlPath = quote.quote_url;
+    let token = quote.quote_token;
+
+    if (!quoteUrlPath && company.slug) {
+      // Generate token if it doesn't exist
+      if (!token) {
+        token = generateQuoteToken();
+      }
+
+      quoteUrlPath = generateQuoteUrl(company.slug, id, token);
+
+      // Update the quote with the generated quote_url path and token
+      await supabase
+        .from('quotes')
+        .update({ quote_url: quoteUrlPath, quote_token: token })
+        .eq('id', id);
+    }
+
+    // Convert path to full URL for email and append security token
+    const fullQuoteUrl = quoteUrlPath && token
+      ? `${getFullQuoteUrl(quoteUrlPath)}${quoteUrlPath.includes('?') ? '&' : '?'}token=${token}`
+      : '';
 
     // Fetch active quote email template for the company
     const { data: template, error: templateError } = await supabase
@@ -107,15 +132,20 @@ export async function POST(
     // Format line items as HTML list
     const quoteLineItems = quote.line_items && quote.line_items.length > 0
       ? '<ul style="list-style: none; padding: 0; margin: 0;">' +
-        quote.line_items.map((item: any) =>
-          `<li style="margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 6px;">
-            <strong>${item.plan_name}</strong> - ${item.service_frequency?.charAt(0).toUpperCase()}${item.service_frequency?.slice(1)}<br>
+        quote.line_items.map((item: any) => {
+          // Format service frequency (capitalize first letter, handle null/undefined)
+          const frequency = item.service_frequency
+            ? ` - ${item.service_frequency.charAt(0).toUpperCase()}${item.service_frequency.slice(1)}`
+            : '';
+
+          return `<li style="margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 6px;">
+            <strong>${item.plan_name}</strong>${frequency}<br>
             <span style="color: #6b7280; font-size: 14px;">
               ${formatCurrency(item.final_initial_price || item.initial_price || 0)} initial,
               ${formatCurrency(item.final_recurring_price || item.recurring_price || 0)}/mo recurring
             </span>
-          </li>`
-        ).join('') +
+          </li>`;
+        }).join('') +
         '</ul>'
       : 'No services selected';
 
@@ -145,6 +175,7 @@ export async function POST(
 
       // Quote variables
       quoteId: quote.id || '',
+      quoteUrl: fullQuoteUrl,
       quoteTotalInitialPrice: formatCurrency(quote.total_initial_price || 0),
       quoteTotalRecurringPrice: formatCurrency(quote.total_recurring_price || 0),
       quoteLineItems: quoteLineItems,

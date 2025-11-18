@@ -43,12 +43,6 @@ export function StreetViewImage({
         return;
       }
 
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
-      if (!apiKey) {
-        setError('Google Maps API key not configured');
-        return;
-      }
-
       setIsLoading(true);
       setError(null);
 
@@ -61,45 +55,42 @@ export function StreetViewImage({
           return;
         }
 
-        // Check Street View availability using Metadata API
-        const metadataUrl = `https://maps.googleapis.com/maps/api/streetview/metadata?` +
-          `location=${latitude},${longitude}&` +
-          `key=${apiKey}`;
+        // Check Street View availability using our server-side proxy
+        const metadataResponse = await fetch('/api/internal/street-view-metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ latitude, longitude }),
+        });
 
-        const metadataResponse = await fetch(metadataUrl);
+        if (!metadataResponse.ok) {
+          throw new Error('Failed to check Street View availability');
+        }
+
         const metadata = await metadataResponse.json();
 
-        // If Street View is available, use it
-        if (metadata.status === 'OK') {
-          const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?` +
-            `size=${width}x${height}&` +
-            `location=${latitude},${longitude}&` +
-            `key=${apiKey}`;
-
-          setImageUrl(streetViewUrl);
-          setImageType('streetview');
+        // Construct API URL based on availability
+        let type: 'streetview' | 'satellite';
+        if (metadata.available) {
+          type = 'streetview';
         } else if (fallbackToSatellite) {
-          // Street View not available, fallback to satellite
-          const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?` +
-            `center=${latitude},${longitude}&` +
-            `zoom=18&` +
-            `size=${width}x${height}&` +
-            `maptype=satellite&` +
-            `markers=color:red%7C${latitude},${longitude}&` +
-            `key=${apiKey}`;
-
-          setImageUrl(satelliteUrl);
-          setImageType('satellite');
+          type = 'satellite';
         } else {
-          // No Street View and fallback disabled
           setError('Street view not available for this location');
           setImageUrl(null);
           setImageType(null);
+          setIsLoading(false);
+          return;
         }
+
+        // Build the API URL that will proxy the image server-side
+        const apiUrl = `/api/internal/street-view-image?latitude=${latitude}&longitude=${longitude}&width=${width}&height=${height}&type=${type}`;
+        setImageUrl(apiUrl);
+        setImageType(type);
+        setIsLoading(false);
       } catch (err) {
         setError('Failed to load location image');
-        console.error('Error generating location image:', err);
-      } finally {
+        setImageUrl(null);
+        setImageType(null);
         setIsLoading(false);
       }
     };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { CreateQuoteRequest } from '@/types/quote';
+import { generateQuoteUrl, generateQuoteToken } from '@/lib/quote-utils';
 
 /**
  * Ensures a quote exists for a lead. Creates one if missing.
@@ -70,6 +71,22 @@ async function ensureQuoteExists(leadId: string) {
   if (createError) {
     console.error('Error creating quote:', createError);
     return { success: false, error: 'Failed to create quote' };
+  }
+
+  // Generate and update quote URL
+  const { data: company } = await supabase
+    .from('companies')
+    .select('slug')
+    .eq('id', lead.company_id)
+    .single();
+
+  if (company?.slug) {
+    const token = generateQuoteToken();
+    const quoteUrl = generateQuoteUrl(company.slug, newQuote.id, token);
+    await supabase
+      .from('quotes')
+      .update({ quote_url: quoteUrl, quote_token: token })
+      .eq('id', newQuote.id);
   }
 
   return { success: true, quoteId: newQuote.id, created: true };
@@ -229,6 +246,25 @@ export async function POST(
       );
     }
 
+    // Fetch discount configurations if discount_ids are provided
+    const discountIds = body.service_plans
+      .map(p => p.discount_id)
+      .filter((id): id is string => !!id);
+
+    let discountConfigs: any[] = [];
+    if (discountIds.length > 0) {
+      const { data: discounts, error: discountsError } = await supabase
+        .from('company_discounts')
+        .select('*')
+        .in('id', discountIds);
+
+      if (discountsError) {
+        console.error('Error fetching discounts:', discountsError);
+      } else {
+        discountConfigs = discounts || [];
+      }
+    }
+
     // Calculate total pricing and prepare line items
     let totalInitialPrice = 0;
     let totalRecurringPrice = 0;
@@ -242,19 +278,46 @@ export async function POST(
       const initialPrice = plan.initial_price || 0;
       const recurringPrice = plan.recurring_price || 0;
 
-      // Apply discounts
-      const discountAmount = planRequest.discount_amount || 0;
-      const discountPercentage = planRequest.discount_percentage || 0;
+      // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
+      let discountAmount = planRequest.discount_amount || 0;
+      let discountPercentage = planRequest.discount_percentage || 0;
+      let appliesToPrice = 'both'; // Default to applying to both prices
 
-      // Calculate final prices
-      let finalInitialPrice = initialPrice - discountAmount;
-      if (discountPercentage > 0) {
-        finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
+      // If discount_id is provided, use pre-fetched discount configuration
+      if (planRequest.discount_id) {
+        const discountConfig = discountConfigs.find(d => d.id === planRequest.discount_id);
+
+        if (discountConfig) {
+          appliesToPrice = discountConfig.applies_to_price;
+
+          if (discountConfig.discount_type === 'percentage') {
+            discountPercentage = discountConfig.discount_value;
+            discountAmount = 0; // Don't combine percentage with fixed amount
+          } else {
+            discountAmount = discountConfig.discount_value;
+            discountPercentage = 0;
+          }
+        }
       }
 
-      let finalRecurringPrice = recurringPrice - discountAmount;
-      if (discountPercentage > 0) {
-        finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
+      // Calculate final prices based on discount configuration
+      let finalInitialPrice = initialPrice;
+      let finalRecurringPrice = recurringPrice;
+
+      // Apply discount to initial price if configured
+      if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
+        finalInitialPrice = initialPrice - discountAmount;
+        if (discountPercentage > 0) {
+          finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
+        }
+      }
+
+      // Apply discount to recurring price if configured
+      if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
+        finalRecurringPrice = recurringPrice - discountAmount;
+        if (discountPercentage > 0) {
+          finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
+        }
       }
 
       // Ensure prices don't go negative
@@ -271,8 +334,10 @@ export async function POST(
         initial_price: initialPrice,
         recurring_price: recurringPrice,
         billing_frequency: plan.billing_frequency,
+        service_frequency: planRequest.service_frequency || plan.treatment_frequency || null,
         discount_percentage: discountPercentage,
         discount_amount: discountAmount,
+        discount_id: planRequest.discount_id || null,
         final_initial_price: finalInitialPrice,
         final_recurring_price: finalRecurringPrice,
         display_order: index,
@@ -325,6 +390,9 @@ export async function POST(
 
       quote = updatedQuote;
     } else {
+      // Generate secure token for new quote
+      const quoteToken = generateQuoteToken();
+
       // Create new quote
       const { data: newQuote, error: createError } = await supabase
         .from('quotes')
@@ -340,6 +408,7 @@ export async function POST(
           total_initial_price: totalInitialPrice,
           total_recurring_price: totalRecurringPrice,
           quote_status: 'draft',
+          quote_token: quoteToken,
         })
         .select()
         .single();
@@ -353,6 +422,21 @@ export async function POST(
       }
 
       quote = newQuote;
+
+      // Generate and update quote URL for new quotes with token
+      const { data: company } = await supabase
+        .from('companies')
+        .select('slug')
+        .eq('id', lead.company_id)
+        .single();
+
+      if (company?.slug) {
+        const quoteUrl = generateQuoteUrl(company.slug, newQuote.id, quoteToken);
+        await supabase
+          .from('quotes')
+          .update({ quote_url: quoteUrl })
+          .eq('id', newQuote.id);
+      }
     }
 
     // Insert line items

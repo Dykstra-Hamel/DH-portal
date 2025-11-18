@@ -351,9 +351,17 @@ export async function POST(
             console.warn('⚠️ Geocoding failed or skipped for customer address');
           }
 
+          // Extract street address from customer.address (handle legacy concatenated format)
+          // If customer.address contains commas, it's likely concatenated (e.g., "123 Main St, Austin, TX, 78701")
+          // Extract just the street portion (everything before the first comma)
+          let streetAddress = customer.address || '';
+          if (streetAddress.includes(',')) {
+            streetAddress = streetAddress.split(',')[0].trim();
+          }
+
           // Create service address with or without coordinates
           const serviceAddressData: any = {
-            street_address: customer.address || '',
+            street_address: streetAddress,
             city: customer.city || '',
             state: customer.state || '',
             zip_code: customer.zip_code || ''
@@ -383,6 +391,20 @@ export async function POST(
               console.error('Failed to link service address to lead:', linkError);
             } else {
               console.log('✅ Service address linked to lead with coordinates');
+
+              // Also update the auto-created quote with the service address
+              // The database trigger creates a quote immediately when the lead is inserted,
+              // but at that time the service_address_id is null. Update it now.
+              const { error: quoteUpdateError } = await supabase
+                .from('quotes')
+                .update({ service_address_id: serviceAddressResult.serviceAddressId })
+                .eq('lead_id', newLead.id);
+
+              if (quoteUpdateError) {
+                console.error('Failed to update quote with service address:', quoteUpdateError);
+              } else {
+                console.log('✅ Quote updated with service address');
+              }
             }
           }
         }

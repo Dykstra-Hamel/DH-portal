@@ -34,6 +34,7 @@
     "@slack/web-api": "^7.9.3",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.4",
+    "@types/react-signature-canvas": "^1.0.7",
     "@types/recharts": "^1.8.29",
     "@userback/widget": "^0.3.11",
     "@vis.gl/react-google-maps": "^1.5.4",
@@ -44,8 +45,9 @@
     "next": "15.3.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^3.1.2",
-    "resend": "^4.6.0",
+    "mailersend": "^2.2.0",
     "retell-sdk": "^4.42.0",
     "sass": "^1.89.2"
   },

@@ -1,10 +1,7 @@
-// import { Resend } from 'resend';
 import { EmailRecipient, LeadNotificationData } from './types';
 import { generateLeadCreatedEmailTemplate } from './templates/lead-created';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from './index';
-
-// const resend = new Resend(process.env.RESEND_API_KEY!);
+import { MAILERSEND_API_TOKEN, getCompanyFromEmail } from './index';
 
 export async function sendLeadCreatedNotifications(
   recipients: string[],
@@ -15,14 +12,14 @@ export async function sendLeadCreatedNotifications(
   companyId?: string
 ) {
   try {
-    // Use MailerSend with hard-coded from email
-    const fromEmail = MAILERSEND_FROM_EMAIL;
-    let fromName = 'Northwest Exterminating';
+    // Get company's from email (custom domain if verified, otherwise fallback)
+    const fromEmail = companyId ? await getCompanyFromEmail(companyId) : await getCompanyFromEmail('');
+    let fromName = 'PMP Central';
 
     if (companyId) {
       try {
         const supabase = createAdminClient();
-        
+
         // Get company name
         const { data: company } = await supabase
           .from('companies')

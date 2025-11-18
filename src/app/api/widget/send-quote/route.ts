@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 // import { Resend } from 'resend';
 import { generateQuoteEmailTemplate } from '@/lib/email/templates/quote';
 import { QuoteEmailData } from '@/lib/email/types';
-import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from '@/lib/email';
+import { MAILERSEND_API_TOKEN, MAILERSEND_FALLBACK_EMAIL } from '@/lib/email';
 import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 // const resend = new Resend(process.env.RESEND_API_KEY);
@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
 
     const emailHtml = generateQuoteEmailTemplate(quoteEmailData);
 
-    // Use MailerSend with hard-coded from email
-    const fromEmail = MAILERSEND_FROM_EMAIL;
+    // Use MailerSend with fallback email
+    const fromEmail = MAILERSEND_FALLBACK_EMAIL;
 
     // Send email using MailerSend
     const mailersendPayload = {
