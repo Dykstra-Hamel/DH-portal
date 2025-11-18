@@ -1,0 +1,221 @@
+.tasksContainer {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.pageHeader {
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 750;
+  color: #252c37;
+  margin: 0;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 250px;
+  padding: 10px 14px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+
+  &:focus-within {
+    border-color: #0080f0;
+    box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
+  }
+
+  svg {
+    color: #6b7280;
+    flex-shrink: 0;
+  }
+}
+
+.searchInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  color: #252c37;
+  background: transparent;
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+.filterSelect {
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  color: #252c37;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0080f0;
+    box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
+  }
+}
+
+.tasksTable {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 0 11px 0 #e8e8ea;
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr 1fr 1fr 0.8fr;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.headerCell {
+  font-size: 12px;
+  font-weight: 650;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tableBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr 1fr 1fr 0.8fr;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.2s ease;
+  cursor: pointer;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: #f9fafb;
+  }
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #252c37;
+}
+
+.taskTitle {
+  font-weight: 550;
+  color: #252c37;
+}
+
+.clientName {
+  color: #6b7280;
+}
+
+.noProject {
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.unassigned {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.dueDate {
+  font-size: 13px;
+  color: #6b7280;
+
+  &.overdue {
+    color: #dc2626;
+    font-weight: 550;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6b7280;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #0080f0;
+    color: #0080f0;
+  }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+  color: #9ca3af;
+
+  svg {
+    margin-bottom: 24px;
+  }
+
+  h3 {
+    font-size: 18px;
+    font-weight: 650;
+    color: #6b7280;
+    margin: 0 0 8px 0;
+  }
+
+  p {
+    font-size: 14px;
+    color: #9ca3af;
+    margin: 0;
+  }
+}
+
+@media (max-width: 1200px) {
+  .tableHeader,
+  .tableRow {
+    grid-template-columns: 2fr 1fr 1fr 0.9fr 0.9fr 0.9fr 0.9fr 0.8fr;
+  }
+}

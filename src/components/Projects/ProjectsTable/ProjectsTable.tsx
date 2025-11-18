@@ -62,7 +62,7 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
             <th>Requester</th>
             <th>Assigned To</th>
             <th>Due Date</th>
-            <th>Budget</th>
+            <th>Quoted Price</th>
             {showActions && <th>Actions</th>}
           </tr>
         </thead>
@@ -143,7 +143,7 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
                   {formatDate(project.due_date)}
                 </div>
               </td>
-              <td>{formatCurrency(project.budget_amount)}</td>
+              <td>{project.is_billable && project.quoted_price ? formatCurrency(project.quoted_price) : '-'}</td>
               {showActions && (
                 <td>
                   <div className={styles.actions}>

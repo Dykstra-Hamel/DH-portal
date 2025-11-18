@@ -149,3 +149,39 @@
     cursor: not-allowed;
   }
 }
+
+.presetTagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.presetTag {
+  padding: 6px 12px;
+  background: white;
+  color: #6b7280;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 550;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #0080f0;
+    color: #0080f0;
+    background: #f0f9ff;
+  }
+
+  &.selected {
+    background: #0080f0;
+    color: white;
+    border-color: #0080f0;
+
+    &:hover {
+      background: #0070d4;
+      border-color: #0070d4;
+    }
+  }
+}

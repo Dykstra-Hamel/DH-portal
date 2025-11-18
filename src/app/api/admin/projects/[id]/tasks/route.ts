@@ -28,11 +28,9 @@ export async function GET(
 
     // Parse query parameters for filtering
     const searchParams = request.nextUrl.searchParams;
-    const status = searchParams.get('status');
     const priority = searchParams.get('priority');
     const assignedTo = searchParams.get('assigned_to');
-    const milestone = searchParams.get('milestone');
-    const sprint = searchParams.get('sprint');
+    const isCompleted = searchParams.get('is_completed');
     const parentTaskId = searchParams.get('parent_task_id');
 
     // Build query
@@ -50,11 +48,11 @@ export async function GET(
       .order('created_at', { ascending: false });
 
     // Apply filters
-    if (status) query = query.eq('status', status);
     if (priority) query = query.eq('priority', priority);
     if (assignedTo) query = query.eq('assigned_to', assignedTo);
-    if (milestone) query = query.eq('milestone', milestone);
-    if (sprint) query = query.eq('sprint', sprint);
+    if (isCompleted !== null && isCompleted !== undefined) {
+      query = query.eq('is_completed', isCompleted === 'true');
+    }
     if (parentTaskId) {
       if (parentTaskId === 'null') {
         query = query.is('parent_task_id', null);
@@ -107,17 +105,6 @@ export async function POST(
     // Parse request body
     const body = await request.json();
 
-    // Process labels if provided as comma-separated string
-    let labels = body.labels;
-    if (typeof labels === 'string' && labels.trim()) {
-      labels = labels
-        .split(',')
-        .map((l: string) => l.trim())
-        .filter((l: string) => l.length > 0);
-    } else if (!Array.isArray(labels)) {
-      labels = null;
-    }
-
     // Prepare task data
     const taskData = {
       project_id: projectId,
@@ -125,21 +112,17 @@ export async function POST(
       title: body.title,
       description: body.description || null,
       notes: body.notes || null,
-      status: body.status || 'todo',
+      is_completed: false, // New tasks always start as not completed
       priority: body.priority || 'medium',
       assigned_to: body.assigned_to || null,
       created_by: user.id,
       due_date: body.due_date || null,
       start_date: body.start_date || null,
-      estimated_hours: body.estimated_hours
-        ? parseFloat(body.estimated_hours)
-        : null,
-      labels,
-      milestone: body.milestone || null,
-      sprint: body.sprint || null,
-      story_points: body.story_points ? parseInt(body.story_points, 10) : null,
       display_order: body.display_order || 0,
-      kanban_column: body.kanban_column || body.status || 'todo',
+      recurring_frequency: body.recurring_frequency || null,
+      recurring_end_date: body.recurring_end_date || null,
+      is_recurring_template: body.recurring_frequency && body.recurring_frequency !== 'none' ? true : false,
+      next_recurrence_date: body.recurring_frequency && body.recurring_frequency !== 'none' && body.due_date ? body.due_date : null,
     };
 
     // Insert task

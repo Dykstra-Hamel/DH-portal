@@ -250,6 +250,32 @@ export function SecondarySideNav({
             />
           </svg>
         );
+      case 'project-management':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 20 20" fill="none">
+            <path
+              d="M6.83333 1H2.16667C1.52233 1 1 1.59695 1 2.33333V7.66667C1 8.40305 1.52233 9 2.16667 9H6.83333C7.47767 9 8 8.40305 8 7.66667V2.33333C8 1.59695 7.47767 1 6.83333 1Z"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M1 16.5L3.33333 19L8 14"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M13 2H23"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        );
       case 'brand':
         return (
           <svg
@@ -364,6 +390,93 @@ export function SecondarySideNav({
         return [
           {
             items: [{ text: 'Brand', href: '/brand' }],
+          },
+        ];
+      case 'project-management':
+        return [
+          {
+            items: [
+              {
+                text: 'Dashboard',
+                href: '/project-management',
+                icon: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path
+                      d="M7 2H3C2.44772 2 2 2.44772 2 3V8C2 8.55228 2.44772 9 3 9H7C7.55228 9 8 8.55228 8 8V3C8 2.44772 7.55228 2 7 2Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M15 2H11C10.4477 2 10 2.44772 10 3V5C10 5.55228 10.4477 6 11 6H15C15.5523 6 16 5.55228 16 5V3C16 2.44772 15.5523 2 15 2Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M15 8H11C10.4477 8 10 8.44772 10 9V15C10 15.5523 10.4477 16 11 16H15C15.5523 16 16 15.5523 16 15V9C16 8.44772 15.5523 8 15 8Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M7 11H3C2.44772 11 2 11.4477 2 12V15C2 15.5523 2.44772 16 3 16H7C7.55228 16 8 15.5523 8 15V12C8 11.4477 7.55228 11 7 11Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ),
+              },
+              {
+                text: 'Tasks',
+                href: '/project-management/tasks',
+                icon: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path
+                      d="M15 2H3C2.44772 2 2 2.44772 2 3V15C2 15.5523 2.44772 16 3 16H15C15.5523 16 16 15.5523 16 15V3C16 2.44772 15.5523 2 15 2Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6 9L8 11L12 7"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ),
+              },
+              {
+                text: 'Reports',
+                href: '/project-management/reports',
+                icon: (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path
+                      d="M15 2H3C2.44772 2 2 2.44772 2 3V15C2 15.5523 2.44772 16 3 16H15C15.5523 16 16 15.5523 16 15V3C16 2.44772 15.5523 2 15 2Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6 13V10M9 13V7M12 13V4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ),
+              },
+            ],
           },
         ];
       case 'connections':
@@ -489,8 +602,10 @@ export function SecondarySideNav({
         <div className={styles.sectionHeader}>
           <div className={styles.iconHeader}>{getPrimaryNavIcon()}</div>
           <h2 className={styles.sectionTitle}>
-            {activePrimaryNav.charAt(0).toUpperCase() +
-              activePrimaryNav.slice(1)}
+            {activePrimaryNav === 'project-management'
+              ? 'Tracker'
+              : activePrimaryNav.charAt(0).toUpperCase() +
+                activePrimaryNav.slice(1)}
           </h2>
         </div>
         <nav className={styles.contextNav}>

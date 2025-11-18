@@ -2,12 +2,18 @@
 
 import styles from './GlobalLowerHeader.module.scss';
 
+interface ActionButton {
+  text: string;
+  onClick: () => void;
+}
+
 interface GlobalLowerHeaderProps {
   title: string;
   description: string;
   showAddButton?: boolean;
   addButtonText?: string;
   onAddClick?: () => void;
+  actionButtons?: ActionButton[];
 }
 
 const PlusIcon = () => (
@@ -22,6 +28,7 @@ export function GlobalLowerHeader({
   showAddButton = false,
   addButtonText = 'Add Lead',
   onAddClick,
+  actionButtons,
 }: GlobalLowerHeaderProps) {
   return (
     <div className={styles.globalLowerHeader}>
@@ -32,7 +39,19 @@ export function GlobalLowerHeader({
         </div>
 
         <div className={styles.rightSection}>
-          {showAddButton && (
+          {actionButtons && actionButtons.length > 0 ? (
+            actionButtons.map((button, index) => (
+              <button
+                key={index}
+                className={styles.addLeadButton}
+                onClick={button.onClick}
+                type="button"
+              >
+                <PlusIcon />
+                <span>{button.text}</span>
+              </button>
+            ))
+          ) : showAddButton ? (
             <button
               className={styles.addLeadButton}
               onClick={onAddClick}
@@ -42,7 +61,7 @@ export function GlobalLowerHeader({
               <PlusIcon />
               <span>{addButtonText}</span>
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

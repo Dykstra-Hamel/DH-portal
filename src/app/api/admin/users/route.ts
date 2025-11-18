@@ -22,10 +22,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all profiles
+    // Get all profiles with admin role
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('*');
+      .select('*')
+      .eq('role', 'admin');
 
     if (profilesError) {
       return NextResponse.json(
@@ -34,12 +35,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Combine auth users with their profiles
+    // Create a set of admin user IDs for filtering
+    const adminUserIds = new Set(profiles?.map(p => p.id) || []);
+
+    // Combine auth users with their profiles, filtering to only admin users
     const usersWithProfiles =
-      authUsers.users?.map(user => ({
-        ...user,
-        profiles: profiles?.find(profile => profile.id === user.id),
-      })) || [];
+      authUsers.users
+        ?.filter(user => adminUserIds.has(user.id))
+        .map(user => ({
+          ...user,
+          profiles: profiles?.find(profile => profile.id === user.id),
+        })) || [];
 
     return NextResponse.json(usersWithProfiles);
   } catch (error) {

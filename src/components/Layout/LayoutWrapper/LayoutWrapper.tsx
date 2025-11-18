@@ -44,6 +44,38 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   // Configure page-specific lower header props
   const getPageConfig = () => {
     switch (pathname) {
+      case '/project-management':
+        return {
+          title: 'Projects Dashboard',
+          description: 'Manage your projects across all phases.',
+          showAddButton: false,
+          actionButtons: [
+            {
+              text: 'New Project',
+              onClick: getPageAction('add-project') || (() => {}),
+            },
+            {
+              text: 'Create from Template',
+              onClick: getPageAction('create-from-template') || (() => {}),
+            },
+            {
+              text: 'New Task',
+              onClick: getPageAction('add-task') || (() => {}),
+            },
+          ],
+        };
+      case '/project-management/tasks':
+        return {
+          title: 'Tasks',
+          description: 'View and manage all tasks.',
+          showAddButton: false,
+          actionButtons: [
+            {
+              text: 'New Task',
+              onClick: getPageAction('add-task') || (() => {}),
+            },
+          ],
+        };
       case '/dashboard':
         return {
           title: 'Dashboard',
@@ -247,6 +279,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
                   ? getPageAction('add') || undefined
                   : undefined
               }
+              actionButtons={pageConfig.actionButtons}
             />
           )}
           <main className={styles.mainContent}>

@@ -1,0 +1,60 @@
+.userAvatarContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  &.withName {
+    .userName {
+      display: inline;
+    }
+  }
+}
+
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+
+  &.small {
+    width: 24px;
+    height: 24px;
+  }
+
+  &.medium {
+    width: 32px;
+    height: 32px;
+  }
+
+  &.large {
+    width: 40px;
+    height: 40px;
+  }
+
+  &.initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 650;
+
+    &.small {
+      font-size: 10px;
+    }
+
+    &.medium {
+      font-size: 12px;
+    }
+
+    &.large {
+      font-size: 14px;
+    }
+  }
+}
+
+.userName {
+  display: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-800);
+  white-space: nowrap;
+}
