@@ -47,6 +47,7 @@ export interface QuoteEmailData {
   pestType: string;
   address: string;
   companyName?: string;
+  companyLogo?: string;
   customerEmail: string;
   selectedPlan?: {
     id: string;

@@ -67,6 +67,13 @@ export async function POST(request: NextRequest) {
       return createCorsErrorResponse('Company not found', origin, 'widget', 404);
     }
 
+    // Fetch brand data for company logo
+    const { data: brandData } = await supabase
+      .from('brands')
+      .select('logo_url')
+      .eq('company_id', quoteData.companyId)
+      .single();
+
     // Fetch service plan data if selectedPlan is provided
     let servicePlan: { id: string; plan_name: string; initial_price: number; recurring_price: number; billing_frequency: string; } | undefined;
     if (quoteData.selectedPlan) {
@@ -85,13 +92,14 @@ export async function POST(request: NextRequest) {
 
     // Extract first name from customer name
     const firstName = quoteData.customerName.split(' ')[0] || quoteData.customerName;
-    
+
     // Generate quote email content using template
     const quoteEmailData: QuoteEmailData = {
       firstName,
       pestType: quoteData.pestType,
       address: quoteData.address || 'your location',
       companyName: company.name,
+      companyLogo: brandData?.logo_url || '',
       customerEmail: quoteData.customerEmail,
       selectedPlan: servicePlan
     };

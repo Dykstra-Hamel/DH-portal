@@ -2,16 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
-interface WidgetDomainLookup {
-  company_id: string;
-  domain: string;
-  companies: {
-    id: string;
-    name: string;
-    widget_config: any;
-  };
-}
-
 // Handle CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
   return await handleCorsPrelight(request, 'widget');
@@ -19,8 +9,8 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Validate origin first
-    const { isValid, origin, response } = await validateOrigin(request, 'widget');
+    // Validate origin and get company info from companies.website column
+    const { isValid, origin, companyId, companyName, response } = await validateOrigin(request, 'widget');
     if (!isValid && response) {
       return response;
     }
@@ -34,67 +24,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Extract domain from origin (e.g., https://example.com -> example.com)
-    const domain = new URL(origin).hostname;
-
-    const supabase = createAdminClient();
-    
-    // Find company by domain using new widget_domains table
-    // Try exact domain matches first (most specific)
-    const { data: exactMatch, error: exactError } = await supabase
-      .from('widget_domains')
-      .select(`
-        company_id,
-        domain,
-        companies (
-          id,
-          name,
-          widget_config
-        )
-      `)
-      .eq('is_active', true)
-      .or(`domain.eq.${origin}, domain.eq.https://${domain}, domain.eq.http://${domain}, domain.eq.https://www.${domain}`)
-      .limit(1)
-      .single() as { data: WidgetDomainLookup | null; error: any };
-
-    // Extract company from the widget_domains result
-    let company = exactMatch?.companies ? {
-      id: exactMatch.companies.id,
-      name: exactMatch.companies.name,
-      widget_config: exactMatch.companies.widget_config
-    } : null;
-    
-    // If no exact match, try subdomain/partial matches
-    if (!company && !exactError) {
-      // Extract base domain for broader matching (e.g., blog.example.com -> example.com)
-      const baseDomain = domain.split('.').slice(-2).join('.');
-      
-      const { data: partialMatch } = await supabase
-        .from('widget_domains')
-        .select(`
-          company_id,
-          domain,
-          companies (
-            id,
-            name,
-            widget_config
-          )
-        `)
-        .eq('is_active', true)
-        .ilike('domain', `%${baseDomain}%`)
-        .limit(1)
-        .single() as { data: WidgetDomainLookup | null; error: any };
-        
-      if (partialMatch?.companies) {
-        company = {
-          id: partialMatch.companies.id,
-          name: partialMatch.companies.name,
-          widget_config: partialMatch.companies.widget_config
-        };
-      }
-    }
-
-    if (!company) {
+    // Check if company was found for this domain
+    if (!companyId) {
+      const domain = new URL(origin).hostname;
       return createCorsErrorResponse(
         `No widget configuration found for domain: ${domain}`,
         origin,
@@ -103,7 +35,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const companyId = company.id;
+    const supabase = createAdminClient();
+
+    // Fetch company data using the companyId from validateOrigin
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('id, name, widget_config')
+      .eq('id', companyId)
+      .single();
+
+    if (companyError || !company) {
+      return createCorsErrorResponse(
+        'Company configuration not found',
+        origin,
+        'widget',
+        404
+      );
+    }
 
     // Fetch brand and captcha settings in parallel
     const [brandResult, captchaSettings] = await Promise.all([
