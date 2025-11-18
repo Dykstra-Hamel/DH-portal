@@ -35,6 +35,7 @@ const ProjectEditPage: React.FC<ProjectEditPageProps> = ({
     name: project.name || '',
     description: project.description || '',
     project_type: project.project_type || '',
+    project_subtype: project.project_subtype || '',
     requested_by: project.requested_by_profile?.id || user.id,
     company_id: project.company?.id || '',
     assigned_to: project.assigned_to_profile?.id || '',
@@ -43,9 +44,8 @@ const ProjectEditPage: React.FC<ProjectEditPageProps> = ({
     due_date: project.due_date || '',
     start_date: project.start_date || '',
     completion_date: project.completion_date || '',
-    estimated_hours: project.estimated_hours?.toString() || '',
-    actual_hours: project.actual_hours?.toString() || '',
-    budget_amount: project.budget_amount?.toString() || '',
+    is_billable: project.is_billable ? 'true' : 'false',
+    quoted_price: project.quoted_price?.toString() || '',
     tags: project.tags?.join(', ') || '',
     notes: project.notes || '',
   });
@@ -354,55 +354,42 @@ const ProjectEditPage: React.FC<ProjectEditPageProps> = ({
 
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label htmlFor="budget_amount" className={styles.label}>
-                  Budget Amount ($)
+                <label className={styles.label}>
+                  <input
+                    type="checkbox"
+                    name="is_billable"
+                    checked={formData.is_billable === 'true'}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        is_billable: e.target.checked ? 'true' : 'false',
+                        quoted_price: e.target.checked ? formData.quoted_price : '',
+                      })
+                    }
+                    style={{ marginRight: '8px' }}
+                  />
+                  Is Billable?
                 </label>
-                <input
-                  type="number"
-                  id="budget_amount"
-                  name="budget_amount"
-                  value={formData.budget_amount}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  className={styles.input}
-                  placeholder="0.00"
-                />
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="estimated_hours" className={styles.label}>
-                  Estimated Hours
-                </label>
-                <input
-                  type="number"
-                  id="estimated_hours"
-                  name="estimated_hours"
-                  value={formData.estimated_hours}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.5"
-                  className={styles.input}
-                  placeholder="0"
-                />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label htmlFor="actual_hours" className={styles.label}>
-                  Actual Hours
-                </label>
-                <input
-                  type="number"
-                  id="actual_hours"
-                  name="actual_hours"
-                  value={formData.actual_hours}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.5"
-                  className={styles.input}
-                  placeholder="0"
-                />
-              </div>
+              {formData.is_billable === 'true' && (
+                <div className={styles.formGroup}>
+                  <label htmlFor="quoted_price" className={styles.label}>
+                    Quoted Price
+                  </label>
+                  <input
+                    type="number"
+                    id="quoted_price"
+                    name="quoted_price"
+                    value={formData.quoted_price}
+                    onChange={handleChange}
+                    min="0"
+                    step="0.01"
+                    className={styles.input}
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
             </div>
           </section>
 

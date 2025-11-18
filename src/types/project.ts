@@ -245,9 +245,12 @@ export interface ProjectTaskTemplate {
 }
 
 export interface ProjectTaskFilters {
-  priority: string;
-  assigned_to: string;
-  is_completed: boolean | null;
+  status?: string;
+  priority?: string;
+  assigned_to?: string;
+  milestone?: string;
+  sprint?: string;
+  is_completed?: boolean | null;
 }
 
 export const taskPriorityOptions = [

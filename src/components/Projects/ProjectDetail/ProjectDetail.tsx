@@ -148,21 +148,27 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, user, onProjectU
         } else if (activity.old_value && !activity.new_value) {
           return 'removed the due date';
         }
-        return `changed due date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`;
+        return activity.old_value && activity.new_value
+          ? `changed due date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`
+          : 'changed due date';
       case 'start_date_changed':
         if (!activity.old_value && activity.new_value) {
           return `set start date to ${new Date(activity.new_value).toLocaleDateString()}`;
         } else if (activity.old_value && !activity.new_value) {
           return 'removed the start date';
         }
-        return `changed start date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`;
+        return activity.old_value && activity.new_value
+          ? `changed start date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`
+          : 'changed start date';
       case 'completion_date_changed':
         if (!activity.old_value && activity.new_value) {
           return `set completion date to ${new Date(activity.new_value).toLocaleDateString()}`;
         } else if (activity.old_value && !activity.new_value) {
           return 'removed the completion date';
         }
-        return `changed completion date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`;
+        return activity.old_value && activity.new_value
+          ? `changed completion date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`
+          : 'changed completion date';
       case 'budget_changed':
         return `changed budget from $${activity.old_value} to $${activity.new_value}`;
       case 'estimated_hours_changed':
@@ -176,7 +182,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, user, onProjectU
       case 'project_subtype_changed':
         return `changed project subtype from ${activity.old_value} to ${activity.new_value}`;
       default:
-        return activity.action_type.replace(/_/g, ' ');
+        return String(activity.action_type).replace(/_/g, ' ');
     }
   };
 

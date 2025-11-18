@@ -190,7 +190,7 @@ export default function ProjectTaskDetail({
                 <select
                   className={styles.editSelect}
                   value={editFormData.priority}
-                  onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
+                  onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value as any })}
                   style={{ backgroundColor: getPriorityColor(editFormData.priority), color: 'white' }}
                 >
                   {taskPriorityOptions.map((option) => (
