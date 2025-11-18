@@ -86,6 +86,53 @@ export function ServiceLocationCard({
     }
   }, [serviceAddress?.home_size_range, serviceAddress?.yard_size_range, selectedHomeSizeOption, selectedYardSizeOption]);
 
+  // Fallback geocoding: If address exists but coordinates are missing, geocode and update
+  useEffect(() => {
+    const geocodeAndUpdateAddress = async () => {
+      // Only geocode if we have an ID, valid address, but missing coordinates
+      if (
+        serviceAddress?.id &&
+        serviceAddress.street_address &&
+        serviceAddress.city &&
+        serviceAddress.state &&
+        (!serviceAddress.latitude || !serviceAddress.longitude)
+      ) {
+        try {
+          const geocodeResponse = await fetch('/api/internal/geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              street: serviceAddress.street_address,
+              city: serviceAddress.city,
+              state: serviceAddress.state,
+              zip: serviceAddress.zip_code,
+            }),
+          });
+
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json();
+            if (geocodeData.success && geocodeData.coordinates) {
+              // Update the service address with coordinates
+              await authenticatedFetch(`/api/service-addresses/${serviceAddress.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  latitude: geocodeData.coordinates.lat,
+                  longitude: geocodeData.coordinates.lng,
+                  hasStreetView: geocodeData.coordinates.hasStreetView || false,
+                }),
+              });
+            }
+          }
+        } catch (error) {
+          // Geocoding failed silently - will retry on next load
+        }
+      }
+    };
+
+    geocodeAndUpdateAddress();
+  }, [serviceAddress?.id, serviceAddress?.street_address, serviceAddress?.city, serviceAddress?.state, serviceAddress?.latitude, serviceAddress?.longitude, serviceAddress?.zip_code]);
+
   const handleUpdateServiceAddressSize = async (
     field: 'home_size_range' | 'yard_size_range',
     value: string
@@ -124,7 +171,6 @@ export function ServiceLocationCard({
 
             onShowToast?.('Change undone', 'success');
           } catch (error) {
-            console.error('Error undoing change:', error);
             onShowToast?.('Failed to undo change', 'error');
           }
         };
@@ -132,7 +178,6 @@ export function ServiceLocationCard({
         onRequestUndo(undoHandler);
       }
     } catch (error) {
-      console.error(`Error updating ${field}:`, error);
       onShowToast?.(`Failed to update ${fieldLabel.toLowerCase()}`, 'error');
     }
   };

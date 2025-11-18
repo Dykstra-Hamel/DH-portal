@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target } from 'lucide-react';
+import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
 import SalesConfigManager from './SalesConfigManager';
+import DiscountManager from './DiscountManager';
+import EmailDomainManager from './EmailDomainManager';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -46,7 +48,7 @@ interface CompanyManagementProps {
   user: User;
 }
 
-type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pricing-settings' | 'sales-config';
+type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
@@ -422,6 +424,8 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     { id: 'login-page', label: 'Login Page', icon: Monitor },
     { id: 'pricing-settings', label: 'Pricing Settings', icon: DollarSign },
     { id: 'sales-config', label: 'Sales Config', icon: Target },
+    { id: 'discounts', label: 'Discounts', icon: Tag },
+    { id: 'email-domain', label: 'Email Domain', icon: Mail },
   ] as const;
 
   return (
@@ -530,6 +534,12 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
           )}
           {activeSection === 'sales-config' && (
             <SalesConfigManager companyId={companyId} />
+          )}
+          {activeSection === 'discounts' && (
+            <DiscountManager companyId={companyId} />
+          )}
+          {activeSection === 'email-domain' && (
+            <EmailDomainManager companyId={companyId} />
           )}
         </div>
       </div>

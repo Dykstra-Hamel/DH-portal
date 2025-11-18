@@ -39,13 +39,17 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Check if this is a public quote page (pattern: /{companySlug}/quote/{quoteId})
+  const isQuotePage = /^\/[^\/]+\/quote\/[^\/]+$/.test(request.nextUrl.pathname);
+
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
     !request.nextUrl.pathname.startsWith('/sign-up') &&
     !request.nextUrl.pathname.startsWith('/api') &&
-    request.nextUrl.pathname !== '/'
+    request.nextUrl.pathname !== '/' &&
+    !isQuotePage
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();

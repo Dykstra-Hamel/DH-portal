@@ -1,8 +1,9 @@
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { Quote } from '@/types/quote';
 import styles from './QuoteSummaryCard.module.scss';
-import { FileText, Mail } from 'lucide-react';
+import { FileText, Mail, ExternalLink } from 'lucide-react';
 import { formatAcresFractional } from '@/lib/pricing-calculations';
+import { getFullQuoteUrl } from '@/lib/quote-utils';
 
 interface QuoteSummaryCardProps {
   quote: Quote | null;
@@ -256,6 +257,17 @@ export function QuoteSummaryCard({
             <Mail size={18} />
             Email Quote
           </button>
+        )}
+        {quote.quote_url && quote.quote_token && (
+          <a
+            href={`${getFullQuoteUrl(quote.quote_url)}${quote.quote_url.includes('?') ? '&' : '?'}token=${quote.quote_token}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.secondaryButton}
+          >
+            <ExternalLink size={18} />
+            View Public Quote Link
+          </a>
         )}
       </div>
     </div>

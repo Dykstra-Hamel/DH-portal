@@ -348,12 +348,47 @@ export async function POST(request: NextRequest) {
     const hasAddressData = normalized.street_address || normalized.city || normalized.state || normalized.zip;
 
     if (hasAddressData && customerId && companyId) {
+      // Geocode the address to get coordinates for satellite imagery
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      let hasStreetView = false;
+
+      if (normalized.city && normalized.state) {
+        try {
+          const geocodeResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/internal/geocode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              street: normalized.street_address,
+              city: normalized.city,
+              state: normalized.state,
+              zip: normalized.zip,
+            }),
+          });
+
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json();
+            if (geocodeData.success && geocodeData.coordinates) {
+              latitude = geocodeData.coordinates.lat;
+              longitude = geocodeData.coordinates.lng;
+              hasStreetView = geocodeData.coordinates.hasStreetView || false;
+              console.log(`✅ Geocoded form submission address: ${latitude}, ${longitude}`);
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Geocoding failed for form submission address:', error);
+          // Continue without coordinates
+        }
+      }
 
       const addressResult = await createOrFindServiceAddress(companyId, {
         street_address: normalized.street_address,
         city: normalized.city,
         state: normalized.state,
         zip_code: normalized.zip,
+        latitude: latitude ?? undefined,
+        longitude: longitude ?? undefined,
+        hasStreetView,
         address_type: normalized.own_or_rent === 'rent' ? 'residential' :
                       normalized.own_or_rent === 'own' ? 'residential' :
                       'residential',

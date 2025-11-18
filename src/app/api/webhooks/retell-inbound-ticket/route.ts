@@ -673,19 +673,10 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         customerUpdateData.zip_code = customerZip.trim();
       }
 
-      // Rebuild formatted address from final values (mix of updated and existing)
-      const finalCity = customerUpdateData.city || existingCustomer.city;
-      const finalState = customerUpdateData.state || existingCustomer.state;
-      const finalZip = customerUpdateData.zip_code || existingCustomer.zip_code;
-
-      // Only rebuild address if we have at least one valid component
-      if (isValidValue(finalCity) || isValidValue(finalState) || isValidValue(finalZip) || isValidValue(customerStreetAddress)) {
-        customerUpdateData.address = formatAddress(
-          customerStreetAddress,
-          finalCity,
-          finalState,
-          finalZip
-        );
+      // Store only street address in legacy address field (not concatenated with city/state/zip)
+      // City, state, and zip are stored in separate fields to prevent duplication
+      if (needsUpdate(existingCustomer.address) && isValidValue(customerStreetAddress)) {
+        customerUpdateData.address = customerStreetAddress.trim();
       }
 
       // Only update if we have changes to make

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { 
-  createDomain, 
-  getDomain, 
-  verifyDomain, 
+import {
+  createDomain,
+  getDomain,
+  getDomainRecords,
+  verifyDomain,
   deleteDomain,
-  type CreateDomainRequest 
-} from '@/lib/resend-domains';
+  type DomainInfo
+} from '@/lib/mailersend-domains';
 
 // GET company settings
 export async function GET(
@@ -89,36 +90,39 @@ export async function GET(
       };
     });
 
-    // If we have domain settings, get the latest info from Resend
-    const resendDomainId = settingsObject.resend_domain_id?.value;
-    if (resendDomainId) {
+    // If we have domain settings, get the latest info from MailerSend
+    const mailersendDomainId = settingsObject.mailersend_domain_id?.value;
+    if (mailersendDomainId) {
       try {
-        const domainInfo = await getDomain(resendDomainId);
-        
+        const domainInfo = await getDomain(mailersendDomainId);
+        const dnsRecords = await getDomainRecords(mailersendDomainId);
+        const status = domainInfo.is_verified ? 'verified' :
+                      domainInfo.is_dns_active ? 'pending' : 'not_configured';
+
         // Update local database with latest status if different
-        if (domainInfo.status !== settingsObject.email_domain_status?.value) {
+        if (status !== settingsObject.email_domain_status?.value) {
           await supabase.from('company_settings').upsert([
             {
               company_id: id,
               setting_key: 'email_domain_status',
-              setting_value: domainInfo.status,
+              setting_value: status,
               setting_type: 'string'
             },
             {
               company_id: id,
               setting_key: 'email_domain_records',
-              setting_value: JSON.stringify(domainInfo.records),
+              setting_value: JSON.stringify(dnsRecords),
               setting_type: 'json'
             }
           ], { onConflict: 'company_id,setting_key' });
-          
+
           // Update our response with fresh data
-          settingsObject.email_domain_status.value = domainInfo.status;
-          settingsObject.email_domain_records.value = domainInfo.records;
+          settingsObject.email_domain_status.value = status;
+          settingsObject.email_domain_records.value = dnsRecords;
         }
-        
+
         // Mark domain as verified if status changed
-        if (domainInfo.status === 'verified' && !settingsObject.email_domain_verified_at?.value) {
+        if (domainInfo.is_verified && !settingsObject.email_domain_verified_at?.value) {
           const verifiedAt = new Date().toISOString();
           await supabase.from('company_settings').upsert({
             company_id: id,
@@ -126,11 +130,11 @@ export async function GET(
             setting_value: verifiedAt,
             setting_type: 'string'
           }, { onConflict: 'company_id,setting_key' });
-          
+
           settingsObject.email_domain_verified_at.value = verifiedAt;
         }
       } catch (error) {
-        console.warn('Failed to sync domain status from Resend:', error);
+        console.warn('Failed to sync domain status from MailerSend:', error);
         // Continue with local data
       }
     }
@@ -407,7 +411,7 @@ async function handleCreateDomain(supabase: any, companyId: string, data: any) {
       .from('company_settings')
       .select('setting_value')
       .eq('company_id', companyId)
-      .eq('setting_key', 'resend_domain_id')
+      .eq('setting_key', 'mailersend_domain_id')
       .single();
 
     // Delete old domain if exists
@@ -419,23 +423,19 @@ async function handleCreateDomain(supabase: any, companyId: string, data: any) {
       }
     }
 
-    // Create new domain in Resend
-    const createDomainRequest: CreateDomainRequest = {
-      name: domain,
-      region: region || 'us-east-1',
-      ...(customReturnPath && { custom_return_path: customReturnPath })
-    };
-
-    const domainInfo = await createDomain(createDomainRequest);
+    // Create new domain in MailerSend
+    const domainInfo = await createDomain(domain);
+    const dnsRecords = await getDomainRecords(domainInfo.id);
+    const status = domainInfo.is_verified ? 'verified' :
+                  domainInfo.is_dns_active ? 'pending' : 'not_configured';
 
     // Update settings
     const settingsToUpdate = [
       { key: 'email_domain', value: domain, type: 'string' },
-      { key: 'email_domain_status', value: domainInfo.status, type: 'string' },
-      { key: 'email_domain_region', value: region || 'us-east-1', type: 'string' },
+      { key: 'email_domain_status', value: status, type: 'string' },
       { key: 'email_domain_prefix', value: customReturnPath || 'noreply', type: 'string' },
-      { key: 'email_domain_records', value: JSON.stringify(domainInfo.records), type: 'json' },
-      { key: 'resend_domain_id', value: domainInfo.id, type: 'string' },
+      { key: 'email_domain_records', value: JSON.stringify(dnsRecords), type: 'json' },
+      { key: 'mailersend_domain_id', value: domainInfo.id, type: 'string' },
       { key: 'email_domain_verified_at', value: '', type: 'string' }
     ];
 
@@ -454,9 +454,9 @@ async function handleCreateDomain(supabase: any, companyId: string, data: any) {
       success: true,
       domain: {
         name: domainInfo.name,
-        status: domainInfo.status,
-        records: domainInfo.records,
-        resendDomainId: domainInfo.id
+        status: status,
+        records: dnsRecords,
+        mailersendDomainId: domainInfo.id
       }
     });
   } catch (error) {
@@ -481,7 +481,7 @@ async function handleVerifyDomain(supabase: any, companyId: string) {
       .from('company_settings')
       .select('setting_value')
       .eq('company_id', companyId)
-      .eq('setting_key', 'resend_domain_id')
+      .eq('setting_key', 'mailersend_domain_id')
       .single();
 
     if (!domainIdSetting?.setting_value) {
@@ -493,23 +493,26 @@ async function handleVerifyDomain(supabase: any, companyId: string) {
 
     // Trigger verification
     const verificationResult = await verifyDomain(domainIdSetting.setting_value);
-    if (!verificationResult.success) {
+    if (!verificationResult.success || !verificationResult.domain) {
       return NextResponse.json(
         { error: verificationResult.message },
         { status: 400 }
       );
     }
 
-    // Get updated domain info
-    const domainInfo = await getDomain(domainIdSetting.setting_value);
+    // Get updated domain info and DNS records
+    const domainInfo = verificationResult.domain;
+    const dnsRecords = await getDomainRecords(domainIdSetting.setting_value);
+    const status = domainInfo.is_verified ? 'verified' :
+                  domainInfo.is_dns_active ? 'pending' : 'not_configured';
 
     // Update settings
     const settingsToUpdate = [
-      { key: 'email_domain_status', value: domainInfo.status, type: 'string' },
-      { key: 'email_domain_records', value: JSON.stringify(domainInfo.records), type: 'json' }
+      { key: 'email_domain_status', value: status, type: 'string' },
+      { key: 'email_domain_records', value: JSON.stringify(dnsRecords), type: 'json' }
     ];
 
-    if (domainInfo.status === 'verified') {
+    if (domainInfo.is_verified) {
       settingsToUpdate.push({
         key: 'email_domain_verified_at',
         value: new Date().toISOString(),
@@ -531,8 +534,8 @@ async function handleVerifyDomain(supabase: any, companyId: string) {
     return NextResponse.json({
       success: true,
       domain: {
-        status: domainInfo.status,
-        records: domainInfo.records
+        status: status,
+        records: dnsRecords
       }
     });
   } catch (error) {
@@ -557,15 +560,15 @@ async function handleDeleteDomain(supabase: any, companyId: string) {
       .from('company_settings')  
       .select('setting_value')
       .eq('company_id', companyId)
-      .eq('setting_key', 'resend_domain_id')
+      .eq('setting_key', 'mailersend_domain_id')
       .single();
 
-    // Delete from Resend if exists
+    // Delete from MailerSend if exists
     if (domainIdSetting?.setting_value) {
       try {
         await deleteDomain(domainIdSetting.setting_value);
       } catch (error) {
-        console.warn('Failed to delete domain from Resend:', error);
+        console.warn('Failed to delete domain from MailerSend:', error);
       }
     }
 
@@ -574,7 +577,7 @@ async function handleDeleteDomain(supabase: any, companyId: string) {
       { key: 'email_domain', value: '', type: 'string' },
       { key: 'email_domain_status', value: 'not_configured', type: 'string' },
       { key: 'email_domain_records', value: '[]', type: 'json' },
-      { key: 'resend_domain_id', value: '', type: 'string' },
+      { key: 'mailersend_domain_id', value: '', type: 'string' },
       { key: 'email_domain_verified_at', value: '', type: 'string' }
     ];
 

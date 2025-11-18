@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { User } from '@supabase/supabase-js';
 import { adminAPI } from '@/lib/api-client';
 import { Users, Building, BarChart3, Bot, Settings } from 'lucide-react';
@@ -276,7 +277,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       case 'admin-pest-pressure':
         return (
           <div>
-            <p>Navigate to <a href="/admin/pest-pressure" style={{ color: 'var(--primary-color)' }}>/admin/pest-pressure</a> to view the cross-company pest pressure dashboard.</p>
+            <p>Navigate to <Link href="/admin/pest-pressure" style={{ color: 'var(--primary-color)' }}>/admin/pest-pressure</Link> to view the cross-company pest pressure dashboard.</p>
           </div>
         );
       default:

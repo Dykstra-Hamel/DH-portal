@@ -72,6 +72,7 @@ export interface EmailVariables {
   pageUrl: string;
 
   // Quote Variables
+  quoteUrl: string;
   quoteId: string;
   quoteTotalInitialPrice: string;
   quoteTotalRecurringPrice: string;
@@ -155,6 +156,7 @@ export function createSampleVariables(
     pageUrl: 'https://example.com/services/pest-control',
 
     // Quote Variables (sample data)
+    quoteUrl: 'https://yourcompany.com/your-company/quote/abc123?token=xyz789',
     quoteId: 'quote_123456',
     quoteTotalInitialPrice: '$238',
     quoteTotalRecurringPrice: '$158',

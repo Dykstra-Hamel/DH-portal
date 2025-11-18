@@ -7,6 +7,7 @@ import {
   verifyCompanyAccess,
   getSupabaseClient
 } from '@/lib/api-utils';
+import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 
 export async function GET(request: NextRequest) {
   try {
@@ -349,8 +350,21 @@ export async function POST(request: NextRequest) {
 
       if (addressError) {
         console.error('Error creating address:', addressError);
-      } else {
+      } else if (newAddress?.id) {
         serviceAddressId = newAddress.id;
+
+        // Link the service address to the customer
+        try {
+          await linkCustomerToServiceAddress(
+            customerId,
+            newAddress.id, // Use newAddress.id directly since we know it exists
+            'owner', // Default relationship type
+            true // Set as primary address
+          );
+        } catch (linkError) {
+          console.error('Error linking service address to customer:', linkError);
+          // Continue with lead creation even if linking fails
+        }
       }
     }
 

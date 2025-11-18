@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 
 export async function GET(request: NextRequest) {
   try {
@@ -163,13 +164,68 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const {
+      streetAddress,
+      city,
+      state,
+      zip,
+      customer_id,
+      company_id,
+      ...leadData
+    } = body;
 
-    // Use admin client to create lead
+    // Use admin client
     const supabase = createAdminClient();
 
+    // Create service address if address data is provided
+    let serviceAddressId = body.service_address_id;
+    if (!serviceAddressId && streetAddress && city && state && zip) {
+      const { data: newAddress, error: addressError } = await supabase
+        .from('service_addresses')
+        .insert([
+          {
+            company_id: company_id,
+            street_address: streetAddress,
+            city: city,
+            state: state,
+            zip_code: zip,
+          },
+        ])
+        .select('id')
+        .single();
+
+      if (addressError) {
+        console.error('Error creating address:', addressError);
+      } else {
+        serviceAddressId = newAddress.id;
+
+        // Link the service address to the customer if customer_id provided
+        if (customer_id) {
+          try {
+            await linkCustomerToServiceAddress(
+              customer_id,
+              serviceAddressId,
+              'owner',
+              true
+            );
+          } catch (linkError) {
+            console.error('Error linking service address to customer:', linkError);
+          }
+        }
+      }
+    }
+
+    // Create lead with service_address_id
     const { data: lead, error } = await supabase
       .from('leads')
-      .insert([body])
+      .insert([
+        {
+          ...leadData,
+          customer_id,
+          company_id,
+          service_address_id: serviceAddressId,
+        },
+      ])
       .select()
       .single();
 

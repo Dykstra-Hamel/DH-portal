@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Lead } from '@/types/lead';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
@@ -158,6 +158,7 @@ export function LeadStepContent({
   const initialLineItemCreatedRef = useRef(false);
   const lineItemCreationLockRef = useRef<Set<number>>(new Set());
   const initialTabSetRef = useRef(false);
+  const discountsFetchedRef = useRef<Set<string>>(new Set());
   const [serviceSelections, setServiceSelections] = useState<
     Array<{
       id: string;
@@ -179,9 +180,24 @@ export function LeadStepContent({
   const [loadingPestOptions, setLoadingPestOptions] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [loadingServicePlans, setLoadingServicePlans] = useState(false);
+  const [loadingDiscounts, setLoadingDiscounts] = useState(false);
   const [activeServiceTab, setActiveServiceTab] = useState('overview');
   const [serviceFrequency, setServiceFrequency] = useState<string>('');
   const [discount, setDiscount] = useState<string>('');
+  const [availableDiscounts, setAvailableDiscounts] = useState<
+    Record<
+      string,
+      Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        discount_type: 'percentage' | 'fixed_amount';
+        discount_value: number;
+        applies_to_price: 'initial' | 'recurring' | 'both';
+        requires_manager: boolean;
+      }>
+    >
+  >({});
   const [preferredDate, setPreferredDate] = useState<string>('');
   const [preferredTime, setPreferredTime] = useState<string>('');
 
@@ -199,7 +215,7 @@ export function LeadStepContent({
     null
   );
 
-  const { user } = useUser();
+  const { user, profile } = useUser();
   const { users: assignableUsers } = useAssignableUsers({
     companyId: lead.company_id,
     departmentType: ticketType === 'support' ? 'support' : 'sales',
@@ -297,6 +313,15 @@ export function LeadStepContent({
         sel.displayOrder === displayOrder ? { ...sel, servicePlan: plan } : sel
       )
     );
+
+    // Fetch available discounts for this plan
+    if (plan?.id) {
+      const discounts = await fetchDiscountsForPlan(plan.id);
+      setAvailableDiscounts(prev => ({
+        ...prev,
+        [plan.id]: discounts,
+      }));
+    }
 
     // Update quote line item
     await createOrUpdateQuoteLineItem(plan, displayOrder);
@@ -605,6 +630,73 @@ export function LeadStepContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quote?.additional_pests, lead.pest_type, pestOptions.length]);
 
+  /**
+   * Fetches available discounts for a specific service plan
+   * Memoized with useCallback to prevent unnecessary re-renders
+   */
+  const fetchDiscountsForPlan = useCallback(async (planId: string) => {
+    if (!profile) return [];
+
+    try {
+      const isManager = profile?.role === 'admin' || profile?.role === 'super_admin';
+      const response = await fetch(
+        `/api/companies/${lead.company_id}/discounts/available?planId=${planId}&userIsManager=${isManager}`
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch discounts');
+        return [];
+      }
+
+      const data = await response.json();
+      return data.discounts || [];
+    } catch (err) {
+      console.error('Error fetching discounts:', err);
+      return [];
+    }
+  }, [profile, lead.company_id]);
+
+  // Re-fetch discounts when profile loads if we have service selections but missing discounts
+  useEffect(() => {
+    if (!profile) return;
+
+    // Get all plan IDs from current serviceSelections
+    const planIds = serviceSelections
+      .map(s => s.servicePlan?.id)
+      .filter((id): id is string => !!id);
+
+    if (planIds.length === 0) return;
+
+    // Check if we're missing discounts for any of these plans
+    const missingDiscounts = planIds.filter(planId => {
+      // Either never fetched, or fetched but got empty results
+      return !discountsFetchedRef.current.has(planId) ||
+             !availableDiscounts[planId] ||
+             availableDiscounts[planId].length === 0;
+    });
+
+    if (missingDiscounts.length === 0) return;
+
+    // Re-fetch discounts now that we have profile
+    const refetchDiscounts = async () => {
+      setLoadingDiscounts(true);
+      try {
+        for (const planId of missingDiscounts) {
+          const discounts = await fetchDiscountsForPlan(planId);
+          setAvailableDiscounts(prev => ({
+            ...prev,
+            [planId]: discounts,
+          }));
+          discountsFetchedRef.current.add(planId);
+        }
+      } finally {
+        setLoadingDiscounts(false);
+      }
+    };
+
+    refetchDiscounts();
+  }, [profile, serviceSelections, availableDiscounts, fetchDiscountsForPlan]);
+
   // Initialize serviceSelections from existing quote line items
   useEffect(() => {
     if (
@@ -626,7 +718,7 @@ export function LeadStepContent({
             servicePlan: servicePlan || null,
             displayOrder: lineItem.display_order,
             frequency: lineItem.service_frequency || '',
-            discount: lineItem.discount_percentage?.toString() || '',
+            discount: (lineItem as any).discount_id || lineItem.discount_percentage?.toString() || '',
           };
         });
 
@@ -641,9 +733,68 @@ export function LeadStepContent({
       if (currentPlanIds !== newPlanIds) {
         setServiceSelections(selectionsFromLineItems);
         initialLineItemCreatedRef.current = true; // Mark as initialized from existing data
+
+        // Fetch discounts for all service plans
+        const fetchAllDiscounts = async () => {
+          const planIds = selectionsFromLineItems
+            .map(s => s.servicePlan?.id)
+            .filter((id): id is string => !!id);
+
+          setLoadingDiscounts(true);
+          try {
+            for (const planId of planIds) {
+              const discounts = await fetchDiscountsForPlan(planId);
+              setAvailableDiscounts(prev => ({
+                ...prev,
+                [planId]: discounts,
+              }));
+              // Only mark as fetched if we have a profile (prevents marking empty fetches)
+              if (profile) {
+                discountsFetchedRef.current.add(planId);
+              }
+            }
+          } finally {
+            setLoadingDiscounts(false);
+          }
+        };
+
+        fetchAllDiscounts();
       }
     }
-  }, [quote?.line_items, allServicePlans]);
+  }, [quote?.line_items, allServicePlans, profile, fetchDiscountsForPlan]);
+
+  // Watch for Service Selection tab activation and ensure discounts are loaded
+  useEffect(() => {
+    if (activeServiceTab === 'service-selection') {
+      // Check if any service plans need discounts fetched (using ref to avoid circular dependency)
+      const plansMissingDiscounts = serviceSelections
+        .filter(s => s.servicePlan?.id && !discountsFetchedRef.current.has(s.servicePlan.id))
+        .map(s => s.servicePlan?.id)
+        .filter((id): id is string => !!id);
+
+      if (plansMissingDiscounts.length > 0) {
+        const fetchMissingDiscounts = async () => {
+          setLoadingDiscounts(true);
+          try {
+            for (const planId of plansMissingDiscounts) {
+              const discounts = await fetchDiscountsForPlan(planId);
+              setAvailableDiscounts(prev => ({
+                ...prev,
+                [planId]: discounts,
+              }));
+              // Only mark as fetched if we have a profile (prevents marking empty fetches)
+              if (profile) {
+                discountsFetchedRef.current.add(planId);
+              }
+            }
+          } finally {
+            setLoadingDiscounts(false);
+          }
+        };
+        fetchMissingDiscounts();
+      }
+    }
+  }, [activeServiceTab, serviceSelections, profile, fetchDiscountsForPlan]);
 
   // Load service plan for first selection when primary pest is selected
   // ONLY if there are no existing line items (auto-recommendation)
@@ -1795,6 +1946,7 @@ export function LeadStepContent({
     additionalData?: {
       service_frequency?: string;
       discount_percentage?: number;
+      discount_id?: string;
     }
   ) => {
     // Check if already creating/updating this display order
@@ -1842,6 +1994,16 @@ export function LeadStepContent({
       // Add discount if provided
       if (additionalData?.discount_percentage !== undefined) {
         lineItemData.discount_percentage = additionalData.discount_percentage;
+      }
+
+      // Add discount_id if provided (new discount system)
+      if (additionalData?.discount_id !== undefined) {
+        lineItemData.discount_id = additionalData.discount_id;
+        // If explicitly setting to null (removing discount), also clear discount values
+        if (additionalData.discount_id === null) {
+          lineItemData.discount_percentage = 0;
+          lineItemData.discount_amount = 0;
+        }
       }
 
       // Call the quote API to update with the new line item
@@ -3505,34 +3667,41 @@ export function LeadStepContent({
                       <div className={styles.formField}>
                         <label className={styles.fieldLabel}>Discount</label>
                         <CustomDropdown
-                          options={[
-                            { value: '0', label: 'No Discount' },
-                            { value: '5', label: '5% off Initial' },
-                            { value: '10', label: '10% off Initial' },
-                            { value: '15', label: '15% off Initial' },
-                            { value: '20', label: '20% off Initial' },
-                          ]}
+                          options={
+                            loadingDiscounts
+                              ? [{ value: '', label: 'Loading discounts...' }]
+                              : [
+                                  { value: '', label: 'No Discount' },
+                                  ...(selection.servicePlan && availableDiscounts[selection.servicePlan.id]
+                                    ? availableDiscounts[selection.servicePlan.id].map(discount => ({
+                                        value: discount.id,
+                                        label: discount.name,
+                                      }))
+                                    : []),
+                                ]
+                          }
                           value={selection.discount}
-                          onChange={async newDiscount => {
+                          onChange={async newDiscountId => {
                             setServiceSelections(prev =>
                               prev.map((sel, idx) =>
                                 idx === index
-                                  ? { ...sel, discount: newDiscount }
+                                  ? { ...sel, discount: newDiscountId }
                                   : sel
                               )
                             );
 
-                            if (selection.servicePlan && newDiscount !== '') {
+                            if (selection.servicePlan) {
                               await createOrUpdateQuoteLineItem(
                                 selection.servicePlan,
                                 selection.displayOrder,
                                 {
-                                  discount_percentage: parseFloat(newDiscount),
+                                  discount_id: newDiscountId === '' ? undefined : newDiscountId,
                                 }
                               );
                             }
                           }}
-                          placeholder="Select Discount"
+                          placeholder={loadingDiscounts ? 'Loading discounts...' : 'Select Discount'}
+                          disabled={loadingDiscounts}
                         />
                       </div>
                     </div>

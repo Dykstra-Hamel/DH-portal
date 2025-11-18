@@ -45,6 +45,18 @@ const TEMPLATE_TYPES = [
   { value: 'custom', label: 'Custom Email' },
 ];
 
+// Quote-specific variables that should only show for quote templates
+const QUOTE_VARIABLES = [
+  'quoteUrl',
+  'quoteId',
+  'quoteTotalInitialPrice',
+  'quoteTotalRecurringPrice',
+  'quoteLineItems',
+  'quotePestConcerns',
+  'quoteHomeSize',
+  'quoteYardSize',
+];
+
 export default function EmailTemplateEditor({
   isOpen,
   onClose,
@@ -429,17 +441,35 @@ export default function EmailTemplateEditor({
                 <h4>Variables</h4>
                 <div className={styles.variableSection}>
                   <h5>Common Variables</h5>
-                  {Object.keys(createSampleVariables(companyData, brandData)).map(variable => (
-                    <button
-                      key={variable}
-                      className={styles.variableButton}
-                      onClick={() => insertVariable(variable)}
-                      title={`Insert ${'{{'}${variable}${'}}'}`}
-                    >
-                      {variable}
-                    </button>
-                  ))}
+                  {Object.keys(createSampleVariables(companyData, brandData))
+                    .filter(variable => !QUOTE_VARIABLES.includes(variable))
+                    .map(variable => (
+                      <button
+                        key={variable}
+                        className={styles.variableButton}
+                        onClick={() => insertVariable(variable)}
+                        title={`Insert ${'{{'}${variable}${'}}'}`}
+                      >
+                        {variable}
+                      </button>
+                    ))}
                 </div>
+
+                {formData.template_type === 'quote' && (
+                  <div className={styles.variableSection}>
+                    <h5>Quote Variables</h5>
+                    {QUOTE_VARIABLES.map(variable => (
+                      <button
+                        key={variable}
+                        className={styles.variableButton}
+                        onClick={() => insertVariable(variable)}
+                        title={`Insert ${'{{'}${variable}${'}}'}`}
+                      >
+                        {variable}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {detectedVariables.length > 0 && (
                   <div className={styles.variableSection}>

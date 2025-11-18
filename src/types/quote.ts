@@ -23,6 +23,16 @@ export interface Quote {
   quote_status: QuoteStatus;
   valid_until?: string;
 
+  // Public access
+  quote_url?: string;
+  quote_token?: string;
+  token_expires_at?: string;
+
+  // Signature fields
+  signed_at?: string;
+  signature_data?: string;
+  device_data?: any;
+
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -66,6 +76,8 @@ export interface CreateQuoteRequest {
     service_plan_id: string;
     discount_percentage?: number;
     discount_amount?: number;
+    discount_id?: string;
+    service_frequency?: string;
   }>;
 }
 

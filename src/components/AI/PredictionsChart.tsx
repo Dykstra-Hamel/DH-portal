@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAI } from '@/contexts/AIContext';
 import styles from './PredictionsChart.module.scss';
 import {
@@ -296,7 +297,7 @@ export default function PredictionsChart({
               <div className={styles.v2Notice}>
                 <p>
                   Showing ML-powered predictions with 0-10 pressure scale.{' '}
-                  <a href="/ai-assistant/pest-pressure">View detailed pest pressure dashboard →</a>
+                  <Link href="/ai-assistant/pest-pressure">View detailed pest pressure dashboard →</Link>
                 </p>
               </div>
             )}

@@ -117,6 +117,42 @@ export async function POST(
       );
     }
 
+    // Geocode the address if coordinates aren't provided
+    let latitude = body.latitude ?? null;
+    let longitude = body.longitude ?? null;
+    let hasStreetView = false;
+
+    if (!latitude || !longitude) {
+      // Only geocode if we have city and state
+      if (body.city && body.state) {
+        try {
+          const geocodeResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/internal/geocode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              street: body.street_address,
+              city: body.city,
+              state: body.state,
+              zip: body.zip_code,
+            }),
+          });
+
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json();
+            if (geocodeData.success && geocodeData.coordinates) {
+              latitude = geocodeData.coordinates.lat;
+              longitude = geocodeData.coordinates.lng;
+              hasStreetView = geocodeData.coordinates.hasStreetView || false;
+              console.log(`✅ Geocoded service address: ${latitude}, ${longitude}`);
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Geocoding failed for service address:', error);
+          // Continue without coordinates
+        }
+      }
+    }
+
     // Create new service address
     const addressData = {
       street_address: body.street_address?.trim() || '',
@@ -129,8 +165,9 @@ export async function POST(
       property_notes: body.property_notes?.trim() || null,
       home_size_range: body.home_size_range || null,
       yard_size_range: body.yard_size_range || null,
-      latitude: body.latitude ?? null,
-      longitude: body.longitude ?? null,
+      latitude,
+      longitude,
+      hasStreetView,
     };
 
     // Validate required fields
@@ -255,6 +292,45 @@ export async function PUT(
 
     const serviceAddressId = primaryAddressResult.serviceAddress.id;
 
+    // Geocode the address if coordinates aren't provided
+    let latitude = body.latitude ?? null;
+    let longitude = body.longitude ?? null;
+    let hasStreetView = false;
+
+    if (!latitude || !longitude) {
+      // Only geocode if we have city and state
+      const city = body.city || primaryAddressResult.serviceAddress.city;
+      const state = body.state || primaryAddressResult.serviceAddress.state;
+
+      if (city && state) {
+        try {
+          const geocodeResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/internal/geocode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              street: body.street_address || primaryAddressResult.serviceAddress.street_address,
+              city,
+              state,
+              zip: body.zip_code || primaryAddressResult.serviceAddress.zip_code,
+            }),
+          });
+
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json();
+            if (geocodeData.success && geocodeData.coordinates) {
+              latitude = geocodeData.coordinates.lat;
+              longitude = geocodeData.coordinates.lng;
+              hasStreetView = geocodeData.coordinates.hasStreetView || false;
+              console.log(`✅ Geocoded updated service address: ${latitude}, ${longitude}`);
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Geocoding failed for updated service address:', error);
+          // Continue without coordinates
+        }
+      }
+    }
+
     // Prepare update data
     const addressData = {
       street_address: body.street_address?.trim() || '',
@@ -267,8 +343,9 @@ export async function PUT(
       property_notes: body.property_notes?.trim() || null,
       home_size_range: body.home_size_range || null,
       yard_size_range: body.yard_size_range || null,
-      latitude: body.latitude ?? null,
-      longitude: body.longitude ?? null,
+      latitude,
+      longitude,
+      hasStreetView,
     };
 
     // If only updating a single field, preserve existing data

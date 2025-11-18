@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import {
   ChevronDown,
+  ChevronUp,
   LifeBuoy,
   Users,
   Sparkle,
@@ -130,6 +131,7 @@ export default function TicketReviewModal({
   const [activeTab, setActiveTab] = useState<
     'customer' | 'details' | 'insights' | 'location'
   >('details');
+  const [showDetails, setShowDetails] = useState(false);
   const tabContentRef = useRef<HTMLDivElement>(null);
 
   // Get assignable users based on selected qualification type
@@ -1127,9 +1129,15 @@ export default function TicketReviewModal({
             </div>
           </div>
         </div>
-        {callRecord && (
+        {/* Show AI summary for both calls and forms */}
+        {(callRecord?.call_analysis?.call_summary || (ticket.type === 'web_form' && ticket.description)) && (
           <div className={styles.callSummary}>
-            <p>Call summary: {callRecord.call_analysis?.call_summary}</p>
+            <p>
+              {ticket.type === 'web_form' ? 'Form summary' : 'Call summary'}:{' '}
+              {ticket.type === 'web_form'
+                ? ticket.description
+                : callRecord?.call_analysis?.call_summary}
+            </p>
           </div>
         )}
         <div className={styles.actionsWrapper}>
@@ -1172,12 +1180,22 @@ export default function TicketReviewModal({
             </>
           )}
         </div>
+
+        {step === 'review' && (selectedQualification === 'sales' || selectedQualification === 'customer_service') && (
+          <button
+            className={styles.toggleDetailsButton}
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            <span>{showDetails ? 'Hide Details' : 'View Details'}</span>
+            {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        )}
       </ModalMiddle>
 
       <ModalBottom>
         {step === 'review' && (
           <>
-            {(selectedQualification === 'sales' ||
+            {showDetails && (selectedQualification === 'sales' ||
               selectedQualification === 'customer_service') && (
               <div className={styles.tabbedInterface}>
                 <div className={styles.tabNavigation}>

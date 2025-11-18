@@ -28,9 +28,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
     pathname === '/sign-up' ||
     pathname.match(/^\/login\/[^\/]+$/);
   const isHomePage = pathname === '/';
+  const isQuotePage = pathname.match(/^\/[^\/]+\/quote\/[^\/]+$/);
 
   // Pages that should have the full layout (header + sidebar)
-  const shouldShowLayout = !isPublicPage && !isHomePage;
+  const shouldShowLayout = !isPublicPage && !isHomePage && !isQuotePage;
 
   const toggleSidebar = () => {
     setIsSidebarActive(!isSidebarActive);

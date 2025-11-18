@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from '@/lib/email';
+import { MAILERSEND_API_TOKEN, MAILERSEND_FALLBACK_EMAIL, getCompanyFromEmail } from '@/lib/email';
 
 interface EmailSendRequest {
   to: string;
@@ -54,10 +54,13 @@ export async function POST(request: NextRequest) {
 
     const fromName = company?.name || 'Automation System';
 
+    // Get company's from email (custom domain if verified, otherwise fallback)
+    const fromEmail = await getCompanyFromEmail(companyId);
+
     // Prepare MailerSend API request
     const mailersendData = {
       from: {
-        email: MAILERSEND_FROM_EMAIL,
+        email: fromEmail,
         name: fromName,
       },
       to: [
@@ -202,7 +205,7 @@ export async function GET() {
       success: true,
       provider: 'mailersend',
       configured: true,
-      fromEmail: MAILERSEND_FROM_EMAIL,
+      fallbackEmail: MAILERSEND_FALLBACK_EMAIL,
     });
 
   } catch (error) {
