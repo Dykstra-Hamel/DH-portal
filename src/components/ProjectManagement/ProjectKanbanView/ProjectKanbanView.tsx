@@ -234,7 +234,7 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
                           <h3 className={styles.projectName}>{project.name}</h3>
                           <ProjectBadge
                             projectName={project.name}
-                            projectType={project.project_type}
+                            projectType={project.project_type as any}
                             size="small"
                           />
                         </div>
