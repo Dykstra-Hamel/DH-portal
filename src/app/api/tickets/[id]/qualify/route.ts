@@ -218,7 +218,12 @@ export async function POST(
       const leadInsertData: any = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
-        lead_source: ticket.source === 'website' ? 'organic' : ticket.source,
+        lead_source: ticket.source === 'website' ? 'organic' :
+                     ticket.source === 'internal' ? 'other' :
+                     ticket.source === 'widget' ? 'widget_submission' :
+                     ticket.source === 'inbound' ? 'cold_call' :
+                     ticket.source === 'outbound' ? 'cold_call' :
+                     ticket.source,
         lead_type: ticket.type,
         service_type: ticket.service_type,
         lead_status:
