@@ -84,6 +84,7 @@
 
   @media (max-width: 640px) {
     padding: 30px 20px;
+    padding-bottom: 150px;
   }
 }
 
@@ -1305,7 +1306,7 @@
   color: white;
   border: none;
   display: block;
-  margin: auto auto 0;
+  margin: 32px auto 0 auto;
   border-radius: 12px;
   font-size: 18px;
   font-weight: 700;

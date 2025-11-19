@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server-admin';
-import { createClient } from '@/lib/supabase/server';
+import {
+  getAuthenticatedUser,
+  verifyCompanyAccess,
+  getSupabaseClient,
+} from '@/lib/api-utils';
 
 /**
  * GET /api/companies/[companyId]/discounts
@@ -8,7 +11,7 @@ import { createClient } from '@/lib/supabase/server';
  * Lists all discounts for a company (requires admin access)
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -21,45 +24,30 @@ export async function GET(
       );
     }
 
-    const supabase = await createClient();
-
-    // Verify user has access to this company
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and check if they're a global admin
+    const authResult = await getAuthenticatedUser();
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
 
-    // Check if user belongs to the company and has admin role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const { user, isGlobalAdmin, supabase } = authResult;
 
-    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
-      return NextResponse.json(
-        { error: 'Admin access required' },
-        { status: 403 }
-      );
+    // Verify user has access to this company (global admins bypass this check)
+    const accessResult = await verifyCompanyAccess(
+      supabase,
+      user.id,
+      companyId,
+      isGlobalAdmin
+    );
+    if (accessResult instanceof NextResponse) {
+      return accessResult; // Return error response
     }
 
-    // Verify user belongs to the company
-    const { data: userCompany } = await supabase
-      .from('user_companies')
-      .select('company_id')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .single();
-
-    if (!userCompany) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    // Use admin client for global admins to bypass RLS
+    const queryClient = getSupabaseClient(isGlobalAdmin, supabase);
 
     // Fetch all discounts for the company
-    const { data: discounts, error } = await supabase
+    const { data: discounts, error } = await queryClient
       .from('company_discounts')
       .select('*')
       .eq('company_id', companyId)
@@ -107,41 +95,23 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
-
-    // Verify user has access to this company
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and check if they're a global admin
+    const authResult = await getAuthenticatedUser();
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
 
-    // Check if user belongs to the company and has admin role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const { user, isGlobalAdmin, supabase } = authResult;
 
-    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
-      return NextResponse.json(
-        { error: 'Admin access required' },
-        { status: 403 }
-      );
-    }
-
-    // Verify user belongs to the company
-    const { data: userCompany } = await supabase
-      .from('user_companies')
-      .select('company_id')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .single();
-
-    if (!userCompany) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Verify user has access to this company (global admins bypass this check)
+    const accessResult = await verifyCompanyAccess(
+      supabase,
+      user.id,
+      companyId,
+      isGlobalAdmin
+    );
+    if (accessResult instanceof NextResponse) {
+      return accessResult; // Return error response
     }
 
     // Validate required fields
@@ -152,9 +122,9 @@ export async function POST(
       );
     }
 
-    // Create discount
-    const adminClient = createAdminClient();
-    const { data: discount, error } = await adminClient
+    // Use admin client for global admins to bypass RLS
+    const queryClient = getSupabaseClient(isGlobalAdmin, supabase);
+    const { data: discount, error } = await queryClient
       .from('company_discounts')
       .insert({
         company_id: companyId,
