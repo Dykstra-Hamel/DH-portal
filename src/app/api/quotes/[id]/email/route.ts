@@ -87,15 +87,32 @@ export async function POST(
 
     const logoOverrideUrl = logoOverrideSetting?.setting_value || '';
 
-    // Fetch brand logo
+    // Fetch brand logo and colors
     const { data: brandData } = await supabase
       .from('brands')
-      .select('logo_url')
+      .select('logo_url, primary_color_hex, secondary_color_hex')
       .eq('company_id', company.id)
       .single();
 
     // Determine logo URL with priority: Logo Override > Brand Logo > Default Placeholder
     const companyLogoUrl = logoOverrideUrl || brandData?.logo_url || '/pcocentral-logo.png';
+
+    // Fetch Google reviews data from company settings
+    const { data: reviewsSetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', company.id)
+      .eq('setting_key', 'google_reviews_data')
+      .single();
+
+    let reviewsData: { rating?: number; reviewCount?: number } | null = null;
+    try {
+      if (reviewsSetting?.setting_value && reviewsSetting.setting_value !== '{}') {
+        reviewsData = JSON.parse(reviewsSetting.setting_value);
+      }
+    } catch (error) {
+      console.error('Error parsing reviews data:', error);
+    }
 
     // Generate quote URL path if it doesn't already exist (fallback for older quotes)
     let quoteUrlPath = quote.quote_url;
@@ -216,6 +233,14 @@ export async function POST(
       // Scheduling info
       requestedDate: lead.requested_date ? new Date(lead.requested_date).toLocaleDateString() : 'Not specified',
       requestedTime: lead.requested_time || 'Not specified',
+
+      // Brand colors
+      brandPrimaryColor: brandData?.primary_color_hex || '',
+      brandSecondaryColor: brandData?.secondary_color_hex || '',
+
+      // Google Reviews
+      googleRating: reviewsData?.rating ? reviewsData.rating.toString() : '',
+      googleReviewCount: reviewsData?.reviewCount ? reviewsData.reviewCount.toString() : '',
     };
 
     // Replace variables in template
