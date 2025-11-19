@@ -1946,7 +1946,7 @@ export function LeadStepContent({
     additionalData?: {
       service_frequency?: string;
       discount_percentage?: number;
-      discount_id?: string;
+      discount_id?: string | null;
     }
   ) => {
     // Check if already creating/updating this display order
@@ -3695,7 +3695,7 @@ export function LeadStepContent({
                                 selection.servicePlan,
                                 selection.displayOrder,
                                 {
-                                  discount_id: newDiscountId === '' ? undefined : newDiscountId,
+                                  discount_id: newDiscountId === '' ? null : newDiscountId,
                                 }
                               );
                             }

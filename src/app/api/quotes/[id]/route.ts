@@ -406,22 +406,29 @@ export async function PUT(
                 }
               }
             } else {
-              // If no discount_id, check for existing discounts on the line item
-              const { data: existingLineItem } = await supabase
-                .from('quote_line_items')
-                .select('discount_percentage, discount_amount, discount_id')
-                .eq('id', lineItem.id)
-                .single();
+              // If discount_id is explicitly null, clear all discounts
+              if ((lineItem as any).discount_id === null) {
+                discountAmount = 0;
+                discountPercentage = 0;
+                discountId = null;
+              } else {
+                // If no discount_id provided (undefined), check for existing discounts on the line item
+                const { data: existingLineItem } = await supabase
+                  .from('quote_line_items')
+                  .select('discount_percentage, discount_amount, discount_id')
+                  .eq('id', lineItem.id)
+                  .single();
 
-              if (existingLineItem) {
-                if (lineItem.discount_amount === undefined) {
-                  discountAmount = existingLineItem.discount_amount || 0;
-                }
-                if (lineItem.discount_percentage === undefined) {
-                  discountPercentage = existingLineItem.discount_percentage || 0;
-                }
-                if (!(lineItem as any).discount_id && existingLineItem.discount_id) {
-                  discountId = existingLineItem.discount_id;
+                if (existingLineItem) {
+                  if (lineItem.discount_amount === undefined) {
+                    discountAmount = existingLineItem.discount_amount || 0;
+                  }
+                  if (lineItem.discount_percentage === undefined) {
+                    discountPercentage = existingLineItem.discount_percentage || 0;
+                  }
+                  if (!(lineItem as any).discount_id && existingLineItem.discount_id) {
+                    discountId = existingLineItem.discount_id;
+                  }
                 }
               }
             }

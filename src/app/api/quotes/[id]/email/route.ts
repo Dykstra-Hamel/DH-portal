@@ -77,6 +77,26 @@ export async function POST(
       );
     }
 
+    // Fetch logo override from company settings
+    const { data: logoOverrideSetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', company.id)
+      .eq('setting_key', 'logo_override_url')
+      .single();
+
+    const logoOverrideUrl = logoOverrideSetting?.setting_value || '';
+
+    // Fetch brand logo
+    const { data: brandData } = await supabase
+      .from('brands')
+      .select('logo_url')
+      .eq('company_id', company.id)
+      .single();
+
+    // Determine logo URL with priority: Logo Override > Brand Logo > Default Placeholder
+    const companyLogoUrl = logoOverrideUrl || brandData?.logo_url || '/pcocentral-logo.png';
+
     // Generate quote URL path if it doesn't already exist (fallback for older quotes)
     let quoteUrlPath = quote.quote_url;
     let token = quote.quote_token;
@@ -172,6 +192,7 @@ export async function POST(
       companyEmail: company.email || '',
       companyPhone: company.phone || '',
       companyWebsite: company.website || '',
+      companyLogo: companyLogoUrl,
 
       // Quote variables
       quoteId: quote.id || '',
