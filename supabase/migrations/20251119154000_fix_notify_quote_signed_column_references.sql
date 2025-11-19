@@ -1,22 +1,11 @@
--- Add quote_signed notification type and trigger
+-- Fix notify_quote_signed() function to use correct column names
+-- Previous migration (20251119153500) referenced non-existent 'price' column
+-- The correct column is 'final_initial_price' which already includes applied discounts
 
--- Update notification type constraint to include quote_signed
-ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
-ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
-    CHECK (type IN (
-        'assignment',
-        'department_lead',
-        'department_ticket',
-        'department_project',
-        'new_ticket',
-        'new_lead_unassigned',
-        'new_lead_assigned',
-        'new_support_case_unassigned',
-        'new_support_case_assigned',
-        'quote_signed'
-    ));
+-- Drop the incorrect function (CASCADE will also drop the dependent trigger)
+DROP FUNCTION IF EXISTS notify_quote_signed() CASCADE;
 
--- Create function to handle quote signed notifications
+-- Recreate the function with correct column references
 CREATE OR REPLACE FUNCTION notify_quote_signed()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -51,6 +40,7 @@ BEGIN
             WHERE id = v_lead.company_id;
 
             -- Calculate quote total from final prices (discounts already applied)
+            -- FIXED: Using final_initial_price instead of non-existent 'price' column
             SELECT COALESCE(SUM(qli.final_initial_price), 0) INTO v_quote_total
             FROM quote_line_items qli
             WHERE qli.quote_id = NEW.id;
@@ -74,13 +64,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger on quotes table for signed_at updates
+-- Recreate the trigger (was dropped by CASCADE above)
 DROP TRIGGER IF EXISTS trigger_quote_signed ON quotes;
 CREATE TRIGGER trigger_quote_signed
     AFTER UPDATE OF signed_at ON quotes
     FOR EACH ROW
     EXECUTE FUNCTION notify_quote_signed();
 
--- Add comment for documentation
-COMMENT ON FUNCTION notify_quote_signed() IS 'Creates in-app notifications when a quote is signed/accepted by a customer';
+-- Add documentation comments
+COMMENT ON FUNCTION notify_quote_signed() IS 'Creates in-app notifications when a quote is signed/accepted by a customer. Uses final_initial_price column which includes applied discounts.';
 COMMENT ON TRIGGER trigger_quote_signed ON quotes IS 'Triggers notification when a quote is signed';

@@ -27,6 +27,9 @@ export function generateQuoteSignedEmailTemplate(
     currency: 'USD',
   }).format(quoteTotal);
 
+  // Build lead URL - routes to the lead page instead of the quote page
+  const leadUrl = `${process.env.NEXT_PUBLIC_APP_URL}/connections/leads/${leadId}`;
+
   return `
     <!DOCTYPE html>
     <html>
@@ -130,18 +133,12 @@ export function generateQuoteSignedEmailTemplate(
             </p>
           </div>
 
-          ${
-            quoteUrl
-              ? `
-          <!-- View Quote Button -->
+          <!-- View Lead Button -->
           <div style="text-align: center; margin-bottom: 16px;">
-            <a href="${quoteUrl}" style="display: inline-block; background-color: #007bff; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 16px;">
-              View Quote
+            <a href="${leadUrl}" style="display: inline-block; background-color: #007bff; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 16px;">
+              View Lead Details
             </a>
           </div>
-          `
-              : ''
-          }
         </div>
 
         <!-- Footer -->

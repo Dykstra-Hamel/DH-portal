@@ -233,31 +233,16 @@ export async function POST(
             .single();
 
           if (assignedProfile && assignedProfile.email) {
-            // Calculate quote total
+            // Calculate quote total from final prices (discounts already applied)
             const { data: lineItems } = await supabase
               .from('quote_line_items')
-              .select(`
-                price,
-                discounts:discount_id (
-                  discount_type,
-                  discount_value
-                )
-              `)
+              .select('final_initial_price')
               .eq('quote_id', id);
 
             let quoteTotal = 0;
             if (lineItems && lineItems.length > 0) {
               quoteTotal = lineItems.reduce((sum, item) => {
-                let itemPrice = item.price || 0;
-                if (item.discounts) {
-                  const discount = item.discounts as any;
-                  if (discount.discount_type === 'percentage') {
-                    itemPrice = itemPrice - (itemPrice * discount.discount_value / 100);
-                  } else {
-                    itemPrice = itemPrice - discount.discount_value;
-                  }
-                }
-                return sum + itemPrice;
+                return sum + (item.final_initial_price || 0);
               }, 0);
             }
 

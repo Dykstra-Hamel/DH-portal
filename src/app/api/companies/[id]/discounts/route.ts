@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server-admin';
-import { createClient } from '@/lib/supabase/server';
 import {
   getAuthenticatedUser,
   verifyCompanyAccess,
@@ -13,7 +11,7 @@ import {
  * Lists all discounts for a company (requires admin access)
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

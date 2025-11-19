@@ -1,22 +1,7 @@
--- Add quote_signed notification type and trigger
+-- Fix notify_quote_signed() trigger function to use correct column names
+-- Changes 'qli.price' to 'qli.final_initial_price' which already includes discounts
 
--- Update notification type constraint to include quote_signed
-ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
-ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
-    CHECK (type IN (
-        'assignment',
-        'department_lead',
-        'department_ticket',
-        'department_project',
-        'new_ticket',
-        'new_lead_unassigned',
-        'new_lead_assigned',
-        'new_support_case_unassigned',
-        'new_support_case_assigned',
-        'quote_signed'
-    ));
-
--- Create function to handle quote signed notifications
+-- Drop and recreate the function with the correct table reference
 CREATE OR REPLACE FUNCTION notify_quote_signed()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -74,13 +59,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger on quotes table for signed_at updates
-DROP TRIGGER IF EXISTS trigger_quote_signed ON quotes;
-CREATE TRIGGER trigger_quote_signed
-    AFTER UPDATE OF signed_at ON quotes
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_quote_signed();
-
 -- Add comment for documentation
 COMMENT ON FUNCTION notify_quote_signed() IS 'Creates in-app notifications when a quote is signed/accepted by a customer';
-COMMENT ON TRIGGER trigger_quote_signed ON quotes IS 'Triggers notification when a quote is signed';
