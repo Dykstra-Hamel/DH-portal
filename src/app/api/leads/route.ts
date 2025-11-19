@@ -398,6 +398,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Auto-link service address to quote if customer has one and lead doesn't
+    if (!serviceAddressId && customerId) {
+      try {
+        const { data: customerAddress } = await supabase
+          .from('customer_service_addresses')
+          .select('service_address_id')
+          .eq('customer_id', customerId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (customerAddress?.service_address_id) {
+          // Update lead with service address
+          await supabase
+            .from('leads')
+            .update({ service_address_id: customerAddress.service_address_id })
+            .eq('id', newLead.id);
+
+          // Update auto-created quote with service address
+          await supabase
+            .from('quotes')
+            .update({ service_address_id: customerAddress.service_address_id })
+            .eq('lead_id', newLead.id);
+        }
+      } catch (error) {
+        console.error('Error auto-linking service address:', error);
+        // Don't fail the request if this fails
+      }
+    }
+
     return NextResponse.json(
       { success: true, lead: newLead },
       { status: 201 }
