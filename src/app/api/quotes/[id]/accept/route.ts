@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { captureDeviceData } from '@/lib/device-utils';
+import { sendQuoteSignedNotification } from '@/lib/email/quote-notifications';
+import { QuoteSignedEmailData } from '@/lib/email/types';
 
 interface AcceptQuoteRequest {
   signature_data: string;
@@ -188,6 +190,117 @@ export async function POST(
             comments: updatedComments,
           })
           .eq('id', quote.lead_id);
+      }
+
+      // Send email notification to assigned user
+      try {
+        // Fetch lead with assigned user, customer, company, and service address info
+        const { data: leadData } = await supabase
+          .from('leads')
+          .select(`
+            id,
+            assigned_to,
+            company_id,
+            service_type,
+            companies:company_id (
+              id,
+              name
+            ),
+            customers:customer_id (
+              id,
+              first_name,
+              last_name,
+              email
+            ),
+            service_addresses:service_address_id (
+              street_address,
+              apartment_unit,
+              city,
+              state,
+              zip_code
+            )
+          `)
+          .eq('id', quote.lead_id)
+          .single();
+
+        // Only send notification if lead has assigned user
+        if (leadData && leadData.assigned_to) {
+          // Get assigned user profile
+          const { data: assignedProfile } = await supabase
+            .from('profiles')
+            .select('email, first_name, last_name')
+            .eq('id', leadData.assigned_to)
+            .single();
+
+          if (assignedProfile && assignedProfile.email) {
+            // Calculate quote total
+            const { data: lineItems } = await supabase
+              .from('quote_line_items')
+              .select(`
+                price,
+                discounts:discount_id (
+                  discount_type,
+                  discount_value
+                )
+              `)
+              .eq('quote_id', id);
+
+            let quoteTotal = 0;
+            if (lineItems && lineItems.length > 0) {
+              quoteTotal = lineItems.reduce((sum, item) => {
+                let itemPrice = item.price || 0;
+                if (item.discounts) {
+                  const discount = item.discounts as any;
+                  if (discount.discount_type === 'percentage') {
+                    itemPrice = itemPrice - (itemPrice * discount.discount_value / 100);
+                  } else {
+                    itemPrice = itemPrice - discount.discount_value;
+                  }
+                }
+                return sum + itemPrice;
+              }, 0);
+            }
+
+            // Build service address string
+            let serviceAddress = '';
+            if (leadData.service_addresses) {
+              const addr = leadData.service_addresses as any;
+              const parts = [
+                addr.street_address,
+                addr.apartment_unit,
+                addr.city,
+                addr.state,
+                addr.zip_code
+              ].filter(Boolean);
+              serviceAddress = parts.join(', ');
+            }
+
+            // Build quote URL
+            const quoteUrl = quote.quote_url ? `${process.env.NEXT_PUBLIC_APP_URL || ''}${quote.quote_url}` : undefined;
+
+            // Prepare email data
+            const emailData: QuoteSignedEmailData = {
+              quoteId: id,
+              leadId: leadData.id,
+              companyName: (leadData.companies as any)?.name || 'Your Company',
+              customerName: `${(leadData.customers as any)?.first_name || ''} ${(leadData.customers as any)?.last_name || ''}`.trim() || (leadData.customers as any)?.email || 'Customer',
+              customerEmail: (leadData.customers as any)?.email || '',
+              quoteTotal: quoteTotal,
+              signedAt: new Date().toISOString(),
+              quoteUrl: quoteUrl,
+              assignedUserName: `${assignedProfile.first_name || ''} ${assignedProfile.last_name || ''}`.trim() || assignedProfile.email,
+              assignedUserEmail: assignedProfile.email,
+              serviceType: leadData.service_type,
+              serviceAddress: serviceAddress || undefined,
+            };
+
+            // Send email notification
+            await sendQuoteSignedNotification(emailData, leadData.company_id);
+          }
+        }
+      } catch (emailError) {
+        // Log error but don't fail the request - quote is already accepted
+        console.error('Error sending quote signed notification email:', emailError);
       }
     }
 

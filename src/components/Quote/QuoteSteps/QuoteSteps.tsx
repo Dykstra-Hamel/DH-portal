@@ -569,22 +569,6 @@ export default function QuoteSteps({
                             </div>
                           </div>
                         </div>
-                        {/* Plan FAQs */}
-                        {item.service_plan?.plan_faqs &&
-                          item.service_plan.plan_faqs.length > 0 && (
-                            <div className={styles.dhPlanFaqs}>
-                              <h3 className={styles.dhFaqsTitle}>
-                                {item.plan_name} FAQs
-                              </h3>
-                              <div className={styles.dhFaqsContainer}>
-                                {item.service_plan.plan_faqs.map(
-                                  (faq: any, faqIndex: number) => (
-                                    <FaqItem key={faqIndex} faq={faq} />
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
                       </div>
                     </div>
                   );
@@ -603,6 +587,34 @@ export default function QuoteSteps({
                   </strong>
                 </div>
               </div>
+
+              {/* Consolidated Plan FAQs */}
+              {quote.line_items.some(
+                (item: any) =>
+                  item.service_plan?.plan_faqs &&
+                  item.service_plan.plan_faqs.length > 0
+              ) && (
+                <div className={styles.dhPlanFaqs}>
+                  <h3 className={styles.dhFaqsTitle}>
+                    Frequently Asked Questions
+                  </h3>
+                  <div className={styles.dhFaqsContainer}>
+                    {quote.line_items.map((item: any, itemIndex: number) =>
+                      item.service_plan?.plan_faqs &&
+                      item.service_plan.plan_faqs.length > 0
+                        ? item.service_plan.plan_faqs.map(
+                            (faq: any, faqIndex: number) => (
+                              <FaqItem
+                                key={`${itemIndex}-${faqIndex}`}
+                                faq={faq}
+                              />
+                            )
+                          )
+                        : null
+                    )}
+                  </div>
+                </div>
+              )}
 
               <button className={styles.primaryButton} onClick={handleNext}>
                 Continue
@@ -1211,22 +1223,6 @@ export default function QuoteSteps({
                             </div>
                           </div>
                         </div>
-                        {/* Plan FAQs */}
-                        {item.service_plan?.plan_faqs &&
-                          item.service_plan.plan_faqs.length > 0 && (
-                            <div className={styles.dhPlanFaqs}>
-                              <h3 className={styles.dhFaqsTitle}>
-                                {item.plan_name} FAQs
-                              </h3>
-                              <div className={styles.dhFaqsContainer}>
-                                {item.service_plan.plan_faqs.map(
-                                  (faq: any, faqIndex: number) => (
-                                    <FaqItem key={faqIndex} faq={faq} />
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
                       </div>
                     </div>
                   );
@@ -1245,6 +1241,34 @@ export default function QuoteSteps({
                   </strong>
                 </div>
               </div>
+
+              {/* Consolidated Plan FAQs */}
+              {quote.line_items.some(
+                (item: any) =>
+                  item.service_plan?.plan_faqs &&
+                  item.service_plan.plan_faqs.length > 0
+              ) && (
+                <div className={styles.dhPlanFaqs}>
+                  <h3 className={styles.dhFaqsTitle}>
+                    Frequently Asked Questions
+                  </h3>
+                  <div className={styles.dhFaqsContainer}>
+                    {quote.line_items.map((item: any, itemIndex: number) =>
+                      item.service_plan?.plan_faqs &&
+                      item.service_plan.plan_faqs.length > 0
+                        ? item.service_plan.plan_faqs.map(
+                            (faq: any, faqIndex: number) => (
+                              <FaqItem
+                                key={`${itemIndex}-${faqIndex}`}
+                                faq={faq}
+                              />
+                            )
+                          )
+                        : null
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Simplified Summary Section */}
               <div className={styles.completionSummary}>

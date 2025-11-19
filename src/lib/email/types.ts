@@ -59,6 +59,21 @@ export interface QuoteEmailData {
   };
 }
 
+export interface QuoteSignedEmailData {
+  quoteId: string;
+  leadId: string;
+  companyName: string;
+  customerName: string;
+  customerEmail: string;
+  quoteTotal: number;
+  signedAt: string;
+  quoteUrl?: string;
+  assignedUserName: string;
+  assignedUserEmail: string;
+  serviceType?: string;
+  serviceAddress?: string;
+}
+
 export interface CallSummaryEmailData {
   callId: string;
   companyName: string;
