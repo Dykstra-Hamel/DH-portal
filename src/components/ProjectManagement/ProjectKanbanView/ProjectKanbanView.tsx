@@ -48,6 +48,8 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
     'bill_client': null,
   });
   const scrollAnimationRef = useRef<number | null>(null);
+  const scrollSpeedRef = useRef<number>(0);
+  const isDraggingRef = useRef<boolean>(false);
 
   const getProjectsByStatus = (status: ProjectStatus): Project[] => {
     return projects.filter(project => project.status === status);
@@ -56,17 +58,15 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
   const handleDragStart = (e: DragEvent<HTMLDivElement>, project: Project) => {
     setDraggedProject(project);
     e.dataTransfer.effectAllowed = 'move';
+    isDraggingRef.current = true;
+    scrollSpeedRef.current = 0;
   };
 
   const handleDragEnd = () => {
     setDraggedProject(null);
     setDragOverColumn(null);
-
-    // Stop auto-scroll
-    if (scrollAnimationRef.current) {
-      cancelAnimationFrame(scrollAnimationRef.current);
-      scrollAnimationRef.current = null;
-    }
+    isDraggingRef.current = false;
+    scrollSpeedRef.current = 0;
   };
 
   const handleDrag = (e: DragEvent<HTMLDivElement>) => {
@@ -74,43 +74,30 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
 
     const container = containerRef.current;
     const containerRect = container.getBoundingClientRect();
-    const scrollEdgeSize = 100; // Distance from edge to trigger scroll
-    const maxScrollSpeed = 10; // Maximum scroll speed
+    const scrollEdgeSize = 180; // Larger trigger zone (was 100)
+    const maxScrollSpeed = 30; // Faster scroll (was 22)
 
     // Calculate distance from edges
     const distanceFromLeft = e.clientX - containerRect.left;
     const distanceFromRight = containerRect.right - e.clientX;
 
-    // Determine scroll direction and speed
+    // Determine scroll direction and speed with easing
     let scrollSpeed = 0;
 
     if (distanceFromLeft < scrollEdgeSize && distanceFromLeft > 0) {
-      // Near left edge - scroll left
-      scrollSpeed = -maxScrollSpeed * (1 - distanceFromLeft / scrollEdgeSize);
+      // Near left edge - scroll left with ease-out-cubic
+      const ratio = distanceFromLeft / scrollEdgeSize;
+      const easedRatio = 1 - Math.pow(ratio, 3);
+      scrollSpeed = -maxScrollSpeed * easedRatio;
     } else if (distanceFromRight < scrollEdgeSize && distanceFromRight > 0) {
-      // Near right edge - scroll right
-      scrollSpeed = maxScrollSpeed * (1 - distanceFromRight / scrollEdgeSize);
+      // Near right edge - scroll right with ease-out-cubic
+      const ratio = distanceFromRight / scrollEdgeSize;
+      const easedRatio = 1 - Math.pow(ratio, 3);
+      scrollSpeed = maxScrollSpeed * easedRatio;
     }
 
-    // Apply scroll
-    if (scrollSpeed !== 0) {
-      const scroll = () => {
-        if (container) {
-          container.scrollLeft += scrollSpeed;
-          scrollAnimationRef.current = requestAnimationFrame(scroll);
-        }
-      };
-
-      // Cancel previous animation and start new one
-      if (scrollAnimationRef.current) {
-        cancelAnimationFrame(scrollAnimationRef.current);
-      }
-      scrollAnimationRef.current = requestAnimationFrame(scroll);
-    } else if (scrollAnimationRef.current) {
-      // Stop scrolling if not near edge
-      cancelAnimationFrame(scrollAnimationRef.current);
-      scrollAnimationRef.current = null;
-    }
+    // Update scroll speed ref (will be read by animation loop)
+    scrollSpeedRef.current = scrollSpeed;
   };
 
   const checkColumnScroll = (columnId: ProjectStatus) => {
@@ -134,6 +121,20 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
   }, [projects]);
 
   useEffect(() => {
+    // Continuous scroll animation loop
+    const scrollLoop = () => {
+      if (isDraggingRef.current && containerRef.current) {
+        const speed = scrollSpeedRef.current;
+        if (speed !== 0) {
+          containerRef.current.scrollLeft += speed;
+        }
+      }
+      scrollAnimationRef.current = requestAnimationFrame(scrollLoop);
+    };
+
+    // Start the loop
+    scrollAnimationRef.current = requestAnimationFrame(scrollLoop);
+
     // Cleanup on unmount
     return () => {
       if (scrollAnimationRef.current) {
