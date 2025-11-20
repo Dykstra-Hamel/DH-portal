@@ -4,6 +4,7 @@ import {
   updateExistingServiceAddress,
   ServiceAddressData,
 } from '@/lib/service-addresses';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 // POST: Create new service address for lead
 export async function POST(
@@ -96,6 +97,21 @@ export async function PUT(
         { error: result.error || 'Failed to update service address' },
         { status: 500 }
       );
+    }
+
+    // Update all quotes for this lead to reference the new service address
+    // This ensures quote hero images and address data reflect the current address
+    const supabase = createAdminClient();
+    const { data: quotes } = await supabase
+      .from('quotes')
+      .select('id')
+      .eq('lead_id', leadId);
+
+    if (quotes && quotes.length > 0) {
+      await supabase
+        .from('quotes')
+        .update({ service_address_id: serviceAddressId })
+        .in('id', quotes.map(q => q.id));
     }
 
     return NextResponse.json({

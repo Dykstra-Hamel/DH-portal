@@ -6,6 +6,7 @@ import {
   generateYardSizeOptions,
   findSizeOptionByValue,
 } from '@/lib/pricing-calculations';
+import { logActivity } from '@/lib/activity-logger';
 
 /**
  * Helper function to parse a size range string (e.g., "1500-2000" or "3000+")
@@ -216,6 +217,23 @@ export async function PUT(
 
     const supabase = createAdminClient();
 
+    // Fetch existing quote to check if it's signed
+    const { data: existingQuote, error: fetchError } = await supabase
+      .from('quotes')
+      .select('signed_at, quote_status')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingQuote) {
+      return NextResponse.json(
+        { error: 'Quote not found' },
+        { status: 404 }
+      );
+    }
+
+    const isQuoteSigned = existingQuote.signed_at !== null;
+    let requiresReset = false;
+
     // Prepare update data
     const updateData: any = {};
 
@@ -239,10 +257,26 @@ export async function PUT(
     // Update size ranges if provided
     if (body.home_size_range !== undefined) {
       updateData.home_size_range = body.home_size_range;
+      // Size change requires reset if quote is signed
+      if (isQuoteSigned) {
+        requiresReset = true;
+      }
     }
 
     if (body.yard_size_range !== undefined) {
       updateData.yard_size_range = body.yard_size_range;
+      // Size change requires reset if quote is signed
+      if (isQuoteSigned) {
+        requiresReset = true;
+      }
+    }
+
+    // If quote is signed and changes require reset, clear signature data
+    if (requiresReset) {
+      updateData.signed_at = null;
+      updateData.signature_data = null;
+      updateData.device_data = null;
+      updateData.quote_status = 'draft';
     }
 
     // Update quote if there's data to update
@@ -258,6 +292,40 @@ export async function PUT(
           { error: 'Failed to update quote' },
           { status: 500 }
         );
+      }
+
+      // Log activity if quote was reset due to modifications
+      if (requiresReset) {
+        try {
+          // Fetch quote to get lead_id and company_id
+          const { data: quoteData } = await supabase
+            .from('quotes')
+            .select('lead_id, company_id')
+            .eq('id', id)
+            .single();
+
+          if (quoteData) {
+            await logActivity({
+              company_id: quoteData.company_id,
+              entity_type: 'lead',
+              entity_id: quoteData.lead_id,
+              activity_type: 'field_update',
+              field_name: 'quote_status',
+              old_value: 'accepted',
+              new_value: 'draft',
+              user_id: null,
+              notes: 'Quote reset due to pricing changes after signing',
+              metadata: {
+                quote_id: id,
+                reason: 'pricing_modified_after_signing',
+                reset_at: new Date().toISOString(),
+              },
+            });
+          }
+        } catch (activityError) {
+          console.error('Error logging quote reset activity:', activityError);
+          // Don't fail the request if activity logging fails
+        }
       }
 
       // Bi-directional sync: If size ranges updated, also update service_address
@@ -296,6 +364,11 @@ export async function PUT(
 
     // Update line items if provided
     if (body.line_items && body.line_items.length > 0) {
+      // Line item changes require reset if quote is signed
+      if (isQuoteSigned) {
+        requiresReset = true;
+      }
+
       // Fetch the quote to get company_id and size ranges
       const { data: quote } = await supabase
         .from('quotes')

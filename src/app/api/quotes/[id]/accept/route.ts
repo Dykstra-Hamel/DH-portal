@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import { captureDeviceData } from '@/lib/device-utils';
 import { sendQuoteSignedNotification } from '@/lib/email/quote-notifications';
 import { QuoteSignedEmailData } from '@/lib/email/types';
+import { logActivity } from '@/lib/activity-logger';
 
 interface AcceptQuoteRequest {
   signature_data: string;
@@ -64,7 +65,7 @@ export async function POST(
     // Fetch the quote to verify it exists, get lead_id, and validate token
     const { data: quote, error: fetchError } = await supabase
       .from('quotes')
-      .select('id, lead_id, quote_status, quote_url, quote_token, token_expires_at')
+      .select('id, lead_id, company_id, quote_status, quote_url, quote_token, token_expires_at')
       .eq('id', id)
       .single();
 
@@ -153,6 +154,30 @@ export async function POST(
         { error: 'Failed to accept quote' },
         { status: 500 }
       );
+    }
+
+    // Log activity for quote acceptance
+    try {
+      await logActivity({
+        company_id: quote.company_id,
+        entity_type: 'lead',
+        entity_id: quote.lead_id,
+        activity_type: 'status_change',
+        field_name: 'quote_status',
+        old_value: quote.quote_status,
+        new_value: 'accepted',
+        user_id: null, // Customer action, no internal user
+        notes: 'Quote signed by customer',
+        metadata: {
+          quote_id: id,
+          signed_at: new Date().toISOString(),
+          signature_captured: true,
+          device_data: completeDeviceData,
+        },
+      });
+    } catch (activityError) {
+      console.error('Error logging quote acceptance activity:', activityError);
+      // Don't fail the request if activity logging fails
     }
 
     // Update the associated lead status
@@ -263,6 +288,9 @@ export async function POST(
             // Build quote URL
             const quoteUrl = quote.quote_url ? `${process.env.NEXT_PUBLIC_APP_URL || ''}${quote.quote_url}` : undefined;
 
+            // Build lead URL with fallback
+            const leadUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connections/leads/${leadData.id}`;
+
             // Prepare email data
             const emailData: QuoteSignedEmailData = {
               quoteId: id,
@@ -273,6 +301,7 @@ export async function POST(
               quoteTotal: quoteTotal,
               signedAt: new Date().toISOString(),
               quoteUrl: quoteUrl,
+              leadUrl: leadUrl,
               assignedUserName: `${assignedProfile.first_name || ''} ${assignedProfile.last_name || ''}`.trim() || assignedProfile.email,
               assignedUserEmail: assignedProfile.email,
               serviceType: leadData.service_type,

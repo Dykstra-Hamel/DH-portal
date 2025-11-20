@@ -12,6 +12,7 @@ export function generateQuoteSignedEmailTemplate(
     quoteTotal,
     signedAt,
     quoteUrl,
+    leadUrl,
     assignedUserName,
     serviceType,
     serviceAddress,
@@ -26,9 +27,6 @@ export function generateQuoteSignedEmailTemplate(
     style: 'currency',
     currency: 'USD',
   }).format(quoteTotal);
-
-  // Build lead URL - routes to the lead page instead of the quote page
-  const leadUrl = `${process.env.NEXT_PUBLIC_APP_URL}/connections/leads/${leadId}`;
 
   return `
     <!DOCTYPE html>
