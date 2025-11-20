@@ -46,6 +46,7 @@ interface Quote {
   total_recurring_price: number;
   quote_status: string;
   quote_url: string;
+  signed_at: string | null;
   line_items: any[];
   customer: {
     id: string;
@@ -62,6 +63,8 @@ interface Quote {
     city: string;
     state: string;
     zip_code: string;
+    latitude: number | null;
+    longitude: number | null;
     home_size_range: string;
     yard_size_range: string;
   };

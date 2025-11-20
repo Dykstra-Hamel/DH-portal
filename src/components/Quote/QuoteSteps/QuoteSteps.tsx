@@ -30,6 +30,7 @@ interface Quote {
   total_initial_price: number;
   total_recurring_price: number;
   line_items: any[];
+  signed_at: string | null;
   customer: {
     first_name: string;
     last_name: string;
@@ -42,6 +43,8 @@ interface Quote {
     city: string;
     state: string;
     zip_code: string;
+    latitude: number | null;
+    longitude: number | null;
   } | null;
   lead: {
     id: string;
@@ -126,6 +129,13 @@ export default function QuoteSteps({
   // Check if multiple plans
   const isMultiplePlans = quote.line_items.length > 1;
 
+  // If quote is already signed, redirect to thank you step
+  useEffect(() => {
+    if (quote.signed_at) {
+      setCurrentStep(4);
+    }
+  }, [quote.signed_at]);
+
   // Update lead scheduling when date/time changes
   const updateLeadSchedule = async (
     field: 'requested_date' | 'requested_time',
@@ -178,22 +188,29 @@ export default function QuoteSteps({
           return;
         }
 
-        // Format the address for Google Maps API
-        const addressString = `${quote.service_address.street_address}, ${quote.service_address.city}, ${quote.service_address.state} ${quote.service_address.zip_code}`;
-        const encodedAddress = encodeURIComponent(addressString);
+        // Prioritize using lat/lng coordinates if available, otherwise use address string
+        let locationParam: string;
+        if (quote.service_address.latitude && quote.service_address.longitude) {
+          // Use precise coordinates for more accurate location
+          locationParam = `${quote.service_address.latitude},${quote.service_address.longitude}`;
+        } else {
+          // Fall back to address string
+          const addressString = `${quote.service_address.street_address}, ${quote.service_address.city}, ${quote.service_address.state} ${quote.service_address.zip_code}`;
+          locationParam = encodeURIComponent(addressString);
+        }
 
         // Check Street View availability
-        const metadataUrl = `https://maps.googleapis.com/maps/api/streetview/metadata?location=${encodedAddress}&key=${apiKey}`;
+        const metadataUrl = `https://maps.googleapis.com/maps/api/streetview/metadata?location=${locationParam}&key=${apiKey}`;
         const metadataResponse = await fetch(metadataUrl);
         const metadata = await metadataResponse.json();
 
         if (metadata.status === 'OK') {
           // Street View is available
-          const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=420x600&location=${encodedAddress}&key=${apiKey}`;
+          const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=420x600&location=${locationParam}&key=${apiKey}`;
           setHeroImageUrl(streetViewUrl);
         } else {
           // Fallback to satellite view
-          const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${encodedAddress}&zoom=18&size=420x600&maptype=satellite&key=${apiKey}`;
+          const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${locationParam}&zoom=18&size=420x600&maptype=satellite&key=${apiKey}`;
           setHeroImageUrl(satelliteUrl);
         }
       } catch (err) {
@@ -202,7 +219,7 @@ export default function QuoteSteps({
     };
 
     generateHeroImage();
-  }, [quote.service_address]);
+  }, [quote.service_address?.latitude, quote.service_address?.longitude, quote.service_address?.street_address]);
 
   // Apply branding colors and font via CSS variables
   const brandingStyle = {

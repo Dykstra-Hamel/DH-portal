@@ -68,6 +68,7 @@ export interface QuoteSignedEmailData {
   quoteTotal: number;
   signedAt: string;
   quoteUrl?: string;
+  leadUrl: string;
   assignedUserName: string;
   assignedUserEmail: string;
   serviceType?: string;

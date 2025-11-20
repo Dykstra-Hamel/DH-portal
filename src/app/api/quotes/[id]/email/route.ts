@@ -287,6 +287,12 @@ export async function POST(
 
     const emailResult = await emailResponse.json();
 
+    // Update lead's last_contacted_at timestamp
+    await supabase
+      .from('leads')
+      .update({ last_contacted_at: new Date().toISOString() })
+      .eq('id', lead.id);
+
     // Log activity for quote emailed
     try {
       const userSupabase = await createClient();

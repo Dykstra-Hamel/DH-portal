@@ -61,6 +61,8 @@ export async function GET(
           city,
           state,
           zip_code,
+          latitude,
+          longitude,
           home_size_range,
           yard_size_range
         ),
