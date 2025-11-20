@@ -286,10 +286,10 @@ export async function POST(
             }
 
             // Build quote URL
-            const quoteUrl = quote.quote_url ? `${process.env.NEXT_PUBLIC_APP_URL || ''}${quote.quote_url}` : undefined;
+            const quoteUrl = quote.quote_url ? `${process.env.NEXT_PUBLIC_SITE_URL || ''}${quote.quote_url}` : undefined;
 
             // Build lead URL with fallback
-            const leadUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/connections/leads/${leadData.id}`;
+            const leadUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/connections/leads/${leadData.id}`;
 
             // Prepare email data
             const emailData: QuoteSignedEmailData = {
