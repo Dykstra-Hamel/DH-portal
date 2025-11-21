@@ -1,0 +1,202 @@
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--gray-600);
+}
+
+// Metrics Grid
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.metricCard {
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  transition: all 0.2s;
+
+  &:hover {
+    box-shadow: var(--box-shadow-card);
+    transform: translateY(-2px);
+  }
+}
+
+.metricIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--border-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &.blue {
+    background: var(--action-100);
+    color: var(--action-600);
+  }
+
+  &.green {
+    background: var(--success-100);
+    color: var(--success-600);
+  }
+
+  &.purple {
+    background: #f3e8ff;
+    color: var(--purple);
+  }
+
+  &.yellow {
+    background: var(--warning-100);
+    color: var(--warning-600);
+  }
+}
+
+.metricContent {
+  flex: 1;
+}
+
+.metricLabel {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin: 0 0 0.25rem 0;
+}
+
+.metricValue {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--brand-black);
+  margin: 0;
+}
+
+// Progress Section
+.progressSection {
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+}
+
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+
+  h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--brand-black);
+  }
+}
+
+.progressPercent {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--action-600);
+}
+
+.progressBar {
+  height: 12px;
+  background: var(--gray-100);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--action-500) 0%, var(--action-600) 100%);
+  transition: width 0.3s ease;
+}
+
+.progressText {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin: 0;
+}
+
+// Charts Grid
+.chartsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+}
+
+.chartCard {
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+
+  h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 1.5rem 0;
+    color: var(--brand-black);
+  }
+}
+
+.noData {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--gray-500);
+  font-size: 0.9375rem;
+}
+
+// Stats Section
+.statsSection {
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+
+  h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 1.5rem 0;
+    color: var(--brand-black);
+  }
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  svg {
+    color: var(--gray-500);
+    flex-shrink: 0;
+  }
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin: 0 0 0.25rem 0;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-black);
+  margin: 0;
+}

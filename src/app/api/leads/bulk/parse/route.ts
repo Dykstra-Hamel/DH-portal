@@ -14,13 +14,14 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { companyId, csvContent } = body;
+    const { companyId, csvContent, skipDatabaseDuplicateCheck } = body;
 
     console.log('Bulk parse request:', {
       companyId,
       csvContentLength: csvContent?.length,
       hasCompanyId: !!companyId,
-      hasCsvContent: !!csvContent
+      hasCsvContent: !!csvContent,
+      skipDatabaseDuplicateCheck
     });
 
     // Validate required fields
@@ -49,21 +50,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get existing leads for duplicate detection
-    const { data: existingLeads } = await supabase
-      .from('leads')
-      .select('id, customer:customers(email, phone)')
-      .eq('company_id', companyId);
+    // Get existing leads for duplicate detection (only if not skipped)
+    let existingLeadsData: Array<{ email?: string; phone_number?: string }> = [];
 
-    // Flatten customer data for duplicate detection
-    const existingLeadsData = (existingLeads || [])
-      .map((lead: any) => ({
-        email: lead.customer?.email,
-        phone_number: lead.customer?.phone,
-      }))
-      .filter((lead: any) => lead.email || lead.phone_number);
+    if (!skipDatabaseDuplicateCheck) {
+      const { data: existingLeads } = await supabase
+        .from('leads')
+        .select('id, customer:customers(email, phone)')
+        .eq('company_id', companyId);
 
-    // Parse CSV using AI
+      // Flatten customer data for duplicate detection
+      existingLeadsData = (existingLeads || [])
+        .map((lead: any) => ({
+          email: lead.customer?.email,
+          phone_number: lead.customer?.phone,
+        }))
+        .filter((lead: any) => lead.email || lead.phone_number);
+    }
+
+    // Parse CSV using AI (with or without database duplicate checking)
     const parseResult = await parseCSVLeads(csvContent, existingLeadsData);
 
     if (!parseResult.success) {

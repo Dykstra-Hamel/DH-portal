@@ -312,8 +312,30 @@ export interface BulkLeadUploadCancelledEvent {
   };
 }
 
+export interface CampaignProcessContactsEvent {
+  name: 'campaign/process-contacts';
+  data: {
+    campaignId: string;
+    companyId: string;
+    workflowId: string;
+    contacts: Array<{
+      memberId: string;
+      contactListId: string;
+      customerId: string | null;
+      leadId: string | null;
+    }>;
+  };
+}
+
+export interface WorkflowCompletedEvent {
+  name: 'workflow/completed';
+  data: {
+    executionId: string;
+  };
+}
+
 // Union type of all events
-export type InngestEvent = LeadCreatedEvent | LeadStatusChangedEvent | WidgetScheduleCompletedEvent | AutomationTriggerEvent | EmailScheduledEvent | WorkflowTestEvent | CallSchedulingEvent | ScheduledCallExecutionEvent | CallCompletedEvent | RetellCallEndedEvent | WorkflowCancellationEvent | PartialLeadCreatedEvent | InboundCallTransferEvent | BulkLeadUploadScheduledEvent | BulkLeadUploadCancelledEvent;
+export type InngestEvent = LeadCreatedEvent | LeadStatusChangedEvent | WidgetScheduleCompletedEvent | AutomationTriggerEvent | EmailScheduledEvent | WorkflowTestEvent | CallSchedulingEvent | ScheduledCallExecutionEvent | CallCompletedEvent | RetellCallEndedEvent | WorkflowCancellationEvent | PartialLeadCreatedEvent | InboundCallTransferEvent | BulkLeadUploadScheduledEvent | BulkLeadUploadCancelledEvent | CampaignProcessContactsEvent | WorkflowCompletedEvent;
 
 // Helper function to send events
 export const sendEvent = async (event: InngestEvent) => {

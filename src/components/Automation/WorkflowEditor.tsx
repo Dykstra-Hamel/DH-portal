@@ -72,6 +72,7 @@ const WORKFLOW_TYPES = [
 ];
 
 const TRIGGER_TYPES = [
+  { value: 'manual', label: 'Manual (Campaign Use)' },
   // { value: 'lead_created', label: 'New Lead Created' }, // Disabled - process not refined yet
   { value: 'widget_schedule_completed', label: 'Widget Schedule Form Completed' },
   { value: 'partial_lead_created', label: 'Partial Lead Created' },

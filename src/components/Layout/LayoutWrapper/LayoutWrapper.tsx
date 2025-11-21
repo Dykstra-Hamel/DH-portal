@@ -191,6 +191,13 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'Monitor the status of your automated processes here.',
           showAddButton: false,
         };
+      case '/campaigns':
+        return {
+          title: 'Campaigns',
+          description: 'Manage your outbound marketing campaigns',
+          showAddButton: true,
+          addButtonText: 'Create Campaign',
+        };
       case '/reports':
       case '/connections/reports':
         return {
