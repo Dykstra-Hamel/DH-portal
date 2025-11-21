@@ -64,7 +64,7 @@ export async function GET(
       .eq('campaign_id', campaignId);
 
     // Get email metrics from email_automation_log via automation_executions
-    const executionIds = executions?.map(e => e.automation_execution?.id).filter(Boolean) || [];
+    const executionIds = executions?.map((e: any) => e.automation_execution?.id).filter(Boolean) || [];
 
     let emailMetrics = {
       sent: 0,
@@ -82,22 +82,22 @@ export async function GET(
 
       if (emailLogs) {
         emailMetrics = {
-          sent: emailLogs.filter(e => ['sent', 'delivered', 'opened', 'clicked'].includes(e.send_status)).length,
-          delivered: emailLogs.filter(e => ['delivered', 'opened', 'clicked'].includes(e.send_status)).length,
-          opened: emailLogs.filter(e => ['opened', 'clicked'].includes(e.send_status)).length,
-          clicked: emailLogs.filter(e => e.send_status === 'clicked').length,
-          failed: emailLogs.filter(e => e.send_status === 'failed').length,
+          sent: emailLogs.filter((e: any) => ['sent', 'delivered', 'opened', 'clicked'].includes(e.send_status)).length,
+          delivered: emailLogs.filter((e: any) => ['delivered', 'opened', 'clicked'].includes(e.send_status)).length,
+          opened: emailLogs.filter((e: any) => ['opened', 'clicked'].includes(e.send_status)).length,
+          clicked: emailLogs.filter((e: any) => e.send_status === 'clicked').length,
+          failed: emailLogs.filter((e: any) => e.send_status === 'failed').length,
         };
       }
     }
 
     // Calculate workflow completion metrics
     const workflowMetrics = {
-      pending: executions?.filter(e => e.automation_execution?.execution_status === 'pending').length || 0,
-      running: executions?.filter(e => e.automation_execution?.execution_status === 'running').length || 0,
-      completed: executions?.filter(e => e.automation_execution?.execution_status === 'completed').length || 0,
-      failed: executions?.filter(e => e.automation_execution?.execution_status === 'failed').length || 0,
-      cancelled: executions?.filter(e => e.automation_execution?.execution_status === 'cancelled').length || 0,
+      pending: executions?.filter((e: any) => e.automation_execution?.execution_status === 'pending').length || 0,
+      running: executions?.filter((e: any) => e.automation_execution?.execution_status === 'running').length || 0,
+      completed: executions?.filter((e: any) => e.automation_execution?.execution_status === 'completed').length || 0,
+      failed: executions?.filter((e: any) => e.automation_execution?.execution_status === 'failed').length || 0,
+      cancelled: executions?.filter((e: any) => e.automation_execution?.execution_status === 'cancelled').length || 0,
     };
 
     // Get contact list breakdown
@@ -111,7 +111,7 @@ export async function GET(
       .eq('campaign_id', campaignId);
 
     // Get member status breakdown
-    const listIds = contactLists?.map(l => l.id) || [];
+    const listIds = contactLists?.map((l: any) => l.id) || [];
     let memberStatusCounts = {
       pending: 0,
       processing: 0,
@@ -130,13 +130,13 @@ export async function GET(
 
       if (members) {
         memberStatusCounts = {
-          pending: members.filter(m => m.status === 'pending').length,
-          processing: members.filter(m => m.status === 'processing').length,
-          processed: members.filter(m => m.status === 'processed').length,
-          failed: members.filter(m => m.status === 'failed').length,
-          bounced: members.filter(m => m.status === 'bounced').length,
-          unsubscribed: members.filter(m => m.status === 'unsubscribed').length,
-          excluded: members.filter(m => m.status === 'excluded').length,
+          pending: members.filter((m: any) => m.status === 'pending').length,
+          processing: members.filter((m: any) => m.status === 'processing').length,
+          processed: members.filter((m: any) => m.status === 'processed').length,
+          failed: members.filter((m: any) => m.status === 'failed').length,
+          bounced: members.filter((m: any) => m.status === 'bounced').length,
+          unsubscribed: members.filter((m: any) => m.status === 'unsubscribed').length,
+          excluded: members.filter((m: any) => m.status === 'excluded').length,
         };
       }
     }

@@ -28,7 +28,7 @@ export const campaignSchedulerHandler = inngest.createFunction(
         `)
         .eq('status', 'scheduled')
         .lte('start_datetime', now)
-        .is('workflow_id', null, false); // Must have a workflow
+        .not('workflow_id', 'is', null); // Must have a workflow
 
       if (error) {
         console.error('Error fetching campaigns to start:', error);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { TrendingUp, Mail, MessageSquare, Phone, Clock, Plus } from 'lucide-react';
 import WorkflowEditor from '@/components/Automation/WorkflowEditor';
@@ -139,9 +140,9 @@ export default function WorkflowSelector({
               <Plus size={16} />
               Create New Workflow
             </button>
-            <a href="/automation" className={styles.createLink}>
+            <Link href="/automation" className={styles.createLink}>
               Go to Automation Settings →
-            </a>
+            </Link>
           </div>
         </div>
 

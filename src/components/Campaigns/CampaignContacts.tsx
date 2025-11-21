@@ -180,7 +180,7 @@ export default function CampaignContacts({ campaignId, companyId, campaignStatus
             <ContactListUpload
               campaignId={campaignId}
               companyId={companyId}
-              onSuccess={() => {
+              onListsChange={() => {
                 fetchContactLists();
                 setShowUploadModal(false);
               }}
