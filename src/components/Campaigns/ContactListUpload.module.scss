@@ -1,0 +1,357 @@
+.contactListUpload {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+
+  h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+}
+
+.description {
+  color: var(--gray-600);
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.totalBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--action-600);
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.uploadSection {
+  padding: 1.5rem;
+  background: var(--gray-50);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.formGroup {
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9375rem;
+  }
+
+  input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+
+    &:focus {
+      outline: none;
+      border-color: var(--action-600);
+    }
+  }
+}
+
+.dropZone {
+  padding: 3rem 2rem;
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: var(--action-600);
+    background: var(--action-50);
+  }
+}
+
+.dropZoneContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+
+  svg {
+    color: var(--gray-600);
+  }
+
+  p {
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .hint {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--action-600);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.successIcon {
+  color: var(--success-600);
+}
+
+.fileName {
+  font-weight: 600;
+  color: var(--brand-black);
+}
+
+.fileInfo {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--error-50);
+  border: 1px solid var(--error-200);
+  border-radius: 8px;
+  color: var(--error-700);
+  font-size: 0.9375rem;
+}
+
+.parseResults {
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+
+  h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+}
+
+.resultsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.resultItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.resultLabel {
+  font-size: 0.8125rem;
+  color: var(--gray-600);
+  font-weight: 500;
+}
+
+.resultValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--brand-black);
+}
+
+.uploadButton {
+  padding: 0.75rem 1.5rem;
+  background: var(--action-600);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: var(--action-700);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.listsSection {
+  h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+}
+
+.listCards {
+  display: grid;
+  gap: 1rem;
+}
+
+.listCard {
+  padding: 1rem;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.listHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+
+  h5 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+}
+
+.removeButton {
+  padding: 0.375rem;
+  background: none;
+  border: none;
+  color: var(--gray-600);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--error-50);
+    color: var(--error-600);
+  }
+}
+
+.listInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gray-600);
+  font-size: 0.875rem;
+
+  svg {
+    color: var(--gray-400);
+  }
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--gray-600);
+
+  svg {
+    color: var(--gray-400);
+    margin-bottom: 1rem;
+  }
+
+  p {
+    margin: 0 0 0.5rem 0;
+    font-weight: 500;
+  }
+
+  span {
+    font-size: 0.875rem;
+  }
+}
+
+// Expandable Details Sections
+.detailsSection {
+  margin-top: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.detailsToggle {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--gray-50);
+  border: none;
+  text-align: left;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--brand-black);
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--gray-100);
+  }
+
+  svg {
+    color: var(--gray-600);
+  }
+}
+
+.rowsList {
+  padding: 1rem;
+  background: white;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.rowDetail {
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--gray-50);
+  border-radius: 6px;
+  border-left: 3px solid var(--error-600);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.rowNumber {
+  font-weight: 600;
+  color: var(--brand-black);
+  margin-bottom: 0.25rem;
+}
+
+.rowReason {
+  color: var(--error-700);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.rowData {
+  font-family: monospace;
+  font-size: 0.8125rem;
+  color: var(--gray-700);
+  padding: 0.5rem;
+  background: white;
+  border-radius: 4px;
+
+  div {
+    margin-bottom: 0.25rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    strong {
+      color: var(--gray-600);
+      margin-right: 0.5rem;
+    }
+  }
+}

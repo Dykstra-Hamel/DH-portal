@@ -50,6 +50,11 @@ export interface CSVParseResult {
     phone?: string;
     reason: string;
   }>;
+  invalidRowDetails: Array<{
+    rowIndex: number;
+    data: NormalizedLeadData;
+    reason: string;
+  }>;
   error?: string;
 }
 
@@ -190,6 +195,7 @@ export async function parseCSVLeads(
         validRows: 0,
         invalidRows: 0,
         duplicates: [],
+        invalidRowDetails: [],
         error: 'No valid data found in CSV',
       };
     }
@@ -300,11 +306,17 @@ IMPORTANT:
       firstLead: parsed.leads?.[0]
     });
 
-    // Detect duplicates
+    // Detect duplicates and invalid rows
     const duplicates: Array<{
       rowIndex: number;
       email?: string;
       phone?: string;
+      reason: string;
+    }> = [];
+
+    const invalidRowDetails: Array<{
+      rowIndex: number;
+      data: NormalizedLeadData;
       reason: string;
     }> = [];
 
@@ -313,6 +325,21 @@ IMPORTANT:
     normalizedLeads.forEach((lead: NormalizedLeadData, index: number) => {
       const email = lead.email?.toLowerCase();
       const phone = lead.phone_number;
+
+      // Check for invalid rows (missing critical contact info)
+      if (!email && !phone) {
+        const missingFields: string[] = [];
+        if (!lead.first_name && !lead.last_name) missingFields.push('name');
+        if (!email) missingFields.push('email');
+        if (!phone) missingFields.push('phone');
+
+        invalidRowDetails.push({
+          rowIndex: index,
+          data: lead,
+          reason: `Missing required contact info: ${missingFields.join(', ')}. At least email or phone is required.`,
+        });
+        return; // Skip duplicate check for invalid rows
+      }
 
       // Check against existing leads
       const emailMatch = email && existingLeads.some(
@@ -331,10 +358,20 @@ IMPORTANT:
       );
 
       if (emailMatch || phoneMatch || batchEmailMatch || batchPhoneMatch) {
-        let reason = 'Duplicate detected: ';
-        if (emailMatch || batchEmailMatch) reason += `Email already exists`;
-        if ((emailMatch || batchEmailMatch) && (phoneMatch || batchPhoneMatch)) reason += ' and ';
-        if (phoneMatch || batchPhoneMatch) reason += `Phone already exists`;
+        let reason = '';
+
+        // Distinguish between database duplicates and within-CSV duplicates
+        if (batchEmailMatch || batchPhoneMatch) {
+          reason = 'Duplicate within CSV: ';
+          if (batchEmailMatch) reason += `Email appears multiple times in this file`;
+          if (batchEmailMatch && batchPhoneMatch) reason += ' and ';
+          if (batchPhoneMatch) reason += `Phone appears multiple times in this file`;
+        } else {
+          reason = 'Duplicate detected: ';
+          if (emailMatch) reason += `Email already exists in database`;
+          if (emailMatch && phoneMatch) reason += ' and ';
+          if (phoneMatch) reason += `Phone already exists in database`;
+        }
 
         duplicates.push({
           rowIndex: index,
@@ -345,9 +382,12 @@ IMPORTANT:
       }
     });
 
-    // Filter out duplicates from the leads array
+    // Filter out duplicates and invalid rows from the leads array
+    const invalidRowIndices = new Set(invalidRowDetails.map(inv => inv.rowIndex));
+    const duplicateRowIndices = new Set(duplicates.map(dup => dup.rowIndex));
+
     const validLeads = normalizedLeads.filter(
-      (_: any, index: number) => !duplicates.some(dup => dup.rowIndex === index)
+      (_: any, index: number) => !invalidRowIndices.has(index) && !duplicateRowIndices.has(index)
     );
 
     return {
@@ -356,8 +396,9 @@ IMPORTANT:
       confidence: parsed.confidence || 0.5,
       totalRows: rows.length,
       validRows: validLeads.length,
-      invalidRows: normalizedLeads.length - validLeads.length,
+      invalidRows: invalidRowDetails.length,
       duplicates,
+      invalidRowDetails,
     };
   } catch (error) {
     console.error('CSV parsing error:', error);
@@ -370,6 +411,7 @@ IMPORTANT:
       validRows: 0,
       invalidRows: 0,
       duplicates: [],
+      invalidRowDetails: [],
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
