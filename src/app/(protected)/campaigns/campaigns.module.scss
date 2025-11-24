@@ -87,7 +87,7 @@
 .loading {
   text-align: center;
   padding: 3rem;
-  color: var(--text-secondary);
+  color: var(--gray-600);
 }
 
 .emptyState {
@@ -96,31 +96,33 @@
   padding: 4rem 2rem;
 
   svg {
-    color: var(--text-tertiary);
+    color: var(--gray-400);
     margin-bottom: 1rem;
   }
 
   h3 {
     font-size: 1.5rem;
     margin: 0 0 0.5rem 0;
+    color: var(--brand-black);
   }
 
   p {
-    color: var(--text-secondary);
+    color: var(--gray-600);
     margin: 0 0 2rem 0;
   }
 }
 
 .campaignCard {
-  background: white;
+  background: var(--white);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--border-radius-lg);
   padding: 1.5rem;
   transition: all 0.2s;
 
   &:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--box-shadow-card);
     transform: translateY(-2px);
+    border-color: var(--action-300);
   }
 }
 
@@ -151,17 +153,17 @@
 
 .actionButton {
   padding: 0.5rem;
-  background: var(--background-secondary);
+  background: var(--gray-50);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--border-radius-md);
   cursor: pointer;
   transition: all 0.2s;
-  color: var(--text-primary);
+  color: var(--brand-black);
 
   &:hover {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
+    background: var(--action-600);
+    border-color: var(--action-600);
+    color: var(--white);
   }
 }
 
@@ -203,7 +205,7 @@
 }
 
 .cardDescription {
-  color: var(--text-secondary);
+  color: var(--gray-600);
   margin: 0 0 1rem 0;
   font-size: 0.9375rem;
 }
@@ -220,10 +222,10 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--gray-600);
 
   svg {
-    color: var(--text-tertiary);
+    color: var(--gray-500);
   }
 }
 
@@ -233,21 +235,21 @@
 
 .progressBar {
   height: 8px;
-  background: var(--background-secondary);
-  border-radius: 4px;
+  background: var(--gray-100);
+  border-radius: var(--border-radius-sm);
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
 
 .progressFill {
   height: 100%;
-  background: var(--primary-color);
+  background: var(--action-600);
   transition: width 0.3s;
 }
 
 .progressText {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--gray-600);
 }
 
 .cardFooter {
@@ -264,16 +266,16 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--gray-600);
 
   svg {
-    color: var(--text-tertiary);
+    color: var(--gray-500);
   }
 }
 
 .cardLink {
   a {
-    color: var(--primary-color);
+    color: var(--action-600);
     text-decoration: none;
     font-weight: 500;
     font-size: 0.9375rem;
@@ -298,9 +300,9 @@
 }
 
 .modalContent {
-  background: white;
+  background: var(--white);
   padding: 2rem;
-  border-radius: 12px;
+  border-radius: var(--border-radius-lg);
   max-width: 600px;
   width: 90%;
   max-height: 90vh;
@@ -308,19 +310,21 @@
 
   h2 {
     margin: 0 0 1rem 0;
+    color: var(--brand-black);
   }
 
   button {
     margin-top: 1rem;
     padding: 0.75rem 1.5rem;
-    background: var(--primary-color);
-    color: white;
+    background: var(--action-600);
+    color: var(--white);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--border-radius-md);
     cursor: pointer;
+    transition: all 0.2s;
 
     &:hover {
-      background: var(--primary-hover);
+      background: var(--action-700);
     }
   }
 }

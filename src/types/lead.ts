@@ -9,6 +9,7 @@ export type LeadSource =
   | 'trade_show'
   | 'webinar'
   | 'content_marketing'
+  | 'campaign'
   | 'widget_submission'
   | 'other';
 
@@ -38,6 +39,7 @@ export interface Lead {
   company_id: string;
   customer_id?: string;
   service_address_id?: string;
+  campaign_id?: string; // Reference to campaign UUID
   lead_source: LeadSource;
   lead_type: LeadType;
   service_type?: string;
@@ -162,6 +164,7 @@ export interface Lead {
 
 export interface LeadFormData {
   customer_id?: string;
+  campaign_id?: string;
   lead_source: LeadSource;
   lead_type: LeadType;
   service_type?: string;
@@ -190,6 +193,7 @@ export const leadSourceOptions = [
   { value: 'trade_show', label: 'Trade Show' },
   { value: 'webinar', label: 'Webinar' },
   { value: 'content_marketing', label: 'Content Marketing' },
+  { value: 'campaign', label: 'Campaign' },
   { value: 'widget_submission', label: 'Widget Submission' },
   { value: 'other', label: 'Other' },
 ] as const;

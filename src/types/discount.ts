@@ -8,6 +8,9 @@ export interface CompanyDiscount {
   is_active: boolean;
   discount_type: 'percentage' | 'fixed_amount';
   discount_value: number;
+  // Separate recurring discount settings (used when applies_to_price = 'both')
+  recurring_discount_type: 'percentage' | 'fixed_amount' | null;
+  recurring_discount_value: number | null;
   applies_to_price: 'initial' | 'recurring' | 'both';
   applies_to_plans: 'all' | 'specific';
   eligible_plan_ids: string[];
@@ -31,6 +34,9 @@ export interface DiscountFormData {
   is_active: boolean;
   discount_type: 'percentage' | 'fixed_amount';
   discount_value: number | string;
+  // Separate recurring discount settings (used when applies_to_price = 'both')
+  recurring_discount_type: 'percentage' | 'fixed_amount' | '';
+  recurring_discount_value: number | string;
   applies_to_price: 'initial' | 'recurring' | 'both';
   applies_to_plans: 'all' | 'specific';
   eligible_plan_ids: string[];
@@ -47,8 +53,9 @@ export interface DiscountFormData {
 
 export interface ServicePlanOption {
   id: string;
+  name?: string; // Mapped from plan_name in DiscountModal
   plan_name: string;
-  plan_category: string;
+  plan_category?: string;
 }
 
 export const MONTH_OPTIONS = [

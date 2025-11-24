@@ -190,7 +190,14 @@ export async function POST(request: NextRequest) {
     const urlOrigin = lookupUrl.startsWith('http') ? new URL(lookupUrl).origin : lookupUrl;
     const sourceDomain = urlOrigin.replace(/^https?:\/\//, '');
 
-    // Step 4: Create initial form_submissions record (pending state)
+    // Step 4: Extract campaign_id if present (supports multiple sources)
+    // Priority: URL query param > form field > top-level payload
+    const queryParams = request.nextUrl.searchParams;
+    const campaignId = queryParams.get('campaign_id') || queryParams.get('campaignId') ||
+                       formData.campaignId || formData.campaign_id || formData['campaign-id'] ||
+                       rawPayload.campaignId || rawPayload.campaign_id || rawPayload['campaign-id'] || null;
+
+    // Step 5: Create initial form_submissions record (pending state)
     const userAgent = request.headers.get('user-agent') || null;
     const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] ||
                       request.headers.get('x-real-ip') ||
@@ -207,6 +214,7 @@ export async function POST(request: NextRequest) {
         processing_status: 'pending',
         ip_address: ipAddress,
         user_agent: userAgent,
+        campaign_id: campaignId,
       })
       .select('id')
       .single();
@@ -414,46 +422,104 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 9: Create ticket
-    const ticketData: any = {
-      company_id: companyId,
-      customer_id: customerId,
-      service_address_id: serviceAddressId,
-      type: 'web_form',
-      source: 'website',
-      description: geminiResult.ticket.description || 'Form submission',
-      priority: geminiResult.ticket.priority || 'medium',
-      service_type: geminiResult.ticket.service_type || 'Pest Control',
-      status: 'new',
-      // pest_type: AI-categorized pest control type (e.g., "Rodent Control", "Termite Control")
-      // normalized.pest_issue: Raw user description (kept in ticket description)
-      pest_type: geminiResult.ticket.pest_type || 'General Pest Control',
-      form_submission_id: submissionId,
-    };
+    // Step 9: Create lead (if campaign) or ticket (if not)
+    let ticketId: string | null = null;
+    let leadId: string | null = null;
 
-    const { data: ticket, error: ticketError } = await supabase
-      .from('tickets')
-      .insert(ticketData)
-      .select('id')
-      .single();
+    if (campaignId) {
+      // Campaign submission: Create a lead instead of a ticket
+      // First, look up the campaign UUID from the campaign_id string
+      const { data: campaign, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .eq('company_id', companyId)
+        .single();
 
-    if (ticketError) {
-      console.error('Failed to create ticket:', ticketError);
-      return createCorsErrorResponse(
-        'Failed to create ticket',
-        origin,
-        'widget',
-        500
-      );
+      if (campaignError) {
+        console.error('Failed to find campaign:', campaignError);
+        return createCorsErrorResponse(
+          'Campaign not found',
+          origin,
+          'widget',
+          404
+        );
+      }
+
+      const leadData: any = {
+        company_id: companyId,
+        customer_id: customerId,
+        campaign_id: campaign.id, // Store campaign UUID for proper FK relationship
+        lead_source: 'campaign',
+        lead_type: 'web_form',
+        service_type: geminiResult.ticket.service_type || 'Pest Control',
+        lead_status: 'unassigned',
+        comments: geminiResult.ticket.description || 'Campaign form submission',
+        priority: geminiResult.ticket.priority || 'medium',
+        utm_campaign: campaignId, // Also store in UTM for tracking purposes
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        referrer_url: lookupUrl,
+      };
+
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .insert(leadData)
+        .select('id')
+        .single();
+
+      if (leadError) {
+        console.error('Failed to create lead:', leadError);
+        return createCorsErrorResponse(
+          'Failed to create lead',
+          origin,
+          'widget',
+          500
+        );
+      }
+
+      leadId = lead.id;
+    } else {
+      // Non-campaign submission: Create a ticket (existing behavior)
+      const ticketData: any = {
+        company_id: companyId,
+        customer_id: customerId,
+        service_address_id: serviceAddressId,
+        type: 'web_form',
+        source: 'website',
+        description: geminiResult.ticket.description || 'Form submission',
+        priority: geminiResult.ticket.priority || 'medium',
+        service_type: geminiResult.ticket.service_type || 'Pest Control',
+        status: 'new',
+        pest_type: geminiResult.ticket.pest_type || 'General Pest Control',
+        form_submission_id: submissionId,
+      };
+
+      const { data: ticket, error: ticketError } = await supabase
+        .from('tickets')
+        .insert(ticketData)
+        .select('id')
+        .single();
+
+      if (ticketError) {
+        console.error('Failed to create ticket:', ticketError);
+        return createCorsErrorResponse(
+          'Failed to create ticket',
+          origin,
+          'widget',
+          500
+        );
+      }
+
+      ticketId = ticket.id;
     }
 
-    const ticketId = ticket.id;
-
-    // Step 10: Link ticket and customer to form submission
+    // Step 10: Link ticket/lead and customer to form submission
     await supabase
       .from('form_submissions')
       .update({
         ticket_id: ticketId,
+        lead_id: leadId,
         customer_id: customerId,
       })
       .eq('id', submissionId);
@@ -521,7 +587,8 @@ export async function POST(request: NextRequest) {
     const response: FormSubmissionResponse = {
       success: true,
       submissionId,
-      ticketId,
+      ticketId: ticketId || undefined,
+      leadId: leadId || undefined,
       customerId: customerId || undefined,
     };
 

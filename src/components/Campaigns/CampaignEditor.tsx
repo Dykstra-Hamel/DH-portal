@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Check, Plus } from 'lucide-react';
 import styles from './CampaignEditor.module.scss';
 import WorkflowSelector from './WorkflowSelector';
 import ContactListUpload from './ContactListUpload';
+import DiscountModal from '@/components/Admin/DiscountModal';
 
 interface CampaignEditorProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export default function CampaignEditor({
   const [discounts, setDiscounts] = useState<any[]>([]);
   const [campaignIdValidating, setCampaignIdValidating] = useState(false);
   const [campaignIdAvailable, setCampaignIdAvailable] = useState<boolean | null>(null);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
 
   // Fetch company data on mount
   useEffect(() => {
@@ -81,6 +83,15 @@ export default function CampaignEditor({
     } catch (error) {
       console.error('Error fetching discounts:', error);
     }
+  };
+
+  const handleDiscountCreated = async () => {
+    // Refresh discounts list
+    await fetchDiscounts();
+    setShowDiscountModal(false);
+
+    // Note: We can't auto-select the newly created discount without knowing its ID
+    // The DiscountModal would need to return the created discount ID in its onSave callback
   };
 
   const validateCampaignId = async (campaignId: string) => {
@@ -405,6 +416,14 @@ export default function CampaignEditor({
                       </option>
                     ))}
                 </select>
+                <button
+                  type="button"
+                  onClick={() => setShowDiscountModal(true)}
+                  className={styles.createDiscountButton}
+                >
+                  <Plus size={16} />
+                  Create New Discount
+                </button>
                 <small>Select a discount to apply to this campaign</small>
               </div>
 
@@ -562,6 +581,15 @@ export default function CampaignEditor({
           </div>
         </div>
       </div>
+
+      {/* Discount Creation Modal */}
+      <DiscountModal
+        isOpen={showDiscountModal}
+        onClose={() => setShowDiscountModal(false)}
+        onSave={handleDiscountCreated}
+        discount={null}
+        companyId={companyId}
+      />
     </div>
   );
 }

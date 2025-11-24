@@ -52,7 +52,9 @@ export interface FormSubmission {
   id: string;
   company_id: string | null;
   ticket_id: string | null;
+  lead_id: string | null;
   customer_id: string | null;
+  campaign_id: string | null;
 
   source_url: string | null;
   source_domain: string | null;
@@ -80,6 +82,7 @@ export interface FormSubmissionResponse {
   success: boolean;
   submissionId?: string;
   ticketId?: string;
+  leadId?: string;
   customerId?: string;
   error?: string;
 }
