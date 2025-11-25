@@ -7,9 +7,10 @@ import styles from './CampaignDetailHeader.module.scss';
 interface CampaignDetailHeaderProps {
   campaign: any;
   onUpdate: () => void;
+  companyTimezone?: string;
 }
 
-export default function CampaignDetailHeader({ campaign, onUpdate }: CampaignDetailHeaderProps) {
+export default function CampaignDetailHeader({ campaign, onUpdate, companyTimezone = 'America/New_York' }: CampaignDetailHeaderProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const handleStartCampaign = async () => {
@@ -114,14 +115,14 @@ export default function CampaignDetailHeader({ campaign, onUpdate }: CampaignDet
         <div className={styles.metaItem}>
           <span className={styles.metaLabel}>Started:</span>
           <span className={styles.metaValue}>
-            {new Date(campaign.start_datetime).toLocaleString()}
+            {new Date(campaign.start_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
           </span>
         </div>
         {campaign.end_datetime && (
           <div className={styles.metaItem}>
             <span className={styles.metaLabel}>Ends:</span>
             <span className={styles.metaValue}>
-              {new Date(campaign.end_datetime).toLocaleString()}
+              {new Date(campaign.end_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
             </span>
           </div>
         )}

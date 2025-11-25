@@ -173,6 +173,24 @@ export async function POST(
       .eq('id', contactList.id)
       .single();
 
+    // Update campaign's total_contacts to reflect all members across all lists
+    const { data: allLists } = await adminSupabase
+      .from('campaign_contact_lists')
+      .select('id')
+      .eq('campaign_id', campaignId);
+
+    if (allLists && allLists.length > 0) {
+      const { count: totalMembersCount } = await adminSupabase
+        .from('campaign_contact_list_members')
+        .select('id', { count: 'exact', head: true })
+        .in('contact_list_id', allLists.map(list => list.id));
+
+      await adminSupabase
+        .from('campaigns')
+        .update({ total_contacts: totalMembersCount || 0 })
+        .eq('id', campaignId);
+    }
+
     return NextResponse.json({
       success: true,
       contactList: updatedList,

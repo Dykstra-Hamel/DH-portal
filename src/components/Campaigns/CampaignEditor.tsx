@@ -234,6 +234,25 @@ export default function CampaignEditor({
       setSaving(true);
       setError(null);
 
+      // Validation: Ensure campaign is complete
+      if (!formData.workflow_id) {
+        setError('Please select a workflow before saving');
+        setSaving(false);
+        return;
+      }
+
+      if (!formData.start_datetime) {
+        setError('Please set a start date and time');
+        setSaving(false);
+        return;
+      }
+
+      if (totalContacts === 0 && contactLists.length === 0) {
+        setError('Please upload at least one contact list');
+        setSaving(false);
+        return;
+      }
+
       const url = campaign
         ? `/api/campaigns/${campaign.id}`
         : '/api/campaigns';
@@ -286,6 +305,27 @@ export default function CampaignEditor({
             console.error(`Error uploading contact list "${list.list_name}":`, uploadErr);
           }
         }
+      }
+
+      // Show success message based on start time
+      const startDate = new Date(formData.start_datetime);
+      const now = new Date();
+
+      if (startDate > now) {
+        // Future campaign
+        const formattedDate = startDate.toLocaleString('en-US', {
+          timeZone: companyTimezone,
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        console.log(`Campaign scheduled to start on ${formattedDate}`);
+      } else {
+        // Immediate start
+        console.log('Campaign scheduled to start within the next 5 minutes');
       }
 
       onSuccess();
@@ -437,6 +477,7 @@ export default function CampaignEditor({
                   <label>Start Date & Time *</label>
                   <input
                     type="datetime-local"
+                    step="900"
                     value={formData.start_datetime}
                     onChange={e => setFormData({ ...formData, start_datetime: e.target.value })}
                   />
@@ -446,6 +487,7 @@ export default function CampaignEditor({
                   <label>End Date & Time (Optional)</label>
                   <input
                     type="datetime-local"
+                    step="900"
                     value={formData.end_datetime}
                     onChange={e => setFormData({ ...formData, end_datetime: e.target.value })}
                   />
@@ -538,14 +580,14 @@ export default function CampaignEditor({
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Start:</span>
                   <span className={styles.reviewValue}>
-                    {new Date(formData.start_datetime).toLocaleString()}
+                    {new Date(formData.start_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
                   </span>
                 </div>
                 {formData.end_datetime && (
                   <div className={styles.reviewItem}>
                     <span className={styles.reviewLabel}>End:</span>
                     <span className={styles.reviewValue}>
-                      {new Date(formData.end_datetime).toLocaleString()}
+                      {new Date(formData.end_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
                     </span>
                   </div>
                 )}
