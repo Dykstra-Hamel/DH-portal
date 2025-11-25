@@ -3,6 +3,7 @@
 import React from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { Mails } from 'lucide-react';
 import { useNavigation, PrimaryNavItem } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import styles from './PrimarySideNav.module.scss';
@@ -97,6 +98,13 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
         </svg>
       ),
       text: 'Connections',
+    },
+    {
+      id: 'campaigns' as PrimaryNavItem,
+      href: '/campaigns',
+      disabled: false,
+      icon: <Mails size={24} />,
+      text: 'Campaigns',
     },
     {
       id: 'customers' as PrimaryNavItem,
@@ -242,6 +250,9 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     }
     if (href === '/connections') {
       return pathname.startsWith('/connections');
+    }
+    if (href === '/campaigns') {
+      return pathname.startsWith('/campaigns');
     }
     return pathname.startsWith(href);
   };

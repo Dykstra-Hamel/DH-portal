@@ -1,6 +1,7 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { formatDateOnly, toE164PhoneNumber } from '@/lib/utils';
+import { fetchCompanyBusinessHours, isBusinessHours, getNextBusinessHourSlot } from '@/lib/campaigns/business-hours';
 
 interface StepResult {
   stepIndex: number;
@@ -272,15 +273,64 @@ export const workflowExecuteHandler = inngest.createFunction(
       
       // Handle delay if this step requires it
       const stepDelayMinutes = (stepResult && 'delayMinutes' in stepResult ? stepResult.delayMinutes as number : null) || currentStep.delay_minutes || 0;
-      const shouldDelay = 
-        (stepResult && 'requiresDelay' in stepResult ? stepResult.requiresDelay as boolean : false) || 
-        currentStep.type === 'wait' || 
+      const shouldDelay =
+        (stepResult && 'requiresDelay' in stepResult ? stepResult.requiresDelay as boolean : false) ||
+        currentStep.type === 'wait' ||
         currentStep.type === 'delay' ||
         (currentStep.delay_minutes && currentStep.delay_minutes > 0);
-        
+
       if (shouldDelay && stepDelayMinutes > 0) {
-        await step.sleep('delay-step', `${stepDelayMinutes}m`);
-        
+        // Check if this is a campaign execution and if it should respect business hours
+        const shouldRespectBusinessHours = await step.run(`check-business-hours-requirement-${stepIndex}`, async () => {
+          // Check if this execution is from a campaign
+          if (triggerType === 'campaign' && execution.execution_data?.campaignId) {
+            const supabase = createAdminClient();
+            const { data: campaign } = await supabase
+              .from('campaigns')
+              .select('respect_business_hours')
+              .eq('id', execution.execution_data.campaignId)
+              .single();
+
+            return campaign?.respect_business_hours ?? false;
+          }
+          return false;
+        });
+
+        // Calculate when the delay will end
+        const delayEndTime = new Date(Date.now() + stepDelayMinutes * 60 * 1000);
+
+        // If we need to respect business hours and the delay would end outside business hours
+        if (shouldRespectBusinessHours) {
+          const businessHours = await fetchCompanyBusinessHours(companyId);
+
+          // Check if delay end time falls outside business hours
+          if (!isBusinessHours(delayEndTime, businessHours)) {
+            console.log(`Workflow ${executionId} step ${stepIndex}: Delay would end outside business hours`, {
+              originalDelayEnd: delayEndTime.toISOString(),
+              delayMinutes: stepDelayMinutes
+            });
+
+            // Calculate next business hour slot
+            const nextBusinessSlot = getNextBusinessHourSlot(new Date(), businessHours);
+            const adjustedDelayMs = nextBusinessSlot.getTime() - Date.now();
+            const adjustedDelayMinutes = Math.ceil(adjustedDelayMs / 60000);
+
+            console.log(`Workflow ${executionId} step ${stepIndex}: Adjusted delay to respect business hours`, {
+              originalDelayMinutes: stepDelayMinutes,
+              adjustedDelayMinutes,
+              nextBusinessSlot: nextBusinessSlot.toISOString()
+            });
+
+            await step.sleep('delay-step', `${adjustedDelayMinutes}m`);
+          } else {
+            // Normal delay - within business hours
+            await step.sleep('delay-step', `${stepDelayMinutes}m`);
+          }
+        } else {
+          // No business hours restriction
+          await step.sleep('delay-step', `${stepDelayMinutes}m`);
+        }
+
         // Check for cancellation after sleep (common cancellation point)
         const postSleepCheck = await step.run(`check-cancellation-after-sleep-${stepIndex}`, async () => {
           const supabase = createAdminClient();
@@ -289,18 +339,18 @@ export const workflowExecuteHandler = inngest.createFunction(
             .select('execution_status, execution_data')
             .eq('id', executionId)
             .single();
-            
+
           // Check both database status and cancellation flags
           const isCancelled = currentExecution?.execution_status === 'cancelled' ||
                              currentExecution?.execution_data?.cancellationProcessed === true;
-            
+
           return {
             status: currentExecution?.execution_status,
             shouldContinue: !isCancelled,
             cancellationReason: isCancelled ? 'Database status or cancellation flag' : null
           };
         });
-        
+
         if (!postSleepCheck.shouldContinue) {
           return {
             success: true,

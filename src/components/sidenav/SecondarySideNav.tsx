@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Mails } from 'lucide-react';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserPageAccess } from '@/hooks/useUserDepartments';
@@ -326,6 +327,8 @@ export function SecondarySideNav({
             />
           </svg>
         );
+      case 'campaigns':
+        return <Mails size={24} />;
       default:
         return null;
     }
@@ -338,6 +341,12 @@ export function SecondarySideNav({
         return [
           {
             items: [{ text: 'Dashboard', href: '/dashboard' }],
+          },
+        ];
+      case 'campaigns':
+        return [
+          {
+            items: [{ text: 'Dashboard', href: '/campaigns' }],
           },
         ];
       case 'customers':

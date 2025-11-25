@@ -5,6 +5,7 @@ import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import styles from './CampaignEditor.module.scss';
 import WorkflowSelector from './WorkflowSelector';
 import ContactListUpload from './ContactListUpload';
+import CampaignSchedulePreview from './CampaignSchedulePreview';
 
 interface CampaignEditorProps {
   isOpen: boolean;
@@ -37,6 +38,8 @@ export default function CampaignEditor({
     start_datetime: '',
     end_datetime: '',
     workflow_id: '',
+    daily_limit: 500,
+    respect_business_hours: true,
   });
 
   const [selectedWorkflow, setSelectedWorkflow] = useState<any>(null);
@@ -45,6 +48,8 @@ export default function CampaignEditor({
   const [discounts, setDiscounts] = useState<any[]>([]);
   const [campaignIdValidating, setCampaignIdValidating] = useState(false);
   const [campaignIdAvailable, setCampaignIdAvailable] = useState<boolean | null>(null);
+  const [estimatedDays, setEstimatedDays] = useState<number | null>(null);
+  const [schedulePreview, setSchedulePreview] = useState<any>(null);
 
   // Fetch company data on mount
   useEffect(() => {
@@ -120,14 +125,28 @@ export default function CampaignEditor({
         start_datetime: campaign.start_datetime || '',
         end_datetime: campaign.end_datetime || '',
         workflow_id: campaign.workflow_id || '',
+        daily_limit: campaign.daily_limit || 500,
+        respect_business_hours: campaign.respect_business_hours ?? true,
       });
       setSelectedWorkflow(campaign.workflow);
+      setEstimatedDays(campaign.estimated_days || null);
       // Mark campaign ID as available if editing existing campaign
       if (campaign.campaign_id) {
         setCampaignIdAvailable(true);
       }
     }
   }, [campaign]);
+
+  // Calculate estimated days when contacts or daily limit changes
+  useEffect(() => {
+    if (totalContacts > 0 && formData.daily_limit > 0) {
+      // Simple estimation (backend will calculate more accurately with business hours)
+      const estimated = Math.ceil(totalContacts / formData.daily_limit);
+      setEstimatedDays(estimated);
+    } else {
+      setEstimatedDays(null);
+    }
+  }, [totalContacts, formData.daily_limit]);
 
   const steps: { key: Step; label: string; number: number }[] = [
     { key: 'basic', label: 'Basic Info', number: 1 },
@@ -227,6 +246,7 @@ export default function CampaignEditor({
         start_datetime: convertToUTC(formData.start_datetime),
         end_datetime: formData.end_datetime ? convertToUTC(formData.end_datetime) : '',
         company_id: companyId,
+        total_contacts: totalContacts,
       };
 
       const response = await fetch(url, {
@@ -288,11 +308,15 @@ export default function CampaignEditor({
       start_datetime: '',
       end_datetime: '',
       workflow_id: '',
+      daily_limit: 500,
+      respect_business_hours: true,
     });
     setSelectedWorkflow(null);
     setContactLists([]);
     setTotalContacts(0);
     setCampaignIdAvailable(null);
+    setEstimatedDays(null);
+    setSchedulePreview(null);
     setError(null);
     onClose();
   };
@@ -442,14 +466,57 @@ export default function CampaignEditor({
           )}
 
           {currentStep === 'contacts' && (
-            <ContactListUpload
-              companyId={companyId}
-              campaignId={campaign?.id}
-              onListsChange={(lists, total) => {
-                setContactLists(lists);
-                setTotalContacts(total);
-              }}
-            />
+            <div className={styles.contactsStep}>
+              <ContactListUpload
+                companyId={companyId}
+                campaignId={campaign?.id}
+                onListsChange={(lists, total) => {
+                  setContactLists(lists);
+                  setTotalContacts(total);
+                }}
+              />
+
+              <div className={styles.sendingConfig}>
+                <h3>Sending Configuration</h3>
+                <div className={styles.formGroup}>
+                  <label>Daily Contact Limit</label>
+                  <input
+                    type="number"
+                    min="50"
+                    max="1000"
+                    step="50"
+                    value={formData.daily_limit}
+                    onChange={e => setFormData({ ...formData, daily_limit: parseInt(e.target.value) || 500 })}
+                  />
+                  <small>Maximum contacts to process per day (50-1000)</small>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={formData.respect_business_hours}
+                      onChange={e => setFormData({ ...formData, respect_business_hours: e.target.checked })}
+                      style={{ width: 'auto', marginRight: '8px' }}
+                    />
+                    Respect business hours
+                  </label>
+                  <small>Only send during company business hours (recommended)</small>
+                </div>
+
+                {totalContacts > 0 && estimatedDays && (
+                  <div className={styles.estimateBox}>
+                    <p><strong>Estimated Duration:</strong> {estimatedDays} {estimatedDays === 1 ? 'day' : 'days'}</p>
+                    <p><small>Based on {formData.daily_limit} contacts/day</small></p>
+                    {estimatedDays > 7 && (
+                      <p style={{ color: '#f59e0b' }}>
+                        ⚠️ This campaign will take over a week to complete
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {currentStep === 'review' && (
@@ -515,6 +582,56 @@ export default function CampaignEditor({
                   </span>
                 </div>
               </div>
+
+              <div className={styles.reviewGroup}>
+                <h4>Sending Schedule</h4>
+                <div className={styles.reviewItem}>
+                  <span className={styles.reviewLabel}>Daily Limit:</span>
+                  <span className={styles.reviewValue}>{formData.daily_limit} contacts/day</span>
+                </div>
+                <div className={styles.reviewItem}>
+                  <span className={styles.reviewLabel}>Batch Size:</span>
+                  <span className={styles.reviewValue}>10 contacts per batch (system default)</span>
+                </div>
+                <div className={styles.reviewItem}>
+                  <span className={styles.reviewLabel}>Batch Interval:</span>
+                  <span className={styles.reviewValue}>10 minutes (system default)</span>
+                </div>
+                <div className={styles.reviewItem}>
+                  <span className={styles.reviewLabel}>Business Hours:</span>
+                  <span className={styles.reviewValue}>
+                    {formData.respect_business_hours ? 'Respect company business hours' : 'Send anytime'}
+                  </span>
+                </div>
+                {estimatedDays !== null && (
+                  <div className={styles.reviewItem}>
+                    <span className={styles.reviewLabel}>Estimated Duration:</span>
+                    <span className={styles.reviewValue}>
+                      {estimatedDays} {estimatedDays === 1 ? 'day' : 'days'}
+                      {estimatedDays > 7 && (
+                        <span style={{ color: '#f59e0b', marginLeft: '8px' }}>
+                          ⚠️ Campaign will take over a week
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Schedule Preview */}
+              {totalContacts > 0 && (
+                <div className={styles.reviewGroup}>
+                  <h4>Campaign Timeline</h4>
+                  <CampaignSchedulePreview
+                    campaignId={campaign?.id}
+                    companyId={companyId}
+                    totalContacts={totalContacts}
+                    dailyLimit={formData.daily_limit}
+                    respectBusinessHours={formData.respect_business_hours}
+                    startDate={formData.start_datetime}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
