@@ -7,6 +7,7 @@ import styles from './CampaignExecutions.module.scss';
 interface CampaignExecutionsProps {
   campaignId: string;
   companyId: string;
+  companyTimezone?: string;
 }
 
 interface Customer {
@@ -27,7 +28,7 @@ interface Execution {
   customers: Customer;
 }
 
-export default function CampaignExecutions({ campaignId, companyId }: CampaignExecutionsProps) {
+export default function CampaignExecutions({ campaignId, companyId, companyTimezone = 'America/New_York' }: CampaignExecutionsProps) {
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -168,7 +169,7 @@ export default function CampaignExecutions({ campaignId, companyId }: CampaignEx
                         <div className={styles.detailItem}>
                           <span className={styles.detailLabel}>Started At:</span>
                           <span className={styles.detailValue}>
-                            {new Date(execution.started_at).toLocaleString()}
+                            {new Date(execution.started_at).toLocaleString('en-US', { timeZone: companyTimezone })}
                           </span>
                         </div>
                       )}
@@ -176,7 +177,7 @@ export default function CampaignExecutions({ campaignId, companyId }: CampaignEx
                         <div className={styles.detailItem}>
                           <span className={styles.detailLabel}>Completed At:</span>
                           <span className={styles.detailValue}>
-                            {new Date(execution.completed_at).toLocaleString()}
+                            {new Date(execution.completed_at).toLocaleString('en-US', { timeZone: companyTimezone })}
                           </span>
                         </div>
                       )}

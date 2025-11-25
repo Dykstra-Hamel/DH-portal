@@ -46,7 +46,7 @@ export async function GET(
     }
 
     // Get contact lists with member counts
-    const { data: contactLists, error } = await queryClient
+    const { data: rawLists, error } = await queryClient
       .from('campaign_contact_lists')
       .select('*')
       .eq('campaign_id', campaignId)
@@ -57,7 +57,54 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch contact lists' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, contactLists });
+    if (!rawLists || rawLists.length === 0) {
+      return NextResponse.json({ success: true, contactLists: [] });
+    }
+
+    // Add computed member counts for each list
+    const contactListsWithCounts = await Promise.all(
+      rawLists.map(async (list: any) => {
+        const { count: totalMembers } = await queryClient
+          .from('campaign_contact_list_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('contact_list_id', list.id);
+
+        const { count: pendingCount } = await queryClient
+          .from('campaign_contact_list_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('contact_list_id', list.id)
+          .eq('status', 'pending');
+
+        const { count: processingCount } = await queryClient
+          .from('campaign_contact_list_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('contact_list_id', list.id)
+          .eq('status', 'processing');
+
+        const { count: processedCount } = await queryClient
+          .from('campaign_contact_list_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('contact_list_id', list.id)
+          .eq('status', 'processed');
+
+        const { count: failedCount } = await queryClient
+          .from('campaign_contact_list_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('contact_list_id', list.id)
+          .eq('status', 'failed');
+
+        return {
+          ...list,
+          total_members: totalMembers || 0,
+          pending_count: pendingCount || 0,
+          processing_count: processingCount || 0,
+          processed_count: processedCount || 0,
+          failed_count: failedCount || 0,
+        };
+      })
+    );
+
+    return NextResponse.json({ success: true, contactLists: contactListsWithCounts });
 
   } catch (error) {
     console.error('Error in contact lists GET:', error);

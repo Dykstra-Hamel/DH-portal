@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, Upload, CheckCircle, XCircle, Clock, Loader } from 'lucide-react';
+import { Users, Upload, CheckCircle, XCircle, Clock, Loader, ChevronRight } from 'lucide-react';
 import ContactListUpload from './ContactListUpload';
+import ContactMembersModal from './ContactMembersModal';
 import styles from './CampaignContacts.module.scss';
 
 interface CampaignContactsProps {
@@ -27,6 +28,8 @@ export default function CampaignContacts({ campaignId, companyId, campaignStatus
   const [contactLists, setContactLists] = useState<ContactList[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [selectedListName, setSelectedListName] = useState<string>('');
 
   useEffect(() => {
     fetchContactLists();
@@ -98,11 +101,19 @@ export default function CampaignContacts({ campaignId, companyId, campaignStatus
         <div className={styles.listGrid}>
           {contactLists.map(list => (
             <div key={list.id} className={styles.listCard}>
-              <div className={styles.listHeader}>
+              <div
+                className={styles.listHeader}
+                onClick={() => {
+                  setSelectedListId(list.id);
+                  setSelectedListName(list.list_name);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 <h3>{list.list_name}</h3>
                 <span className={styles.memberCount}>
                   <Users size={16} />
                   {list.total_members} contacts
+                  <ChevronRight size={16} />
                 </span>
               </div>
 
@@ -187,6 +198,16 @@ export default function CampaignContacts({ campaignId, companyId, campaignStatus
             />
           </div>
         </div>
+      )}
+
+      {/* Contact Members Modal */}
+      {selectedListId && (
+        <ContactMembersModal
+          campaignId={campaignId}
+          listId={selectedListId}
+          listName={selectedListName}
+          onClose={() => setSelectedListId(null)}
+        />
       )}
     </div>
   );

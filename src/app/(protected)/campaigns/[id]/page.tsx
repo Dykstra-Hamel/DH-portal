@@ -26,6 +26,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [companyTimezone, setCompanyTimezone] = useState<string>('America/New_York');
 
   useEffect(() => {
     params.then(p => setCampaignId(p.id));
@@ -34,6 +35,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   useEffect(() => {
     if (campaignId && selectedCompany?.id) {
       fetchCampaignData();
+      fetchCompanyTimezone();
       setupRealtimeSubscription();
     }
   }, [campaignId, selectedCompany?.id]);
@@ -66,6 +68,25 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
       setError(err instanceof Error ? err.message : 'Failed to load campaign');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCompanyTimezone = async () => {
+    if (!selectedCompany?.id) return;
+
+    try {
+      const response = await fetch(`/api/companies/${selectedCompany.id}/settings`);
+      const result = await response.json();
+
+      if (result.success && result.settings) {
+        const tzSetting = result.settings.find((s: any) => s.setting_key === 'company_timezone');
+        if (tzSetting) {
+          setCompanyTimezone(tzSetting.setting_value || 'America/New_York');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching company timezone:', error);
+      // Keep default timezone if fetch fails
     }
   };
 
@@ -152,6 +173,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
       <CampaignDetailHeader
         campaign={campaign}
         onUpdate={handleCampaignUpdate}
+        companyTimezone={companyTimezone}
       />
 
       {/* Tabs */}
@@ -203,6 +225,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
           <CampaignExecutions
             campaignId={campaign.id}
             companyId={selectedCompany?.id || ''}
+            companyTimezone={companyTimezone}
           />
         )}
 
