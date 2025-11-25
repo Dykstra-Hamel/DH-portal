@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server-admin';
-import { MAILERSEND_API_TOKEN, MAILERSEND_FALLBACK_EMAIL, getCompanyFromEmail } from '@/lib/email';
+import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from '@/lib/email';
+import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
 
 interface EmailSendRequest {
   to: string;
@@ -43,138 +43,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
-
     // Get company information for proper from name
-    const { data: company } = await supabase
-      .from('companies')
-      .select('name')
-      .eq('id', companyId)
-      .single();
-
-    const fromName = company?.name || 'Automation System';
-
-    // Get company's from email (custom domain if verified, otherwise fallback)
+    const fromName = await getCompanyName(companyId);
     const fromEmail = await getCompanyFromEmail(companyId);
+    const tenantName = await getCompanyTenantName(companyId);
 
-    // Prepare MailerSend API request
-    const mailersendData = {
-      from: {
-        email: fromEmail,
-        name: fromName,
-      },
-      to: [
-        {
-          email: to,
-          name: to.split('@')[0], // Use email prefix as name
-        },
-      ],
-      subject: subject,
-      html: html,
-      text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML tags as fallback
+    // Send email via AWS SES
+    const result = await sendEmailWithFallback({
+      tenantName,
+      from: fromEmail,
+      fromName,
+      to,
+      subject,
+      html,
+      text: text || undefined,
+      companyId,
+      leadId,
+      templateId,
+      source,
       tags: [
         'automation',
         source,
         ...(templateId ? [`template-${templateId}`] : []),
         ...(leadId ? [`lead-${leadId}`] : []),
       ],
-      variables: [
-        {
-          email: to,
-          substitutions: [
-            {
-              var: 'company_name',
-              value: fromName,
-            },
-          ],
-        },
-      ],
-    };
-
-    // Prepare MailerSend payload
-    const mailersendPayload = JSON.stringify(mailersendData);
-
-    // Send email via MailerSend
-    const response = await fetch('https://api.mailersend.com/v1/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: mailersendPayload,
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('MailerSend API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorData,
-      });
-      
+    if (!result.success) {
+      console.error('AWS SES error:', result.error);
+
       return NextResponse.json(
-        { 
-          success: false, 
-          error: `Email service error: ${response.status} - ${response.statusText}`,
-          details: errorData 
+        {
+          success: false,
+          error: `Email service error: ${result.error}`,
         },
         { status: 500 }
       );
     }
 
-    let result;
-    let messageId;
-    
-    try {
-      const responseText = await response.text();
-      
-      if (responseText.trim()) {
-        result = JSON.parse(responseText);
-        messageId = result.message_id || `auto-${Date.now()}`;
-      } else {
-        // Empty response but successful HTTP status
-        result = { message_id: `mailersend-${Date.now()}` };
-        messageId = result.message_id;
-      }
-    } catch (parseError) {
-      console.error('Failed to parse MailerSend response as JSON:', parseError);
-      // If parsing fails but HTTP status was OK, treat as success
-      messageId = `mailersend-fallback-${Date.now()}`;
-      result = { message_id: messageId };
-    }
-
-
-    // Optional: Log email sending to database for tracking
-    try {
-      await supabase
-        .from('email_logs')
-        .insert([
-          {
-            company_id: companyId,
-            lead_id: leadId,
-            template_id: templateId,
-            recipient_email: to,
-            subject_line: subject,
-            email_provider: 'mailersend',
-            provider_message_id: messageId,
-            send_status: 'sent',
-            source: source,
-            sent_at: new Date().toISOString(),
-          },
-        ]);
-    } catch (logError) {
-      console.warn('Failed to log email sending (non-critical):', logError);
-      // Don't fail the email sending if logging fails
-    }
-
     return NextResponse.json({
       success: true,
-      messageId,
-      provider: 'mailersend',
+      messageId: result.messageId,
+      provider: 'aws-ses',
       to,
       subject,
-      sentAt: new Date().toISOString(),
+      sentAt: result.sentAt,
     });
 
   } catch (error) {
@@ -193,26 +106,29 @@ export async function POST(request: NextRequest) {
 // GET method to check email service status
 export async function GET() {
   try {
-    // Basic health check for MailerSend configuration
-    if (!MAILERSEND_API_TOKEN) {
+    const { isSESConfigured } = await import('@/lib/aws-ses/client');
+    const { FALLBACK_FROM_EMAIL } = await import('@/lib/email');
+
+    // Basic health check for AWS SES configuration
+    if (!isSESConfigured()) {
       return NextResponse.json(
-        { success: false, error: 'MailerSend API token not configured' },
+        { success: false, error: 'AWS SES not configured. Check AWS credentials.' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      provider: 'mailersend',
+      provider: 'aws-ses',
       configured: true,
-      fallbackEmail: MAILERSEND_FALLBACK_EMAIL,
+      fallbackEmail: FALLBACK_FROM_EMAIL,
     });
 
   } catch (error) {
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Configuration error' 
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Configuration error'
       },
       { status: 500 }
     );

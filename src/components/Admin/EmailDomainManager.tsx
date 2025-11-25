@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import styles from './EmailDomainManager.module.scss';
 
 interface DomainRecord {
@@ -16,7 +16,8 @@ interface DomainData {
   status: string;
   records: DomainRecord[];
   verifiedAt: string | null;
-  mailersendDomainId: string | null;
+  identityArn?: string | null;
+  dkimTokens?: DomainRecord[];
   liveInfo?: any;
 }
 
@@ -30,6 +31,12 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Tenant provisioning state
+  const [tenantProvisioned, setTenantProvisioned] = useState<boolean | null>(null);
+  const [tenantInfo, setTenantInfo] = useState<any>(null);
+  const [provisioning, setProvisioning] = useState(false);
+  const [deletingTenant, setDeletingTenant] = useState(false);
+
   // Form state
   const [isEditing, setIsEditing] = useState(false);
   const [formDomain, setFormDomain] = useState('');
@@ -38,14 +45,29 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
   const [verifying, setVerifying] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Import modal state
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [availableDomains, setAvailableDomains] = useState<DomainData[]>([]);
-  const [loadingDomains, setLoadingDomains] = useState(false);
-  const [importing, setImporting] = useState(false);
+  // Fetch tenant provisioning status
+  const fetchTenantStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/admin/companies/${companyId}/provision-ses`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch tenant status');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setTenantProvisioned(data.provisioned || false);
+        setTenantInfo(data.provisioned ? data : null);
+      }
+    } catch (err) {
+      console.error('Error fetching tenant status:', err);
+      setTenantProvisioned(false);
+    }
+  }, [companyId]);
 
   // Fetch current domain configuration
-  const fetchDomain = async () => {
+  const fetchDomain = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -68,13 +90,14 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId]);
 
   useEffect(() => {
     if (companyId) {
+      fetchTenantStatus();
       fetchDomain();
     }
-  }, [companyId]);
+  }, [companyId, fetchTenantStatus, fetchDomain]);
 
   // Clear messages after 5 seconds
   useEffect(() => {
@@ -86,6 +109,68 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
       return () => clearTimeout(timer);
     }
   }, [error, success]);
+
+  // Provision SES tenant
+  const handleProvisionTenant = async () => {
+    setProvisioning(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(`/api/admin/companies/${companyId}/provision-ses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to provision SES tenant');
+      }
+
+      setSuccess('SES tenant provisioned successfully! You can now add your email domain.');
+      setTenantProvisioned(true);
+      setTenantInfo(data);
+      await fetchTenantStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to provision tenant');
+    } finally {
+      setProvisioning(false);
+    }
+  };
+
+  // Delete SES tenant
+  const handleDeleteTenant = async () => {
+    if (!confirm('Are you sure you want to delete this SES tenant? This will remove all email sending configuration and cannot be undone.')) {
+      return;
+    }
+
+    setDeletingTenant(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(`/api/admin/companies/${companyId}/provision-ses`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete SES tenant');
+      }
+
+      setSuccess('SES tenant deleted successfully. You can provision a new one if needed.');
+      setTenantProvisioned(false);
+      setTenantInfo(null);
+      await fetchTenantStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete tenant');
+    } finally {
+      setDeletingTenant(false);
+    }
+  };
 
   // Add domain
   const handleAddDomain = async (e: React.FormEvent) => {
@@ -124,77 +209,6 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
     } finally {
       setSubmitting(false);
     }
-  };
-
-  // Fetch available domains for import
-  const fetchAvailableDomains = async () => {
-    setLoadingDomains(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/admin/mailersend-domains?companyId=${companyId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch domains');
-      }
-
-      setAvailableDomains(data.domains.available.map((d: any) => ({
-        name: d.name,
-        prefix: 'noreply',
-        status: d.is_verified ? 'verified' : 'pending',
-        records: [],
-        verifiedAt: d.is_verified ? d.updated_at : null,
-        mailersendDomainId: d.id,
-        liveInfo: d
-      })));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load available domains');
-    } finally {
-      setLoadingDomains(false);
-    }
-  };
-
-  // Import existing domain
-  const handleImportDomain = async (domainId: string, domainName: string) => {
-    if (!confirm(`Import domain "${domainName}"? This will connect it to this company.`)) {
-      return;
-    }
-
-    setImporting(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch(`/api/admin/companies/${companyId}/domain`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          domainId: domainId,
-          emailPrefix: formPrefix
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to import domain');
-      }
-
-      setSuccess(`Domain "${domainName}" imported successfully!`);
-      setShowImportModal(false);
-      await fetchDomain();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to import domain');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  // Open import modal
-  const handleOpenImportModal = () => {
-    setShowImportModal(true);
-    fetchAvailableDomains();
   };
 
   // Verify domain
@@ -298,6 +312,47 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
         </p>
       </div>
 
+      {/* SES Tenant Provisioning Status */}
+      {tenantProvisioned === false && (
+        <div className={styles.tenantAlert} data-type="warning">
+          <div className={styles.tenantAlertContent}>
+            <div>
+              <strong>AWS SES Tenant Not Provisioned</strong>
+              <p>Before you can add an email domain, you need to provision an AWS SES tenant for this company. This creates the necessary infrastructure for sending emails.</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleProvisionTenant}
+              className={styles.btnProvision}
+              disabled={provisioning}
+            >
+              {provisioning ? 'Provisioning...' : 'Provision SES Tenant'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tenantProvisioned === true && tenantInfo && (
+        <div className={styles.tenantAlert} data-type="success">
+          <div className={styles.tenantAlertContent}>
+            <div>
+              <strong>✓ AWS SES Tenant Provisioned</strong>
+              <p className={styles.tenantDetails}>
+                Tenant: <code>{tenantInfo.tenant?.tenantName || 'N/A'}</code>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDeleteTenant}
+              className={styles.btnDeleteTenant}
+              disabled={deletingTenant}
+            >
+              {deletingTenant ? 'Deleting...' : 'Delete Tenant'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className={styles.alert} data-type="error">
           <strong>Error:</strong> {error}
@@ -321,7 +376,7 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
               onChange={(e) => setFormDomain(e.target.value)}
               placeholder="example.com"
               className={styles.input}
-              disabled={submitting}
+              disabled={submitting || tenantProvisioned === false}
               required
             />
             <small>Enter your company domain (e.g., acmepest.com)</small>
@@ -336,7 +391,7 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
               onChange={(e) => setFormPrefix(e.target.value)}
               placeholder="noreply"
               className={styles.input}
-              disabled={submitting}
+              disabled={submitting || tenantProvisioned === false}
               required
             />
             <small>The prefix for the email address (e.g., &quot;noreply&quot; creates noreply@{formDomain || 'example.com'})</small>
@@ -346,7 +401,7 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
             <button
               type="submit"
               className={styles.btnPrimary}
-              disabled={submitting}
+              disabled={submitting || tenantProvisioned === false}
             >
               {submitting ? 'Adding Domain...' : domain?.name ? 'Update Domain' : 'Add Domain'}
             </button>
@@ -478,78 +533,6 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
           <p>
             <strong>No custom domain configured.</strong> Emails will be sent from the fallback domain: <code>noreply@pmpcentral.io</code>
           </p>
-          <button
-            type="button"
-            onClick={handleOpenImportModal}
-            className={styles.btnSecondary}
-            style={{ marginTop: '1rem' }}
-          >
-            Import Existing Domain from MailerSend
-          </button>
-        </div>
-      )}
-
-      {/* Import Domain Modal */}
-      {showImportModal && (
-        <div className={styles.modal}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h4>Import Existing MailerSend Domain</h4>
-              <button
-                type="button"
-                onClick={() => setShowImportModal(false)}
-                className={styles.btnClose}
-                disabled={importing}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className={styles.modalBody}>
-              {loadingDomains ? (
-                <div className={styles.loading}>Loading available domains...</div>
-              ) : availableDomains.length === 0 ? (
-                <div className={styles.emptyState}>
-                  <p>No available domains found in your MailerSend account.</p>
-                  <p className={styles.helpText}>
-                    All domains in your MailerSend account are either already connected to companies or you haven&apos;t added any domains yet.
-                  </p>
-                </div>
-              ) : (
-                <div className={styles.domainsList}>
-                  <p className={styles.instructions}>
-                    Select a domain from your MailerSend account to import:
-                  </p>
-                  {availableDomains.map((availableDomain) => (
-                    <div key={availableDomain.mailersendDomainId} className={styles.domainCard}>
-                      <div className={styles.domainCardHeader}>
-                        <h5>{availableDomain.name}</h5>
-                        {getStatusBadge(availableDomain.status)}
-                      </div>
-                      <div className={styles.domainCardDetails}>
-                        <p>
-                          <strong>Domain ID:</strong> <code>{availableDomain.mailersendDomainId}</code>
-                        </p>
-                        {availableDomain.liveInfo?.is_verified && (
-                          <p className={styles.verifiedNote}>
-                            ✓ This domain is already verified and ready to send emails
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleImportDomain(availableDomain.mailersendDomainId!, availableDomain.name!)}
-                        className={styles.btnPrimary}
-                        disabled={importing}
-                      >
-                        {importing ? 'Importing...' : 'Import This Domain'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       )}
     </div>

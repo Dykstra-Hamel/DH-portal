@@ -26,10 +26,12 @@
     "seed-leads-addresses": "node scripts/seed-service-addresses.js",
     "seed-all": "npm run seed-with-users && npm run seed-tickets-support-cases && npm run seed-service-addresses && npm run seed-automations",
     "backfill-pest-pressure": "npx tsx scripts/backfill-pest-pressure.ts",
+    "migrate-to-ses": "npx tsx scripts/migrate-to-ses.ts",
     "restartdb": "supabase db reset --local",
     "stopstart": "supabase stop && supabase start"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.939.0",
     "@google/generative-ai": "^0.24.1",
     "@slack/web-api": "^7.9.3",
     "@supabase/ssr": "^0.6.1",
@@ -47,7 +49,6 @@
     "react-dom": "^19.0.0",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^3.1.2",
-    "mailersend": "^2.2.0",
     "retell-sdk": "^4.42.0",
     "sass": "^1.89.2"
   },

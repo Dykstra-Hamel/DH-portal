@@ -109,6 +109,65 @@ When creating a new migration file, ALWAYS use the following naming convention:
   - `pest_issue`, `own_or_rent`, `additional_comments`
 - **Database**: All submissions stored in `form_submissions` table with raw + normalized data
 
+## AWS SES Email Service
+
+- **Email Provider**: Uses AWS SES (Simple Email Service) for all transactional emails
+- **Tenant Architecture**: One SES tenant per company for isolated reputation management
+- **Event Tracking**: SNS webhook at `/api/webhooks/ses-events` for bounce/complaint/delivery tracking
+- **Suppression List**: Automatic email suppression for bounces and complaints in `email_suppression_list` table
+
+### Required Environment Variables
+
+```
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=<your-access-key>
+AWS_SECRET_ACCESS_KEY=<your-secret-key>
+```
+
+### Setup for New Companies
+
+1. **Provision SES Tenant**:
+   - POST to `/api/admin/companies/[id]/provision-ses`
+   - Body: `{ "domain": "example.com", "snsTopicArn": "optional" }`
+   - Creates tenant, configuration set, and email identity (if domain provided)
+
+2. **Configure DNS Records**:
+   - Add DKIM CNAME records returned from provisioning
+   - Typically 3 CNAME records: `{token}._domainkey.{domain}` → `{token}.dkim.amazonses.com`
+   - DNS verification can take up to 72 hours
+
+3. **Verify Domain**:
+   - PUT to `/api/admin/companies/[id]/domain` to check verification status
+   - Once verified, emails can be sent from that domain
+
+### Bulk Migration
+
+Use the migration script to provision SES tenants for existing companies:
+
+```bash
+# Dry run (preview changes)
+npm run migrate-to-ses -- --dry-run
+
+# Migrate all companies
+npm run migrate-to-ses
+
+# Migrate specific company
+npm run migrate-to-ses -- --company-id=<uuid>
+```
+
+### Email Sending
+
+All email sending goes through:
+- **API Route**: `/api/email/send` - Main email sending endpoint
+- **Direct Import**: `import { sendEmail } from '@/lib/aws-ses/send-email'` - For server-side code
+- **Features**: Automatic suppression list checking, tenant routing, delivery tracking
+
+### Event Tracking
+
+- **SNS Topics**: Bounces, complaints, deliveries, opens, clicks
+- **Database**: Events logged to `email_logs` table with full delivery status
+- **Suppression**: Hard bounces and complaints automatically added to suppression list
+
 ## Database Changes
 
 - Create migration: `npx supabase migration new <name>`
