@@ -70,7 +70,7 @@ export async function GET(
         const { count } = await queryClient
           .from('campaign_contact_list_members')
           .select('id', { count: 'exact', head: true })
-          .in('contact_list_id', contactLists.map(l => l.id));
+          .in('contact_list_id', contactLists.map((l: { id: string }) => l.id));
 
         totalContacts = count || 0;
       }
