@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { findCompanyByAgentId } from '@/lib/agent-utils';
+import { trackCallEnd } from '@/lib/campaigns/concurrency-manager';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(durationSeconds: number | null): number | null {
@@ -273,6 +274,10 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
     retell_llm_dynamic_variables,
     opt_out_sensitive_data_storage,
   } = callData;
+
+  // Track call completion for campaign concurrency management
+  const durationSeconds = duration_ms ? Math.round(duration_ms / 1000) : null;
+  await trackCallEnd(call_id, durationSeconds || undefined);
 
   // Extract updated data from dynamic variables (may have changed during call)
   const extractedData = extractCallData(

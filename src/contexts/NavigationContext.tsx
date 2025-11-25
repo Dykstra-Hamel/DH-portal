@@ -12,6 +12,7 @@ import { usePathname } from 'next/navigation';
 export type PrimaryNavItem =
   | 'dashboard'
   | 'connections'
+  | 'campaigns'
   | 'customers'
   | 'tasks'
   | 'brand'
@@ -41,6 +42,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     } else if (pathname.startsWith('/leads')) {
       // Legacy /leads route should also activate connections
       setActivePrimaryNav('connections');
+    } else if (pathname.startsWith('/campaigns')) {
+      setActivePrimaryNav('campaigns');
     } else if (pathname.startsWith('/customers')) {
       setActivePrimaryNav('customers');
     } else if (pathname.startsWith('/brand')) {
