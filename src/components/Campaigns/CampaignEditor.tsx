@@ -257,7 +257,6 @@ export default function CampaignEditor({
       setSaving(true);
       setError(null);
 
-      const url = campaign ? `/api/campaigns/${campaign.id}` : '/api/campaigns';
       // Validation: Ensure campaign is complete
       if (!formData.workflow_id) {
         setError('Please select a workflow before saving');
