@@ -6,6 +6,7 @@ import styles from './CampaignEditor.module.scss';
 import WorkflowSelector from './WorkflowSelector';
 import ContactListUpload from './ContactListUpload';
 import DiscountModal from '@/components/Admin/DiscountModal';
+import CampaignSchedulePreview from './CampaignSchedulePreview';
 
 interface CampaignEditorProps {
   isOpen: boolean;
@@ -22,12 +23,13 @@ export default function CampaignEditor({
   onClose,
   companyId,
   campaign,
-  onSuccess
+  onSuccess,
 }: CampaignEditorProps) {
   const [currentStep, setCurrentStep] = useState<Step>('basic');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [companyTimezone, setCompanyTimezone] = useState<string>('America/New_York');
+  const [companyTimezone, setCompanyTimezone] =
+    useState<string>('America/New_York');
 
   // Form data
   const [formData, setFormData] = useState({
@@ -38,6 +40,8 @@ export default function CampaignEditor({
     start_datetime: '',
     end_datetime: '',
     workflow_id: '',
+    daily_limit: 500,
+    respect_business_hours: true,
   });
 
   const [selectedWorkflow, setSelectedWorkflow] = useState<any>(null);
@@ -45,8 +49,12 @@ export default function CampaignEditor({
   const [totalContacts, setTotalContacts] = useState(0);
   const [discounts, setDiscounts] = useState<any[]>([]);
   const [campaignIdValidating, setCampaignIdValidating] = useState(false);
-  const [campaignIdAvailable, setCampaignIdAvailable] = useState<boolean | null>(null);
+  const [campaignIdAvailable, setCampaignIdAvailable] = useState<
+    boolean | null
+  >(null);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [estimatedDays, setEstimatedDays] = useState<number | null>(null);
+  const [schedulePreview, setSchedulePreview] = useState<any>(null);
 
   // Fetch company data on mount
   useEffect(() => {
@@ -62,7 +70,9 @@ export default function CampaignEditor({
       const result = await response.json();
 
       if (result.success && result.settings) {
-        const tzSetting = result.settings.find((s: any) => s.setting_key === 'company_timezone');
+        const tzSetting = result.settings.find(
+          (s: any) => s.setting_key === 'company_timezone'
+        );
         if (tzSetting) {
           setCompanyTimezone(tzSetting.setting_value || 'America/New_York');
         }
@@ -131,14 +141,28 @@ export default function CampaignEditor({
         start_datetime: campaign.start_datetime || '',
         end_datetime: campaign.end_datetime || '',
         workflow_id: campaign.workflow_id || '',
+        daily_limit: campaign.daily_limit || 500,
+        respect_business_hours: campaign.respect_business_hours ?? true,
       });
       setSelectedWorkflow(campaign.workflow);
+      setEstimatedDays(campaign.estimated_days || null);
       // Mark campaign ID as available if editing existing campaign
       if (campaign.campaign_id) {
         setCampaignIdAvailable(true);
       }
     }
   }, [campaign]);
+
+  // Calculate estimated days when contacts or daily limit changes
+  useEffect(() => {
+    if (totalContacts > 0 && formData.daily_limit > 0) {
+      // Simple estimation (backend will calculate more accurately with business hours)
+      const estimated = Math.ceil(totalContacts / formData.daily_limit);
+      setEstimatedDays(estimated);
+    } else {
+      setEstimatedDays(null);
+    }
+  }, [totalContacts, formData.daily_limit]);
 
   const steps: { key: Step; label: string; number: number }[] = [
     { key: 'basic', label: 'Basic Info', number: 1 },
@@ -152,10 +176,12 @@ export default function CampaignEditor({
   const canProceed = () => {
     switch (currentStep) {
       case 'basic':
-        return formData.name.trim() &&
-               formData.campaign_id.trim() &&
-               campaignIdAvailable === true &&
-               formData.start_datetime;
+        return (
+          formData.name.trim() &&
+          formData.campaign_id.trim() &&
+          campaignIdAvailable === true &&
+          formData.start_datetime
+        );
       case 'workflow':
         return formData.workflow_id;
       case 'contacts':
@@ -196,11 +222,12 @@ export default function CampaignEditor({
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      hour12: false
+      hour12: false,
     });
 
     const parts = formatter.formatToParts(date);
-    const getValue = (type: string) => parts.find(p => p.type === type)?.value || '';
+    const getValue = (type: string) =>
+      parts.find(p => p.type === type)?.value || '';
 
     // Create a date string in company timezone
     const companyDateStr = `${getValue('year')}-${getValue('month')}-${getValue('day')}T${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
@@ -211,8 +238,12 @@ export default function CampaignEditor({
     const companyDate = new Date(`${datePart}T${timePart}:00`);
 
     // Get offset between company timezone and UTC
-    const utcDate = new Date(companyDate.toLocaleString('en-US', { timeZone: 'UTC' }));
-    const tzDate = new Date(companyDate.toLocaleString('en-US', { timeZone: companyTimezone }));
+    const utcDate = new Date(
+      companyDate.toLocaleString('en-US', { timeZone: 'UTC' })
+    );
+    const tzDate = new Date(
+      companyDate.toLocaleString('en-US', { timeZone: companyTimezone })
+    );
     const offset = tzDate.getTime() - utcDate.getTime();
 
     // Apply offset to get correct UTC time
@@ -226,9 +257,7 @@ export default function CampaignEditor({
       setSaving(true);
       setError(null);
 
-      const url = campaign
-        ? `/api/campaigns/${campaign.id}`
-        : '/api/campaigns';
+      const url = campaign ? `/api/campaigns/${campaign.id}` : '/api/campaigns';
 
       const method = campaign ? 'PUT' : 'POST';
 
@@ -236,8 +265,11 @@ export default function CampaignEditor({
       const payload = {
         ...formData,
         start_datetime: convertToUTC(formData.start_datetime),
-        end_datetime: formData.end_datetime ? convertToUTC(formData.end_datetime) : '',
+        end_datetime: formData.end_datetime
+          ? convertToUTC(formData.end_datetime)
+          : '',
         company_id: companyId,
+        total_contacts: totalContacts,
       };
 
       const response = await fetch(url, {
@@ -259,22 +291,31 @@ export default function CampaignEditor({
         // Upload each temporary contact list
         for (const list of contactLists.filter(l => l.isTemporary)) {
           try {
-            const uploadResponse = await fetch(`/api/campaigns/${newCampaignId}/contact-lists/upload`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                listName: list.list_name,
-                parsedData: list.parsedData,
-              }),
-            });
+            const uploadResponse = await fetch(
+              `/api/campaigns/${newCampaignId}/contact-lists/upload`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  listName: list.list_name,
+                  parsedData: list.parsedData,
+                }),
+              }
+            );
 
             const uploadResult = await uploadResponse.json();
 
             if (!uploadResult.success) {
-              console.error(`Failed to upload contact list "${list.list_name}":`, uploadResult.error);
+              console.error(
+                `Failed to upload contact list "${list.list_name}":`,
+                uploadResult.error
+              );
             }
           } catch (uploadErr) {
-            console.error(`Error uploading contact list "${list.list_name}":`, uploadErr);
+            console.error(
+              `Error uploading contact list "${list.list_name}":`,
+              uploadErr
+            );
           }
         }
       }
@@ -299,11 +340,15 @@ export default function CampaignEditor({
       start_datetime: '',
       end_datetime: '',
       workflow_id: '',
+      daily_limit: 500,
+      respect_business_hours: true,
     });
     setSelectedWorkflow(null);
     setContactLists([]);
     setTotalContacts(0);
     setCampaignIdAvailable(null);
+    setEstimatedDays(null);
+    setSchedulePreview(null);
     setError(null);
     onClose();
   };
@@ -342,11 +387,7 @@ export default function CampaignEditor({
         </div>
 
         {/* Error Message */}
-        {error && (
-          <div className={styles.error}>
-            {error}
-          </div>
-        )}
+        {error && <div className={styles.error}>{error}</div>}
 
         {/* Step Content */}
         <div className={styles.stepContent}>
@@ -358,7 +399,9 @@ export default function CampaignEditor({
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="e.g., Spring Promotion 2024"
                 />
               </div>
@@ -367,7 +410,9 @@ export default function CampaignEditor({
                 <label>Description</label>
                 <textarea
                   value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   placeholder="Brief description of this campaign..."
                   rows={3}
                 />
@@ -379,7 +424,9 @@ export default function CampaignEditor({
                   type="text"
                   value={formData.campaign_id}
                   onChange={e => {
-                    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    const value = e.target.value
+                      .toUpperCase()
+                      .replace(/[^A-Z0-9]/g, '');
                     setFormData({ ...formData, campaign_id: value });
                     validateCampaignId(value);
                   }}
@@ -388,29 +435,38 @@ export default function CampaignEditor({
                   disabled={!!campaign}
                 />
                 {campaignIdValidating && (
-                  <small style={{ color: '#666' }}>Checking availability...</small>
+                  <small style={{ color: '#666' }}>
+                    Checking availability...
+                  </small>
                 )}
-                {!campaignIdValidating && campaignIdAvailable === true && formData.campaign_id && (
-                  <small style={{ color: '#22c55e' }}>✓ Available</small>
-                )}
+                {!campaignIdValidating &&
+                  campaignIdAvailable === true &&
+                  formData.campaign_id && (
+                    <small style={{ color: '#22c55e' }}>✓ Available</small>
+                  )}
                 {!campaignIdValidating && campaignIdAvailable === false && (
                   <small style={{ color: '#ef4444' }}>✗ Already in use</small>
                 )}
-                <small>Human-friendly unique identifier for reports and forms</small>
+                <small>
+                  Human-friendly unique identifier for reports and forms
+                </small>
               </div>
 
               <div className={styles.formGroup}>
                 <label>Discount (Optional)</label>
                 <select
                   value={formData.discount_id}
-                  onChange={e => setFormData({ ...formData, discount_id: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, discount_id: e.target.value })
+                  }
                 >
                   <option value="">No Discount</option>
                   {discounts
                     .filter(d => d.is_active)
                     .map(discount => (
                       <option key={discount.id} value={discount.id}>
-                        {discount.discount_name} - {discount.discount_type === 'percentage'
+                        {discount.discount_name} -{' '}
+                        {discount.discount_type === 'percentage'
                           ? `${discount.discount_value}%`
                           : `$${discount.discount_value}`}
                       </option>
@@ -433,7 +489,12 @@ export default function CampaignEditor({
                   <input
                     type="datetime-local"
                     value={formData.start_datetime}
-                    onChange={e => setFormData({ ...formData, start_datetime: e.target.value })}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        start_datetime: e.target.value,
+                      })
+                    }
                   />
                 </div>
 
@@ -442,7 +503,9 @@ export default function CampaignEditor({
                   <input
                     type="datetime-local"
                     value={formData.end_datetime}
-                    onChange={e => setFormData({ ...formData, end_datetime: e.target.value })}
+                    onChange={e =>
+                      setFormData({ ...formData, end_datetime: e.target.value })
+                    }
                   />
                 </div>
               </div>
@@ -461,14 +524,76 @@ export default function CampaignEditor({
           )}
 
           {currentStep === 'contacts' && (
-            <ContactListUpload
-              companyId={companyId}
-              campaignId={campaign?.id}
-              onListsChange={(lists, total) => {
-                setContactLists(lists);
-                setTotalContacts(total);
-              }}
-            />
+            <div className={styles.contactsStep}>
+              <ContactListUpload
+                companyId={companyId}
+                campaignId={campaign?.id}
+                onListsChange={(lists, total) => {
+                  setContactLists(lists);
+                  setTotalContacts(total);
+                }}
+              />
+
+              <div className={styles.sendingConfig}>
+                <h3>Sending Configuration</h3>
+                <div className={styles.formGroup}>
+                  <label>Daily Contact Limit</label>
+                  <input
+                    type="number"
+                    min="50"
+                    max="1000"
+                    step="50"
+                    value={formData.daily_limit}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        daily_limit: parseInt(e.target.value) || 500,
+                      })
+                    }
+                  />
+                  <small>Maximum contacts to process per day (50-1000)</small>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={formData.respect_business_hours}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          respect_business_hours: e.target.checked,
+                        })
+                      }
+                      style={{ width: 'auto', marginRight: '8px' }}
+                    />
+                    Respect business hours
+                  </label>
+                  <small>
+                    Only send during company business hours (recommended)
+                  </small>
+                </div>
+
+                {totalContacts > 0 && estimatedDays && (
+                  <div className={styles.estimateBox}>
+                    <p>
+                      <strong>Estimated Duration:</strong> {estimatedDays}{' '}
+                      {estimatedDays === 1 ? 'day' : 'days'}
+                    </p>
+                    <p>
+                      <small>
+                        Based on {formData.daily_limit} contacts/day
+                      </small>
+                    </p>
+                    {estimatedDays > 7 && (
+                      <p style={{ color: '#f59e0b' }}>
+                        ⚠️ This campaign will take over a week to complete
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {currentStep === 'review' && (
@@ -484,7 +609,9 @@ export default function CampaignEditor({
                 {formData.description && (
                   <div className={styles.reviewItem}>
                     <span className={styles.reviewLabel}>Description:</span>
-                    <span className={styles.reviewValue}>{formData.description}</span>
+                    <span className={styles.reviewValue}>
+                      {formData.description}
+                    </span>
                   </div>
                 )}
                 <div className={styles.reviewItem}>
@@ -530,10 +657,71 @@ export default function CampaignEditor({
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Lists:</span>
                   <span className={styles.reviewValue}>
-                    {contactLists.length} list{contactLists.length !== 1 ? 's' : ''}
+                    {contactLists.length} list
+                    {contactLists.length !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>
+
+              <div className={styles.reviewGroup}>
+                <h4>Sending Schedule</h4>
+                <div className={styles.reviewItem}>
+                  <span className={styles.reviewLabel}>Daily Limit:</span>
+                  <span className={styles.reviewValue}>
+                    {formData.daily_limit} contacts/day
+                  </span>
+                </div>
+                <div className={styles.reviewItem}>
+                  <span className={styles.reviewLabel}>Batch Size:</span>
+                  <span className={styles.reviewValue}>
+                    10 contacts per batch (system default)
+                  </span>
+                </div>
+                <div className={styles.reviewItem}>
+                  <span className={styles.reviewLabel}>Batch Interval:</span>
+                  <span className={styles.reviewValue}>
+                    10 minutes (system default)
+                  </span>
+                </div>
+                <div className={styles.reviewItem}>
+                  <span className={styles.reviewLabel}>Business Hours:</span>
+                  <span className={styles.reviewValue}>
+                    {formData.respect_business_hours
+                      ? 'Respect company business hours'
+                      : 'Send anytime'}
+                  </span>
+                </div>
+                {estimatedDays !== null && (
+                  <div className={styles.reviewItem}>
+                    <span className={styles.reviewLabel}>
+                      Estimated Duration:
+                    </span>
+                    <span className={styles.reviewValue}>
+                      {estimatedDays} {estimatedDays === 1 ? 'day' : 'days'}
+                      {estimatedDays > 7 && (
+                        <span style={{ color: '#f59e0b', marginLeft: '8px' }}>
+                          ⚠️ Campaign will take over a week
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Schedule Preview */}
+              {totalContacts > 0 && (
+                <div className={styles.reviewGroup}>
+                  <h4>Campaign Timeline</h4>
+                  <CampaignSchedulePreview
+                    campaignId={campaign?.id}
+                    companyId={companyId}
+                    totalContacts={totalContacts}
+                    dailyLimit={formData.daily_limit}
+                    respectBusinessHours={formData.respect_business_hours}
+                    startDate={formData.start_datetime}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -575,7 +763,11 @@ export default function CampaignEditor({
                 className={styles.saveButton}
                 disabled={!canProceed() || saving}
               >
-                {saving ? 'Saving...' : campaign ? 'Save Changes' : 'Create Campaign'}
+                {saving
+                  ? 'Saving...'
+                  : campaign
+                    ? 'Save Changes'
+                    : 'Create Campaign'}
               </button>
             )}
           </div>

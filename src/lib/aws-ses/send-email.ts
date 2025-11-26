@@ -38,9 +38,14 @@ export async function sendEmail(
     companyId,
     leadId,
     templateId,
+    executionId,
+    campaignId,
+    recipientName,
+    scheduledFor,
     source = 'automation_workflow',
     tags = [],
     configurationSetName: providedConfigSetName,
+    trackingData,
   } = params;
 
   try {
@@ -62,7 +67,7 @@ export async function sendEmail(
     // Generate tenant and config set names if not provided
     const tenantName = providedTenantName || generateTenantName(companyId);
     const configurationSetName =
-      providedConfigSetName || generateConfigSetName(companyId);
+      providedConfigSetName || 'my-first-configuration-set';
 
     // Build from address with name if provided
     const fromAddress = fromName ? `"${fromName}" <${from}>` : from;
@@ -129,7 +134,10 @@ export async function sendEmail(
         company_id: companyId,
         lead_id: leadId || null,
         template_id: templateId || null,
+        execution_id: executionId || null,
+        campaign_id: campaignId || null,
         recipient_email: recipients.join(', '),
+        recipient_name: recipientName || null,
         subject_line: subject,
         email_provider: 'aws-ses',
         provider_message_id: messageId,
@@ -138,6 +146,8 @@ export async function sendEmail(
         send_status: 'sent',
         delivery_status: 'sent',
         source: source,
+        scheduled_for: scheduledFor || sentAt,
+        tracking_data: trackingData || {},
         sent_at: sentAt,
       });
     } catch (logError) {
@@ -163,12 +173,17 @@ export async function sendEmail(
         company_id: companyId,
         lead_id: leadId || null,
         template_id: templateId || null,
+        execution_id: executionId || null,
+        campaign_id: campaignId || null,
         recipient_email: recipients.join(', '),
+        recipient_name: recipientName || null,
         subject_line: subject,
         email_provider: 'aws-ses',
         send_status: 'failed',
         delivery_status: 'failed',
         source: source,
+        scheduled_for: scheduledFor || new Date().toISOString(),
+        tracking_data: trackingData || {},
         sent_at: new Date().toISOString(),
         ses_event_data: {
           error: error instanceof Error ? error.message : 'Unknown error',

@@ -1,6 +1,7 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { formatDateOnly, toE164PhoneNumber } from '@/lib/utils';
+import { fetchCompanyBusinessHours, isBusinessHours, getNextBusinessHourSlot } from '@/lib/campaigns/business-hours';
 
 interface StepResult {
   stepIndex: number;
@@ -203,7 +204,7 @@ export const workflowExecuteHandler = inngest.createFunction(
         try {
           switch (currentStep.type) {
             case 'send_email':
-              result = await executeEmailStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
+              result = await executeEmailStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId);
               break;
             case 'send_sms':
               result = await executeSMSStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
@@ -272,15 +273,64 @@ export const workflowExecuteHandler = inngest.createFunction(
       
       // Handle delay if this step requires it
       const stepDelayMinutes = (stepResult && 'delayMinutes' in stepResult ? stepResult.delayMinutes as number : null) || currentStep.delay_minutes || 0;
-      const shouldDelay = 
-        (stepResult && 'requiresDelay' in stepResult ? stepResult.requiresDelay as boolean : false) || 
-        currentStep.type === 'wait' || 
+      const shouldDelay =
+        (stepResult && 'requiresDelay' in stepResult ? stepResult.requiresDelay as boolean : false) ||
+        currentStep.type === 'wait' ||
         currentStep.type === 'delay' ||
         (currentStep.delay_minutes && currentStep.delay_minutes > 0);
-        
+
       if (shouldDelay && stepDelayMinutes > 0) {
-        await step.sleep('delay-step', `${stepDelayMinutes}m`);
-        
+        // Check if this is a campaign execution and if it should respect business hours
+        const shouldRespectBusinessHours = await step.run(`check-business-hours-requirement-${stepIndex}`, async () => {
+          // Check if this execution is from a campaign
+          if (triggerType === 'campaign' && execution.execution_data?.campaignId) {
+            const supabase = createAdminClient();
+            const { data: campaign } = await supabase
+              .from('campaigns')
+              .select('respect_business_hours')
+              .eq('id', execution.execution_data.campaignId)
+              .single();
+
+            return campaign?.respect_business_hours ?? false;
+          }
+          return false;
+        });
+
+        // Calculate when the delay will end
+        const delayEndTime = new Date(Date.now() + stepDelayMinutes * 60 * 1000);
+
+        // If we need to respect business hours and the delay would end outside business hours
+        if (shouldRespectBusinessHours) {
+          const businessHours = await fetchCompanyBusinessHours(companyId);
+
+          // Check if delay end time falls outside business hours
+          if (!isBusinessHours(delayEndTime, businessHours)) {
+            console.log(`Workflow ${executionId} step ${stepIndex}: Delay would end outside business hours`, {
+              originalDelayEnd: delayEndTime.toISOString(),
+              delayMinutes: stepDelayMinutes
+            });
+
+            // Calculate next business hour slot
+            const nextBusinessSlot = getNextBusinessHourSlot(new Date(), businessHours);
+            const adjustedDelayMs = nextBusinessSlot.getTime() - Date.now();
+            const adjustedDelayMinutes = Math.ceil(adjustedDelayMs / 60000);
+
+            console.log(`Workflow ${executionId} step ${stepIndex}: Adjusted delay to respect business hours`, {
+              originalDelayMinutes: stepDelayMinutes,
+              adjustedDelayMinutes,
+              nextBusinessSlot: nextBusinessSlot.toISOString()
+            });
+
+            await step.sleep('delay-step', `${adjustedDelayMinutes}m`);
+          } else {
+            // Normal delay - within business hours
+            await step.sleep('delay-step', `${stepDelayMinutes}m`);
+          }
+        } else {
+          // No business hours restriction
+          await step.sleep('delay-step', `${stepDelayMinutes}m`);
+        }
+
         // Check for cancellation after sleep (common cancellation point)
         const postSleepCheck = await step.run(`check-cancellation-after-sleep-${stepIndex}`, async () => {
           const supabase = createAdminClient();
@@ -289,18 +339,18 @@ export const workflowExecuteHandler = inngest.createFunction(
             .select('execution_status, execution_data')
             .eq('id', executionId)
             .single();
-            
+
           // Check both database status and cancellation flags
           const isCancelled = currentExecution?.execution_status === 'cancelled' ||
                              currentExecution?.execution_data?.cancellationProcessed === true;
-            
+
           return {
             status: currentExecution?.execution_status,
             shouldContinue: !isCancelled,
             cancellationReason: isCancelled ? 'Database status or cancellation flag' : null
           };
         });
-        
+
         if (!postSleepCheck.shouldContinue) {
           return {
             success: true,
@@ -364,7 +414,7 @@ export const workflowExecuteHandler = inngest.createFunction(
 );
 
 // Helper function to execute email steps
-async function executeEmailStep(step: any, leadData: any, companyId: string, leadId: string, customerId: string, attribution: any, partialLeadData: any = null, executionId: string) {
+async function executeEmailStep(step: any, leadData: any, companyId: string, leadId: string, customerId: string, attribution: any, partialLeadData: any = null, executionId: string, campaignId?: string) {
   const supabase = createAdminClient();
 
   // Get email template (check both possible field names)
@@ -688,28 +738,6 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     
   });
 
-  // Create email log entry in email_automation_log table (matching old architecture)
-  const { data: emailLogEntry, error: logError } = await supabase
-    .from('email_automation_log')
-    .insert([{
-      execution_id: executionId,
-      company_id: companyId,
-      template_id: template.id,
-      recipient_email: customerEmail,
-      recipient_name: emailVariables.customerName || customerEmail,
-      subject_line: subjectLine,
-      send_status: 'scheduled',
-      scheduled_for: new Date().toISOString(),
-    }])
-    .select('id')
-    .single();
-
-  const emailLogId = emailLogEntry?.id;
-  
-  if (logError) {
-    console.warn('Failed to create email log entry:', logError);
-  }
-
   // Send email using email API with enhanced error handling and fallback
   try {
     const emailApiUrl = process.env.NEXT_PUBLIC_SITE_URL 
@@ -731,6 +759,10 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
         companyId,
         templateId: template.id,
         leadId,
+        executionId,
+        campaignId,
+        recipientName: emailVariables.customerName || customerEmail,
+        scheduledFor: new Date().toISOString(),
         source: 'automation_workflow',
       }),
     });
@@ -755,23 +787,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
       console.error('Failed to parse email API response as JSON:', parseError);
       emailResult = { success: true, messageId: `workflow-${Date.now()}` };
     }
-    
-    // Update email log entry with success status (matching old architecture)
-    if (emailLogId) {
-      try {
-        await supabase
-          .from('email_automation_log')
-          .update({
-            send_status: 'sent',
-            sent_at: new Date().toISOString(),
-            email_provider_id: emailResult.messageId,
-          })
-          .eq('id', emailLogId);
-      } catch (updateError) {
-        console.warn('Failed to update email log entry:', updateError);
-      }
-    }
-    
+
     return {
       success: true,
       emailSent: true,
@@ -791,23 +807,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
       leadId,
       companyId,
     });
-    
-    // Update email log entry with failure status (matching old architecture)
-    if (emailLogId) {
-      try {
-        await supabase
-          .from('email_automation_log')
-          .update({
-            send_status: 'failed',
-            failed_at: new Date().toISOString(),
-            error_message: error instanceof Error ? error.message : String(error),
-          })
-          .eq('id', emailLogId);
-      } catch (updateError) {
-        console.warn('Failed to update email log entry with failure:', updateError);
-      }
-    }
-    
+
     // Don't throw the error immediately - let's try to continue the workflow
     // and mark this step as failed but not the entire workflow
     return {

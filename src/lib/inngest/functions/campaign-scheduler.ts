@@ -1,5 +1,7 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { fetchCompanyBusinessHours, isBusinessHours, getNextBusinessHourSlot } from '@/lib/campaigns/business-hours';
+import { canStartNewCall, trackCallStart, cleanupStaleCalls } from '@/lib/campaigns/concurrency-manager';
 
 export const campaignSchedulerHandler = inngest.createFunction(
   {
@@ -9,6 +11,11 @@ export const campaignSchedulerHandler = inngest.createFunction(
   },
   { cron: '*/5 * * * *' }, // Run every 5 minutes
   async ({ event, step }) => {
+    // Cleanup stale call records first
+    await step.run('cleanup-stale-calls', async () => {
+      await cleanupStaleCalls();
+    });
+
     // Find campaigns that should start now
     const campaignsToStart = await step.run('find-campaigns-to-start', async () => {
       const supabase = createAdminClient();
@@ -24,7 +31,11 @@ export const campaignSchedulerHandler = inngest.createFunction(
           start_datetime,
           end_datetime,
           target_audience_type,
-          audience_filter_criteria
+          audience_filter_criteria,
+          respect_business_hours,
+          batch_size,
+          batch_interval_minutes,
+          daily_limit
         `)
         .eq('status', 'scheduled')
         .lte('start_datetime', now)
@@ -47,10 +58,35 @@ export const campaignSchedulerHandler = inngest.createFunction(
       await step.run(`start-campaign-${campaign.id}`, async () => {
         const supabase = createAdminClient();
 
+        // Check business hours if enabled
+        if (campaign.respect_business_hours) {
+          const businessHours = await fetchCompanyBusinessHours(campaign.company_id);
+          const now = new Date();
+
+          if (!isBusinessHours(now, businessHours)) {
+            console.log(`Campaign ${campaign.id} respects business hours - waiting for next business hour slot`);
+            const nextSlot = getNextBusinessHourSlot(now, businessHours);
+            console.log(`Next business hour slot: ${nextSlot.toISOString()}`);
+
+            // Reschedule campaign for next business hour
+            await supabase
+              .from('campaigns')
+              .update({ start_datetime: nextSlot.toISOString() })
+              .eq('id', campaign.id);
+
+            return { success: false, reason: 'Outside business hours - rescheduled' };
+          }
+        }
+
         // Update campaign status to running
         await supabase
           .from('campaigns')
-          .update({ status: 'running' })
+          .update({
+            status: 'running',
+            current_day_date: new Date().toISOString().split('T')[0],
+            contacts_sent_today: 0,
+            current_batch: 0
+          })
           .eq('id', campaign.id);
 
         // Get contact lists for this campaign
@@ -125,13 +161,79 @@ export const campaignProcessContactsHandler = inngest.createFunction(
   { event: 'campaign/process-contacts' },
   async ({ event, step }) => {
     const { campaignId, companyId, workflowId, contacts } = event.data;
+    const supabase = createAdminClient();
 
-    // Process contacts in batches to avoid overwhelming the system
-    const BATCH_SIZE = 50;
+    // Get campaign settings
+    const { data: campaign } = await supabase
+      .from('campaigns')
+      .select('batch_size, batch_interval_minutes, daily_limit, contacts_sent_today, current_day_date, respect_business_hours')
+      .eq('id', campaignId)
+      .single();
+
+    if (!campaign) {
+      throw new Error(`Campaign ${campaignId} not found`);
+    }
+
+    // Check if we need to reset daily counter
+    const today = new Date().toISOString().split('T')[0];
+    if (campaign.current_day_date !== today) {
+      await supabase
+        .from('campaigns')
+        .update({
+          contacts_sent_today: 0,
+          current_day_date: today
+        })
+        .eq('id', campaignId);
+      campaign.contacts_sent_today = 0;
+    }
+
+    // Check business hours if enabled
+    if (campaign.respect_business_hours) {
+      const businessHours = await fetchCompanyBusinessHours(companyId);
+      const now = new Date();
+
+      if (!isBusinessHours(now, businessHours)) {
+        console.log(`Campaign ${campaignId} paused - outside business hours`);
+        // Re-queue for next business hour slot
+        const nextSlot = getNextBusinessHourSlot(now, businessHours);
+        await inngest.send({
+          name: 'campaign/process-contacts',
+          data: event.data,
+          timestamp: nextSlot.getTime()
+        });
+        return { success: true, rescheduled: true, nextProcessing: nextSlot.toISOString() };
+      }
+    }
+
+    // Use configurable batch size from campaign
+    const BATCH_SIZE = campaign.batch_size || 10;
+    const BATCH_INTERVAL_MS = (campaign.batch_interval_minutes || 10) * 60 * 1000;
+
+    // Filter contacts to respect daily limit
+    const remainingDailyLimit = campaign.daily_limit - campaign.contacts_sent_today;
+    const contactsToProcess = contacts.slice(0, remainingDailyLimit);
+
+    if (contactsToProcess.length === 0) {
+      console.log(`Campaign ${campaignId} reached daily limit (${campaign.daily_limit})`);
+      // Schedule remaining contacts for tomorrow
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(9, 0, 0, 0); // 9 AM tomorrow
+
+      if (contacts.length > 0) {
+        await inngest.send({
+          name: 'campaign/process-contacts',
+          data: event.data,
+          timestamp: tomorrow.getTime()
+        });
+      }
+
+      return { success: true, dailyLimitReached: true, rescheduledCount: contacts.length };
+    }
+
     const batches = [];
-
-    for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
-      batches.push(contacts.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < contactsToProcess.length; i += BATCH_SIZE) {
+      batches.push(contactsToProcess.slice(i, i + BATCH_SIZE));
     }
 
     let totalProcessed = 0;
@@ -284,13 +386,43 @@ export const campaignProcessContactsHandler = inngest.createFunction(
           }
         }
 
+        // Update campaign counters
+        await supabase
+          .from('campaigns')
+          .update({
+            contacts_sent_today: campaign.contacts_sent_today + batch.length,
+            current_batch: batchIndex + 1,
+            last_batch_sent_at: new Date().toISOString()
+          })
+          .eq('id', campaignId);
+
         return { processed: batch.length };
       });
 
-      // Add small delay between batches to avoid rate limits
+      // Add delay between batches using campaign settings
       if (batchIndex < batches.length - 1) {
-        await step.sleep('batch-delay', '30s');
+        const delaySeconds = Math.floor(BATCH_INTERVAL_MS / 1000);
+        await step.sleep(`batch-delay-${batchIndex}`, `${delaySeconds}s`);
       }
+    }
+
+    // If there are remaining contacts that hit daily limit, schedule them
+    if (contacts.length > contactsToProcess.length) {
+      const remainingContacts = contacts.slice(contactsToProcess.length);
+      console.log(`Campaign ${campaignId}: ${remainingContacts.length} contacts deferred to next day due to daily limit`);
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(9, 0, 0, 0);
+
+      await inngest.send({
+        name: 'campaign/process-contacts',
+        data: {
+          ...event.data,
+          contacts: remainingContacts
+        },
+        timestamp: tomorrow.getTime()
+      });
     }
 
     // Check if campaign is complete

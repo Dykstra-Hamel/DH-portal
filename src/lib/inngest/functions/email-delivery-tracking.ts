@@ -30,15 +30,15 @@ export const emailWebhookHandler = inngest.createFunction(
     const emailLog = await step.run('find-email-log', async () => {
       const supabase = createAdminClient();
 
-      // Check email_automation_log table (for automation workflow emails)
+      // Check email_logs table (consolidated email tracking)
       const { data: log, error } = await supabase
-        .from('email_automation_log')
+        .from('email_logs')
         .select('*')
-        .eq('email_provider_id', messageId)
+        .eq('ses_message_id', messageId)
         .single();
 
       if (error) {
-        console.warn(`Email automation log not found for SES message ID: ${messageId}`);
+        console.warn(`Email log not found for SES message ID: ${messageId}`);
         return null;
       }
 
@@ -46,8 +46,8 @@ export const emailWebhookHandler = inngest.createFunction(
     });
 
     if (!emailLog) {
-      console.log('Email automation log not found, event likely for non-automation email');
-      return { success: true, message: 'Email log not found in automation table' };
+      console.log('Email log not found for SES message ID');
+      return { success: true, message: 'Email log not found' };
     }
 
     // Step 2: Update email log based on SES event type
@@ -62,37 +62,41 @@ export const emailWebhookHandler = inngest.createFunction(
 
       switch (sesEvent.eventType) {
         case 'Delivery':
+          updateData.delivery_status = 'delivered';
           updateData.send_status = 'delivered';
           updateData.delivered_at = sesEvent.delivery?.timestamp || timestamp;
           break;
         case 'Open':
+          updateData.delivery_status = 'opened';
           updateData.send_status = 'opened';
           updateData.opened_at = timestamp;
           break;
         case 'Click':
+          updateData.delivery_status = 'clicked';
           updateData.send_status = 'clicked';
           updateData.clicked_at = timestamp;
           break;
         case 'Bounce':
+          updateData.delivery_status = 'bounced';
           updateData.send_status = 'failed';
-          updateData.failed_at = sesEvent.bounce?.timestamp || timestamp;
-          updateData.error_message = sesEvent.bounce?.bounceType
-            ? `Bounce: ${sesEvent.bounce.bounceType}`
-            : 'Email bounced';
+          updateData.bounce_type = sesEvent.bounce?.bounceType;
+          updateData.bounce_subtype = sesEvent.bounce?.bounceSubType;
+          updateData.bounced_at = sesEvent.bounce?.timestamp || timestamp;
           break;
         case 'Complaint':
+          updateData.delivery_status = 'complained';
           updateData.send_status = 'failed';
-          updateData.failed_at = sesEvent.complaint?.timestamp || timestamp;
-          updateData.error_message = 'Recipient complained';
+          updateData.complaint_feedback_type = sesEvent.complaint?.complaintFeedbackType;
+          updateData.complained_at = sesEvent.complaint?.timestamp || timestamp;
           break;
       }
 
-      // Merge SES event data into tracking_data
-      const existingTrackingData = emailLog.tracking_data || {};
-      updateData.tracking_data = {
-        ...existingTrackingData,
-        sesEvents: [
-          ...(existingTrackingData.sesEvents || []),
+      // Merge SES event data into ses_event_data
+      const existingSesData = emailLog.ses_event_data || {};
+      updateData.ses_event_data = {
+        ...existingSesData,
+        events: [
+          ...(existingSesData.events || []),
           {
             eventType: sesEvent.eventType,
             timestamp,
@@ -102,12 +106,12 @@ export const emailWebhookHandler = inngest.createFunction(
       };
 
       const { error } = await supabase
-        .from('email_automation_log')
+        .from('email_logs')
         .update(updateData)
         .eq('id', emailLog.id);
 
       if (error) {
-        throw new Error(`Failed to update email automation log: ${error.message}`);
+        throw new Error(`Failed to update email log: ${error.message}`);
       }
     });
 

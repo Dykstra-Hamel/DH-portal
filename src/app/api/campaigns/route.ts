@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/api-utils';
+import { calculateCampaignEstimatedDays } from '@/lib/campaigns/business-hours';
 
 export async function GET(request: NextRequest) {
   try {
@@ -112,6 +113,12 @@ export async function POST(request: NextRequest) {
       workflow_id,
       target_audience_type,
       audience_filter_criteria,
+      batch_size,
+      batch_interval_minutes,
+      daily_limit,
+      respect_business_hours,
+      exclude_weekends,
+      total_contacts,
     } = body;
 
     // Validate required fields
@@ -119,6 +126,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields: company_id, name, campaign_id, start_datetime, workflow_id' },
         { status: 400 }
+      );
+    }
+
+    // Calculate estimated days if we have total contacts
+    let estimated_days = null;
+    if (total_contacts && daily_limit) {
+      estimated_days = await calculateCampaignEstimatedDays(
+        company_id,
+        total_contacts,
+        daily_limit || 500,
+        respect_business_hours ?? true
       );
     }
 
@@ -162,6 +180,13 @@ export async function POST(request: NextRequest) {
         workflow_id,
         target_audience_type: target_audience_type || 'custom_list',
         audience_filter_criteria: audience_filter_criteria || {},
+        batch_size: batch_size || 10,
+        batch_interval_minutes: batch_interval_minutes || 10,
+        daily_limit: daily_limit || 500,
+        respect_business_hours: respect_business_hours ?? true,
+        exclude_weekends: exclude_weekends ?? true,
+        estimated_days,
+        total_contacts: total_contacts || 0,
         created_by: user.id,
       })
       .select()

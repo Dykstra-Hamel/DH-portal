@@ -244,24 +244,50 @@ export async function POST(
     const tenantName = tenantSettings.aws_ses_tenant_name;
 
     if (tenantName) {
+      // Construct identity ARN (since AWS doesn't return it directly)
+      const awsRegion = process.env.AWS_REGION || 'us-east-1';
+      const awsAccountId = process.env.AWS_ACCOUNT_ID;
+
+      if (!awsAccountId) {
+        return NextResponse.json(
+          { error: 'AWS_ACCOUNT_ID environment variable not set. Required for identity association.' },
+          { status: 500 }
+        );
+      }
+
+      const identityArn = `arn:aws:ses:${awsRegion}:${awsAccountId}:identity/${domain}`;
+
+      console.log('🔗 Associating identity with tenant:', { domain, tenantName, identityArn });
+
       const associateResult = await associateIdentityWithTenant(
         domain,
         tenantName,
-        identityInfo.identityArn
+        identityArn
       );
 
       if (!associateResult.success) {
-        console.warn('Failed to associate identity with tenant:', associateResult.error);
+        // FAIL HARD - association is required for tenants to send from their identities
+        return NextResponse.json(
+          { error: `Identity created but failed to associate with tenant: ${associateResult.error}. This will prevent email sending from ${domain}.` },
+          { status: 500 }
+        );
       }
+
+      console.log('✅ Identity successfully associated with tenant');
     } else {
       console.warn('No SES tenant found for company. Identity created but not associated with tenant.');
     }
+
+    // Construct identity ARN for storage (same as above)
+    const awsRegion = process.env.AWS_REGION || 'us-east-1';
+    const awsAccountId = process.env.AWS_ACCOUNT_ID || '';
+    const constructedArn = `arn:aws:ses:${awsRegion}:${awsAccountId}:identity/${domain}`;
 
     // Update company settings with domain configuration
     await updateCompanySettings(companyId, {
       email_domain: domain,
       email_domain_prefix: emailPrefix || 'noreply',
-      aws_ses_identity_arn: identityInfo.identityArn,
+      aws_ses_identity_arn: constructedArn, // Use constructed ARN instead of empty string
       email_domain_status: identityInfo.verifiedForSendingStatus ? 'verified' : 'pending',
       aws_ses_dkim_tokens: JSON.stringify(dkimTokens),
       email_domain_verified_at: identityInfo.verifiedForSendingStatus ? new Date().toISOString() : ''
@@ -278,7 +304,7 @@ export async function POST(
         status: identityInfo.verifiedForSendingStatus ? 'verified' : 'pending',
         records: records,
         dkimTokens: dkimTokens,
-        identityArn: identityInfo.identityArn,
+        identityArn: constructedArn, // Return constructed ARN
         liveInfo: identityInfo
       }
     });

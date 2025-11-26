@@ -38,8 +38,52 @@ export default function CampaignOverview({ campaign, metrics }: CampaignOverview
     { name: 'Clicked', value: metrics.email.clicked },
   ];
 
+  // Calculate batch progress
+  const dailyLimit = campaign.daily_limit || 500;
+  const contactsSentToday = campaign.contacts_sent_today || 0;
+  const currentBatch = campaign.current_batch || 0;
+  const batchSize = campaign.batch_size || 10;
+  const lastBatchTime = campaign.last_batch_sent_at;
+
   return (
     <div className={styles.overview}>
+      {/* Batch Progress Section */}
+      {campaign.status === 'running' && (
+        <div className={styles.batchProgress}>
+          <h3>Current Progress</h3>
+          <div className={styles.progressStats}>
+            <div className={styles.progressStat}>
+              <span className={styles.statLabel}>Today&apos;s Progress:</span>
+              <span className={styles.statValue}>
+                {contactsSentToday} / {dailyLimit} contacts
+              </span>
+              <div className={styles.miniProgressBar}>
+                <div
+                  className={styles.miniProgressFill}
+                  style={{ width: `${Math.min((contactsSentToday / dailyLimit) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+            <div className={styles.progressStat}>
+              <span className={styles.statLabel}>Current Batch:</span>
+              <span className={styles.statValue}>Batch #{currentBatch}</span>
+            </div>
+            <div className={styles.progressStat}>
+              <span className={styles.statLabel}>Batch Size:</span>
+              <span className={styles.statValue}>{batchSize} contacts</span>
+            </div>
+            {lastBatchTime && (
+              <div className={styles.progressStat}>
+                <span className={styles.statLabel}>Last Batch:</span>
+                <span className={styles.statValue}>
+                  {new Date(lastBatchTime).toLocaleTimeString()}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Key Metrics Cards */}
       <div className={styles.metricsGrid}>
         <div className={styles.metricCard}>

@@ -207,20 +207,28 @@ export async function associateIdentityWithTenant(
   identityArn?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    console.log('🔍 associateIdentityWithTenant called with:', { identity, tenantName, identityArn });
+
     // Fetch identity ARN if not provided
     let arn = identityArn;
     if (!arn) {
+      console.log('⚠️ No ARN provided, attempting to fetch from AWS...');
       const identityResult = await getEmailIdentity(identity);
       if (!identityResult.success) {
+        console.log('❌ Failed to fetch identity ARN:', identityResult.error);
         return {
           success: false,
           error: 'Failed to fetch identity ARN: ' + identityResult.error,
         };
       }
       arn = identityResult.data?.identityArn;
+      console.log('📥 Fetched ARN from AWS:', arn);
     }
 
+    console.log('🔎 Final ARN to use:', arn);
+
     if (!arn) {
+      console.log('❌ ARN is empty/undefined - cannot associate');
       return {
         success: false,
         error: 'Identity ARN not found',

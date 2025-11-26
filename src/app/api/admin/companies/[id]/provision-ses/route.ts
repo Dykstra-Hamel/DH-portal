@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { createTenant, deleteTenant } from '@/lib/aws-ses/tenants';
 import { createEmailIdentity, associateIdentityWithTenant, getDkimTokens, deleteEmailIdentity } from '@/lib/aws-ses/identities';
-import { createConfigurationSetWithEvents, associateConfigSetWithTenant, deleteConfigurationSet } from '@/lib/aws-ses/config-sets';
+import { getConfigurationSet, deleteConfigurationSet } from '@/lib/aws-ses/config-sets';
 
 interface ProvisionRequest {
   domain?: string;
@@ -27,10 +27,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('🎯 POST /provision-ses called - START');
   try {
     const { id: companyId } = await params;
     const body: ProvisionRequest = await request.json();
     const { domain, snsTopicArn } = body;
+    console.log('📦 Request body:', { companyId, domain, snsTopicArn });
 
     const supabase = createAdminClient();
 
@@ -75,39 +77,31 @@ export async function POST(
 
     const tenant = tenantResult.data;
 
-    // Step 2: Create configuration set (for event tracking)
-    const configSetResult = await createConfigurationSetWithEvents(
-      companyId,
-      snsTopicArn
-    );
+    // Step 2: Verify shared configuration set exists
+    const sharedConfigSet = 'my-first-configuration-set';
+    const configSetResult = await getConfigurationSet(sharedConfigSet);
 
-    if (!configSetResult.success || !configSetResult.data) {
+    if (!configSetResult.success) {
       return NextResponse.json(
         {
           success: false,
-          error: `Tenant created but failed to create configuration set: ${configSetResult.error}`,
+          error: `Shared configuration set '${sharedConfigSet}' does not exist. Please create it in AWS SES Console first with event destinations configured.`,
         },
-        { status: 500 }
+        { status: 400 }
       );
     }
 
-    const configSet = configSetResult.data;
-
-    // Step 3: Associate configuration set with tenant
-    const configAssocResult = await associateConfigSetWithTenant(
-      configSet.name,
-      tenant.tenantName
-    );
-
-    if (!configAssocResult.success) {
-      console.warn('Failed to associate config set with tenant:', configAssocResult.error);
-    }
+    // We're using a shared config set, so no need to create or associate per-tenant
+    const configSet = { name: sharedConfigSet };
 
     let identityArn: string | undefined;
     let dkimTokens: any[] = [];
 
-    // Step 4: Create email identity if domain provided
+    // Step 3: Create email identity if domain provided
+    console.log('📋 Provisioning request params:', { companyId, domain, hasSnsTopicArn: !!snsTopicArn });
+
     if (domain) {
+      console.log('🚀 Starting identity creation for domain:', domain);
       const identityResult = await createEmailIdentity(domain);
 
       if (!identityResult.success || !identityResult.data) {
@@ -122,22 +116,58 @@ export async function POST(
         );
       }
 
-      identityArn = identityResult.data.identityArn;
       dkimTokens = identityResult.dkimTokens || [];
 
-      // Associate identity with tenant
+      // Construct identity ARN (since AWS doesn't return it directly)
+      const awsRegion = process.env.AWS_REGION || 'us-east-1';
+      const awsAccountId = process.env.AWS_ACCOUNT_ID;
+
+      console.log('🔍 ARN Construction Debug:', {
+        awsRegion,
+        awsAccountId,
+        domain,
+      });
+
+      if (!awsAccountId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'AWS_ACCOUNT_ID environment variable not set. Required for identity association.',
+          },
+          { status: 500 }
+        );
+      }
+
+      identityArn = `arn:aws:ses:${awsRegion}:${awsAccountId}:identity/${domain}`;
+
+      console.log('✅ Constructed ARN:', identityArn);
+      console.log('🔗 Calling associateIdentityWithTenant with:', { domain, tenantName: tenant.tenantName, identityArn });
+
+      // Associate identity with tenant (REQUIRED for multi-tenant email sending)
       const identityAssocResult = await associateIdentityWithTenant(
         domain,
         tenant.tenantName,
         identityArn
       );
 
+      console.log('📊 Association result:', identityAssocResult);
+
       if (!identityAssocResult.success) {
-        console.warn('Failed to associate identity with tenant:', identityAssocResult.error);
+        // FAIL HARD - association is required for tenants to send from their identities
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Identity created but failed to associate with tenant: ${identityAssocResult.error}. This will prevent email sending from ${domain}.`,
+            tenant,
+          },
+          { status: 500 }
+        );
       }
+
+      console.log(`✅ Identity ${domain} successfully associated with tenant ${tenant.tenantName}`);
     }
 
-    // Step 5: Store configuration in database
+    // Step 4: Store configuration in database
     const settingsToInsert = [
       {
         company_id: companyId,
@@ -157,7 +187,7 @@ export async function POST(
       {
         company_id: companyId,
         setting_key: 'aws_ses_configuration_set',
-        setting_value: configSet.name,
+        setting_value: 'my-first-configuration-set', // Shared config set for all tenants
       },
     ];
 
@@ -379,13 +409,15 @@ export async function DELETE(
       }
     }
 
-    // Delete configuration set from AWS SES if it exists
-    if (configSetName) {
+    // Don't delete shared configuration set - it's used by all tenants
+    if (configSetName && configSetName !== 'my-first-configuration-set') {
       console.log(`Deleting configuration set: ${configSetName}`);
       const configSetResult = await deleteConfigurationSet(configSetName);
       if (!configSetResult.success) {
         console.warn(`Failed to delete configuration set ${configSetName}:`, configSetResult.error);
       }
+    } else if (configSetName === 'my-first-configuration-set') {
+      console.log(`Skipping deletion of shared configuration set: ${configSetName}`);
     }
 
     // Delete tenant from AWS SES if it exists

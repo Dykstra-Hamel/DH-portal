@@ -44,9 +44,14 @@ export interface SendEmailParams {
   companyId: string;
   leadId?: string;
   templateId?: string;
+  executionId?: string;
+  campaignId?: string;
+  recipientName?: string;
+  scheduledFor?: string;
   source?: string;
   tags?: string[];
   configurationSetName?: string;
+  trackingData?: Record<string, any>;
 }
 
 export interface SendEmailResult {

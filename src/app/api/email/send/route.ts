@@ -11,19 +11,23 @@ interface EmailSendRequest {
   templateId?: string;
   leadId?: string;
   source?: string;
+  campaignId?: string;
+  executionId?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { 
-      to, 
-      subject, 
-      html, 
-      text, 
-      companyId, 
-      templateId, 
-      leadId, 
-      source = 'automation_workflow' 
+    const {
+      to,
+      subject,
+      html,
+      text,
+      companyId,
+      templateId,
+      leadId,
+      source = 'automation_workflow',
+      campaignId,
+      executionId
     }: EmailSendRequest = await request.json();
 
     // Basic validation
@@ -61,11 +65,14 @@ export async function POST(request: NextRequest) {
       leadId,
       templateId,
       source,
+      campaignId,
+      executionId,
       tags: [
         'automation',
         source,
         ...(templateId ? [`template-${templateId}`] : []),
         ...(leadId ? [`lead-${leadId}`] : []),
+        ...(campaignId ? [`campaign-${campaignId}`] : []),
       ],
     });
 

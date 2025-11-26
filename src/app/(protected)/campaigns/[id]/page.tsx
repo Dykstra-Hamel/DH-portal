@@ -11,6 +11,7 @@ import CampaignOverview from '@/components/Campaigns/CampaignOverview';
 import CampaignContacts from '@/components/Campaigns/CampaignContacts';
 import CampaignExecutions from '@/components/Campaigns/CampaignExecutions';
 import CampaignLeads from '@/components/Campaigns/CampaignLeads';
+import CampaignReport from '@/components/Campaigns/CampaignReport';
 
 interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
@@ -233,10 +234,11 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
         )}
 
         {activeTab === 'report' && (
-          <div className={styles.comingSoon}>
-            <h3>Campaign Report</h3>
-            <p>Advanced analytics and reporting coming soon...</p>
-          </div>
+          <CampaignReport
+            campaign={campaign}
+            metrics={metrics}
+            onRefresh={fetchCampaignData}
+          />
         )}
       </div>
     </div>
