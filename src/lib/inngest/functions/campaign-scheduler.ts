@@ -78,6 +78,27 @@ export const campaignSchedulerHandler = inngest.createFunction(
           }
         }
 
+        // Validate campaign has contact lists before starting
+        const { data: contactLists } = await supabase
+          .from('campaign_contact_lists')
+          .select('id')
+          .eq('campaign_id', campaign.id);
+
+        if (!contactLists || contactLists.length === 0) {
+          console.error(`Campaign ${campaign.id} has no contact lists - cannot start`);
+
+          // Set back to draft status - campaign is incomplete
+          await supabase
+            .from('campaigns')
+            .update({ status: 'draft' })
+            .eq('id', campaign.id);
+
+          return {
+            success: false,
+            reason: 'No contact lists - moved back to draft'
+          };
+        }
+
         // Update campaign status to running
         await supabase
           .from('campaigns')
@@ -88,17 +109,6 @@ export const campaignSchedulerHandler = inngest.createFunction(
             current_batch: 0
           })
           .eq('id', campaign.id);
-
-        // Get contact lists for this campaign
-        const { data: contactLists } = await supabase
-          .from('campaign_contact_lists')
-          .select('id')
-          .eq('campaign_id', campaign.id);
-
-        if (!contactLists || contactLists.length === 0) {
-          console.warn(`Campaign ${campaign.id} has no contact lists`);
-          return { success: false, reason: 'No contact lists' };
-        }
 
         // Get all pending contacts from all lists
         const { data: contacts } = await supabase

@@ -42,7 +42,7 @@ export default function CampaignsPage() {
   const { registerPageAction, unregisterPageAction } = usePageActions();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'active' | 'scheduled' | 'past'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'scheduled' | 'draft' | 'past'>('active');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [companyTimezone, setCompanyTimezone] = useState<string>('America/New_York');
 
@@ -106,7 +106,8 @@ export default function CampaignsPage() {
       // Filter by status
       const filteredData = data?.filter(c => {
         if (activeTab === 'active') return c.status === 'running';
-        if (activeTab === 'scheduled') return ['scheduled', 'draft', 'paused'].includes(c.status);
+        if (activeTab === 'scheduled') return ['scheduled', 'paused'].includes(c.status);
+        if (activeTab === 'draft') return c.status === 'draft';
         return ['completed', 'cancelled'].includes(c.status);
       }) || [];
 
@@ -197,6 +198,12 @@ export default function CampaignsPage() {
           Scheduled
         </button>
         <button
+          className={`${styles.tab} ${activeTab === 'draft' ? styles.active : ''}`}
+          onClick={() => setActiveTab('draft')}
+        >
+          Drafts
+        </button>
+        <button
           className={`${styles.tab} ${activeTab === 'past' ? styles.active : ''}`}
           onClick={() => setActiveTab('past')}
         >
@@ -222,11 +229,11 @@ export default function CampaignsPage() {
                   {getStatusBadge(campaign.status)}
                 </div>
                 <div className={styles.cardActions}>
-                  {campaign.status === 'draft' || campaign.status === 'paused' ? (
+                  {campaign.status === 'paused' ? (
                     <button
                       className={styles.actionButton}
                       onClick={() => handleStartCampaign(campaign.id)}
-                      title="Start campaign"
+                      title="Resume campaign"
                     >
                       <Play size={16} />
                     </button>

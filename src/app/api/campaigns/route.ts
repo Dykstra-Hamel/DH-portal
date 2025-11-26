@@ -165,6 +165,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Determine initial status based on whether campaign is ready to be scheduled
+    let initialStatus = 'draft';
+
+    // Campaign is ready to schedule if it has workflow and start time
+    // Note: Contacts will be uploaded after creation in the UI flow
+    const hasWorkflow = !!workflow_id;
+    const hasStartTime = !!start_datetime;
+
+    if (hasWorkflow && hasStartTime) {
+      initialStatus = 'scheduled';
+    }
+
     // Create campaign
     const { data: campaign, error: createError } = await supabase
       .from('campaigns')
@@ -174,7 +186,7 @@ export async function POST(request: NextRequest) {
         description,
         campaign_id,
         discount_id: discount_id || null,
-        status: 'draft',
+        status: initialStatus,
         start_datetime,
         end_datetime: end_datetime && end_datetime.trim() !== '' ? end_datetime : null,
         workflow_id,
