@@ -45,6 +45,12 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
   const [verifying, setVerifying] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Email DNS Instructions modal state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   // Fetch tenant provisioning status
   const fetchTenantStatus = useCallback(async () => {
     try {
@@ -285,6 +291,50 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
     }
   };
 
+  // Email validation helper
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Send DNS instructions email
+  const handleSendDnsInstructions = async () => {
+    // Validate email
+    if (!emailRecipient || !validateEmail(emailRecipient)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    setSendingEmail(true);
+    setEmailError(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/companies/${companyId}/email-dns-instructions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientEmail: emailRecipient,
+          domain: domain?.name
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email');
+      }
+
+      setSuccess(`DNS instructions sent to ${emailRecipient}`);
+      setShowEmailModal(false);
+      setEmailRecipient('');
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : 'Failed to send email');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   // Get status badge
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { text: string; className: string }> = {
@@ -508,6 +558,16 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
             >
               {verifying ? 'Verifying...' : 'Verify Domain'}
             </button>
+            {domain.status !== 'verified' && domain.records && domain.records.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(true)}
+                className={styles.btnSecondary}
+                disabled={verifying || deleting || sendingEmail}
+              >
+                Email DNS Instructions
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsEditing(true)}
@@ -533,6 +593,81 @@ export default function EmailDomainManager({ companyId }: EmailDomainManagerProp
           <p>
             <strong>No custom domain configured.</strong> Emails will be sent from the fallback domain: <code>noreply@pmpcentral.io</code>
           </p>
+        </div>
+      )}
+
+      {/* Email DNS Instructions Modal */}
+      {showEmailModal && (
+        <div className={styles.modal}>
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <h4>Email DNS Instructions</h4>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setEmailRecipient('');
+                  setEmailError(null);
+                }}
+                className={styles.btnClose}
+                disabled={sendingEmail}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.instructions}>
+                Send DNS configuration instructions for <strong>{domain?.name}</strong> to a technical team member.
+              </p>
+
+              {emailError && (
+                <div className={styles.alert} data-type="error">
+                  {emailError}
+                </div>
+              )}
+
+              <div className={styles.formGroup}>
+                <label htmlFor="recipient-email">Recipient Email Address</label>
+                <input
+                  type="email"
+                  id="recipient-email"
+                  value={emailRecipient}
+                  onChange={(e) => {
+                    setEmailRecipient(e.target.value);
+                    setEmailError(null);
+                  }}
+                  placeholder="tech@example.com"
+                  className={styles.input}
+                  disabled={sendingEmail}
+                  required
+                />
+                <small>Enter the email address of the person who will configure DNS</small>
+              </div>
+
+              <div className={styles.formActions}>
+                <button
+                  type="button"
+                  onClick={handleSendDnsInstructions}
+                  className={styles.btnPrimary}
+                  disabled={sendingEmail || !emailRecipient}
+                >
+                  {sendingEmail ? 'Sending...' : 'Send Instructions'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEmailModal(false);
+                    setEmailRecipient('');
+                    setEmailError(null);
+                  }}
+                  className={styles.btnSecondary}
+                  disabled={sendingEmail}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

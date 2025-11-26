@@ -171,10 +171,22 @@ export async function getConfigurationSet(
 
     const response = await sesClient.send(command);
 
+    // Construct the ARN manually since it's not returned by the API
+    // Format: arn:aws:ses:region:account-id:configuration-set/name
+    const region = process.env.AWS_REGION || 'us-east-1';
+    const accountId = process.env.AWS_ACCOUNT_ID;
+    const name = response.ConfigurationSetName || configSetName;
+
+    let arn: string | undefined;
+    if (accountId) {
+      arn = `arn:aws:ses:${region}:${accountId}:configuration-set/${name}`;
+    }
+
     return {
       success: true,
       data: {
-        name: response.ConfigurationSetName || configSetName,
+        name,
+        arn,
       },
     };
   } catch (error) {

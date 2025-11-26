@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { createTenant, deleteTenant } from '@/lib/aws-ses/tenants';
 import { createEmailIdentity, associateIdentityWithTenant, getDkimTokens, deleteEmailIdentity } from '@/lib/aws-ses/identities';
-import { getConfigurationSet, deleteConfigurationSet } from '@/lib/aws-ses/config-sets';
+import { getConfigurationSet, deleteConfigurationSet, associateConfigSetWithTenant } from '@/lib/aws-ses/config-sets';
 
 interface ProvisionRequest {
   domain?: string;
@@ -77,7 +77,7 @@ export async function POST(
 
     const tenant = tenantResult.data;
 
-    // Step 2: Verify shared configuration set exists
+    // Step 2: Verify and associate configuration set with tenant
     const sharedConfigSet = 'my-first-configuration-set';
     const configSetResult = await getConfigurationSet(sharedConfigSet);
 
@@ -91,7 +91,24 @@ export async function POST(
       );
     }
 
-    // We're using a shared config set, so no need to create or associate per-tenant
+    // Associate the configuration set with the tenant
+    const associationResult = await associateConfigSetWithTenant(
+      sharedConfigSet,
+      tenant.tenantName,
+      configSetResult.data?.arn
+    );
+
+    if (!associationResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Tenant created but failed to associate configuration set: ${associationResult.error}`,
+          tenant,
+        },
+        { status: 500 }
+      );
+    }
+
     const configSet = { name: sharedConfigSet };
 
     let identityArn: string | undefined;
