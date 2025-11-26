@@ -10,12 +10,14 @@ import CampaignDetailHeader from '@/components/Campaigns/CampaignDetailHeader';
 import CampaignOverview from '@/components/Campaigns/CampaignOverview';
 import CampaignContacts from '@/components/Campaigns/CampaignContacts';
 import CampaignExecutions from '@/components/Campaigns/CampaignExecutions';
+import CampaignLeads from '@/components/Campaigns/CampaignLeads';
+import CampaignReport from '@/components/Campaigns/CampaignReport';
 
 interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-type TabType = 'overview' | 'contacts' | 'executions' | 'report';
+type TabType = 'overview' | 'contacts' | 'leads' | 'executions' | 'report';
 
 export default function CampaignDetailPage({ params }: CampaignDetailPageProps) {
   const router = useRouter();
@@ -23,6 +25,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<any>(null);
   const [metrics, setMetrics] = useState<any>(null);
+  const [leadCount, setLeadCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -61,6 +64,17 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
 
       if (metricsResult.success) {
         setMetrics(metricsResult.metrics);
+      }
+
+      // Fetch lead count
+      const supabase = createClient();
+      const { count, error: countError } = await supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('campaign_id', campaignId);
+
+      if (!countError && count !== null) {
+        setLeadCount(count);
       }
 
     } catch (err) {
@@ -191,6 +205,12 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
           Contacts ({campaign.total_contacts || 0})
         </button>
         <button
+          className={`${styles.tab} ${activeTab === 'leads' ? styles.active : ''}`}
+          onClick={() => setActiveTab('leads')}
+        >
+          Leads ({leadCount})
+        </button>
+        <button
           className={`${styles.tab} ${activeTab === 'executions' ? styles.active : ''}`}
           onClick={() => setActiveTab('executions')}
         >
@@ -221,6 +241,13 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
           />
         )}
 
+        {activeTab === 'leads' && (
+          <CampaignLeads
+            campaignId={campaign.id}
+            companyId={selectedCompany?.id || ''}
+          />
+        )}
+
         {activeTab === 'executions' && (
           <CampaignExecutions
             campaignId={campaign.id}
@@ -230,10 +257,11 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
         )}
 
         {activeTab === 'report' && (
-          <div className={styles.comingSoon}>
-            <h3>Campaign Report</h3>
-            <p>Advanced analytics and reporting coming soon...</p>
-          </div>
+          <CampaignReport
+            campaign={campaign}
+            metrics={metrics}
+            onRefresh={fetchCampaignData}
+          />
         )}
       </div>
     </div>

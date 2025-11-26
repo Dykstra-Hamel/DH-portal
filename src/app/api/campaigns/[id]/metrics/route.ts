@@ -63,32 +63,54 @@ export async function GET(
       `)
       .eq('campaign_id', campaignId);
 
-    // Get email metrics from email_automation_log via automation_executions
-    const executionIds = executions?.map((e: any) => e.automation_execution?.id).filter(Boolean) || [];
+    // Get email metrics from email_logs table (consolidated email tracking)
+    // Query directly by campaign_id for cleaner, more efficient lookup
+    const { data: emailLogs } = await queryClient
+      .from('email_logs')
+      .select('delivery_status, bounce_type, opened_at, clicked_at, bounced_at, complained_at')
+      .eq('campaign_id', campaignId);
 
+    // Calculate email metrics with comprehensive SES tracking
     let emailMetrics = {
-      sent: 0,
-      delivered: 0,
-      opened: 0,
-      clicked: 0,
-      failed: 0,
+      sent: emailLogs?.length || 0,
+      delivered: emailLogs?.filter((e: any) =>
+        ['delivered', 'opened', 'clicked'].includes(e.delivery_status)
+      ).length || 0,
+      opened: emailLogs?.filter((e: any) => e.opened_at !== null).length || 0,
+      clicked: emailLogs?.filter((e: any) => e.clicked_at !== null).length || 0,
+      bounced: emailLogs?.filter((e: any) => e.delivery_status === 'bounced').length || 0,
+      hard_bounces: emailLogs?.filter((e: any) =>
+        e.delivery_status === 'bounced' && e.bounce_type === 'Permanent'
+      ).length || 0,
+      soft_bounces: emailLogs?.filter((e: any) =>
+        e.delivery_status === 'bounced' && e.bounce_type === 'Transient'
+      ).length || 0,
+      complained: emailLogs?.filter((e: any) => e.delivery_status === 'complained').length || 0,
+      failed: emailLogs?.filter((e: any) => e.delivery_status === 'failed').length || 0,
+      bounce_rate: 0,
+      open_rate: 0,
+      click_rate: 0,
+      click_through_rate: 0,
+      complaint_rate: 0,
     };
 
-    if (executionIds.length > 0) {
-      const { data: emailLogs } = await queryClient
-        .from('email_automation_log')
-        .select('send_status')
-        .in('execution_id', executionIds);
+    // Get aggregated metrics with calculated rates from view
+    const { data: aggregatedMetrics } = await queryClient
+      .from('campaign_email_metrics')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .single();
 
-      if (emailLogs) {
-        emailMetrics = {
-          sent: emailLogs.filter((e: any) => ['sent', 'delivered', 'opened', 'clicked'].includes(e.send_status)).length,
-          delivered: emailLogs.filter((e: any) => ['delivered', 'opened', 'clicked'].includes(e.send_status)).length,
-          opened: emailLogs.filter((e: any) => ['opened', 'clicked'].includes(e.send_status)).length,
-          clicked: emailLogs.filter((e: any) => e.send_status === 'clicked').length,
-          failed: emailLogs.filter((e: any) => e.send_status === 'failed').length,
-        };
-      }
+    // Add calculated rates if available
+    if (aggregatedMetrics) {
+      emailMetrics = {
+        ...emailMetrics,
+        bounce_rate: aggregatedMetrics.bounce_rate,
+        open_rate: aggregatedMetrics.open_rate,
+        click_rate: aggregatedMetrics.click_rate,
+        click_through_rate: aggregatedMetrics.click_through_rate,
+        complaint_rate: aggregatedMetrics.complaint_rate,
+      };
     }
 
     // Calculate workflow completion metrics

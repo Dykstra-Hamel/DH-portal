@@ -313,3 +313,24 @@
     transform: translateY(-1px);
   }
 }
+
+.createDiscountButton {
+  margin-top: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: white;
+  border: 1px dashed var(--action-600);
+  border-radius: 6px;
+  color: var(--action-600);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  &:hover {
+    background: var(--action-50);
+    border-style: solid;
+  }
+}

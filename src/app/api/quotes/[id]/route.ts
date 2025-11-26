@@ -460,6 +460,8 @@ export async function PUT(
             // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
             let discountAmount = lineItem.discount_amount || 0;
             let discountPercentage = lineItem.discount_percentage || 0;
+            let recurringDiscountAmount = 0;
+            let recurringDiscountPercentage = 0;
             let appliesToPrice = 'both'; // Default to applying to both prices
             let discountId = (lineItem as any).discount_id || null;
 
@@ -470,12 +472,28 @@ export async function PUT(
               if (discountConfig) {
                 appliesToPrice = discountConfig.applies_to_price;
 
+                // Initial discount settings
                 if (discountConfig.discount_type === 'percentage') {
                   discountPercentage = discountConfig.discount_value;
-                  discountAmount = 0; // Don't combine percentage with fixed amount
+                  discountAmount = 0;
                 } else {
                   discountAmount = discountConfig.discount_value;
                   discountPercentage = 0;
+                }
+
+                // Recurring discount settings (for 'both' - use separate values if set)
+                if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
+                  if (discountConfig.recurring_discount_type === 'percentage') {
+                    recurringDiscountPercentage = discountConfig.recurring_discount_value;
+                    recurringDiscountAmount = 0;
+                  } else {
+                    recurringDiscountAmount = discountConfig.recurring_discount_value;
+                    recurringDiscountPercentage = 0;
+                  }
+                } else {
+                  // Fall back to same as initial
+                  recurringDiscountAmount = discountAmount;
+                  recurringDiscountPercentage = discountPercentage;
                 }
               }
             } else {
@@ -483,6 +501,8 @@ export async function PUT(
               if ((lineItem as any).discount_id === null) {
                 discountAmount = 0;
                 discountPercentage = 0;
+                recurringDiscountAmount = 0;
+                recurringDiscountPercentage = 0;
                 discountId = null;
               } else {
                 // If no discount_id provided (undefined), check for existing discounts on the line item
@@ -502,6 +522,9 @@ export async function PUT(
                   if (!(lineItem as any).discount_id && existingLineItem.discount_id) {
                     discountId = existingLineItem.discount_id;
                   }
+                  // For legacy line items without discount_id, use same values for recurring
+                  recurringDiscountAmount = discountAmount;
+                  recurringDiscountPercentage = discountPercentage;
                 }
               }
             }
@@ -520,9 +543,9 @@ export async function PUT(
 
             // Apply discount to recurring price if configured
             if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
-              finalRecurringPrice = recurringPriceWithSize - discountAmount;
-              if (discountPercentage > 0) {
-                finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
+              finalRecurringPrice = recurringPriceWithSize - recurringDiscountAmount;
+              if (recurringDiscountPercentage > 0) {
+                finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
               }
             }
 
@@ -577,6 +600,8 @@ export async function PUT(
             if (existingLineItem) {
               let discountAmount = lineItem.discount_amount || 0;
               let discountPercentage = lineItem.discount_percentage || 0;
+              let recurringDiscountAmount = discountAmount;
+              let recurringDiscountPercentage = discountPercentage;
               let appliesToPrice = 'both';
               const discountId = (lineItem as any).discount_id || null;
 
@@ -587,12 +612,27 @@ export async function PUT(
                 if (discountConfig) {
                   appliesToPrice = discountConfig.applies_to_price;
 
+                  // Initial discount settings
                   if (discountConfig.discount_type === 'percentage') {
                     discountPercentage = discountConfig.discount_value;
                     discountAmount = 0;
                   } else {
                     discountAmount = discountConfig.discount_value;
                     discountPercentage = 0;
+                  }
+
+                  // Recurring discount settings (for 'both' - use separate values if set)
+                  if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
+                    if (discountConfig.recurring_discount_type === 'percentage') {
+                      recurringDiscountPercentage = discountConfig.recurring_discount_value;
+                      recurringDiscountAmount = 0;
+                    } else {
+                      recurringDiscountAmount = discountConfig.recurring_discount_value;
+                      recurringDiscountPercentage = 0;
+                    }
+                  } else {
+                    recurringDiscountAmount = discountAmount;
+                    recurringDiscountPercentage = discountPercentage;
                   }
                 }
               }
@@ -611,9 +651,9 @@ export async function PUT(
 
               // Apply discount to recurring price if configured
               if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
-                finalRecurringPrice = existingLineItem.recurring_price - discountAmount;
-                if (discountPercentage > 0) {
-                  finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
+                finalRecurringPrice = existingLineItem.recurring_price - recurringDiscountAmount;
+                if (recurringDiscountPercentage > 0) {
+                  finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
                 }
               }
 
@@ -681,6 +721,8 @@ export async function PUT(
             // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
             let discountAmount = lineItem.discount_amount || 0;
             let discountPercentage = lineItem.discount_percentage || 0;
+            let recurringDiscountAmount = discountAmount;
+            let recurringDiscountPercentage = discountPercentage;
             let appliesToPrice = 'both';
             const discountId = (lineItem as any).discount_id || null;
 
@@ -691,12 +733,27 @@ export async function PUT(
               if (discountConfig) {
                 appliesToPrice = discountConfig.applies_to_price;
 
+                // Initial discount settings
                 if (discountConfig.discount_type === 'percentage') {
                   discountPercentage = discountConfig.discount_value;
                   discountAmount = 0;
                 } else {
                   discountAmount = discountConfig.discount_value;
                   discountPercentage = 0;
+                }
+
+                // Recurring discount settings (for 'both' - use separate values if set)
+                if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
+                  if (discountConfig.recurring_discount_type === 'percentage') {
+                    recurringDiscountPercentage = discountConfig.recurring_discount_value;
+                    recurringDiscountAmount = 0;
+                  } else {
+                    recurringDiscountAmount = discountConfig.recurring_discount_value;
+                    recurringDiscountPercentage = 0;
+                  }
+                } else {
+                  recurringDiscountAmount = discountAmount;
+                  recurringDiscountPercentage = discountPercentage;
                 }
               }
             }
@@ -715,9 +772,9 @@ export async function PUT(
 
             // Apply discount to recurring price if configured
             if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
-              finalRecurringPrice = recurringPriceWithSize - discountAmount;
-              if (discountPercentage > 0) {
-                finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
+              finalRecurringPrice = recurringPriceWithSize - recurringDiscountAmount;
+              if (recurringDiscountPercentage > 0) {
+                finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
               }
             }
 

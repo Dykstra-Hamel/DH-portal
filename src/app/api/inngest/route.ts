@@ -8,7 +8,7 @@ import { widgetScheduleCompletedHandler } from '@/lib/inngest/functions/widget-s
 import { automationTriggerHandler } from '@/lib/inngest/functions/automation-trigger';
 import { emailScheduledHandler } from '@/lib/inngest/functions/email-scheduled';
 import { leadFollowUpSequence } from '@/lib/inngest/functions/lead-followup-sequence';
-import { emailDeliveryTracking } from '@/lib/inngest/functions/email-delivery-tracking';
+import { emailWebhookHandler } from '@/lib/inngest/functions/email-delivery-tracking';
 import { workflowTestHandler } from '@/lib/inngest/functions/workflow-test';
 import { workflowExecuteHandler } from '@/lib/inngest/functions/workflow-execute';
 import { callSchedulingHandler, scheduledCallExecutor } from '@/lib/inngest/functions/call-scheduling-handler';
@@ -40,7 +40,7 @@ export const { GET, POST, PUT } = serve({
     automationTriggerHandler,
     emailScheduledHandler,
     leadFollowUpSequence,
-    emailDeliveryTracking,
+    emailWebhookHandler,
     workflowTestHandler,
     workflowExecuteHandler,
     callSchedulingHandler,

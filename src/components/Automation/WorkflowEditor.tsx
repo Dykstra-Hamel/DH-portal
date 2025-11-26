@@ -112,9 +112,11 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     is_active: false,
     auto_cancel_on_status: true,
     cancel_on_statuses: ['won', 'closed_won', 'converted'],
+    agent_id: '',
   });
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [smsAgents, setSmsAgents] = useState<any[]>([]);
+  const [callingAgents, setCallingAgents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -150,7 +152,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
   const fetchSmsAgents = useCallback(async () => {
     try {
       const supabase = createClient();
-      
+
       const { data, error } = await supabase
         .from('agents')
         .select('id, agent_id, agent_name, phone_number')
@@ -159,7 +161,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
         .eq('is_active', true)
         .not('phone_number', 'is', null)
         .order('agent_name');
-      
+
       if (error) {
         console.error('Error fetching SMS agents:', error);
       } else {
@@ -170,10 +172,35 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     }
   }, [companyId]);
 
+  const fetchCallingAgents = useCallback(async () => {
+    try {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from('agents')
+        .select('id, agent_id, agent_name, phone_number')
+        .eq('company_id', companyId)
+        .eq('agent_type', 'calling')
+        .eq('agent_direction', 'outbound')
+        .eq('is_active', true)
+        .not('phone_number', 'is', null)
+        .order('agent_name');
+
+      if (error) {
+        console.error('Error fetching calling agents:', error);
+      } else {
+        setCallingAgents(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching calling agents:', error);
+    }
+  }, [companyId]);
+
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
       fetchSmsAgents();
+      fetchCallingAgents();
       if (workflow) {
         setFormData({
           name: workflow.name || '',
@@ -185,6 +212,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
           is_active: workflow.is_active || false,
           auto_cancel_on_status: workflow.auto_cancel_on_status !== false,
           cancel_on_statuses: workflow.cancel_on_statuses || ['won', 'closed_won', 'converted'],
+          agent_id: workflow.agent_id || '',
         });
       } else {
         // Reset form for new workflow
@@ -198,10 +226,11 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
           is_active: false,
           auto_cancel_on_status: true,
           cancel_on_statuses: ['won', 'closed_won', 'converted'],
+          agent_id: '',
         });
       }
     }
-  }, [isOpen, workflow, fetchTemplates, fetchSmsAgents]);
+  }, [isOpen, workflow, fetchTemplates, fetchSmsAgents, fetchCallingAgents]);
 
   const handleSave = async () => {
     try {
@@ -759,6 +788,22 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 placeholder="Describe what this workflow does..."
                 rows={3}
               />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>AI Call Agent (Optional)</label>
+              <select
+                value={formData.agent_id}
+                onChange={(e) => setFormData(prev => ({ ...prev, agent_id: e.target.value }))}
+              >
+                <option value="">Use Default Agent</option>
+                {callingAgents.map(agent => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.agent_name} {agent.phone_number ? `(${agent.phone_number})` : ''}
+                  </option>
+                ))}
+              </select>
+              <small>Select Retell agent for AI phone calls in this workflow</small>
             </div>
 
             <div className={styles.formRow}>

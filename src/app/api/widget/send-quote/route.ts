@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-// import { Resend } from 'resend';
 import { generateQuoteEmailTemplate } from '@/lib/email/templates/quote';
 import { QuoteEmailData } from '@/lib/email/types';
-import { MAILERSEND_API_TOKEN, MAILERSEND_FALLBACK_EMAIL } from '@/lib/email';
+import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from '@/lib/email';
+import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
 import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 
 // const resend = new Resend(process.env.RESEND_API_KEY);
@@ -106,35 +106,26 @@ export async function POST(request: NextRequest) {
 
     const emailHtml = generateQuoteEmailTemplate(quoteEmailData);
 
-    // Use MailerSend with fallback email
-    const fromEmail = MAILERSEND_FALLBACK_EMAIL;
+    // Get company email configuration
+    const fromEmail = await getCompanyFromEmail(quoteData.companyId);
+    const fromName = await getCompanyName(quoteData.companyId);
+    const tenantName = await getCompanyTenantName(quoteData.companyId);
 
-    // Send email using MailerSend
-    const mailersendPayload = {
-      from: {
-        email: fromEmail
-      },
-      to: [
-        {
-          email: quoteData.customerEmail
-        }
-      ],
+    // Send email using AWS SES
+    const result = await sendEmailWithFallback({
+      tenantName,
+      from: fromEmail,
+      fromName,
+      to: quoteData.customerEmail,
       subject: `Your Pest Control Quote - ${company.name}`,
-      html: emailHtml
-    };
-
-    const response = await fetch('https://api.mailersend.com/v1/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
-      },
-      body: JSON.stringify(mailersendPayload),
+      html: emailHtml,
+      companyId: quoteData.companyId,
+      source: 'widget_quote',
+      tags: ['widget', 'quote', quoteData.pestType],
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('DEBUG: MailerSend email sending failed:', response.status, errorData);
+    if (!result.success) {
+      console.error('AWS SES email sending failed:', result.error);
       return createCorsErrorResponse(
         'Failed to send quote email',
         origin,
@@ -143,19 +134,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let responseData: any = {};
-    try {
-      const responseText = await response.text();
-      if (responseText.trim()) {
-        responseData = JSON.parse(responseText);
-      }
-    } catch (error) {
-      // MailerSend response was not JSON, but email may have sent successfully
-    }
-
     return createCorsResponse({
       success: true,
-      emailId: responseData?.data?.id || 'unknown',
+      emailId: result.messageId,
       message: 'Quote sent successfully to ' + quoteData.customerEmail,
     }, origin, 'widget');
   } catch (error) {
