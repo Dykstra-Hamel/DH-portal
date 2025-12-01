@@ -100,18 +100,27 @@ export async function GET(
       cancelled: executions?.filter((e: any) => e.automation_execution?.execution_status === 'cancelled').length || 0,
     };
 
-    // Get contact list breakdown
-    const { data: contactLists } = await queryClient
-      .from('campaign_contact_lists')
+    // Get contact list breakdown from new reusable lists system
+    const { data: assignments } = await queryClient
+      .from('campaign_contact_list_assignments')
       .select(`
-        id,
-        list_name,
-        total_contacts
+        contact_list_id,
+        contact_lists (
+          id,
+          name,
+          total_contacts
+        )
       `)
       .eq('campaign_id', campaignId);
 
-    // Get member status breakdown
-    const listIds = contactLists?.map((l: any) => l.id) || [];
+    // Transform assignments to contact list format for backward compatibility
+    const contactLists = assignments?.map((a: any) => ({
+      id: a.contact_lists?.id,
+      list_name: a.contact_lists?.name,
+      total_contacts: a.contact_lists?.total_contacts,
+    })).filter((l: any) => l.id) || [];
+
+    // Get member status breakdown - filter by campaign_id for reusable lists
     let memberStatusCounts = {
       pending: 0,
       processing: 0,
@@ -122,23 +131,21 @@ export async function GET(
       excluded: 0,
     };
 
-    if (listIds.length > 0) {
-      const { data: members } = await queryClient
-        .from('campaign_contact_list_members')
-        .select('status')
-        .in('contact_list_id', listIds);
+    const { data: members } = await queryClient
+      .from('campaign_contact_list_members')
+      .select('status')
+      .eq('campaign_id', campaignId);
 
-      if (members) {
-        memberStatusCounts = {
-          pending: members.filter((m: any) => m.status === 'pending').length,
-          processing: members.filter((m: any) => m.status === 'processing').length,
-          processed: members.filter((m: any) => m.status === 'processed').length,
-          failed: members.filter((m: any) => m.status === 'failed').length,
-          bounced: members.filter((m: any) => m.status === 'bounced').length,
-          unsubscribed: members.filter((m: any) => m.status === 'unsubscribed').length,
-          excluded: members.filter((m: any) => m.status === 'excluded').length,
-        };
-      }
+    if (members) {
+      memberStatusCounts = {
+        pending: members.filter((m: any) => m.status === 'pending').length,
+        processing: members.filter((m: any) => m.status === 'processing').length,
+        processed: members.filter((m: any) => m.status === 'processed').length,
+        failed: members.filter((m: any) => m.status === 'failed').length,
+        bounced: members.filter((m: any) => m.status === 'bounced').length,
+        unsubscribed: members.filter((m: any) => m.status === 'unsubscribed').length,
+        excluded: members.filter((m: any) => m.status === 'excluded').length,
+      };
     }
 
     // Calculate progress percentage

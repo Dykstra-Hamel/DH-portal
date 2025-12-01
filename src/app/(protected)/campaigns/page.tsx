@@ -84,7 +84,6 @@ export default function CampaignsPage() {
     if (!selectedCompany?.id) return;
 
     try {
-      console.log('Fetching campaigns for company:', selectedCompany.id);
       setLoading(true);
       const supabase = createClient();
 
@@ -93,8 +92,6 @@ export default function CampaignsPage() {
         .select('*')
         .eq('company_id', selectedCompany.id)
         .order('created_at', { ascending: false });
-
-      console.log('Campaigns query result:', { data, error });
 
       if (error) {
         console.error('Error fetching campaigns:', error);
@@ -111,7 +108,6 @@ export default function CampaignsPage() {
         return ['completed', 'cancelled'].includes(c.status);
       }) || [];
 
-      console.log('Filtered campaigns:', filteredData);
       setCampaigns(filteredData);
     } catch (error) {
       console.error('Error fetching campaigns:', error);

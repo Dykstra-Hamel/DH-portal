@@ -34,11 +34,6 @@ export function UserbackProvider({ children }: UserbackProviderProps) {
       return;
     }
 
-    console.log(
-      'Initializing Userback widget with token:',
-      token.substring(0, 10) + '...'
-    );
-
     const initUserback = async () => {
       try {
         const userData = user

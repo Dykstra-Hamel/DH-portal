@@ -168,6 +168,27 @@
     }
   }
 
+  // Style for react-datepicker
+  :global(.react-datepicker-wrapper) {
+    width: 100%;
+  }
+
+  :global(.datePickerInput) {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+    transition: all 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: var(--action-600);
+      box-shadow: 0 0 0 3px rgba(0, 105, 224, 0.1);
+    }
+  }
+
   textarea {
     resize: vertical;
     min-height: 80px;

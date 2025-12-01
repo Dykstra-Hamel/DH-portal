@@ -14,7 +14,7 @@ interface Customer {
   first_name: string;
   last_name: string;
   email: string;
-  phone_number: string | null;
+  phone: string | null;
 }
 
 interface Execution {
@@ -58,6 +58,12 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
       const response = await fetch(url.toString());
       const result = await response.json();
 
+      console.log('Executions API response:', {
+        success: result.success,
+        executionsLength: result.executions?.length,
+        pagination: result.pagination,
+      });
+
       if (result.success) {
         if (offset === 0) {
           setExecutions(result.executions || []);
@@ -65,6 +71,8 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
           setExecutions(prev => [...prev, ...(result.executions || [])]);
         }
         setPagination(result.pagination);
+      } else {
+        console.error('API returned error:', result.error);
       }
     } catch (error) {
       console.error('Error fetching executions:', error);
@@ -148,7 +156,7 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
                       </p>
                       <p className={styles.customerContact}>
                         {execution.customers.email}
-                        {execution.customers.phone_number && ` • ${execution.customers.phone_number}`}
+                        {execution.customers.phone && ` • ${execution.customers.phone}`}
                       </p>
                     </div>
                   </div>

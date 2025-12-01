@@ -15,7 +15,7 @@ interface ContactMember {
     first_name: string;
     last_name: string;
     email: string;
-    phone_number: string | null;
+    phone: string | null;
   };
 }
 
@@ -125,10 +125,10 @@ export default function ContactMembersModal({ campaignId, listId, listName, onCl
                       </td>
                       <td>
                         <div className={styles.phoneCell}>
-                          {member.customer.phone_number ? (
+                          {member.customer.phone ? (
                             <>
                               <Phone size={14} />
-                              <span>{member.customer.phone_number}</span>
+                              <span>{member.customer.phone}</span>
                             </>
                           ) : (
                             <span className={styles.noData}>-</span>

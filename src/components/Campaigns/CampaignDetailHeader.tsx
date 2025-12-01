@@ -65,9 +65,9 @@ export default function CampaignDetailHeader({ campaign, onUpdate, companyTimezo
     try {
       setActionLoading('cancel');
       const response = await fetch(`/api/campaigns/${campaign.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...campaign, status: 'cancelled' }),
+        body: JSON.stringify({ status: 'cancelled' }),
       });
 
       const result = await response.json();
@@ -118,14 +118,6 @@ export default function CampaignDetailHeader({ campaign, onUpdate, companyTimezo
             {new Date(campaign.start_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
           </span>
         </div>
-        {campaign.end_datetime && (
-          <div className={styles.metaItem}>
-            <span className={styles.metaLabel}>Ends:</span>
-            <span className={styles.metaValue}>
-              {new Date(campaign.end_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
-            </span>
-          </div>
-        )}
         {campaign.workflow && (
           <div className={styles.metaItem}>
             <span className={styles.metaLabel}>Workflow:</span>

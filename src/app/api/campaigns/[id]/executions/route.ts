@@ -54,25 +54,45 @@ export async function GET(
     // Build query
     let query = queryClient
       .from('campaign_executions')
-      .select('*, customers(first_name, last_name, email, phone_number)', { count: 'exact' })
+      .select('*, customers(first_name, last_name, email, phone)', { count: 'exact' })
       .eq('campaign_id', campaignId)
-      .order('created_at', { ascending: false })
+      .order('started_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (status) {
-      query = query.eq('status', status);
+      query = query.eq('execution_status', status);
     }
 
     const { data: executions, error, count } = await query;
+
+    // Debug logging
+    console.log('Executions query result:', {
+      count,
+      executionsLength: executions?.length,
+      error,
+      hasData: !!executions,
+    });
 
     if (error) {
       console.error('Error fetching executions:', error);
       return NextResponse.json({ error: 'Failed to fetch executions' }, { status: 500 });
     }
 
+    if (executions) {
+      console.log('Sample execution:', executions[0]);
+    }
+
+    // Map execution_status to status for frontend compatibility
+    const mappedExecutions = executions?.map((exec: any) => ({
+      ...exec,
+      status: exec.execution_status,
+    }));
+
+    console.log('Mapped executions length:', mappedExecutions?.length);
+
     return NextResponse.json({
       success: true,
-      executions,
+      executions: mappedExecutions,
       pagination: {
         total: count || 0,
         limit,

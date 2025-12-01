@@ -29,13 +29,13 @@ interface WorkflowStep {
   template_id?: string;
   sms_message?: string;
   sms_agent_id?: string;
+  agent_id?: string;
   delay_minutes?: number;
   new_status?: string;
   assign_to_user_id?: string;
   condition?: any;
   branches?: WorkflowBranch[];
   call_variables?: any;
-  call_type?: 'immediate' | 'follow_up' | 'urgent';
   archive_reason?: string;
   required?: boolean;
 }
@@ -115,6 +115,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
   });
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [smsAgents, setSmsAgents] = useState<any[]>([]);
+  const [callingAgents, setCallingAgents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -150,7 +151,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
   const fetchSmsAgents = useCallback(async () => {
     try {
       const supabase = createClient();
-      
+
       const { data, error } = await supabase
         .from('agents')
         .select('id, agent_id, agent_name, phone_number')
@@ -159,7 +160,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
         .eq('is_active', true)
         .not('phone_number', 'is', null)
         .order('agent_name');
-      
+
       if (error) {
         console.error('Error fetching SMS agents:', error);
       } else {
@@ -170,10 +171,34 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     }
   }, [companyId]);
 
+  const fetchCallingAgents = useCallback(async () => {
+    try {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from('agents')
+        .select('id, agent_id, agent_name, phone_number')
+        .eq('company_id', companyId)
+        .eq('agent_type', 'calling')
+        .eq('agent_direction', 'outbound')
+        .eq('is_active', true)
+        .order('agent_name');
+
+      if (error) {
+        console.error('Error fetching calling agents:', error);
+      } else {
+        setCallingAgents(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching calling agents:', error);
+    }
+  }, [companyId]);
+
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
       fetchSmsAgents();
+      fetchCallingAgents();
       if (workflow) {
         setFormData({
           name: workflow.name || '',
@@ -201,7 +226,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
         });
       }
     }
-  }, [isOpen, workflow, fetchTemplates, fetchSmsAgents]);
+  }, [isOpen, workflow, fetchTemplates, fetchSmsAgents, fetchCallingAgents]);
 
   const handleSave = async () => {
     try {
@@ -422,7 +447,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 Step {index + 1}: {getStepTypeName(step.type)}
               </span>
               <span className={styles.stepDescription}>
-                {getStepDescription(step, templates)}
+                {getStepDescription(step, templates, callingAgents)}
               </span>
             </div>
           </div>
@@ -544,26 +569,30 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
             {step.type === 'make_call' && (
               <>
                 <div className={styles.formGroup}>
-                  <label>Call Type</label>
+                  <label>Outbound Calling Agent *</label>
                   <select
-                    value={step.call_type || 'immediate'}
-                    onChange={(e) => updateStep(step.id, { call_type: e.target.value as 'immediate' | 'follow_up' | 'urgent' })}
+                    value={step.agent_id || ''}
+                    onChange={(e) => updateStep(step.id, { agent_id: e.target.value })}
                   >
-                    <option value="immediate">Immediate Call</option>
-                    <option value="follow_up">Follow-up Call</option>
-                    <option value="urgent">Urgent Call</option>
+                    <option value="">Select an agent</option>
+                    {callingAgents.map(agent => (
+                      <option key={agent.id} value={agent.agent_id}>
+                        {agent.agent_name}{agent.phone_number ? ` - ${agent.phone_number}` : ''}
+                      </option>
+                    ))}
                   </select>
+                  <small>Select which outbound calling agent will make the call</small>
                 </div>
                 <div className={styles.formGroup}>
                   <label>Delay (minutes)</label>
                   <input
                     type="number"
                     min="0"
-                    max="60"
+                    max="10080"
                     value={step.delay_minutes || 0}
                     onChange={(e) => updateStep(step.id, { delay_minutes: parseInt(e.target.value) || 0 })}
                   />
-                  <small>0 = immediate, up to 60 minutes for immediate calls</small>
+                  <small>0 = immediate, 60 = 1 hour, 1440 = 1 day</small>
                 </div>
               </>
             )}
@@ -1092,7 +1121,7 @@ function getStepTypeName(type: string): string {
   return names[type as keyof typeof names] || type;
 }
 
-function getStepDescription(step: WorkflowStep, templates: EmailTemplate[]): string {
+function getStepDescription(step: WorkflowStep, templates: EmailTemplate[], callingAgents: any[] = []): string {
   switch (step.type) {
     case 'send_email':
       if (step.template_id) {
@@ -1109,7 +1138,12 @@ function getStepDescription(step: WorkflowStep, templates: EmailTemplate[]): str
     case 'wait':
       return `Wait ${step.delay_minutes || 60} minutes`;
     case 'make_call':
-      return `Make AI call ${step.delay_minutes ? `after ${step.delay_minutes} minutes` : 'immediately'}`;
+      if (step.agent_id) {
+        const agent = callingAgents.find(a => a.agent_id === step.agent_id);
+        const agentName = agent?.agent_name || 'Unknown Agent';
+        return `Call with ${agentName} ${step.delay_minutes ? `after ${step.delay_minutes} minutes` : 'immediately'}`;
+      }
+      return 'Calling agent not selected';
     case 'conditional':
       if (step.condition) {
         return `Branch on ${step.condition.field} ${step.condition.operator} ${step.condition.value}`;

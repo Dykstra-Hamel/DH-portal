@@ -175,6 +175,85 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    // Get authenticated user
+    const authResult = await getAuthenticatedUser();
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
+    const { user, isGlobalAdmin, supabase } = authResult;
+
+    const body = await request.json();
+
+    // Get existing campaign
+    const { data: existingCampaign, error: fetchError } = await supabase
+      .from('campaigns')
+      .select('company_id, status')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingCampaign) {
+      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+    }
+
+    // Check user has permission (skip for global admins)
+    if (!isGlobalAdmin) {
+      const { data: userCompany } = await supabase
+        .from('user_companies')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('company_id', existingCampaign.company_id)
+        .single();
+
+      if (!userCompany || !['admin', 'manager', 'owner'].includes(userCompany.role)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      }
+    }
+
+    // Validate status changes
+    if (body.status) {
+      const validStatuses = ['draft', 'scheduled', 'running', 'paused', 'completed', 'cancelled'];
+      if (!validStatuses.includes(body.status)) {
+        return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+      }
+
+      // Don't allow cancelling already completed campaigns
+      if (body.status === 'cancelled' && existingCampaign.status === 'completed') {
+        return NextResponse.json(
+          { error: 'Cannot cancel a completed campaign' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Update campaign with only provided fields
+    const { data: campaign, error: updateError } = await supabase
+      .from('campaigns')
+      .update(body)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating campaign:', updateError);
+      return NextResponse.json({ error: 'Failed to update campaign' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, campaign });
+
+  } catch (error) {
+    console.error('Error in campaign PATCH:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

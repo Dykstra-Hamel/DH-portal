@@ -15,7 +15,7 @@ interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-type TabType = 'overview' | 'contacts' | 'executions' | 'report';
+type TabType = 'overview' | 'contacts' | 'executions';
 
 export default function CampaignDetailPage({ params }: CampaignDetailPageProps) {
   const router = useRouter();
@@ -196,12 +196,6 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
         >
           Executions ({metrics?.totalExecutions || 0})
         </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'report' ? styles.active : ''}`}
-          onClick={() => setActiveTab('report')}
-        >
-          Report
-        </button>
       </div>
 
       {/* Tab Content */}
@@ -227,13 +221,6 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
             companyId={selectedCompany?.id || ''}
             companyTimezone={companyTimezone}
           />
-        )}
-
-        {activeTab === 'report' && (
-          <div className={styles.comingSoon}>
-            <h3>Campaign Report</h3>
-            <p>Advanced analytics and reporting coming soon...</p>
-          </div>
         )}
       </div>
     </div>
