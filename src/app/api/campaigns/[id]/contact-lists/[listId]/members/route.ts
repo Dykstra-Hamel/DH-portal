@@ -19,15 +19,16 @@ export async function GET(
     // Use admin client for global admins to bypass RLS
     const queryClient = getSupabaseClient(isGlobalAdmin, supabase);
 
-    // Get contact list to verify it belongs to campaign
-    const { data: contactList } = await queryClient
-      .from('campaign_contact_lists')
-      .select('campaign_id')
-      .eq('id', listId)
+    // Verify the contact list is assigned to this campaign (new reusable system)
+    const { data: assignment } = await queryClient
+      .from('campaign_contact_list_assignments')
+      .select('contact_list_id')
+      .eq('campaign_id', campaignId)
+      .eq('contact_list_id', listId)
       .single();
 
-    if (!contactList || contactList.campaign_id !== campaignId) {
-      return NextResponse.json({ error: 'Contact list not found' }, { status: 404 });
+    if (!assignment) {
+      return NextResponse.json({ error: 'Contact list not found or not assigned to this campaign' }, { status: 404 });
     }
 
     // Get campaign to verify access
@@ -56,6 +57,7 @@ export async function GET(
     }
 
     // Get contact list members with customer details
+    // Filter by both contact_list_id AND campaign_id for reusable lists
     const { data: members, error } = await queryClient
       .from('campaign_contact_list_members')
       .select(`
@@ -69,10 +71,11 @@ export async function GET(
           first_name,
           last_name,
           email,
-          phone_number
+          phone
         )
       `)
       .eq('contact_list_id', listId)
+      .eq('campaign_id', campaignId)
       .order('added_at', { ascending: false });
 
     if (error) {

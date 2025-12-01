@@ -157,9 +157,6 @@ export function useNotifications() {
           if (status === 'SUBSCRIBED') {
             // Successfully subscribed, reset reconnect attempts
             reconnectAttempts = 0;
-            if (isDevelopment) {
-              console.log(`✅ Realtime notifications subscribed: ${channelName}`);
-            }
           } else if (status === 'CHANNEL_ERROR') {
             // Only log error once in development, not repeatedly
             if (isDevelopment && reconnectAttempts === 0) {

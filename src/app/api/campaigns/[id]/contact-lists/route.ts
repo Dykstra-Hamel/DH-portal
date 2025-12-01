@@ -45,56 +45,66 @@ export async function GET(
       }
     }
 
-    // Get contact lists with member counts
-    const { data: rawLists, error } = await queryClient
-      .from('campaign_contact_lists')
-      .select('*')
+    // Get contact lists from reusable contact lists via assignments
+    const { data: assignments, error: assignmentsError } = await queryClient
+      .from('campaign_contact_list_assignments')
+      .select('contact_list_id, assigned_at, contact_lists(*)')
       .eq('campaign_id', campaignId)
-      .order('created_at', { ascending: false });
+      .order('assigned_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching contact lists:', error);
+    if (assignmentsError) {
+      console.error('Error fetching contact list assignments:', assignmentsError);
       return NextResponse.json({ error: 'Failed to fetch contact lists' }, { status: 500 });
     }
 
-    if (!rawLists || rawLists.length === 0) {
+    if (!assignments || assignments.length === 0) {
       return NextResponse.json({ success: true, contactLists: [] });
     }
 
     // Add computed member counts for each list
     const contactListsWithCounts = await Promise.all(
-      rawLists.map(async (list: any) => {
+      assignments.map(async (assignment: any) => {
+        const list = assignment.contact_lists;
+        if (!list) return null;
+
         const { count: totalMembers } = await queryClient
           .from('campaign_contact_list_members')
           .select('id', { count: 'exact', head: true })
-          .eq('contact_list_id', list.id);
+          .eq('contact_list_id', list.id)
+          .eq('campaign_id', campaignId);
 
         const { count: pendingCount } = await queryClient
           .from('campaign_contact_list_members')
           .select('id', { count: 'exact', head: true })
           .eq('contact_list_id', list.id)
+          .eq('campaign_id', campaignId)
           .eq('status', 'pending');
 
         const { count: processingCount } = await queryClient
           .from('campaign_contact_list_members')
           .select('id', { count: 'exact', head: true })
           .eq('contact_list_id', list.id)
+          .eq('campaign_id', campaignId)
           .eq('status', 'processing');
 
         const { count: processedCount } = await queryClient
           .from('campaign_contact_list_members')
           .select('id', { count: 'exact', head: true })
           .eq('contact_list_id', list.id)
+          .eq('campaign_id', campaignId)
           .eq('status', 'processed');
 
         const { count: failedCount } = await queryClient
           .from('campaign_contact_list_members')
           .select('id', { count: 'exact', head: true })
           .eq('contact_list_id', list.id)
+          .eq('campaign_id', campaignId)
           .eq('status', 'failed');
 
         return {
           ...list,
+          list_name: list.name, // Maintain backward compatibility with old field name
+          total_contacts: list.total_contacts,
           total_members: totalMembers || 0,
           pending_count: pendingCount || 0,
           processing_count: processingCount || 0,
@@ -104,7 +114,10 @@ export async function GET(
       })
     );
 
-    return NextResponse.json({ success: true, contactLists: contactListsWithCounts });
+    // Filter out null entries
+    const validLists = contactListsWithCounts.filter(list => list !== null);
+
+    return NextResponse.json({ success: true, contactLists: validLists });
 
   } catch (error) {
     console.error('Error in contact lists GET:', error);

@@ -29,7 +29,6 @@ export const campaignSchedulerHandler = inngest.createFunction(
           name,
           workflow_id,
           start_datetime,
-          end_datetime,
           target_audience_type,
           audience_filter_criteria,
           respect_business_hours,
@@ -79,24 +78,39 @@ export const campaignSchedulerHandler = inngest.createFunction(
         }
 
         // Validate campaign has contact lists before starting
-        const { data: contactLists } = await supabase
-          .from('campaign_contact_lists')
-          .select('id')
+        // Check new reusable contact lists system first
+        const { data: assignments } = await supabase
+          .from('campaign_contact_list_assignments')
+          .select('contact_list_id')
           .eq('campaign_id', campaign.id);
 
-        if (!contactLists || contactLists.length === 0) {
-          console.error(`Campaign ${campaign.id} has no contact lists - cannot start`);
+        let contactListIds: string[] = [];
 
-          // Set back to draft status - campaign is incomplete
-          await supabase
-            .from('campaigns')
-            .update({ status: 'draft' })
-            .eq('id', campaign.id);
+        if (!assignments || assignments.length === 0) {
+          // Fall back to old system for backward compatibility
+          const { data: oldLists } = await supabase
+            .from('campaign_contact_lists')
+            .select('id')
+            .eq('campaign_id', campaign.id);
 
-          return {
-            success: false,
-            reason: 'No contact lists - moved back to draft'
-          };
+          if (!oldLists || oldLists.length === 0) {
+            console.error(`Campaign ${campaign.id} has no contact lists - cannot start`);
+
+            // Set back to draft status - campaign is incomplete
+            await supabase
+              .from('campaigns')
+              .update({ status: 'draft' })
+              .eq('id', campaign.id);
+
+            return {
+              success: false,
+              reason: 'No contact lists - moved back to draft'
+            };
+          }
+
+          contactListIds = oldLists.map(l => l.id);
+        } else {
+          contactListIds = assignments.map(a => a.contact_list_id);
         }
 
         // Update campaign status to running
@@ -119,8 +133,9 @@ export const campaignSchedulerHandler = inngest.createFunction(
             customer_id,
             lead_id
           `)
-          .in('contact_list_id', contactLists.map(l => l.id))
-          .eq('status', 'pending');
+          .in('contact_list_id', contactListIds)
+          .eq('status', 'pending')
+          .eq('campaign_id', campaign.id);
 
         if (!contacts || contacts.length === 0) {
           console.warn(`Campaign ${campaign.id} has no pending contacts`);
@@ -441,15 +456,14 @@ export const campaignProcessContactsHandler = inngest.createFunction(
 
       const { data: campaign } = await supabase
         .from('campaigns')
-        .select('processed_contacts, total_contacts, end_datetime')
+        .select('processed_contacts, total_contacts')
         .eq('id', campaignId)
         .single();
 
       if (campaign) {
         const allProcessed = campaign.processed_contacts >= campaign.total_contacts;
-        const endDatePassed = campaign.end_datetime && new Date(campaign.end_datetime) < new Date();
 
-        if (allProcessed || endDatePassed) {
+        if (allProcessed) {
           await supabase
             .from('campaigns')
             .update({ status: 'completed' })
@@ -481,15 +495,15 @@ export const campaignWorkflowCompletionHandler = inngest.createFunction(
     await step.run('update-campaign-member-status', async () => {
       const supabase = createAdminClient();
 
-      // Get execution details
-      const { data: execution } = await supabase
-        .from('automation_executions')
-        .select('execution_status, execution_data')
-        .eq('id', executionId)
+      // Get campaign execution details
+      const { data: campaignExecution } = await supabase
+        .from('campaign_executions')
+        .select('execution_status, campaign_id')
+        .eq('automation_execution_id', executionId)
         .single();
 
-      if (!execution || !execution.execution_data?.campaignId) {
-        return { success: false, reason: 'Not a campaign execution' };
+      if (!campaignExecution) {
+        return { success: false, reason: 'Campaign execution not found' };
       }
 
       // Find the member record
@@ -503,8 +517,8 @@ export const campaignWorkflowCompletionHandler = inngest.createFunction(
         return { success: false, reason: 'Member not found' };
       }
 
-      // Update member status based on execution result
-      const newStatus = execution.execution_status === 'completed' ? 'processed' : 'failed';
+      // Update member status based on campaign execution result
+      const newStatus = campaignExecution.execution_status === 'completed' ? 'processed' : 'failed';
 
       await supabase
         .from('campaign_contact_list_members')
@@ -514,14 +528,60 @@ export const campaignWorkflowCompletionHandler = inngest.createFunction(
         })
         .eq('id', member.id);
 
-      // Update campaign execution status
+      // Ensure campaign execution has completed_at timestamp
       await supabase
         .from('campaign_executions')
         .update({
-          execution_status: execution.execution_status,
           completed_at: new Date().toISOString(),
         })
-        .eq('automation_execution_id', executionId);
+        .eq('automation_execution_id', executionId)
+        .is('completed_at', null);
+
+      // Update campaign counters
+      const { data: allMembers } = await supabase
+        .from('campaign_contact_list_members')
+        .select('status')
+        .eq('campaign_id', campaignExecution.campaign_id);
+
+      if (allMembers) {
+        const processed = allMembers.filter((m: any) => ['processed', 'failed'].includes(m.status)).length;
+        const successful = allMembers.filter((m: any) => m.status === 'processed').length;
+        const failed = allMembers.filter((m: any) => m.status === 'failed').length;
+
+        await supabase
+          .from('campaigns')
+          .update({
+            processed_contacts: processed,
+            successful_contacts: successful,
+            failed_contacts: failed,
+          })
+          .eq('id', campaignExecution.campaign_id);
+
+        // Check if campaign is now complete
+        const { data: updatedCampaign } = await supabase
+          .from('campaigns')
+          .select('processed_contacts, total_contacts, status')
+          .eq('id', campaignExecution.campaign_id)
+          .single();
+
+        if (updatedCampaign && updatedCampaign.status === 'running') {
+          const allProcessed = updatedCampaign.processed_contacts >= updatedCampaign.total_contacts;
+
+          if (allProcessed) {
+            const { error: statusUpdateError } = await supabase
+              .from('campaigns')
+              .update({
+                status: 'completed',
+                end_datetime: new Date().toISOString()
+              })
+              .eq('id', campaignExecution.campaign_id);
+
+            if (statusUpdateError) {
+              console.error(`Failed to mark campaign as completed:`, statusUpdateError);
+            }
+          }
+        }
+      }
 
       return { success: true, status: newStatus };
     });

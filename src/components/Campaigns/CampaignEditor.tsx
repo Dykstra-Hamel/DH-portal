@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Plus } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import styles from './CampaignEditor.module.scss';
 import WorkflowSelector from './WorkflowSelector';
 import ContactListUpload from './ContactListUpload';
@@ -38,7 +40,6 @@ export default function CampaignEditor({
     campaign_id: '',
     discount_id: '',
     start_datetime: '',
-    end_datetime: '',
     workflow_id: '',
     daily_limit: 500,
     respect_business_hours: true,
@@ -50,6 +51,10 @@ export default function CampaignEditor({
   const [discounts, setDiscounts] = useState<any[]>([]);
   const [campaignIdValidating, setCampaignIdValidating] = useState(false);
   const [campaignIdAvailable, setCampaignIdAvailable] = useState<
+    boolean | null
+  >(null);
+  const [campaignNameValidating, setCampaignNameValidating] = useState(false);
+  const [campaignNameAvailable, setCampaignNameAvailable] = useState<
     boolean | null
   >(null);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -131,6 +136,34 @@ export default function CampaignEditor({
     }
   };
 
+  const validateCampaignName = async (name: string) => {
+    if (!name.trim()) {
+      setCampaignNameAvailable(null);
+      return;
+    }
+
+    setCampaignNameValidating(true);
+    try {
+      const response = await fetch('/api/campaigns/validate-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          company_id: companyId,
+          exclude_campaign_id: campaign?.id,
+        }),
+      });
+
+      const result = await response.json();
+      setCampaignNameAvailable(result.available);
+    } catch (error) {
+      console.error('Error validating campaign name:', error);
+      setCampaignNameAvailable(null);
+    } finally {
+      setCampaignNameValidating(false);
+    }
+  };
+
   useEffect(() => {
     if (campaign) {
       setFormData({
@@ -139,19 +172,49 @@ export default function CampaignEditor({
         campaign_id: campaign.campaign_id || '',
         discount_id: campaign.discount_id || '',
         start_datetime: campaign.start_datetime || '',
-        end_datetime: campaign.end_datetime || '',
         workflow_id: campaign.workflow_id || '',
         daily_limit: campaign.daily_limit || 500,
         respect_business_hours: campaign.respect_business_hours ?? true,
       });
       setSelectedWorkflow(campaign.workflow);
       setEstimatedDays(campaign.estimated_days || null);
-      // Mark campaign ID as available if editing existing campaign
+      // Mark campaign ID and name as available if editing existing campaign
       if (campaign.campaign_id) {
         setCampaignIdAvailable(true);
       }
+      if (campaign.name) {
+        setCampaignNameAvailable(true);
+      }
     }
   }, [campaign]);
+
+  // Debounced validation for campaign name
+  useEffect(() => {
+    if (!formData.name.trim()) {
+      setCampaignNameAvailable(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      validateCampaignName(formData.name);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.name]);
+
+  // Debounced validation for campaign ID
+  useEffect(() => {
+    if (!formData.campaign_id.trim()) {
+      setCampaignIdAvailable(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      validateCampaignId(formData.campaign_id);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.campaign_id]);
 
   // Calculate estimated days when contacts or daily limit changes
   useEffect(() => {
@@ -205,15 +268,39 @@ export default function CampaignEditor({
     }
   };
 
+  // Convert datetime-local string to Date object for DatePicker
+  const parseDateTime = (datetimeLocal: string): Date | null => {
+    if (!datetimeLocal) return null;
+    return new Date(datetimeLocal);
+  };
+
+  // Convert Date object to datetime-local string for storage
+  const formatDateTime = (date: Date | null): string => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   // Convert datetime-local input (which is in company timezone) to ISO string for UTC storage
   const convertToUTC = (datetimeLocal: string): string => {
     if (!datetimeLocal) return '';
 
-    // Parse the datetime-local value as if it's in the company timezone
-    // Format: "2025-11-20T14:45" → treat as company time → convert to UTC ISO string
-    const date = new Date(datetimeLocal);
+    // Format: "2025-11-26T10:30"
+    // This represents 10:30 AM in the company timezone, not browser timezone
 
-    // Get the timezone offset for the company timezone
+    // Parse the datetime-local string
+    const [datePart, timePart] = datetimeLocal.split('T');
+    const [year, month, day] = datePart.split('-');
+    const [hour, minute] = timePart.split(':');
+
+    // The trick: create a date string that will be interpreted in the company timezone
+    // Format it as an ISO string with explicit timezone indicator
+    // First, create a formatter to get the timezone offset
+    const date = new Date();
     const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: companyTimezone,
       year: 'numeric',
@@ -223,33 +310,38 @@ export default function CampaignEditor({
       minute: '2-digit',
       second: '2-digit',
       hour12: false,
+      timeZoneName: 'longOffset',
     });
 
-    const parts = formatter.formatToParts(date);
-    const getValue = (type: string) =>
-      parts.find(p => p.type === type)?.value || '';
+    // Use the input date/time to create a reference point
+    const referenceDate = new Date(
+      `${year}-${month}-${day}T${hour}:${minute}:00Z`
+    ); // Parse as UTC
 
-    // Create a date string in company timezone
-    const companyDateStr = `${getValue('year')}-${getValue('month')}-${getValue('day')}T${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
+    // Format this reference date in the company timezone
+    const parts = formatter.formatToParts(referenceDate);
+    const tzOffset = parts.find(p => p.type === 'timeZoneName')?.value || 'UTC';
 
-    // This datetime-local value represents the user's intent in company time
-    // We need to interpret the INPUT as company time, not system time
-    const [datePart, timePart] = datetimeLocal.split('T');
-    const companyDate = new Date(`${datePart}T${timePart}:00`);
+    // Parse the offset (e.g., "GMT-5" -> -5 hours)
+    const offsetMatch = tzOffset.match(/GMT([+-]\d+)/);
+    const offsetHours = offsetMatch ? parseInt(offsetMatch[1]) : 0;
 
-    // Get offset between company timezone and UTC
+    // Create the correct UTC time by adding the timezone offset
     const utcDate = new Date(
-      companyDate.toLocaleString('en-US', { timeZone: 'UTC' })
+      Date.UTC(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(hour),
+        parseInt(minute),
+        0
+      )
     );
-    const tzDate = new Date(
-      companyDate.toLocaleString('en-US', { timeZone: companyTimezone })
-    );
-    const offset = tzDate.getTime() - utcDate.getTime();
 
-    // Apply offset to get correct UTC time
-    const correctedDate = new Date(companyDate.getTime() - offset);
+    // Adjust by subtracting the timezone offset (convert company time to UTC)
+    utcDate.setHours(utcDate.getHours() - offsetHours);
 
-    return correctedDate.toISOString();
+    return utcDate.toISOString();
   };
 
   const handleSave = async () => {
@@ -258,6 +350,20 @@ export default function CampaignEditor({
       setError(null);
 
       // Validation: Ensure campaign is complete
+      if (!formData.name.trim()) {
+        setError('Please enter a campaign name');
+        setSaving(false);
+        return;
+      }
+
+      if (campaignNameAvailable === false) {
+        setError(
+          'Campaign name is already in use. Please choose a different name.'
+        );
+        setSaving(false);
+        return;
+      }
+
       if (!formData.workflow_id) {
         setError('Please select a workflow before saving');
         setSaving(false);
@@ -276,9 +382,7 @@ export default function CampaignEditor({
         return;
       }
 
-      const url = campaign
-        ? `/api/campaigns/${campaign.id}`
-        : '/api/campaigns';
+      const url = campaign ? `/api/campaigns/${campaign.id}` : '/api/campaigns';
 
       const method = campaign ? 'PUT' : 'POST';
 
@@ -286,9 +390,6 @@ export default function CampaignEditor({
       const payload = {
         ...formData,
         start_datetime: convertToUTC(formData.start_datetime),
-        end_datetime: formData.end_datetime
-          ? convertToUTC(formData.end_datetime)
-          : '',
         company_id: companyId,
         total_contacts: totalContacts,
       };
@@ -305,40 +406,44 @@ export default function CampaignEditor({
         throw new Error(result.error || 'Failed to save campaign');
       }
 
-      // If creating a new campaign, upload temporary contact lists
+      // If creating a new campaign, assign ALL contact lists
       if (!campaign && result.campaign?.id) {
         const newCampaignId = result.campaign.id;
 
-        // Upload each temporary contact list
-        for (const list of contactLists.filter(l => l.isTemporary)) {
+        // Assign ALL contact lists to the campaign
+        // This includes both:
+        // - Pre-existing lists that were selected (marked with isExisting)
+        // - Newly uploaded lists that were just created (no isExisting flag)
+        for (const list of contactLists) {
           try {
-            const uploadResponse = await fetch(
-              `/api/campaigns/${newCampaignId}/contact-lists/upload`,
+            const assignResponse = await fetch(
+              `/api/campaigns/${newCampaignId}/contact-lists/assign`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  listName: list.list_name,
-                  parsedData: list.parsedData,
+                  contact_list_id: list.id,
                 }),
               }
             );
 
-            const uploadResult = await uploadResponse.json();
+            const assignResult = await assignResponse.json();
 
-            if (!uploadResult.success) {
+            if (!assignResult.success) {
               console.error(
-                `Failed to upload contact list "${list.list_name}":`,
-                uploadResult.error
+                `Failed to assign contact list "${list.name || list.list_name}":`,
+                assignResult.error
               );
             }
-          } catch (uploadErr) {
+          } catch (assignErr) {
             console.error(
-              `Error uploading contact list "${list.list_name}":`,
-              uploadErr
+              `Error assigning contact list "${list.name || list.list_name}":`,
+              assignErr
             );
           }
         }
+
+        // All lists (both pre-existing and newly uploaded) are now assigned
       }
 
       // Show success message based on start time
@@ -354,7 +459,7 @@ export default function CampaignEditor({
           year: 'numeric',
           hour: 'numeric',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
         });
         console.log(`Campaign scheduled to start on ${formattedDate}`);
       } else {
@@ -380,7 +485,6 @@ export default function CampaignEditor({
       campaign_id: '',
       discount_id: '',
       start_datetime: '',
-      end_datetime: '',
       workflow_id: '',
       daily_limit: 500,
       respect_business_hours: true,
@@ -446,6 +550,22 @@ export default function CampaignEditor({
                   }
                   placeholder="e.g., Spring Promotion 2024"
                 />
+                {campaignNameValidating && (
+                  <small style={{ color: '#666' }}>
+                    Checking availability...
+                  </small>
+                )}
+                {!campaignNameValidating &&
+                  campaignNameAvailable === true &&
+                  formData.name && (
+                    <small style={{ color: '#22c55e' }}>✓ Available</small>
+                  )}
+                {!campaignNameValidating && campaignNameAvailable === false && (
+                  <small style={{ color: '#ef4444' }}>
+                    ✗ This campaign name is already in use. Please choose a
+                    unique name.
+                  </small>
+                )}
               </div>
 
               <div className={styles.formGroup}>
@@ -470,7 +590,6 @@ export default function CampaignEditor({
                       .toUpperCase()
                       .replace(/[^A-Z0-9]/g, '');
                     setFormData({ ...formData, campaign_id: value });
-                    validateCampaignId(value);
                   }}
                   placeholder="e.g., PEST26"
                   maxLength={50}
@@ -525,33 +644,23 @@ export default function CampaignEditor({
                 <small>Select a discount to apply to this campaign</small>
               </div>
 
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <label>Start Date & Time *</label>
-                  <input
-                    type="datetime-local"
-                    step="900"
-                    value={formData.start_datetime}
-                    onChange={e =>
-                      setFormData({
-                        ...formData,
-                        start_datetime: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>End Date & Time (Optional)</label>
-                  <input
-                    type="datetime-local"
-                    step="900"
-                    value={formData.end_datetime}
-                    onChange={e =>
-                      setFormData({ ...formData, end_datetime: e.target.value })
-                    }
-                  />
-                </div>
+              <div className={styles.formGroup}>
+                <label>Start Date & Time *</label>
+                <DatePicker
+                  selected={parseDateTime(formData.start_datetime)}
+                  onChange={(date: Date | null) => {
+                    setFormData({
+                      ...formData,
+                      start_datetime: formatDateTime(date),
+                    });
+                  }}
+                  showTimeSelect
+                  timeIntervals={15}
+                  timeFormat="h:mm aa"
+                  dateFormat="MMMM d, yyyy h:mm aa"
+                  placeholderText="Select date and time"
+                  className={styles.datePickerInput}
+                />
               </div>
             </div>
           )}
@@ -661,17 +770,11 @@ export default function CampaignEditor({
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Start:</span>
                   <span className={styles.reviewValue}>
-                    {new Date(formData.start_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
+                    {new Date(formData.start_datetime).toLocaleString('en-US', {
+                      timeZone: companyTimezone,
+                    })}
                   </span>
                 </div>
-                {formData.end_datetime && (
-                  <div className={styles.reviewItem}>
-                    <span className={styles.reviewLabel}>End:</span>
-                    <span className={styles.reviewValue}>
-                      {new Date(formData.end_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
-                    </span>
-                  </div>
-                )}
               </div>
 
               <div className={styles.reviewGroup}>

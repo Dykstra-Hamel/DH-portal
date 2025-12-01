@@ -209,6 +209,9 @@ export const workflowExecuteHandler = inngest.createFunction(
             case 'send_sms':
               result = await executeSMSStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
               break;
+            case 'make_call':
+              result = await executeMakeCallStep(currentStep, leadData, companyId, leadId, customerId, executionId);
+              break;
             case 'delay':
             case 'wait':
               result = await executeDelayStep(currentStep);
@@ -232,6 +235,8 @@ export const workflowExecuteHandler = inngest.createFunction(
           };
           
           // Update execution progress
+          const newStatus = result?.success === false && currentStep.critical ? 'failed' : 'running';
+
           await supabase
             .from('automation_executions')
             .update({
@@ -241,23 +246,44 @@ export const workflowExecuteHandler = inngest.createFunction(
                 stepIndex: stepIndex + 1,
                 stepResults: [...stepResults, stepData]
               },
-              execution_status: result?.success === false && currentStep.critical ? 'failed' : 'running'
+              execution_status: newStatus
             })
             .eq('id', executionId);
+
+          // Sync campaign_executions status if this is a campaign execution
+          if (triggerType === 'campaign') {
+            await supabase
+              .from('campaign_executions')
+              .update({ execution_status: newStatus })
+              .eq('automation_execution_id', executionId);
+          }
             
           return result;
           
         } catch (error) {
           console.error(`Error executing step ${stepIndex}:`, error);
-          
+
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
           await supabase
             .from('automation_executions')
             .update({
               execution_status: 'failed',
               completed_at: new Date().toISOString(),
-              error_message: error instanceof Error ? error.message : 'Unknown error'
+              error_message: errorMessage
             })
             .eq('id', executionId);
+
+          // Sync campaign_executions status if this is a campaign execution
+          if (triggerType === 'campaign') {
+            await supabase
+              .from('campaign_executions')
+              .update({
+                execution_status: 'failed',
+                completed_at: new Date().toISOString()
+              })
+              .eq('automation_execution_id', executionId);
+          }
             
           throw error;
         }
@@ -394,12 +420,36 @@ export const workflowExecuteHandler = inngest.createFunction(
         })
         .eq('id', executionId)
         .neq('execution_status', 'cancelled'); // Extra safety - don't update if cancelled
-        
+
       if (updateError) {
         console.error('Error marking workflow as completed:', updateError);
         throw new Error(`Failed to mark execution as completed: ${updateError.message}`);
       }
-      
+
+      // Sync campaign_executions status if this is a campaign execution
+      if (triggerType === 'campaign') {
+        await supabase
+          .from('campaign_executions')
+          .update({
+            execution_status: 'completed',
+            completed_at: new Date().toISOString()
+          })
+          .eq('automation_execution_id', executionId)
+          .neq('execution_status', 'cancelled');
+      }
+
+      // Send workflow completion event for campaign tracking
+      await inngest.send({
+        name: 'workflow/completed',
+        data: {
+          executionId,
+          workflowId,
+          companyId,
+          triggerType,
+          success: true,
+        },
+      });
+
       return { completed: true };
     });
     
@@ -1157,5 +1207,169 @@ async function executeUpdateLeadStatusStep(step: any, leadId: string, companyId:
     statusUpdated: true,
     newStatus: step.new_status,
     leadId,
+  };
+}
+
+// Helper function to execute make call steps
+async function executeMakeCallStep(
+  step: any,
+  leadData: any,
+  companyId: string,
+  leadId: string,
+  customerId: string,
+  executionId: string
+) {
+  const supabase = createAdminClient();
+
+  // Validate agent_id is provided
+  if (!step.agent_id) {
+    throw new Error('Agent ID is required for make_call step');
+  }
+
+  // Get the agent configuration
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('*')
+    .eq('agent_id', step.agent_id)
+    .eq('company_id', companyId)
+    .eq('agent_type', 'calling')
+    .eq('agent_direction', 'outbound')
+    .eq('is_active', true)
+    .single();
+
+  if (agentError || !agent) {
+    throw new Error(`Outbound calling agent not found or inactive: ${step.agent_id}`);
+  }
+
+  if (!agent.phone_number) {
+    throw new Error(`Agent ${agent.agent_name} has no phone number configured`);
+  }
+
+  // Get Retell API key from company settings
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('setting_value')
+    .eq('company_id', companyId)
+    .eq('setting_key', 'retell_api_key')
+    .single();
+
+  if (!settings?.setting_value) {
+    throw new Error('Retell API key not configured for company');
+  }
+
+  // Get customer and lead details
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('id', customerId)
+    .single();
+
+  if (!customer) {
+    throw new Error('Customer not found');
+  }
+
+  if (!customer.phone) {
+    throw new Error('Customer phone number is required for calls');
+  }
+
+  // Get company info
+  const { data: company } = await supabase
+    .from('companies')
+    .select('name, website')
+    .eq('id', companyId)
+    .single();
+
+  // Get lead info
+  const { data: lead } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', leadId)
+    .single();
+
+  // Apply delay if specified
+  if (step.delay_minutes && step.delay_minutes > 0) {
+    await new Promise(resolve => setTimeout(resolve, step.delay_minutes * 60 * 1000));
+  }
+
+  // Format phone number
+  const cleanPhone = customer.phone.replace(/\D/g, '');
+  const formattedPhone = cleanPhone.startsWith('+') ? cleanPhone : `+1${cleanPhone}`;
+
+  // Prepare call payload
+  const callPayload = {
+    from_number: agent.phone_number,
+    to_number: formattedPhone,
+    agent_id: agent.agent_id,
+    retell_llm_dynamic_variables: {
+      customer_first_name: customer.first_name || '',
+      customer_last_name: customer.last_name || '',
+      customer_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
+      customer_email: customer.email || '',
+      customer_comments: lead?.comments || '',
+      customer_pest_problem: lead?.pest_type || '',
+      customer_urgency: lead?.urgency || '',
+      customer_street_address: customer.street_address || '',
+      customer_city: customer.city || '',
+      customer_state: customer.state || '',
+      customer_zip: customer.zip_code || '',
+      company_id: String(companyId),
+      company_name: company?.name || '',
+      company_url: (Array.isArray(company?.website) ? company.website[0] : company?.website) || 'https://example.com',
+      is_follow_up: 'false',
+      lead_id: String(leadId),
+      execution_id: String(executionId),
+    },
+  };
+
+  // Make the call using Retell API
+  const callResponse = await fetch('https://api.retellai.com/v2/create-phone-call', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${settings.setting_value}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(callPayload),
+  });
+
+  if (!callResponse.ok) {
+    const errorText = await callResponse.text();
+    throw new Error(`Retell API error: ${callResponse.status} - ${errorText}`);
+  }
+
+  const callResult = await callResponse.json();
+
+  // Log the call in call_automation_log if table exists
+  try {
+    await supabase.from('call_automation_log').insert({
+      execution_id: executionId,
+      company_id: companyId,
+      lead_id: leadId,
+      call_id: callResult.call_id,
+      call_type: 'workflow',
+      call_status: callResult.call_status || 'calling',
+      attempted_at: new Date().toISOString(),
+      retell_variables: callPayload.retell_llm_dynamic_variables,
+    });
+  } catch (logError) {
+    console.error('Failed to log call in call_automation_log:', logError);
+    // Don't throw - call was successful even if logging failed
+  }
+
+  // Update lead status to contacted
+  await supabase
+    .from('leads')
+    .update({
+      lead_status: 'contacted',
+      last_contacted_at: new Date().toISOString(),
+    })
+    .eq('id', leadId);
+
+  return {
+    success: true,
+    callInitiated: true,
+    callId: callResult.call_id,
+    callStatus: callResult.call_status,
+    agentName: agent.agent_name,
+    phoneNumber: formattedPhone,
   };
 }
