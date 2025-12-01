@@ -5,7 +5,7 @@
 🔨 Building widget from source files...
 ✅ Build complete!
 📁 Output: /Users/austin/Desktop/dh-sites/software/DH-portal/public/widget/embed.js
-📊 Size: 357KB (original: 0KB)
+📊 Size: 356KB (original: 0KB)
 🏗️ Source files: 9 modular files combined
 
 🎯 PRODUCTION READY:
@@ -21,7 +21,7 @@
    - Environments: .env.local, .env.production
 
    Creating an optimized production build ...
- ⚠ Compiled with warnings in 5.0s
+ ⚠ Compiled with warnings in 17.0s
 
 ./src/components/Tickets/TicketContent/CallDetails.module.scss
 Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CallDetails.module.scss:1:8:
@@ -39,8 +39,7 @@ Import trace for requested module:
 ./src/components/Tickets/TicketContent/index.ts
 ./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
 ./src/components/Tickets/TicketReviewModal/index.ts
-./src/components/Tickets/TicketsList/TicketsList.tsx
-./src/app/connections/tickets/page.tsx
+./src/app/connections/incoming/page.tsx
 
 ./src/components/Tickets/TicketContent/CallInsights.module.scss
 Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CallInsights.module.scss:1:8:
@@ -58,8 +57,7 @@ Import trace for requested module:
 ./src/components/Tickets/TicketContent/index.ts
 ./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
 ./src/components/Tickets/TicketReviewModal/index.ts
-./src/components/Tickets/TicketsList/TicketsList.tsx
-./src/app/connections/tickets/page.tsx
+./src/app/connections/incoming/page.tsx
 
 ./src/components/Tickets/TicketContent/CustomerInformation.module.scss
 Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CustomerInformation.module.scss:1:8:
@@ -74,17 +72,81 @@ src/components/Tickets/TicketContent/CustomerInformation.module.scss 2:9  root s
 Import trace for requested module:
 ./src/components/Tickets/TicketContent/CustomerInformation.module.scss
 ./src/components/Tickets/TicketContent/CustomerInformation.tsx
+./src/components/Common/LeadStepContent/LeadStepContent.tsx
+./src/app/connections/leads/[id]/page.tsx
+
+./src/components/Tickets/TicketContent/ServiceLocation.module.scss
+Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/ServiceLocation.module.scss:1:8:
+Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.
+
+More info and automated migrator: https://sass-lang.com/d/import
+
+1 | @import './SharedSection.module.scss';
+
+src/components/Tickets/TicketContent/ServiceLocation.module.scss 2:9  root stylesheet
+
+Import trace for requested module:
+./src/components/Tickets/TicketContent/ServiceLocation.module.scss
+./src/components/Tickets/TicketContent/ServiceLocation.tsx
 ./src/components/Tickets/TicketContent/index.ts
 ./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
 ./src/components/Tickets/TicketReviewModal/index.ts
-./src/components/Tickets/TicketsList/TicketsList.tsx
-./src/app/connections/tickets/page.tsx
+./src/app/connections/incoming/page.tsx
 
- ✓ Compiled successfully in 6.0s
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (108kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled successfully in 21.0s
    Linting and checking validity of types ...
 
-./src/components/Admin/GlobalWidgetDomains.tsx
-212:6  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+./src/app/(protected)/campaigns/[id]/page.tsx
+47:6  Warning: React Hook useEffect has missing dependencies: 'fetchCampaignData', 'fetchCompanyTimezone', and 'setupRealtimeSubscription'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/campaigns/page.tsx
+62:6  Warning: React Hook useEffect has missing dependencies: 'fetchCampaigns' and 'fetchCompanyTimezone'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/contact-lists/page.tsx
+34:6  Warning: React Hook useEffect has a missing dependency: 'fetchLists'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/connections/incoming/page.tsx
+515:5  Warning: React Hook useCallback has a missing dependency: 'tickets'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+592:5  Warning: React Hook useCallback has an unnecessary dependency: 'fetchMetrics'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+681:5  Warning: React Hook useCallback has an unnecessary dependency: 'fetchMetrics'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+947:6  Warning: React Hook useEffect has a missing dependency: 'refetchTabCounts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/connections/my-sales-leads/page.tsx
+58:6  Warning: React Hook useEffect has a missing dependency: 'fetchMyLeads'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/connections/my-support-cases/page.tsx
+59:6  Warning: React Hook useEffect has a missing dependency: 'fetchMySupportCases'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/connections/my-tasks/page.tsx
+100:6  Warning: React Hook useEffect has a missing dependency: 'fetchMyTasks'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/AI/InsightsPanel.tsx
+37:6  Warning: React Hook useEffect has a missing dependency: 'fetchInsights'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/AI/PestPressure/AdminControls.tsx
+64:6  Warning: React Hook useEffect has a missing dependency: 'loadStats'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/AI/PestPressure/PestPressureDashboard.tsx
+37:6  Warning: React Hook useEffect has a missing dependency: 'fetchPestPressurePredictions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/AI/PredictionsChart.tsx
+45:6  Warning: React Hook useEffect has a missing dependency: 'fetchPredictions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/DiscountManager.tsx
+26:6  Warning: React Hook useEffect has a missing dependency: 'fetchDiscounts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/DiscountModal.tsx
+59:6  Warning: React Hook useEffect has a missing dependency: 'fetchServicePlans'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/PricingSettingsManager.tsx
+31:6  Warning: React Hook useEffect has a missing dependency: 'loadSettings'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/SalesConfigManager.tsx
+31:6  Warning: React Hook useEffect has a missing dependency: 'loadCadences'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/TestCalling.tsx
+33:6  Warning: React Hook useEffect has a missing dependency: 'loadOutboundAgents'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
 
 ./src/components/Agents/AgentsList.tsx
 33:6  Warning: React Hook useEffect has a missing dependency: 'fetchAgents'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
@@ -98,218 +160,136 @@ Import trace for requested module:
 ./src/components/Automation/AutomationSettings.tsx
 698:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
 
-./src/components/Common/LiveCallBar/LiveCallBar.tsx
-470:6  Warning: React Hook useMemo has an unnecessary dependency: 'currentTime'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+./src/components/Brand/Brand.tsx
+1020:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Campaigns/CampaignContacts.tsx
+36:6  Warning: React Hook useEffect has a missing dependency: 'fetchContactLists'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/CampaignEditor.tsx
+70:6  Warning: React Hook useEffect has missing dependencies: 'fetchCompanyTimezone' and 'fetchDiscounts'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+203:6  Warning: React Hook useEffect has a missing dependency: 'validateCampaignName'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+217:6  Warning: React Hook useEffect has a missing dependency: 'validateCampaignId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/CampaignExecutions.tsx
+45:6  Warning: React Hook useEffect has a missing dependency: 'fetchExecutions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/CampaignLeads.tsx
+23:6  Warning: React Hook useEffect has a missing dependency: 'fetchLeads'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/CampaignSchedulePreview.tsx
+63:6  Warning: React Hook useEffect has missing dependencies: 'fetchSchedulePreview' and 'generateSimplePreview'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/ContactListUpload.tsx
+56:6  Warning: React Hook useEffect has missing dependencies: 'fetchAvailableLists' and 'fetchSelectedLists'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+64:6  Warning: React Hook useEffect has a missing dependency: 'onListsChange'. Either include it or remove the dependency array. If 'onListsChange' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/ContactMembersModal.tsx
+35:6  Warning: React Hook useEffect has a missing dependency: 'fetchMembers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/WorkflowSelector.tsx
+29:6  Warning: React Hook useEffect has a missing dependency: 'fetchWorkflows'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Common/ActivityFeed/ActivityFeed.tsx
+29:6  Warning: React Hook useEffect has missing dependencies: 'loadActivities' and 'subscribeToActivities'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Common/ContactInformationCard/ContactInformationCard.tsx
+333:33  Warning: The ref value 'timeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'timeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+334:40  Warning: The ref value 'successTimeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'successTimeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/Common/LeadStepContent/LeadStepContent.tsx
+764:6  Warning: React Hook useEffect has a missing dependency: 'serviceSelections'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Common/ReadyToScheduleModal/ReadyToScheduleModal.tsx
+224:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+262:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+313:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Common/SalesCadenceCard/SalesCadenceCard.tsx
+95:6  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/ContactLists/ContactListModal.tsx
+35:6  Warning: React Hook useEffect has a missing dependency: 'fetchListDetails'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Layout/Breadcrumbs/Breadcrumbs.tsx
+373:6  Warning: React Hook useEffect has a missing dependency: 'isAdmin'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
 
 ./src/components/Layout/GlobalHeader/CompanyDropdown/GlobalCompanyDropdown.tsx
-76:9  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
-
-./src/components/Layout/SearchBar/SearchBar.tsx
-57:6  Warning: React Hook useEffect has a missing dependency: 'performSearch'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+101:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
 
 ./src/components/Layout/UserAvatar/UserAvatar.tsx
 176:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
 202:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
 
+./src/components/Projects/ProjectDetail/ProjectDetail.tsx
+193:6  Warning: React Hook React.useEffect has a missing dependency: 'fetchComments'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Quote/QuoteSteps/QuoteSteps.tsx
+222:6  Warning: React Hook useEffect has a missing dependency: 'quote.service_address'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+373:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+643:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+690:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+779:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+826:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+921:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+938:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+1318:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/TaskManagement/TaskListView/TaskListView.tsx
+56:6  Warning: React Hook useMemo has a missing dependency: 'getProjectForTask'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/TaskManagement/shared/UserAvatar.tsx
+39:9  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Tasks/TaskForm/TaskForm.tsx
+50:6  Warning: React Hook useEffect has a missing dependency: 'loadRelatedEntities'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+131:6  Warning: React Hook useEffect has a missing dependency: 'validateForm'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Tasks/TaskSection/TaskSection.tsx
+45:6  Warning: React Hook useEffect has a missing dependency: 'loadTasks'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
 ./src/components/TestAutomation/AutomationTestPage.tsx
 210:6  Warning: React Hook useEffect has a missing dependency: 'fetchCompanies'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
 216:6  Warning: React Hook useEffect has a missing dependency: 'fetchServicePlans'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
 
+./src/components/Tickets/TicketContent/CustomerInformation.tsx
+310:33  Warning: The ref value 'timeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'timeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+311:40  Warning: The ref value 'successTimeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'successTimeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/Tickets/TicketContent/ServiceLocation.tsx
+369:6  Warning: React Hook useEffect has a missing dependency: 'getInitialFieldValues'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+549:33  Warning: The ref value 'timeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'timeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+550:40  Warning: The ref value 'successTimeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'successTimeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/Tickets/TicketForm/TicketForm.tsx
+296:6  Warning: React Hook useEffect has a missing dependency: 'validateForm'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
+432:6  Warning: React Hook useEffect has missing dependencies: 'getDisplayName', 'profile?.email', 'profile?.first_name', 'profile?.last_name', and 'user.email'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/contexts/CompanyContext.tsx
+343:9  Warning: The 'setSelectedCompany' function makes the dependencies of useMemo Hook (at line 442) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'setSelectedCompany' in its own useCallback() Hook.  react-hooks/exhaustive-deps
+366:9  Warning: The 'refreshCompanies' function makes the dependencies of useMemo Hook (at line 442) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'refreshCompanies' in its own useCallback() Hook.  react-hooks/exhaustive-deps
+383:9  Warning: The 'refreshBranding' function makes the dependencies of useMemo Hook (at line 442) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'refreshBranding' in its own useCallback() Hook.  react-hooks/exhaustive-deps
+
+./src/hooks/usePricingSettings.ts
+53:6  Warning: React Hook useEffect has a missing dependency: 'fetchSettings'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/hooks/useRealtimeCounts.ts
+75:5  Warning: React Hook useCallback has a missing dependency: 'setLastViewedTimestamp'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+174:5  Warning: React Hook useCallback has missing dependencies: 'triggerAnimation' and 'triggerNewItemIndicator'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+635:6  Warning: React Hook useEffect has a missing dependency: 'updateCount'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
 info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
    Collecting page data ...
-(node:6998) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-(node:6993) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-(node:6994) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-(node:6999) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-(node:6997) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-(node:6995) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-(node:6996) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-   Generating static pages (0/95) ...
-   Generating static pages (23/95) 
-(node:7020) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-   Generating static pages (47/95) 
-(node:7019) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-   Generating static pages (71/95) 
-(node:7018) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-(node:7021) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
- ✓ Generating static pages (95/95)
-   Finalizing page optimization ...
-   Collecting build traces ...
+[Error [PageNotFoundError]: Cannot find module for page: /campaigns/[id]] {
+  code: 'ENOENT'
+}
+[Error [PageNotFoundError]: Cannot find module for page: /account/update-password] {
+  code: 'ENOENT'
+}
 
-Route (app)                                               Size  First Load JS
-┌ ○ /                                                    177 B         105 kB
-├ ○ /_not-found                                          992 B         103 kB
-├ ○ /account/update-password                           1.67 kB         144 kB
-├ ○ /admin                                             70.1 kB         236 kB
-├ ƒ /admin/companies/[id]                              6.58 kB         157 kB
-├ ○ /admin/sms-test                                    2.28 kB         147 kB
-├ ƒ /api/admin/attribution-analytics                     436 B         102 kB
-├ ƒ /api/admin/brands                                    436 B         102 kB
-├ ƒ /api/admin/calls                                     436 B         102 kB
-├ ƒ /api/admin/calls/[id]                                436 B         102 kB
-├ ƒ /api/admin/calls/billing-report                      436 B         102 kB
-├ ƒ /api/admin/categories                                436 B         102 kB
-├ ƒ /api/admin/companies                                 436 B         102 kB
-├ ƒ /api/admin/companies/[id]                            436 B         102 kB
-├ ƒ /api/admin/companies/[id]/domain                     436 B         102 kB
-├ ƒ /api/admin/companies/[id]/domains                    436 B         102 kB
-├ ƒ /api/admin/customers                                 436 B         102 kB
-├ ƒ /api/admin/customers/[id]                            436 B         102 kB
-├ ƒ /api/admin/customers/[id]/leads                      436 B         102 kB
-├ ƒ /api/admin/form-analytics                            436 B         102 kB
-├ ƒ /api/admin/leads                                     436 B         102 kB
-├ ƒ /api/admin/leads/[id]                                436 B         102 kB
-├ ƒ /api/admin/leads/[id]/calls                          436 B         102 kB
-├ ƒ /api/admin/partial-leads                             436 B         102 kB
-├ ƒ /api/admin/partial-leads/[id]                        436 B         102 kB
-├ ƒ /api/admin/pest-options/[companyId]                  436 B         102 kB
-├ ƒ /api/admin/pest-types                                436 B         102 kB
-├ ƒ /api/admin/projects                                  436 B         102 kB
-├ ƒ /api/admin/projects/[id]                             436 B         102 kB
-├ ƒ /api/admin/service-plans/[companyId]                 436 B         102 kB
-├ ƒ /api/admin/template-library                          436 B         102 kB
-├ ƒ /api/admin/template-library/[id]                     436 B         102 kB
-├ ƒ /api/admin/user-companies                            436 B         102 kB
-├ ƒ /api/admin/user-companies/[id]                       436 B         102 kB
-├ ƒ /api/admin/users                                     436 B         102 kB
-├ ƒ /api/admin/users/[id]                                436 B         102 kB
-├ ƒ /api/admin/users/invite                              436 B         102 kB
-├ ƒ /api/admin/widget-domains                            436 B         102 kB
-├ ƒ /api/agents/[id]                                     436 B         102 kB
-├ ƒ /api/analytics                                       436 B         102 kB
-├ ƒ /api/callrail/audio                                  436 B         102 kB
-├ ƒ /api/callrail/calls                                  436 B         102 kB
-├ ƒ /api/calls                                           436 B         102 kB
-├ ƒ /api/calls/[id]                                      436 B         102 kB
-├ ƒ /api/companies/[id]/ab-tests                         436 B         102 kB
-├ ƒ /api/companies/[id]/ab-tests/[testId]                436 B         102 kB
-├ ƒ /api/companies/[id]/ab-tests/[testId]/promote        436 B         102 kB
-├ ƒ /api/companies/[id]/ab-tests/[testId]/results        436 B         102 kB
-├ ƒ /api/companies/[id]/ab-tests/analytics               436 B         102 kB
-├ ƒ /api/companies/[id]/agents                           436 B         102 kB
-├ ƒ /api/companies/[id]/email-templates                  436 B         102 kB
-├ ƒ /api/companies/[id]/email-templates/[templateId]     436 B         102 kB
-├ ƒ /api/companies/[id]/executions                       436 B         102 kB
-├ ƒ /api/companies/[id]/executions/[executionId]         436 B         102 kB
-├ ƒ /api/companies/[id]/google-places                    436 B         102 kB
-├ ƒ /api/companies/[id]/knowledge-base                   436 B         102 kB
-├ ƒ /api/companies/[id]/knowledge-base/retell            436 B         102 kB
-├ ƒ /api/companies/[id]/knowledge-base/upload            436 B         102 kB
-├ ƒ /api/companies/[id]/login-branding                   436 B         102 kB
-├ ƒ /api/companies/[id]/logo-override                    436 B         102 kB
-├ ƒ /api/companies/[id]/settings                         436 B         102 kB
-├ ƒ /api/companies/[id]/templates/import/[templateId]    436 B         102 kB
-├ ƒ /api/companies/[id]/users                            436 B         102 kB
-├ ƒ /api/companies/[id]/workflows                        436 B         102 kB
-├ ƒ /api/companies/[id]/workflows/[workflowId]           436 B         102 kB
-├ ƒ /api/companies/[id]/workflows/[workflowId]/test      436 B         102 kB
-├ ƒ /api/companies/by-slug/[slug]                        436 B         102 kB
-├ ƒ /api/customers                                       436 B         102 kB
-├ ƒ /api/customers/[id]                                  436 B         102 kB
-├ ƒ /api/customers/search                                436 B         102 kB
-├ ƒ /api/debug/trigger-event                             436 B         102 kB
-├ ƒ /api/email/debug-template                            436 B         102 kB
-├ ƒ /api/email/send                                      436 B         102 kB
-├ ƒ /api/email/test-images                               436 B         102 kB
-├ ƒ /api/email/test-simple-image                         436 B         102 kB
-├ ƒ /api/google-places-key                               436 B         102 kB
-├ ƒ /api/google-places/reviews/[companyId]               436 B         102 kB
-├ ƒ /api/inngest                                         436 B         102 kB
-├ ƒ /api/leads                                           436 B         102 kB
-├ ƒ /api/leads/[id]                                      436 B         102 kB
-├ ƒ /api/leads/[id]/calls                                436 B         102 kB
-├ ƒ /api/metrics                                         436 B         102 kB
-├ ƒ /api/notifications/project-created                   436 B         102 kB
-├ ƒ /api/projects                                        436 B         102 kB
-├ ƒ /api/retell-call                                     436 B         102 kB
-├ ƒ /api/service-areas/[companyId]                       436 B         102 kB
-├ ƒ /api/service-areas/validate                          436 B         102 kB
-├ ƒ /api/sign-up                                         436 B         102 kB
-├ ƒ /api/slack/interactive                               436 B         102 kB
-├ ƒ /api/sms/conversations                               436 B         102 kB
-├ ƒ /api/sms/conversations/[id]                          436 B         102 kB
-├ ƒ /api/sms/send                                        436 B         102 kB
-├ ƒ /api/sms/test                                        436 B         102 kB
-├ ƒ /api/support-cases                                   436 B         102 kB
-├ ƒ /api/support-cases/[id]                              436 B         102 kB
-├ ƒ /api/support-cases/[id]/satisfaction                 436 B         102 kB
-├ ƒ /api/support-cases/[id]/update-status                436 B         102 kB
-├ ƒ /api/template-library/[id]                           436 B         102 kB
-├ ƒ /api/template-library/categories                     436 B         102 kB
-├ ƒ /api/template-library/public                         436 B         102 kB
-├ ƒ /api/test-automation                                 436 B         102 kB
-├ ƒ /api/test-automation/trigger                         436 B         102 kB
-├ ƒ /api/tickets                                         436 B         102 kB
-├ ƒ /api/tickets/[id]                                    436 B         102 kB
-├ ƒ /api/tickets/[id]/calls                              436 B         102 kB
-├ ƒ /api/tickets/[id]/qualify                            436 B         102 kB
-├ ƒ /api/tickets/[id]/undo                               436 B         102 kB
-├ ƒ /api/user-companies                                  436 B         102 kB
-├ ƒ /api/webhooks/retell                                 436 B         102 kB
-├ ƒ /api/webhooks/retell-business-hours                  436 B         102 kB
-├ ƒ /api/webhooks/retell-inbound                         436 B         102 kB
-├ ƒ /api/webhooks/retell-inbound-ticket                  436 B         102 kB
-├ ƒ /api/webhooks/retell-outbound                        436 B         102 kB
-├ ƒ /api/webhooks/retell-sms                             436 B         102 kB
-├ ƒ /api/webhooks/widget-submit-ticket                   436 B         102 kB
-├ ƒ /api/widget/address-autocomplete                     436 B         102 kB
-├ ƒ /api/widget/config                                   436 B         102 kB
-├ ƒ /api/widget/config/[companyId]                       436 B         102 kB
-├ ƒ /api/widget/partial-save                             436 B         102 kB
-├ ƒ /api/widget/recover-form                             436 B         102 kB
-├ ƒ /api/widget/send-quote                               436 B         102 kB
-├ ƒ /api/widget/send-sms                                 436 B         102 kB
-├ ƒ /api/widget/submit                                   436 B         102 kB
-├ ƒ /api/widget/suggested-plans                          436 B         102 kB
-├ ƒ /auth/callback                                       436 B         102 kB
-├ ƒ /auth/confirm                                        436 B         102 kB
-├ ○ /automation-status                                 2.05 kB         144 kB
-├ ○ /brand                                              4.5 kB         155 kB
-├ ○ /connections                                         391 B         102 kB
-├ ○ /connections/archived-calls                          325 B         102 kB
-├ ○ /connections/assigned-to-me                          341 B         102 kB
-├ ○ /connections/call-records                          3.31 kB         154 kB
-├ ○ /connections/customer-service                      3.31 kB         152 kB
-├ ○ /connections/leads                                 5.58 kB         151 kB
-├ ƒ /connections/leads/[id]                            6.16 kB         156 kB
-├ ○ /connections/my-tasks                                366 B         102 kB
-├ ○ /connections/reports                                 326 B         102 kB
-├ ○ /connections/scheduling                              327 B         102 kB
-├ ○ /connections/tickets                               22.9 kB         177 kB
-├ ƒ /connections/tickets/[id]                           3.6 kB         153 kB
-├ ○ /customers                                           458 B         102 kB
-├ ƒ /customers/[id]                                    4.57 kB         149 kB
-├ ○ /dashboard                                          115 kB         260 kB
-├ ○ /dashboard/customers                               5.46 kB         150 kB
-├ ƒ /dashboard/customers/[id]                          4.57 kB         149 kB
-├ ○ /leads                                               459 B         102 kB
-├ ƒ /leads/[id]                                        6.17 kB         156 kB
-├ ○ /login                                               547 B         154 kB
-├ ƒ /login/[slug]                                      1.03 kB         154 kB
-├ ○ /projects                                          4.67 kB         151 kB
-├ ○ /settings                                          31.2 kB         176 kB
-├ ○ /sign-up                                            2.2 kB         110 kB
-├ ○ /test-automation                                   6.92 kB         149 kB
-└ ƒ /widget.js                                           436 B         102 kB
-+ First Load JS shared by all                           102 kB
-  ├ chunks/1684-2b5cc4ce053730e3.js                    46.6 kB
-  ├ chunks/4bd1b696-b552e0affc3fe7f7.js                53.2 kB
-  └ other shared chunks (total)                        2.07 kB
-
-
-ƒ Middleware                                           66.2 kB
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
+> Build error occurred
+[Error: Failed to collect page data for /campaigns/[id]] {
+  type: 'Error'
+}

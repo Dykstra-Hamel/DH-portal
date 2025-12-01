@@ -1,7 +1,7 @@
 import { EmailRecipient, LeadNotificationData } from './types';
 import { generateLeadCreatedEmailTemplate } from './templates/lead-created';
-import { createAdminClient } from '@/lib/supabase/server-admin';
-import { MAILERSEND_API_TOKEN, getCompanyFromEmail } from './index';
+import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from './index';
+import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
 
 export async function sendLeadCreatedNotifications(
   recipients: string[],
@@ -14,26 +14,8 @@ export async function sendLeadCreatedNotifications(
   try {
     // Get company's from email (custom domain if verified, otherwise fallback)
     const fromEmail = companyId ? await getCompanyFromEmail(companyId) : await getCompanyFromEmail('');
-    let fromName = 'PMP Central';
-
-    if (companyId) {
-      try {
-        const supabase = createAdminClient();
-
-        // Get company name
-        const { data: company } = await supabase
-          .from('companies')
-          .select('name')
-          .eq('id', companyId)
-          .single();
-
-        if (company) {
-          fromName = company.name;
-        }
-      } catch (error) {
-        console.warn('Failed to load company name, using default:', error);
-      }
-    }
+    const fromName = companyId ? await getCompanyName(companyId) : 'DH Portal';
+    const tenantName = companyId ? await getCompanyTenantName(companyId) : '';
 
     const results = [];
 
@@ -49,46 +31,28 @@ export async function sendLeadCreatedNotifications(
         // Generate subject line
         const subject = generateSubjectLine(leadData, emailConfig?.subjectLine);
 
-        // Send email using MailerSend
-        const mailersendPayload = {
-          from: {
-            email: fromEmail,
-            name: fromName
-          },
-          to: [
-            {
-              email: email
-            }
-          ],
-          subject: subject,
-          html: generateLeadCreatedEmailTemplate(recipientName, leadData)
-        };
+        // Generate HTML content
+        const html = generateLeadCreatedEmailTemplate(recipientName, leadData);
 
-        const response = await fetch('https://api.mailersend.com/v1/email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
-          },
-          body: JSON.stringify(mailersendPayload),
+        // Send email using AWS SES with fallback
+        const result = await sendEmailWithFallback({
+          tenantName,
+          from: fromEmail,
+          fromName,
+          to: email,
+          subject,
+          html,
+          companyId: companyId || '',
+          leadId: leadData.leadId,
+          source: 'lead_created_notification',
+          tags: ['lead', 'notification'],
         });
 
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error(`Failed to send lead notification to ${email}:`, response.status, errorData);
-          results.push({ email, success: false, error: `MailerSend error: ${response.status}` });
+        if (!result.success) {
+          console.error(`Failed to send lead notification to ${email}:`, result.error);
+          results.push({ email, success: false, error: result.error });
         } else {
-          let responseData: any = {};
-          try {
-            const responseText = await response.text();
-            if (responseText.trim()) {
-              responseData = JSON.parse(responseText);
-            }
-          } catch (error) {
-            console.log('MailerSend response was not JSON, but email may have sent successfully');
-          }
-          
-          results.push({ email, success: true, data: responseData });
+          results.push({ email, success: true, messageId: result.messageId });
         }
       } catch (emailError) {
         console.error(`Error sending email to ${email}:`, emailError);

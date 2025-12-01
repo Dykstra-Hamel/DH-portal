@@ -1,5 +1,9 @@
 -- Migration: Migrate Resend domain configuration to MailerSend
 -- This migration updates company_settings to use MailerSend instead of Resend for email domains
+--
+-- **DEPRECATED**: This migration is superseded by AWS SES migration (20251124180000_add_ses_fields_to_company_settings.sql)
+-- As of November 2025, the system has been migrated from MailerSend to AWS SES for email sending.
+-- This file is kept for historical reference only.
 
 -- Update setting_key from resend_domain_id to mailersend_domain_id
 UPDATE company_settings

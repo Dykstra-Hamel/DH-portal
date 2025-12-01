@@ -1,7 +1,7 @@
 import { QuoteSignedEmailData } from './types';
 import { generateQuoteSignedEmailTemplate } from './templates/quote-signed';
-import { createAdminClient } from '@/lib/supabase/server-admin';
-import { MAILERSEND_API_TOKEN, getCompanyFromEmail } from './index';
+import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from './index';
+import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
 
 /**
  * Send quote signed notification email to the assigned user
@@ -24,26 +24,8 @@ export async function sendQuoteSignedNotification(
 
     // Get company's from email (custom domain if verified, otherwise fallback)
     const fromEmail = await getCompanyFromEmail(companyId);
-    let fromName = 'PMP Central';
-
-    if (companyId) {
-      try {
-        const supabase = createAdminClient();
-
-        // Get company name
-        const { data: company } = await supabase
-          .from('companies')
-          .select('name')
-          .eq('id', companyId)
-          .single();
-
-        if (company) {
-          fromName = company.name;
-        }
-      } catch (error) {
-        console.warn('Failed to load company name, using default:', error);
-      }
-    }
+    const fromName = await getCompanyName(companyId);
+    const tenantName = await getCompanyTenantName(companyId);
 
     // Generate subject line
     const subject = `Quote Accepted - ${customerName}`;
@@ -51,54 +33,28 @@ export async function sendQuoteSignedNotification(
     // Generate email HTML
     const html = generateQuoteSignedEmailTemplate(data);
 
-    // Send email using MailerSend
-    const mailersendPayload = {
-      from: {
-        email: fromEmail,
-        name: fromName,
-      },
-      to: [
-        {
-          email: assignedUserEmail,
-          name: assignedUserName,
-        },
-      ],
-      subject: subject,
-      html: html,
-    };
-
-    const response = await fetch('https://api.mailersend.com/v1/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${MAILERSEND_API_TOKEN}`,
-      },
-      body: JSON.stringify(mailersendPayload),
+    // Send email using AWS SES
+    const result = await sendEmailWithFallback({
+      tenantName,
+      from: fromEmail,
+      fromName,
+      to: assignedUserEmail,
+      subject,
+      html,
+      companyId,
+      source: 'quote_signed_notification',
+      tags: ['quote', 'notification'],
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
+    if (!result.success) {
       console.error(
         `Failed to send quote signed notification to ${assignedUserEmail}:`,
-        response.status,
-        errorData
+        result.error
       );
       return {
         success: false,
-        error: `MailerSend error: ${response.status}`,
+        error: result.error || 'Failed to send email',
       };
-    }
-
-    let responseData: any = {};
-    try {
-      const responseText = await response.text();
-      if (responseText.trim()) {
-        responseData = JSON.parse(responseText);
-      }
-    } catch (error) {
-      console.log(
-        'MailerSend response was not JSON, but email may have sent successfully'
-      );
     }
 
     console.log(
@@ -107,7 +63,7 @@ export async function sendQuoteSignedNotification(
 
     return {
       success: true,
-      data: responseData,
+      messageId: result.messageId,
     };
   } catch (error) {
     console.error('Error in sendQuoteSignedNotification:', error);

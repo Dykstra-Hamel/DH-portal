@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Check, Plus } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import styles from './CampaignEditor.module.scss';
 import WorkflowSelector from './WorkflowSelector';
 import ContactListUpload from './ContactListUpload';
+import DiscountModal from '@/components/Admin/DiscountModal';
 import CampaignSchedulePreview from './CampaignSchedulePreview';
 
 interface CampaignEditorProps {
@@ -24,12 +25,13 @@ export default function CampaignEditor({
   onClose,
   companyId,
   campaign,
-  onSuccess
+  onSuccess,
 }: CampaignEditorProps) {
   const [currentStep, setCurrentStep] = useState<Step>('basic');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [companyTimezone, setCompanyTimezone] = useState<string>('America/New_York');
+  const [companyTimezone, setCompanyTimezone] =
+    useState<string>('America/New_York');
 
   // Form data
   const [formData, setFormData] = useState({
@@ -48,9 +50,14 @@ export default function CampaignEditor({
   const [totalContacts, setTotalContacts] = useState(0);
   const [discounts, setDiscounts] = useState<any[]>([]);
   const [campaignIdValidating, setCampaignIdValidating] = useState(false);
-  const [campaignIdAvailable, setCampaignIdAvailable] = useState<boolean | null>(null);
+  const [campaignIdAvailable, setCampaignIdAvailable] = useState<
+    boolean | null
+  >(null);
   const [campaignNameValidating, setCampaignNameValidating] = useState(false);
-  const [campaignNameAvailable, setCampaignNameAvailable] = useState<boolean | null>(null);
+  const [campaignNameAvailable, setCampaignNameAvailable] = useState<
+    boolean | null
+  >(null);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [estimatedDays, setEstimatedDays] = useState<number | null>(null);
   const [schedulePreview, setSchedulePreview] = useState<any>(null);
 
@@ -68,7 +75,9 @@ export default function CampaignEditor({
       const result = await response.json();
 
       if (result.success && result.settings) {
-        const tzSetting = result.settings.find((s: any) => s.setting_key === 'company_timezone');
+        const tzSetting = result.settings.find(
+          (s: any) => s.setting_key === 'company_timezone'
+        );
         if (tzSetting) {
           setCompanyTimezone(tzSetting.setting_value || 'America/New_York');
         }
@@ -89,6 +98,15 @@ export default function CampaignEditor({
     } catch (error) {
       console.error('Error fetching discounts:', error);
     }
+  };
+
+  const handleDiscountCreated = async () => {
+    // Refresh discounts list
+    await fetchDiscounts();
+    setShowDiscountModal(false);
+
+    // Note: We can't auto-select the newly created discount without knowing its ID
+    // The DiscountModal would need to return the created discount ID in its onSave callback
   };
 
   const validateCampaignId = async (campaignId: string) => {
@@ -221,10 +239,12 @@ export default function CampaignEditor({
   const canProceed = () => {
     switch (currentStep) {
       case 'basic':
-        return formData.name.trim() &&
-               formData.campaign_id.trim() &&
-               campaignIdAvailable === true &&
-               formData.start_datetime;
+        return (
+          formData.name.trim() &&
+          formData.campaign_id.trim() &&
+          campaignIdAvailable === true &&
+          formData.start_datetime
+        );
       case 'workflow':
         return formData.workflow_id;
       case 'contacts':
@@ -290,11 +310,13 @@ export default function CampaignEditor({
       minute: '2-digit',
       second: '2-digit',
       hour12: false,
-      timeZoneName: 'longOffset'
+      timeZoneName: 'longOffset',
     });
 
     // Use the input date/time to create a reference point
-    const referenceDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`); // Parse as UTC
+    const referenceDate = new Date(
+      `${year}-${month}-${day}T${hour}:${minute}:00Z`
+    ); // Parse as UTC
 
     // Format this reference date in the company timezone
     const parts = formatter.formatToParts(referenceDate);
@@ -305,14 +327,16 @@ export default function CampaignEditor({
     const offsetHours = offsetMatch ? parseInt(offsetMatch[1]) : 0;
 
     // Create the correct UTC time by adding the timezone offset
-    const utcDate = new Date(Date.UTC(
-      parseInt(year),
-      parseInt(month) - 1,
-      parseInt(day),
-      parseInt(hour),
-      parseInt(minute),
-      0
-    ));
+    const utcDate = new Date(
+      Date.UTC(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(hour),
+        parseInt(minute),
+        0
+      )
+    );
 
     // Adjust by subtracting the timezone offset (convert company time to UTC)
     utcDate.setHours(utcDate.getHours() - offsetHours);
@@ -333,7 +357,9 @@ export default function CampaignEditor({
       }
 
       if (campaignNameAvailable === false) {
-        setError('Campaign name is already in use. Please choose a different name.');
+        setError(
+          'Campaign name is already in use. Please choose a different name.'
+        );
         setSaving(false);
         return;
       }
@@ -356,9 +382,7 @@ export default function CampaignEditor({
         return;
       }
 
-      const url = campaign
-        ? `/api/campaigns/${campaign.id}`
-        : '/api/campaigns';
+      const url = campaign ? `/api/campaigns/${campaign.id}` : '/api/campaigns';
 
       const method = campaign ? 'PUT' : 'POST';
 
@@ -392,21 +416,30 @@ export default function CampaignEditor({
         // - Newly uploaded lists that were just created (no isExisting flag)
         for (const list of contactLists) {
           try {
-            const assignResponse = await fetch(`/api/campaigns/${newCampaignId}/contact-lists/assign`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contact_list_id: list.id,
-              }),
-            });
+            const assignResponse = await fetch(
+              `/api/campaigns/${newCampaignId}/contact-lists/assign`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contact_list_id: list.id,
+                }),
+              }
+            );
 
             const assignResult = await assignResponse.json();
 
             if (!assignResult.success) {
-              console.error(`Failed to assign contact list "${list.name || list.list_name}":`, assignResult.error);
+              console.error(
+                `Failed to assign contact list "${list.name || list.list_name}":`,
+                assignResult.error
+              );
             }
           } catch (assignErr) {
-            console.error(`Error assigning contact list "${list.name || list.list_name}":`, assignErr);
+            console.error(
+              `Error assigning contact list "${list.name || list.list_name}":`,
+              assignErr
+            );
           }
         }
 
@@ -426,7 +459,7 @@ export default function CampaignEditor({
           year: 'numeric',
           hour: 'numeric',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
         });
         console.log(`Campaign scheduled to start on ${formattedDate}`);
       } else {
@@ -500,11 +533,7 @@ export default function CampaignEditor({
         </div>
 
         {/* Error Message */}
-        {error && (
-          <div className={styles.error}>
-            {error}
-          </div>
-        )}
+        {error && <div className={styles.error}>{error}</div>}
 
         {/* Step Content */}
         <div className={styles.stepContent}>
@@ -516,17 +545,26 @@ export default function CampaignEditor({
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="e.g., Spring Promotion 2024"
                 />
                 {campaignNameValidating && (
-                  <small style={{ color: '#666' }}>Checking availability...</small>
+                  <small style={{ color: '#666' }}>
+                    Checking availability...
+                  </small>
                 )}
-                {!campaignNameValidating && campaignNameAvailable === true && formData.name && (
-                  <small style={{ color: '#22c55e' }}>✓ Available</small>
-                )}
+                {!campaignNameValidating &&
+                  campaignNameAvailable === true &&
+                  formData.name && (
+                    <small style={{ color: '#22c55e' }}>✓ Available</small>
+                  )}
                 {!campaignNameValidating && campaignNameAvailable === false && (
-                  <small style={{ color: '#ef4444' }}>✗ This campaign name is already in use. Please choose a unique name.</small>
+                  <small style={{ color: '#ef4444' }}>
+                    ✗ This campaign name is already in use. Please choose a
+                    unique name.
+                  </small>
                 )}
               </div>
 
@@ -534,7 +572,9 @@ export default function CampaignEditor({
                 <label>Description</label>
                 <textarea
                   value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   placeholder="Brief description of this campaign..."
                   rows={3}
                 />
@@ -546,7 +586,9 @@ export default function CampaignEditor({
                   type="text"
                   value={formData.campaign_id}
                   onChange={e => {
-                    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    const value = e.target.value
+                      .toUpperCase()
+                      .replace(/[^A-Z0-9]/g, '');
                     setFormData({ ...formData, campaign_id: value });
                   }}
                   placeholder="e.g., PEST26"
@@ -554,34 +596,51 @@ export default function CampaignEditor({
                   disabled={!!campaign}
                 />
                 {campaignIdValidating && (
-                  <small style={{ color: '#666' }}>Checking availability...</small>
+                  <small style={{ color: '#666' }}>
+                    Checking availability...
+                  </small>
                 )}
-                {!campaignIdValidating && campaignIdAvailable === true && formData.campaign_id && (
-                  <small style={{ color: '#22c55e' }}>✓ Available</small>
-                )}
+                {!campaignIdValidating &&
+                  campaignIdAvailable === true &&
+                  formData.campaign_id && (
+                    <small style={{ color: '#22c55e' }}>✓ Available</small>
+                  )}
                 {!campaignIdValidating && campaignIdAvailable === false && (
                   <small style={{ color: '#ef4444' }}>✗ Already in use</small>
                 )}
-                <small>Human-friendly unique identifier for reports and forms</small>
+                <small>
+                  Human-friendly unique identifier for reports and forms
+                </small>
               </div>
 
               <div className={styles.formGroup}>
                 <label>Discount (Optional)</label>
                 <select
                   value={formData.discount_id}
-                  onChange={e => setFormData({ ...formData, discount_id: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, discount_id: e.target.value })
+                  }
                 >
                   <option value="">No Discount</option>
                   {discounts
                     .filter(d => d.is_active)
                     .map(discount => (
                       <option key={discount.id} value={discount.id}>
-                        {discount.discount_name} - {discount.discount_type === 'percentage'
+                        {discount.discount_name} -{' '}
+                        {discount.discount_type === 'percentage'
                           ? `${discount.discount_value}%`
                           : `$${discount.discount_value}`}
                       </option>
                     ))}
                 </select>
+                <button
+                  type="button"
+                  onClick={() => setShowDiscountModal(true)}
+                  className={styles.createDiscountButton}
+                >
+                  <Plus size={16} />
+                  Create New Discount
+                </button>
                 <small>Select a discount to apply to this campaign</small>
               </div>
 
@@ -590,7 +649,10 @@ export default function CampaignEditor({
                 <DatePicker
                   selected={parseDateTime(formData.start_datetime)}
                   onChange={(date: Date | null) => {
-                    setFormData({ ...formData, start_datetime: formatDateTime(date) });
+                    setFormData({
+                      ...formData,
+                      start_datetime: formatDateTime(date),
+                    });
                   }}
                   showTimeSelect
                   timeIntervals={15}
@@ -635,7 +697,12 @@ export default function CampaignEditor({
                     max="1000"
                     step="50"
                     value={formData.daily_limit}
-                    onChange={e => setFormData({ ...formData, daily_limit: parseInt(e.target.value) || 500 })}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        daily_limit: parseInt(e.target.value) || 500,
+                      })
+                    }
                   />
                   <small>Maximum contacts to process per day (50-1000)</small>
                 </div>
@@ -645,18 +712,32 @@ export default function CampaignEditor({
                     <input
                       type="checkbox"
                       checked={formData.respect_business_hours}
-                      onChange={e => setFormData({ ...formData, respect_business_hours: e.target.checked })}
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          respect_business_hours: e.target.checked,
+                        })
+                      }
                       style={{ width: 'auto', marginRight: '8px' }}
                     />
                     Respect business hours
                   </label>
-                  <small>Only send during company business hours (recommended)</small>
+                  <small>
+                    Only send during company business hours (recommended)
+                  </small>
                 </div>
 
                 {totalContacts > 0 && estimatedDays && (
                   <div className={styles.estimateBox}>
-                    <p><strong>Estimated Duration:</strong> {estimatedDays} {estimatedDays === 1 ? 'day' : 'days'}</p>
-                    <p><small>Based on {formData.daily_limit} contacts/day</small></p>
+                    <p>
+                      <strong>Estimated Duration:</strong> {estimatedDays}{' '}
+                      {estimatedDays === 1 ? 'day' : 'days'}
+                    </p>
+                    <p>
+                      <small>
+                        Based on {formData.daily_limit} contacts/day
+                      </small>
+                    </p>
                     {estimatedDays > 7 && (
                       <p style={{ color: '#f59e0b' }}>
                         ⚠️ This campaign will take over a week to complete
@@ -681,13 +762,17 @@ export default function CampaignEditor({
                 {formData.description && (
                   <div className={styles.reviewItem}>
                     <span className={styles.reviewLabel}>Description:</span>
-                    <span className={styles.reviewValue}>{formData.description}</span>
+                    <span className={styles.reviewValue}>
+                      {formData.description}
+                    </span>
                   </div>
                 )}
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Start:</span>
                   <span className={styles.reviewValue}>
-                    {new Date(formData.start_datetime).toLocaleString('en-US', { timeZone: companyTimezone })}
+                    {new Date(formData.start_datetime).toLocaleString('en-US', {
+                      timeZone: companyTimezone,
+                    })}
                   </span>
                 </div>
               </div>
@@ -719,7 +804,8 @@ export default function CampaignEditor({
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Lists:</span>
                   <span className={styles.reviewValue}>
-                    {contactLists.length} list{contactLists.length !== 1 ? 's' : ''}
+                    {contactLists.length} list
+                    {contactLists.length !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>
@@ -728,25 +814,35 @@ export default function CampaignEditor({
                 <h4>Sending Schedule</h4>
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Daily Limit:</span>
-                  <span className={styles.reviewValue}>{formData.daily_limit} contacts/day</span>
+                  <span className={styles.reviewValue}>
+                    {formData.daily_limit} contacts/day
+                  </span>
                 </div>
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Batch Size:</span>
-                  <span className={styles.reviewValue}>10 contacts per batch (system default)</span>
+                  <span className={styles.reviewValue}>
+                    10 contacts per batch (system default)
+                  </span>
                 </div>
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Batch Interval:</span>
-                  <span className={styles.reviewValue}>10 minutes (system default)</span>
+                  <span className={styles.reviewValue}>
+                    10 minutes (system default)
+                  </span>
                 </div>
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Business Hours:</span>
                   <span className={styles.reviewValue}>
-                    {formData.respect_business_hours ? 'Respect company business hours' : 'Send anytime'}
+                    {formData.respect_business_hours
+                      ? 'Respect company business hours'
+                      : 'Send anytime'}
                   </span>
                 </div>
                 {estimatedDays !== null && (
                   <div className={styles.reviewItem}>
-                    <span className={styles.reviewLabel}>Estimated Duration:</span>
+                    <span className={styles.reviewLabel}>
+                      Estimated Duration:
+                    </span>
                     <span className={styles.reviewValue}>
                       {estimatedDays} {estimatedDays === 1 ? 'day' : 'days'}
                       {estimatedDays > 7 && (
@@ -814,12 +910,25 @@ export default function CampaignEditor({
                 className={styles.saveButton}
                 disabled={!canProceed() || saving}
               >
-                {saving ? 'Saving...' : campaign ? 'Save Changes' : 'Create Campaign'}
+                {saving
+                  ? 'Saving...'
+                  : campaign
+                    ? 'Save Changes'
+                    : 'Create Campaign'}
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Discount Creation Modal */}
+      <DiscountModal
+        isOpen={showDiscountModal}
+        onClose={() => setShowDiscountModal(false)}
+        onSave={handleDiscountCreated}
+        discount={null}
+        companyId={companyId}
+      />
     </div>
   );
 }

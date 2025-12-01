@@ -10,23 +10,29 @@ import CampaignDetailHeader from '@/components/Campaigns/CampaignDetailHeader';
 import CampaignOverview from '@/components/Campaigns/CampaignOverview';
 import CampaignContacts from '@/components/Campaigns/CampaignContacts';
 import CampaignExecutions from '@/components/Campaigns/CampaignExecutions';
+import CampaignLeads from '@/components/Campaigns/CampaignLeads';
+import CampaignReport from '@/components/Campaigns/CampaignReport';
 
 interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-type TabType = 'overview' | 'contacts' | 'executions';
+type TabType = 'overview' | 'contacts' | 'leads' | 'executions' | 'report';
 
-export default function CampaignDetailPage({ params }: CampaignDetailPageProps) {
+export default function CampaignDetailPage({
+  params,
+}: CampaignDetailPageProps) {
   const router = useRouter();
   const { selectedCompany } = useCompany();
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<any>(null);
   const [metrics, setMetrics] = useState<any>(null);
+  const [leadCount, setLeadCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [companyTimezone, setCompanyTimezone] = useState<string>('America/New_York');
+  const [companyTimezone, setCompanyTimezone] =
+    useState<string>('America/New_York');
 
   useEffect(() => {
     params.then(p => setCampaignId(p.id));
@@ -56,13 +62,25 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
       setCampaign(campaignResult.campaign);
 
       // Fetch metrics
-      const metricsResponse = await fetch(`/api/campaigns/${campaignId}/metrics`);
+      const metricsResponse = await fetch(
+        `/api/campaigns/${campaignId}/metrics`
+      );
       const metricsResult = await metricsResponse.json();
 
       if (metricsResult.success) {
         setMetrics(metricsResult.metrics);
       }
 
+      // Fetch lead count
+      const supabase = createClient();
+      const { count, error: countError } = await supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('campaign_id', campaignId);
+
+      if (!countError && count !== null) {
+        setLeadCount(count);
+      }
     } catch (err) {
       console.error('Error fetching campaign:', err);
       setError(err instanceof Error ? err.message : 'Failed to load campaign');
@@ -75,11 +93,15 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
     if (!selectedCompany?.id) return;
 
     try {
-      const response = await fetch(`/api/companies/${selectedCompany.id}/settings`);
+      const response = await fetch(
+        `/api/companies/${selectedCompany.id}/settings`
+      );
       const result = await response.json();
 
       if (result.success && result.settings) {
-        const tzSetting = result.settings.find((s: any) => s.setting_key === 'company_timezone');
+        const tzSetting = result.settings.find(
+          (s: any) => s.setting_key === 'company_timezone'
+        );
         if (tzSetting) {
           setCompanyTimezone(tzSetting.setting_value || 'America/New_York');
         }
@@ -104,7 +126,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
           table: 'campaigns',
           filter: `id=eq.${campaignId}`,
         },
-        (payload) => {
+        payload => {
           console.log('Campaign updated:', payload);
           fetchCampaignData();
         }
@@ -122,7 +144,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
           table: 'campaign_executions',
           filter: `campaign_id=eq.${campaignId}`,
         },
-        (payload) => {
+        payload => {
           console.log('Execution updated:', payload);
           fetchCampaignData();
         }
@@ -153,7 +175,10 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
       <div className={styles.errorContainer}>
         <h2>Error Loading Campaign</h2>
         <p>{error || 'Campaign not found'}</p>
-        <button onClick={() => router.push('/campaigns')} className={styles.backButton}>
+        <button
+          onClick={() => router.push('/campaigns')}
+          className={styles.backButton}
+        >
           <ArrowLeft size={16} />
           Back to Campaigns
         </button>
@@ -164,7 +189,10 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   return (
     <div className={styles.campaignDetailPage}>
       {/* Back Button */}
-      <button onClick={() => router.push('/campaigns')} className={styles.backLink}>
+      <button
+        onClick={() => router.push('/campaigns')}
+        className={styles.backLink}
+      >
         <ArrowLeft size={16} />
         Back to Campaigns
       </button>
@@ -191,6 +219,12 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
           Contacts ({campaign.total_contacts || 0})
         </button>
         <button
+          className={`${styles.tab} ${activeTab === 'leads' ? styles.active : ''}`}
+          onClick={() => setActiveTab('leads')}
+        >
+          Leads ({leadCount})
+        </button>
+        <button
           className={`${styles.tab} ${activeTab === 'executions' ? styles.active : ''}`}
           onClick={() => setActiveTab('executions')}
         >
@@ -201,10 +235,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
       {/* Tab Content */}
       <div className={styles.tabContent}>
         {activeTab === 'overview' && (
-          <CampaignOverview
-            campaign={campaign}
-            metrics={metrics}
-          />
+          <CampaignOverview campaign={campaign} metrics={metrics} />
         )}
 
         {activeTab === 'contacts' && (
@@ -212,6 +243,13 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
             campaignId={campaign.id}
             companyId={selectedCompany?.id || ''}
             campaignStatus={campaign.status}
+          />
+        )}
+
+        {activeTab === 'leads' && (
+          <CampaignLeads
+            campaignId={campaign.id}
+            companyId={selectedCompany?.id || ''}
           />
         )}
 

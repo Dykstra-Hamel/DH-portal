@@ -146,7 +146,7 @@ export async function PUT(
     }
 
     // Update campaign
-    const { data: campaign, error: updateError } = await supabase
+    const { data: campaign, error: updateError} = await supabase
       .from('campaigns')
       .update({
         name,

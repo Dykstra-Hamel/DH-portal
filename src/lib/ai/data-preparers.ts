@@ -296,9 +296,9 @@ export async function prepareEmailMetrics(
 ): Promise<EmailMetrics> {
   const supabase = createAdminClient();
 
-  // Fetch email automation logs
+  // Fetch email logs (consolidated email tracking)
   const { data: emails, error } = await supabase
-    .from('email_automation_log')
+    .from('email_logs')
     .select('*')
     .eq('company_id', companyId)
     .gte('created_at', startDate)
@@ -320,15 +320,19 @@ export async function prepareEmailMetrics(
     };
   }
 
-  const totalSent = emails.filter((e) => e.send_status === 'sent' || e.send_status === 'delivered').length;
-  const totalDelivered = emails.filter((e) => e.send_status === 'delivered').length;
-  const totalOpened = emails.filter((e) => e.send_status === 'opened').length;
-  const totalClicked = emails.filter((e) => e.send_status === 'clicked').length;
+  // Calculate metrics using email_logs columns
+  const totalSent = emails.length;
+  const totalDelivered = emails.filter((e) =>
+    ['delivered', 'opened', 'clicked'].includes(e.delivery_status)
+  ).length;
+  const totalOpened = emails.filter((e) => e.opened_at !== null).length;
+  const totalClicked = emails.filter((e) => e.clicked_at !== null).length;
+  const totalBounced = emails.filter((e) => e.delivery_status === 'bounced').length;
 
-  const openRate = totalSent > 0 ? Math.round((totalOpened / totalSent) * 100) : 0;
+  const openRate = totalDelivered > 0 ? Math.round((totalOpened / totalDelivered) * 100) : 0;
   const clickRate = totalOpened > 0 ? Math.round((totalClicked / totalOpened) * 100) : 0;
   const conversionRate = 0; // Would need to track conversions
-  const bounceRate = 0; // Would need bounce data
+  const bounceRate = totalSent > 0 ? Math.round((totalBounced / totalSent) * 100) : 0;
 
   // Template performance (would need to aggregate by template_id)
   const templatePerformance: EmailMetrics['templatePerformance'] = [];

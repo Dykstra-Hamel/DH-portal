@@ -22,12 +22,12 @@ export default function CampaignOverview({ campaign, metrics }: CampaignOverview
     ? Math.round((campaign.successful_contacts / campaign.processed_contacts) * 100)
     : 0;
 
-  // Status breakdown data for pie chart
+  // Status breakdown data for pie chart - using design system colors
   const statusData = [
-    { name: 'Pending', value: metrics.memberStatus.pending, color: '#94a3b8' },
-    { name: 'Processing', value: metrics.memberStatus.processing, color: '#3b82f6' },
-    { name: 'Processed', value: metrics.memberStatus.processed, color: '#10b981' },
-    { name: 'Failed', value: metrics.memberStatus.failed, color: '#ef4444' },
+    { name: 'Pending', value: metrics.memberStatus.pending, color: '#99a1af' }, // gray-400
+    { name: 'Processing', value: metrics.memberStatus.processing, color: '#0069e0' }, // action-600
+    { name: 'Processed', value: metrics.memberStatus.processed, color: '#089b65' }, // success-700
+    { name: 'Failed', value: metrics.memberStatus.failed, color: '#e7000b' }, // error-600
   ].filter(item => item.value > 0);
 
   // Email performance data for bar chart
@@ -166,7 +166,14 @@ export default function CampaignOverview({ campaign, metrics }: CampaignOverview
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #d2d2d7',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -181,11 +188,25 @@ export default function CampaignOverview({ campaign, metrics }: CampaignOverview
             <h3>Email Performance</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={emailData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="#3b82f6" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 12 }}
+                  stroke="#6a7282"
+                />
+                <YAxis
+                  tick={{ fontSize: 12 }}
+                  stroke="#6a7282"
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #d2d2d7',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Bar dataKey="value" fill="#0069e0" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

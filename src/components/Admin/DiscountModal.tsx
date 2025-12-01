@@ -35,6 +35,8 @@ export default function DiscountModal({
     is_active: true,
     discount_type: 'percentage',
     discount_value: '',
+    recurring_discount_type: '',
+    recurring_discount_value: '',
     applies_to_price: 'initial',
     applies_to_plans: 'all',
     eligible_plan_ids: [],
@@ -65,6 +67,8 @@ export default function DiscountModal({
         is_active: discount.is_active,
         discount_type: discount.discount_type,
         discount_value: discount.discount_value.toString(),
+        recurring_discount_type: discount.recurring_discount_type || '',
+        recurring_discount_value: discount.recurring_discount_value?.toString() || '',
         applies_to_price: discount.applies_to_price,
         applies_to_plans: discount.applies_to_plans,
         eligible_plan_ids: discount.eligible_plan_ids || [],
@@ -86,6 +90,8 @@ export default function DiscountModal({
         is_active: true,
         discount_type: 'percentage',
         discount_value: '',
+        recurring_discount_type: '',
+        recurring_discount_value: '',
         applies_to_price: 'initial',
         applies_to_plans: 'all',
         eligible_plan_ids: [],
@@ -157,6 +163,15 @@ export default function DiscountModal({
         is_active: formData.is_active,
         discount_type: formData.discount_type,
         discount_value: Number(formData.discount_value),
+        // Recurring discount fields (only used when applies_to_price = 'both')
+        recurring_discount_type:
+          formData.applies_to_price === 'both' && formData.recurring_discount_type
+            ? formData.recurring_discount_type
+            : null,
+        recurring_discount_value:
+          formData.applies_to_price === 'both' && formData.recurring_discount_value
+            ? Number(formData.recurring_discount_value)
+            : null,
         applies_to_price: formData.applies_to_price,
         applies_to_plans: formData.applies_to_plans,
         eligible_plan_ids:
@@ -299,71 +314,6 @@ export default function DiscountModal({
             <h3>Discount Value</h3>
 
             <div className={styles.formGroup}>
-              <label>Discount Type</label>
-              <div className={styles.radioGroup}>
-                <label className={styles.radioLabel}>
-                  <input
-                    type="radio"
-                    name="discount_type"
-                    value="percentage"
-                    checked={formData.discount_type === 'percentage'}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        discount_type: e.target.value as 'percentage',
-                      })
-                    }
-                  />
-                  <span>Percentage</span>
-                </label>
-                <label className={styles.radioLabel}>
-                  <input
-                    type="radio"
-                    name="discount_type"
-                    value="fixed_amount"
-                    checked={formData.discount_type === 'fixed_amount'}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        discount_type: e.target.value as 'fixed_amount',
-                      })
-                    }
-                  />
-                  <span>Fixed Amount</span>
-                </label>
-              </div>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label htmlFor="discount_value">
-                Discount Value <span className={styles.required}>*</span>
-              </label>
-              <div className={styles.inputWithPrefix}>
-                {formData.discount_type === 'fixed_amount' && (
-                  <span className={styles.prefix}>$</span>
-                )}
-                <input
-                  type="number"
-                  id="discount_value"
-                  value={formData.discount_value}
-                  onChange={(e) =>
-                    setFormData({ ...formData, discount_value: e.target.value })
-                  }
-                  placeholder={
-                    formData.discount_type === 'percentage' ? '15' : '100'
-                  }
-                  min="0"
-                  step={formData.discount_type === 'percentage' ? '0.01' : '1'}
-                  max={formData.discount_type === 'percentage' ? '100' : undefined}
-                  required
-                />
-                {formData.discount_type === 'percentage' && (
-                  <span className={styles.suffix}>%</span>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.formGroup}>
               <label>Applies To</label>
               <div className={styles.radioGroup}>
                 <label className={styles.radioLabel}>
@@ -409,10 +359,187 @@ export default function DiscountModal({
                       })
                     }
                   />
-                  <span>Both</span>
+                  <span>Both (Initial &amp; Recurring)</span>
                 </label>
               </div>
             </div>
+
+            {/* Single discount inputs for initial or recurring only */}
+            {formData.applies_to_price !== 'both' && (
+              <>
+                <div className={styles.formGroup}>
+                  <label>Discount Type</label>
+                  <div className={styles.radioGroup}>
+                    <label className={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        name="discount_type"
+                        value="percentage"
+                        checked={formData.discount_type === 'percentage'}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            discount_type: e.target.value as 'percentage',
+                          })
+                        }
+                      />
+                      <span>Percentage</span>
+                    </label>
+                    <label className={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        name="discount_type"
+                        value="fixed_amount"
+                        checked={formData.discount_type === 'fixed_amount'}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            discount_type: e.target.value as 'fixed_amount',
+                          })
+                        }
+                      />
+                      <span>Fixed Amount</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="discount_value">
+                    Discount Value <span className={styles.required}>*</span>
+                  </label>
+                  <div className={styles.inputWithPrefix}>
+                    {formData.discount_type === 'fixed_amount' && (
+                      <span className={styles.prefix}>$</span>
+                    )}
+                    <input
+                      type="number"
+                      id="discount_value"
+                      value={formData.discount_value}
+                      onChange={(e) =>
+                        setFormData({ ...formData, discount_value: e.target.value })
+                      }
+                      placeholder={
+                        formData.discount_type === 'percentage' ? '15' : '100'
+                      }
+                      min="0"
+                      step={formData.discount_type === 'percentage' ? '0.01' : '1'}
+                      max={formData.discount_type === 'percentage' ? '100' : undefined}
+                      required
+                    />
+                    {formData.discount_type === 'percentage' && (
+                      <span className={styles.suffix}>%</span>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Separate initial and recurring discount inputs when "Both" is selected */}
+            {formData.applies_to_price === 'both' && (
+              <div className={styles.bothDiscountsContainer}>
+                {/* Initial Price Discount */}
+                <div className={styles.discountGroup}>
+                  <h4>Initial Price Discount</h4>
+                  <div className={styles.formGroup}>
+                    <label>Type</label>
+                    <select
+                      value={formData.discount_type}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          discount_type: e.target.value as 'percentage' | 'fixed_amount',
+                        })
+                      }
+                    >
+                      <option value="percentage">Percentage</option>
+                      <option value="fixed_amount">Fixed Amount</option>
+                    </select>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label htmlFor="discount_value">
+                      Value <span className={styles.required}>*</span>
+                    </label>
+                    <div className={styles.inputWithPrefix}>
+                      {formData.discount_type === 'fixed_amount' && (
+                        <span className={styles.prefix}>$</span>
+                      )}
+                      <input
+                        type="number"
+                        id="discount_value"
+                        value={formData.discount_value}
+                        onChange={(e) =>
+                          setFormData({ ...formData, discount_value: e.target.value })
+                        }
+                        placeholder={formData.discount_type === 'percentage' ? '15' : '100'}
+                        min="0"
+                        step={formData.discount_type === 'percentage' ? '0.01' : '1'}
+                        max={formData.discount_type === 'percentage' ? '100' : undefined}
+                        required
+                      />
+                      {formData.discount_type === 'percentage' && (
+                        <span className={styles.suffix}>%</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recurring Price Discount */}
+                <div className={styles.discountGroup}>
+                  <h4>Recurring Price Discount</h4>
+                  <div className={styles.formGroup}>
+                    <label>Type</label>
+                    <select
+                      value={formData.recurring_discount_type}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          recurring_discount_type: e.target.value as 'percentage' | 'fixed_amount' | '',
+                        })
+                      }
+                    >
+                      <option value="">Same as Initial</option>
+                      <option value="percentage">Percentage</option>
+                      <option value="fixed_amount">Fixed Amount</option>
+                    </select>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label htmlFor="recurring_discount_value">
+                      Value {formData.recurring_discount_type && <span className={styles.required}>*</span>}
+                    </label>
+                    <div className={styles.inputWithPrefix}>
+                      {(formData.recurring_discount_type === 'fixed_amount' ||
+                        (!formData.recurring_discount_type && formData.discount_type === 'fixed_amount')) && (
+                        <span className={styles.prefix}>$</span>
+                      )}
+                      <input
+                        type="number"
+                        id="recurring_discount_value"
+                        value={formData.recurring_discount_value}
+                        onChange={(e) =>
+                          setFormData({ ...formData, recurring_discount_value: e.target.value })
+                        }
+                        placeholder={
+                          formData.recurring_discount_type
+                            ? formData.recurring_discount_type === 'percentage' ? '10' : '50'
+                            : 'Same as initial'
+                        }
+                        min="0"
+                        step={(formData.recurring_discount_type || formData.discount_type) === 'percentage' ? '0.01' : '1'}
+                        max={(formData.recurring_discount_type || formData.discount_type) === 'percentage' ? '100' : undefined}
+                        disabled={!formData.recurring_discount_type}
+                      />
+                      {(formData.recurring_discount_type === 'percentage' ||
+                        (!formData.recurring_discount_type && formData.discount_type === 'percentage')) && (
+                        <span className={styles.suffix}>%</span>
+                      )}
+                    </div>
+                    {!formData.recurring_discount_type && (
+                      <small>Select a different type above to set a separate recurring discount</small>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Plan Targeting */}
@@ -471,7 +598,7 @@ export default function DiscountModal({
                           checked={formData.eligible_plan_ids.includes(plan.id)}
                           onChange={() => handlePlanToggle(plan.id)}
                         />
-                        <span>{plan.plan_name}</span>
+                        <span>{plan.name || plan.plan_name}</span>
                       </label>
                     ))
                   )}

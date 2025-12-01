@@ -28,7 +28,10 @@ export async function GET(
       .single();
 
     if (!campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Campaign not found' },
+        { status: 404 }
+      );
     }
 
     // Check user has access (skip for global admins)
@@ -51,10 +54,22 @@ export async function GET(
     const offset = parseInt(searchParams.get('offset') || '0');
     const status = searchParams.get('status');
 
-    // Build query
+    // Build query - alias execution_status as status for frontend compatibility
     let query = queryClient
       .from('campaign_executions')
-      .select('*, customers(first_name, last_name, email, phone)', { count: 'exact' })
+      .select(
+        `
+        id,
+        customer_id,
+        lead_id,
+        execution_status,
+        started_at,
+        completed_at,
+        automation_execution_id,
+        customers(first_name, last_name, email, phone_number)
+      `,
+        { count: 'exact' }
+      )
       .eq('campaign_id', campaignId)
       .order('started_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -75,20 +90,19 @@ export async function GET(
 
     if (error) {
       console.error('Error fetching executions:', error);
-      return NextResponse.json({ error: 'Failed to fetch executions' }, { status: 500 });
-    }
-
-    if (executions) {
-      console.log('Sample execution:', executions[0]);
+      return NextResponse.json(
+        { error: 'Failed to fetch executions' },
+        { status: 500 }
+      );
     }
 
     // Map execution_status to status for frontend compatibility
-    const mappedExecutions = executions?.map((exec: any) => ({
-      ...exec,
-      status: exec.execution_status,
+    const mappedExecutions = (executions || []).map((execution: any) => ({
+      ...execution,
+      status: execution.execution_status,
+      workflow_run_id: execution.automation_execution_id,
+      error_message: null, // Can be joined from automation_executions table later if needed
     }));
-
-    console.log('Mapped executions length:', mappedExecutions?.length);
 
     return NextResponse.json({
       success: true,
@@ -100,9 +114,11 @@ export async function GET(
         hasMore: count ? offset + limit < count : false,
       },
     });
-
   } catch (error) {
     console.error('Error in executions GET:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

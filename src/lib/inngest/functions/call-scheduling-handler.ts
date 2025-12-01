@@ -150,8 +150,51 @@ export const callSchedulingHandler = inngest.createFunction(
     if (shouldScheduleNow) {
       return await step.run('execute-immediate-call', async () => {
         try {
-          // Get outbound calling agent configuration
-          const agentConfig = await getDefaultAgentConfig(companyId, 'calling', 'outbound');
+          // Check if the workflow has a specific agent configured
+          let agentConfig;
+
+          const { data: execution } = await supabase
+            .from('automation_executions')
+            .select(`
+              workflow_id,
+              automation_workflows (
+                agent_id
+              )
+            `)
+            .eq('id', executionId)
+            .single();
+
+          // If execution has a workflow with a specific agent, use it
+          if (execution?.automation_workflows?.[0]?.agent_id) {
+            const workflowAgentId = execution.automation_workflows[0].agent_id;
+
+            // Fetch the workflow-specific agent configuration
+            const { data: agent } = await supabase
+              .from('agents')
+              .select('*')
+              .eq('id', workflowAgentId)
+              .eq('company_id', companyId)
+              .eq('is_active', true)
+              .eq('agent_direction', 'outbound')
+              .eq('agent_type', 'calling')
+              .single();
+
+            if (agent) {
+              agentConfig = {
+                config: {
+                  agentId: agent.id,
+                  phoneNumber: agent.phone_number,
+                  apiKey: process.env.RETELL_API_KEY || ''
+                }
+              };
+            }
+          }
+
+          // Fall back to default agent if no workflow agent or workflow agent not found
+          if (!agentConfig) {
+            agentConfig = await getDefaultAgentConfig(companyId, 'calling', 'outbound');
+          }
+
           if (agentConfig.error || !agentConfig.config) {
             throw new Error(`Agent configuration error: ${agentConfig.error || 'No outbound calling agent found'}`);
           }

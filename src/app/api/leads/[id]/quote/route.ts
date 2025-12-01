@@ -281,6 +281,8 @@ export async function POST(
       // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
       let discountAmount = planRequest.discount_amount || 0;
       let discountPercentage = planRequest.discount_percentage || 0;
+      let recurringDiscountAmount = discountAmount;
+      let recurringDiscountPercentage = discountPercentage;
       let appliesToPrice = 'both'; // Default to applying to both prices
 
       // If discount_id is provided, use pre-fetched discount configuration
@@ -290,12 +292,27 @@ export async function POST(
         if (discountConfig) {
           appliesToPrice = discountConfig.applies_to_price;
 
+          // Initial discount settings
           if (discountConfig.discount_type === 'percentage') {
             discountPercentage = discountConfig.discount_value;
-            discountAmount = 0; // Don't combine percentage with fixed amount
+            discountAmount = 0;
           } else {
             discountAmount = discountConfig.discount_value;
             discountPercentage = 0;
+          }
+
+          // Recurring discount settings (for 'both' - use separate values if set)
+          if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
+            if (discountConfig.recurring_discount_type === 'percentage') {
+              recurringDiscountPercentage = discountConfig.recurring_discount_value;
+              recurringDiscountAmount = 0;
+            } else {
+              recurringDiscountAmount = discountConfig.recurring_discount_value;
+              recurringDiscountPercentage = 0;
+            }
+          } else {
+            recurringDiscountAmount = discountAmount;
+            recurringDiscountPercentage = discountPercentage;
           }
         }
       }
@@ -314,9 +331,9 @@ export async function POST(
 
       // Apply discount to recurring price if configured
       if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
-        finalRecurringPrice = recurringPrice - discountAmount;
-        if (discountPercentage > 0) {
-          finalRecurringPrice = finalRecurringPrice * (1 - discountPercentage / 100);
+        finalRecurringPrice = recurringPrice - recurringDiscountAmount;
+        if (recurringDiscountPercentage > 0) {
+          finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
         }
       }
 
