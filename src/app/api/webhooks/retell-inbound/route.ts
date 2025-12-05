@@ -335,7 +335,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       customer_id: customerId,
       lead_source: 'cold_call',
       lead_type: 'phone_call',
-      lead_status: 'unassigned', // Will be updated based on AI qualification later
+      lead_status: 'new', // Will be updated based on AI qualification later
       priority: 'medium',
       comments: `📞 Inbound call started at ${new Date().toISOString()}`,
       created_at: new Date().toISOString(),
@@ -546,7 +546,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     // Update lead status based on AI qualification decision
     if (isQualified === 'true' || isQualified === true) {
       // AI determined this is a qualified lead - keep as 'new' for follow-up
-      updateData.lead_status = 'unassigned';
+      updateData.lead_status = 'new';
       updateData.comments =
         `${updateData.comments}\n\n✅ AI Qualification: QUALIFIED - Ready for follow-up`.trim();
     } else if (isQualified === 'false' || isQualified === false) {
@@ -556,7 +556,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         `${updateData.comments}\n\n❌ AI Qualification: UNQUALIFIED - Not a sales opportunity`.trim();
     } else {
       // No qualification decision provided - keep as 'new' for inbound calls (available for follow-up)
-      updateData.lead_status = 'unassigned';
+      updateData.lead_status = 'new';
     }
 
     await supabase

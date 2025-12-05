@@ -330,7 +330,7 @@ export async function POST(
       const { data: updatedLead, error: updateError } = await supabase
         .from('leads')
         .update({
-          lead_status: 'ready_to_schedule',
+          lead_status: 'scheduling',
           service_address_id: addressData?.id || existingLead.service_address_id,
           requested_date: body.requested_date || null,
           comments: updatedComments,
@@ -349,9 +349,9 @@ export async function POST(
       }
 
       lead = updatedLead;
-      console.log(`Updated existing lead ${lead.id} from '${existingLead.lead_status}' to 'ready_to_schedule'`);
+      console.log(`Updated existing lead ${lead.id} from '${existingLead.lead_status}' to 'scheduling'`);
     } else {
-      // Create new lead in 'ready_to_schedule' stage (no prior email engagement)
+      // Create new lead in 'scheduling' stage (no prior email engagement)
       const { data: newLead, error: createError } = await supabase
         .from('leads')
         .insert({
@@ -360,7 +360,7 @@ export async function POST(
           service_address_id: addressData?.id || null,
           campaign_id: campaign.id,
           lead_source: 'campaign',
-          lead_status: 'ready_to_schedule',
+          lead_status: 'scheduling',
           comments: leadComments,
           requested_date: body.requested_date || null,
         })
@@ -376,7 +376,7 @@ export async function POST(
       }
 
       lead = newLead;
-      console.log(`Created new lead ${lead.id} in 'ready_to_schedule' stage`);
+      console.log(`Created new lead ${lead.id} in 'scheduling' stage`);
     }
 
     // QUOTE CREATION: Only create quote if campaign has a service plan
@@ -609,7 +609,7 @@ export async function POST(
           requested_time: body.requested_time,
           device_data: completeDeviceData,
           previous_lead_status: existingLead?.lead_status || null,
-          new_lead_status: 'ready_to_schedule',
+          new_lead_status: 'scheduling',
           selected_addon_ids: body.selected_addon_ids || [],
         },
       });

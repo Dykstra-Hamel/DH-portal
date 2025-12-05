@@ -239,7 +239,7 @@ export function LeadStepContent({
     leadId: lead.id,
     userId: user?.id,
     enabled:
-      lead.lead_status === 'quoted' || lead.lead_status === 'ready_to_schedule',
+      lead.lead_status === 'quoted' || lead.lead_status === 'scheduling',
   });
 
   // Helper functions for managing service selections
@@ -1467,9 +1467,9 @@ export function LeadStepContent({
       if (ticketType === 'sales') {
         // Map option to lead status
         const statusMap = {
-          communication: 'contacting',
+          communication: 'in_process',
           quote: 'quoted',
-          schedule: 'ready_to_schedule',
+          schedule: 'scheduling',
         };
 
         const newStatus = statusMap[option];
@@ -1550,16 +1550,16 @@ export function LeadStepContent({
       if (ticketType === 'sales') {
         // Sales Lead logic
         if (selectedAssignee === 'sales_team') {
-          // Assigned to Sales Team - keep as unassigned lead
+          // Assigned to Sales Team - keep as new lead
           if (isAdmin) {
             await adminAPI.updateLead(lead.id, {
               assigned_to: null,
-              lead_status: 'unassigned',
+              lead_status: 'new',
             });
           } else {
             await adminAPI.updateUserLead(lead.id, {
               assigned_to: null,
-              lead_status: 'unassigned',
+              lead_status: 'new',
             });
           }
 
@@ -1576,16 +1576,16 @@ export function LeadStepContent({
           setAssignedUserInfo(assigneeInfo);
           setShowAssignSuccessModal(true);
         } else {
-          // Assigned to specific person - update to contacting status
+          // Assigned to specific person - update to in_process status
           if (isAdmin) {
             await adminAPI.updateLead(lead.id, {
               assigned_to: selectedAssignee,
-              lead_status: 'contacting',
+              lead_status: 'in_process',
             });
           } else {
             await adminAPI.updateUserLead(lead.id, {
               assigned_to: selectedAssignee,
-              lead_status: 'contacting',
+              lead_status: 'in_process',
             });
           }
 
@@ -1614,7 +1614,7 @@ export function LeadStepContent({
           issue_type: 'general_inquiry',
           summary: `Converted from sales lead${lead.customer ? ` - ${lead.customer.first_name} ${lead.customer.last_name}` : ''}`,
           description: lead.comments || 'Converted from sales lead',
-          status: 'unassigned',
+          status: 'new',
           priority: 'medium',
           assigned_to:
             selectedAssignee === 'support_team' ? undefined : selectedAssignee,
@@ -1889,16 +1889,16 @@ export function LeadStepContent({
     }
   };
 
-  // Handle progressing lead to ready_to_schedule
+  // Handle progressing lead to scheduling
   const handleProgressToReadyToSchedule = async () => {
     try {
       if (isAdmin) {
         await adminAPI.updateLead(lead.id, {
-          lead_status: 'ready_to_schedule',
+          lead_status: 'scheduling',
         });
       } else {
         await adminAPI.updateUserLead(lead.id, {
-          lead_status: 'ready_to_schedule',
+          lead_status: 'scheduling',
         });
       }
       onLeadUpdate?.();
@@ -2209,7 +2209,7 @@ export function LeadStepContent({
   };
 
   const getAIQualification = (leadStatus: string) => {
-    return leadStatus === 'qualified' || leadStatus === 'contacting'
+    return leadStatus === 'qualified' || leadStatus === 'in_process'
       ? 'Sales Lead'
       : 'Unqualified';
   };
@@ -4866,13 +4866,13 @@ export function LeadStepContent({
   // Render content based on lead status
   const renderContent = () => {
     switch (lead.lead_status) {
-      case 'unassigned':
+      case 'new':
         return renderQualifyContent();
-      case 'contacting':
+      case 'in_process':
         return renderContactingContent();
       case 'quoted':
         return renderQuotedContent();
-      case 'ready_to_schedule':
+      case 'scheduling':
         return renderReadyToScheduleContent();
       default:
         return renderQualifyContent(); // Default to qualify content

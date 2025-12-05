@@ -106,13 +106,13 @@ export async function GET(request: NextRequest) {
     } else {
       // Default behavior: show active leads (exclude archived)
       query = query
-        .in('lead_status', ['unassigned', 'contacting', 'quoted', 'ready_to_schedule', 'scheduled', 'won', 'lost'])
+        .in('lead_status', ['new', 'in_process', 'quoted', 'scheduling', 'won', 'lost'])
         .or('archived.is.null,archived.eq.false');
     }
 
     // Apply additional filters
     if (status) {
-      // Handle comma-separated status values (e.g., "unassigned,contacting,quoted")
+      // Handle comma-separated status values (e.g., "new,in_process,quoted")
       const statusArray = status.split(',').map(s => s.trim());
       if (statusArray.length === 1) {
         query = query.eq('lead_status', statusArray[0]);
@@ -378,7 +378,7 @@ export async function POST(request: NextRequest) {
           service_address_id: serviceAddressId,
           lead_type: 'web_form',
           lead_source: leadSource || 'other',
-          lead_status: 'unassigned',
+          lead_status: 'new',
           priority: priority || 'medium',
           pest_type: pestType,
           comments,

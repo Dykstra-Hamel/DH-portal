@@ -24,11 +24,10 @@ export type LeadType =
   | 'other';
 
 export type LeadStatus =
-  | 'unassigned'
-  | 'contacting'
+  | 'new'
+  | 'in_process'
   | 'quoted'
-  | 'ready_to_schedule'
-  | 'scheduled'
+  | 'scheduling'
   | 'won'
   | 'lost';
 
@@ -210,11 +209,10 @@ export const leadTypeOptions = [
 ] as const;
 
 export const leadStatusOptions = [
-  { value: 'unassigned', label: 'Unassigned' },
-  { value: 'contacting', label: 'Contacting' },
+  { value: 'new', label: 'New' },
+  { value: 'in_process', label: 'In Process' },
   { value: 'quoted', label: 'Quoted' },
-  { value: 'ready_to_schedule', label: 'Ready To Schedule' },
-  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'scheduling', label: 'Scheduling' },
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },
 ] as const;

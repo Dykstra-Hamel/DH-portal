@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Default behavior: show active leads (exclude archived)
       query = query
-        .in('lead_status', ['unassigned', 'contacting', 'quoted', 'ready_to_schedule', 'scheduled'])
+        .in('lead_status', ['new', 'in_process', 'quoted', 'scheduling', 'won'])
         .or('archived.is.null,archived.eq.false');
     }
 

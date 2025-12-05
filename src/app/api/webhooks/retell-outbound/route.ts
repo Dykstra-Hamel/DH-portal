@@ -168,7 +168,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
         .select('id, customer_id, company_id, comments, lead_status')
         .eq('customer_id', customerId)
         .eq('company_id', companyId)
-        .in('lead_status', ['unassigned', 'contacting', 'quoted'])
+        .in('lead_status', ['new', 'in_process', 'quoted'])
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -345,7 +345,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
           .from('leads')
           .select('id, customer_id, comments')
           .eq('customer_id', customerId)
-          .eq('lead_status', 'unassigned')
+          .eq('lead_status', 'new')
           .order('created_at', { ascending: false })
           .limit(1);
 
