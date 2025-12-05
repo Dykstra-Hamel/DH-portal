@@ -641,7 +641,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
       companyId,
       customerId: customerId || undefined,
       email: customerEmail,
-      phone: leadData.customerPhone || leadData.phone || fullLeadData?.customer?.phone || undefined,
+      phoneNumber: leadData.customerPhone || leadData.phone || fullLeadData?.customer?.phone || undefined,
       source: campaignId ? 'email_campaign' : 'automation_workflow',
       metadata: {
         campaignId,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './unsubscribe.module.scss';
 
@@ -11,7 +11,7 @@ interface TokenData {
   source?: string;
 }
 
-export default function UnsubscribePage() {
+function UnsubscribeContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
@@ -295,5 +295,22 @@ export default function UnsubscribePage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function UnsubscribePage() {
+  return (
+    <Suspense fallback={
+      <div className={styles.container}>
+        <div className={styles.card}>
+          <div className={styles.loading}>
+            <div className={styles.spinner}></div>
+            <p>Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <UnsubscribeContent />
+    </Suspense>
   );
 }

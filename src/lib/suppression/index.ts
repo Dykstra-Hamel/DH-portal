@@ -52,7 +52,7 @@ export async function addToSuppressionList(
     // Check if already suppressed
     const { data: existing } = await supabase
       .from('suppression_list')
-      .select('id')
+      .select('id, communication_type')
       .eq('company_id', companyId)
       .ilike('email_address', email)
       .single();
