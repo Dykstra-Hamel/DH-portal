@@ -8,7 +8,7 @@
 import { SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { sesClient } from './client';
 import { SendEmailParams, SendEmailResult } from '@/types/aws-ses';
-import { isEmailSuppressed } from './suppression';
+import { isEmailSuppressed } from '@/lib/suppression';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { generateTenantName } from './tenants';
 import { generateConfigSetName } from './config-sets';

@@ -17,12 +17,14 @@ import styles from './ContactListUpload.module.scss';
 interface ContactListUploadProps {
   companyId: string;
   campaignId?: string; // Optional for new campaigns
+  initialLists?: any[]; // Previously selected lists (for restoring state when navigating back)
   onListsChange: (lists: any[], totalContacts: number) => void;
 }
 
 export default function ContactListUpload({
   companyId,
   campaignId,
+  initialLists,
   onListsChange,
 }: ContactListUploadProps) {
   const [selectedLists, setSelectedLists] = useState<any[]>([]); // Lists selected for this campaign
@@ -54,6 +56,13 @@ export default function ContactListUpload({
       fetchSelectedLists();
     }
   }, [companyId, campaignId]);
+
+  // Restore selected lists from initialLists prop (when navigating back)
+  useEffect(() => {
+    if (initialLists && initialLists.length > 0 && selectedLists.length === 0) {
+      setSelectedLists(initialLists);
+    }
+  }, [initialLists]);
 
   useEffect(() => {
     const totalContacts = selectedLists.reduce(

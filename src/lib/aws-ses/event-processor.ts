@@ -6,7 +6,7 @@
  */
 
 import { SesEvent, ProcessedSesEvent } from '@/types/ses-events';
-import { addToSuppressionList } from './suppression';
+import { addToSuppressionList } from '@/lib/suppression';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 
 /**

@@ -114,7 +114,9 @@ When creating a new migration file, ALWAYS use the following naming convention:
 - **Email Provider**: Uses AWS SES (Simple Email Service) for all transactional emails
 - **Tenant Architecture**: One SES tenant per company for isolated reputation management
 - **Event Tracking**: SNS webhook at `/api/webhooks/ses-events` for bounce/complaint/delivery tracking
-- **Suppression List**: Automatic email suppression for bounces and complaints in `email_suppression_list` table
+- **Suppression List**: Automatic communication suppression for bounces, complaints, and unsubscribes in `suppression_list` table
+  - Supports multiple channels: email, phone calls, SMS
+  - Tracks unsubscribe requests and communication preferences
 
 ### Required Environment Variables
 

@@ -26,6 +26,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   const isPublicPage =
     pathname === '/login' ||
     pathname === '/sign-up' ||
+    pathname === '/unsubscribe' ||
     pathname.match(/^\/login\/[^\/]+$/);
   const isHomePage = pathname === '/';
   const isQuotePage = pathname.match(/^\/[^\/]+\/quote\/[^\/]+$/);

@@ -66,7 +66,8 @@ export async function GET(
         started_at,
         completed_at,
         automation_execution_id,
-        customers(first_name, last_name, email, phone_number)
+        customers(first_name, last_name, email, phone),
+        automation_execution:automation_executions(execution_data, error_message)
       `,
         { count: 'exact' }
       )
@@ -101,7 +102,8 @@ export async function GET(
       ...execution,
       status: execution.execution_status,
       workflow_run_id: execution.automation_execution_id,
-      error_message: null, // Can be joined from automation_executions table later if needed
+      error_message: execution.automation_execution?.error_message || null,
+      step_results: execution.automation_execution?.execution_data?.stepResults || [],
     }));
 
     return NextResponse.json({
