@@ -42,6 +42,15 @@ export async function updateSession(request: NextRequest) {
   // Check if this is a public quote page (pattern: /{companySlug}/quote/{quoteId})
   const isQuotePage = /^\/[^\/]+\/quote\/[^\/]+$/.test(request.nextUrl.pathname);
 
+  // Check if this is a public campaign landing page (pattern: /campaign/{campaignId}/{customerId})
+  // Works with or without company subdomain - company is looked up from campaign ID
+  const isCampaignLandingPage = /^\/campaign\/[^\/]+\/[^\/]+$/.test(request.nextUrl.pathname);
+
+  // Check if this is a static asset (fonts, images, etc.)
+  const isStaticAsset = request.nextUrl.pathname.startsWith('/fonts/') ||
+    request.nextUrl.pathname.startsWith('/_next/') ||
+    request.nextUrl.pathname.startsWith('/favicon.ico');
+
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
@@ -50,7 +59,9 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/unsubscribe') &&
     !request.nextUrl.pathname.startsWith('/api') &&
     request.nextUrl.pathname !== '/' &&
-    !isQuotePage
+    !isQuotePage &&
+    !isCampaignLandingPage &&
+    !isStaticAsset
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();

@@ -45,6 +45,7 @@ export interface QuoteLineItem {
   id: string;
   quote_id: string;
   service_plan_id?: string;
+  addon_service_id?: string;
 
   // Plan details
   plan_name: string;
@@ -91,6 +92,7 @@ export interface UpdateQuoteRequest {
   line_items?: Array<{
     id?: string; // If updating existing item
     service_plan_id?: string;
+    addon_service_id?: string;
     discount_percentage?: number;
     discount_amount?: number;
     display_order?: number;

@@ -260,15 +260,19 @@ export async function processClickEvent(
   try {
     const supabase = createAdminClient();
 
-    // Update email log with click timestamp (first click only)
-    const { data: existingLog } = await supabase
+    // Get email log to find context (customer_id, campaign_id, company_id)
+    const { data: emailLog } = await supabase
       .from('email_logs')
-      .select('clicked_at')
+      .select('id, clicked_at, customer_id, campaign_id, company_id, lead_id')
       .eq('ses_message_id', messageId)
       .single();
 
-    // Only update if not already clicked (track first click)
-    if (existingLog && !existingLog.clicked_at) {
+    if (!emailLog) {
+      return { success: false, error: 'Email log not found' };
+    }
+
+    // Update email log with click timestamp (first click only)
+    if (!emailLog.clicked_at) {
       await supabase
         .from('email_logs')
         .update({
@@ -279,6 +283,19 @@ export async function processClickEvent(
         .eq('ses_message_id', messageId);
     }
 
+    // Check if this click should generate a lead
+    const linkTags = click.linkTags || {};
+    const shouldGenerateLead = linkTags.generateLead?.[0] === 'true';
+
+    if (shouldGenerateLead) {
+      await handleLeadCreationFromClick(
+        emailLog,
+        linkTags,
+        click,
+        supabase
+      );
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Error processing click event:', error);
@@ -287,6 +304,113 @@ export async function processClickEvent(
       error: error instanceof Error ? error.message : 'Failed to process click',
     };
   }
+}
+
+/**
+ * Handle lead creation from email click with generateLead tag
+ *
+ * Creates a lead in 'quoted' stage when a customer clicks a tracked link.
+ * Prevents duplicate leads for the same customer + campaign combination.
+ *
+ * @param emailLog - Email log record with context
+ * @param linkTags - SES link tags from click event
+ * @param click - Click event data
+ * @param supabase - Supabase client
+ */
+async function handleLeadCreationFromClick(
+  emailLog: any,
+  linkTags: Record<string, string[]>,
+  click: any,
+  supabase: any
+): Promise<void> {
+  const customerId = linkTags.customerId?.[0] || emailLog.customer_id;
+  const campaignId = linkTags.campaignId?.[0] || emailLog.campaign_id;
+  const companyId = emailLog.company_id;
+
+  if (!customerId || !companyId) {
+    console.warn('Missing customerId or companyId for lead creation from click');
+    return;
+  }
+
+  // Check if lead already exists for this customer + campaign
+  const { data: existingLead } = await supabase
+    .from('leads')
+    .select('id, lead_status')
+    .eq('customer_id', customerId)
+    .eq('company_id', companyId)
+    .eq('campaign_id', campaignId)
+    .single();
+
+  if (existingLead) {
+    console.log(`Lead already exists (${existingLead.id}) for customer ${customerId}, skipping creation`);
+    return;
+  }
+
+  // Get customer and service address
+  const { data: customer } = await supabase
+    .from('customers')
+    .select(`
+      id,
+      first_name,
+      last_name,
+      email,
+      phone_number,
+      customer_service_addresses!inner(
+        service_address:service_addresses(id)
+      )
+    `)
+    .eq('id', customerId)
+    .single();
+
+  const serviceAddressId = customer?.customer_service_addresses?.[0]?.service_address?.id || null;
+
+  // Create lead in 'quoted' stage
+  const { data: newLead, error: leadError } = await supabase
+    .from('leads')
+    .insert({
+      company_id: companyId,
+      customer_id: customerId,
+      service_address_id: serviceAddressId,
+      campaign_id: campaignId,
+      lead_source: 'campaign',
+      lead_status: 'quoted',
+      comments: `Lead created from email click engagement. Link: ${click.link}`,
+      ip_address: click.ipAddress || null,
+      user_agent: click.userAgent || null,
+    })
+    .select('id')
+    .single();
+
+  if (leadError) {
+    console.error('Error creating lead from click:', leadError);
+    return;
+  }
+
+  // Update email log with lead reference
+  await supabase
+    .from('email_logs')
+    .update({ lead_id: newLead.id })
+    .eq('id', emailLog.id);
+
+  // Log activity
+  await supabase
+    .from('activities')
+    .insert({
+      activity_type: 'lead_created_from_email_click',
+      customer_id: customerId,
+      lead_id: newLead.id,
+      company_id: companyId,
+      metadata: {
+        campaign_id: campaignId,
+        email_log_id: emailLog.id,
+        clicked_link: click.link,
+        link_tags: linkTags,
+        ip_address: click.ipAddress,
+        user_agent: click.userAgent,
+      },
+    });
+
+  console.log(`Lead created (${newLead.id}) from email click for customer ${customerId}`);
 }
 
 /**

@@ -7,10 +7,11 @@ import styles from './CampaignDetailHeader.module.scss';
 interface CampaignDetailHeaderProps {
   campaign: any;
   onUpdate: () => void;
+  onEdit: () => void;
   companyTimezone?: string;
 }
 
-export default function CampaignDetailHeader({ campaign, onUpdate, companyTimezone = 'America/New_York' }: CampaignDetailHeaderProps) {
+export default function CampaignDetailHeader({ campaign, onUpdate, onEdit, companyTimezone = 'America/New_York' }: CampaignDetailHeaderProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const handleStartCampaign = async () => {
@@ -152,7 +153,7 @@ export default function CampaignDetailHeader({ campaign, onUpdate, companyTimezo
         {campaign.status !== 'running' && campaign.status !== 'completed' && campaign.status !== 'cancelled' && (
           <button
             className={`${styles.actionButton} ${styles.secondary}`}
-            onClick={() => window.location.href = `/campaigns?edit=${campaign.id}`}
+            onClick={onEdit}
           >
             <Edit size={16} />
             Edit

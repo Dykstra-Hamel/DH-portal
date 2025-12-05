@@ -10,6 +10,7 @@ interface EmailSendRequest {
   companyId: string;
   templateId?: string;
   leadId?: string;
+  customerId?: string;
   source?: string;
   campaignId?: string;
   executionId?: string;
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
       companyId,
       templateId,
       leadId,
+      customerId,
       source = 'automation_workflow',
       campaignId,
       executionId
@@ -50,31 +52,66 @@ export async function POST(request: NextRequest) {
     // Get company information for proper from name
     const fromName = await getCompanyName(companyId);
     const fromEmail = await getCompanyFromEmail(companyId);
-    const tenantName = await getCompanyTenantName(companyId);
 
-    // Send email via AWS SES
-    const result = await sendEmailWithFallback({
-      tenantName,
-      from: fromEmail,
-      fromName,
-      to,
-      subject,
-      html,
-      text: text || undefined,
-      companyId,
-      leadId,
-      templateId,
-      source,
-      campaignId,
-      executionId,
-      tags: [
-        'automation',
+    // IMPORTANT: If using fallback email domain, use fallback tenant directly
+    // Company tenants are only associated with their own custom domains, not pmpcentral.io
+    const FALLBACK_FROM_EMAIL = 'noreply@pmpcentral.io';
+
+    let result;
+
+    if (fromEmail === FALLBACK_FROM_EMAIL) {
+      // Using fallback email - send directly with fallback tenant (no retry needed)
+      const { sendEmail } = await import('@/lib/aws-ses/send-email');
+      result = await sendEmail({
+        tenantName: process.env.FALLBACK_SES_TENANT_NAME || 'pmpcentral-fallback',
+        from: fromEmail,
+        fromName,
+        to,
+        subject,
+        html,
+        text: text || undefined,
+        companyId,
+        leadId,
+        customerId,
+        templateId,
         source,
-        ...(templateId ? [`template-${templateId}`] : []),
-        ...(leadId ? [`lead-${leadId}`] : []),
-        ...(campaignId ? [`campaign-${campaignId}`] : []),
-      ],
-    });
+        campaignId,
+        executionId,
+        tags: [
+          'automation',
+          source,
+          ...(templateId ? [`template-${templateId}`] : []),
+          ...(leadId ? [`lead-${leadId}`] : []),
+          ...(campaignId ? [`campaign-${campaignId}`] : []),
+        ],
+      });
+    } else {
+      // Using custom domain - use fallback mechanism as safety net
+      const tenantName = await getCompanyTenantName(companyId);
+      result = await sendEmailWithFallback({
+        tenantName,
+        from: fromEmail,
+        fromName,
+        to,
+        subject,
+        html,
+        text: text || undefined,
+        companyId,
+        leadId,
+        customerId,
+        templateId,
+        source,
+        campaignId,
+        executionId,
+        tags: [
+          'automation',
+          source,
+          ...(templateId ? [`template-${templateId}`] : []),
+          ...(leadId ? [`lead-${leadId}`] : []),
+          ...(campaignId ? [`campaign-${campaignId}`] : []),
+        ],
+      });
+    }
 
     if (!result.success) {
       console.error('AWS SES error:', result.error);

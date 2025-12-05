@@ -51,7 +51,11 @@ const formatPhone = (phone?: string): string => {
   return phone;
 };
 
-const getLeadSourceLabel = (leadType: string): string => {
+const getLeadSourceLabel = (leadType: string | null): string => {
+  if (!leadType) {
+    return 'Other';
+  }
+
   switch (leadType) {
     case 'phone_call':
       return 'Call';

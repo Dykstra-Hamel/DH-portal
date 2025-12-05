@@ -14,6 +14,7 @@ import { ServiceConfirmationModal } from '@/components/Common/ServiceConfirmatio
 import { PestSelection } from '@/components/Common/PestSelection/PestSelection';
 import { AdditionalPestsSelection } from '@/components/Common/AdditionalPestsSelection/AdditionalPestsSelection';
 import { CustomDropdown } from '@/components/Common/CustomDropdown/CustomDropdown';
+import EligibleAddOnSelector from '@/components/Quotes/EligibleAddOnSelector/EligibleAddOnSelector';
 import CustomerInformation from '@/components/Tickets/TicketContent/CustomerInformation';
 import { ActivityFeed } from '@/components/Common/ActivityFeed/ActivityFeed';
 import { NotesSection } from '@/components/Common/NotesSection/NotesSection';
@@ -198,6 +199,12 @@ export function LeadStepContent({
       }>
     >
   >({});
+
+  // Add-on services state
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [eligibleAddOns, setEligibleAddOns] = useState<any[]>([]);
+  const [loadingAddOns, setLoadingAddOns] = useState(false);
+
   const [preferredDate, setPreferredDate] = useState<string>('');
   const [preferredTime, setPreferredTime] = useState<string>('');
 
@@ -704,8 +711,12 @@ export function LeadStepContent({
       quote.line_items.length > 0 &&
       allServicePlans.length > 0
     ) {
-      // Map line items to service selections
-      const selectionsFromLineItems = quote.line_items
+      // Separate line items by type
+      const servicePlanItems = quote.line_items.filter(item => item.service_plan_id);
+      const addonItems = quote.line_items.filter(item => item.addon_service_id);
+
+      // Map service plan line items to service selections
+      const selectionsFromLineItems = servicePlanItems
         .sort((a, b) => a.display_order - b.display_order)
         .map((lineItem, index) => {
           // Find the full service plan data
@@ -722,6 +733,11 @@ export function LeadStepContent({
           };
         });
 
+      // Extract add-on IDs
+      const addonIds = addonItems
+        .map(item => item.addon_service_id)
+        .filter(Boolean) as string[];
+
       // Only update if selections are different (prevent infinite loop)
       const currentPlanIds = serviceSelections
         .map(s => s.servicePlan?.id)
@@ -732,6 +748,7 @@ export function LeadStepContent({
 
       if (currentPlanIds !== newPlanIds) {
         setServiceSelections(selectionsFromLineItems);
+        setSelectedAddOns(addonIds); // Sync add-on selections
         initialLineItemCreatedRef.current = true; // Mark as initialized from existing data
 
         // Fetch discounts for all service plans
@@ -795,6 +812,35 @@ export function LeadStepContent({
       }
     }
   }, [activeServiceTab, serviceSelections, profile, fetchDiscountsForPlan]);
+
+  // Fetch eligible add-ons when primary service plan changes
+  useEffect(() => {
+    const fetchEligibleAddOns = async (planId: string) => {
+      setLoadingAddOns(true);
+      try {
+        const response = await fetch(
+          `/api/add-on-services/${lead.company_id}/eligible-for-plan/${planId}`
+        );
+        const result = await response.json();
+        if (result.success) {
+          const eligible = result.addons.filter((a: any) => a.is_eligible);
+          setEligibleAddOns(eligible);
+        }
+      } catch (error) {
+        console.error('Error fetching add-ons:', error);
+      } finally {
+        setLoadingAddOns(false);
+      }
+    };
+
+    const primaryPlan = serviceSelections[0]?.servicePlan;
+
+    if (primaryPlan?.id && lead.company_id) {
+      fetchEligibleAddOns(primaryPlan.id);
+    } else {
+      setEligibleAddOns([]);
+    }
+  }, [serviceSelections[0]?.servicePlan?.id, lead.company_id]);
 
   // Load service plan for first selection when primary pest is selected
   // ONLY if there are no existing line items (auto-recommendation)
@@ -2035,6 +2081,85 @@ export function LeadStepContent({
     } finally {
       // Always release lock
       lineItemCreationLockRef.current.delete(displayOrder);
+    }
+  };
+
+  // Add-on line item management functions
+  const handleToggleAddon = async (addonId: string) => {
+    const isSelected = selectedAddOns.includes(addonId);
+
+    if (isSelected) {
+      // Remove add-on
+      setSelectedAddOns(prev => prev.filter(id => id !== addonId));
+      await removeAddonLineItem(addonId);
+    } else {
+      // Add add-on
+      setSelectedAddOns(prev => [...prev, addonId]);
+      await createAddonLineItem(addonId);
+    }
+  };
+
+  const createAddonLineItem = async (addonId: string) => {
+    if (!quote) return;
+
+    try {
+      // Fetch add-on details
+      const response = await fetch(`/api/add-on-services/${lead.company_id}/${addonId}`);
+      const result = await response.json();
+
+      if (!result.success) throw new Error('Failed to fetch add-on');
+
+      const addon = result.addon;
+      const maxOrder = Math.max(...(quote.line_items?.map(i => i.display_order) || [0]));
+
+      // Create line item
+      const lineItemData = {
+        addon_service_id: addon.id,
+        display_order: maxOrder + 1,
+      };
+
+      const updateResponse = await fetch(`/api/quotes/${quote.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ line_items: [lineItemData] }),
+      });
+
+      if (updateResponse.ok) {
+        const data = await updateResponse.json();
+        if (data.success && data.data) {
+          await broadcastQuoteUpdate(data.data);
+          onShowToast?.('Add-on service added', 'success');
+        }
+      }
+    } catch (error) {
+      console.error('Error adding add-on:', error);
+      onShowToast?.('Failed to add add-on service', 'error');
+      setSelectedAddOns(prev => prev.filter(id => id !== addonId));
+    }
+  };
+
+  const removeAddonLineItem = async (addonId: string) => {
+    if (!quote) return;
+
+    const addonLineItem = quote.line_items?.find(
+      item => item.addon_service_id === addonId
+    );
+
+    if (!addonLineItem) return;
+
+    try {
+      const response = await fetch(
+        `/api/quotes/${quote.id}/line-items/${addonLineItem.id}`,
+        { method: 'DELETE' }
+      );
+
+      if (response.ok) {
+        onShowToast?.('Add-on service removed', 'success');
+      }
+    } catch (error) {
+      console.error('Error removing add-on:', error);
+      onShowToast?.('Failed to remove add-on service', 'error');
+      setSelectedAddOns(prev => [...prev, addonId]);
     }
   };
 
@@ -3789,6 +3914,18 @@ export function LeadStepContent({
                       </div>
                     )}
                 </div>
+
+                {/* Add-On Services Section */}
+                {serviceSelections[0]?.servicePlan && (
+                  <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
+                    <EligibleAddOnSelector
+                      companyId={lead.company_id}
+                      servicePlanId={serviceSelections[0].servicePlan.id}
+                      selectedAddonIds={selectedAddOns}
+                      onToggleAddon={handleToggleAddon}
+                    />
+                  </div>
+                )}
 
                 {/* Plan Pricing Section */}
                 {serviceSelections.some(sel => sel.servicePlan) && (

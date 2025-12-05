@@ -803,6 +803,50 @@ export async function PUT(
               .from('quote_line_items')
               .insert(insertData);
           }
+        } else if (lineItem.addon_service_id) {
+          // Process add-on service line items
+          const { data: addon } = await supabase
+            .from('add_on_services')
+            .select('*')
+            .eq('id', lineItem.addon_service_id)
+            .single();
+
+          if (addon) {
+            const initialPrice = addon.initial_price || 0;
+            const recurringPrice = addon.recurring_price;
+
+            // Prepare update/insert data for add-on line item
+            const addonData: any = {
+              addon_service_id: addon.id,
+              service_plan_id: null, // Add-ons don't have service_plan_id
+              plan_name: addon.addon_name,
+              plan_description: addon.addon_description,
+              initial_price: initialPrice,
+              recurring_price: recurringPrice,
+              final_initial_price: initialPrice,
+              final_recurring_price: recurringPrice,
+              billing_frequency: addon.billing_frequency,
+              display_order: lineItem.display_order,
+              discount_percentage: 0, // Add-ons don't get discounts by default
+              discount_amount: 0,
+            };
+
+            if (lineItem.id) {
+              // Update existing add-on line item
+              await supabase
+                .from('quote_line_items')
+                .update(addonData)
+                .eq('id', lineItem.id);
+            } else {
+              // Create new add-on line item
+              await supabase
+                .from('quote_line_items')
+                .insert({
+                  ...addonData,
+                  quote_id: id,
+                });
+            }
+          }
         }
       }
 

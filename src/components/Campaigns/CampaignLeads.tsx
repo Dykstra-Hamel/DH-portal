@@ -135,7 +135,7 @@ export default function CampaignLeads({ campaignId, companyId }: CampaignLeadsPr
                   {getPriorityBadge(lead.priority)}
                 </div>
               </div>
-              <a href={`/leads/${lead.id}`} className={styles.viewLink}>
+              <a href={`/connections/leads/${lead.id}`} className={styles.viewLink}>
                 View Lead
                 <ExternalLink size={14} />
               </a>

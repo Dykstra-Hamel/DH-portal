@@ -82,60 +82,78 @@ export function QuoteSummaryCard({
           </div>
         </div>
 
-        {/* Display all line items */}
-        {quote.line_items && quote.line_items.length > 0 && (
+        {/* Service Plans Section */}
+        {quote.line_items && quote.line_items.some(item => item.service_plan_id) && (
           <>
-            {quote.line_items.map((lineItem, index) => (
-              <div key={lineItem.id}>
-                {/* Service Selection, Frequency, Initial Price, Recurring Price all on one row */}
-                <div className={styles.gridRow}>
-                  <div className={styles.gridItem}>
-                    <div className={styles.fieldLabel}>
-                      Service Selection {index + 1}/{totalLineItems}
+            <h5 className={styles.subsectionTitle}>Service Plans</h5>
+            {quote.line_items
+              .filter(item => item.service_plan_id)
+              .map((lineItem, index) => (
+                <div key={lineItem.id}>
+                  <div className={styles.gridRow}>
+                    <div className={styles.gridItem}>
+                      <div className={styles.fieldLabel}>Service {index + 1}</div>
+                      <div className={styles.fieldValue}>{lineItem.plan_name}</div>
                     </div>
-                    <div className={styles.fieldValue}>
-                      {lineItem.plan_name}
+                    <div className={styles.gridItem}>
+                      <div className={styles.fieldLabel}>Frequency</div>
+                      <div className={styles.fieldValue}>
+                        {lineItem.billing_frequency === 'quarterly'
+                          ? 'Quarterly'
+                          : lineItem.billing_frequency === 'monthly'
+                            ? 'Monthly'
+                            : lineItem.billing_frequency === 'annual'
+                              ? 'Annual'
+                              : lineItem.billing_frequency}
+                      </div>
                     </div>
-                  </div>
-                  <div className={styles.gridItem}>
-                    <div className={styles.fieldLabel}>Frequency</div>
-                    <div className={styles.fieldValue}>
-                      {lineItem.billing_frequency === 'quarterly'
-                        ? 'Quarterly'
-                        : lineItem.billing_frequency === 'monthly'
-                          ? 'Monthly'
-                          : lineItem.billing_frequency === 'annual'
-                            ? 'Annual'
-                            : lineItem.billing_frequency}
+                    <div className={styles.gridItem}>
+                      <div className={styles.fieldLabel}>Initial Price</div>
+                      <div className={styles.fieldValue}>
+                        {formatCurrency(lineItem.final_initial_price || lineItem.initial_price || 0)}
+                        {(lineItem.discount_percentage || lineItem.discount_amount) ? ' (Discounted)' : ''}
+                      </div>
                     </div>
-                  </div>
-                  <div className={styles.gridItem}>
-                    <div className={styles.fieldLabel}>Initial Price</div>
-                    <div className={styles.fieldValue}>
-                      {formatCurrency(
-                        lineItem.final_initial_price ||
-                          lineItem.initial_price ||
-                          0
-                      )}
-                      {lineItem.discount_percentage || lineItem.discount_amount
-                        ? ' (Discounted)'
-                        : ''}
-                    </div>
-                  </div>
-                  <div className={styles.gridItem}>
-                    <div className={styles.fieldLabel}>Recurring Price</div>
-                    <div className={styles.fieldValue}>
-                      {formatCurrency(
-                        lineItem.final_recurring_price ||
-                          lineItem.recurring_price ||
-                          0
-                      )}
-                      /mo
+                    <div className={styles.gridItem}>
+                      <div className={styles.fieldLabel}>Recurring Price</div>
+                      <div className={styles.fieldValue}>
+                        {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+          </>
+        )}
+
+        {/* Add-On Services Section */}
+        {quote.line_items && quote.line_items.some(item => item.addon_service_id) && (
+          <>
+            <h5 className={styles.subsectionTitle}>Add-On Services</h5>
+            {quote.line_items
+              .filter(item => item.addon_service_id)
+              .map((lineItem, index) => (
+                <div key={lineItem.id}>
+                  <div className={styles.gridRow}>
+                    <div className={styles.gridItem}>
+                      <div className={styles.fieldLabel}>Add-On {index + 1}</div>
+                      <div className={styles.fieldValue}>{lineItem.plan_name}</div>
+                    </div>
+                    <div className={styles.gridItem}>
+                      <div className={styles.fieldLabel}>Initial Price</div>
+                      <div className={styles.fieldValue}>
+                        {formatCurrency(lineItem.final_initial_price || lineItem.initial_price || 0)}
+                      </div>
+                    </div>
+                    <div className={styles.gridItem}>
+                      <div className={styles.fieldLabel}>Recurring Price</div>
+                      <div className={styles.fieldValue}>
+                        {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
           </>
         )}
       </div>

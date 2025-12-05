@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
+import localFont from 'next/font/local';
 import { LayoutWrapper } from '@/components/Layout/LayoutWrapper/LayoutWrapper';
 import { UserbackProvider } from '@/components/Common/UserbackProvider';
 import '@/styles/main.scss';
@@ -7,6 +8,12 @@ import '@/styles/main.scss';
 const outfit = Outfit({
   subsets: ['latin'],
   variable: '--font-outfit',
+  display: 'swap',
+});
+
+const veganDays = localFont({
+  src: '../../public/fonts/vegan-days.regular.ttf',
+  variable: '--font-vegan-days',
   display: 'swap',
 });
 
@@ -22,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.className}`}>
+    <html lang="en" className={`${outfit.className} ${veganDays.variable}`}>
       <body>
         <UserbackProvider>
           <LayoutWrapper>{children}</LayoutWrapper>

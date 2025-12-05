@@ -37,6 +37,7 @@ export async function sendEmail(
     text,
     companyId,
     leadId,
+    customerId,
     templateId,
     executionId,
     campaignId,
@@ -133,6 +134,7 @@ export async function sendEmail(
       await supabase.from('email_logs').insert({
         company_id: companyId,
         lead_id: leadId || null,
+        customer_id: customerId || null,
         template_id: templateId || null,
         execution_id: executionId || null,
         campaign_id: campaignId || null,
@@ -172,6 +174,7 @@ export async function sendEmail(
       await supabase.from('email_logs').insert({
         company_id: companyId,
         lead_id: leadId || null,
+        customer_id: customerId || null,
         template_id: templateId || null,
         execution_id: executionId || null,
         campaign_id: campaignId || null,
