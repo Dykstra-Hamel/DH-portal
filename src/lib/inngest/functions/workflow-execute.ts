@@ -2,6 +2,8 @@ import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { formatDateOnly, toE164PhoneNumber } from '@/lib/utils';
 import { fetchCompanyBusinessHours, isBusinessHours, getNextBusinessHourSlot } from '@/lib/campaigns/business-hours';
+import { generateLeadTrackingTags } from '@/lib/email/variables';
+import { generateCampaignLandingUrl, formatDiscount } from '@/lib/campaign-utils';
 
 interface StepResult {
   stepIndex: number;
@@ -534,7 +536,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
   // Get company information for email sending
   const { data: company } = await supabase
     .from('companies')
-    .select('name, website, email, phone')
+    .select('name, website, email, phone, slug')
     .eq('id', companyId)
     .single();
     
@@ -560,6 +562,36 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     }
   } catch (parseError) {
     console.error('Error parsing Google reviews data:', parseError);
+  }
+
+  // Get campaign data if campaignId exists
+  let campaign = null;
+  if (campaignId) {
+    console.log(`[Campaign Email] Fetching campaign data for campaignId: ${campaignId}`);
+    const { data: campaignData, error: campaignError } = await supabase
+      .from('campaigns')
+      .select('id, campaign_id, name, discount_id, company_discounts!discount_id(discount_type, discount_value)')
+      .eq('id', campaignId)
+      .single();
+
+    if (campaignError) {
+      console.error(`[Campaign Email] Error fetching campaign data:`, campaignError);
+    }
+
+    campaign = campaignData;
+    console.log(`[Campaign Email] Campaign data (full):`, JSON.stringify(campaign, null, 2));
+  } else {
+    console.log(`[Campaign Email] No campaignId provided to workflow`);
+  }
+
+  // Get company slug for campaign landing URL
+  const companySlug = company?.slug || '';
+  const useVanityUrl = true; // Default to vanity URLs for campaigns
+
+  if (campaignId && companySlug) {
+    console.log(`[Campaign Email] Using company slug: ${companySlug}`);
+  } else if (campaignId && !companySlug) {
+    console.warn(`[Campaign Email] Company has no slug set for companyId: ${companyId}`);
   }
 
   // Get company logo override from company settings
@@ -728,12 +760,50 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
                          leadData.id ||
                          'unknown',
     pageUrl: attribution?.page_url || leadData.pageUrl || leadData.attribution_data?.page_url || company?.website || '#',
-    
+
+    // Quote Variables (not populated in workflow context)
+    quoteUrl: '',
+    quoteId: '',
+    quoteTotalInitialPrice: '',
+    quoteTotalRecurringPrice: '',
+    quoteLineItems: '',
+    quotePestConcerns: '',
+    quoteHomeSize: '',
+    quoteYardSize: '',
+
+    // Campaign Variables
+    campaignLandingUrl: campaignId && customerId && companySlug
+      ? generateCampaignLandingUrl(companySlug, campaign?.campaign_id || campaignId, customerId, useVanityUrl)
+      : '',
+    campaignId: campaign?.campaign_id || '',
+    campaignName: campaign?.name || '',
+    campaignDiscountText: campaign?.company_discounts && Array.isArray(campaign.company_discounts) && campaign.company_discounts.length > 0
+      ? formatDiscount(campaign.company_discounts[0])
+      : campaign?.company_discounts && !Array.isArray(campaign.company_discounts)
+      ? formatDiscount(campaign.company_discounts)
+      : '',
+    createLeadLink: campaignId && customerId
+      ? generateLeadTrackingTags(campaignId, customerId)
+      : '',
+
     // Legacy variables for backward compatibility
     leadId,
     customerId,
     ...step.email_variables, // Any additional variables from step config
   };
+
+  // Log campaign variable population for debugging
+  if (campaignId) {
+    console.log(`[Campaign Email] Variable population:`, {
+      campaignId,
+      customerId,
+      companySlug,
+      campaignLandingUrl: emailVariables.campaignLandingUrl,
+      createLeadLink: emailVariables.createLeadLink,
+      campaignName: emailVariables.campaignName,
+      campaignDiscountText: emailVariables.campaignDiscountText,
+    });
+  }
 
   // Calculate the session ID - prioritize DB query for partial leads
   const resolvedSessionId = partialLeadData?.session_id ||
@@ -809,6 +879,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
         companyId,
         templateId: template.id,
         leadId,
+        customerId,
         executionId,
         campaignId,
         recipientName: emailVariables.customerName || customerEmail,

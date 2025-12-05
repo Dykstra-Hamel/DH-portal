@@ -12,6 +12,7 @@ import CampaignContacts from '@/components/Campaigns/CampaignContacts';
 import CampaignExecutions from '@/components/Campaigns/CampaignExecutions';
 import CampaignLeads from '@/components/Campaigns/CampaignLeads';
 import CampaignReport from '@/components/Campaigns/CampaignReport';
+import CampaignEditor from '@/components/Campaigns/CampaignEditor';
 
 interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
@@ -33,6 +34,7 @@ export default function CampaignDetailPage({
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [companyTimezone, setCompanyTimezone] =
     useState<string>('America/New_York');
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     params.then(p => setCampaignId(p.id));
@@ -201,6 +203,7 @@ export default function CampaignDetailPage({
       <CampaignDetailHeader
         campaign={campaign}
         onUpdate={handleCampaignUpdate}
+        onEdit={() => setShowEditModal(true)}
         companyTimezone={companyTimezone}
       />
 
@@ -229,6 +232,12 @@ export default function CampaignDetailPage({
           onClick={() => setActiveTab('executions')}
         >
           Executions ({metrics?.totalExecutions || 0})
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'report' ? styles.active : ''}`}
+          onClick={() => setActiveTab('report')}
+        >
+          Report
         </button>
       </div>
 
@@ -260,7 +269,27 @@ export default function CampaignDetailPage({
             companyTimezone={companyTimezone}
           />
         )}
+
+        {activeTab === 'report' && (
+          <CampaignReport
+            campaign={campaign}
+            metrics={metrics}
+            onRefresh={fetchCampaignData}
+          />
+        )}
       </div>
+
+      {/* Edit Campaign Modal */}
+      <CampaignEditor
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        companyId={campaign.company_id}
+        campaign={campaign}
+        onSuccess={() => {
+          fetchCampaignData();
+          setShowEditModal(false);
+        }}
+      />
     </div>
   );
 }

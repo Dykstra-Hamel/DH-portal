@@ -80,6 +80,13 @@ export interface EmailVariables {
   quotePestConcerns: string;
   quoteHomeSize: string;
   quoteYardSize: string;
+
+  // Campaign Variables
+  campaignLandingUrl: string;
+  campaignId: string;
+  campaignName: string;
+  campaignDiscountText: string;
+  createLeadLink: string;
 }
 
 /**
@@ -164,6 +171,13 @@ export function createSampleVariables(
     quotePestConcerns: 'Ants, Spiders, Cockroaches',
     quoteHomeSize: '2000-2500 sq ft',
     quoteYardSize: '1/4 to 1/2 Acre',
+
+    // Campaign Variables (sample data)
+    campaignLandingUrl: 'https://your-company.staging.pmpcentral.io/campaign/PEST26/abc123',
+    campaignId: 'PEST26',
+    campaignName: 'Spring Special - Save on Pest Control',
+    campaignDiscountText: '15% OFF',
+    createLeadLink: 'ses:tags="generateLead:true;campaignId:PEST26;customerId:abc-123;"',
   };
 }
 
@@ -195,4 +209,29 @@ export function extractVariables(content: string): string[] {
     variables.add(match[1]);
   }
   return Array.from(variables);
+}
+
+/**
+ * Generate SES tracking tags for lead creation from email clicks
+ *
+ * When a customer clicks a link with these tags, the SES webhook will detect
+ * the generateLead:true flag and create a lead in 'quoted' stage.
+ *
+ * @param campaignId - Campaign identifier (e.g., "PEST26")
+ * @param customerId - Customer UUID
+ * @param leadId - Optional existing lead UUID (if updating)
+ * @returns SES tags attribute string in format: ses:tags="key:value;key:value;"
+ */
+export function generateLeadTrackingTags(
+  campaignId: string | null,
+  customerId: string | null,
+  leadId?: string | null
+): string {
+  const tags: string[] = ['generateLead:true'];
+
+  if (campaignId) tags.push(`campaignId:${campaignId}`);
+  if (customerId) tags.push(`customerId:${customerId}`);
+  if (leadId) tags.push(`leadId:${leadId}`);
+
+  return `ses:tags="${tags.join(';')};"`;
 }

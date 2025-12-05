@@ -1,0 +1,164 @@
+.richTextEditor {
+  border: 1px solid var(--gray-300, #d1d5db);
+  border-radius: 6px;
+  background: white;
+  overflow: hidden;
+
+  &:focus-within {
+    border-color: var(--action-500, #0080f0);
+    box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
+  }
+}
+
+.toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+  background: var(--gray-50, #f9fafb);
+  flex-wrap: wrap;
+
+  button {
+    padding: 6px 10px;
+    border: none;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--gray-700, #374152);
+    transition: all 0.2s;
+    min-width: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      background: var(--gray-100, #f3f4f6);
+    }
+
+    &.active {
+      background: var(--action-100, #d6e9ff);
+      color: var(--action-700, #0054c2);
+    }
+
+    strong,
+    em,
+    s {
+      font-size: 14px;
+    }
+  }
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background: var(--gray-300, #d1d5db);
+  margin: 0 4px;
+}
+
+.editorContent {
+  min-height: 200px;
+  padding: 16px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--gray-900, #161a22);
+
+  &:focus {
+    outline: none;
+  }
+
+  // Style the content using :global() wrapper
+  :global(p) {
+    margin: 0 0 12px 0;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    &.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      float: left;
+      color: var(--gray-400, #99a1af);
+      pointer-events: none;
+      height: 0;
+    }
+  }
+
+  :global(h2) {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    color: var(--gray-900, #161a22);
+  }
+
+  :global(h3) {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    color: var(--gray-900, #161a22);
+  }
+
+  :global(strong) {
+    font-weight: 700;
+  }
+
+  :global(em) {
+    font-style: italic;
+  }
+
+  :global(s) {
+    text-decoration: line-through;
+  }
+
+  :global(ul),
+  :global(ol) {
+    margin: 0 0 12px 0;
+    padding-left: 24px;
+
+    :global(li) {
+      margin-bottom: 4px;
+
+      :global(p) {
+        margin: 0;
+      }
+    }
+  }
+
+  :global(ul) {
+    list-style-type: disc;
+  }
+
+  :global(ol) {
+    list-style-type: decimal;
+  }
+
+  :global(code) {
+    background: var(--gray-100, #f3f4f6);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+  }
+
+  :global(pre) {
+    background: var(--gray-900, #161a22);
+    color: white;
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0 0 12px 0;
+
+    :global(code) {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+  }
+
+  :global(blockquote) {
+    border-left: 4px solid var(--gray-300, #d1d5db);
+    padding-left: 16px;
+    margin: 0 0 12px 0;
+    color: var(--gray-600, #4a5565);
+  }
+}

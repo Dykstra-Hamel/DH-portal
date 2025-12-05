@@ -108,14 +108,18 @@ function generateEmailHtml(domain: string, records: DnsRecord[]): string {
         <p style="margin: 0; color: #6b7280; line-height: 1.6;">These records enable DomainKeys Identified Mail (DKIM) authentication, which helps prevent email spoofing and improves deliverability. You should see 3 CNAME records with &quot;_domainkey&quot; in the hostname.</p>
       </div>
 
-      <div style="background-color: #f9fafb; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
-        <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 16px;">TXT Record (SPF)</h3>
-        <p style="margin: 0; color: #6b7280; line-height: 1.6;">The SPF (Sender Policy Framework) record specifies which mail servers are authorized to send email on behalf of your domain. The hostname is typically &quot;@&quot; or your root domain.</p>
+      <div style="background-color: #fef3c7; padding: 20px; border-radius: 6px; border-left: 4px solid #f59e0b; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 10px 0; color: #92400e; font-size: 16px;">⚠️ TXT Record (SPF) - IMPORTANT</h3>
+        <p style="margin: 0 0 10px 0; color: #78350f; line-height: 1.6; font-weight: 600;">You can only have ONE SPF record per domain.</p>
+        <p style="margin: 0; color: #78350f; line-height: 1.6;"><strong>If you already have an SPF record:</strong> Do NOT create a new one. Instead, add <code style="background-color: #ffffff; padding: 2px 6px; border-radius: 3px;">include:amazonses.com</code> to your existing SPF record, before the final mechanism (usually <code style="background-color: #ffffff; padding: 2px 6px; border-radius: 3px;">~all</code> or <code style="background-color: #ffffff; padding: 2px 6px; border-radius: 3px;">-all</code>).</p>
+        <p style="margin: 10px 0 0 0; color: #78350f; line-height: 1.6;"><strong>If you don&apos;t have an SPF record yet:</strong> Create a new TXT record with the value shown in the table above.</p>
       </div>
 
-      <div style="background-color: #f9fafb; padding: 20px; border-radius: 6px;">
-        <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 16px;">TXT Record (DMARC)</h3>
-        <p style="margin: 0; color: #6b7280; line-height: 1.6;">The DMARC (Domain-based Message Authentication, Reporting &amp; Conformance) record tells receiving mail servers how to handle messages that fail authentication. The hostname starts with &quot;_dmarc&quot;.</p>
+      <div style="background-color: #fef3c7; padding: 20px; border-radius: 6px; border-left: 4px solid #f59e0b;">
+        <h3 style="margin: 0 0 10px 0; color: #92400e; font-size: 16px;">⚠️ TXT Record (DMARC) - IMPORTANT</h3>
+        <p style="margin: 0 0 10px 0; color: #78350f; line-height: 1.6; font-weight: 600;">You can only have ONE DMARC record per domain.</p>
+        <p style="margin: 0; color: #78350f; line-height: 1.6;"><strong>If you already have a DMARC record:</strong> Do NOT create a new one. Your existing DMARC record should work fine with AWS SES. No changes needed unless you want to adjust your DMARC policy.</p>
+        <p style="margin: 10px 0 0 0; color: #78350f; line-height: 1.6;"><strong>If you don&apos;t have a DMARC record yet:</strong> Create a new TXT record with the value shown in the table above.</p>
       </div>
 
       <h2 style="margin: 30px 0 20px 0; color: #1f2937; font-size: 20px;">Important Notes</h2>
@@ -170,11 +174,26 @@ WHAT THESE RECORDS DO:
 CNAME Records (DKIM):
 These records enable DomainKeys Identified Mail (DKIM) authentication, which helps prevent email spoofing and improves deliverability. You should see 3 CNAME records with "_domainkey" in the hostname.
 
-TXT Record (SPF):
-The SPF (Sender Policy Framework) record specifies which mail servers are authorized to send email on behalf of your domain. The hostname is typically "@" or your root domain.
+⚠️ TXT Record (SPF) - IMPORTANT:
+You can only have ONE SPF record per domain.
 
-TXT Record (DMARC):
-The DMARC (Domain-based Message Authentication, Reporting & Conformance) record tells receiving mail servers how to handle messages that fail authentication. The hostname starts with "_dmarc".
+** If you already have an SPF record: **
+Do NOT create a new one. Instead, add "include:amazonses.com" to your existing SPF record, before the final mechanism (usually "~all" or "-all").
+
+Example: If your current SPF is "v=spf1 include:_spf.google.com ~all"
+Update it to: "v=spf1 include:_spf.google.com include:amazonses.com ~all"
+
+** If you don't have an SPF record yet: **
+Create a new TXT record with the value shown in the table above.
+
+⚠️ TXT Record (DMARC) - IMPORTANT:
+You can only have ONE DMARC record per domain.
+
+** If you already have a DMARC record: **
+Do NOT create a new one. Your existing DMARC record should work fine with AWS SES. No changes needed unless you want to adjust your DMARC policy.
+
+** If you don't have a DMARC record yet: **
+Create a new TXT record with the value shown in the table above.
 
 IMPORTANT NOTES:
 

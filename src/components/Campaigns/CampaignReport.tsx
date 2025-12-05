@@ -76,13 +76,13 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
       ['Metric', 'Count', 'Percentage'],
       ['Total Sent', emailMetrics.sent, '100%'],
       ['Delivered', emailMetrics.delivered, deliveryRate + '%'],
-      ['Opened', emailMetrics.opened, emailMetrics.open_rate ? `${(emailMetrics.open_rate * 100).toFixed(1)}%` : 'N/A'],
-      ['Clicked', emailMetrics.clicked, emailMetrics.click_rate ? `${(emailMetrics.click_rate * 100).toFixed(1)}%` : 'N/A'],
-      ['Click-Through Rate', emailMetrics.clicked, emailMetrics.click_through_rate ? `${(emailMetrics.click_through_rate * 100).toFixed(1)}%` : 'N/A'],
-      ['Bounced', emailMetrics.bounced, emailMetrics.bounce_rate ? `${(emailMetrics.bounce_rate * 100).toFixed(1)}%` : 'N/A'],
-      ['Hard Bounces', emailMetrics.hard_bounces, emailMetrics.bounced > 0 ? `${((emailMetrics.hard_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : 'N/A'],
-      ['Soft Bounces', emailMetrics.soft_bounces, emailMetrics.bounced > 0 ? `${((emailMetrics.soft_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : 'N/A'],
-      ['Complained', emailMetrics.complained, emailMetrics.complaint_rate ? `${(emailMetrics.complaint_rate * 100).toFixed(1)}%` : 'N/A'],
+      ['Opened', emailMetrics.opened, emailMetrics.open_rate != null ? `${emailMetrics.open_rate.toFixed(1)}%` : 'N/A'],
+      ['Clicked', emailMetrics.clicked, emailMetrics.click_rate != null ? `${emailMetrics.click_rate.toFixed(1)}%` : 'N/A'],
+      ['Click-Through Rate', emailMetrics.clicked, emailMetrics.click_through_rate != null ? `${emailMetrics.click_through_rate.toFixed(1)}%` : 'N/A'],
+      ['Bounced', emailMetrics.bounced, emailMetrics.bounce_rate != null ? `${emailMetrics.bounce_rate.toFixed(1)}%` : 'N/A'],
+      ['Hard Bounces', emailMetrics.hard_bounces, emailMetrics.bounced > 0 ? `${((emailMetrics.hard_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : '0.0%'],
+      ['Soft Bounces', emailMetrics.soft_bounces, emailMetrics.bounced > 0 ? `${((emailMetrics.soft_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : '0.0%'],
+      ['Complained', emailMetrics.complained, emailMetrics.complaint_rate != null ? `${emailMetrics.complaint_rate.toFixed(1)}%` : 'N/A'],
       ['Failed', emailMetrics.failed, emailMetrics.sent > 0 ? `${((emailMetrics.failed / emailMetrics.sent) * 100).toFixed(1)}%` : 'N/A'],
     ];
 
@@ -193,56 +193,56 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
 
         {/* Open Rate */}
         <div className={styles.kpiCard}>
-          <div className={`${styles.kpiIcon} ${getRateColorClass(emailMetrics.open_rate * 100)}`}>
+          <div className={`${styles.kpiIcon} ${getRateColorClass(emailMetrics.open_rate)}`}>
             <TrendingUp size={20} />
           </div>
           <div className={styles.kpiContent}>
             <p className={styles.kpiValue}>{emailMetrics.opened.toLocaleString()}</p>
             <p className={styles.kpiLabel}>Opened</p>
-            <p className={`${styles.kpiPercent} ${getRateColorClass(emailMetrics.open_rate * 100)}`}>
-              {emailMetrics.open_rate ? `${(emailMetrics.open_rate * 100).toFixed(1)}%` : 'N/A'}
+            <p className={`${styles.kpiPercent} ${getRateColorClass(emailMetrics.open_rate)}`}>
+              {emailMetrics.open_rate != null ? `${emailMetrics.open_rate.toFixed(1)}%` : 'N/A'}
             </p>
           </div>
         </div>
 
         {/* Click Rate */}
         <div className={styles.kpiCard}>
-          <div className={`${styles.kpiIcon} ${getRateColorClass(emailMetrics.click_rate * 100)}`}>
+          <div className={`${styles.kpiIcon} ${getRateColorClass(emailMetrics.click_rate)}`}>
             <TrendingUp size={20} />
           </div>
           <div className={styles.kpiContent}>
             <p className={styles.kpiValue}>{emailMetrics.clicked.toLocaleString()}</p>
             <p className={styles.kpiLabel}>Clicked</p>
-            <p className={`${styles.kpiPercent} ${getRateColorClass(emailMetrics.click_rate * 100)}`}>
-              {emailMetrics.click_rate ? `${(emailMetrics.click_rate * 100).toFixed(1)}%` : 'N/A'}
+            <p className={`${styles.kpiPercent} ${getRateColorClass(emailMetrics.click_rate)}`}>
+              {emailMetrics.click_rate != null ? `${emailMetrics.click_rate.toFixed(1)}%` : 'N/A'}
             </p>
           </div>
         </div>
 
         {/* Bounce Rate */}
         <div className={styles.kpiCard}>
-          <div className={`${styles.kpiIcon} ${getRateColorClass(emailMetrics.bounce_rate * 100, 'negative')}`}>
+          <div className={`${styles.kpiIcon} ${getRateColorClass(emailMetrics.bounce_rate, 'negative')}`}>
             <AlertTriangle size={20} />
           </div>
           <div className={styles.kpiContent}>
             <p className={styles.kpiValue}>{emailMetrics.bounced.toLocaleString()}</p>
             <p className={styles.kpiLabel}>Bounced</p>
-            <p className={`${styles.kpiPercent} ${getRateColorClass(emailMetrics.bounce_rate * 100, 'negative')}`}>
-              {emailMetrics.bounce_rate ? `${(emailMetrics.bounce_rate * 100).toFixed(1)}%` : 'N/A'}
+            <p className={`${styles.kpiPercent} ${getRateColorClass(emailMetrics.bounce_rate, 'negative')}`}>
+              {emailMetrics.bounce_rate != null ? `${emailMetrics.bounce_rate.toFixed(1)}%` : 'N/A'}
             </p>
           </div>
         </div>
 
         {/* Complaint Rate */}
         <div className={styles.kpiCard}>
-          <div className={`${styles.kpiIcon} ${getRateColorClass(emailMetrics.complaint_rate * 100, 'negative')}`}>
+          <div className={`${styles.kpiIcon} ${getRateColorClass(emailMetrics.complaint_rate, 'negative')}`}>
             <XCircle size={20} />
           </div>
           <div className={styles.kpiContent}>
             <p className={styles.kpiValue}>{emailMetrics.complained.toLocaleString()}</p>
             <p className={styles.kpiLabel}>Complained</p>
-            <p className={`${styles.kpiPercent} ${getRateColorClass(emailMetrics.complaint_rate * 100, 'negative')}`}>
-              {emailMetrics.complaint_rate ? `${(emailMetrics.complaint_rate * 100).toFixed(1)}%` : 'N/A'}
+            <p className={`${styles.kpiPercent} ${getRateColorClass(emailMetrics.complaint_rate, 'negative')}`}>
+              {emailMetrics.complaint_rate != null ? `${emailMetrics.complaint_rate.toFixed(1)}%` : 'N/A'}
             </p>
           </div>
         </div>
@@ -353,17 +353,17 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
             <tr>
               <td>Opened</td>
               <td>{emailMetrics.opened.toLocaleString()}</td>
-              <td>{emailMetrics.open_rate ? `${(emailMetrics.open_rate * 100).toFixed(1)}%` : 'N/A'}</td>
+              <td>{emailMetrics.open_rate != null ? `${emailMetrics.open_rate.toFixed(1)}%` : 'N/A'}</td>
             </tr>
             <tr>
               <td>Clicked</td>
               <td>{emailMetrics.clicked.toLocaleString()}</td>
-              <td>{emailMetrics.click_rate ? `${(emailMetrics.click_rate * 100).toFixed(1)}%` : 'N/A'}</td>
+              <td>{emailMetrics.click_rate != null ? `${emailMetrics.click_rate.toFixed(1)}%` : 'N/A'}</td>
             </tr>
             <tr>
               <td>Click-Through Rate (CTR)</td>
               <td>{emailMetrics.clicked.toLocaleString()}</td>
-              <td>{emailMetrics.click_through_rate ? `${(emailMetrics.click_through_rate * 100).toFixed(1)}%` : 'N/A'}</td>
+              <td>{emailMetrics.click_through_rate != null ? `${emailMetrics.click_through_rate.toFixed(1)}%` : 'N/A'}</td>
             </tr>
 
             <tr className={styles.categoryRow}>
@@ -372,22 +372,22 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
             <tr>
               <td>Total Bounced</td>
               <td>{emailMetrics.bounced.toLocaleString()}</td>
-              <td>{emailMetrics.bounce_rate ? `${(emailMetrics.bounce_rate * 100).toFixed(1)}%` : 'N/A'}</td>
+              <td>{emailMetrics.bounce_rate != null ? `${emailMetrics.bounce_rate.toFixed(1)}%` : 'N/A'}</td>
             </tr>
             <tr>
               <td>&nbsp;&nbsp;Hard Bounces</td>
               <td>{emailMetrics.hard_bounces.toLocaleString()}</td>
-              <td>{emailMetrics.bounced > 0 ? `${((emailMetrics.hard_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : 'N/A'}</td>
+              <td>{emailMetrics.bounced > 0 ? `${((emailMetrics.hard_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : '0.0%'}</td>
             </tr>
             <tr>
               <td>&nbsp;&nbsp;Soft Bounces</td>
               <td>{emailMetrics.soft_bounces.toLocaleString()}</td>
-              <td>{emailMetrics.bounced > 0 ? `${((emailMetrics.soft_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : 'N/A'}</td>
+              <td>{emailMetrics.bounced > 0 ? `${((emailMetrics.soft_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : '0.0%'}</td>
             </tr>
             <tr>
               <td>Complained</td>
               <td>{emailMetrics.complained.toLocaleString()}</td>
-              <td>{emailMetrics.complaint_rate ? `${(emailMetrics.complaint_rate * 100).toFixed(1)}%` : 'N/A'}</td>
+              <td>{emailMetrics.complaint_rate != null ? `${emailMetrics.complaint_rate.toFixed(1)}%` : 'N/A'}</td>
             </tr>
           </tbody>
         </table>

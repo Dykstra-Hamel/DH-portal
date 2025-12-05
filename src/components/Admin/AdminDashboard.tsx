@@ -20,6 +20,7 @@ import PestManager from './PestManager';
 import TemplateLibraryManager from './TemplateLibraryManager';
 import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
+import AddOnServicesManager from './AddOnServicesManager';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -34,7 +35,7 @@ type AdminCategory =
   | 'system';
 
 type UserSubsection = 'users' | 'relationships';
-type CompanySubsection = 'companies' | 'projects' | 'brands';
+type CompanySubsection = 'companies' | 'projects' | 'brands' | 'add-ons';
 type AnalyticsSubsection =
   | 'attribution'
   | 'forms'
@@ -62,6 +63,7 @@ type AdminSection =
   | 'relationships'
   | 'brands'
   | 'projects'
+  | 'add-ons'
   | 'widgets'
   | 'call-records'
   | 'call-settings'
@@ -115,6 +117,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
       { id: 'companies', label: 'Companies', legacySection: 'companies' },
       { id: 'projects', label: 'Projects', legacySection: 'projects' },
       { id: 'brands', label: 'Brand Management', legacySection: 'brands' },
+      { id: 'add-ons', label: 'Add-On Services', legacySection: 'add-ons' },
     ],
   },
   {
@@ -250,6 +253,15 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <BrandManager />;
       case 'projects':
         return <ProjectsManager user={user} />;
+      case 'add-ons':
+        if (!selectedCompanyId) {
+          return (
+            <div className={styles.emptyState}>
+              <p>Please select a company to manage add-on services</p>
+            </div>
+          );
+        }
+        return <AddOnServicesManager companyId={selectedCompanyId} />;
       case 'widgets':
         return <WidgetManager />;
       case 'call-records':
@@ -331,8 +343,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         );
       })()}
 
-      {/* Company Selection for Workflow Executions */}
-      {activeSubsection === 'executions' && companies.length > 0 && (
+      {/* Company Selection for Workflow Executions and Add-Ons */}
+      {(activeSubsection === 'executions' || activeSubsection === 'add-ons') && companies.length > 0 && (
         <div className={styles.companySelector}>
           <label htmlFor="company-select">Select Company:</label>
           <select

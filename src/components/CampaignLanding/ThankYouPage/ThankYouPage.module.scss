@@ -1,0 +1,146 @@
+// Thank You Page Styles
+// Full-page version shown when campaign already redeemed
+
+.thankYouPage {
+  min-height: 100vh;
+  background: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+
+  // CSS variables for branding
+  --brand-primary: #00529b;
+  --brand-secondary: #00b142;
+}
+
+.container {
+  max-width: 900px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 60px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+
+  @media (max-width: 768px) {
+    padding: 40px 24px;
+  }
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 40px;
+
+  img {
+    max-width: 200px;
+    height: auto;
+  }
+}
+
+.completionHeader {
+  text-align: center;
+  margin-bottom: 50px;
+
+  h1 {
+    font-size: 36px;
+    font-weight: 700;
+    color: #2b2b2b;
+    margin-bottom: 16px;
+
+    @media (max-width: 768px) {
+      font-size: 28px;
+    }
+  }
+
+  p {
+    font-size: 18px;
+    color: #4e4e4e;
+    margin: 8px 0;
+  }
+}
+
+.redeemedDate {
+  font-size: 14px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.checkmark {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  color: #ffffff;
+  font-size: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 30px;
+  animation: scaleIn 0.5s ease-out;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.summaryCard {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+
+  h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #2b2b2b;
+    margin-bottom: 16px;
+  }
+
+  p {
+    margin: 8px 0;
+    color: #4e4e4e;
+    font-size: 14px;
+    line-height: 1.6;
+
+    strong {
+      color: #2b2b2b;
+      font-weight: 600;
+    }
+  }
+
+  ul {
+    padding-left: 20px;
+    margin: 12px 0;
+
+    li {
+      margin: 8px 0;
+      color: #4e4e4e;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  }
+}
+
+.discountSummary {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--brand-secondary);
+  margin-top: 12px;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

@@ -9,6 +9,9 @@ import WorkflowSelector from './WorkflowSelector';
 import ContactListUpload from './ContactListUpload';
 import DiscountModal from '@/components/Admin/DiscountModal';
 import CampaignSchedulePreview from './CampaignSchedulePreview';
+import CampaignLandingPageEditorStep, {
+  LandingPageFormData,
+} from './CampaignLandingPageEditorStep/CampaignLandingPageEditorStep';
 
 interface CampaignEditorProps {
   isOpen: boolean;
@@ -18,7 +21,7 @@ interface CampaignEditorProps {
   onSuccess: () => void;
 }
 
-type Step = 'basic' | 'workflow' | 'contacts' | 'review';
+type Step = 'basic' | 'workflow' | 'contacts' | 'landing-page' | 'review';
 
 export default function CampaignEditor({
   isOpen,
@@ -60,6 +63,46 @@ export default function CampaignEditor({
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [estimatedDays, setEstimatedDays] = useState<number | null>(null);
   const [schedulePreview, setSchedulePreview] = useState<any>(null);
+
+  // Landing page state
+  const [landingPageEnabled, setLandingPageEnabled] = useState(false);
+  const [servicePlanId, setServicePlanId] = useState<string | null>(null);
+  const [landingPageData, setLandingPageData] = useState<LandingPageFormData>({
+    hero_title: 'Quarterly Pest Control starting at only $44/mo',
+    hero_subtitle: 'Special Offer',
+    hero_description: '',
+    hero_button_text: 'Upgrade Today!',
+    hero_image_url: '',
+    display_price: '$44/mo',
+    display_original_price: '',
+    display_savings: '',
+    show_letter: true,
+    letter_content: '',
+    letter_signature_text: 'The Team',
+    letter_image_url: '',
+    feature_heading: 'No initial cost to get started',
+    feature_bullets: [],
+    feature_image_url: '',
+    show_additional_services: true,
+    additional_services_heading:
+      'And thats not all, we offer additional add-on programs as well including:',
+    additional_services: [],
+    additional_services_image_url: '',
+    show_faq: true,
+    faq_heading: 'Frequently Asked Questions',
+    faq_items: [],
+    header_primary_button_text: 'Upgrade Now',
+    header_secondary_button_text: 'Call (888) 888-8888',
+    show_header_cta: true,
+    footer_company_tagline: 'Personal. Urgent. Reliable.',
+    footer_links: [],
+    terms_content: '',
+    override_logo_url: '',
+    override_primary_color: '',
+    override_secondary_color: '',
+    override_phone: '',
+    accent_color_preference: 'primary',
+  });
 
   // Fetch company data on mount
   useEffect(() => {
@@ -164,6 +207,65 @@ export default function CampaignEditor({
     }
   };
 
+  const fetchLandingPageData = async (campaignId: string) => {
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/landing-page`);
+      const result = await response.json();
+
+      if (result.success && result.landingPage) {
+        const lp = result.landingPage;
+
+        // Enable landing page if data exists
+        setLandingPageEnabled(true);
+
+        // Set service plan ID
+        if (result.campaign?.service_plan_id) {
+          setServicePlanId(result.campaign.service_plan_id);
+        }
+
+        // Map API response to form data
+        setLandingPageData({
+          hero_title: lp.hero.title || 'Quarterly Pest Control starting at only $44/mo',
+          hero_subtitle: lp.hero.subtitle || 'Special Offer',
+          hero_description: lp.hero.description || '',
+          hero_button_text: lp.hero.buttonText || 'Upgrade Today!',
+          hero_image_url: lp.hero.imageUrl || '',
+          display_price: lp.pricing.displayPrice || '$44/mo',
+          display_original_price: lp.pricing.originalPrice || '',
+          display_savings: lp.pricing.savings || '',
+          show_letter: lp.letter.show,
+          letter_content: lp.letter.content || '',
+          letter_signature_text: lp.letter.signatureText || 'The Team',
+          letter_image_url: lp.letter.imageUrl || '',
+          feature_heading: lp.features.heading || 'No initial cost to get started',
+          feature_bullets: lp.features.bullets || [],
+          feature_image_url: lp.features.imageUrl || '',
+          show_additional_services: lp.additionalServices.show,
+          additional_services_heading: lp.additionalServices.heading || 'And thats not all, we offer additional add-on programs as well including:',
+          additional_services: lp.additionalServices.services || [],
+          additional_services_image_url: lp.additionalServices.imageUrl || '',
+          show_faq: lp.faq.show,
+          faq_heading: lp.faq.heading || 'Frequently Asked Questions',
+          faq_items: lp.faq.items || [],
+          header_primary_button_text: lp.header.primaryButtonText || 'Upgrade Now',
+          header_secondary_button_text: lp.header.secondaryButtonText || 'Call (888) 888-8888',
+          show_header_cta: lp.header.showCta,
+          footer_company_tagline: lp.footer.tagline || 'Personal. Urgent. Reliable.',
+          footer_links: lp.footer.links || [],
+          terms_content: lp.terms.content || '',
+          override_logo_url: lp.branding.logoUrl || '',
+          override_primary_color: lp.branding.primaryColor || '',
+          override_secondary_color: lp.branding.secondaryColor || '',
+          override_phone: lp.branding.phoneNumber || '',
+          accent_color_preference: lp.branding.accentColorPreference || 'primary',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching landing page data:', error);
+      // Don't throw - landing page is optional
+    }
+  };
+
   useEffect(() => {
     if (campaign) {
       setFormData({
@@ -178,12 +280,18 @@ export default function CampaignEditor({
       });
       setSelectedWorkflow(campaign.workflow);
       setEstimatedDays(campaign.estimated_days || null);
+      setServicePlanId(campaign.service_plan_id || null);
       // Mark campaign ID and name as available if editing existing campaign
       if (campaign.campaign_id) {
         setCampaignIdAvailable(true);
       }
       if (campaign.name) {
         setCampaignNameAvailable(true);
+      }
+
+      // Fetch landing page data if campaign exists
+      if (campaign.campaign_id) {
+        fetchLandingPageData(campaign.campaign_id);
       }
     }
   }, [campaign]);
@@ -231,7 +339,10 @@ export default function CampaignEditor({
     { key: 'basic', label: 'Basic Info', number: 1 },
     { key: 'workflow', label: 'Select Workflow', number: 2 },
     { key: 'contacts', label: 'Add Contacts', number: 3 },
-    { key: 'review', label: 'Review & Launch', number: 4 },
+    ...(landingPageEnabled
+      ? [{ key: 'landing-page' as Step, label: 'Landing Page', number: 4 }]
+      : []),
+    { key: 'review', label: 'Review & Launch', number: landingPageEnabled ? 5 : 4 },
   ];
 
   const currentStepIndex = steps.findIndex(s => s.key === currentStep);
@@ -249,6 +360,12 @@ export default function CampaignEditor({
         return formData.workflow_id;
       case 'contacts':
         return contactLists.length > 0 && totalContacts > 0;
+      case 'landing-page':
+        // Require hero_title and display_price if landing page is enabled
+        return (
+          landingPageData.hero_title.trim() !== '' &&
+          landingPageData.display_price.trim() !== ''
+        );
       case 'review':
         return true;
       default:
@@ -392,6 +509,7 @@ export default function CampaignEditor({
         start_datetime: convertToUTC(formData.start_datetime),
         company_id: companyId,
         total_contacts: totalContacts,
+        service_plan_id: servicePlanId,
       };
 
       const response = await fetch(url, {
@@ -405,6 +523,11 @@ export default function CampaignEditor({
       if (!result.success) {
         throw new Error(result.error || 'Failed to save campaign');
       }
+
+      // Determine campaign_id for landing page operations
+      const campaignIdForLandingPage = campaign
+        ? campaign.campaign_id  // Use existing campaign_id when editing
+        : formData.campaign_id;  // Use new campaign_id when creating
 
       // If creating a new campaign, assign ALL contact lists
       if (!campaign && result.campaign?.id) {
@@ -444,6 +567,34 @@ export default function CampaignEditor({
         }
 
         // All lists (both pre-existing and newly uploaded) are now assigned
+      }
+
+      // Save landing page (works for both create and edit)
+      if (landingPageEnabled && campaignIdForLandingPage) {
+        try {
+          const landingPageMethod = campaign ? 'PUT' : 'POST';
+          const landingPageResponse = await fetch(
+            `/api/campaigns/${campaignIdForLandingPage}/landing-page`,
+            {
+              method: landingPageMethod,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...landingPageData,
+                service_plan_id: servicePlanId,
+              }),
+            }
+          );
+
+          const landingPageResult = await landingPageResponse.json();
+
+          if (!landingPageResult.success) {
+            console.error('Failed to save landing page:', landingPageResult.error);
+            // Don't throw - campaign is already created/updated
+          }
+        } catch (landingPageErr) {
+          console.error('Error saving landing page:', landingPageErr);
+          // Don't throw - campaign is already created/updated
+        }
       }
 
       // Show success message based on start time
@@ -496,6 +647,46 @@ export default function CampaignEditor({
     setEstimatedDays(null);
     setSchedulePreview(null);
     setError(null);
+
+    // Reset landing page state
+    setLandingPageEnabled(false);
+    setLandingPageData({
+      hero_title: 'Quarterly Pest Control starting at only $44/mo',
+      hero_subtitle: 'Special Offer',
+      hero_description: '',
+      hero_button_text: 'Upgrade Today!',
+      hero_image_url: '',
+      display_price: '$44/mo',
+      display_original_price: '',
+      display_savings: '',
+      show_letter: true,
+      letter_content: '',
+      letter_signature_text: 'The Team',
+      letter_image_url: '',
+      feature_heading: 'No initial cost to get started',
+      feature_bullets: [],
+      feature_image_url: '',
+      show_additional_services: true,
+      additional_services_heading:
+        'And thats not all, we offer additional add-on programs as well including:',
+      additional_services: [],
+      additional_services_image_url: '',
+      show_faq: true,
+      faq_heading: 'Frequently Asked Questions',
+      faq_items: [],
+      header_primary_button_text: 'Upgrade Now',
+      header_secondary_button_text: 'Call (888) 888-8888',
+      show_header_cta: true,
+      footer_company_tagline: 'Personal. Urgent. Reliable.',
+      footer_links: [],
+      terms_content: '',
+      override_logo_url: '',
+      override_primary_color: '',
+      override_secondary_color: '',
+      override_phone: '',
+      accent_color_preference: 'primary',
+    });
+
     onClose();
   };
 
@@ -745,7 +936,40 @@ export default function CampaignEditor({
                     )}
                   </div>
                 )}
+
+                {/* Landing Page Option */}
+                <div className={styles.landingPageOption}>
+                  <h3>Landing Page (Optional)</h3>
+                  <div className={styles.formGroup}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={landingPageEnabled}
+                        onChange={(e) => setLandingPageEnabled(e.target.checked)}
+                        style={{ width: 'auto', marginRight: '8px' }}
+                      />
+                      Create custom landing page for this campaign
+                    </label>
+                    <small>
+                      Add a customized landing page with images, text, and branding specific to
+                      this campaign
+                    </small>
+                  </div>
+                </div>
               </div>
+            </div>
+          )}
+
+          {currentStep === 'landing-page' && (
+            <div className={styles.landingPageStep}>
+              <CampaignLandingPageEditorStep
+                campaignId={formData.campaign_id}
+                companyId={companyId}
+                data={landingPageData}
+                onChange={setLandingPageData}
+                servicePlanId={servicePlanId}
+                onServicePlanChange={setServicePlanId}
+              />
             </div>
           )}
 
@@ -867,6 +1091,38 @@ export default function CampaignEditor({
                     respectBusinessHours={formData.respect_business_hours}
                     startDate={formData.start_datetime}
                   />
+                </div>
+              )}
+
+              {/* Landing Page Review */}
+              {landingPageEnabled && (
+                <div className={styles.reviewGroup}>
+                  <h4>Landing Page</h4>
+                  <div className={styles.reviewItem}>
+                    <span className={styles.reviewLabel}>Status:</span>
+                    <span className={styles.reviewValue}>Custom landing page enabled</span>
+                  </div>
+                  <div className={styles.reviewItem}>
+                    <span className={styles.reviewLabel}>Hero Title:</span>
+                    <span className={styles.reviewValue}>{landingPageData.hero_title}</span>
+                  </div>
+                  <div className={styles.reviewItem}>
+                    <span className={styles.reviewLabel}>Display Price:</span>
+                    <span className={styles.reviewValue}>{landingPageData.display_price}</span>
+                  </div>
+                  <div className={styles.reviewItem}>
+                    <span className={styles.reviewLabel}>Sections:</span>
+                    <span className={styles.reviewValue}>
+                      {[
+                        landingPageData.show_letter && 'Letter',
+                        landingPageData.feature_bullets.length > 0 && 'Features',
+                        landingPageData.show_additional_services && 'Services',
+                        landingPageData.show_faq && 'FAQ',
+                      ]
+                        .filter(Boolean)
+                        .join(', ') || 'Hero section only'}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

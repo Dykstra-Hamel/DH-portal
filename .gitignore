@@ -52,3 +52,5 @@ scripts/*.sh
 
 # Migration backups (historical data migrations already run in production)
 backups/
+
+.mcp.json

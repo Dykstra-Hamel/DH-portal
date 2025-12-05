@@ -43,6 +43,7 @@ export interface SendEmailParams {
   text?: string;
   companyId: string;
   leadId?: string;
+  customerId?: string;
   templateId?: string;
   executionId?: string;
   campaignId?: string;

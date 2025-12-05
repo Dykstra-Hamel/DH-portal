@@ -114,3 +114,12 @@
     cursor: not-allowed;
   }
 }
+
+.subsectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin: 16px 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

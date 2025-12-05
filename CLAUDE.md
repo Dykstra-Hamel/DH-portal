@@ -158,6 +158,7 @@ npm run migrate-to-ses -- --company-id=<uuid>
 ### Email Sending
 
 All email sending goes through:
+
 - **API Route**: `/api/email/send` - Main email sending endpoint
 - **Direct Import**: `import { sendEmail } from '@/lib/aws-ses/send-email'` - For server-side code
 - **Features**: Automatic suppression list checking, tenant routing, delivery tracking
@@ -173,6 +174,7 @@ All email sending goes through:
 - Create migration: `npx supabase migration new <name>`
 - Test locally: `npx supabase db push --local`
 - Deploy to production: `npx supabase db push --linked`
+- CLAUDE - do not run any supabase migration commands either locally or to the remote linked database.
 
 ## Notes for Developers
 
