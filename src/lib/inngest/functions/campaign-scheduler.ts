@@ -2,6 +2,7 @@ import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { fetchCompanyBusinessHours, isBusinessHours, getNextBusinessHourSlot } from '@/lib/campaigns/business-hours';
 import { canStartNewCall, trackCallStart, cleanupStaleCalls } from '@/lib/campaigns/concurrency-manager';
+import { bulkCheckSuppression, bulkCheckPhoneSuppression } from '@/lib/suppression';
 
 export const campaignSchedulerHandler = inngest.createFunction(
   {
@@ -149,14 +150,139 @@ export const campaignSchedulerHandler = inngest.createFunction(
 
         console.log(`Starting campaign ${campaign.name} with ${contacts.length} contacts`);
 
-        // Send event to process contacts in batch
+        // Filter out suppressed contacts
+        // Get customer emails and phones for all contacts
+        const customerIds = contacts.map(c => c.customer_id).filter(Boolean);
+        const { data: customers } = await supabase
+          .from('customers')
+          .select('id, email, phone')
+          .in('id', customerIds);
+
+        const emailMap = new Map(customers?.map(c => [c.id, c.email]) || []);
+        const phoneMap = new Map(customers?.map(c => [c.id, c.phone]) || []);
+
+        // Get workflow to determine communication type
+        const { data: workflow } = await supabase
+          .from('automation_workflows')
+          .select('workflow_steps')
+          .eq('id', campaign.workflow_id)
+          .single();
+
+        // Check what type of communications this workflow uses
+        const workflowSteps = workflow?.workflow_steps || [];
+        const hasEmailSteps = workflowSteps.some((s: any) => s.type === 'send_email');
+        const hasPhoneSteps = workflowSteps.some((s: any) => s.type === 'make_call');
+        const hasSmsSteps = workflowSteps.some((s: any) => s.type === 'send_sms');
+
+        // Build suppression check lists
+        const emailsToCheck: string[] = [];
+        const phonesToCheck: string[] = [];
+        const contactEmailMap = new Map<string, string>();
+        const contactPhoneMap = new Map<string, string>();
+
+        for (const contact of contacts) {
+          const email = emailMap.get(contact.customer_id);
+          const phone = phoneMap.get(contact.customer_id);
+
+          if (hasEmailSteps && email) {
+            emailsToCheck.push(email);
+            contactEmailMap.set(contact.id, email);
+          }
+          if ((hasPhoneSteps || hasSmsSteps) && phone) {
+            phonesToCheck.push(phone);
+            contactPhoneMap.set(contact.id, phone);
+          }
+        }
+
+        // Bulk check suppressions
+        const [emailSuppressionResult, phoneSuppressionResult, smsSuppressionResult] = await Promise.all([
+          hasEmailSteps && emailsToCheck.length > 0
+            ? bulkCheckSuppression(emailsToCheck, campaign.company_id)
+            : Promise.resolve({ success: true, data: {} }),
+          hasPhoneSteps && phonesToCheck.length > 0
+            ? bulkCheckPhoneSuppression(phonesToCheck, campaign.company_id, 'phone')
+            : Promise.resolve({ success: true, data: {} }),
+          hasSmsSteps && phonesToCheck.length > 0
+            ? bulkCheckPhoneSuppression(phonesToCheck, campaign.company_id, 'sms')
+            : Promise.resolve({ success: true, data: {} }),
+        ]);
+
+        // Filter contacts and mark suppressed ones as excluded
+        // IMPORTANT: Only exclude if suppressed for ALL communication types the workflow uses
+        // This allows partial suppression (e.g., email-only unsubscribe while phone calls still work)
+        const validContacts = [];
+        const suppressedContactIds = [];
+
+        for (const contact of contacts) {
+          const email = contactEmailMap.get(contact.id);
+          const phone = contactPhoneMap.get(contact.id);
+
+          const emailSuppressed = email && emailSuppressionResult.data ?
+            (emailSuppressionResult.data as Record<string, boolean>)[email] ?? false : false;
+          const phoneSuppressed = phone && phoneSuppressionResult.data ?
+            (phoneSuppressionResult.data as Record<string, boolean>)[phone] ?? false : false;
+          const smsSuppressed = phone && smsSuppressionResult.data ?
+            (smsSuppressionResult.data as Record<string, boolean>)[phone] ?? false : false;
+
+          // Count which step types are suppressed vs available
+          let suppressedStepTypes = 0;
+          let totalStepTypes = 0;
+
+          if (hasEmailSteps) {
+            totalStepTypes++;
+            if (emailSuppressed) suppressedStepTypes++;
+          }
+          if (hasPhoneSteps) {
+            totalStepTypes++;
+            if (phoneSuppressed) suppressedStepTypes++;
+          }
+          if (hasSmsSteps) {
+            totalStepTypes++;
+            if (smsSuppressed) suppressedStepTypes++;
+          }
+
+          // Only exclude if ALL communication types the workflow needs are suppressed
+          // If at least one type is available, allow the workflow to proceed
+          if (suppressedStepTypes === totalStepTypes && totalStepTypes > 0) {
+            suppressedContactIds.push(contact.id);
+          } else {
+            validContacts.push(contact);
+          }
+        }
+
+        // Update suppressed contacts to 'excluded' status
+        if (suppressedContactIds.length > 0) {
+          await supabase
+            .from('campaign_contact_list_members')
+            .update({
+              status: 'excluded',
+              error_message: 'Contact is on suppression list (unsubscribed)',
+              processed_at: new Date().toISOString()
+            })
+            .in('id', suppressedContactIds);
+
+          console.log(`Campaign ${campaign.id}: Excluded ${suppressedContactIds.length} suppressed contacts`);
+        }
+
+        if (validContacts.length === 0) {
+          console.warn(`Campaign ${campaign.id}: All contacts are suppressed`);
+          await supabase
+            .from('campaigns')
+            .update({ status: 'completed' })
+            .eq('id', campaign.id);
+          return { success: true, contacts: 0, suppressedCount: suppressedContactIds.length };
+        }
+
+        console.log(`Campaign ${campaign.id}: Processing ${validContacts.length} contacts (${suppressedContactIds.length} excluded)`);
+
+        // Send event to process valid contacts in batch
         await inngest.send({
           name: 'campaign/process-contacts',
           data: {
             campaignId: campaign.id,
             companyId: campaign.company_id,
             workflowId: campaign.workflow_id,
-            contacts: contacts.map(c => ({
+            contacts: validContacts.map(c => ({
               memberId: c.id,
               contactListId: c.contact_list_id,
               customerId: c.customer_id,
@@ -544,9 +670,11 @@ export const campaignWorkflowCompletionHandler = inngest.createFunction(
         .eq('campaign_id', campaignExecution.campaign_id);
 
       if (allMembers) {
-        const processed = allMembers.filter((m: any) => ['processed', 'failed'].includes(m.status)).length;
+        // Include 'excluded' (suppressed) contacts in processed count for campaign completion
+        const processed = allMembers.filter((m: any) => ['processed', 'failed', 'excluded'].includes(m.status)).length;
         const successful = allMembers.filter((m: any) => m.status === 'processed').length;
-        const failed = allMembers.filter((m: any) => m.status === 'failed').length;
+        // Include 'excluded' (suppressed) contacts in failed count since they didn't receive communication
+        const failed = allMembers.filter((m: any) => ['failed', 'excluded'].includes(m.status)).length;
 
         await supabase
           .from('campaigns')

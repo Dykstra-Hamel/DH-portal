@@ -17,6 +17,14 @@ interface Customer {
   phone: string | null;
 }
 
+interface StepResult {
+  stepIndex: number;
+  stepType: string;
+  completedAt: string;
+  result: any;
+  success: boolean;
+}
+
 interface Execution {
   id: string;
   customer_id: string;
@@ -26,6 +34,7 @@ interface Execution {
   error_message: string | null;
   workflow_run_id: string | null;
   customers: Customer;
+  step_results: StepResult[];
 }
 
 export default function CampaignExecutions({ campaignId, companyId, companyTimezone = 'America/New_York' }: CampaignExecutionsProps) {
@@ -113,6 +122,38 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
+  const getStepIcon = (stepType: string) => {
+    switch (stepType) {
+      case 'send_email':
+        return '📧';
+      case 'make_call':
+        return '📞';
+      case 'send_sms':
+        return '💬';
+      case 'delay':
+      case 'wait':
+        return '⏱️';
+      default:
+        return '•';
+    }
+  };
+
+  const getStepLabel = (stepType: string, result: any) => {
+    switch (stepType) {
+      case 'send_email':
+        return `Sent Email${result?.subject ? `: ${result.subject}` : ''}`;
+      case 'make_call':
+        return `Made Phone Call${result?.duration ? ` (${Math.round(result.duration / 60)}min)` : ''}`;
+      case 'send_sms':
+        return 'Sent SMS Message';
+      case 'delay':
+      case 'wait':
+        return `Waited${result?.duration ? ` ${result.duration} seconds` : ''}`;
+      default:
+        return stepType;
+    }
+  };
+
   if (loading && executions.length === 0) {
     return <div className={styles.loading}>Loading executions...</div>;
   }
@@ -189,13 +230,28 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
                           </span>
                         </div>
                       )}
-                      {execution.workflow_run_id && (
-                        <div className={styles.detailItem}>
-                          <span className={styles.detailLabel}>Workflow Run ID:</span>
-                          <span className={styles.detailValue}>{execution.workflow_run_id}</span>
-                        </div>
-                      )}
                     </div>
+
+                    {execution.step_results && execution.step_results.length > 0 && (
+                      <div className={styles.stepsSection}>
+                        <h4 className={styles.stepsHeader}>Steps Taken:</h4>
+                        <div className={styles.stepsList}>
+                          {execution.step_results.map((step, idx) => (
+                            <div
+                              key={idx}
+                              className={`${styles.stepItem} ${step.success ? styles.stepSuccess : styles.stepFailed}`}
+                            >
+                              <span className={styles.stepIcon}>{getStepIcon(step.stepType)}</span>
+                              <span className={styles.stepLabel}>{getStepLabel(step.stepType, step.result)}</span>
+                              {!step.success && step.result?.error && (
+                                <span className={styles.stepError}>- {step.result.error}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {execution.error_message && (
                       <div className={styles.errorMessage}>
                         <strong>Error:</strong> {execution.error_message}

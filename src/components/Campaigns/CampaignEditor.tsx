@@ -2,9 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Plus } from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import styles from './CampaignEditor.module.scss';
+
+// Configure dayjs with timezone support
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import WorkflowSelector from './WorkflowSelector';
 import ContactListUpload from './ContactListUpload';
 import DiscountModal from '@/components/Admin/DiscountModal';
@@ -268,82 +276,6 @@ export default function CampaignEditor({
     }
   };
 
-  // Convert datetime-local string to Date object for DatePicker
-  const parseDateTime = (datetimeLocal: string): Date | null => {
-    if (!datetimeLocal) return null;
-    return new Date(datetimeLocal);
-  };
-
-  // Convert Date object to datetime-local string for storage
-  const formatDateTime = (date: Date | null): string => {
-    if (!date) return '';
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  // Convert datetime-local input (which is in company timezone) to ISO string for UTC storage
-  const convertToUTC = (datetimeLocal: string): string => {
-    if (!datetimeLocal) return '';
-
-    // Format: "2025-11-26T10:30"
-    // This represents 10:30 AM in the company timezone, not browser timezone
-
-    // Parse the datetime-local string
-    const [datePart, timePart] = datetimeLocal.split('T');
-    const [year, month, day] = datePart.split('-');
-    const [hour, minute] = timePart.split(':');
-
-    // The trick: create a date string that will be interpreted in the company timezone
-    // Format it as an ISO string with explicit timezone indicator
-    // First, create a formatter to get the timezone offset
-    const date = new Date();
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: companyTimezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-      timeZoneName: 'longOffset',
-    });
-
-    // Use the input date/time to create a reference point
-    const referenceDate = new Date(
-      `${year}-${month}-${day}T${hour}:${minute}:00Z`
-    ); // Parse as UTC
-
-    // Format this reference date in the company timezone
-    const parts = formatter.formatToParts(referenceDate);
-    const tzOffset = parts.find(p => p.type === 'timeZoneName')?.value || 'UTC';
-
-    // Parse the offset (e.g., "GMT-5" -> -5 hours)
-    const offsetMatch = tzOffset.match(/GMT([+-]\d+)/);
-    const offsetHours = offsetMatch ? parseInt(offsetMatch[1]) : 0;
-
-    // Create the correct UTC time by adding the timezone offset
-    const utcDate = new Date(
-      Date.UTC(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(hour),
-        parseInt(minute),
-        0
-      )
-    );
-
-    // Adjust by subtracting the timezone offset (convert company time to UTC)
-    utcDate.setHours(utcDate.getHours() - offsetHours);
-
-    return utcDate.toISOString();
-  };
-
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -386,10 +318,9 @@ export default function CampaignEditor({
 
       const method = campaign ? 'PUT' : 'POST';
 
-      // Convert datetimes from company timezone to UTC
+      // formData.start_datetime is already in UTC format from DateTimePicker
       const payload = {
         ...formData,
-        start_datetime: convertToUTC(formData.start_datetime),
         company_id: companyId,
         total_contacts: totalContacts,
       };
@@ -467,8 +398,9 @@ export default function CampaignEditor({
         console.log('Campaign scheduled to start within the next 5 minutes');
       }
 
+      // Call onSuccess first, then reset state
       onSuccess();
-      onClose();
+      handleClose();
     } catch (err) {
       console.error('Error saving campaign:', err);
       setError(err instanceof Error ? err.message : 'Failed to save campaign');
@@ -478,6 +410,7 @@ export default function CampaignEditor({
   };
 
   const handleClose = () => {
+    // Reset all internal state
     setCurrentStep('basic');
     setFormData({
       name: '',
@@ -493,9 +426,12 @@ export default function CampaignEditor({
     setContactLists([]);
     setTotalContacts(0);
     setCampaignIdAvailable(null);
+    setCampaignNameAvailable(null);
     setEstimatedDays(null);
     setSchedulePreview(null);
     setError(null);
+
+    // Close the modal
     onClose();
   };
 
@@ -645,22 +581,40 @@ export default function CampaignEditor({
               </div>
 
               <div className={styles.formGroup}>
-                <label>Start Date & Time *</label>
-                <DatePicker
-                  selected={parseDateTime(formData.start_datetime)}
-                  onChange={(date: Date | null) => {
-                    setFormData({
-                      ...formData,
-                      start_datetime: formatDateTime(date),
-                    });
-                  }}
-                  showTimeSelect
-                  timeIntervals={15}
-                  timeFormat="h:mm aa"
-                  dateFormat="MMMM d, yyyy h:mm aa"
-                  placeholderText="Select date and time"
-                  className={styles.datePickerInput}
-                />
+                <label>Start Date & Time * ({companyTimezone})</label>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DateTimePicker
+                    value={
+                      formData.start_datetime
+                        ? dayjs(formData.start_datetime).tz(companyTimezone)
+                        : null
+                    }
+                    onChange={(newValue: Dayjs | null) => {
+                      if (newValue) {
+                        // Convert the selected time in company timezone to UTC for storage
+                        const utcTime = newValue.tz(companyTimezone, true).utc().toISOString();
+                        setFormData({
+                          ...formData,
+                          start_datetime: utcTime,
+                        });
+                      } else {
+                        setFormData({
+                          ...formData,
+                          start_datetime: '',
+                        });
+                      }
+                    }}
+                    timeSteps={{ minutes: 10 }}
+                    skipDisabled={true}
+                    format="MMMM D, YYYY h:mm A"
+                    slotProps={{
+                      textField: {
+                        placeholder: 'Select date and time',
+                        fullWidth: true,
+                      },
+                    }}
+                  />
+                </LocalizationProvider>
               </div>
             </div>
           )}
@@ -681,6 +635,7 @@ export default function CampaignEditor({
               <ContactListUpload
                 companyId={companyId}
                 campaignId={campaign?.id}
+                initialLists={contactLists}
                 onListsChange={(lists, total) => {
                   setContactLists(lists);
                   setTotalContacts(total);

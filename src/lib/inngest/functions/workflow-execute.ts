@@ -2,6 +2,8 @@ import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { formatDateOnly, toE164PhoneNumber } from '@/lib/utils';
 import { fetchCompanyBusinessHours, isBusinessHours, getNextBusinessHourSlot } from '@/lib/campaigns/business-hours';
+import { isPhoneSuppressed } from '@/lib/suppression';
+import { generateUnsubscribeToken, getUnsubscribeUrl } from '@/lib/suppression/tokens';
 
 interface StepResult {
   stepIndex: number;
@@ -204,7 +206,7 @@ export const workflowExecuteHandler = inngest.createFunction(
         try {
           switch (currentStep.type) {
             case 'send_email':
-              result = await executeEmailStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId);
+              result = await executeEmailStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId, workflowId);
               break;
             case 'send_sms':
               result = await executeSMSStep(currentStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
@@ -464,7 +466,7 @@ export const workflowExecuteHandler = inngest.createFunction(
 );
 
 // Helper function to execute email steps
-async function executeEmailStep(step: any, leadData: any, companyId: string, leadId: string, customerId: string, attribution: any, partialLeadData: any = null, executionId: string, campaignId?: string) {
+async function executeEmailStep(step: any, leadData: any, companyId: string, leadId: string, customerId: string, attribution: any, partialLeadData: any = null, executionId: string, campaignId?: string, workflowId?: string) {
   const supabase = createAdminClient();
 
   // Get email template (check both possible field names)
@@ -621,7 +623,7 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
   // Helper function to format plan FAQs
   const formatPlanFaqs = (faqs: any) => {
     if (!faqs || !Array.isArray(faqs)) return '';
-    const faqItems = faqs.map(faq => 
+    const faqItems = faqs.map(faq =>
       `<div class="faq-item">
         <h3 class="faq-question">${faq.question}</h3>
         <p class="faq-answer">${faq.answer}</p>
@@ -629,6 +631,35 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
     ).join('');
     return `<div class="faq-section">${faqItems}</div>`;
   };
+
+  // Generate unsubscribe token for this email
+  let unsubscribeUrl = '';
+  let unsubscribeLink = '';
+
+  try {
+    const tokenResult = await generateUnsubscribeToken({
+      companyId,
+      customerId: customerId || undefined,
+      email: customerEmail,
+      phoneNumber: leadData.customerPhone || leadData.phone || fullLeadData?.customer?.phone || undefined,
+      source: campaignId ? 'email_campaign' : 'automation_workflow',
+      metadata: {
+        campaignId,
+        executionId,
+        workflowId,
+        leadId,
+        templateId: template.id,
+      },
+    });
+
+    if (tokenResult.success && tokenResult.data) {
+      unsubscribeUrl = getUnsubscribeUrl(tokenResult.data.token);
+      unsubscribeLink = `<a href="${unsubscribeUrl}">Unsubscribe</a>`;
+    }
+  } catch (error) {
+    console.error('Error generating unsubscribe token:', error);
+    // Continue with empty unsubscribe links rather than failing the entire email
+  }
 
   // Extract plan data with fallbacks for partial leads
   const planData = fullLeadData?.service_plans || leadData.selectedPlan;
@@ -728,7 +759,11 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
                          leadData.id ||
                          'unknown',
     pageUrl: attribution?.page_url || leadData.pageUrl || leadData.attribution_data?.page_url || company?.website || '#',
-    
+
+    // Unsubscribe variables
+    unsubscribeUrl,
+    unsubscribeLink,
+
     // Legacy variables for backward compatibility
     leadId,
     customerId,
@@ -759,11 +794,27 @@ async function executeEmailStep(step: any, leadData: any, companyId: string, lea
         contactInfo: leadData.contactInfo
       }
     });
-    
+
     return {
       success: false,
       emailSent: false,
       error: 'No customer email available for sending. Email may not be captured yet in the form flow.',
+      templateName: template.name,
+      recipient: customerEmail,
+      subject: template.subject_line,
+    };
+  }
+
+  // Check if email is suppressed (unsubscribed)
+  const { isEmailSuppressed } = await import('@/lib/suppression');
+  const emailIsSuppressed = await isEmailSuppressed(customerEmail, companyId);
+
+  if (emailIsSuppressed) {
+    console.warn(`Email ${customerEmail} is suppressed for company ${companyId} - skipping email`);
+    return {
+      success: false,
+      emailSent: false,
+      error: 'Email address is on suppression list (unsubscribed from marketing emails)',
       templateName: template.name,
       recipient: customerEmail,
       subject: template.subject_line,
@@ -931,6 +982,18 @@ async function executeSMSStep(step: any, leadData: any, companyId: string, leadI
         customerId
       });
       throw new Error('Customer phone number not available for SMS');
+    }
+
+    // Check if phone number is suppressed for SMS
+    const phoneIsSuppressed = await isPhoneSuppressed(customerPhone, companyId, 'sms');
+    if (phoneIsSuppressed) {
+      console.warn(`Phone ${customerPhone} is suppressed for SMS for company ${companyId} - skipping SMS`);
+      return {
+        success: false,
+        smsSent: false,
+        error: 'Phone number is on suppression list (unsubscribed from SMS)',
+        phone: customerPhone,
+      };
     }
 
     // Import email variables to use for SMS personalization
@@ -1270,6 +1333,19 @@ async function executeMakeCallStep(
 
   if (!customer.phone) {
     throw new Error('Customer phone number is required for calls');
+  }
+
+  // Check if phone number is suppressed
+  const phoneIsSuppressed = await isPhoneSuppressed(customer.phone, companyId, 'phone');
+  if (phoneIsSuppressed) {
+    console.warn(`Phone ${customer.phone} is suppressed for company ${companyId} - skipping call`);
+    return {
+      success: false,
+      callMade: false,
+      error: 'Phone number is on suppression list (unsubscribed from calls)',
+      customerId,
+      phone: customer.phone,
+    };
   }
 
   // Get company info

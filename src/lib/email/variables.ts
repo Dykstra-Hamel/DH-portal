@@ -80,6 +80,10 @@ export interface EmailVariables {
   quotePestConcerns: string;
   quoteHomeSize: string;
   quoteYardSize: string;
+
+  // Unsubscribe Variables
+  unsubscribeUrl: string;
+  unsubscribeLink: string;
 }
 
 /**
@@ -164,6 +168,10 @@ export function createSampleVariables(
     quotePestConcerns: 'Ants, Spiders, Cockroaches',
     quoteHomeSize: '2000-2500 sq ft',
     quoteYardSize: '1/4 to 1/2 Acre',
+
+    // Unsubscribe Variables (sample data - will be replaced with real token at send time)
+    unsubscribeUrl: 'https://yourcompany.com/unsubscribe?token=sample_token_abc123',
+    unsubscribeLink: '<a href="https://yourcompany.com/unsubscribe?token=sample_token_abc123">Unsubscribe</a>',
   };
 }
 
