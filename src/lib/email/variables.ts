@@ -86,6 +86,7 @@ export interface EmailVariables {
   campaignId: string;
   campaignName: string;
   campaignDiscountText: string;
+  campaignHeroImage: string;
   createLeadLink: string;
   // Unsubscribe Variables
   unsubscribeUrl: string;
@@ -194,6 +195,8 @@ export function createSampleVariables(
     campaignId: 'PEST26',
     campaignName: 'Spring Special - Save on Pest Control',
     campaignDiscountText: '15% OFF',
+    campaignHeroImage:
+      'https://cwmckkfkcjxznkpdxgie.supabase.co/storage/v1/object/public/brand-assets/general/placeholder.jpg',
     createLeadLink:
       'ses:tags="generateLead:true;campaignId:PEST26;customerId:abc-123;"',
     // Unsubscribe Variables (sample data - will be replaced with real token at send time)
