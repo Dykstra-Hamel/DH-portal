@@ -692,6 +692,7 @@ async function executeEmailStep(
 
   // Get campaign data if campaignId exists
   let campaign = null;
+  let campaignLandingPage = null;
   if (campaignId) {
     console.log(
       `[Campaign Email] Fetching campaign data for campaignId: ${campaignId}`
@@ -716,6 +717,28 @@ async function executeEmailStep(
       `[Campaign Email] Campaign data (full):`,
       JSON.stringify(campaign, null, 2)
     );
+
+    // Fetch campaign landing page data for hero image
+    if (campaign?.id) {
+      const { data: landingPageData, error: landingPageError } = await supabase
+        .from('campaign_landing_pages')
+        .select('hero_image_url')
+        .eq('campaign_id', campaign.id)
+        .maybeSingle();
+
+      if (landingPageError) {
+        console.error(
+          `[Campaign Email] Error fetching landing page data:`,
+          landingPageError
+        );
+      } else {
+        campaignLandingPage = landingPageData;
+        console.log(
+          `[Campaign Email] Landing page hero image:`,
+          landingPageData?.hero_image_url || 'none'
+        );
+      }
+    }
   } else {
     console.log(`[Campaign Email] No campaignId provided to workflow`);
   }
@@ -1040,6 +1063,7 @@ async function executeEmailStep(
             !Array.isArray(campaign.company_discounts)
           ? formatDiscount(campaign.company_discounts)
           : '',
+    campaignHeroImage: campaignLandingPage?.hero_image_url || '',
     createLeadLink:
       campaignId && customerId
         ? generateLeadTrackingTags(campaignId, customerId)
@@ -1064,6 +1088,7 @@ async function executeEmailStep(
       createLeadLink: emailVariables.createLeadLink,
       campaignName: emailVariables.campaignName,
       campaignDiscountText: emailVariables.campaignDiscountText,
+      campaignHeroImage: emailVariables.campaignHeroImage,
     });
   }
 
