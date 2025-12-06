@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import styles from './AddOnServiceEditor.module.scss';
 import { AddOnService, AddOnServiceFormData } from '@/types/addon-service';
+import DynamicListEditor from '@/components/Campaigns/DynamicListEditor/DynamicListEditor';
 
 interface AddOnServiceEditorProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export default function AddOnServiceEditor({
     billing_frequency: 'monthly',
     treatment_frequency: 'monthly',
     addon_features: [],
+    addon_faqs: [],
     eligibility_mode: 'all',
     eligible_plan_ids: [],
     is_active: true,
@@ -52,6 +54,7 @@ export default function AddOnServiceEditor({
           billing_frequency: addon.billing_frequency,
           treatment_frequency: addon.treatment_frequency,
           addon_features: addon.addon_features || [],
+          addon_faqs: addon.addon_faqs || [],
           eligibility_mode: addon.eligibility_mode,
           eligible_plan_ids: addon.eligible_plan_ids || [],
           is_active: addon.is_active,
@@ -67,6 +70,7 @@ export default function AddOnServiceEditor({
           billing_frequency: 'monthly',
           treatment_frequency: 'monthly',
           addon_features: [],
+          addon_faqs: [],
           eligibility_mode: 'all',
           eligible_plan_ids: [],
           is_active: true,
@@ -128,6 +132,23 @@ export default function AddOnServiceEditor({
         : prev.eligible_plan_ids.filter(id => id !== planId),
     }));
   };
+
+  const faqFields = [
+    {
+      name: 'question',
+      label: 'Question',
+      type: 'text' as const,
+      placeholder: 'e.g., How often is this service performed?',
+      required: true,
+    },
+    {
+      name: 'answer',
+      label: 'Answer',
+      type: 'textarea' as const,
+      placeholder: 'Detailed answer to the question',
+      required: true,
+    },
+  ];
 
   if (!isOpen) return null;
 
@@ -287,6 +308,22 @@ export default function AddOnServiceEditor({
                 <option value="on-demand">On-Demand</option>
               </select>
             </div>
+          </div>
+
+          {/* FAQ Section */}
+          <div className={styles.formSection}>
+            <h3>Frequently Asked Questions</h3>
+            <p className={styles.helpText}>
+              Add common questions customers might have about this add-on service
+            </p>
+            <DynamicListEditor
+              label=""
+              items={formData.addon_faqs}
+              onChange={(faqs) => setFormData({ ...formData, addon_faqs: faqs })}
+              fields={faqFields}
+              addButtonText="Add FAQ"
+              emptyText="No FAQs added yet. Click &apos;Add FAQ&apos; to create one."
+            />
           </div>
 
           <div className={styles.formSection}>

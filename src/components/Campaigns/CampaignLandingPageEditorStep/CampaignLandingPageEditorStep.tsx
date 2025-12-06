@@ -495,7 +495,7 @@ export default function CampaignLandingPageEditorStep({
                   />
                   <p className={styles.helpText}>
                     Available placeholders: {'{customer_first_name}'}, {'{customer_last_name}'},
-                    {'{service_address}'}, {'{city}'}, {'{state}'}
+                    {'{service_address}'}, {'{city}'}, {'{state}'}, {'{signature}'}
                   </p>
                 </div>
 

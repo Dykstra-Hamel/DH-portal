@@ -1,17 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, Pause, Edit, Copy, X } from 'lucide-react';
+import { Play, Pause, Edit, Copy, X, FileText } from 'lucide-react';
 import styles from './CampaignDetailHeader.module.scss';
 
 interface CampaignDetailHeaderProps {
   campaign: any;
   onUpdate: () => void;
   onEdit: () => void;
+  onEditLandingPage: () => void;
   companyTimezone?: string;
 }
 
-export default function CampaignDetailHeader({ campaign, onUpdate, onEdit, companyTimezone = 'America/New_York' }: CampaignDetailHeaderProps) {
+export default function CampaignDetailHeader({ campaign, onUpdate, onEdit, onEditLandingPage, companyTimezone = 'America/New_York' }: CampaignDetailHeaderProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const handleStartCampaign = async () => {
@@ -159,6 +160,16 @@ export default function CampaignDetailHeader({ campaign, onUpdate, onEdit, compa
             Edit
           </button>
         )}
+
+        {/* Edit Landing Page button - available for all campaign statuses */}
+        <button
+          className={`${styles.actionButton} ${styles.secondary}`}
+          onClick={onEditLandingPage}
+          title="Edit Landing Page"
+        >
+          <FileText size={16} />
+          Edit Landing Page
+        </button>
 
         {campaign.status !== 'cancelled' && campaign.status !== 'completed' && (
           <button

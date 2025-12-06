@@ -7,9 +7,10 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import styles from '../CampaignLandingPage.module.scss';
 import FAQItem from '../components/FAQItem';
+import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
 
 interface TabbedFAQSectionProps {
   faq: {
@@ -23,11 +24,41 @@ interface TabbedFAQSectionProps {
       faqs: Array<{ question: string; answer: string }>;
     }>;
   };
+  customer: VariableContext['customer'];
+  pricing: VariableContext['pricing'];
+  company: VariableContext['company'];
+  branding?: VariableContext['branding'];
+  serviceName?: string;
 }
 
-export default function TabbedFAQSection({ faq }: TabbedFAQSectionProps) {
+export default function TabbedFAQSection({
+  faq,
+  customer,
+  pricing,
+  company,
+  branding,
+  serviceName,
+}: TabbedFAQSectionProps) {
   const [activeTab, setActiveTab] = useState<string>('service');
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
+  // Create variable context for text processing
+  const variableContext = useMemo(
+    () => ({
+      customer,
+      pricing,
+      company,
+      branding,
+      serviceName,
+    }),
+    [customer, pricing, company, branding, serviceName]
+  );
+
+  // Process heading with variables
+  const processedHeading = useMemo(
+    () => processTextWithVariables(faq.heading, variableContext),
+    [faq.heading, variableContext]
+  );
 
   // Build tabs array combining service + all add-ons
   const tabs = [
@@ -53,12 +84,31 @@ export default function TabbedFAQSection({ faq }: TabbedFAQSectionProps) {
   };
 
   return (
-    <section className={styles.faqSection}>
+    <section id="faq-section" className={styles.faqSection}>
       <div className={styles.faqContainer}>
-        <h2 className={styles.faqHeading}>{faq.heading}</h2>
+        <h2 className={styles.faqHeading}>{processedHeading}</h2>
+
+        {/* Mobile Dropdown (visible on mobile only) */}
+        <div className={styles.faqDropdownContainer}>
+          <label htmlFor="faq-program-select" className={styles.faqDropdownLabel}>
+            Choose A Program To View FAQs:
+          </label>
+          <select
+            id="faq-program-select"
+            className={styles.faqDropdown}
+            value={activeTab}
+            onChange={(e) => handleTabChange(e.target.value)}
+          >
+            {tabs.map(tab => (
+              <option key={tab.id} value={tab.id}>
+                {tab.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className={styles.faqLayout}>
-          {/* Left Sidebar Tabs */}
+          {/* Left Sidebar Tabs (hidden on mobile) */}
           <div className={styles.faqTabs}>
             {tabs.map(tab => (
               <button

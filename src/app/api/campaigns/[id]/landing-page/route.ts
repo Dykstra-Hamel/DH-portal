@@ -19,8 +19,13 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customerId');
 
-    // Validate required parameters
-    if (!customerId) {
+    // Check if this is an authenticated admin request (for editing) or public request (for viewing)
+    const authSupabase = await createClient();
+    const { data: { user } } = await authSupabase.auth.getUser();
+    const isAdminRequest = !!user && !customerId;
+
+    // For public requests, customerId is required
+    if (!isAdminRequest && !customerId) {
       return NextResponse.json(
         { success: false, error: 'Customer ID is required' },
         { status: 400 }
@@ -31,7 +36,12 @@ export async function GET(
     const supabase = createServiceRoleClient();
 
     // Fetch campaign with discount information and optional service plan link
-    const { data: campaign, error: campaignError } = await supabase
+    // Support both database id (for admin/internal use) and campaign_id (for public URLs)
+    let campaign = null;
+    let campaignError = null;
+
+    // First, try looking up by database id (UUID format)
+    const { data: campaignById, error: errorById } = await supabase
       .from('campaigns')
       .select(`
         id,
@@ -48,8 +58,37 @@ export async function GET(
           discount_name
         )
       `)
-      .eq('campaign_id', campaignId)
-      .single();
+      .eq('id', campaignId)
+      .maybeSingle();
+
+    if (campaignById) {
+      // Found by database id (admin request)
+      campaign = campaignById;
+    } else {
+      // Not found by database id, try campaign_id (public request)
+      const { data: campaignByExternalId, error: errorByExternalId } = await supabase
+        .from('campaigns')
+        .select(`
+          id,
+          campaign_id,
+          name,
+          description,
+          company_id,
+          discount_id,
+          service_plan_id,
+          company_discounts (
+            id,
+            discount_type,
+            discount_value,
+            discount_name
+          )
+        `)
+        .eq('campaign_id', campaignId)
+        .single();
+
+      campaign = campaignByExternalId;
+      campaignError = errorByExternalId;
+    }
 
     if (campaignError || !campaign) {
       console.error('Campaign lookup failed:', { campaignId, campaignError });
@@ -59,38 +98,61 @@ export async function GET(
       );
     }
 
-    // Fetch customer with service address
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select(`
-        id,
-        first_name,
-        last_name,
-        email,
-        phone,
-        customer_service_addresses (
-          is_primary_address,
-          service_addresses (
-            id,
-            street_address,
-            city,
-            state,
-            zip_code
+    // Fetch customer with service address (or use mock data for admin requests)
+    let customer;
+    if (isAdminRequest) {
+      // For admin requests, provide mock customer data for preview purposes
+      customer = {
+        id: 'admin-preview',
+        first_name: 'John',
+        last_name: 'Doe',
+        email: 'customer@example.com',
+        phone: '(555) 123-4567',
+        customer_service_addresses: [{
+          is_primary_address: true,
+          service_addresses: {
+            id: 'mock-address',
+            street_address: '123 Main Street',
+            city: 'Anytown',
+            state: 'CA',
+            zip_code: '12345',
+          },
+        }],
+      };
+    } else {
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          customer_service_addresses (
+            is_primary_address,
+            service_addresses (
+              id,
+              street_address,
+              city,
+              state,
+              zip_code
+            )
           )
-        )
-      `)
-      .eq('id', customerId)
-      .eq('company_id', campaign.company_id)
-      .single();
+        `)
+        .eq('id', customerId)
+        .eq('company_id', campaign.company_id)
+        .single();
 
-    console.log('Customer query result:', { customer, customerError, customerId, companyId: campaign.company_id });
+      console.log('Customer query result:', { customer: customerData, customerError, customerId, companyId: campaign.company_id });
 
-    if (customerError || !customer) {
-      console.error('Customer lookup failed:', { customerId, companyId: campaign.company_id, customerError });
-      return NextResponse.json(
-        { success: false, error: 'Customer not found' },
-        { status: 404 }
-      );
+      if (customerError || !customerData) {
+        console.error('Customer lookup failed:', { customerId, companyId: campaign.company_id, customerError });
+        return NextResponse.json(
+          { success: false, error: 'Customer not found' },
+          { status: 404 }
+        );
+      }
+      customer = customerData;
     }
 
     // Fetch company information (including phone for branding)
@@ -171,88 +233,115 @@ export async function GET(
       ? campaign.company_discounts[0]
       : campaign.company_discounts;
 
-    // SECURITY: Validate customer is in campaign's contact lists
-    // Query the new reusable contact list system
-    const { data: contactListAssignments, error: assignmentsError } = await supabase
-      .from('campaign_contact_list_assignments')
-      .select('contact_list_id')
-      .eq('campaign_id', campaign.id);
+    // For admin requests, skip customer authorization and provide mock redemption data
+    let redemption;
+    if (isAdminRequest) {
+      // For authenticated admin users, verify they have access to this campaign's company
+      const { data: userCompany } = await authSupabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user!.id)
+        .eq('company_id', campaign.company_id)
+        .maybeSingle();
 
-    if (assignmentsError) {
-      console.error('Error fetching contact list assignments:', assignmentsError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to verify campaign access' },
-        { status: 500 }
-      );
-    }
+      if (!userCompany) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this campaign' },
+          { status: 403 }
+        );
+      }
 
-    if (!contactListAssignments || contactListAssignments.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'No contact lists found for this campaign' },
-        { status: 404 }
-      );
-    }
+      // Mock redemption data for preview
+      redemption = {
+        redeemed_at: null,
+        signed_at: null,
+        requested_date: null,
+        requested_time: null,
+      };
+    } else {
+      // SECURITY: Validate customer is in campaign's contact lists (public requests only)
+      // Query the new reusable contact list system
+      const { data: contactListAssignments, error: assignmentsError } = await supabase
+        .from('campaign_contact_list_assignments')
+        .select('contact_list_id')
+        .eq('campaign_id', campaign.id);
 
-    const listIds = contactListAssignments.map(a => a.contact_list_id);
+      if (assignmentsError) {
+        console.error('Error fetching contact list assignments:', assignmentsError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to verify campaign access' },
+          { status: 500 }
+        );
+      }
 
-    // Check if customer is a member of any contact list for this campaign
-    const { data: membership, error: membershipError } = await supabase
-      .from('contact_list_members')
-      .select('id, contact_list_id')
-      .eq('customer_id', customerId)
-      .in('contact_list_id', listIds)
-      .maybeSingle();
+      if (!contactListAssignments || contactListAssignments.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'No contact lists found for this campaign' },
+          { status: 404 }
+        );
+      }
 
-    if (membershipError) {
-      console.error('Error checking membership:', membershipError);
-    }
+      const listIds = contactListAssignments.map(a => a.contact_list_id);
 
-    if (!membership) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'You are not authorized to access this campaign. This link may have expired or is invalid.'
-        },
-        { status: 403 }
-      );
-    }
+      // Check if customer is a member of any contact list for this campaign
+      const { data: membership, error: membershipError } = await supabase
+        .from('contact_list_members')
+        .select('id, contact_list_id')
+        .eq('customer_id', customerId)
+        .in('contact_list_id', listIds)
+        .maybeSingle();
 
-    // Get campaign-specific tracking data (status, redemption info)
-    const { data: memberRecord, error: trackingError } = await supabase
-      .from('campaign_contact_list_members')
-      .select('id, status, redeemed_at, signed_at, requested_date, requested_time')
-      .eq('customer_id', customerId)
-      .eq('contact_list_id', membership.contact_list_id)
-      .eq('campaign_id', campaign.id)
-      .maybeSingle();
+      if (membershipError) {
+        console.error('Error checking membership:', membershipError);
+      }
 
-    if (trackingError) {
-      console.error('Error checking campaign tracking:', trackingError);
-    }
+      if (!membership) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'You are not authorized to access this campaign. This link may have expired or is invalid.'
+          },
+          { status: 403 }
+        );
+      }
 
-    // Check if member status is valid (not excluded or unsubscribed)
-    if (memberRecord?.status === 'excluded' || memberRecord?.status === 'unsubscribed') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'You have been unsubscribed from this campaign.'
-        },
-        { status: 403 }
-      );
-    }
+      // Get campaign-specific tracking data (status, redemption info)
+      const { data: memberRecord, error: trackingError } = await supabase
+        .from('campaign_contact_list_members')
+        .select('id, status, redeemed_at, signed_at, requested_date, requested_time')
+        .eq('customer_id', customerId)
+        .eq('contact_list_id', membership.contact_list_id)
+        .eq('campaign_id', campaign.id)
+        .maybeSingle();
 
-    // Build redemption object from member record (may be null if not tracked yet)
-    const redemption = memberRecord ? {
-      redeemed_at: memberRecord.redeemed_at,
-      signed_at: memberRecord.signed_at,
-      requested_date: memberRecord.requested_date,
-      requested_time: memberRecord.requested_time,
-    } : {
-      redeemed_at: null,
-      signed_at: null,
-      requested_date: null,
-      requested_time: null,
+      if (trackingError) {
+        console.error('Error checking campaign tracking:', trackingError);
+      }
+
+      // Check if member status is valid (not excluded or unsubscribed)
+      if (memberRecord?.status === 'excluded' || memberRecord?.status === 'unsubscribed') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'You have been unsubscribed from this campaign.'
+          },
+          { status: 403 }
+        );
+      }
+
+      // Build redemption object from member record (may be null if not tracked yet)
+      redemption = memberRecord ? {
+        redeemed_at: memberRecord.redeemed_at,
+        signed_at: memberRecord.signed_at,
+        requested_date: memberRecord.requested_date,
+        requested_time: memberRecord.requested_time,
+      } : {
+        redeemed_at: null,
+        signed_at: null,
+        requested_date: null,
+        requested_time: null,
     };
+    }
 
     // Build branding object with hierarchy (landing page overrides > brand > company > defaults)
     const branding = {
@@ -405,11 +494,30 @@ export async function POST(
     }
 
     // Get campaign to verify ownership
-    const { data: campaign, error: campaignError } = await supabase
+    // Support both database id (for admin/internal use) and campaign_id (for public URLs)
+    let campaign = null;
+    let campaignError = null;
+
+    // First, try looking up by database id (UUID format)
+    const { data: campaignById } = await supabase
       .from('campaigns')
       .select('id, campaign_id, company_id')
-      .eq('campaign_id', campaignId)
-      .single();
+      .eq('id', campaignId)
+      .maybeSingle();
+
+    if (campaignById) {
+      campaign = campaignById;
+    } else {
+      // Not found by database id, try campaign_id
+      const { data: campaignByExternalId, error: errorByExternalId } = await supabase
+        .from('campaigns')
+        .select('id, campaign_id, company_id')
+        .eq('campaign_id', campaignId)
+        .single();
+
+      campaign = campaignByExternalId;
+      campaignError = errorByExternalId;
+    }
 
     if (campaignError || !campaign) {
       return NextResponse.json(
@@ -579,11 +687,30 @@ export async function PUT(
     }
 
     // Get campaign to verify ownership
-    const { data: campaign, error: campaignError } = await supabase
+    // Support both database id (for admin/internal use) and campaign_id (for public URLs)
+    let campaign = null;
+    let campaignError = null;
+
+    // First, try looking up by database id (UUID format)
+    const { data: campaignById } = await supabase
       .from('campaigns')
       .select('id, campaign_id, company_id')
-      .eq('campaign_id', campaignId)
-      .single();
+      .eq('id', campaignId)
+      .maybeSingle();
+
+    if (campaignById) {
+      campaign = campaignById;
+    } else {
+      // Not found by database id, try campaign_id
+      const { data: campaignByExternalId, error: errorByExternalId } = await supabase
+        .from('campaigns')
+        .select('id, campaign_id, company_id')
+        .eq('campaign_id', campaignId)
+        .single();
+
+      campaign = campaignByExternalId;
+      campaignError = errorByExternalId;
+    }
 
     if (campaignError || !campaign) {
       return NextResponse.json(

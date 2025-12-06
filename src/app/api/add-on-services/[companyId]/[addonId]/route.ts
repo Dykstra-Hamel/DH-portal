@@ -89,6 +89,7 @@ export async function PUT(
         addon_image_url: body.addon_image_url || null,
         addon_disclaimer: body.addon_disclaimer || null,
         addon_features: body.addon_features || [],
+        addon_faqs: body.addon_faqs || [],
         display_order: body.display_order || 0,
         highlight_badge: body.highlight_badge || null,
         color_scheme: body.color_scheme || null,

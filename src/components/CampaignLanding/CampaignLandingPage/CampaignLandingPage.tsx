@@ -9,8 +9,7 @@
 import { useState, useEffect } from 'react';
 import styles from './CampaignLandingPage.module.scss';
 import ThankYouPage from '../ThankYouPage/ThankYouPage';
-import RedemptionModal from '../RedemptionModal/RedemptionModal';
-import CampaignRedemptionCard from '../CampaignRedemptionCard/CampaignRedemptionCard';
+import InlineRedemptionCard from '../InlineRedemptionCard/InlineRedemptionCard';
 import HeaderSection from './sections/HeaderSection';
 import HeroSection from './sections/HeroSection';
 import LetterSection from './sections/LetterSection';
@@ -138,8 +137,7 @@ export default function CampaignLandingPage({
   redemption,
   landingPage,
 }: CampaignLandingPageProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
+  const [isRedeeming, setIsRedeeming] = useState(false);
 
   // Load brand primary font dynamically
   useEffect(() => {
@@ -168,20 +166,51 @@ export default function CampaignLandingPage({
     );
   }
 
-  const handleOpenModal = () => {
-    setIsModalOpen(true);
-  };
+  const handleImmediateRedeem = async (data?: {
+    startDate: Date | null;
+    serviceTime: string;
+    phoneNumber: string;
+    selectedAddonIds: string[];
+  }) => {
+    if (isRedeeming) return;
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-  };
+    setIsRedeeming(true);
+    try {
+      // Capture device data for tracking
+      const deviceData = {
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        screen_resolution: `${window.screen.width}x${window.screen.height}`,
+        language: navigator.language,
+      };
 
-  const handleAddonChange = (addonId: string, checked: boolean) => {
-    setSelectedAddonIds(prev =>
-      checked
-        ? [...prev, addonId]  // Add if checked
-        : prev.filter(id => id !== addonId)  // Remove if unchecked
-    );
+      const response = await fetch(`/api/campaigns/${campaign.campaign_id}/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: customer.id,
+          requested_date: data?.startDate?.toISOString(),
+          requested_time: data?.serviceTime || null,
+          phone_number: data?.phoneNumber || customer.phone_number,
+          selected_addon_ids: data?.selectedAddonIds || [],
+          client_device_data: deviceData,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Reload page to show thank you screen
+        window.location.reload();
+      } else {
+        console.error('Redemption error:', result.error);
+        alert(`Error redeeming offer: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Redemption error:', error);
+      alert('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsRedeeming(false);
+    }
   };
 
   return (
@@ -193,6 +222,9 @@ export default function CampaignLandingPage({
         '--accent-color': landingPage.branding.accentColorPreference === 'primary'
           ? landingPage.branding.primaryColor
           : landingPage.branding.secondaryColor,
+        '--faq-color': landingPage.branding.accentColorPreference === 'primary'
+          ? landingPage.branding.secondaryColor
+          : landingPage.branding.primaryColor,
         '--font-primary': landingPage.branding.fontPrimaryName
           ? `"${landingPage.branding.fontPrimaryName}", sans-serif`
           : '"Inter Tight", sans-serif',
@@ -206,7 +238,7 @@ export default function CampaignLandingPage({
           primaryButtonText={landingPage.header.primaryButtonText}
           secondaryButtonText={landingPage.header.secondaryButtonText}
           phoneNumber={landingPage.branding.phoneNumber}
-          onPrimaryClick={handleOpenModal}
+          onPrimaryClick={() => handleImmediateRedeem()}
         />
       )}
 
@@ -214,7 +246,11 @@ export default function CampaignLandingPage({
       <HeroSection
         hero={landingPage.hero}
         pricing={landingPage.pricing}
-        onCtaClick={handleOpenModal}
+        customer={customer}
+        company={company}
+        branding={landingPage.branding}
+        serviceName={landingPage.faq.serviceName}
+        onCtaClick={() => handleImmediateRedeem()}
       />
 
       {/* Letter Section with Redemption Card (2-column layout) */}
@@ -227,22 +263,26 @@ export default function CampaignLandingPage({
                 pricing={landingPage.pricing}
                 customer={customer}
                 campaign={campaign}
+                company={company}
                 branding={landingPage.branding}
-                onCtaClick={handleOpenModal}
+                serviceName={landingPage.faq.serviceName}
+                onCtaClick={() => handleImmediateRedeem()}
               />
             </div>
             <div className={styles.redemptionColumn}>
-              <CampaignRedemptionCard
-                price={landingPage.pricing.displayPrice.split('/')[0] || '$44'}
-                frequency={'/' + (landingPage.pricing.displayPrice.split('/')[1] || 'mo')}
-                originalPrice={landingPage.pricing.originalPrice || undefined}
-                addons={landingPage.addons.map(addon => ({
-                  id: addon.id,
-                  name: `${addon.name}*`,
-                  checked: false,
-                }))}
-                onRedeemClick={handleOpenModal}
-                onAddonChange={handleAddonChange}
+              <InlineRedemptionCard
+                customer={customer}
+                campaign={campaign}
+                pricing={{
+                  ...landingPage.pricing,
+                  priceAmount: landingPage.pricing.displayPrice.split('/')[0]?.replace('$', '') || '44',
+                  priceFrequency: landingPage.pricing.displayPrice.split('/')[1] || 'mo',
+                }}
+                addons={landingPage.addons}
+                company={company}
+                branding={landingPage.branding}
+                serviceName={landingPage.faq.serviceName}
+                onRedeem={handleImmediateRedeem}
               />
             </div>
           </div>
@@ -251,7 +291,15 @@ export default function CampaignLandingPage({
 
       {/* Features Section */}
       {landingPage.features.bullets.length > 0 && (
-        <FeaturesSection features={landingPage.features} onCtaClick={handleOpenModal} />
+        <FeaturesSection
+          features={landingPage.features}
+          customer={customer}
+          pricing={landingPage.pricing}
+          company={company}
+          branding={landingPage.branding}
+          serviceName={landingPage.faq.serviceName}
+          onCtaClick={() => handleImmediateRedeem()}
+        />
       )}
 
       {/* Additional Services Section */}
@@ -260,13 +308,25 @@ export default function CampaignLandingPage({
           <AdditionalServicesSection
             additionalServices={landingPage.additionalServices}
             addons={landingPage.addons}
-            onCtaClick={handleOpenModal}
+            customer={customer}
+            pricing={landingPage.pricing}
+            company={company}
+            branding={landingPage.branding}
+            serviceName={landingPage.faq.serviceName}
+            onCtaClick={() => handleImmediateRedeem()}
           />
         )}
 
       {/* FAQ Section */}
       {landingPage.faq.show && (landingPage.faq.serviceFaqs.length > 0 || landingPage.faq.addonFaqs.length > 0) && (
-        <TabbedFAQSection faq={landingPage.faq} />
+        <TabbedFAQSection
+          faq={landingPage.faq}
+          customer={customer}
+          pricing={landingPage.pricing}
+          company={company}
+          branding={landingPage.branding}
+          serviceName={landingPage.faq.serviceName}
+        />
       )}
 
       {/* Footer Section */}
@@ -274,19 +334,6 @@ export default function CampaignLandingPage({
         footer={landingPage.footer}
         branding={landingPage.branding}
       />
-
-      {/* Redemption Modal */}
-      {isModalOpen && (
-        <RedemptionModal
-          campaign={campaign}
-          customer={customer}
-          company={company}
-          branding={landingPage.branding}
-          termsContent={landingPage.terms.content}
-          selectedAddonIds={selectedAddonIds}
-          onClose={handleCloseModal}
-        />
-      )}
     </div>
   );
 }
