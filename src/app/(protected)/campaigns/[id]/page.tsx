@@ -13,6 +13,7 @@ import CampaignExecutions from '@/components/Campaigns/CampaignExecutions';
 import CampaignLeads from '@/components/Campaigns/CampaignLeads';
 import CampaignReport from '@/components/Campaigns/CampaignReport';
 import CampaignEditor from '@/components/Campaigns/CampaignEditor';
+import EditLandingPageModal from '@/components/Campaigns/EditLandingPageModal/EditLandingPageModal';
 
 interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
@@ -35,6 +36,7 @@ export default function CampaignDetailPage({
   const [companyTimezone, setCompanyTimezone] =
     useState<string>('America/New_York');
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showLandingPageModal, setShowLandingPageModal] = useState(false);
 
   useEffect(() => {
     params.then(p => setCampaignId(p.id));
@@ -204,6 +206,7 @@ export default function CampaignDetailPage({
         campaign={campaign}
         onUpdate={handleCampaignUpdate}
         onEdit={() => setShowEditModal(true)}
+        onEditLandingPage={() => setShowLandingPageModal(true)}
         companyTimezone={companyTimezone}
       />
 
@@ -290,6 +293,23 @@ export default function CampaignDetailPage({
           setShowEditModal(false);
         }}
       />
+
+      {/* Edit Landing Page Modal */}
+      {showLandingPageModal && campaign && (
+        <EditLandingPageModal
+          campaign={{
+            id: campaign.id,
+            company_id: campaign.company_id,
+            service_plan_id: campaign.service_plan_id,
+          }}
+          isOpen={showLandingPageModal}
+          onClose={() => setShowLandingPageModal(false)}
+          onSuccess={() => {
+            fetchCampaignData();
+            setShowLandingPageModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }

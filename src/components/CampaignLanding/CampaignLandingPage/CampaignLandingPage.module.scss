@@ -19,6 +19,9 @@
   --brand-primary: #00529b;
   --brand-secondary: #00b142;
   --accent-color: var(--brand-primary);
+  --faq-color: var(
+    --brand-secondary
+  ); // Inverse of accent - secondary by default, primary when accent is secondary
   --font-primary:
     'Inter Tight', sans-serif; // Default fallback, overridden by inline styles
 
@@ -62,6 +65,10 @@
     pointer-events: none;
     z-index: -1;
   }
+
+  @media (max-width: 768px) {
+    padding: 20px 0 0;
+  }
 }
 
 .headerContainer {
@@ -85,6 +92,10 @@
   img {
     height: 110px;
     width: auto;
+
+    @media (max-width: 768px) {
+      max-width: 150px;
+    }
   }
 }
 
@@ -132,6 +143,37 @@
   }
 }
 
+.headerPhoneIcon {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Mobile Header Styles
+@media (max-width: 768px) {
+  .header {
+    position: relative;
+  }
+
+  .headerContainer {
+    justify-content: center;
+  }
+
+  .headerLogo {
+    text-align: center;
+  }
+
+  .headerActions {
+    position: absolute;
+    top: 32px;
+    right: 20px;
+  }
+}
+
 // ========================================
 // HERO SECTION
 // ========================================
@@ -150,6 +192,10 @@
     border-radius: 0 0 16px 16px;
     opacity: 0.05;
     pointer-events: none;
+  }
+
+  @media (max-width: 768px) {
+    padding: 31px 0;
   }
 }
 
@@ -192,11 +238,12 @@
 }
 
 .heroTitle {
-  font-size: 64px;
+  font-size: 50px;
+  font-style: normal;
   font-weight: 800;
-  line-height: 67px;
-  letter-spacing: -0.64px;
-  color: var(--color-text);
+  line-height: 54px; /* 108% */
+  letter-spacing: -0.5px;
+  color: var(--Gray-Text);
   margin: 0;
 
   @media (max-width: 1200px) {
@@ -204,7 +251,11 @@
   }
 
   @media (max-width: 768px) {
-    font-size: 36px;
+    font-size: 28px;
+    font-style: normal;
+    font-weight: 800;
+    line-height: 30px; /* 107.143% */
+    letter-spacing: -0.28px;
   }
 }
 
@@ -315,6 +366,40 @@
   }
 }
 
+// Mobile Hero Styles
+@media (max-width: 768px) {
+  .heroContainer {
+    text-align: center;
+  }
+
+  .heroContent {
+    align-items: center;
+  }
+
+  .heroBadge {
+    margin-left: 0;
+    font-size: 20px;
+  }
+
+  .heroCta {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .heroImages,
+  .heroImage {
+    margin-left: -20px;
+    margin-right: -20px;
+    width: calc(100% + 41px);
+  }
+
+  .heroImageDisplay {
+    border-radius: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 // ========================================
 // LETTER & REDEMPTION SECTION (2-COLUMN LAYOUT)
 // ========================================
@@ -329,13 +414,13 @@
   margin: 0 auto;
   @include contentSectionPadding;
   display: grid;
-  grid-template-columns: 639px 384px;
+  grid-template-columns: 639px 1fr;
   gap: 60px;
   align-items: start;
 
   @media (max-width: 1400px) {
     gap: 40px;
-    grid-template-columns: 1fr 384px;
+    grid-template-columns: 1fr 1fr;
   }
 
   @media (max-width: 1024px) {
@@ -375,6 +460,17 @@
 
   p {
     margin: 16px 0;
+  }
+
+  a {
+    color: var(--accent-color);
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 0.8;
+    }
   }
 }
 
@@ -710,7 +806,9 @@
   align-items: flex-start;
   gap: 12px;
   font-size: 16px;
+  font-style: normal;
   font-weight: 600;
+  line-height: 33px;
   color: var(--color-text);
 }
 
@@ -725,6 +823,10 @@
   display: flex;
   gap: 16px;
   align-items: center;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
 }
 
 .additionalServicesCta {
@@ -764,7 +866,7 @@
 
 .faqSection {
   margin: 0 283px;
-  padding: 80px 0;
+  padding: 52px 0;
   background: var(--color-white);
   position: relative;
   border-radius: 16px;
@@ -774,7 +876,9 @@
   }
 
   @media (max-width: 768px) {
-    margin: 0 20px;
+    margin: 0;
+    padding: 40px 0;
+    border-radius: 0;
   }
 
   &::before {
@@ -785,12 +889,20 @@
     opacity: 0.05;
     pointer-events: none;
     border-radius: 16px;
+
+    @media (max-width: 768px) {
+      border-radius: 0;
+    }
   }
 }
 
 .faqContainer {
   margin: 0 auto;
   padding: 0 30px;
+
+  @media (max-width: 768px) {
+    padding: 0 20px;
+  }
 }
 
 .faqHeading {
@@ -800,6 +912,56 @@
   letter-spacing: -0.33px;
   color: var(--color-text);
   margin-bottom: 48px;
+
+  @media (max-width: 768px) {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 30px;
+    letter-spacing: -0.28px;
+    margin-bottom: 24px;
+  }
+}
+
+.faqDropdownContainer {
+  display: none; // Hidden on desktop
+
+  @media (max-width: 768px) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+}
+
+.faqDropdownLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 20px;
+}
+
+.faqDropdown {
+  width: 100%;
+  z-index: 2;
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-white);
+  border: 1px solid var(--color-border-gray);
+  border-radius: 8px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%232b2b2b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 20px;
+  padding-right: 40px;
+
+  &:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+  }
 }
 
 .faqLayout {
@@ -810,6 +972,10 @@
   @media (max-width: 968px) {
     grid-template-columns: 1fr;
     gap: 24px;
+  }
+
+  @media (max-width: 768px) {
+    display: block; // Change to block on mobile
   }
 }
 
@@ -822,7 +988,6 @@
   top: 24px;
 
   @media (max-width: 968px) {
-    flex-direction: row;
     overflow-x: auto;
     gap: 12px;
     position: static;
@@ -836,6 +1001,10 @@
       background: var(--color-border-gray);
       border-radius: 2px;
     }
+  }
+
+  @media (max-width: 768px) {
+    display: none; // Hide tabs on mobile, show dropdown instead
   }
 }
 
@@ -862,11 +1031,11 @@
 }
 
 .faqTabActive {
-  background: var(--accent-color);
+  background: var(--faq-color);
   color: var(--color-white);
 
   &:hover {
-    background: var(--accent-color);
+    background: var(--faq-color);
     filter: brightness(0.95);
   }
 }
@@ -889,10 +1058,24 @@
   background: var(--color-border-gray);
   border-radius: 8px;
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    gap: 0;
+    background: transparent;
+    border-radius: 0;
+  }
 }
 
 .faqItem {
   background: var(--color-white);
+
+  @media (max-width: 768px) {
+    border-bottom: 1px solid var(--color-border-gray);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
 }
 
 .faqQuestion {
@@ -909,6 +1092,11 @@
   font-weight: 700;
   color: var(--color-text);
   transition: background 0.2s;
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+    padding: 16px 0;
+  }
 }
 
 .faqIcon {
@@ -926,6 +1114,12 @@
 
   p {
     margin: 0;
+  }
+
+  @media (max-width: 768px) {
+    padding: 0 0 16px 0;
+    font-size: 16px;
+    line-height: 1.5;
   }
 }
 
@@ -971,6 +1165,9 @@
 
   @media (max-width: 768px) {
     flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
     gap: 40px;
   }
 }
@@ -999,6 +1196,7 @@
 
 .footerSupport {
   text-align: left;
+  align-self: center;
 
   h4 {
     font-size: 17px;
@@ -1011,6 +1209,10 @@
     font-size: 16px;
     color: var(--color-text);
     margin: 8px 0;
+  }
+
+  @media (max-width: 768px) {
+    text-align: center;
   }
 }
 

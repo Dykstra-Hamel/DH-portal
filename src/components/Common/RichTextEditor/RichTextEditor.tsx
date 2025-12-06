@@ -9,8 +9,10 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import { useEffect } from 'react';
+import Link from '@tiptap/extension-link';
+import { useEffect, useCallback, useState } from 'react';
 import styles from './RichTextEditor.module.scss';
+import LinkModal from './LinkModal';
 
 interface RichTextEditorProps {
   value: string;
@@ -25,11 +27,21 @@ export default function RichTextEditor({
   placeholder = 'Start typing...',
   className,
 }: RichTextEditorProps) {
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkOpenInNewTab, setLinkOpenInNewTab] = useState(true);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
       Placeholder.configure({
         placeholder,
+      }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          class: null,
+        },
       }),
     ],
     content: value,
@@ -43,6 +55,39 @@ export default function RichTextEditor({
     },
     immediatelyRender: false,
   });
+
+  const openLinkModal = useCallback(() => {
+    if (!editor) return;
+
+    const previousUrl = editor.getAttributes('link').href || '';
+    const previousTarget = editor.getAttributes('link').target || '_blank';
+
+    setLinkUrl(previousUrl);
+    setLinkOpenInNewTab(previousTarget === '_blank');
+    setIsLinkModalOpen(true);
+  }, [editor]);
+
+  const handleSaveLink = useCallback((url: string, openInNewTab: boolean) => {
+    if (!editor) return;
+
+    // Empty string removes the link
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
+    }
+
+    // Update link with target attribute
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange('link')
+      .setLink({
+        href: url,
+        target: openInNewTab ? '_blank' : '_self',
+        rel: openInNewTab ? 'noopener noreferrer' : null,
+      })
+      .run();
+  }, [editor]);
 
   // Update editor content when value changes externally
   useEffect(() => {
@@ -81,6 +126,15 @@ export default function RichTextEditor({
           title="Strikethrough"
         >
           <s>S</s>
+        </button>
+        <div className={styles.divider} />
+        <button
+          type="button"
+          onClick={openLinkModal}
+          className={editor.isActive('link') ? styles.active : ''}
+          title="Add Link"
+        >
+          🔗
         </button>
         <div className={styles.divider} />
         <button
@@ -134,6 +188,13 @@ export default function RichTextEditor({
         </button>
       </div>
       <EditorContent editor={editor} />
+      <LinkModal
+        isOpen={isLinkModalOpen}
+        onClose={() => setIsLinkModalOpen(false)}
+        onSave={handleSaveLink}
+        initialUrl={linkUrl}
+        initialOpenInNewTab={linkOpenInNewTab}
+      />
     </div>
   );
 }

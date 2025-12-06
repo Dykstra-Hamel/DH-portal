@@ -4,7 +4,9 @@
  * Two-column hero with content left, image collage right
  */
 
+import { useMemo } from 'react';
 import styles from '../CampaignLandingPage.module.scss';
+import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
 
 interface HeroSectionProps {
   hero: {
@@ -19,10 +21,50 @@ interface HeroSectionProps {
     originalPrice: string | null;
     savings: string | null;
   };
+  customer: VariableContext['customer'];
+  company: VariableContext['company'];
+  branding?: VariableContext['branding'];
+  serviceName?: string;
   onCtaClick: () => void;
 }
 
-export default function HeroSection({ hero, pricing, onCtaClick }: HeroSectionProps) {
+export default function HeroSection({
+  hero,
+  pricing,
+  customer,
+  company,
+  branding,
+  serviceName,
+  onCtaClick,
+}: HeroSectionProps) {
+  // Create variable context for text processing
+  const variableContext = useMemo(
+    () => ({
+      customer,
+      pricing,
+      company,
+      branding,
+      serviceName,
+    }),
+    [customer, pricing, company, branding, serviceName]
+  );
+
+  // Process text fields with variables
+  const processedTitle = useMemo(
+    () => processTextWithVariables(hero.title, variableContext),
+    [hero.title, variableContext]
+  );
+
+  const processedSubtitle = useMemo(
+    () => processTextWithVariables(hero.subtitle, variableContext),
+    [hero.subtitle, variableContext]
+  );
+
+  const processedDescription = useMemo(
+    () => (hero.description ? processTextWithVariables(hero.description, variableContext) : null),
+    [hero.description, variableContext]
+  );
+
   // Extract price components for highlighting
   const priceMatch = pricing.displayPrice.match(/\$(\d+)\/mo/);
   const priceAmount = priceMatch ? priceMatch[1] : null;
@@ -32,11 +74,11 @@ export default function HeroSection({ hero, pricing, onCtaClick }: HeroSectionPr
       <div className={styles.heroContainer}>
         {/* Left column - Content */}
         <div className={styles.heroContent}>
-          <div className={styles.heroBadge}>{hero.subtitle}</div>
+          <div className={styles.heroBadge}>{processedSubtitle}</div>
 
           <h1 className={styles.heroTitle}>
-            {/* Parse the title to highlight the price */}
-            {hero.title.split('$').map((part, index) => {
+            {/* Parse the processed title to highlight the price */}
+            {processedTitle.split('$').map((part, index) => {
               if (index === 0) return <span key={index}>{part}</span>;
 
               // Extract price pattern like "44/mo"
@@ -56,8 +98,8 @@ export default function HeroSection({ hero, pricing, onCtaClick }: HeroSectionPr
             })}
           </h1>
 
-          {hero.description && (
-            <p className={styles.heroDescription}>{hero.description}</p>
+          {processedDescription && (
+            <p className={styles.heroDescription}>{processedDescription}</p>
           )}
 
           <button className={styles.heroCta} onClick={onCtaClick}>

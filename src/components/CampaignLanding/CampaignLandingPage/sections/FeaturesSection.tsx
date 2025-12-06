@@ -4,7 +4,9 @@
  * Image with feature bullets and CTA
  */
 
+import { useMemo } from 'react';
 import styles from '../CampaignLandingPage.module.scss';
+import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
 
 interface FeaturesSectionProps {
   features: {
@@ -12,13 +14,54 @@ interface FeaturesSectionProps {
     bullets: string[];
     imageUrl: string | null;
   };
+  customer: VariableContext['customer'];
+  pricing: VariableContext['pricing'];
+  company: VariableContext['company'];
+  branding?: VariableContext['branding'];
+  serviceName?: string;
   onCtaClick: () => void;
 }
 
 export default function FeaturesSection({
   features,
+  customer,
+  pricing,
+  company,
+  branding,
+  serviceName,
   onCtaClick,
 }: FeaturesSectionProps) {
+  // Create variable context for text processing
+  const variableContext = useMemo(
+    () => ({
+      customer,
+      pricing,
+      company,
+      branding,
+      serviceName,
+    }),
+    [customer, pricing, company, branding, serviceName]
+  );
+
+  // Process heading with variables
+  const processedHeading = useMemo(
+    () => processTextWithVariables(features.heading, variableContext),
+    [features.heading, variableContext]
+  );
+
+  // Process each bullet with variables
+  const processedBullets = useMemo(
+    () => features.bullets.map((bullet) => processTextWithVariables(bullet, variableContext)),
+    [features.bullets, variableContext]
+  );
+
+  const scrollToFaq = () => {
+    const faqSection = document.getElementById('faq-section');
+    if (faqSection) {
+      faqSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <section className={styles.featuresSection}>
       <div className={styles.featuresContainer}>
@@ -33,10 +76,10 @@ export default function FeaturesSection({
 
         {/* Right column - Content */}
         <div className={styles.featuresContent}>
-          <h2 className={styles.featuresHeading}>{features.heading}</h2>
+          <h2 className={styles.featuresHeading}>{processedHeading}</h2>
 
           <ul className={styles.featuresList}>
-            {features.bullets.map((bullet, index) => (
+            {processedBullets.map((bullet, index) => (
               <li key={index} className={styles.featureItem}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -76,7 +119,7 @@ export default function FeaturesSection({
             <button className={styles.featuresCta} onClick={onCtaClick}>
               Upgrade Today!
             </button>
-            <button className={styles.featuresLink}>
+            <button className={styles.featuresLink} onClick={scrollToFaq}>
               View Program FAQ&apos;s
             </button>
           </div>

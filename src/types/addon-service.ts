@@ -69,6 +69,7 @@ export interface AddOnServiceFormData {
   billing_frequency: 'monthly' | 'quarterly' | 'semi-annually' | 'annually';
   treatment_frequency: 'monthly' | 'bi-monthly' | 'quarterly' | 'on-demand' | null;
   addon_features: string[];
+  addon_faqs: Array<{ question: string; answer: string }>;
   eligibility_mode: 'all' | 'specific';
   eligible_plan_ids: string[];
   is_active: boolean;

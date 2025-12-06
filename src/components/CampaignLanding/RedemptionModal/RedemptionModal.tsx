@@ -53,6 +53,7 @@ interface RedemptionModalProps {
     logoUrl: string | null;
     primaryColor: string;
     secondaryColor: string;
+    accentColor: string;
     phoneNumber: string | null;
     email: string | null;
     companyName: string;
@@ -146,6 +147,7 @@ export default function RedemptionModal({
         style={{
           '--brand-primary': branding.primaryColor,
           '--brand-secondary': branding.secondaryColor,
+          '--accent-color': branding.accentColor,
         } as React.CSSProperties}
       >
         {/* Close button (hidden on thank you step) */}

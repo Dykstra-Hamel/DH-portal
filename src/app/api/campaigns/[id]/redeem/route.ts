@@ -12,10 +12,11 @@ import { captureDeviceData } from '@/lib/device-utils';
 
 interface RedeemRequest {
   customerId: string;
-  signature_data: string;
-  terms_accepted: boolean;
+  signature_data?: string;
+  terms_accepted?: boolean;
   requested_date?: string;
   requested_time?: string;
+  phone_number?: string;
   client_device_data?: {
     timezone?: string;
     screen_resolution?: string;
@@ -40,22 +41,8 @@ export async function POST(
       );
     }
 
-    if (!body.signature_data) {
-      return NextResponse.json(
-        { success: false, error: 'Signature is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!body.terms_accepted) {
-      return NextResponse.json(
-        { success: false, error: 'Terms must be accepted' },
-        { status: 400 }
-      );
-    }
-
     // Field whitelisting to prevent unauthorized field injection
-    const allowedFields = ['customerId', 'signature_data', 'terms_accepted', 'requested_date', 'requested_time', 'client_device_data', 'selected_addon_ids'];
+    const allowedFields = ['customerId', 'signature_data', 'terms_accepted', 'requested_date', 'requested_time', 'phone_number', 'client_device_data', 'selected_addon_ids'];
     const requestedFields = Object.keys(body);
     const unauthorizedFields = requestedFields.filter(field => !allowedFields.includes(field));
 
@@ -94,6 +81,7 @@ export async function POST(
         first_name,
         last_name,
         email,
+        phone,
         customer_service_addresses (
           is_primary_address,
           service_addresses (
@@ -260,19 +248,26 @@ export async function POST(
 
     const now = new Date().toISOString();
 
+    // Build update object conditionally
+    const updateData: any = {
+      redeemed_at: now,
+      device_data: completeDeviceData,
+      requested_date: body.requested_date || null,
+      requested_time: body.requested_time || null,
+      status: 'processed',
+    };
+
+    // Only include signature data if provided (backward compatibility with old modal flow)
+    if (body.signature_data) {
+      updateData.signed_at = now;
+      updateData.signature_data = body.signature_data;
+      updateData.terms_accepted = body.terms_accepted || false;
+    }
+
     // Idempotent update: only update if not already redeemed (prevents race conditions)
     const { data: updatedMember } = await supabase
       .from('campaign_contact_list_members')
-      .update({
-        redeemed_at: now,
-        signed_at: now,
-        signature_data: body.signature_data,
-        device_data: completeDeviceData,
-        terms_accepted: body.terms_accepted,
-        requested_date: body.requested_date || null,
-        requested_time: body.requested_time || null,
-        status: 'processed',
-      })
+      .update(updateData)
       .eq('id', memberRecord.id)
       .is('redeemed_at', null)
       .select()
@@ -286,11 +281,18 @@ export async function POST(
     }
 
     // Build lead comments
-    let leadComments = `Campaign: ${campaign.name}\nRedeemed with signature on ${new Date().toLocaleDateString()}`;
+    let leadComments = body.signature_data
+      ? `Campaign: ${campaign.name}\nRedeemed with signature on ${new Date().toLocaleDateString()}`
+      : `Campaign: ${campaign.name}\nRedeemed via inline form on ${new Date().toLocaleDateString()}`;
 
     // Add note if no service address provided
     if (!addressData) {
       leadComments += `\n\nNote: Customer did not have a service address on file. Please collect service address when scheduling.`;
+    }
+
+    // Add phone number if provided
+    if (body.phone_number) {
+      leadComments += `\n\nContact Phone: ${body.phone_number}`;
     }
 
     if (body.requested_date || body.requested_time) {
@@ -322,10 +324,11 @@ export async function POST(
     const signedAt = new Date().toLocaleDateString();
 
     if (existingLead) {
-      // Update existing lead to 'scheduled' stage
+      // Update existing lead to 'ready_to_schedule' stage
+      const acceptanceMethod = body.signature_data ? 'Signature captured' : 'Offer accepted via inline form';
       const updatedComments = existingLead.comments
-        ? `${existingLead.comments}\n\nCampaign offer accepted. Signature captured on ${signedAt}. Requested: ${body.requested_date || 'ASAP'} ${body.requested_time || ''}`
-        : `Campaign: ${campaign.name}. Signature captured on ${signedAt}. Requested: ${body.requested_date || 'ASAP'} ${body.requested_time || ''}`;
+        ? `${existingLead.comments}\n\nCampaign offer accepted. ${acceptanceMethod} on ${signedAt}. Requested: ${body.requested_date || 'ASAP'} ${body.requested_time || ''}`
+        : `Campaign: ${campaign.name}. ${acceptanceMethod} on ${signedAt}. Requested: ${body.requested_date || 'ASAP'} ${body.requested_time || ''}`;
 
       const { data: updatedLead, error: updateError } = await supabase
         .from('leads')
@@ -377,6 +380,23 @@ export async function POST(
 
       lead = newLead;
       console.log(`Created new lead ${lead.id} in 'ready_to_schedule' stage`);
+    }
+
+    // UPDATE CUSTOMER PHONE NUMBER: If phone number provided and different from existing
+    if (body.phone_number && body.phone_number !== customer.phone) {
+      console.log('[REDEEM] Updating customer phone number...');
+      const { error: phoneUpdateError } = await supabase
+        .from('customers')
+        .update({ phone: body.phone_number })
+        .eq('id', body.customerId)
+        .eq('company_id', campaign.company_id); // Security: ensure same company
+
+      if (phoneUpdateError) {
+        console.error('[REDEEM] Error updating customer phone:', phoneUpdateError);
+        // Don't fail redemption if phone update fails, just log it
+      } else {
+        console.log('[REDEEM] Successfully updated customer phone number');
+      }
     }
 
     // QUOTE CREATION: Only create quote if campaign has a service plan

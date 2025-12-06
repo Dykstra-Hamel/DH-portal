@@ -4,8 +4,10 @@
  * Personalized letter content with floating price card
  */
 
+import { useMemo } from 'react';
 import styles from '../CampaignLandingPage.module.scss';
 import PriceCard from '../components/PriceCard';
+import { processTextWithVariables } from '@/lib/campaign-text-processing';
 
 interface LetterSectionProps {
   letter: {
@@ -21,10 +23,13 @@ interface LetterSectionProps {
   customer: {
     first_name: string;
     last_name: string;
+    email?: string;
+    phone_number?: string;
     service_address: {
       street_address: string;
       city: string;
       state: string;
+      zip_code: string;
     } | null;
   };
   campaign: {
@@ -33,9 +38,13 @@ interface LetterSectionProps {
       discount_value: number;
     } | null;
   };
+  company: {
+    name: string;
+  };
   branding: {
     phoneNumber: string | null;
   };
+  serviceName?: string;
   onCtaClick: () => void;
 }
 
@@ -44,16 +53,31 @@ export default function LetterSection({
   pricing,
   customer,
   campaign,
+  company,
   branding,
+  serviceName,
   onCtaClick,
 }: LetterSectionProps) {
-  // Replace placeholders in letter content
-  const processedContent = letter.content
-    ?.replace(/\{customer_first_name\}/g, customer.first_name)
-    .replace(/\{customer_last_name\}/g, customer.last_name)
-    .replace(/\{service_address\}/g, customer.service_address?.street_address || 'your property')
-    .replace(/\{city\}/g, customer.service_address?.city || '')
-    .replace(/\{state\}/g, customer.service_address?.state || '');
+  // Create variable context for text processing
+  const variableContext = useMemo(
+    () => ({
+      customer,
+      pricing,
+      company,
+      branding,
+      serviceName,
+      signature: letter.signatureText,
+      signatureClassName: styles.letterSignature,
+    }),
+    [customer, pricing, company, branding, serviceName, letter.signatureText]
+  );
+
+  // Process letter content with variables, markdown links, and sanitization
+  // Note: Signature should now be included in the letter content itself for full flexibility
+  const processedContent = useMemo(
+    () => (letter.content ? processTextWithVariables(letter.content, variableContext) : null),
+    [letter.content, variableContext]
+  );
 
   return (
     <section className={styles.letterSection}>
@@ -73,17 +97,6 @@ export default function LetterSection({
               <img src={letter.imageUrl} alt="Letter visual" />
             </div>
           )}
-
-          <div className={styles.letterSignature}>
-            <p>{letter.signatureText}</p>
-          </div>
-
-          <div className={styles.letterCta}>
-            <p>
-              Or call us at <span className={styles.phoneLink}>{branding.phoneNumber || '(888) 888-8888'}</span> to upgrade
-              over the phone.
-            </p>
-          </div>
         </div>
       </div>
     </section>
