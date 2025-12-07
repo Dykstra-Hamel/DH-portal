@@ -1,0 +1,140 @@
+
+> dh-portal@0.1.0 prebuild
+> node widget-src/build.js
+
+🔨 Building widget from source files...
+✅ Build complete!
+📁 Output: /Users/austin/Desktop/dh-sites/software/DH-portal/public/widget/embed.js
+📊 Size: 357KB (original: 0KB)
+🏗️ Source files: 9 modular files combined
+
+🎯 PRODUCTION READY:
+  ✅ Functions injected before config declaration
+  ✅ Proper scope and execution order maintained
+  ✅ Ready for testing with existing scripts
+  💡 Original backed up as embed-original.js
+
+> dh-portal@0.1.0 build
+> next build
+
+   ▲ Next.js 15.3.5
+   - Environments: .env.local, .env.production
+
+   Creating an optimized production build ...
+ ⚠ Compiled with warnings in 7.0s
+
+./src/components/Tickets/TicketContent/CallDetails.module.scss
+Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CallDetails.module.scss:1:8:
+Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.
+
+More info and automated migrator: https://sass-lang.com/d/import
+
+1 | @import './SharedSection.module.scss';
+
+src/components/Tickets/TicketContent/CallDetails.module.scss 2:9  root stylesheet
+
+Import trace for requested module:
+./src/components/Tickets/TicketContent/CallDetails.module.scss
+./src/components/Tickets/TicketContent/CallDetails.tsx
+./src/components/Tickets/TicketContent/index.ts
+./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
+./src/components/Tickets/TicketReviewModal/index.ts
+./src/components/Tickets/TicketsList/TicketsList.tsx
+./src/app/connections/tickets/page.tsx
+
+./src/components/Tickets/TicketContent/CallInsights.module.scss
+Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CallInsights.module.scss:1:8:
+Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.
+
+More info and automated migrator: https://sass-lang.com/d/import
+
+1 | @import './SharedSection.module.scss';
+
+src/components/Tickets/TicketContent/CallInsights.module.scss 2:9  root stylesheet
+
+Import trace for requested module:
+./src/components/Tickets/TicketContent/CallInsights.module.scss
+./src/components/Tickets/TicketContent/CallInsights.tsx
+./src/components/Tickets/TicketContent/index.ts
+./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
+./src/components/Tickets/TicketReviewModal/index.ts
+./src/components/Tickets/TicketsList/TicketsList.tsx
+./src/app/connections/tickets/page.tsx
+
+./src/components/Tickets/TicketContent/CustomerInformation.module.scss
+Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CustomerInformation.module.scss:1:8:
+Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.
+
+More info and automated migrator: https://sass-lang.com/d/import
+
+1 | @import './SharedSection.module.scss';
+
+src/components/Tickets/TicketContent/CustomerInformation.module.scss 2:9  root stylesheet
+
+Import trace for requested module:
+./src/components/Tickets/TicketContent/CustomerInformation.module.scss
+./src/components/Tickets/TicketContent/CustomerInformation.tsx
+./src/components/Tickets/TicketContent/index.ts
+./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
+./src/components/Tickets/TicketReviewModal/index.ts
+./src/components/Tickets/TicketsList/TicketsList.tsx
+./src/app/connections/tickets/page.tsx
+
+ ✓ Compiled successfully in 9.0s
+   Linting and checking validity of types ...
+
+./src/components/Admin/GlobalWidgetDomains.tsx
+212:6  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Agents/AgentsList.tsx
+33:6  Warning: React Hook useEffect has a missing dependency: 'fetchAgents'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Auth/components/AuthHeader.tsx
+30:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Auth/components/BrandingPanel.tsx
+27:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Automation/AutomationSettings.tsx
+698:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Common/LiveCallBar/LiveCallBar.tsx
+470:6  Warning: React Hook useMemo has an unnecessary dependency: 'currentTime'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Layout/GlobalHeader/CompanyDropdown/GlobalCompanyDropdown.tsx
+76:9  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Layout/SearchBar/SearchBar.tsx
+57:6  Warning: React Hook useEffect has a missing dependency: 'performSearch'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Layout/UserAvatar/UserAvatar.tsx
+176:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+202:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/TestAutomation/AutomationTestPage.tsx
+210:6  Warning: React Hook useEffect has a missing dependency: 'fetchCompanies'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+216:6  Warning: React Hook useEffect has a missing dependency: 'fetchServicePlans'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+[Error [PageNotFoundError]: Cannot find module for page: /_not-found] {
+  code: 'ENOENT'
+}
+[Error [PageNotFoundError]: Cannot find module for page: /admin] {
+  code: 'ENOENT'
+}
+[Error [PageNotFoundError]: Cannot find module for page: /api/admin/attribution-analytics] {
+  code: 'ENOENT'
+}
+[Error [PageNotFoundError]: Cannot find module for page: /account/update-password] {
+  code: 'ENOENT'
+}
+[Error [PageNotFoundError]: Cannot find module for page: /admin/companies/[id]] {
+  code: 'ENOENT'
+}
+[Error [PageNotFoundError]: Cannot find module for page: /admin/sms-test] {
+  code: 'ENOENT'
+}
+
+> Build error occurred
+[Error: Failed to collect page data for /_not-found] { type: 'Error' }

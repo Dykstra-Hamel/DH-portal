@@ -1,0 +1,239 @@
+.ticketRow {
+  display: flex;
+  padding: 20px 16px;
+  align-items: center;
+  border-radius: 6px;
+  background: var(--white);
+  box-shadow: var(--box-shadow-card);
+  margin-bottom: 8px;
+  cursor: pointer;
+  animation: slideInFromTop 0.5s ease-out;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.1s ease;
+
+  &:hover {
+    box-shadow: var(--box-shadow-card-hover);
+    transform: translateY(-1px);
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  &.newTicket {
+    animation: slideInFromTop 0.5s ease-out;
+  }
+
+  &.highlighted {
+    background: var(--action-50);
+    border: 2px solid var(--action-500);
+    animation: highlightPulse 3s ease-in-out;
+
+    &:hover {
+      background: var(--action-100);
+    }
+  }
+}
+
+@keyframes highlightPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(12, 168, 235, 0.2);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(12, 168, 235, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(12, 168, 235, 0);
+  }
+}
+
+.cell {
+  display: flex;
+  align-items: flex-start;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  justify-content: flex-start;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--gray-800);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Column-specific widths and styling
+.inQueue {
+  width: 120px;
+  flex-shrink: 0;
+  color: var(--gray-600);
+  font-size: 12px;
+}
+
+.name {
+  width: 180px;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.phone {
+  width: 140px;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.address {
+  width: 250px;
+  flex-shrink: 0;
+  color: var(--gray-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.format {
+  width: 100px;
+  flex-shrink: 0;
+  justify-content: flex-start;
+  color: var(--action-600);
+  font-weight: 600;
+  align-items: center;
+  gap: 6px;
+
+  &::first-letter {
+    text-transform: uppercase;
+  }
+}
+
+.source {
+  width: 120px;
+  flex-shrink: 0;
+  color: var(--action-600);
+  font-weight: 600;
+}
+
+.ticketType {
+  width: 150px;
+  flex-shrink: 0;
+  color: var(--action-600);
+  font-weight: 600;
+  text-transform: capitalize;
+  align-items: center;
+  gap: 6px;
+}
+
+.salesIcon {
+  display: inline;
+  margin-right: 6px;
+  vertical-align: middle;
+
+  path {
+    stroke: var(--action-600);
+  }
+}
+
+.supportIcon {
+  display: inline;
+  margin-right: 6px;
+  vertical-align: middle;
+  color: var(--action-600);
+}
+
+.qualifyButton {
+  flex-shrink: 0;
+  justify-content: center;
+  color: var(--UX-Colors-Primary-Colors-Primary-900, #0b4b6f);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 14px;
+  border-radius: 6px;
+  background: var(--UX-Colors-Primary-Colors-Primary---100, #e0f2fe);
+  padding: 9px 16px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+// Status indicators for different types
+.format {
+  font-weight: 600;
+
+  /* Different colors for different formats
+  &::has-text('Call') {
+    color: var(--action-600);
+  }
+
+  &::has-text('Form') {
+    color: var(--sales-500);
+  }
+    */
+}
+
+// Ticket animations
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+    margin-bottom: 8px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+}
+
+// Responsive design
+@media (max-width: 1200px) {
+  .address {
+    width: 180px;
+    min-width: 150px;
+  }
+
+  .ticketType {
+    width: 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ticketRow {
+    padding: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cell {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  // Hide less important columns on mobile
+  .source,
+  .ticketType {
+    display: none;
+  }
+
+  .inQueue,
+  .name,
+  .phone {
+    width: auto;
+    flex: 1;
+    min-width: 80px;
+  }
+
+  .address {
+    width: 100%;
+    margin-top: 4px;
+  }
+}

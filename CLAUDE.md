@@ -93,11 +93,90 @@ When creating a new migration file, ALWAYS use the following naming convention:
 - Environment variable required: `GOOGLE_PLACES_API_KEY`
 - Configure in widget settings to enable/disable address autocomplete
 
+## Form Submission Webhook
+
+- **Universal Form Endpoint**: `/api/webhooks/form-submit`
+- **Security**: Uses widget domain whitelisting (only domains in `widget_domains` table can submit)
+- **Supported Content Types**:
+  - `application/json` (modern JavaScript forms)
+  - `application/x-www-form-urlencoded` (traditional HTML forms)
+- **AI Processing**: Uses Google Gemini AI to normalize flexible form field names into standardized schema
+- **Auto-Creation**: Automatically creates customer records and tickets from form submissions
+- **Environment variable required**: `GEMINI_API_KEY` (get from https://aistudio.google.com/app/apikey)
+- **Expected Schema** (flexible field names normalized by AI):
+  - `first_name`, `last_name`, `email`, `phone_number`
+  - `street_address`, `city`, `state`, `zip`
+  - `pest_issue`, `own_or_rent`, `additional_comments`
+- **Database**: All submissions stored in `form_submissions` table with raw + normalized data
+
+## AWS SES Email Service
+
+- **Email Provider**: Uses AWS SES (Simple Email Service) for all transactional emails
+- **Tenant Architecture**: One SES tenant per company for isolated reputation management
+- **Event Tracking**: SNS webhook at `/api/webhooks/ses-events` for bounce/complaint/delivery tracking
+- **Suppression List**: Automatic communication suppression for bounces, complaints, and unsubscribes in `suppression_list` table
+  - Supports multiple channels: email, phone calls, SMS
+  - Tracks unsubscribe requests and communication preferences
+
+### Required Environment Variables
+
+```
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=<your-access-key>
+AWS_SECRET_ACCESS_KEY=<your-secret-key>
+```
+
+### Setup for New Companies
+
+1. **Provision SES Tenant**:
+   - POST to `/api/admin/companies/[id]/provision-ses`
+   - Body: `{ "domain": "example.com", "snsTopicArn": "optional" }`
+   - Creates tenant, configuration set, and email identity (if domain provided)
+
+2. **Configure DNS Records**:
+   - Add DKIM CNAME records returned from provisioning
+   - Typically 3 CNAME records: `{token}._domainkey.{domain}` → `{token}.dkim.amazonses.com`
+   - DNS verification can take up to 72 hours
+
+3. **Verify Domain**:
+   - PUT to `/api/admin/companies/[id]/domain` to check verification status
+   - Once verified, emails can be sent from that domain
+
+### Bulk Migration
+
+Use the migration script to provision SES tenants for existing companies:
+
+```bash
+# Dry run (preview changes)
+npm run migrate-to-ses -- --dry-run
+
+# Migrate all companies
+npm run migrate-to-ses
+
+# Migrate specific company
+npm run migrate-to-ses -- --company-id=<uuid>
+```
+
+### Email Sending
+
+All email sending goes through:
+
+- **API Route**: `/api/email/send` - Main email sending endpoint
+- **Direct Import**: `import { sendEmail } from '@/lib/aws-ses/send-email'` - For server-side code
+- **Features**: Automatic suppression list checking, tenant routing, delivery tracking
+
+### Event Tracking
+
+- **SNS Topics**: Bounces, complaints, deliveries, opens, clicks
+- **Database**: Events logged to `email_logs` table with full delivery status
+- **Suppression**: Hard bounces and complaints automatically added to suppression list
+
 ## Database Changes
 
 - Create migration: `npx supabase migration new <name>`
 - Test locally: `npx supabase db push --local`
 - Deploy to production: `npx supabase db push --linked`
+- CLAUDE - do not run any supabase migration commands either locally or to the remote linked database.
 
 ## Notes for Developers
 

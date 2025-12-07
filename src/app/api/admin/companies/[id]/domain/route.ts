@@ -1,17 +1,82 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { 
-  createDomain, 
-  getDomain, 
-  verifyDomain, 
-  deleteDomain,
-  type CreateDomainRequest,
-  type DomainInfo 
-} from '@/lib/resend-domains';
+import {
+  createEmailIdentity,
+  getEmailIdentity,
+  deleteEmailIdentity,
+  associateIdentityWithTenant,
+  getIdentityVerificationStatus,
+} from '@/lib/aws-ses/identities';
 
 // Helper function to await params in Next.js 15+
 async function getParams(params: Promise<{ id: string }>) {
   return await params;
+}
+
+// Helper to get company settings
+async function getCompanySettings(companyId: string, keys: string[]) {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('company_settings')
+    .select('setting_key, setting_value')
+    .eq('company_id', companyId)
+    .in('setting_key', keys);
+
+  if (error) {
+    throw new Error(`Failed to fetch company settings: ${error.message}`);
+  }
+
+  const settings: Record<string, string> = {};
+  data?.forEach(s => {
+    settings[s.setting_key] = s.setting_value;
+  });
+  return settings;
+}
+
+// Helper to update company settings (upsert to handle new settings)
+async function updateCompanySettings(companyId: string, updates: Record<string, string>) {
+  const supabase = createAdminClient();
+
+  const settingsToUpsert = Object.entries(updates).map(([key, value]) => ({
+    company_id: companyId,
+    setting_key: key,
+    setting_value: value,
+  }));
+
+  const { error } = await supabase
+    .from('company_settings')
+    .upsert(settingsToUpsert, {
+      onConflict: 'company_id,setting_key',
+    });
+
+  if (error) {
+    throw new Error(`Failed to upsert settings: ${error.message}`);
+  }
+}
+
+// Helper to transform DKIM tokens into DNS records format
+function transformDkimTokensToRecords(dkimTokens: any[], domain: string): any[] {
+  const records: any[] = [];
+
+  // Add DKIM CNAME records
+  if (dkimTokens && dkimTokens.length > 0) {
+    dkimTokens.forEach((token) => {
+      records.push({
+        hostname: token.name || `${token.token}._domainkey.${domain}`,
+        type: token.type || 'CNAME',
+        value: token.value || `${token.token}.dkim.amazonses.com`,
+      });
+    });
+  }
+
+  // Add SPF TXT record
+  records.push({
+    hostname: '@',
+    type: 'TXT',
+    value: 'v=spf1 include:amazonses.com ~all',
+  });
+
+  return records;
 }
 
 /**
@@ -24,61 +89,74 @@ export async function GET(
 ) {
   try {
     const { id: companyId } = await getParams(params);
-    const supabase = createAdminClient();
 
-    // Get company domain configuration
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('email_domain, email_domain_configured, resend_domain_id, email_domain_status, email_domain_records, email_domain_verified_at')
-      .eq('id', companyId)
-      .single();
+    // Get company domain configuration from settings
+    const settings = await getCompanySettings(companyId, [
+      'email_domain',
+      'email_domain_status',
+      'email_domain_prefix',
+      'aws_ses_identity_arn',
+      'aws_ses_dkim_tokens',
+      'email_domain_verified_at'
+    ]);
 
-    if (companyError || !company) {
-      return NextResponse.json(
-        { error: 'Company not found' },
-        { status: 404 }
-      );
-    }
+    // If domain is configured, get latest info from AWS SES
+    let identityInfo: any = null;
+    let dkimTokens: any[] = [];
 
-    // If domain is configured, get latest info from Resend
-    let domainInfo: DomainInfo | null = null;
-    if (company.resend_domain_id) {
+    if (settings.email_domain) {
       try {
-        domainInfo = await getDomain(company.resend_domain_id);
-        
-        // Update local database with latest status
-        await supabase
-          .from('companies')
-          .update({
-            email_domain_status: domainInfo.status,
-            email_domain_records: domainInfo.records,
-            ...(domainInfo.status === 'verified' && !company.email_domain_verified_at && {
+        const result = await getEmailIdentity(settings.email_domain);
+
+        if (result.success && result.data) {
+          identityInfo = result.data;
+          dkimTokens = result.dkimTokens || [];
+
+          // Update local database with latest status
+          const status = identityInfo.verifiedForSendingStatus ? 'verified' : 'pending';
+
+          await updateCompanySettings(companyId, {
+            email_domain_status: status,
+            aws_ses_dkim_tokens: JSON.stringify(dkimTokens),
+            aws_ses_identity_arn: identityInfo.identityArn,
+            ...(identityInfo.verifiedForSendingStatus && !settings.email_domain_verified_at && {
               email_domain_verified_at: new Date().toISOString()
             })
-          })
-          .eq('id', companyId);
+          });
+        }
       } catch (error) {
-        console.error('Error fetching domain from Resend:', error);
-        // Continue with local data if Resend API is unavailable
+        console.error('Error fetching domain from AWS SES:', error);
+        // Continue with local data if AWS SES API is unavailable
+        try {
+          dkimTokens = JSON.parse(settings.aws_ses_dkim_tokens || '[]');
+        } catch (e) {
+          dkimTokens = [];
+        }
       }
     }
+
+    // Transform DKIM tokens into records format for UI
+    const records = settings.email_domain
+      ? transformDkimTokensToRecords(dkimTokens, settings.email_domain)
+      : [];
 
     return NextResponse.json({
       success: true,
       domain: {
-        name: company.email_domain,
-        configured: company.email_domain_configured,
-        status: company.email_domain_status,
-        records: company.email_domain_records || [],
-        verifiedAt: company.email_domain_verified_at,
-        resendDomainId: company.resend_domain_id,
-        liveInfo: domainInfo
+        name: settings.email_domain || null,
+        prefix: settings.email_domain_prefix || 'noreply',
+        status: settings.email_domain_status || 'not_configured',
+        records: records,
+        dkimTokens: dkimTokens,
+        verifiedAt: settings.email_domain_verified_at || null,
+        identityArn: settings.aws_ses_identity_arn || null,
+        liveInfo: identityInfo
       }
     });
   } catch (error) {
     console.error('Error getting domain configuration:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }
@@ -86,7 +164,11 @@ export async function GET(
 
 /**
  * POST /api/admin/companies/[id]/domain
- * Create or update domain configuration for a company
+ * Create domain configuration for a company
+ *
+ * Body params:
+ * - domain: Domain name (required)
+ * - emailPrefix: Email prefix like "noreply" (default: "noreply")
  */
 export async function POST(
   request: NextRequest,
@@ -95,7 +177,7 @@ export async function POST(
   try {
     const { id: companyId } = await getParams(params);
     const body = await request.json();
-    const { domain, region, customReturnPath } = body;
+    const { domain, emailPrefix } = body;
 
     if (!domain) {
       return NextResponse.json(
@@ -118,7 +200,7 @@ export async function POST(
     // Check if company exists
     const { data: company, error: companyError } = await supabase
       .from('companies')
-      .select('id, email_domain, resend_domain_id')
+      .select('id, name')
       .eq('id', companyId)
       .single();
 
@@ -129,61 +211,101 @@ export async function POST(
       );
     }
 
-    // If domain already exists, delete the old one first
-    if (company.resend_domain_id) {
+    // Get existing domain configuration
+    const settings = await getCompanySettings(companyId, ['email_domain', 'aws_ses_identity_arn']);
+
+    // If domain already exists and is different, delete the old one first
+    if (settings.email_domain && settings.email_domain !== domain) {
       try {
-        await deleteDomain(company.resend_domain_id);
+        await deleteEmailIdentity(settings.email_domain);
       } catch (error) {
-        console.warn('Failed to delete old domain from Resend:', error);
+        console.warn('Failed to delete old domain from AWS SES:', error);
         // Continue anyway - might have been already deleted
       }
     }
 
-    // Create domain in Resend
-    const createDomainRequest: CreateDomainRequest = {
-      name: domain,
-      region: region || 'us-east-1',
-      ...(customReturnPath && { custom_return_path: customReturnPath })
-    };
+    console.log(`Creating AWS SES email identity for domain: ${domain}`);
 
-    const domainInfo = await createDomain(createDomainRequest);
+    // Create email identity in AWS SES
+    const result = await createEmailIdentity(domain);
 
-    // Update company with domain configuration
-    const { error: updateError } = await supabase
-      .from('companies')
-      .update({
-        email_domain: domain,
-        email_domain_configured: true,
-        resend_domain_id: domainInfo.id,
-        email_domain_status: domainInfo.status,
-        email_domain_records: domainInfo.records,
-        email_domain_verified_at: null // Reset verification timestamp
-      })
-      .eq('id', companyId);
-
-    if (updateError) {
-      console.error('Error updating company domain configuration:', updateError);
-      // Try to clean up the created domain
-      try {
-        await deleteDomain(domainInfo.id);
-      } catch (cleanupError) {
-        console.error('Failed to cleanup domain after database error:', cleanupError);
-      }
+    if (!result.success || !result.data) {
       return NextResponse.json(
-        { error: 'Failed to save domain configuration' },
+        { error: `Failed to create email identity: ${result.error}` },
         { status: 500 }
       );
     }
 
+    const identityInfo = result.data;
+    const dkimTokens = result.dkimTokens || [];
+
+    // Get tenant name from database (stored during provisioning)
+    const tenantSettings = await getCompanySettings(companyId, ['aws_ses_tenant_name']);
+    const tenantName = tenantSettings.aws_ses_tenant_name;
+
+    if (tenantName) {
+      // Construct identity ARN (since AWS doesn't return it directly)
+      const awsRegion = process.env.AWS_REGION || 'us-east-1';
+      const awsAccountId = process.env.AWS_ACCOUNT_ID;
+
+      if (!awsAccountId) {
+        return NextResponse.json(
+          { error: 'AWS_ACCOUNT_ID environment variable not set. Required for identity association.' },
+          { status: 500 }
+        );
+      }
+
+      const identityArn = `arn:aws:ses:${awsRegion}:${awsAccountId}:identity/${domain}`;
+
+      console.log('🔗 Associating identity with tenant:', { domain, tenantName, identityArn });
+
+      const associateResult = await associateIdentityWithTenant(
+        domain,
+        tenantName,
+        identityArn
+      );
+
+      if (!associateResult.success) {
+        // FAIL HARD - association is required for tenants to send from their identities
+        return NextResponse.json(
+          { error: `Identity created but failed to associate with tenant: ${associateResult.error}. This will prevent email sending from ${domain}.` },
+          { status: 500 }
+        );
+      }
+
+      console.log('✅ Identity successfully associated with tenant');
+    } else {
+      console.warn('No SES tenant found for company. Identity created but not associated with tenant.');
+    }
+
+    // Construct identity ARN for storage (same as above)
+    const awsRegion = process.env.AWS_REGION || 'us-east-1';
+    const awsAccountId = process.env.AWS_ACCOUNT_ID || '';
+    const constructedArn = `arn:aws:ses:${awsRegion}:${awsAccountId}:identity/${domain}`;
+
+    // Update company settings with domain configuration
+    await updateCompanySettings(companyId, {
+      email_domain: domain,
+      email_domain_prefix: emailPrefix || 'noreply',
+      aws_ses_identity_arn: constructedArn, // Use constructed ARN instead of empty string
+      email_domain_status: identityInfo.verifiedForSendingStatus ? 'verified' : 'pending',
+      aws_ses_dkim_tokens: JSON.stringify(dkimTokens),
+      email_domain_verified_at: identityInfo.verifiedForSendingStatus ? new Date().toISOString() : ''
+    });
+
+    // Transform DKIM tokens into records format for UI
+    const records = transformDkimTokensToRecords(dkimTokens, domain);
+
     return NextResponse.json({
       success: true,
       domain: {
-        name: domainInfo.name,
-        configured: true,
-        status: domainInfo.status,
-        records: domainInfo.records,
-        resendDomainId: domainInfo.id,
-        liveInfo: domainInfo
+        name: domain,
+        prefix: emailPrefix || 'noreply',
+        status: identityInfo.verifiedForSendingStatus ? 'verified' : 'pending',
+        records: records,
+        dkimTokens: dkimTokens,
+        identityArn: constructedArn, // Return constructed ARN
+        liveInfo: identityInfo
       }
     });
   } catch (error) {
@@ -196,8 +318,8 @@ export async function POST(
 }
 
 /**
- * PUT /api/admin/companies/[id]/domain/verify
- * Trigger domain verification
+ * PUT /api/admin/companies/[id]/domain
+ * Check domain verification status
  */
 export async function PUT(
   request: NextRequest,
@@ -205,54 +327,57 @@ export async function PUT(
 ) {
   try {
     const { id: companyId } = await getParams(params);
-    const supabase = createAdminClient();
 
     // Get company domain configuration
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('resend_domain_id')
-      .eq('id', companyId)
-      .single();
+    const settings = await getCompanySettings(companyId, ['email_domain']);
 
-    if (companyError || !company || !company.resend_domain_id) {
+    if (!settings.email_domain) {
       return NextResponse.json(
         { error: 'Domain not configured for this company' },
         { status: 404 }
       );
     }
 
-    // Trigger verification in Resend
-    const verificationResult = await verifyDomain(company.resend_domain_id);
+    // Check verification status from AWS SES
+    const verificationResult = await getIdentityVerificationStatus(settings.email_domain);
 
     if (!verificationResult.success) {
       return NextResponse.json(
-        { error: verificationResult.message },
+        { error: verificationResult.error || 'Failed to check verification status' },
         { status: 400 }
       );
     }
 
-    // Get updated domain info
-    const domainInfo = await getDomain(company.resend_domain_id);
+    const status = verificationResult.isVerified ? 'verified' : 'pending';
+    const message = verificationResult.isVerified
+      ? 'Domain is verified and ready to send emails'
+      : 'Domain is not yet verified. Please ensure DNS records are configured correctly.';
+
+    // Get DKIM tokens
+    const identityResult = await getEmailIdentity(settings.email_domain);
+    const dkimTokens = identityResult.dkimTokens || [];
 
     // Update local database
-    await supabase
-      .from('companies')
-      .update({
-        email_domain_status: domainInfo.status,
-        email_domain_records: domainInfo.records,
-        ...(domainInfo.status === 'verified' && {
-          email_domain_verified_at: new Date().toISOString()
-        })
+    await updateCompanySettings(companyId, {
+      email_domain_status: status,
+      aws_ses_dkim_tokens: JSON.stringify(dkimTokens),
+      ...(verificationResult.isVerified && {
+        email_domain_verified_at: new Date().toISOString()
       })
-      .eq('id', companyId);
+    });
+
+    // Transform DKIM tokens into records format for UI
+    const records = transformDkimTokensToRecords(dkimTokens, settings.email_domain);
 
     return NextResponse.json({
       success: true,
-      message: 'Domain verification triggered',
+      message,
       domain: {
-        status: domainInfo.status,
-        records: domainInfo.records,
-        liveInfo: domainInfo
+        status,
+        dkimStatus: verificationResult.dkimStatus,
+        records: records,
+        dkimTokens,
+        isVerified: verificationResult.isVerified
       }
     });
   } catch (error) {
@@ -274,52 +399,29 @@ export async function DELETE(
 ) {
   try {
     const { id: companyId } = await getParams(params);
-    const supabase = createAdminClient();
 
     // Get company domain configuration
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('resend_domain_id')
-      .eq('id', companyId)
-      .single();
+    const settings = await getCompanySettings(companyId, ['email_domain']);
 
-    if (companyError || !company) {
-      return NextResponse.json(
-        { error: 'Company not found' },
-        { status: 404 }
-      );
-    }
-
-    // Delete domain from Resend if it exists
-    if (company.resend_domain_id) {
+    // Delete domain from AWS SES if it exists
+    if (settings.email_domain) {
       try {
-        await deleteDomain(company.resend_domain_id);
+        await deleteEmailIdentity(settings.email_domain);
       } catch (error) {
-        console.warn('Failed to delete domain from Resend:', error);
+        console.warn('Failed to delete domain from AWS SES:', error);
         // Continue anyway - domain might have been already deleted
       }
     }
 
-    // Clear domain configuration from company
-    const { error: updateError } = await supabase
-      .from('companies')
-      .update({
-        email_domain: null,
-        email_domain_configured: false,
-        resend_domain_id: null,
-        email_domain_status: 'not_configured',
-        email_domain_records: null,
-        email_domain_verified_at: null
-      })
-      .eq('id', companyId);
-
-    if (updateError) {
-      console.error('Error clearing domain configuration:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to clear domain configuration' },
-        { status: 500 }
-      );
-    }
+    // Clear domain configuration from company settings
+    await updateCompanySettings(companyId, {
+      email_domain: '',
+      email_domain_prefix: 'noreply',
+      aws_ses_identity_arn: '',
+      email_domain_status: 'not_configured',
+      aws_ses_dkim_tokens: '[]',
+      email_domain_verified_at: ''
+    });
 
     return NextResponse.json({
       success: true,
@@ -328,7 +430,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting domain:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }

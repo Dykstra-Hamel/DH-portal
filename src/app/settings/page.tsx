@@ -6,6 +6,7 @@ import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { useCompanyRole, useIsCompanyAdminAny } from '@/hooks/useCompanyRole';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
+import { useCompany } from '@/contexts/CompanyContext';
 import { adminAPI } from '@/lib/api-client';
 import {
   Save,
@@ -57,7 +58,6 @@ export default function SettingsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [settings, setSettings] = useState<CompanySettings>({});
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -69,17 +69,18 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<'user' | 'company'>('user');
   const router = useRouter();
 
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
   const {
     isAdminForAnyCompany,
     adminCompanies,
     isLoading: roleLoading,
   } = useIsCompanyAdminAny();
-  const { isCompanyAdmin } = useCompanyRole(selectedCompanyId);
+  const { isCompanyAdmin } = useCompanyRole(selectedCompany?.id || '');
 
   // Check if user is global admin
   const isGlobalAdmin = profile ? isAuthorizedAdminSync(profile) : false;
-  const [allCompanies, setAllCompanies] = useState<UserCompany[]>([]);
-  const [companiesLoading, setCompaniesLoading] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -124,40 +125,13 @@ export default function SettingsPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  const fetchAllCompanies = useCallback(async () => {
-    if (!profile) return;
-    
-    try {
-      setCompaniesLoading(true);
-      const companies = await adminAPI.getCompanies();
-
-      // Convert to UserCompany format for consistency
-      const userCompanies: UserCompany[] = companies.map((company: any) => ({
-        id: `global-${company.id}`,
-        user_id: profile.id,
-        company_id: company.id,
-        role: 'admin', // Global admins have admin role
-        is_primary: false,
-        companies: {
-          id: company.id,
-          name: company.name,
-        },
-      }));
-      setAllCompanies(userCompanies);
-    } catch (error) {
-      console.error('Error fetching all companies:', error);
-    } finally {
-      setCompaniesLoading(false);
-    }
-  }, [profile]);
-
   const fetchSettings = useCallback(async () => {
-    if (!selectedCompanyId) return;
+    if (!selectedCompany?.id) return;
 
     try {
       setSettingsLoading(true);
       const response = await fetch(
-        `/api/companies/${selectedCompanyId}/settings`
+        `/api/companies/${selectedCompany.id}/settings`
       );
 
       if (!response.ok) {
@@ -172,29 +146,14 @@ export default function SettingsPage() {
     } finally {
       setSettingsLoading(false);
     }
-  }, [selectedCompanyId]);
+  }, [selectedCompany?.id]);
 
-  // Fetch all companies for global admins
+  // Fetch settings when company is selected or changes
   useEffect(() => {
-    if (isGlobalAdmin && profile) {
-      fetchAllCompanies();
-    }
-  }, [isGlobalAdmin, profile, fetchAllCompanies]);
-
-  // Set default selected company when companies are loaded
-  useEffect(() => {
-    const availableCompanies = isGlobalAdmin ? allCompanies : adminCompanies;
-    if (!selectedCompanyId && availableCompanies.length > 0) {
-      setSelectedCompanyId(availableCompanies[0].company_id);
-    }
-  }, [adminCompanies, allCompanies, selectedCompanyId, isGlobalAdmin]);
-
-  // Fetch settings when company is selected
-  useEffect(() => {
-    if (selectedCompanyId && (isCompanyAdmin || isGlobalAdmin)) {
+    if (!contextLoading && selectedCompany && (isCompanyAdmin || isGlobalAdmin)) {
       fetchSettings();
     }
-  }, [selectedCompanyId, isCompanyAdmin, isGlobalAdmin, fetchSettings]);
+  }, [contextLoading, selectedCompany, isCompanyAdmin, isGlobalAdmin, fetchSettings]);
 
   const handleSettingChange = (key: string, value: any) => {
     setSettings(prev => ({
@@ -207,14 +166,14 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!selectedCompanyId) return;
+    if (!selectedCompany?.id) return;
 
     try {
       setSaving(true);
       setMessage(null);
 
       const response = await fetch(
-        `/api/companies/${selectedCompanyId}/settings`,
+        `/api/companies/${selectedCompany.id}/settings`,
         {
           method: 'PUT',
           headers: {
@@ -237,7 +196,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading || roleLoading || companiesLoading) {
+  if (loading || roleLoading || contextLoading) {
     return <div className={styles.loading}>Loading...</div>;
   }
 
@@ -247,11 +206,6 @@ export default function SettingsPage() {
 
   // Show user settings to all users, company settings only to admins
   const showCompanySettings = isAdminForAnyCompany || isGlobalAdmin;
-
-  const availableCompanies = isGlobalAdmin ? allCompanies : adminCompanies;
-  const selectedCompany = availableCompanies.find(
-    uc => uc.company_id === selectedCompanyId
-  );
 
   return (
     <div className={styles.container}>
@@ -332,35 +286,14 @@ export default function SettingsPage() {
         {/* Company Settings Section */}
         {activeSection === 'company' && showCompanySettings && (
           <>
-            {/* Company Selector */}
-            {availableCompanies.length > 1 && (
-              <div className={styles.companySelector}>
-                <label htmlFor="company-select" className={styles.label}>
-                  Select Company:
-                </label>
-                <select
-                  id="company-select"
-                  value={selectedCompanyId}
-                  onChange={e => setSelectedCompanyId(e.target.value)}
-                  className={styles.select}
-                >
-                  {availableCompanies.map(userCompany => (
-                    <option
-                      key={userCompany.company_id}
-                      value={userCompany.company_id}
-                    >
-                      {userCompany.companies.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {selectedCompany && (
+            {selectedCompany ? (
               <div className={styles.settingsSection}>
                 <h2 className={styles.sectionTitle}>
-                  Settings for {selectedCompany.companies.name}
+                  Settings for {selectedCompany.name}
                 </h2>
+                <p className={styles.sectionDescription}>
+                  Use the company dropdown in the header to switch between companies.
+                </p>
 
                 {message && (
                   <div className={`${styles.message} ${styles[message.type]}`}>
@@ -436,14 +369,14 @@ export default function SettingsPage() {
                     {/* Automation Tab */}
                     {activeTab === 'automation' && (
                       <div className={styles.automationSection}>
-                        <AutomationSettings companyId={selectedCompanyId} />
+                        <AutomationSettings companyId={selectedCompany.id} />
                       </div>
                     )}
 
                     {/* Knowledge Base Tab */}
                     {activeTab === 'knowledge-base' && (
                       <div className={styles.knowledgeBaseSection}>
-                        <KnowledgeBase companyId={selectedCompanyId} />
+                        <KnowledgeBase companyId={selectedCompany.id} />
                       </div>
                     )}
 
@@ -462,6 +395,13 @@ export default function SettingsPage() {
                     )}
                   </div>
                 )}
+              </div>
+            ) : (
+              <div className={styles.settingsSection}>
+                <div className={styles.message}>
+                  <AlertCircle size={16} />
+                  Please select a company from the header dropdown to view settings.
+                </div>
               </div>
             )}
           </>

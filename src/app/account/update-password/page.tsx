@@ -21,7 +21,7 @@ export default function UpdatePasswordPage() {
     const checkAuthStatus = async () => {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (session) {
         setIsAuthenticated(true);
       } else {
@@ -29,7 +29,7 @@ export default function UpdatePasswordPage() {
         router.push('/login?error=auth-required');
         return;
       }
-      
+
       setCheckingAuth(false);
     };
 

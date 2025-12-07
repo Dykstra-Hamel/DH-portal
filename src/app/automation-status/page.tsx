@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 interface WorkflowStats {
@@ -23,17 +24,17 @@ export default function AutomationStatus() {
   const fetchStats = async () => {
     try {
       const supabase = createClient();
-      
+
       // Get workflows count
       const { data: workflows } = await supabase
         .from('automation_workflows')
         .select('id, is_active');
-      
+
       // Get templates count
       const { data: templates } = await supabase
         .from('email_templates')
         .select('id');
-      
+
       // Get recent executions
       const { data: executions } = await supabase
         .from('automation_executions')
@@ -233,7 +234,7 @@ export default function AutomationStatus() {
       <div style={{ marginTop: '24px', fontSize: '14px', color: '#64748b' }}>
         <p>🚀 <strong>Next Steps:</strong></p>
         <ul>
-          <li>Visit <a href="/settings" style={{ color: '#3b82f6' }}>/settings</a> to configure automation workflows</li>
+          <li>Visit <Link href="/settings" style={{ color: '#3b82f6' }}>/settings</Link> to configure automation workflows</li>
           <li>Check the Inngest dashboard at <code>http://localhost:3000/api/inngest</code></li>
           <li>Test the widget form to trigger real automations</li>
         </ul>

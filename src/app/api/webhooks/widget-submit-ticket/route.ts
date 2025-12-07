@@ -276,8 +276,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Set ticket source as organic for widget form submissions
-    const ticketSource = 'organic';
+    // Set ticket source as widget for widget chat submissions
+    const ticketSource = 'widget';
 
     // Create ticket with enhanced attribution data
     const { data: ticket, error: ticketError } = await supabase

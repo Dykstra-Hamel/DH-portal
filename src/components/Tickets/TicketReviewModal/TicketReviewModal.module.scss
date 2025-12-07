@@ -1,0 +1,626 @@
+.ticketModal {
+  max-width: 950px !important;
+  width: 100%;
+  transition: all 0.3s ease;
+  opacity: 1;
+  transform: translateY(0);
+
+  &.stepTransition {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.ticketSummarySection {
+  display: flex;
+  position: relative;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+
+  p {
+    color: var(--gray-500);
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 450;
+    line-height: 170%;
+  }
+}
+
+.ticketSummaryName {
+  color: var(--gray-900);
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 170%;
+}
+
+.reviewerSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reviewingText {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 550;
+  line-height: 14px;
+  color: var(--action-500);
+}
+
+.reviewerInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatarContainer {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarInitials {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #006bc2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.reviewerName {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.callSummary {
+  color: var(--gray-800);
+  margin: 20px 0;
+}
+
+.actionsWrapper {
+  display: flex;
+  position: relative;
+  flex-flow: column;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-300);
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.toggleDetailsButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 16px;
+  margin: 0 auto;
+  border: none;
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-900);
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  svg {
+    margin-left: 8px;
+    color: var(--gray-600);
+  }
+}
+
+.dividerLine {
+  background: var(--gray-200);
+  height: 1px;
+  width: 100%;
+}
+
+.assignActions {
+  display: flex;
+}
+
+.leftColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; // Sections have their own margins
+}
+
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0; // Sections have their own margins
+}
+
+.customDropdown {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+}
+
+.dropdownButton {
+  display: flex;
+  width: 100%;
+  height: 44px;
+  padding: 8px 12px;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 4px;
+  border: 1px solid var(--Misc-Border-Color, #dedede);
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-600);
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+  }
+
+  &:hover:not(.disabled) {
+    border-color: var(--action-600);
+  }
+
+  &.disabled {
+    background: #f9fafb;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border-color: #e5e7eb;
+  }
+}
+
+.selectedOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  svg path {
+    stroke: var(--action-500);
+  }
+
+  // For Lucide icons (they use currentColor)
+  svg {
+    color: var(--action-500);
+  }
+}
+
+.optionText {
+  font-weight: 600;
+  line-height: 1;
+}
+
+.chevronIcon {
+  color: #000;
+  transition: transform 0.2s ease;
+
+  .open & {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid var(--Misc-Border-Color, #dedede);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.dropdownOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: #fff;
+  color: var(--gray-800);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background: var(--primary-100, #e0f2fe);
+  }
+
+  &.selected {
+    background: var(--primary-100, #e0f2fe);
+    color: var(--action-600);
+
+    svg path {
+      stroke: var(--action-600);
+    }
+
+    // For Lucide icons (they use currentColor)
+    svg {
+      color: var(--action-600);
+    }
+  }
+
+  svg path {
+    stroke: var(--gray-800);
+  }
+
+  // For Lucide icons (they use currentColor)
+  svg {
+    color: var(--gray-800);
+  }
+
+  // Override for team avatar - keep the Users icon white
+  .avatarContainer svg,
+  .avatarContainer path {
+    color: white;
+    stroke: white;
+  }
+
+  .optionText {
+    font-weight: 500;
+  }
+}
+
+.loadingMessage {
+  padding: 16px;
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+}
+
+// Responsive design adjustments
+@media (max-width: 768px) {
+  .ticketModal {
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem);
+  }
+
+  .modalContent {
+    max-height: 60vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .ticketModal {
+    margin: 0.25rem;
+    max-width: calc(100vw - 0.5rem);
+  }
+
+  .modalContent {
+    max-height: 65vh;
+  }
+}
+
+.assignmentSelect {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #006bc2;
+    box-shadow: 0 0 0 3px rgba(0, 107, 194, 0.1);
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+.avatarContainer {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarInitials {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #006bc2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  align-items: flex-start;
+}
+
+.userName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--action-600);
+  line-height: 1.2;
+}
+
+.myselfLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--action-600);
+  line-height: 1;
+}
+
+// Radio button styles
+.radioGroup {
+  display: flex;
+  gap: 24px;
+  margin: 16px 0;
+  align-items: center;
+
+  @media (max-width: 768px) {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-800);
+  transition: all 0.2s ease;
+
+  &.disabled {
+    cursor: not-allowed;
+    color: var(--gray-400);
+  }
+
+  &:hover:not(.disabled) {
+    color: var(--action-600);
+  }
+}
+
+.radioInput {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 0;
+  height: 0;
+
+  &:checked + .radioCustom {
+    background: var(--action-600);
+    border-color: var(--action-600);
+
+    &::after {
+      display: block;
+    }
+  }
+
+  &:disabled + .radioCustom {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+    cursor: not-allowed;
+
+    &::after {
+      background: var(--gray-400);
+    }
+  }
+}
+
+.radioCustom {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-300);
+  border-radius: 50%;
+  background: white;
+  transition: all 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: white;
+  }
+}
+
+.radioLabel {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  user-select: none;
+}
+
+// Reason section styles
+.reasonSection {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reasonLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-800);
+  margin-bottom: 4px;
+}
+
+// Tabbed interface styles
+.tabbedInterface {
+  display: grid;
+  width: 100%;
+  gap: 0;
+  height: 100%;
+  grid-template-columns: 50% 50%;
+}
+
+.tabNavigation {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--gray-200);
+  background: #fff;
+  padding: 16px 16px 0 0;
+
+  @media (max-width: 768px) {
+    width: 200px;
+  }
+
+  @media (max-width: 480px) {
+    display: none;
+  }
+}
+
+.tabButton {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: var(--gray-900);
+  font-size: 14px;
+  line-height: 24px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  svg {
+    margin-right: 8px;
+
+    &:last-of-type {
+      margin: 0 0 0 auto;
+      opacity: 0;
+      color: var(--gray-400);
+    }
+  }
+
+  &:hover {
+    svg {
+      &:last-of-type {
+        opacity: 1;
+      }
+    }
+  }
+
+  &.active {
+    background: var(--slate-100);
+
+    svg {
+      &:last-of-type {
+        opacity: 1;
+      }
+    }
+  }
+
+  &:first-child {
+    border-top: none;
+  }
+
+  @media (max-width: 768px) {
+    padding: 14px 16px;
+    font-size: 13px;
+  }
+}
+
+.tabContent {
+  flex: 1;
+  padding: 16px 0 0 0;
+  background: white;
+  overflow: hidden;
+  transition: height 0.3s ease-in-out;
+
+  @media (max-width: 480px) {
+    max-height: 400px;
+  }
+}
+
+// Mobile responsive - show tabs horizontally when vertical tabs are hidden
+@media (max-width: 480px) {
+  .tabbedInterface {
+    flex-direction: column;
+  }
+
+  .tabNavigation {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--gray-200);
+    background: #f9fafb;
+    overflow-x: auto;
+  }
+
+  .tabButton {
+    white-space: nowrap;
+    min-width: fit-content;
+    padding: 12px 16px;
+    border-bottom: none;
+    border-right: 1px solid var(--gray-200);
+
+    &.active {
+      border-right: 1px solid var(--gray-200);
+      border-bottom: 3px solid var(--action-600);
+      margin-right: 0;
+      margin-bottom: -1px;
+    }
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+}

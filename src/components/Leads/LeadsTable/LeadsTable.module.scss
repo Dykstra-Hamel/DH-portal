@@ -102,7 +102,17 @@
   color: #374151;
 }
 
-.statusBadge,
+.statusBadge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+  background: transparent;
+}
+
 .priorityBadge {
   display: inline-block;
   padding: 4px 8px;

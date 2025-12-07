@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Globe, Plus, X, AlertTriangle, CheckCircle, Save, ChevronDown, ChevronRight, Search, Building2, Edit2 } from 'lucide-react';
+import { useCompany } from '@/contexts/CompanyContext';
 import styles from './GlobalWidgetDomains.module.scss';
 
 interface WidgetDomain {
@@ -27,10 +28,12 @@ interface GlobalWidgetDomainsProps {
 }
 
 export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsProps) {
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
   const [domains, setDomains] = useState<WidgetDomain[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [newDomain, setNewDomain] = useState('');
-  const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,11 +56,6 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
       if (data.success) {
         setDomains(data.domains || []);
         setCompanies(data.companies || []);
-        
-        // Set default company selection to first company
-        if (!selectedCompanyId && data.companies?.length > 0) {
-          setSelectedCompanyId(data.companies[0].id);
-        }
       } else {
         setError(data.error || 'Failed to load data');
       }
@@ -71,7 +69,7 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
   // Add new domain
   const addDomain = async () => {
     const trimmed = newDomain.trim();
-    if (!trimmed || !selectedCompanyId) return;
+    if (!trimmed || !selectedCompany) return;
 
     try {
       setSaving(true);
@@ -80,9 +78,9 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           domain: trimmed,
-          company_id: selectedCompanyId
+          company_id: selectedCompany.id
         }),
       });
 
@@ -246,32 +244,23 @@ export default function GlobalWidgetDomains({ className }: GlobalWidgetDomainsPr
             onChange={(e) => setNewDomain(e.target.value)}
             onKeyPress={handleKeyPress}
             className={styles.domainInput}
-            disabled={saving}
+            disabled={saving || !selectedCompany}
           />
-          <select
-            value={selectedCompanyId}
-            onChange={(e) => setSelectedCompanyId(e.target.value)}
-            className={styles.companySelect}
-            disabled={saving}
-          >
-            <option value="">Select Company</option>
-            {companies.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
           <button
             onClick={addDomain}
-            disabled={!newDomain.trim() || !selectedCompanyId || saving}
+            disabled={!newDomain.trim() || !selectedCompany || saving}
             className={styles.addButton}
           >
             <Plus size={16} />
-            Add Domain
+            {selectedCompany ? `Add to ${selectedCompany.name}` : 'Select Company'}
           </button>
         </div>
         <div className={styles.helpText}>
-          Enter full URL and select the company that owns this domain.
+          {selectedCompany ? (
+            <>Enter full URL to add a domain for {selectedCompany.name}. Use the company dropdown in the header to switch companies.</>
+          ) : (
+            <>Please select a company from the header dropdown to add a domain.</>
+          )}
         </div>
       </div>
 

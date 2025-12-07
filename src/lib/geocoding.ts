@@ -152,3 +152,158 @@ export function createCachedGeocodeResult(result: GeocodeResult): CachedGeocodeR
     cachedAt: new Date().toISOString(),
   };
 }
+
+// ============================================================================
+// Reusable Geocoding Utilities for Customer/Service Addresses
+// ============================================================================
+
+export interface CustomerAddressComponents {
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+}
+
+export interface CustomerGeocodeResult {
+  success: boolean;
+  coordinates?: {
+    lat: number;
+    lng: number;
+    hasStreetView?: boolean;
+  };
+  error?: string;
+}
+
+/**
+ * Validates a single address field
+ * Returns true if the field has a valid value (not null, empty, or "none")
+ */
+export function isValidAddressField(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (trimmed === '') return false;
+  if (trimmed.toLowerCase() === 'none') return false;
+  return true;
+}
+
+/**
+ * Builds a geocodable address string from address components
+ * Returns null if insufficient data (requires at least city + state)
+ */
+export function buildGeocodableAddress(
+  street?: string | null,
+  city?: string | null,
+  state?: string | null,
+  zip?: string | null
+): string | null {
+  const parts: string[] = [];
+
+  // Add valid components to the address string
+  if (isValidAddressField(street)) parts.push(street!.trim());
+  if (isValidAddressField(city)) parts.push(city!.trim());
+  if (isValidAddressField(state)) parts.push(state!.trim());
+  if (isValidAddressField(zip)) parts.push(zip!.trim());
+
+  // Require at least city + state for meaningful geocoding
+  if (!isValidAddressField(city) || !isValidAddressField(state)) {
+    return null; // Not enough data to geocode
+  }
+
+  return parts.join(', ');
+}
+
+/**
+ * Geocodes an address using Google Geocoding API (server-side only)
+ * Minimum requirement: city + state
+ * Returns coordinates and Street View availability
+ *
+ * NOTE: This function should only be called from API routes (server-side)
+ * as it uses the GOOGLE_PLACES_API_KEY environment variable
+ */
+export async function geocodeCustomerAddress(
+  addressComponents: CustomerAddressComponents
+): Promise<CustomerGeocodeResult> {
+  try {
+    // Build the geocodable address string
+    const addressString = buildGeocodableAddress(
+      addressComponents.street,
+      addressComponents.city,
+      addressComponents.state,
+      addressComponents.zip
+    );
+
+    if (!addressString) {
+      return {
+        success: false,
+        error: 'Insufficient address data (requires at least city + state)'
+      };
+    }
+
+    // Get API key (server-side only)
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) {
+      return {
+        success: false,
+        error: 'Google Places API key not configured'
+      };
+    }
+
+    // Call Google Geocoding API
+    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addressString)}&key=${apiKey}`;
+    const geocodeResponse = await fetch(geocodeUrl);
+
+    if (!geocodeResponse.ok) {
+      return {
+        success: false,
+        error: `Geocoding API error: ${geocodeResponse.status}`
+      };
+    }
+
+    const geocodeData = await geocodeResponse.json();
+
+    if (geocodeData.status !== 'OK' || !geocodeData.results?.[0]) {
+      return {
+        success: false,
+        error: `Geocoding failed: ${geocodeData.status}`
+      };
+    }
+
+    const location = geocodeData.results[0].geometry?.location;
+    if (!location?.lat || !location?.lng) {
+      return {
+        success: false,
+        error: 'No coordinates found in geocoding response'
+      };
+    }
+
+    // Check Street View availability
+    let hasStreetView = false;
+    try {
+      const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview/metadata?location=${location.lat},${location.lng}&key=${apiKey}`;
+      const streetViewResponse = await fetch(streetViewUrl);
+
+      if (streetViewResponse.ok) {
+        const streetViewData = await streetViewResponse.json();
+        hasStreetView = streetViewData.status === 'OK';
+      }
+    } catch (error) {
+      console.warn('Street View check failed:', error);
+      // Continue without Street View info
+    }
+
+    return {
+      success: true,
+      coordinates: {
+        lat: location.lat,
+        lng: location.lng,
+        hasStreetView
+      }
+    };
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown geocoding error'
+    };
+  }
+}

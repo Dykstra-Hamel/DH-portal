@@ -27,8 +27,10 @@ export async function GET(
       return accessCheck; // Return error response
     }
 
-    // Use appropriate client based on admin status
-    const queryClient = getSupabaseClient(isGlobalAdmin, supabase);
+    // Use service role client for fetching company users to bypass RLS issues
+    // This is safe because we've already verified the user has access to this company
+    // The service role client allows us to fetch all users in the company without RLS blocking
+    const queryClient = getSupabaseClient(true, supabase);
 
     // First, get all user IDs associated with this company
     const { data: companyUsers, error: fetchError } = await queryClient
@@ -48,32 +50,101 @@ export async function GET(
     // Get user IDs to query profiles
     const userIds = companyUsers.map((cu: { user_id: string }) => cu.user_id);
 
-    // Now fetch the profiles for those users (using admin client if admin)
+    // Now fetch the profiles for those users with their departments (using admin client if admin)
     const { data: profiles, error: profilesError } = await queryClient
       .from('profiles')
-      .select('id, first_name, last_name, email')
-      .in('id', userIds);
+      .select(`
+        id,
+        first_name,
+        last_name,
+        email,
+        avatar_url,
+        user_departments!left(department)
+      `)
+      .in('id', userIds)
+      .eq('user_departments.company_id', companyId);
 
     if (profilesError) {
       console.error('Error fetching user profiles:', profilesError);
       return createErrorResponse('Failed to fetch user profiles');
     }
 
+    // Separately fetch user roles from user_companies table
+    const { data: userCompaniesData, error: rolesError } = await queryClient
+      .from('user_companies')
+      .select('user_id, role')
+      .eq('company_id', companyId)
+      .in('user_id', userIds);
 
-    // Format the response data
-    const users = (profiles || []).map((profile: {
+    if (rolesError) {
+      console.error('Error fetching user roles:', rolesError);
+      return createErrorResponse('Failed to fetch user roles');
+    }
+
+    // Process the profiles and combine with role data
+    const allProfiles = profiles || [];
+    const roleData = userCompaniesData || [];
+
+    // Group departments and roles by user
+    const userDepartments: { [userId: string]: string[] } = {};
+    const userRoles: { [userId: string]: string[] } = {};
+
+    // Process departments from profiles
+    allProfiles.forEach((profile: any) => {
+      if (!userDepartments[profile.id]) {
+        userDepartments[profile.id] = [];
+      }
+
+      // Handle array of department objects from LEFT join
+      if (Array.isArray(profile.user_departments)) {
+        profile.user_departments.forEach((deptObj: any) => {
+          if (deptObj?.department && !userDepartments[profile.id].includes(deptObj.department)) {
+            userDepartments[profile.id].push(deptObj.department);
+          }
+        });
+      } else if (profile.user_departments?.department && !userDepartments[profile.id].includes(profile.user_departments.department)) {
+        // Handle single department object (fallback)
+        userDepartments[profile.id].push(profile.user_departments.department);
+      }
+    });
+
+    // Process roles from separate query
+    roleData.forEach((userCompany: any) => {
+      const userId = userCompany.user_id;
+      if (!userRoles[userId]) {
+        userRoles[userId] = [];
+      }
+      if (userCompany.role && !userRoles[userId].includes(userCompany.role)) {
+        userRoles[userId].push(userCompany.role);
+      }
+    });
+
+
+    // Remove duplicates and format the response data
+    const uniqueProfiles = allProfiles.reduce((acc: any[], current: any) => {
+      const existingUser = acc.find(user => user.id === current.id);
+      if (!existingUser) {
+        acc.push(current);
+      }
+      return acc;
+    }, []);
+
+    const users = uniqueProfiles.map((profile: {
       id: string;
       first_name: string;
       last_name: string;
       email: string;
+      avatar_url: string | null;
     }) => ({
       id: profile.id,
       first_name: profile.first_name,
       last_name: profile.last_name,
       email: profile.email,
-      display_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email
+      avatar_url: profile.avatar_url,
+      display_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
+      departments: userDepartments[profile.id] || [],
+      roles: userRoles[profile.id] || []
     }));
-
 
     return createSuccessResponse({ users });
 

@@ -10,7 +10,6 @@ import {
   formatDuration,
   formatPhoneNumber 
 } from '@/lib/callrail/types';
-import { useDateFilter } from '@/contexts/DateFilterContext';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import styles from './AnalyticsDashboard.module.scss';
@@ -49,15 +48,14 @@ export default function CallAnalyticsDashboard({
   const [error, setError] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
   
-  // Use global date filter instead of local state
-  const { getDaysCount } = useDateFilter();
+  // Removed date filter - using default 30 days
   const [selectedCall, setSelectedCall] = useState<CallRailCall | null>(null);
 
   const fetchCallData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
-    const days = getDaysCount() || 30; // Default to 30 days if "All Time" is selected
+    const days = 30; // Default to 30 days if "All Time" is selected
     
     try {
       const response = await fetch(`/api/callrail/calls?companyId=${companyId}&days=${days}`);
@@ -78,7 +76,7 @@ export default function CallAnalyticsDashboard({
     } finally {
       setLoading(false);
     }
-  }, [companyId, getDaysCount]);
+  }, [companyId, ]);
 
   useEffect(() => {
     if (companyId) {
@@ -249,7 +247,7 @@ export default function CallAnalyticsDashboard({
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={statusData}
+                    data={statusData as any[]}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}

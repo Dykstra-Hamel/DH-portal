@@ -1,0 +1,67 @@
+.notesSection {
+  width: 100%;
+  padding: 20px 16px;
+}
+
+.textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--slate-300);
+  border-radius: 6px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 14px;
+  color: var(--slate-900);
+  background-color: white;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+  }
+
+  &::placeholder {
+    color: var(--slate-400);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.secondaryButton {
+  background: white;
+  color: var(--gray-900);
+  border: 1px solid var(--gray-300);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+
+  &:hover:not(:disabled) {
+    background: var(--slate-50);
+    border-color: var(--gray-500);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

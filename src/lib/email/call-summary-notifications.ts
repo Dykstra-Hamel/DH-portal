@@ -1,8 +1,8 @@
 import { CallSummaryEmailData } from './types';
 import { generateCallSummaryEmailTemplate } from './templates/call-summary';
-import { createAdminClient } from '@/lib/supabase/server-admin';
-import { MAILERSEND_API_TOKEN, MAILERSEND_FROM_EMAIL } from './index';
+import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from './index';
 import { validateEmails } from './lead-notifications';
+import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
 
 export async function sendCallSummaryNotifications(
   recipients: string[],
@@ -27,28 +27,10 @@ export async function sendCallSummaryNotifications(
       };
     }
 
-    // Use MailerSend with hard-coded from email
-    const fromEmail = MAILERSEND_FROM_EMAIL;
-    let fromName = callData.companyName || 'Call Management System';
-
-    if (companyId) {
-      try {
-        const supabase = createAdminClient();
-        
-        // Get company name
-        const { data: company } = await supabase
-          .from('companies')
-          .select('name')
-          .eq('id', companyId)
-          .single();
-
-        if (company) {
-          fromName = company.name;
-        }
-      } catch (error) {
-        console.warn(`[Call Summary Email Service] Failed to load company name:`, error);
-      }
-    }
+    // Get company's from email (custom domain if verified, otherwise fallback)
+    const fromEmail = companyId ? await getCompanyFromEmail(companyId) : await getCompanyFromEmail('');
+    const fromName = companyId ? await getCompanyName(companyId) : (callData.companyName || 'Call Management System');
+    const tenantName = companyId ? await getCompanyTenantName(companyId) : '';
 
     const results = [];
 
@@ -65,46 +47,24 @@ export async function sendCallSummaryNotifications(
         const subject = generateSubjectLine(callData, emailConfig?.subjectLine);
         const emailHtml = generateCallSummaryEmailTemplate(recipientName, callData);
 
-        // Send email using MailerSend
-        const mailersendPayload = {
-          from: {
-            email: fromEmail,
-            name: fromName
-          },
-          to: [
-            {
-              email: email
-            }
-          ],
-          subject: subject,
-          html: emailHtml
-        };
-
-        const response = await fetch('https://api.mailersend.com/v1/email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
-          },
-          body: JSON.stringify(mailersendPayload),
+        // Send email using AWS SES
+        const result = await sendEmailWithFallback({
+          tenantName,
+          from: fromEmail,
+          fromName,
+          to: email,
+          subject,
+          html: emailHtml,
+          companyId: companyId || '',
+          source: 'call_summary_notification',
+          tags: ['call', 'summary', 'notification'],
         });
 
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error(`[Call Summary Email Service] Failed to send to ${email}: ${response.status}`, errorData);
-          results.push({ email, success: false, error: `MailerSend error: ${response.status}` });
+        if (!result.success) {
+          console.error(`[Call Summary Email Service] Failed to send to ${email}:`, result.error);
+          results.push({ email, success: false, error: result.error });
         } else {
-          let responseData: any = {};
-          try {
-            const responseText = await response.text();
-            if (responseText.trim()) {
-              responseData = JSON.parse(responseText);
-            }
-          } catch (error) {
-            // Response wasn't JSON but that's okay
-          }
-          
-          results.push({ email, success: true, data: responseData });
+          results.push({ email, success: true, messageId: result.messageId });
         }
       } catch (emailError) {
         console.error(`[Call Summary Email Service] Error sending to ${email}:`, emailError);

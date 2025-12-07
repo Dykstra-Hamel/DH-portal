@@ -1,0 +1,238 @@
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+
+  .headerContent {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    svg {
+      color: #3b82f6;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #111827;
+    }
+  }
+
+  .closeButton {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #6b7280;
+    transition: color 0.2s;
+
+    &:hover {
+      color: #111827;
+    }
+  }
+}
+
+.modalBody {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.templateInfo {
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: #374151;
+
+    strong {
+      color: #111827;
+    }
+  }
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+
+  &.success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+
+    svg {
+      color: #10b981;
+    }
+  }
+
+  &.error {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #ef4444;
+
+    svg {
+      color: #ef4444;
+    }
+  }
+}
+
+.formGroup {
+  margin-bottom: 20px;
+
+  label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+
+    .required {
+      color: #ef4444;
+    }
+  }
+
+  .input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    &::placeholder {
+      color: #9ca3af;
+    }
+  }
+
+  .helpText {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.4;
+  }
+}
+
+.infoBox {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: #dbeafe;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  margin-top: 20px;
+
+  svg {
+    color: #3b82f6;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: #1e40af;
+    line-height: 1.5;
+
+    strong {
+      font-weight: 600;
+    }
+  }
+}
+
+.modalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+
+  button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  .cancelButton {
+    background: white;
+    border: 1px solid #d1d5db;
+    color: #374151;
+
+    &:hover:not(:disabled) {
+      background-color: #f9fafb;
+      border-color: #9ca3af;
+    }
+  }
+
+  .sendButton {
+    background-color: #3b82f6;
+    border: 1px solid #3b82f6;
+    color: white;
+
+    &:hover:not(:disabled) {
+      background-color: #2563eb;
+      border-color: #2563eb;
+    }
+
+    &:active:not(:disabled) {
+      background-color: #1d4ed8;
+    }
+  }
+}

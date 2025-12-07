@@ -1,16 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, AlertCircle, CheckCircle, Eye, EyeOff, ChevronDown, ChevronUp, Settings, Phone } from 'lucide-react';
-import { adminAPI } from '@/lib/api-client';
+import {
+  Save,
+  AlertCircle,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronUp,
+  Settings,
+  Phone,
+} from 'lucide-react';
+import { useCompany } from '@/contexts/CompanyContext';
 import AgentsManager from '@/components/Agents/AgentsManager';
 import TestCalling from './TestCalling';
 import styles from './AdminManager.module.scss';
-
-interface Company {
-  id: string;
-  name: string;
-}
 
 interface CompanySetting {
   value: any;
@@ -23,9 +28,10 @@ interface CompanySettings {
 }
 
 export default function CallSettingsManager() {
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
   // State
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [settings, setSettings] = useState<CompanySettings>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,29 +42,24 @@ export default function CallSettingsManager() {
   } | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [businessHoursExpanded, setBusinessHoursExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'settings' | 'agents' | 'test-calling'>('settings');
+  const [activeTab, setActiveTab] = useState<
+    'settings' | 'agents' | 'test-calling'
+  >('settings');
 
   useEffect(() => {
-    loadCompanies();
-  }, []);
-
-  const loadCompanies = async () => {
-    try {
-      const companiesData = await adminAPI.getCompanies();
-      setCompanies(companiesData);
-    } catch (err) {
-      console.error('Failed to load companies:', err);
+    if (!contextLoading && selectedCompany) {
+      loadSettings(selectedCompany.id);
     }
-  };
+  }, [contextLoading, selectedCompany]);
 
   const loadSettings = async (companyId: string) => {
     if (!companyId) return;
-    
+
     try {
       setLoading(true);
       setError(null);
       const response = await fetch(`/api/companies/${companyId}/settings`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch settings');
       }
@@ -73,13 +74,6 @@ export default function CallSettingsManager() {
     }
   };
 
-  const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
-    if (companyId) {
-      loadSettings(companyId);
-    }
-  };
-
   const handleSettingChange = (key: string, value: any) => {
     setSettings(prev => ({
       ...prev,
@@ -91,15 +85,18 @@ export default function CallSettingsManager() {
   };
 
   const handleSaveSettings = async () => {
-    if (!selectedCompanyId) return;
+    if (!selectedCompany) return;
 
     try {
       setSaving(true);
-      const response = await fetch(`/api/companies/${selectedCompanyId}/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings }),
-      });
+      const response = await fetch(
+        `/api/companies/${selectedCompany.id}/settings`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to save settings');
@@ -120,33 +117,17 @@ export default function CallSettingsManager() {
     <div className={styles.adminManager}>
       <div className={styles.header}>
         <h2>Call Settings & Agent Management</h2>
-      </div>
-
-      {/* Company Dropdown */}
-      <div className={styles.companySelector}>
-        <label htmlFor="company-select" className={styles.selectorLabel}>
-          Select Company:
-        </label>
-        <select
-          id="company-select"
-          value={selectedCompanyId}
-          onChange={(e) => handleCompanyChange(e.target.value)}
-          className={styles.companySelect}
-        >
-          <option value="">-- Select a Company --</option>
-          {companies.map(company => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
+        {selectedCompany && <p>Managing settings for {selectedCompany.name}</p>}
+        <small>
+          Use the company dropdown in the header to switch companies.
+        </small>
       </div>
 
       {/* Tabs */}
-      {selectedCompanyId && (
+      {selectedCompany && (
         <div className={styles.tabContainer}>
           <div className={styles.tabList}>
-            <button 
+            <button
               className={`${styles.tab} ${activeTab === 'settings' ? styles.active : ''}`}
               onClick={() => setActiveTab('settings')}
             >
@@ -173,17 +154,20 @@ export default function CallSettingsManager() {
 
       {/* Content */}
       <div className={styles.tabContent}>
-        {!selectedCompanyId ? (
+        {!selectedCompany ? (
           <div className={styles.noSelection}>
-            <p>Please select a company to manage call settings and agents.</p>
+            <p>
+              Please select a company from the header dropdown to manage call
+              settings and agents.
+            </p>
           </div>
         ) : activeTab === 'agents' ? (
           <div className={styles.agentsTab}>
-            <AgentsManager companyId={selectedCompanyId} />
+            <AgentsManager companyId={selectedCompany.id} />
           </div>
         ) : activeTab === 'test-calling' ? (
           <div className={styles.testCallingTab}>
-            <TestCalling companyId={selectedCompanyId} />
+            <TestCalling companyId={selectedCompany.id} />
           </div>
         ) : loading ? (
           <div className={styles.loading}>Loading settings...</div>
@@ -193,7 +177,11 @@ export default function CallSettingsManager() {
           <div className={styles.settingsForm}>
             {message && (
               <div className={`${styles.message} ${styles[message.type]}`}>
-                {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                {message.type === 'success' ? (
+                  <CheckCircle size={16} />
+                ) : (
+                  <AlertCircle size={16} />
+                )}
                 {message.text}
               </div>
             )}
@@ -202,11 +190,14 @@ export default function CallSettingsManager() {
             <div className={styles.migrationNotice}>
               <h3>🎉 New Multi-Agent System</h3>
               <p>
-                We&apos;ve upgraded to a flexible multi-agent system! You can now create unlimited Retell agents 
-                for different purposes. Use the <strong>Agent Management</strong> tab to configure your agents.
+                We&apos;ve upgraded to a flexible multi-agent system! You can
+                now create unlimited Retell agents for different purposes. Use
+                the <strong>Agent Management</strong> tab to configure your
+                agents.
               </p>
               <p className={styles.noticeSubtext}>
-                The old individual agent ID fields have been replaced with the new agent management system.
+                The old individual agent ID fields have been replaced with the
+                new agent management system.
               </p>
             </div>
 
@@ -219,11 +210,15 @@ export default function CallSettingsManager() {
 
               <div className={styles.setting}>
                 <div className={styles.settingInfo}>
-                  <label htmlFor="auto-call-enabled" className={styles.settingLabel}>
+                  <label
+                    htmlFor="auto-call-enabled"
+                    className={styles.settingLabel}
+                  >
                     Auto-Call New Leads
                   </label>
                   <p className={styles.settingDescription}>
-                    {settings.auto_call_enabled?.description || 'Automatically initiate phone calls for new leads'}
+                    {settings.auto_call_enabled?.description ||
+                      'Automatically initiate phone calls for new leads'}
                   </p>
                 </div>
                 <div className={styles.settingControl}>
@@ -231,8 +226,16 @@ export default function CallSettingsManager() {
                     <input
                       id="auto-call-enabled"
                       type="checkbox"
-                      checked={settings.auto_call_enabled?.value === true || settings.auto_call_enabled?.value === 'true'}
-                      onChange={(e) => handleSettingChange('auto_call_enabled', e.target.checked)}
+                      checked={
+                        settings.auto_call_enabled?.value === true ||
+                        settings.auto_call_enabled?.value === 'true'
+                      }
+                      onChange={e =>
+                        handleSettingChange(
+                          'auto_call_enabled',
+                          e.target.checked
+                        )
+                      }
                     />
                     <span className={styles.toggleSlider}></span>
                   </label>
@@ -241,11 +244,15 @@ export default function CallSettingsManager() {
 
               <div className={styles.setting}>
                 <div className={styles.settingInfo}>
-                  <label htmlFor="off-hour-calling" className={styles.settingLabel}>
+                  <label
+                    htmlFor="off-hour-calling"
+                    className={styles.settingLabel}
+                  >
                     Off-Hour Calling
                   </label>
                   <p className={styles.settingDescription}>
-                    {settings.off_hour_calling_enabled?.description || 'Allow calls outside business hours and on weekends'}
+                    {settings.off_hour_calling_enabled?.description ||
+                      'Allow calls outside business hours and on weekends'}
                   </p>
                 </div>
                 <div className={styles.settingControl}>
@@ -253,8 +260,16 @@ export default function CallSettingsManager() {
                     <input
                       id="off-hour-calling"
                       type="checkbox"
-                      checked={settings.off_hour_calling_enabled?.value === true || settings.off_hour_calling_enabled?.value === 'true'}
-                      onChange={(e) => handleSettingChange('off_hour_calling_enabled', e.target.checked)}
+                      checked={
+                        settings.off_hour_calling_enabled?.value === true ||
+                        settings.off_hour_calling_enabled?.value === 'true'
+                      }
+                      onChange={e =>
+                        handleSettingChange(
+                          'off_hour_calling_enabled',
+                          e.target.checked
+                        )
+                      }
                     />
                     <span className={styles.toggleSlider}></span>
                   </label>
@@ -263,11 +278,15 @@ export default function CallSettingsManager() {
 
               <div className={styles.setting}>
                 <div className={styles.settingInfo}>
-                  <label htmlFor="call-throttle" className={styles.settingLabel}>
+                  <label
+                    htmlFor="call-throttle"
+                    className={styles.settingLabel}
+                  >
                     Call Throttle (minutes)
                   </label>
                   <p className={styles.settingDescription}>
-                    {settings.call_throttle_minutes?.description || 'Minimum minutes between calls to same customer'}
+                    {settings.call_throttle_minutes?.description ||
+                      'Minimum minutes between calls to same customer'}
                   </p>
                 </div>
                 <div className={styles.settingControl}>
@@ -277,7 +296,12 @@ export default function CallSettingsManager() {
                     min="1"
                     max="60"
                     value={settings.call_throttle_minutes?.value || 5}
-                    onChange={(e) => handleSettingChange('call_throttle_minutes', parseInt(e.target.value))}
+                    onChange={e =>
+                      handleSettingChange(
+                        'call_throttle_minutes',
+                        parseInt(e.target.value)
+                      )
+                    }
                     className={styles.textInput}
                   />
                 </div>
@@ -288,16 +312,21 @@ export default function CallSettingsManager() {
             <div className={styles.settingGroup}>
               <h3 className={styles.groupTitle}>Retell AI Configuration</h3>
               <p className={styles.groupDescription}>
-                Configure your Retell AI API key and knowledge base. Individual agents are now managed in the Agent Management tab.
+                Configure your Retell AI API key and knowledge base. Individual
+                agents are now managed in the Agent Management tab.
               </p>
 
               <div className={styles.setting}>
                 <div className={styles.settingInfo}>
-                  <label htmlFor="retell-api-key" className={styles.settingLabel}>
+                  <label
+                    htmlFor="retell-api-key"
+                    className={styles.settingLabel}
+                  >
                     Retell API Key
                   </label>
                   <p className={styles.settingDescription}>
-                    {settings.retell_api_key?.description || 'Retell AI API key for this company account'}
+                    {settings.retell_api_key?.description ||
+                      'Retell AI API key for this company account'}
                   </p>
                 </div>
                 <div className={styles.settingControl}>
@@ -306,7 +335,9 @@ export default function CallSettingsManager() {
                       id="retell-api-key"
                       type={showApiKey ? 'text' : 'password'}
                       value={settings.retell_api_key?.value || ''}
-                      onChange={(e) => handleSettingChange('retell_api_key', e.target.value)}
+                      onChange={e =>
+                        handleSettingChange('retell_api_key', e.target.value)
+                      }
                       className={styles.textInput}
                       placeholder="key_xxxxxxxxxxxxxxxxxxxxxxxx"
                     />
@@ -324,11 +355,15 @@ export default function CallSettingsManager() {
 
               <div className={styles.setting}>
                 <div className={styles.settingInfo}>
-                  <label htmlFor="retell-knowledge-base-id" className={styles.settingLabel}>
+                  <label
+                    htmlFor="retell-knowledge-base-id"
+                    className={styles.settingLabel}
+                  >
                     Retell Knowledge Base ID
                   </label>
                   <p className={styles.settingDescription}>
-                    {settings.retell_knowledge_base_id?.description || 'Knowledge base ID for company-specific information'}
+                    {settings.retell_knowledge_base_id?.description ||
+                      'Knowledge base ID for company-specific information'}
                   </p>
                 </div>
                 <div className={styles.settingControl}>
@@ -336,7 +371,12 @@ export default function CallSettingsManager() {
                     id="retell-knowledge-base-id"
                     type="text"
                     value={settings.retell_knowledge_base_id?.value || ''}
-                    onChange={(e) => handleSettingChange('retell_knowledge_base_id', e.target.value)}
+                    onChange={e =>
+                      handleSettingChange(
+                        'retell_knowledge_base_id',
+                        e.target.value
+                      )
+                    }
                     className={styles.textInput}
                     placeholder="kb_xxxxxxxxxxxxxxxxxxxxxxxx"
                   />
@@ -348,16 +388,21 @@ export default function CallSettingsManager() {
             <div className={styles.settingGroup}>
               <h3 className={styles.groupTitle}>Call Summary Emails</h3>
               <p className={styles.groupDescription}>
-                Configure automatic email notifications with call summaries after calls are completed.
+                Configure automatic email notifications with call summaries
+                after calls are completed.
               </p>
 
               <div className={styles.setting}>
                 <div className={styles.settingInfo}>
-                  <label htmlFor="call-summary-emails-enabled" className={styles.settingLabel}>
+                  <label
+                    htmlFor="call-summary-emails-enabled"
+                    className={styles.settingLabel}
+                  >
                     Enable Call Summary Emails
                   </label>
                   <p className={styles.settingDescription}>
-                    {settings.call_summary_emails_enabled?.description || 'Send detailed call summaries via email when calls complete'}
+                    {settings.call_summary_emails_enabled?.description ||
+                      'Send detailed call summaries via email when calls complete'}
                   </p>
                 </div>
                 <div className={styles.settingControl}>
@@ -365,29 +410,50 @@ export default function CallSettingsManager() {
                     <input
                       id="call-summary-emails-enabled"
                       type="checkbox"
-                      checked={settings.call_summary_emails_enabled?.value === true || settings.call_summary_emails_enabled?.value === 'true'}
-                      onChange={(e) => handleSettingChange('call_summary_emails_enabled', e.target.checked)}
+                      checked={
+                        settings.call_summary_emails_enabled?.value === true ||
+                        settings.call_summary_emails_enabled?.value === 'true'
+                      }
+                      onChange={e =>
+                        handleSettingChange(
+                          'call_summary_emails_enabled',
+                          e.target.checked
+                        )
+                      }
                     />
                     <span className={styles.toggleSlider}></span>
                   </label>
                 </div>
               </div>
 
-              {(settings.call_summary_emails_enabled?.value === true || settings.call_summary_emails_enabled?.value === 'true') && (
+              {(settings.call_summary_emails_enabled?.value === true ||
+                settings.call_summary_emails_enabled?.value === 'true') && (
                 <div className={styles.setting}>
                   <div className={styles.settingInfo}>
-                    <label htmlFor="call-summary-email-recipients" className={styles.settingLabel}>
+                    <label
+                      htmlFor="call-summary-email-recipients"
+                      className={styles.settingLabel}
+                    >
                       Email Recipients
                     </label>
                     <p className={styles.settingDescription}>
-                      Enter email addresses separated by commas. These recipients will receive detailed call summaries including transcripts, analysis, and customer information.
+                      Enter email addresses separated by commas. These
+                      recipients will receive detailed call summaries including
+                      transcripts, analysis, and customer information.
                     </p>
                   </div>
                   <div className={styles.settingControl}>
                     <textarea
                       id="call-summary-email-recipients"
-                      value={settings.call_summary_email_recipients?.value || ''}
-                      onChange={(e) => handleSettingChange('call_summary_email_recipients', e.target.value)}
+                      value={
+                        settings.call_summary_email_recipients?.value || ''
+                      }
+                      onChange={e =>
+                        handleSettingChange(
+                          'call_summary_email_recipients',
+                          e.target.value
+                        )
+                      }
                       className={styles.textArea}
                       placeholder="manager@company.com, sales@company.com, support@company.com"
                       rows={3}
@@ -396,25 +462,50 @@ export default function CallSettingsManager() {
                     {settings.call_summary_email_recipients?.value && (
                       <div className={styles.emailValidation}>
                         {(() => {
-                          const emails = settings.call_summary_email_recipients?.value
-                            .split(',')
-                            .map((email: string) => email.trim())
-                            .filter((email: string) => email.length > 0);
-                          
+                          const emails =
+                            settings.call_summary_email_recipients?.value
+                              .split(',')
+                              .map((email: string) => email.trim())
+                              .filter((email: string) => email.length > 0);
+
                           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                          const validEmails = emails.filter((email: string) => emailRegex.test(email));
-                          const invalidEmails = emails.filter((email: string) => !emailRegex.test(email));
-                          
+                          const validEmails = emails.filter((email: string) =>
+                            emailRegex.test(email)
+                          );
+                          const invalidEmails = emails.filter(
+                            (email: string) => !emailRegex.test(email)
+                          );
+
                           return (
                             <div style={{ marginTop: '8px' }}>
                               {validEmails.length > 0 && (
-                                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#059669' }}>
-                                  ✓ {validEmails.length} valid email{validEmails.length !== 1 ? 's' : ''}: {validEmails.slice(0, 3).join(', ')}{validEmails.length > 3 ? ` and ${validEmails.length - 3} more` : ''}
+                                <p
+                                  style={{
+                                    margin: '0 0 4px 0',
+                                    fontSize: '12px',
+                                    color: '#059669',
+                                  }}
+                                >
+                                  ✓ {validEmails.length} valid email
+                                  {validEmails.length !== 1 ? 's' : ''}:{' '}
+                                  {validEmails.slice(0, 3).join(', ')}
+                                  {validEmails.length > 3
+                                    ? ` and ${validEmails.length - 3} more`
+                                    : ''}
                                 </p>
                               )}
                               {invalidEmails.length > 0 && (
-                                <p style={{ margin: '0', fontSize: '12px', color: '#dc2626' }}>
-                                  ✗ {invalidEmails.length} invalid email{invalidEmails.length !== 1 ? 's' : ''}: {invalidEmails.slice(0, 2).join(', ')}{invalidEmails.length > 2 ? '...' : ''}
+                                <p
+                                  style={{
+                                    margin: '0',
+                                    fontSize: '12px',
+                                    color: '#dc2626',
+                                  }}
+                                >
+                                  ✗ {invalidEmails.length} invalid email
+                                  {invalidEmails.length !== 1 ? 's' : ''}:{' '}
+                                  {invalidEmails.slice(0, 2).join(', ')}
+                                  {invalidEmails.length > 2 ? '...' : ''}
                                 </p>
                               )}
                             </div>
@@ -426,11 +517,31 @@ export default function CallSettingsManager() {
                 </div>
               )}
 
-              {(settings.call_summary_emails_enabled?.value === true || settings.call_summary_emails_enabled?.value === 'true') && (
-                <div style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9', borderRadius: '6px', padding: '16px', marginTop: '16px' }}>
-                  <p style={{ margin: '0', fontSize: '14px', color: '#0369a1', lineHeight: '1.5' }}>
-                    <strong>📧 Email Content Preview:</strong><br />
-                    Call summary emails include call details, transcript, sentiment analysis, customer information, service details, and call recording links when available. Emails are sent automatically when calls complete.
+              {(settings.call_summary_emails_enabled?.value === true ||
+                settings.call_summary_emails_enabled?.value === 'true') && (
+                <div
+                  style={{
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #0ea5e9',
+                    borderRadius: '6px',
+                    padding: '16px',
+                    marginTop: '16px',
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: '0',
+                      fontSize: '14px',
+                      color: '#0369a1',
+                      lineHeight: '1.5',
+                    }}
+                  >
+                    <strong>📧 Email Content Preview:</strong>
+                    <br />
+                    Call summary emails include call details, transcript,
+                    sentiment analysis, customer information, service details,
+                    and call recording links when available. Emails are sent
+                    automatically when calls complete.
                   </p>
                 </div>
               )}
@@ -438,14 +549,27 @@ export default function CallSettingsManager() {
 
             {/* Business Hours Settings */}
             <div className={styles.settingGroup}>
-              <div className={styles.collapsibleHeader} onClick={() => setBusinessHoursExpanded(!businessHoursExpanded)}>
+              <div
+                className={styles.collapsibleHeader}
+                onClick={() => setBusinessHoursExpanded(!businessHoursExpanded)}
+              >
                 <h3 className={styles.groupTitle}>Business Hours & Timezone</h3>
-                {businessHoursExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                {businessHoursExpanded ? (
+                  <ChevronUp size={20} />
+                ) : (
+                  <ChevronDown size={20} />
+                )}
               </div>
               <p className={styles.groupDescription}>
-                Configure business hours and timezone for this company. These settings are used for business hours webhook logic and reporting.
+                Configure business hours and timezone for this company. These
+                settings are used for business hours webhook logic and
+                reporting.
                 {settings.off_hour_calling_enabled?.value && (
-                  <span className={styles.noteText}> Note: Off-Hour Calling is currently enabled, so calls will be allowed outside these hours.</span>
+                  <span className={styles.noteText}>
+                    {' '}
+                    Note: Off-Hour Calling is currently enabled, so calls will
+                    be allowed outside these hours.
+                  </span>
                 )}
               </p>
 
@@ -454,34 +578,67 @@ export default function CallSettingsManager() {
                   {/* Company Timezone Setting */}
                   <div className={styles.setting}>
                     <div className={styles.settingInfo}>
-                      <label htmlFor="company-timezone" className={styles.settingLabel}>
+                      <label
+                        htmlFor="company-timezone"
+                        className={styles.settingLabel}
+                      >
                         Company Timezone
                       </label>
                       <p className={styles.settingDescription}>
-                        {settings.company_timezone?.description || 'Timezone used for business hours calculations'}
+                        {settings.company_timezone?.description ||
+                          'Timezone used for business hours calculations'}
                       </p>
                     </div>
                     <div className={styles.settingControl}>
                       <select
                         id="company-timezone"
-                        value={settings.company_timezone?.value || 'America/New_York'}
-                        onChange={(e) => handleSettingChange('company_timezone', e.target.value)}
+                        value={
+                          settings.company_timezone?.value || 'America/New_York'
+                        }
+                        onChange={e =>
+                          handleSettingChange(
+                            'company_timezone',
+                            e.target.value
+                          )
+                        }
                         className={styles.textInput}
                       >
-                        <option value="America/New_York">Eastern (America/New_York)</option>
-                        <option value="America/Chicago">Central (America/Chicago)</option>
-                        <option value="America/Denver">Mountain (America/Denver)</option>
-                        <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
-                        <option value="America/Phoenix">Arizona (America/Phoenix)</option>
-                        <option value="America/Anchorage">Alaska (America/Anchorage)</option>
-                        <option value="Pacific/Honolulu">Hawaii (Pacific/Honolulu)</option>
+                        <option value="America/New_York">
+                          Eastern (America/New_York)
+                        </option>
+                        <option value="America/Chicago">
+                          Central (America/Chicago)
+                        </option>
+                        <option value="America/Denver">
+                          Mountain (America/Denver)
+                        </option>
+                        <option value="America/Los_Angeles">
+                          Pacific (America/Los_Angeles)
+                        </option>
+                        <option value="America/Phoenix">
+                          Arizona (America/Phoenix)
+                        </option>
+                        <option value="America/Anchorage">
+                          Alaska (America/Anchorage)
+                        </option>
+                        <option value="Pacific/Honolulu">
+                          Hawaii (Pacific/Honolulu)
+                        </option>
                         <option value="UTC">UTC</option>
                       </select>
                     </div>
                   </div>
 
                   {/* Daily Business Hours */}
-                  {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                  {[
+                    'monday',
+                    'tuesday',
+                    'wednesday',
+                    'thursday',
+                    'friday',
+                    'saturday',
+                    'sunday',
+                  ].map(day => (
                     <div key={day} className={styles.businessHoursDay}>
                       <div className={styles.dayHeader}>
                         <span className={styles.dayName}>
@@ -490,9 +647,14 @@ export default function CallSettingsManager() {
                         <label className={styles.toggle}>
                           <input
                             type="checkbox"
-                            checked={settings[`business_hours_${day}`]?.value?.enabled ?? true}
-                            onChange={(e) => {
-                              const currentValue = settings[`business_hours_${day}`]?.value || {
+                            checked={
+                              settings[`business_hours_${day}`]?.value
+                                ?.enabled ?? true
+                            }
+                            onChange={e => {
+                              const currentValue = settings[
+                                `business_hours_${day}`
+                              ]?.value || {
                                 start: '09:00',
                                 end: '17:00',
                                 enabled: true,
@@ -507,15 +669,21 @@ export default function CallSettingsManager() {
                         </label>
                       </div>
 
-                      {settings[`business_hours_${day}`]?.value?.enabled !== false && (
+                      {settings[`business_hours_${day}`]?.value?.enabled !==
+                        false && (
                         <div className={styles.timeSettings}>
                           <div className={styles.timeInputGroup}>
                             <label className={styles.settingLabel}>Start</label>
                             <input
                               type="time"
-                              value={settings[`business_hours_${day}`]?.value?.start || '09:00'}
-                              onChange={(e) => {
-                                const currentValue = settings[`business_hours_${day}`]?.value || {
+                              value={
+                                settings[`business_hours_${day}`]?.value
+                                  ?.start || '09:00'
+                              }
+                              onChange={e => {
+                                const currentValue = settings[
+                                  `business_hours_${day}`
+                                ]?.value || {
                                   start: '09:00',
                                   end: '17:00',
                                   enabled: true,
@@ -533,9 +701,14 @@ export default function CallSettingsManager() {
                             <label className={styles.settingLabel}>End</label>
                             <input
                               type="time"
-                              value={settings[`business_hours_${day}`]?.value?.end || '17:00'}
-                              onChange={(e) => {
-                                const currentValue = settings[`business_hours_${day}`]?.value || {
+                              value={
+                                settings[`business_hours_${day}`]?.value?.end ||
+                                '17:00'
+                              }
+                              onChange={e => {
+                                const currentValue = settings[
+                                  `business_hours_${day}`
+                                ]?.value || {
                                   start: '09:00',
                                   end: '17:00',
                                   enabled: true,

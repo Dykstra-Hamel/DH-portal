@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
       'localhost', // Alternative localhost
       'supabase.co', // Production Supabase
       'cwmckkfkcjxznkpdxgie.supabase.co', // Replace with your actual project ID
+      // OAuth provider avatars
+      'lh3.googleusercontent.com', // Google avatars
+      'platform-lookaside.fbsbx.com', // Facebook avatars
+      'avatars.githubusercontent.com', // GitHub avatars
+      'cdn.discordapp.com', // Discord avatars
     ],
   },
 };

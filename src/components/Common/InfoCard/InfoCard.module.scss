@@ -1,0 +1,133 @@
+.infoCard {
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--slate-300);
+  overflow: hidden;
+}
+
+.header {
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.2s ease-in-out;
+
+  &.collapsed {
+    background: white;
+
+    &.clickable:hover {
+      background: #f9fafb;
+    }
+  }
+
+  &.expanded {
+    background: var(--slate-100);
+
+    &.clickable:hover {
+      background: #e8ebf4;
+    }
+  }
+
+  &.clickable {
+    cursor: pointer;
+  }
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--slate-600);
+  }
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--slate-600);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.toggleButton {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 6px;
+  border: 1px solid var(--gray-300);
+  background: #e5e7eb;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background: #d1d5db;
+  }
+
+  svg {
+    transition: transform 0.2s ease-in-out;
+  }
+
+  svg.rotated {
+    transform: rotate(180deg);
+  }
+}
+
+.rotated {
+  transform: rotate(180deg);
+}
+
+// Reusable text styles for InfoCard content
+.defaultText,
+.inputLabels {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+  line-height: 170%;
+  margin-bottom: 4px;
+}
+
+.lightText {
+  font-size: 14px;
+  font-weight: 450;
+  color: var(--gray-500);
+}
+
+.inputText {
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+}
+
+.dataLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+
+.dataText {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.transcriptText {
+  font-size: 14px;
+  font-weight: 450;
+  color: var(--gray-900);
+}

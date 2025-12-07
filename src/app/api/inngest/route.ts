@@ -8,7 +8,7 @@ import { widgetScheduleCompletedHandler } from '@/lib/inngest/functions/widget-s
 import { automationTriggerHandler } from '@/lib/inngest/functions/automation-trigger';
 import { emailScheduledHandler } from '@/lib/inngest/functions/email-scheduled';
 import { leadFollowUpSequence } from '@/lib/inngest/functions/lead-followup-sequence';
-import { emailDeliveryTracking } from '@/lib/inngest/functions/email-delivery-tracking';
+import { emailWebhookHandler } from '@/lib/inngest/functions/email-delivery-tracking';
 import { workflowTestHandler } from '@/lib/inngest/functions/workflow-test';
 import { workflowExecuteHandler } from '@/lib/inngest/functions/workflow-execute';
 import { callSchedulingHandler, scheduledCallExecutor } from '@/lib/inngest/functions/call-scheduling-handler';
@@ -16,6 +16,16 @@ import { callOutcomeTracker, retellCallWebhookHandler } from '@/lib/inngest/func
 import { workflowCancellationHandler } from '@/lib/inngest/functions/workflow-cancel';
 import { partialLeadCreated } from '@/lib/inngest/functions/partial-lead-created';
 import { inboundCallTransfer } from '@/lib/inngest/functions/inbound-call-transfer';
+import { cleanupStaleLiveTickets } from '@/lib/inngest/functions/cleanup-stale-live-tickets';
+import { bulkLeadUploadHandler } from '@/lib/inngest/functions/bulk-lead-upload';
+import { campaignSchedulerHandler, campaignProcessContactsHandler, campaignWorkflowCompletionHandler } from '@/lib/inngest/functions/campaign-scheduler';
+
+// Pest Pressure Prediction System functions
+import { aggregatePestPressureDataJob } from '@/lib/inngest/functions/aggregate-pest-pressure-data';
+import { syncWeatherData } from '@/lib/inngest/functions/sync-weather-data';
+import { trainPestPressureModels } from '@/lib/inngest/functions/train-pest-pressure-models';
+import { generatePestPredictions } from '@/lib/inngest/functions/generate-pest-predictions';
+import { detectPestAnomalies } from '@/lib/inngest/functions/detect-pest-anomalies';
 
 // Create the handler
 export const { GET, POST, PUT } = serve({
@@ -26,10 +36,11 @@ export const { GET, POST, PUT } = serve({
     widgetScheduleCompletedHandler,
     partialLeadCreated,
     inboundCallTransfer,
+    bulkLeadUploadHandler,
     automationTriggerHandler,
     emailScheduledHandler,
     leadFollowUpSequence,
-    emailDeliveryTracking,
+    emailWebhookHandler,
     workflowTestHandler,
     workflowExecuteHandler,
     callSchedulingHandler,
@@ -37,6 +48,17 @@ export const { GET, POST, PUT } = serve({
     callOutcomeTracker,
     retellCallWebhookHandler,
     workflowCancellationHandler,
+    cleanupStaleLiveTickets,
+    // Campaign system
+    campaignSchedulerHandler,
+    campaignProcessContactsHandler,
+    campaignWorkflowCompletionHandler,
+    // Pest Pressure Prediction System
+    aggregatePestPressureDataJob,
+    syncWeatherData,
+    trainPestPressureModels,
+    generatePestPredictions,
+    detectPestAnomalies,
   ],
   streaming: false, // Disable streaming for compatibility
 });

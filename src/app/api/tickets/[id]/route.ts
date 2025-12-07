@@ -38,7 +38,7 @@ export async function GET(
 
     const { id } = await params;
 
-    // Get ticket with customer and company info
+    // Get ticket with customer, company, and service address info
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
       .select(
@@ -59,6 +59,19 @@ export async function GET(
           id,
           name,
           website
+        ),
+        service_address:service_addresses!left(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type,
+          property_notes,
+          home_size_range,
+          yard_size_range
         )
       `
       )
@@ -156,19 +169,30 @@ export async function PUT(
       );
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: userCompanyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', existingTicket.company_id)
+    // Check user profile to determine if they're a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
       .single();
 
-    if (userCompanyError || !userCompany) {
-      return NextResponse.json(
-        { error: 'Access denied to this ticket' },
-        { status: 403 }
-      );
+    const isGlobalAdmin = profile?.role === 'admin';
+
+    // Verify user has access to this company (admins have access to all companies)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: userCompanyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', existingTicket.company_id)
+        .single();
+
+      if (userCompanyError || !userCompany) {
+        return NextResponse.json(
+          { error: 'Access denied to this ticket' },
+          { status: 403 }
+        );
+      }
     }
 
     // Update the ticket
@@ -178,7 +202,7 @@ export async function PUT(
       .eq('id', id)
       .select(`
         *,
-        customer:customers(
+        customer:customers!tickets_customer_id_fkey(
           id,
           first_name,
           last_name,
@@ -188,6 +212,19 @@ export async function PUT(
           city,
           state,
           zip_code
+        ),
+        service_address:service_addresses!left(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type,
+          property_notes,
+          home_size_range,
+          yard_size_range
         )
       `)
       .single();

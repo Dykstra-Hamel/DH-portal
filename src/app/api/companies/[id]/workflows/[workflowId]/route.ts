@@ -174,6 +174,7 @@ export async function PUT(
     if (workflowData.business_hours_only !== undefined) updateData.business_hours_only = workflowData.business_hours_only;
     if (workflowData.auto_cancel_on_status !== undefined) updateData.auto_cancel_on_status = workflowData.auto_cancel_on_status;
     if (workflowData.cancel_on_statuses !== undefined) updateData.cancel_on_statuses = workflowData.cancel_on_statuses;
+    if (workflowData.agent_id !== undefined) updateData.agent_id = workflowData.agent_id || null;
 
     const { data: workflow, error } = await supabase
       .from('automation_workflows')

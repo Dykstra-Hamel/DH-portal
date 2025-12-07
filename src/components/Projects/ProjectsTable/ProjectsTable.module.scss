@@ -45,6 +45,17 @@
     font-weight: 600;
   }
 
+  .projectName {
+    color: var(--primary-color, #3b82f6);
+    cursor: pointer;
+    transition: color 0.2s;
+
+    &:hover {
+      color: var(--primary-color-dark, #2563eb);
+      text-decoration: underline;
+    }
+  }
+
   .description {
     color: #9ca3af;
     font-size: 0.8rem;

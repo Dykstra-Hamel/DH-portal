@@ -1,30 +1,37 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useCompany } from '@/contexts/CompanyContext';
 import { adminAPI } from '@/lib/api-client';
 import TicketsTable from '@/components/Tickets/TicketsTable/TicketsTable';
-import CompanyDropdown from '@/components/Common/CompanyDropdown/CompanyDropdown';
 import { Ticket } from '@/types/ticket';
 import { createClient } from '@/lib/supabase/client';
+import {
+  createTicketChannel,
+  subscribeToTicketUpdates,
+  TicketUpdatePayload,
+} from '@/lib/realtime/ticket-channel';
 import styles from './AdminDashboard.module.scss';
 
 export default function TicketsManager() {
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [archivedTickets, setArchivedTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
 
   const fetchTickets = useCallback(async (companyId: string, includeArchived: boolean = false) => {
     if (!companyId) return;
-    
+
     setLoading(true);
     try {
-      const ticketsData = await adminAPI.tickets.list({ 
-        companyId, 
-        includeArchived 
+      const ticketsData = await adminAPI.tickets.list({
+        companyId,
+        includeArchived
       });
-      
+
       if (includeArchived) {
         setArchivedTickets(ticketsData);
       } else {
@@ -38,69 +45,41 @@ export default function TicketsManager() {
   }, []);
 
   useEffect(() => {
-    if (selectedCompanyId) {
-      fetchTickets(selectedCompanyId, false);
-      fetchTickets(selectedCompanyId, true);
+    if (!contextLoading && selectedCompany) {
+      fetchTickets(selectedCompany.id, false);
+      fetchTickets(selectedCompany.id, true);
     }
-  }, [selectedCompanyId, fetchTickets]);
+  }, [contextLoading, selectedCompany, fetchTickets]);
 
-  // Supabase Realtime subscription for live updates
+  // Supabase Realtime broadcast subscription for live updates
   useEffect(() => {
-    if (!selectedCompanyId) return;
+    if (!selectedCompany) return;
 
-    const supabase = createClient();
-    
-    // Subscribe to tickets table changes for this company
-    const ticketsSubscription = supabase
-      .channel('tickets-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'tickets',
-          filter: `company_id=eq.${selectedCompanyId}`,
-        },
-        (payload) => {
-          // Refresh tickets data when changes occur
-          fetchTickets(selectedCompanyId, false);
-          fetchTickets(selectedCompanyId, true);
-        }
-      )
-      .subscribe();
+    const channel = createTicketChannel(selectedCompany.id);
 
-    // Subscribe to call_records table changes to detect status updates
-    const callRecordsSubscription = supabase
-      .channel('call-records-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'call_records',
-        },
-        (payload) => {
-          // Check if this call record is associated with a ticket for this company
-          // Refresh tickets to get updated call status
-          fetchTickets(selectedCompanyId, false);
-          fetchTickets(selectedCompanyId, true);
-        }
-      )
-      .subscribe();
+    subscribeToTicketUpdates(channel, async (payload: TicketUpdatePayload) => {
+      const { company_id } = payload;
 
-    // Cleanup subscriptions on unmount
+      // Verify this is for our selected company
+      if (company_id !== selectedCompany.id) return;
+
+      // Refresh both active and archived tickets when any change occurs
+      // This ensures we always have the latest data
+      fetchTickets(selectedCompany.id, false);
+      fetchTickets(selectedCompany.id, true);
+    });
+
     return () => {
-      supabase.removeChannel(ticketsSubscription);
-      supabase.removeChannel(callRecordsSubscription);
+      createClient().removeChannel(channel);
     };
-  }, [selectedCompanyId, fetchTickets]);
+  }, [selectedCompany, fetchTickets]);
 
   const handleArchiveTicket = async (ticketId: string) => {
     try {
       await adminAPI.tickets.archive(ticketId);
-      if (selectedCompanyId) {
-        fetchTickets(selectedCompanyId, false);
-        fetchTickets(selectedCompanyId, true);
+      if (selectedCompany) {
+        fetchTickets(selectedCompany.id, false);
+        fetchTickets(selectedCompany.id, true);
       }
     } catch (error) {
       console.error('Error archiving ticket:', error);
@@ -110,9 +89,9 @@ export default function TicketsManager() {
   const handleUnarchiveTicket = async (ticketId: string) => {
     try {
       await adminAPI.tickets.update(ticketId, { archived: false });
-      if (selectedCompanyId) {
-        fetchTickets(selectedCompanyId, false);
-        fetchTickets(selectedCompanyId, true);
+      if (selectedCompany) {
+        fetchTickets(selectedCompany.id, false);
+        fetchTickets(selectedCompany.id, true);
       }
     } catch (error) {
       console.error('Error unarchiving ticket:', error);
@@ -120,9 +99,9 @@ export default function TicketsManager() {
   };
 
   const handleTicketUpdated = () => {
-    if (selectedCompanyId) {
-      fetchTickets(selectedCompanyId, false);
-      fetchTickets(selectedCompanyId, true);
+    if (selectedCompany) {
+      fetchTickets(selectedCompany.id, false);
+      fetchTickets(selectedCompany.id, true);
     }
   };
 
@@ -138,18 +117,17 @@ export default function TicketsManager() {
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <h2>Tickets Manager</h2>
-        <p>View and manage tickets across companies</p>
+        {selectedCompany ? (
+          <>
+            <p>Managing tickets for {selectedCompany.name}</p>
+            <small>Use the company dropdown in the header to switch companies.</small>
+          </>
+        ) : (
+          <p>Select a company from the header dropdown to view tickets</p>
+        )}
       </div>
 
-      <div className={styles.controls}>
-        <CompanyDropdown
-          selectedCompanyId={selectedCompanyId}
-          onCompanyChange={setSelectedCompanyId}
-          placeholder="Select a company to view tickets"
-        />
-      </div>
-
-      {selectedCompanyId && (
+      {selectedCompany && (
         <>
           {/* Tab Navigation */}
           <div className={styles.tabNavigation}>

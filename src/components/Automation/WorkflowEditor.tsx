@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Settings,
   Mail,
+  MessageSquare,
   Clock,
   GitBranch,
   User,
@@ -24,15 +25,25 @@ import styles from './WorkflowEditor.module.scss';
 
 interface WorkflowStep {
   id: string;
-  type: 'send_email' | 'wait' | 'update_lead_status' | 'assign_lead' | 'conditional' | 'make_call' | 'archive_call';
+  type:
+    | 'send_email'
+    | 'send_sms'
+    | 'wait'
+    | 'update_lead_status'
+    | 'assign_lead'
+    | 'conditional'
+    | 'make_call'
+    | 'archive_call';
   template_id?: string;
+  sms_message?: string;
+  sms_agent_id?: string;
+  agent_id?: string;
   delay_minutes?: number;
   new_status?: string;
   assign_to_user_id?: string;
   condition?: any;
   branches?: WorkflowBranch[];
   call_variables?: any;
-  call_type?: 'immediate' | 'follow_up' | 'urgent';
   archive_reason?: string;
   required?: boolean;
 }
@@ -69,8 +80,12 @@ const WORKFLOW_TYPES = [
 ];
 
 const TRIGGER_TYPES = [
+  { value: 'manual', label: 'Manual (Campaign Use)' },
   // { value: 'lead_created', label: 'New Lead Created' }, // Disabled - process not refined yet
-  { value: 'widget_schedule_completed', label: 'Widget Schedule Form Completed' },
+  {
+    value: 'widget_schedule_completed',
+    label: 'Widget Schedule Form Completed',
+  },
   { value: 'partial_lead_created', label: 'Partial Lead Created' },
   { value: 'inbound_call_transfer', label: 'Inbound Call Transferred' },
   // { value: 'lead_updated', label: 'Lead Updated' }, // Disabled temporarily
@@ -81,12 +96,28 @@ const TRIGGER_TYPES = [
 ];
 
 const PEST_TYPES = [
-  'ants', 'roaches', 'spiders', 'mice', 'rats', 'termites', 
-  'bed bugs', 'wasps', 'mosquitoes', 'fleas', 'other'
+  'ants',
+  'roaches',
+  'spiders',
+  'mice',
+  'rats',
+  'termites',
+  'bed bugs',
+  'wasps',
+  'mosquitoes',
+  'fleas',
+  'other',
 ];
 
 const URGENCY_LEVELS = ['low', 'medium', 'high', 'urgent'];
-const LEAD_SOURCES = ['organic', 'referral', 'google_cpc', 'facebook_ads', 'widget_submission', 'other'];
+const LEAD_SOURCES = [
+  'organic',
+  'referral',
+  'google_cpc',
+  'facebook_ads',
+  'widget_submission',
+  'other',
+];
 const LEAD_STATUSES = [
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
@@ -97,7 +128,13 @@ const LEAD_STATUSES = [
   { value: 'unqualified', label: 'Unqualified' },
 ];
 
-export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, onSave }: WorkflowEditorProps) {
+export default function WorkflowEditor({
+  isOpen,
+  onClose,
+  companyId,
+  workflow,
+  onSave,
+}: WorkflowEditorProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -108,11 +145,17 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     is_active: false,
     auto_cancel_on_status: true,
     cancel_on_statuses: ['won', 'closed_won', 'converted'],
+    agent_id: '',
   });
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [smsAgents, setSmsAgents] = useState<any[]>([]);
+  const [callingAgents, setCallingAgents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [testing, setTesting] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
@@ -122,7 +165,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     try {
       setLoading(true);
       const supabase = createClient();
-      
+
       const { data, error } = await supabase
         .from('email_templates')
         .select('id, name, subject_line, template_type')
@@ -142,9 +185,57 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     }
   }, [companyId]);
 
+  const fetchSmsAgents = useCallback(async () => {
+    try {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from('agents')
+        .select('id, agent_id, agent_name, phone_number')
+        .eq('company_id', companyId)
+        .eq('agent_type', 'sms')
+        .eq('is_active', true)
+        .not('phone_number', 'is', null)
+        .order('agent_name');
+
+      if (error) {
+        console.error('Error fetching SMS agents:', error);
+      } else {
+        setSmsAgents(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching SMS agents:', error);
+    }
+  }, [companyId]);
+
+  const fetchCallingAgents = useCallback(async () => {
+    try {
+      const supabase = createClient();
+
+      const { data, error } = await supabase
+        .from('agents')
+        .select('id, agent_id, agent_name, phone_number')
+        .eq('company_id', companyId)
+        .eq('agent_type', 'calling')
+        .eq('agent_direction', 'outbound')
+        .eq('is_active', true)
+        .order('agent_name');
+
+      if (error) {
+        console.error('Error fetching calling agents:', error);
+      } else {
+        setCallingAgents(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching calling agents:', error);
+    }
+  }, [companyId]);
+
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
+      fetchSmsAgents();
+      fetchCallingAgents();
       if (workflow) {
         setFormData({
           name: workflow.name || '',
@@ -155,7 +246,12 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
           workflow_steps: workflow.workflow_steps || [],
           is_active: workflow.is_active || false,
           auto_cancel_on_status: workflow.auto_cancel_on_status !== false,
-          cancel_on_statuses: workflow.cancel_on_statuses || ['won', 'closed_won', 'converted'],
+          cancel_on_statuses: workflow.cancel_on_statuses || [
+            'won',
+            'closed_won',
+            'converted',
+          ],
+          agent_id: workflow.agent_id || '',
         });
       } else {
         // Reset form for new workflow
@@ -169,10 +265,11 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
           is_active: false,
           auto_cancel_on_status: true,
           cancel_on_statuses: ['won', 'closed_won', 'converted'],
+          agent_id: '',
         });
       }
     }
-  }, [isOpen, workflow, fetchTemplates]);
+  }, [isOpen, workflow, fetchTemplates, fetchSmsAgents, fetchCallingAgents]);
 
   const handleSave = async () => {
     try {
@@ -186,15 +283,18 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
       }
 
       if (formData.workflow_steps.length === 0) {
-        setMessage({ type: 'error', text: 'At least one workflow step is required' });
+        setMessage({
+          type: 'error',
+          text: 'At least one workflow step is required',
+        });
         return;
       }
 
       // API call
-      const url = workflow 
+      const url = workflow
         ? `/api/companies/${companyId}/workflows/${workflow.id}`
         : `/api/companies/${companyId}/workflows`;
-      
+
       const method = workflow ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -231,50 +331,65 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
 
       // Basic validation before testing
       if (!formData.name.trim()) {
-        setMessage({ type: 'error', text: 'Workflow name is required for testing' });
+        setMessage({
+          type: 'error',
+          text: 'Workflow name is required for testing',
+        });
         return;
       }
 
       if (formData.workflow_steps.length === 0) {
-        setMessage({ type: 'error', text: 'At least one workflow step is required for testing' });
+        setMessage({
+          type: 'error',
+          text: 'At least one workflow step is required for testing',
+        });
         return;
       }
 
       // For new workflows, we need to test the configuration as-is
       // For existing workflows, we can test the saved workflow
       const testWorkflowId = workflow?.id;
-      
+
       if (!testWorkflowId) {
-        setMessage({ type: 'error', text: 'Please save the workflow first before testing' });
+        setMessage({
+          type: 'error',
+          text: 'Please save the workflow first before testing',
+        });
         return;
       }
 
-      const response = await fetch(`/api/companies/${companyId}/workflows/${testWorkflowId}/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sampleLead: {
-            name: 'John Smith',
-            email: 'john.smith@example.com',
-            phone: '(555) 123-4567',
-            pest_type: 'ants',
-            urgency: 'high',
-            lead_source: 'website'
-          }
-        }),
-      });
+      const response = await fetch(
+        `/api/companies/${companyId}/workflows/${testWorkflowId}/test`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sampleLead: {
+              name: 'John Smith',
+              email: 'john.smith@example.com',
+              phone: '(555) 123-4567',
+              pest_type: 'ants',
+              urgency: 'high',
+              lead_source: 'website',
+            },
+          }),
+        }
+      );
 
       const result = await response.json();
 
       if (result.success) {
         setTestResults(result.testResult);
         setShowTestResults(true);
-        setMessage({ type: 'success', text: `Test completed successfully! ${result.testResult.summary.totalSteps} steps executed.` });
+        setMessage({
+          type: 'success',
+          text: `Test completed successfully! ${result.testResult.summary.totalSteps} steps executed.`,
+        });
       } else {
         if (result.validationErrors && result.validationErrors.length > 0) {
-          setMessage({ 
-            type: 'error', 
-            text: `Workflow validation failed: ${result.validationErrors.join(', ')}` 
+          setMessage({
+            type: 'error',
+            text: `Workflow validation failed: ${result.validationErrors.join(', ')}`,
           });
         } else {
           setMessage({ type: 'error', text: result.error || 'Test failed' });
@@ -297,6 +412,10 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
 
     if (stepType === 'send_email') {
       newStep.delay_minutes = 0;
+    } else if (stepType === 'send_sms') {
+      newStep.delay_minutes = 0;
+      newStep.sms_message = '';
+      newStep.required = true;
     } else if (stepType === 'wait') {
       newStep.delay_minutes = 60;
     } else if (stepType === 'make_call') {
@@ -307,7 +426,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
       newStep.condition = {
         field: 'urgency',
         operator: 'equals',
-        value: 'high'
+        value: 'high',
       };
     }
 
@@ -315,7 +434,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
       ...prev,
       workflow_steps: [...prev.workflow_steps, newStep],
     }));
-    
+
     // Expand the new step
     setExpandedSteps(prev => new Set(prev).add(newStep.id));
   };
@@ -345,13 +464,13 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
     setFormData(prev => {
       const steps = [...prev.workflow_steps];
       const index = steps.findIndex(s => s.id === stepId);
-      
+
       if (direction === 'up' && index > 0) {
         [steps[index - 1], steps[index]] = [steps[index], steps[index - 1]];
       } else if (direction === 'down' && index < steps.length - 1) {
         [steps[index], steps[index + 1]] = [steps[index + 1], steps[index]];
       }
-      
+
       return { ...prev, workflow_steps: steps };
     });
   };
@@ -370,13 +489,17 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
 
   const renderStepContent = (step: WorkflowStep, index: number) => {
     const isExpanded = expandedSteps.has(step.id);
-    
+
     return (
       <div key={step.id} className={styles.workflowStep}>
-        <div className={styles.stepHeader} onClick={() => toggleStepExpansion(step.id)}>
+        <div
+          className={styles.stepHeader}
+          onClick={() => toggleStepExpansion(step.id)}
+        >
           <div className={styles.stepInfo}>
             <div className={styles.stepIcon}>
               {step.type === 'send_email' && <Mail size={16} />}
+              {step.type === 'send_sms' && <MessageSquare size={16} />}
               {step.type === 'wait' && <Clock size={16} />}
               {step.type === 'make_call' && <PhoneCall size={16} />}
               {step.type === 'conditional' && <GitBranch size={16} />}
@@ -388,29 +511,38 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 Step {index + 1}: {getStepTypeName(step.type)}
               </span>
               <span className={styles.stepDescription}>
-                {getStepDescription(step, templates)}
+                {getStepDescription(step, templates, callingAgents)}
               </span>
             </div>
           </div>
           <div className={styles.stepActions}>
             {index > 0 && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); moveStep(step.id, 'up'); }}
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  moveStep(step.id, 'up');
+                }}
                 className={styles.moveButton}
               >
                 <ChevronUp size={14} />
               </button>
             )}
             {index < formData.workflow_steps.length - 1 && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); moveStep(step.id, 'down'); }}
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  moveStep(step.id, 'down');
+                }}
                 className={styles.moveButton}
               >
                 <ChevronDown size={14} />
               </button>
             )}
-            <button 
-              onClick={(e) => { e.stopPropagation(); deleteStep(step.id); }}
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                deleteStep(step.id);
+              }}
               className={styles.deleteButton}
             >
               <Trash2 size={14} />
@@ -429,7 +561,9 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                   <label>Email Template *</label>
                   <select
                     value={step.template_id || ''}
-                    onChange={(e) => updateStep(step.id, { template_id: e.target.value })}
+                    onChange={e =>
+                      updateStep(step.id, { template_id: e.target.value })
+                    }
                   >
                     <option value="">Select a template</option>
                     {templates.map(template => (
@@ -446,7 +580,62 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                     min="0"
                     max="10080"
                     value={step.delay_minutes || 0}
-                    onChange={(e) => updateStep(step.id, { delay_minutes: parseInt(e.target.value) || 0 })}
+                    onChange={e =>
+                      updateStep(step.id, {
+                        delay_minutes: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                  <small>0 = immediate, 60 = 1 hour, 1440 = 1 day</small>
+                </div>
+              </>
+            )}
+
+            {step.type === 'send_sms' && (
+              <>
+                <div className={styles.formGroup}>
+                  <label>SMS Agent *</label>
+                  <select
+                    value={step.sms_agent_id || ''}
+                    onChange={e =>
+                      updateStep(step.id, { sms_agent_id: e.target.value })
+                    }
+                  >
+                    <option value="">Select an SMS agent</option>
+                    {smsAgents.map(agent => (
+                      <option key={agent.id} value={agent.agent_id}>
+                        {agent.agent_name} - {agent.phone_number}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>SMS Message *</label>
+                  <textarea
+                    value={step.sms_message || ''}
+                    onChange={e =>
+                      updateStep(step.id, { sms_message: e.target.value })
+                    }
+                    placeholder="Enter your SMS message. You can use variables like {{customerName}}, {{selectedPlanName}}, etc."
+                    rows={4}
+                  />
+                  <small>
+                    Customize this message with variables. The message will be
+                    sent as the initial message to start the SMS conversation.
+                  </small>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Delay (minutes)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10080"
+                    value={step.delay_minutes || 0}
+                    onChange={e =>
+                      updateStep(step.id, {
+                        delay_minutes: parseInt(e.target.value) || 0,
+                      })
+                    }
                   />
                   <small>0 = immediate, 60 = 1 hour, 1440 = 1 day</small>
                 </div>
@@ -461,35 +650,51 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                   min="1"
                   max="10080"
                   value={step.delay_minutes || 60}
-                  onChange={(e) => updateStep(step.id, { delay_minutes: parseInt(e.target.value) || 60 })}
+                  onChange={e =>
+                    updateStep(step.id, {
+                      delay_minutes: parseInt(e.target.value) || 60,
+                    })
+                  }
                 />
               </div>
             )}
 
-
             {step.type === 'make_call' && (
               <>
                 <div className={styles.formGroup}>
-                  <label>Call Type</label>
+                  <label>Outbound Calling Agent *</label>
                   <select
-                    value={step.call_type || 'immediate'}
-                    onChange={(e) => updateStep(step.id, { call_type: e.target.value as 'immediate' | 'follow_up' | 'urgent' })}
+                    value={step.agent_id || ''}
+                    onChange={e =>
+                      updateStep(step.id, { agent_id: e.target.value })
+                    }
                   >
-                    <option value="immediate">Immediate Call</option>
-                    <option value="follow_up">Follow-up Call</option>
-                    <option value="urgent">Urgent Call</option>
+                    <option value="">Select an agent</option>
+                    {callingAgents.map(agent => (
+                      <option key={agent.id} value={agent.agent_id}>
+                        {agent.agent_name}
+                        {agent.phone_number ? ` - ${agent.phone_number}` : ''}
+                      </option>
+                    ))}
                   </select>
+                  <small>
+                    Select which outbound calling agent will make the call
+                  </small>
                 </div>
                 <div className={styles.formGroup}>
                   <label>Delay (minutes)</label>
                   <input
                     type="number"
                     min="0"
-                    max="60"
+                    max="10080"
                     value={step.delay_minutes || 0}
-                    onChange={(e) => updateStep(step.id, { delay_minutes: parseInt(e.target.value) || 0 })}
+                    onChange={e =>
+                      updateStep(step.id, {
+                        delay_minutes: parseInt(e.target.value) || 0,
+                      })
+                    }
                   />
-                  <small>0 = immediate, up to 60 minutes for immediate calls</small>
+                  <small>0 = immediate, 60 = 1 hour, 1440 = 1 day</small>
                 </div>
               </>
             )}
@@ -500,9 +705,11 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                   <label>Condition Field *</label>
                   <select
                     value={step.condition?.field || ''}
-                    onChange={(e) => updateStep(step.id, { 
-                      condition: { ...step.condition, field: e.target.value }
-                    })}
+                    onChange={e =>
+                      updateStep(step.id, {
+                        condition: { ...step.condition, field: e.target.value },
+                      })
+                    }
                   >
                     <option value="">Select field</option>
                     <option value="urgency">Urgency Level</option>
@@ -518,9 +725,14 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                   <label>Operator *</label>
                   <select
                     value={step.condition?.operator || ''}
-                    onChange={(e) => updateStep(step.id, { 
-                      condition: { ...step.condition, operator: e.target.value }
-                    })}
+                    onChange={e =>
+                      updateStep(step.id, {
+                        condition: {
+                          ...step.condition,
+                          operator: e.target.value,
+                        },
+                      })
+                    }
                   >
                     <option value="">Select operator</option>
                     <option value="equals">Equals</option>
@@ -536,12 +748,16 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                   <input
                     type="text"
                     value={step.condition?.value || ''}
-                    onChange={(e) => updateStep(step.id, { 
-                      condition: { ...step.condition, value: e.target.value }
-                    })}
+                    onChange={e =>
+                      updateStep(step.id, {
+                        condition: { ...step.condition, value: e.target.value },
+                      })
+                    }
                     placeholder="Enter comparison value"
                   />
-                  <small>For &quot;In Array&quot;, separate values with commas</small>
+                  <small>
+                    For &quot;In Array&quot;, separate values with commas
+                  </small>
                 </div>
               </>
             )}
@@ -551,7 +767,9 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 <label>New Lead Status *</label>
                 <select
                   value={step.new_status || ''}
-                  onChange={(e) => updateStep(step.id, { new_status: e.target.value })}
+                  onChange={e =>
+                    updateStep(step.id, { new_status: e.target.value })
+                  }
                 >
                   <option value="">Select status</option>
                   <option value="new">New</option>
@@ -570,7 +788,9 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 <input
                   type="checkbox"
                   checked={step.required !== false}
-                  onChange={(e) => updateStep(step.id, { required: e.target.checked })}
+                  onChange={e =>
+                    updateStep(step.id, { required: e.target.checked })
+                  }
                 />
                 Required step (workflow stops if this fails)
               </label>
@@ -595,7 +815,11 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
 
         {message && (
           <div className={`${styles.message} ${styles[message.type]}`}>
-            {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            {message.type === 'success' ? (
+              <CheckCircle size={16} />
+            ) : (
+              <AlertCircle size={16} />
+            )}
             {message.text}
           </div>
         )}
@@ -607,30 +831,45 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
               <div className={styles.summaryStats}>
                 <div className={styles.statItem}>
                   <span className={styles.statLabel}>Total Steps:</span>
-                  <span className={styles.statValue}>{testResults.summary.totalSteps}</span>
+                  <span className={styles.statValue}>
+                    {testResults.summary.totalSteps}
+                  </span>
                 </div>
                 <div className={styles.statItem}>
                   <span className={styles.statLabel}>Successful:</span>
-                  <span className={styles.statValue}>{testResults.summary.successfulSteps}</span>
+                  <span className={styles.statValue}>
+                    {testResults.summary.successfulSteps}
+                  </span>
                 </div>
                 <div className={styles.statItem}>
                   <span className={styles.statLabel}>Email Steps:</span>
-                  <span className={styles.statValue}>{testResults.summary.emailSteps}</span>
+                  <span className={styles.statValue}>
+                    {testResults.summary.emailSteps}
+                  </span>
                 </div>
                 <div className={styles.statItem}>
                   <span className={styles.statLabel}>Duration:</span>
-                  <span className={styles.statValue}>{testResults.summary.estimatedTotalDuration} min</span>
+                  <span className={styles.statValue}>
+                    {testResults.summary.estimatedTotalDuration} min
+                  </span>
                 </div>
               </div>
             </div>
-            
+
             {testResults.steps && testResults.steps.length > 0 && (
               <div className={styles.testSteps}>
                 <h4>Step Execution Results:</h4>
                 {testResults.steps.map((step: any, index: number) => (
-                  <div key={index} className={`${styles.testStep} ${styles[step.status]}`}>
-                    <div className={styles.stepNumber}>Step {step.stepNumber}</div>
-                    <div className={styles.stepType}>{step.type.replace('_', ' ').toUpperCase()}</div>
+                  <div
+                    key={index}
+                    className={`${styles.testStep} ${styles[step.status]}`}
+                  >
+                    <div className={styles.stepNumber}>
+                      Step {step.stepNumber}
+                    </div>
+                    <div className={styles.stepType}>
+                      {step.type.replace('_', ' ').toUpperCase()}
+                    </div>
                     <div className={styles.stepMessage}>{step.message}</div>
                     {step.status === 'success' ? (
                       <CheckCircle size={16} className={styles.stepIcon} />
@@ -642,37 +881,46 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
               </div>
             )}
 
-            {testResults.emailPreviews && testResults.emailPreviews.length > 0 && (
-              <div className={styles.emailPreviews}>
-                <h4>Email Previews:</h4>
-                {testResults.emailPreviews.map((preview: any, index: number) => (
-                  <div key={index} className={styles.emailPreview}>
-                    <div className={styles.previewHeader}>
-                      <span className={styles.previewTitle}>Step {preview.stepNumber}: {preview.templateName}</span>
-                      {preview.delay > 0 && (
-                        <span className={styles.previewDelay}>Delay: {preview.delay} min</span>
-                      )}
-                    </div>
-                    <div className={styles.previewSubject}>
-                      <strong>Subject:</strong> {preview.subject}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {testResults.emailPreviews &&
+              testResults.emailPreviews.length > 0 && (
+                <div className={styles.emailPreviews}>
+                  <h4>Email Previews:</h4>
+                  {testResults.emailPreviews.map(
+                    (preview: any, index: number) => (
+                      <div key={index} className={styles.emailPreview}>
+                        <div className={styles.previewHeader}>
+                          <span className={styles.previewTitle}>
+                            Step {preview.stepNumber}: {preview.templateName}
+                          </span>
+                          {preview.delay > 0 && (
+                            <span className={styles.previewDelay}>
+                              Delay: {preview.delay} min
+                            </span>
+                          )}
+                        </div>
+                        <div className={styles.previewSubject}>
+                          <strong>Subject:</strong> {preview.subject}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
           </div>
         )}
 
         <div className={styles.modalBody}>
           <div className={styles.formSection}>
             <h3>Basic Information</h3>
-            
+
             <div className={styles.formGroup}>
               <label>Workflow Name *</label>
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={e =>
+                  setFormData(prev => ({ ...prev, name: e.target.value }))
+                }
                 placeholder="e.g., Lead Nurturing Sequence"
               />
             </div>
@@ -681,10 +929,36 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
               <label>Description</label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 placeholder="Describe what this workflow does..."
                 rows={3}
               />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>AI Call Agent (Optional)</label>
+              <select
+                value={formData.agent_id}
+                onChange={e =>
+                  setFormData(prev => ({ ...prev, agent_id: e.target.value }))
+                }
+              >
+                <option value="">Use Default Agent</option>
+                {callingAgents.map(agent => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.agent_name}{' '}
+                    {agent.phone_number ? `(${agent.phone_number})` : ''}
+                  </option>
+                ))}
+              </select>
+              <small>
+                Select Retell agent for AI phone calls in this workflow
+              </small>
             </div>
 
             <div className={styles.formRow}>
@@ -692,10 +966,17 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 <label>Workflow Type *</label>
                 <select
                   value={formData.workflow_type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, workflow_type: e.target.value }))}
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      workflow_type: e.target.value,
+                    }))
+                  }
                 >
                   {WORKFLOW_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -704,10 +985,17 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                 <label>Trigger *</label>
                 <select
                   value={formData.trigger_type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, trigger_type: e.target.value }))}
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      trigger_type: e.target.value,
+                    }))
+                  }
                 >
                   {TRIGGER_TYPES.map(trigger => (
-                    <option key={trigger.value} value={trigger.value}>{trigger.label}</option>
+                    <option key={trigger.value} value={trigger.value}>
+                      {trigger.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -721,18 +1009,24 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                   <div className={styles.formGroup}>
                     <label>From Status (optional)</label>
                     <select
-                      value={(formData.trigger_conditions as any)?.from_status || ''}
-                      onChange={(e) => setFormData(prev => ({ 
-                        ...prev, 
-                        trigger_conditions: { 
-                          ...prev.trigger_conditions, 
-                          from_status: e.target.value || undefined 
-                        } 
-                      }))}
+                      value={
+                        (formData.trigger_conditions as any)?.from_status || ''
+                      }
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          trigger_conditions: {
+                            ...prev.trigger_conditions,
+                            from_status: e.target.value || undefined,
+                          },
+                        }))
+                      }
                     >
                       <option value="">Any Status</option>
                       {LEAD_STATUSES.map(status => (
-                        <option key={status.value} value={status.value}>{status.label}</option>
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
                       ))}
                     </select>
                     <small>Leave empty to trigger from any status</small>
@@ -741,21 +1035,29 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                   <div className={styles.formGroup}>
                     <label>To Status *</label>
                     <select
-                      value={(formData.trigger_conditions as any)?.to_status || ''}
-                      onChange={(e) => setFormData(prev => ({ 
-                        ...prev, 
-                        trigger_conditions: { 
-                          ...prev.trigger_conditions, 
-                          to_status: e.target.value 
-                        } 
-                      }))}
+                      value={
+                        (formData.trigger_conditions as any)?.to_status || ''
+                      }
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          trigger_conditions: {
+                            ...prev.trigger_conditions,
+                            to_status: e.target.value,
+                          },
+                        }))
+                      }
                     >
                       <option value="">Select target status</option>
                       {LEAD_STATUSES.map(status => (
-                        <option key={status.value} value={status.value}>{status.label}</option>
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
                       ))}
                     </select>
-                    <small>Required: workflow triggers when lead reaches this status</small>
+                    <small>
+                      Required: workflow triggers when lead reaches this status
+                    </small>
                   </div>
                 </div>
               </div>
@@ -771,27 +1073,42 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                     <div className={styles.checkboxGroup}>
                       {[
                         { value: 'address', label: 'Address Entry' },
-                        { value: 'confirm-address', label: 'Address Confirmation' },
+                        {
+                          value: 'confirm-address',
+                          label: 'Address Confirmation',
+                        },
                         { value: 'how-we-do-it', label: 'Service Information' },
-                        { value: 'quote-contact', label: 'Contact Information' },
+                        {
+                          value: 'quote-contact',
+                          label: 'Contact Information',
+                        },
                         { value: 'plan-comparison', label: 'Plan Comparison' },
-                        { value: 'contact', label: 'Scheduling Details' }
+                        { value: 'contact', label: 'Scheduling Details' },
                       ].map(step => (
-                        <label key={step.value} className={styles.checkboxLabel}>
+                        <label
+                          key={step.value}
+                          className={styles.checkboxLabel}
+                        >
                           <input
                             type="checkbox"
-                            checked={((formData.trigger_conditions as any)?.steps || []).includes(step.value)}
-                            onChange={(e) => {
-                              const currentSteps = (formData.trigger_conditions as any)?.steps || [];
+                            checked={(
+                              (formData.trigger_conditions as any)?.steps || []
+                            ).includes(step.value)}
+                            onChange={e => {
+                              const currentSteps =
+                                (formData.trigger_conditions as any)?.steps ||
+                                [];
                               const newSteps = e.target.checked
                                 ? [...currentSteps, step.value]
-                                : currentSteps.filter((s: string) => s !== step.value);
+                                : currentSteps.filter(
+                                    (s: string) => s !== step.value
+                                  );
                               setFormData(prev => ({
                                 ...prev,
                                 trigger_conditions: {
                                   ...prev.trigger_conditions,
-                                  steps: newSteps
-                                }
+                                  steps: newSteps,
+                                },
                               }));
                             }}
                           />
@@ -799,7 +1116,9 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                         </label>
                       ))}
                     </div>
-                    <small>Select which widget steps should trigger this workflow</small>
+                    <small>
+                      Select which widget steps should trigger this workflow
+                    </small>
                   </div>
                 </div>
               </div>
@@ -816,35 +1135,50 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                       type="number"
                       min="0"
                       max="3600"
-                      value={(formData.trigger_conditions as any)?.min_duration_seconds || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        trigger_conditions: {
-                          ...prev.trigger_conditions,
-                          min_duration_seconds: e.target.value ? parseInt(e.target.value) : undefined
-                        }
-                      }))}
+                      value={
+                        (formData.trigger_conditions as any)
+                          ?.min_duration_seconds || ''
+                      }
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          trigger_conditions: {
+                            ...prev.trigger_conditions,
+                            min_duration_seconds: e.target.value
+                              ? parseInt(e.target.value)
+                              : undefined,
+                          },
+                        }))
+                      }
                       placeholder="Optional minimum duration"
                     />
                     <small>Leave empty to trigger on any call duration</small>
                   </div>
-                  
+
                   <div className={styles.formGroup}>
                     <label>
                       <input
                         type="checkbox"
-                        checked={(formData.trigger_conditions as any)?.include_follow_ups || false}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          trigger_conditions: {
-                            ...prev.trigger_conditions,
-                            include_follow_ups: e.target.checked
-                          }
-                        }))}
+                        checked={
+                          (formData.trigger_conditions as any)
+                            ?.include_follow_ups || false
+                        }
+                        onChange={e =>
+                          setFormData(prev => ({
+                            ...prev,
+                            trigger_conditions: {
+                              ...prev.trigger_conditions,
+                              include_follow_ups: e.target.checked,
+                            },
+                          }))
+                        }
                       />
                       Include follow-up calls
                     </label>
-                    <small>Check to trigger on both initial and follow-up call transfers</small>
+                    <small>
+                      Check to trigger on both initial and follow-up call
+                      transfers
+                    </small>
                   </div>
                 </div>
               </div>
@@ -856,24 +1190,34 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                   <input
                     type="checkbox"
                     checked={formData.is_active}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        is_active: e.target.checked,
+                      }))
+                    }
                   />
                   Active (workflow will run when triggered)
                 </label>
               </div>
-
 
               <div className={styles.formGroup}>
                 <label className={styles.checkbox}>
                   <input
                     type="checkbox"
                     checked={formData.auto_cancel_on_status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, auto_cancel_on_status: e.target.checked }))}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        auto_cancel_on_status: e.target.checked,
+                      }))
+                    }
                   />
                   Auto-cancel when lead reaches terminal status
                 </label>
                 <small className={styles.fieldHint}>
-                  Automatically cancel pending workflows when lead is won, converted, or closed
+                  Automatically cancel pending workflows when lead is won,
+                  converted, or closed
                 </small>
               </div>
 
@@ -885,17 +1229,25 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
                       <label key={status.value} className={styles.checkbox}>
                         <input
                           type="checkbox"
-                          checked={formData.cancel_on_statuses.includes(status.value)}
-                          onChange={(e) => {
+                          checked={formData.cancel_on_statuses.includes(
+                            status.value
+                          )}
+                          onChange={e => {
                             if (e.target.checked) {
                               setFormData(prev => ({
                                 ...prev,
-                                cancel_on_statuses: [...prev.cancel_on_statuses, status.value]
+                                cancel_on_statuses: [
+                                  ...prev.cancel_on_statuses,
+                                  status.value,
+                                ],
                               }));
                             } else {
                               setFormData(prev => ({
                                 ...prev,
-                                cancel_on_statuses: prev.cancel_on_statuses.filter(s => s !== status.value)
+                                cancel_on_statuses:
+                                  prev.cancel_on_statuses.filter(
+                                    s => s !== status.value
+                                  ),
                               }));
                             }
                           }}
@@ -911,45 +1263,52 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
 
           <div className={styles.formSection}>
             <h3>Workflow Steps</h3>
-            
+
             <div className={styles.addStepButtons}>
-              <button 
-                onClick={() => addStep('send_email')} 
+              <button
+                onClick={() => addStep('send_email')}
                 className={styles.addStepButton}
               >
                 <Mail size={16} />
                 Add Email
               </button>
-              <button 
-                onClick={() => addStep('wait')} 
+              <button
+                onClick={() => addStep('send_sms')}
+                className={styles.addStepButton}
+              >
+                <MessageSquare size={16} />
+                Add SMS
+              </button>
+              <button
+                onClick={() => addStep('wait')}
                 className={styles.addStepButton}
               >
                 <Clock size={16} />
                 Add Wait
               </button>
-              <button 
-                onClick={() => addStep('make_call')} 
+              <button
+                onClick={() => addStep('make_call')}
                 className={styles.addStepButton}
               >
                 <PhoneCall size={16} />
                 Make Call
               </button>
-              <button 
-                onClick={() => addStep('conditional')} 
+              <button
+                onClick={() => addStep('conditional')}
                 className={styles.addStepButton}
               >
                 <GitBranch size={16} />
                 Add Branch
               </button>
-              <button 
-                onClick={() => addStep('update_lead_status')} 
+              <button
+                onClick={() => addStep('update_lead_status')}
                 className={styles.addStepButton}
               >
                 <Settings size={16} />
                 Update Status
               </button>
-              <button 
-                onClick={() => addStep('archive_call')} 
+              <button
+                onClick={() => addStep('archive_call')}
                 className={styles.addStepButton}
               >
                 <Archive size={16} />
@@ -960,10 +1319,15 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
             <div className={styles.workflowSteps}>
               {formData.workflow_steps.length === 0 ? (
                 <div className={styles.emptySteps}>
-                  <p>No steps added yet. Click the buttons above to add workflow steps.</p>
+                  <p>
+                    No steps added yet. Click the buttons above to add workflow
+                    steps.
+                  </p>
                 </div>
               ) : (
-                formData.workflow_steps.map((step, index) => renderStepContent(step, index))
+                formData.workflow_steps.map((step, index) =>
+                  renderStepContent(step, index)
+                )
               )}
             </div>
           </div>
@@ -974,8 +1338,8 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
             Cancel
           </button>
           {workflow && (
-            <button 
-              onClick={handleTest} 
+            <button
+              onClick={handleTest}
               disabled={testing}
               className={styles.testButton}
             >
@@ -983,8 +1347,8 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
               {testing ? 'Testing...' : 'Test Workflow'}
             </button>
           )}
-          <button 
-            onClick={handleSave} 
+          <button
+            onClick={handleSave}
             disabled={saving}
             className={styles.saveButton}
           >
@@ -1000,6 +1364,7 @@ export default function WorkflowEditor({ isOpen, onClose, companyId, workflow, o
 function getStepTypeName(type: string): string {
   const names = {
     send_email: 'Send Email',
+    send_sms: 'Send SMS',
     wait: 'Wait/Delay',
     make_call: 'Make Call',
     conditional: 'Conditional Branch',
@@ -1010,7 +1375,11 @@ function getStepTypeName(type: string): string {
   return names[type as keyof typeof names] || type;
 }
 
-function getStepDescription(step: WorkflowStep, templates: EmailTemplate[]): string {
+function getStepDescription(
+  step: WorkflowStep,
+  templates: EmailTemplate[],
+  callingAgents: any[] = []
+): string {
   switch (step.type) {
     case 'send_email':
       if (step.template_id) {
@@ -1018,10 +1387,24 @@ function getStepDescription(step: WorkflowStep, templates: EmailTemplate[]): str
         return `Send "${template?.name || 'Unknown'}" ${step.delay_minutes ? `after ${step.delay_minutes} minutes` : 'immediately'}`;
       }
       return 'Email template not selected';
+    case 'send_sms':
+      if (step.sms_agent_id && step.sms_message) {
+        const messagePreview =
+          step.sms_message.length > 50
+            ? step.sms_message.substring(0, 50) + '...'
+            : step.sms_message;
+        return `Send SMS: "${messagePreview}" ${step.delay_minutes ? `after ${step.delay_minutes} minutes` : 'immediately'}`;
+      }
+      return 'SMS agent or message not configured';
     case 'wait':
       return `Wait ${step.delay_minutes || 60} minutes`;
     case 'make_call':
-      return `Make AI call ${step.delay_minutes ? `after ${step.delay_minutes} minutes` : 'immediately'}`;
+      if (step.agent_id) {
+        const agent = callingAgents.find(a => a.agent_id === step.agent_id);
+        const agentName = agent?.agent_name || 'Unknown Agent';
+        return `Call with ${agentName} ${step.delay_minutes ? `after ${step.delay_minutes} minutes` : 'immediately'}`;
+      }
+      return 'Calling agent not selected';
     case 'conditional':
       if (step.condition) {
         return `Branch on ${step.condition.field} ${step.condition.operator} ${step.condition.value}`;
@@ -1032,7 +1415,7 @@ function getStepDescription(step: WorkflowStep, templates: EmailTemplate[]): str
     case 'assign_lead':
       return 'Assign lead to user';
     case 'archive_call':
-      return step.archive_reason 
+      return step.archive_reason
         ? `Archive call record - Reason: ${step.archive_reason}`
         : 'Archive call record from active views';
     default:

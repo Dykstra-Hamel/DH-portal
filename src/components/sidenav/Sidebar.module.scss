@@ -5,31 +5,44 @@
   position: relative;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 1600px) {
   .sidebarContainer {
     position: fixed;
     top: 0;
-    left: -100%;
-    width: 100vw;
+    left: -336px; /* Width of primary (80px) + secondary (256px) nav */
+    width: auto;
     height: 100vh;
     z-index: 1100;
     transition: left 0.3s ease;
-    background: rgba(0, 0, 0, 0.5);
 
     &.active {
       left: 0;
     }
 
-    /* Add overlay click area */
+    /* Background overlay */
     &::before {
       content: '';
-      position: absolute;
+      position: fixed;
       top: 0;
       right: 0;
       bottom: 0;
-      left: 320px; /* Width of primary (64px) + secondary (256px) nav */
-      background: transparent;
-      z-index: 0;
+      left: 0;
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: -1;
+      pointer-events: none;
     }
+
+    &.active::before {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .sidebarContainer {
+    left: -320px; /* Width of primary (64px) + secondary (256px) nav for mobile */
   }
 }
