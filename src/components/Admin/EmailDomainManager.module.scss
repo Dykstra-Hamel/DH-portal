@@ -1,0 +1,685 @@
+.emailDomainManager {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.header {
+  margin-bottom: 24px;
+
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 8px 0;
+  }
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 0.875rem;
+
+  &[data-type="error"] {
+    background-color: #fee2e2;
+    border: 1px solid #f87171;
+    color: #991b1b;
+
+    strong {
+      font-weight: 600;
+    }
+  }
+
+  &[data-type="success"] {
+    background-color: #d1fae5;
+    border: 1px solid #10b981;
+    color: #065f46;
+  }
+}
+
+.tenantAlert {
+  padding: 16px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 0.875rem;
+
+  &[data-type="warning"] {
+    background-color: #fef3c7;
+    border: 2px solid #fbbf24;
+
+    strong {
+      color: #92400e;
+      font-weight: 600;
+      font-size: 1rem;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: #78350f;
+      margin: 0;
+      line-height: 1.5;
+    }
+  }
+
+  &[data-type="success"] {
+    background-color: #d1fae5;
+    border: 2px solid #10b981;
+
+    strong {
+      color: #065f46;
+      font-weight: 600;
+      font-size: 1rem;
+      display: block;
+      margin-bottom: 4px;
+    }
+  }
+}
+
+.tenantAlertContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.tenantDetails {
+  margin: 0;
+  color: #065f46;
+  font-size: 0.8125rem;
+
+  code {
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: 'Courier New', Courier, monospace;
+    color: #047857;
+    font-weight: 500;
+  }
+}
+
+.btnProvision {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background-color: #f59e0b;
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background-color: #d97706;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+.btnDeleteTenant {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid #dc2626;
+  background-color: transparent;
+  color: #dc2626;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background-color: #dc2626;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2), 0 2px 4px -1px rgba(220, 38, 38, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+.form {
+  background: #f9fafb;
+  padding: 20px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.formGroup {
+  margin-bottom: 16px;
+
+  label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+  }
+
+  small {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+  }
+}
+
+.formActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btnPrimary,
+.btnSecondary,
+.btnDanger,
+.btnCopy {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btnPrimary {
+  background-color: #3b82f6;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background-color: #2563eb;
+  }
+}
+
+.btnSecondary {
+  background-color: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+
+  &:hover:not(:disabled) {
+    background-color: #f9fafb;
+  }
+}
+
+.btnDanger {
+  background-color: #ef4444;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background-color: #dc2626;
+  }
+}
+
+.btnCopy {
+  padding: 4px 12px;
+  background-color: #f3f4f6;
+  color: #374151;
+  font-size: 0.75rem;
+
+  &:hover:not(:disabled) {
+    background-color: #e5e7eb;
+  }
+}
+
+.domainInfo {
+  margin-top: 16px;
+}
+
+.infoHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+
+  h4 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 4px 0;
+  }
+}
+
+.emailPreview {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+
+  strong {
+    color: #111827;
+    font-weight: 500;
+  }
+}
+
+.statusContainer {
+  display: flex;
+  align-items: center;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusVerified {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.statusPending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.statusNotConfigured {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+.statusFailed {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.dnsRecords {
+  margin-top: 20px;
+  background: #f9fafb;
+  padding: 20px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+
+  h5 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 8px 0;
+  }
+}
+
+.instructions {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 16px 0;
+}
+
+.recordsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.recordCard {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.recordHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.recordType {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: #3b82f6;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.recordLabel {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.recordFields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recordField {
+  label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+}
+
+.recordValue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  code {
+    flex: 1;
+    padding: 6px 10px;
+    background-color: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: 'Courier New', Courier, monospace;
+    color: #111827;
+    overflow-x: auto;
+  }
+}
+
+.valueWrap {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.verifiedInfo {
+  background-color: #d1fae5;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-top: 16px;
+
+  p {
+    margin: 0;
+    color: #065f46;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+}
+
+.domainActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.fallbackInfo {
+  background-color: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 16px;
+
+  p {
+    margin: 0;
+    color: #92400e;
+    font-size: 0.875rem;
+
+    strong {
+      font-weight: 600;
+    }
+
+    code {
+      background-color: #fff;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.8125rem;
+      font-family: 'Courier New', Courier, monospace;
+    }
+  }
+}
+
+// Import Modal Styles
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: #fff;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+
+  h4 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #111827;
+  }
+}
+
+.btnClose {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+
+  &:hover:not(:disabled) {
+    background-color: #f3f4f6;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.modalBody {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px 20px;
+
+  p {
+    margin: 0 0 12px 0;
+    color: #374151;
+    font-size: 0.875rem;
+  }
+}
+
+.helpText {
+  color: #6b7280 !important;
+  font-size: 0.8125rem !important;
+}
+
+.domainsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.domainCard {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 16px;
+
+  h5 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  button {
+    margin-top: 12px;
+    width: 100%;
+  }
+}
+
+.domainCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.domainCardDetails {
+  margin-bottom: 12px;
+
+  p {
+    margin: 0 0 8px 0;
+    font-size: 0.8125rem;
+    color: #6b7280;
+
+    strong {
+      color: #374151;
+    }
+
+    code {
+      background-color: #fff;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      font-family: 'Courier New', Courier, monospace;
+      border: 1px solid #d1d5db;
+    }
+  }
+}
+
+.verifiedNote {
+  color: #065f46 !important;
+  background-color: #d1fae5;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .emailDomainManager {
+    padding: 16px;
+  }
+
+  .infoHeader {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .formActions,
+  .domainActions {
+    flex-direction: column;
+  }
+
+  .recordValue {
+    flex-direction: column;
+    align-items: stretch;
+
+    code {
+      font-size: 0.6875rem;
+    }
+  }
+
+  .modal {
+    padding: 10px;
+  }
+
+  .modalContent {
+    max-height: 90vh;
+  }
+
+  .domainCardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

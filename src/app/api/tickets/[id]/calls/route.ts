@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function GET(
   request: NextRequest,
@@ -64,8 +65,32 @@ export async function GET(
       }
     }
 
+    // Get the full ticket details
+    const { data: fullTicket } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single();
+
+    // For call records, use admin client if user is a global admin to bypass RLS
+    const callRecordsClient = isGlobalAdmin ? createAdminClient() : supabase;
+
+    // Try to get the specific call record by ID if we have it
+    let callRecordById = null;
+    if (fullTicket?.call_record_id) {
+      const { data: callById } = await callRecordsClient
+        .from('call_records')
+        .select('*')
+        .eq('id', fullTicket.call_record_id)
+        .single();
+
+      if (callById) {
+        callRecordById = callById;
+      }
+    }
+
     // Get call records for this ticket
-    const { data: calls, error: callsError } = await supabase
+    const { data: calls, error: callsError } = await callRecordsClient
       .from('call_records')
       .select('*')
       .eq('ticket_id', ticketId)
@@ -79,7 +104,13 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(calls || []);
+    // Return the call record - prioritize direct reference, then ticket relationship
+    const callRecord = callRecordById || (calls && calls.length > 0 ? calls[0] : null);
+
+    return NextResponse.json({
+      callRecord,
+      allCalls: calls || []
+    });
   } catch (error) {
     console.error('Error in ticket calls API:', error);
     return NextResponse.json(

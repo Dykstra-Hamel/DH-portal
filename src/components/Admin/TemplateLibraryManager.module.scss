@@ -210,7 +210,7 @@
 .templateActions {
   display: flex;
   gap: 0.5rem;
-  
+
   button {
     display: flex;
     align-items: center;
@@ -223,12 +223,21 @@
     color: #666;
     cursor: pointer;
     transition: all 0.2s ease;
-    
+
     &:hover {
       background: #d1d5db;
       color: #1a202c;
     }
-    
+
+    &.testButton {
+      color: #3b82f6;
+
+      &:hover {
+        background: #eff6ff;
+        color: #2563eb;
+      }
+    }
+
     &.deleteButton:hover {
       background: #fed7d7;
       color: #c53030;
@@ -491,11 +500,16 @@
 
 .modalFooter {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 1rem;
   padding: 1.5rem 2rem;
   border-top: 1px solid #e2e8f0;
-  
+
+  .footerActions {
+    display: flex;
+    gap: 1rem;
+  }
+
   button {
     display: flex;
     align-items: center;
@@ -506,7 +520,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
-    
+
     &:disabled {
       opacity: 0.6;
       cursor: not-allowed;
@@ -518,17 +532,27 @@
   background: white;
   color: #666;
   border: 1px solid #d1d5db !important;
-  
+
   &:hover:not(:disabled) {
     background: #f9fafb;
     color: #1a202c;
   }
 }
 
+.testButton {
+  background: white;
+  color: #3b82f6;
+  border: 1px solid #3b82f6 !important;
+
+  &:hover:not(:disabled) {
+    background: #eff6ff;
+  }
+}
+
 .saveButton {
   background: #3b82f6;
   color: white;
-  
+
   &:hover:not(:disabled) {
     background: #2563eb;
   }

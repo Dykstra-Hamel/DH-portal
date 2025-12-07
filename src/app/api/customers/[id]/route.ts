@@ -21,7 +21,7 @@ export async function GET(
 
     const { id: customerId } = await params;
 
-    // Get customer with company info
+    // Get customer with company info and primary service address
     const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select(
@@ -31,10 +31,25 @@ export async function GET(
           id,
           name,
           website
+        ),
+        primary_service_address:customer_service_addresses!customer_service_addresses_customer_id_fkey(
+          service_address:service_addresses(
+            id,
+            street_address,
+            apartment_unit,
+            city,
+            state,
+            zip_code,
+            home_size_range,
+            yard_size_range,
+            latitude,
+            longitude
+          )
         )
       `
       )
       .eq('id', customerId)
+      .eq('customer_service_addresses.is_primary_address', true)
       .single();
 
     if (customerError) {
@@ -87,12 +102,12 @@ export async function GET(
       [];
     let assignedUsers: any[] = [];
 
-    // Get all tickets for this customer
+    // Get new tickets for this customer
     const { data: tickets, error: ticketsError } = await supabase
       .from('tickets')
       .select('*')
       .eq('customer_id', customerId)
-      .eq('archived', false) // Only show non-archived tickets
+      .eq('status', 'new')
       .order('created_at', { ascending: false });
 
     if (ticketsError) {
@@ -139,11 +154,20 @@ export async function GET(
           : null,
       })) || [];
 
+    // Flatten primary service address structure
+    const primaryServiceAddress =
+      customer.primary_service_address &&
+      Array.isArray(customer.primary_service_address) &&
+      customer.primary_service_address.length > 0
+        ? customer.primary_service_address[0]?.service_address
+        : null;
+
     // Enhanced customer object
     const enhancedCustomer = {
       ...customer,
       leads: leadsWithUsers || [],
       tickets: ticketsWithUsers || [],
+      primary_service_address: primaryServiceAddress,
     };
 
     return NextResponse.json(enhancedCustomer);
@@ -213,13 +237,50 @@ export async function PUT(
       );
     }
 
-    // Normalize phone number if provided in update
-    const updateData = {
-      ...body,
-      phone: body.phone
-        ? normalizePhoneNumber(body.phone) || body.phone
-        : body.phone,
-    };
+    // Clean and validate the data before updating
+    // Only include fields that are present in the request body
+    const updateData: any = {};
+
+    // Only process fields that were actually sent in the request
+    if ('email' in body) {
+      updateData.email = body.email?.trim() || null;
+    }
+    if ('phone' in body) {
+      updateData.phone = body.phone?.trim()
+        ? normalizePhoneNumber(body.phone.trim()) || body.phone.trim()
+        : null;
+    }
+    if ('alternate_phone' in body) {
+      updateData.alternate_phone = body.alternate_phone?.trim()
+        ? normalizePhoneNumber(body.alternate_phone.trim()) || body.alternate_phone.trim()
+        : null;
+    }
+    if ('first_name' in body) {
+      updateData.first_name = body.first_name?.trim() || null;
+    }
+    if ('last_name' in body) {
+      updateData.last_name = body.last_name?.trim() || null;
+    }
+    if ('address' in body) {
+      updateData.address = (body.address?.trim() && body.address !== 'none') ? body.address.trim() : null;
+    }
+    if ('city' in body) {
+      updateData.city = (body.city?.trim() && body.city !== 'none') ? body.city.trim() : null;
+    }
+    if ('state' in body) {
+      updateData.state = (body.state?.trim() && body.state !== 'none') ? body.state.trim() : null;
+    }
+    if ('zip_code' in body) {
+      updateData.zip_code = (body.zip_code?.trim() && body.zip_code !== 'none') ? body.zip_code.trim() : null;
+    }
+    if ('notes' in body) {
+      updateData.notes = body.notes?.trim() || null;
+    }
+    if ('customer_status' in body) {
+      updateData.customer_status = body.customer_status?.trim() || null;
+    }
+
+    console.log('Customer API: Updating customer with data:', updateData);
 
     // Update the customer
     const { data: customer, error } = await supabase

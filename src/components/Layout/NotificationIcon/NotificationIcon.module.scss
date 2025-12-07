@@ -11,7 +11,7 @@
   border: none;
   background: transparent;
   border-radius: 8px;
-  color: var(--neutral-800);
+  color: var(--gray-800);
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -33,20 +33,21 @@
 
 .notificationBadge {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  background: #ef4444;
+  top: -5px;
+  right: -2px;
+  background: var(--notification-red);
   color: white;
   font-size: 10px;
   font-weight: 600;
-  padding: 2px 5px;
-  border-radius: 10px;
-  min-width: 16px;
-  height: 16px;
+  padding: 2px 4px;
+  border-radius: 50%;
+  min-width: 13px;
+  height: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  box-shadow: 0 0 0 2px white;
 }
 
 .backdrop {
@@ -91,7 +92,9 @@
   overflow-y: auto;
 }
 
-.emptyState {
+.emptyState,
+.loadingState,
+.errorState {
   padding: 40px 20px;
   text-align: center;
 
@@ -102,11 +105,16 @@
   }
 }
 
+.errorState p {
+  color: #ef4444;
+}
+
 .notificationList {
   padding: 0;
 }
 
 .notificationItem {
+  position: relative;
   padding: 16px 20px;
   border-bottom: 1px solid #f3f4f6;
   cursor: pointer;
@@ -118,6 +126,14 @@
 
   &:hover {
     background-color: #f8fafc;
+  }
+
+  &.unread {
+    background-color: var(--action-50);
+
+    &:hover {
+      background-color: var(--action-100);
+    }
   }
 }
 
@@ -147,13 +163,28 @@
   margin-top: 2px;
 }
 
+.unreadIndicator {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: var(--notification-red);
+  border-radius: 50%;
+}
+
 .dropdownFooter {
   padding: 12px 20px;
   border-top: 1px solid #f3f4f6;
   background: #f9fafb;
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
 }
 
-.viewAllButton {
+.viewAllButton,
+.markAllReadButton {
   width: 100%;
   padding: 8px 16px;
   border: 1px solid #e5e7eb;
@@ -165,7 +196,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: #f3f4f6;
     border-color: #d1d5db;
   }
@@ -174,6 +205,22 @@
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.markAllReadButton {
+  background-color: var(--action-500);
+  color: white;
+  border-color: var(--action-500);
+
+  &:hover:not(:disabled) {
+    background-color: var(--action-600);
+    border-color: var(--action-600);
   }
 }
 

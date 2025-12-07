@@ -34,10 +34,8 @@ function LoginContent() {
 
 export default function Login() {
   return (
-    <main className="main">
-      <Suspense fallback={<div>Loading...</div>}>
-        <LoginContent />
-      </Suspense>
-    </main>
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

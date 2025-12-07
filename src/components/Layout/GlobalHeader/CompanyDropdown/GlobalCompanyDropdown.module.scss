@@ -1,33 +1,54 @@
 .companyDropdown {
+  display: flex;
   position: relative;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-right: 1px solid var(--gray-200);
+  padding-right: 20px;
   z-index: 1000;
+}
+
+.iconLogoWrapper {
+  display: flex;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+  align-items: center;
+  padding: 3px;
+  border-radius: 50%;
+}
+
+.iconLogo {
+  display: block;
+  position: relative;
+  width: 100%;
 }
 
 .trigger {
   display: flex;
-  width: 232px;
-  padding: 8px 12px;
+  width: 230px;
+  padding: 8px 12px 8px 6px;
   align-items: center;
   gap: 13px;
   background: white;
-  border: 1px solid var(--border-color);
+  border: none;
   border-radius: var(--border-radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 14px;
   font-weight: 760;
   line-height: 20px;
-  color: var(--neutral-600);
+  color: var(--gray-600);
 
-  &:hover {
-    background: var(--neutral-100);
-    border-color: var(--drop-shadow-hover);
+  &:hover .chevron {
+    color: black;
   }
 
   &:focus {
     outline: none;
-    box-shadow: 0 0 0 2px var(--primary-100);
-    border-color: var(--primary-600);
+    border: none;
   }
 }
 
@@ -40,10 +61,10 @@
 }
 
 .chevron {
-  color: var(--neutral-600);
-  transition: transform 0.2s ease;
+  color: var(--gray-600);
   flex-shrink: 0;
   display: flex;
+  transition: all 0.3s;
 
   &.open {
     transform: rotate(180deg);
@@ -55,13 +76,69 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
+  width: 265px;
   background: white;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-sm);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-height: 300px;
-  overflow-y: auto;
   z-index: 1001;
+  overflow: hidden;
+}
+
+.searchContainer {
+  position: relative;
+  padding: 8px;
+  border-bottom: 1px solid var(--gray-200);
+  background: white;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius-sm);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--gray-600);
+  background: white;
+  transition: border-color 0.2s ease;
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+  }
+}
+
+.clearButton {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: var(--gray-600);
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.optionsList {
+  max-height: 250px;
+  overflow-y: auto;
 }
 
 .option {
@@ -77,11 +154,11 @@
   font-size: 14px;
   font-weight: 760;
   line-height: 20px;
-  color: var(--neutral-600);
+  color: var(--gray-600);
   text-align: left;
 
   &:hover {
-    background: var(--neutral-100);
+    background: var(--gray-100);
   }
 
   &:first-child {
@@ -95,12 +172,12 @@
   }
 
   &.selected {
-    background: var(--primary-100);
-    color: var(--primary-600);
+    background: var(--action-100);
+    color: var(--action-600);
     font-weight: 760;
 
     &:hover {
-      background: var(--primary-100);
+      background: var(--action-100);
     }
   }
 
@@ -113,10 +190,18 @@
 }
 
 .checkmark {
-  color: var(--primary-600);
+  color: var(--action-600);
   font-weight: bold;
   font-size: 12px;
   flex-shrink: 0;
+}
+
+.noResults {
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--gray-400);
+  font-size: 14px;
+  line-height: 20px;
 }
 
 @media (max-width: 768px) {

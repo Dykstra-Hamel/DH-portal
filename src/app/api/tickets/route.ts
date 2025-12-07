@@ -1,12 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { TicketFormData } from '@/types/ticket';
-import { 
-  getAuthenticatedUser, 
-  verifyCompanyAccess, 
+import {
+  getAuthenticatedUser,
+  verifyCompanyAccess,
   createErrorResponse,
-  createSuccessResponse 
+  createSuccessResponse
 } from '@/lib/api-utils';
+
+/**
+ * Helper function to get ticket counts for all tabs
+ * Uses optimized RPC function with fallback to individual queries
+ */
+async function getTicketTabCounts(
+  companyId: string,
+  includeArchived: boolean
+): Promise<{ all: number; incoming: number; outbound: number; forms: number }> {
+  const adminSupabase = createAdminClient();
+
+  // Try to use the optimized RPC function first
+  const { data: countsData } = await adminSupabase.rpc('get_ticket_tab_counts', {
+    p_company_id: companyId,
+    p_include_archived: includeArchived
+  });
+
+  // Return RPC results if available
+  if (countsData) {
+    return countsData;
+  }
+
+  // Fallback: Use parallel queries if RPC doesn't exist yet
+  const [allCount, incomingCount, outboundCount, formsCount] = await Promise.all([
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'inbound').neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'outbound').neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'web_form').neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
+  ]);
+
+  return {
+    all: allCount.count || 0,
+    incoming: incomingCount.count || 0,
+    outbound: outboundCount.count || 0,
+    forms: formsCount.count || 0,
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,13 +52,20 @@ export async function GET(request: NextRequest) {
     if (authResult instanceof NextResponse) {
       return authResult;
     }
-    
+
     const { user, isGlobalAdmin, supabase } = authResult;
 
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
     const includeArchived = searchParams.get('includeArchived') === 'true';
+    const countOnly = searchParams.get('countOnly') === 'true';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '25', 10);
+    const sortBy = searchParams.get('sortBy') || 'created_at';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const search = searchParams.get('search') || '';
+    const tabFilter = searchParams.get('tab') || 'all';
 
     if (!companyId) {
       return createErrorResponse('Company ID is required', 400);
@@ -31,6 +75,12 @@ export async function GET(request: NextRequest) {
     const accessCheck = await verifyCompanyAccess(supabase, user.id, companyId, isGlobalAdmin);
     if (accessCheck instanceof NextResponse) {
       return accessCheck;
+    }
+
+    // If count only, return counts for all tabs using optimized helper
+    if (countOnly) {
+      const counts = await getTicketTabCounts(companyId, includeArchived);
+      return createSuccessResponse({ counts });
     }
 
     // Build query based on whether archived tickets are requested
@@ -49,23 +99,80 @@ export async function GET(request: NextRequest) {
           city,
           state,
           zip_code
+        ),
+        service_address:service_addresses!left(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type,
+          property_notes,
+          home_size_range,
+          yard_size_range
+        ),
+        reviewed_by_profile:profiles!reviewed_by(
+          id,
+          first_name,
+          last_name,
+          email
         )
-      `
+      `,
+        { count: 'exact' }
       )
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false });
+      .eq('company_id', companyId);
 
     if (includeArchived) {
-      // If including archived, only show archived tickets
       query = query.eq('archived', true);
     } else {
-      // Default behavior: show active tickets (exclude archived)
       query = query
-        .in('status', ['new', 'contacted', 'qualified', 'quoted', 'in_progress', 'resolved', 'unqualified'])
         .or('archived.is.null,archived.eq.false');
     }
 
-    const { data: tickets, error } = await query;
+    // Apply tab filter with status exclusions
+    if (tabFilter === 'incoming') {
+      query = query
+        .eq('type', 'phone_call')
+        .eq('call_direction', 'inbound')
+        .neq('status', 'live')
+        .neq('status', 'closed');
+    } else if (tabFilter === 'outbound') {
+      query = query
+        .eq('type', 'phone_call')
+        .eq('call_direction', 'outbound')
+        .neq('status', 'live')
+        .neq('status', 'closed');
+    } else if (tabFilter === 'forms') {
+      query = query
+        .eq('type', 'web_form')
+        .neq('status', 'live')
+        .neq('status', 'closed');
+    } else if (tabFilter === 'all') {
+      query = query
+        .neq('status', 'live')
+        .neq('status', 'closed');
+    }
+
+    // Apply search filter
+    if (search) {
+      query = query.or(
+        `customer.first_name.ilike.%${search}%,customer.last_name.ilike.%${search}%,customer.email.ilike.%${search}%,customer.phone.ilike.%${search}%,pest_issue.ilike.%${search}%`
+      );
+    }
+
+    // Apply sorting
+    const ascending = sortOrder === 'asc';
+    query = query.order(sortBy, { ascending });
+
+    // Apply pagination
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+    query = query.range(from, to);
+
+    // Execute query - count is already included from line 105
+    const { data: tickets, error, count: totalCount } = await query;
 
     if (error) {
       console.error('Error fetching tickets:', error);
@@ -73,7 +180,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (!tickets || tickets.length === 0) {
-      return createSuccessResponse([]);
+      return createSuccessResponse({
+        tickets: [],
+        pagination: {
+          page,
+          limit,
+          total: totalCount || 0,
+          totalPages: Math.ceil((totalCount || 0) / limit),
+          hasMore: false,
+        },
+      });
     }
 
     // Fetch call_records for all tickets if any exist
@@ -159,7 +275,20 @@ export async function GET(request: NextRequest) {
       call_records: callRecordsMap.get(ticket.id) || [],
     }));
 
-    return createSuccessResponse(enhancedTickets);
+    // Get tab counts using the optimized helper function
+    const counts = await getTicketTabCounts(companyId, includeArchived);
+
+    return createSuccessResponse({
+      tickets: enhancedTickets,
+      pagination: {
+        page,
+        limit,
+        total: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit),
+        hasMore: page < Math.ceil((totalCount || 0) / limit),
+      },
+      counts
+    });
   } catch (error) {
     console.error('Error in tickets API:', error);
     return createErrorResponse('Internal server error');
@@ -190,7 +319,7 @@ export async function POST(request: NextRequest) {
       .insert([ticketData])
       .select(`
         *,
-        customer:customers(
+        customer:customers!tickets_customer_id_fkey(
           id,
           first_name,
           last_name,
@@ -200,6 +329,19 @@ export async function POST(request: NextRequest) {
           city,
           state,
           zip_code
+        ),
+        service_address:service_addresses!left(
+          id,
+          street_address,
+          city,
+          state,
+          zip_code,
+          apartment_unit,
+          address_line_2,
+          address_type,
+          property_notes,
+          home_size_range,
+          yard_size_range
         )
       `)
       .single();
@@ -207,6 +349,22 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error creating ticket:', insertError);
       return createErrorResponse('Failed to create ticket');
+    }
+
+    // Generate notifications for all company users
+    try {
+      const adminSupabase = createAdminClient();
+      await adminSupabase.rpc('notify_all_company_users', {
+        p_company_id: ticketData.company_id,
+        p_type: 'new_ticket',
+        p_title: 'New Ticket Created',
+        p_message: `A new ticket has been created from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
+        p_reference_id: ticket.id,
+        p_reference_type: 'ticket'
+      });
+    } catch (notificationError) {
+      console.error('Error creating ticket notifications:', notificationError);
+      // Don't fail the request if notification creation fails
     }
 
     return createSuccessResponse(ticket, 201);

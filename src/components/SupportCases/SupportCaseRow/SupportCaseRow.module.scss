@@ -1,0 +1,224 @@
+// Support Case Row Styles - Based on TicketRow patterns
+.supportCaseRow {
+  display: grid;
+  grid-template-columns: 120px 180px 140px 250px 120px 120px 150px 100px;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background-color: #f9fafb;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  padding-right: 12px;
+  color: #374151;
+}
+
+.dateCell {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.customerName {
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.phoneNumber {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.summary {
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.issueTypeBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  
+  &.billing {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+  
+  &.scheduling {
+    background-color: #dbeafe;
+    color: #1e40af;
+  }
+  
+  &.complaint {
+    background-color: #fecaca;
+    color: #dc2626;
+  }
+  
+  &.service_quality {
+    background-color: #fed7d7;
+    color: #c53030;
+  }
+  
+  &.treatment_request {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+  
+  &.re_service {
+    background-color: #e0e7ff;
+    color: #3730a3;
+  }
+  
+  &.general_inquiry {
+    background-color: #f3f4f6;
+    color: #374151;
+  }
+  
+  &.warranty_claim {
+    background-color: #fdf2f8;
+    color: #be185d;
+  }
+}
+
+.priorityBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  
+  &.low {
+    background-color: #f3f4f6;
+    color: #6b7280;
+  }
+  
+  &.medium {
+    background-color: #dbeafe;
+    color: #1e40af;
+  }
+  
+  &.high {
+    background-color: #fed7d7;
+    color: #c53030;
+  }
+  
+  &.urgent {
+    background-color: #fecaca;
+    color: #dc2626;
+    animation: pulse 2s infinite;
+  }
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  
+  &.new {
+    background-color: #dbeafe;
+    color: #1e40af;
+  }
+  
+  &.assigned {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+  
+  &.in_progress {
+    background-color: #e0e7ff;
+    color: #3730a3;
+  }
+  
+  &.awaiting_customer {
+    background-color: #fed7d7;
+    color: #c53030;
+  }
+  
+  &.awaiting_internal {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+  
+  &.resolved {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+  
+  &.closed {
+    background-color: #f3f4f6;
+    color: #6b7280;
+  }
+}
+
+.actionsCell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  
+  &:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+    background-color: #f8fafc;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    
+    &:hover {
+      border-color: #d1d5db;
+      color: #6b7280;
+      background: white;
+    }
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}

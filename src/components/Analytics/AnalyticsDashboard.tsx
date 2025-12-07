@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GAAnalyticsResponse } from '@/lib/google-analytics/types';
 import { generateDemoAnalyticsData } from '@/lib/analytics-demo-data';
-import { useDateFilter } from '@/contexts/DateFilterContext';
 import TrafficChart from './Charts/TrafficChart';
 import DeviceChart from './Charts/DeviceChart';
 import SourceChart from './Charts/SourceChart';
@@ -23,14 +22,13 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
   const [error, setError] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
   
-  // Use global date filter instead of local state
-  const { getDaysCount } = useDateFilter();
+  // Removed date filter - using default 30 days
 
   const fetchAnalyticsData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
-    const days = getDaysCount() || 30; // Default to 30 days if "All Time" is selected
+    const days = 30; // Default to 30 days
     
     try {
       const response = await fetch(`/api/analytics?companyId=${companyId}&days=${days}`);
@@ -51,7 +49,7 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
     } finally {
       setLoading(false);
     }
-  }, [companyId, getDaysCount]);
+  }, [companyId]);
 
   useEffect(() => {
     if (companyId) {
@@ -72,7 +70,7 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
 
   if (!configured) {
     // Show demo data with placeholder overlay
-    const days = getDaysCount() || 30;
+    const days = 30;
     const demoData = generateDemoAnalyticsData(days);
     const { traffic, sources, devices, pages, summary } = demoData;
 

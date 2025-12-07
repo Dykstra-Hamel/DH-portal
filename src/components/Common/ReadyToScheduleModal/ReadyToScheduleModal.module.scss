@@ -1,0 +1,323 @@
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modalContent {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modalTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0 0 20px 0;
+}
+
+.optionsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.radioOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 16px 0 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.radioInput {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 0;
+  height: 0;
+
+  &:checked + .radioCustom {
+    background: var(--action-600);
+    border-color: var(--action-600);
+
+    &::after {
+      display: block;
+    }
+  }
+}
+
+.radioCustom {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--gray-300);
+  border-radius: 50%;
+  background: white;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 2px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+  }
+}
+
+.radioContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.radioLabel {
+  font-size: 16px;
+  font-weight: 550;
+  color: var(--gray-900);
+  line-height: 1.4;
+}
+
+.radioDescription {
+  font-size: 14px;
+  font-weight: 450;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.assignSection {
+  margin-bottom: 24px;
+}
+
+.assignLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+
+.dropdownContainer {
+  position: relative;
+}
+
+.assignmentButton {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-100);
+  }
+}
+
+.assignmentDisplay {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.defaultAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--orange-500);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.teamAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--action-500);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assignmentInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1;
+}
+
+.assignmentName {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+}
+
+.assignmentSubtitle {
+  font-size: 12px;
+  color: var(--gray-600);
+}
+
+.chevronIcon {
+  transition: transform 0.2s ease;
+  color: var(--gray-600);
+
+  &.rotated {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdownOption {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+  text-align: left;
+
+  &:hover {
+    background: var(--gray-50);
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--gray-200);
+  }
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancelButton {
+  padding: 10px 20px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-900);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+
+  &:active {
+    background: var(--gray-100);
+  }
+}
+
+.submitButton {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  background: var(--success-600);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &:hover:not(:disabled) {
+    background: var(--success-700);
+  }
+
+  &:active:not(:disabled) {
+    background: var(--success-800);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

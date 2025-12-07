@@ -1,0 +1,488 @@
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+
+  &:hover {
+    border-color: var(--primary-color, #3b82f6);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color, #3b82f6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+}
+
+.taskCount {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+.createButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--primary-color-dark, #2563eb);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+// Empty State
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  background: white;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.75rem;
+}
+
+.emptyIcon {
+  color: var(--text-secondary, #9ca3af);
+  margin-bottom: 1rem;
+}
+
+.emptyState h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0 0 0.5rem 0;
+}
+
+.emptyState p {
+  font-size: 0.9375rem;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 1.5rem 0;
+}
+
+.createButtonLarge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--primary-color-dark, #2563eb);
+  }
+}
+
+// Loading State
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color, #e5e7eb);
+  border-top-color: var(--primary-color, #3b82f6);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Table
+.tableContainer {
+  background: white;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+
+  thead {
+    background: var(--gray-50, #f9fafb);
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-primary, #374151);
+      font-size: 0.8125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+
+      &:hover {
+        background: var(--gray-100, #f3f4f6);
+      }
+    }
+  }
+
+  tbody {
+    tr {
+      border-bottom: 1px solid var(--border-color-light, #f3f4f6);
+      transition: background 0.15s;
+
+      &:hover {
+        background: var(--gray-50, #f9fafb);
+      }
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    td {
+      padding: 1rem;
+      vertical-align: middle;
+    }
+  }
+}
+
+.taskRow {
+  cursor: pointer;
+
+  &.completed {
+    opacity: 0.6;
+    background: var(--gray-50, #f9fafb);
+
+    &:hover {
+      opacity: 0.75;
+    }
+
+    .taskTitle span {
+      text-decoration: line-through;
+      color: var(--text-secondary, #9ca3af);
+    }
+
+    .priorityBadge,
+    .assignee,
+    .dueDate {
+      opacity: 0.7;
+    }
+  }
+}
+
+.completedText {
+  text-decoration: line-through;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.sortIndicator {
+  margin-left: 0.25rem;
+  font-size: 0.75rem;
+}
+
+// Column Widths
+.statusCol {
+  width: 120px;
+}
+
+.titleCol {
+  min-width: 250px;
+}
+
+.assigneeCol {
+  width: 180px;
+}
+
+.priorityCol {
+  width: 110px;
+}
+
+.dueDateCol {
+  width: 130px;
+}
+
+.progressCol {
+  width: 140px;
+}
+
+.actionsCol {
+  width: 80px;
+  text-align: center;
+}
+
+// Cell Styles
+.statusCell {
+  button {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+
+  &:hover {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.titleCell {
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.taskTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.completedIcon {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.blockedIcon {
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+.labels {
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.label {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: var(--gray-100, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.labelMore {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.assigneeCell {
+  color: var(--text-primary, #374151);
+}
+
+.assignee {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.unassigned {
+  color: var(--text-secondary, #9ca3af);
+  font-style: italic;
+}
+
+.priorityCell {
+  padding: 1rem;
+}
+
+.priorityBadge {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: white;
+}
+
+.dueDateCell {
+  color: var(--text-secondary, #6b7280);
+}
+
+.dueDate {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.overdue {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.progressCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.progressBar {
+  flex: 1;
+  height: 8px;
+  background: var(--gray-200, #e5e7eb);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--primary-color, #3b82f6);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.progressText {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+  min-width: 38px;
+  text-align: right;
+}
+
+.actionsCell {
+  text-align: center;
+}
+
+.deleteButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #9ca3af);
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #fee2e2;
+    color: #ef4444;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+// Responsive
+@media (max-width: 1200px) {
+  .assigneeCol,
+  .progressCol {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .filter {
+    width: 100%;
+  }
+
+  .tableContainer {
+    overflow-x: auto;
+  }
+
+  .table {
+    min-width: 600px;
+  }
+
+  .dueDateCol,
+  .priorityCol {
+    display: none;
+  }
+}

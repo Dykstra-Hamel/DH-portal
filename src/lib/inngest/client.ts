@@ -289,8 +289,53 @@ export interface InboundCallTransferEvent {
   };
 }
 
+export interface BulkLeadUploadScheduledEvent {
+  name: 'bulk-lead-upload/scheduled';
+  data: {
+    uploadId: string;
+    companyId: string;
+    createdBy: string;
+    fileName: string;
+    scheduledFor: string;
+    totalRows: number;
+    parsedData: any[];
+  };
+}
+
+export interface BulkLeadUploadCancelledEvent {
+  name: 'bulk-lead-upload/cancelled';
+  data: {
+    uploadId: string;
+    companyId: string;
+    cancelledBy: string;
+    timestamp: string;
+  };
+}
+
+export interface CampaignProcessContactsEvent {
+  name: 'campaign/process-contacts';
+  data: {
+    campaignId: string;
+    companyId: string;
+    workflowId: string;
+    contacts: Array<{
+      memberId: string;
+      contactListId: string;
+      customerId: string | null;
+      leadId: string | null;
+    }>;
+  };
+}
+
+export interface WorkflowCompletedEvent {
+  name: 'workflow/completed';
+  data: {
+    executionId: string;
+  };
+}
+
 // Union type of all events
-export type InngestEvent = LeadCreatedEvent | LeadStatusChangedEvent | WidgetScheduleCompletedEvent | AutomationTriggerEvent | EmailScheduledEvent | WorkflowTestEvent | CallSchedulingEvent | ScheduledCallExecutionEvent | CallCompletedEvent | RetellCallEndedEvent | WorkflowCancellationEvent | PartialLeadCreatedEvent | InboundCallTransferEvent;
+export type InngestEvent = LeadCreatedEvent | LeadStatusChangedEvent | WidgetScheduleCompletedEvent | AutomationTriggerEvent | EmailScheduledEvent | WorkflowTestEvent | CallSchedulingEvent | ScheduledCallExecutionEvent | CallCompletedEvent | RetellCallEndedEvent | WorkflowCancellationEvent | PartialLeadCreatedEvent | InboundCallTransferEvent | BulkLeadUploadScheduledEvent | BulkLeadUploadCancelledEvent | CampaignProcessContactsEvent | WorkflowCompletedEvent;
 
 // Helper function to send events
 export const sendEvent = async (event: InngestEvent) => {

@@ -1,0 +1,40 @@
+.priorityBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-weight: 550;
+  white-space: nowrap;
+
+  &.medium {
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  &.small {
+    padding: 2px 8px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  &.low {
+    background: var(--priority-low-outer);
+    color: var(--priority-low-inner);
+  }
+
+  &.medium {
+    background: var(--priority-medium-outer);
+    color: var(--priority-medium-inner);
+  }
+
+  &.high {
+    background: var(--priority-high-outer);
+    color: var(--priority-high-inner);
+  }
+
+  &.urgent {
+    background: var(--priority-urgent-outer);
+    color: var(--priority-urgent-inner);
+  }
+}

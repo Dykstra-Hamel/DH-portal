@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api-client';
+import { useCompanyDepartments, useUserDepartments } from '@/hooks/useUserDepartments';
+import { DepartmentSelector, DepartmentBadges } from '@/components/Common/DepartmentSelector';
+import { Department, canHaveDepartments } from '@/types/user';
 import styles from './AdminManager.module.scss';
 
 interface UserCompany {
@@ -43,6 +46,12 @@ export default function UserCompanyManager() {
   const [editingRelationship, setEditingRelationship] =
     useState<UserCompany | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingDepartments, setEditingDepartments] = useState<{
+    userId: string;
+    companyId: string;
+    userName: string;
+    companyName: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     user_id: '',
     company_id: '',
@@ -114,6 +123,22 @@ export default function UserCompanyManager() {
     } catch (error) {
       console.error('Error deleting relationship:', error);
     }
+  };
+
+  const handleEditDepartments = (relationship: UserCompany) => {
+    if (!canHaveDepartments(relationship.role as any)) {
+      alert('Only users with Member or Manager roles can have departments assigned.');
+      return;
+    }
+
+    setEditingDepartments({
+      userId: relationship.user_id,
+      companyId: relationship.company_id,
+      userName: relationship.profiles
+        ? `${relationship.profiles.first_name} ${relationship.profiles.last_name}`
+        : 'Unknown User',
+      companyName: relationship.companies?.name || 'Unknown Company'
+    });
   };
 
   const getUserDisplayName = (user: User) => {
@@ -301,6 +326,17 @@ export default function UserCompanyManager() {
         </div>
       )}
 
+      {/* Department Management Modal */}
+      {editingDepartments && (
+        <DepartmentManagementModal
+          userId={editingDepartments.userId}
+          companyId={editingDepartments.companyId}
+          userName={editingDepartments.userName}
+          companyName={editingDepartments.companyName}
+          onClose={() => setEditingDepartments(null)}
+        />
+      )}
+
       <div className={styles.table}>
         <table>
           <thead>
@@ -309,6 +345,7 @@ export default function UserCompanyManager() {
               <th>Email</th>
               <th>Company</th>
               <th>Role</th>
+              <th>Departments</th>
               <th>Primary</th>
               <th>Joined</th>
               <th>Actions</th>
@@ -333,6 +370,13 @@ export default function UserCompanyManager() {
                     {relationship.role}
                   </span>
                 </td>
+                <td>
+                  <UserDepartmentDisplay
+                    userId={relationship.user_id}
+                    companyId={relationship.company_id}
+                    canHaveDepartments={canHaveDepartments(relationship.role as any)}
+                  />
+                </td>
                 <td>{relationship.is_primary ? '✓' : '-'}</td>
                 <td>{new Date(relationship.joined_at).toLocaleDateString()}</td>
                 <td>
@@ -343,6 +387,15 @@ export default function UserCompanyManager() {
                     >
                       Edit
                     </button>
+                    {canHaveDepartments(relationship.role as any) && (
+                      <button
+                        className={styles.departmentButton}
+                        onClick={() => handleEditDepartments(relationship)}
+                        title="Manage Departments"
+                      >
+                        Depts
+                      </button>
+                    )}
                     <button
                       className={styles.deleteButton}
                       onClick={() => handleDeleteRelationship(relationship.id)}
@@ -355,6 +408,121 @@ export default function UserCompanyManager() {
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+// Helper component to display user departments
+function UserDepartmentDisplay({
+  userId,
+  companyId,
+  canHaveDepartments: canHaveDepts
+}: {
+  userId: string;
+  companyId: string;
+  canHaveDepartments: boolean;
+}) {
+  const { departments, isLoading } = useUserDepartments(userId, companyId);
+
+  if (!canHaveDepts) {
+    return <span className={styles.noDepartments}>N/A</span>;
+  }
+
+  if (isLoading) {
+    return <span className={styles.loading}>Loading...</span>;
+  }
+
+  if (departments.length === 0) {
+    return <span className={styles.noDepartments}>None</span>;
+  }
+
+  return <DepartmentBadges departments={departments} size="small" maxDisplay={2} />;
+}
+
+// Department Management Modal Component
+function DepartmentManagementModal({
+  userId,
+  companyId,
+  userName,
+  companyName,
+  onClose
+}: {
+  userId: string;
+  companyId: string;
+  userName: string;
+  companyName: string;
+  onClose: () => void;
+}) {
+  const {
+    departments,
+    isLoading,
+    error,
+    updateDepartments
+  } = useUserDepartments(userId, companyId);
+
+  const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setSelectedDepartments(departments);
+  }, [departments]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const success = await updateDepartments(selectedDepartments);
+    if (success) {
+      onClose();
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className={styles.modal}>
+      <div className={styles.modalContent}>
+        <h3>Manage Departments</h3>
+        <div className={styles.modalHeader}>
+          <p>
+            <strong>User:</strong> {userName}
+          </p>
+          <p>
+            <strong>Company:</strong> {companyName}
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className={styles.loading}>Loading current departments...</div>
+        ) : (
+          <div className={styles.departmentSelection}>
+            <DepartmentSelector
+              selectedDepartments={selectedDepartments}
+              onDepartmentChange={setSelectedDepartments}
+              disabled={saving}
+              error={error || undefined}
+              layout="vertical"
+              size="medium"
+            />
+          </div>
+        )}
+
+        <div className={styles.formActions}>
+          <button
+            type="button"
+            className={styles.saveButton}
+            onClick={handleSave}
+            disabled={saving || isLoading}
+          >
+            {saving ? 'Saving...' : 'Save Departments'}
+          </button>
+          <button
+            type="button"
+            className={styles.cancelButton}
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );

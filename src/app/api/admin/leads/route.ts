@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,18 +16,40 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
+    const assignedTo = searchParams.get('assignedTo');
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
     // Use admin client to fetch leads
     const supabase = createAdminClient();
 
-    // Build query to include customer and company data directly
+    // Build query - specify only needed columns to reduce data transfer
     // For assigned users, we'll need to fetch profiles separately since assigned_to references auth.users
     let query = supabase
       .from('leads')
       .select(
         `
-        *,
+        id,
+        company_id,
+        customer_id,
+        service_address_id,
+        lead_source,
+        lead_type,
+        service_type,
+        lead_status,
+        comments,
+        assigned_to,
+        last_contacted_at,
+        next_follow_up_at,
+        estimated_value,
+        priority,
+        lost_reason,
+        lost_stage,
+        archived,
+        furthest_completed_stage,
+        scheduled_date,
+        scheduled_time,
+        created_at,
+        updated_at,
         customer:customers(
           id,
           first_name,
@@ -49,7 +72,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Default behavior: show active leads (exclude archived)
       query = query
-        .in('lead_status', ['new', 'contacted', 'qualified', 'quoted', 'unqualified'])
+        .in('lead_status', ['unassigned', 'contacting', 'quoted', 'ready_to_schedule', 'scheduled'])
         .or('archived.is.null,archived.eq.false');
     }
 
@@ -62,6 +85,9 @@ export async function GET(request: NextRequest) {
     }
     if (priority) {
       query = query.eq('priority', priority);
+    }
+    if (assignedTo) {
+      query = query.eq('assigned_to', assignedTo);
     }
 
     const { data: leads, error } = await query;
@@ -91,7 +117,7 @@ export async function GET(request: NextRequest) {
     if (userIds.size > 0) {
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .in('id', Array.from(userIds));
 
       if (profilesError) {
@@ -138,13 +164,68 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const {
+      streetAddress,
+      city,
+      state,
+      zip,
+      customer_id,
+      company_id,
+      ...leadData
+    } = body;
 
-    // Use admin client to create lead
+    // Use admin client
     const supabase = createAdminClient();
 
+    // Create service address if address data is provided
+    let serviceAddressId = body.service_address_id;
+    if (!serviceAddressId && streetAddress && city && state && zip) {
+      const { data: newAddress, error: addressError } = await supabase
+        .from('service_addresses')
+        .insert([
+          {
+            company_id: company_id,
+            street_address: streetAddress,
+            city: city,
+            state: state,
+            zip_code: zip,
+          },
+        ])
+        .select('id')
+        .single();
+
+      if (addressError) {
+        console.error('Error creating address:', addressError);
+      } else {
+        serviceAddressId = newAddress.id;
+
+        // Link the service address to the customer if customer_id provided
+        if (customer_id) {
+          try {
+            await linkCustomerToServiceAddress(
+              customer_id,
+              serviceAddressId,
+              'owner',
+              true
+            );
+          } catch (linkError) {
+            console.error('Error linking service address to customer:', linkError);
+          }
+        }
+      }
+    }
+
+    // Create lead with service_address_id
     const { data: lead, error } = await supabase
       .from('leads')
-      .insert([body])
+      .insert([
+        {
+          ...leadData,
+          customer_id,
+          company_id,
+          service_address_id: serviceAddressId,
+        },
+      ])
       .select()
       .single();
 
@@ -154,6 +235,38 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create lead' },
         { status: 500 }
       );
+    }
+
+    // Generate notifications based on assignment status
+    try {
+      if (body.company_id) {
+        if (lead.assigned_to) {
+          // Lead is assigned - notify only the assigned user and managers/admins
+          await supabase.rpc('notify_assigned_and_managers', {
+            p_company_id: body.company_id,
+            p_assigned_user_id: lead.assigned_to,
+            p_type: 'new_lead_assigned',
+            p_title: 'New Lead Assigned to You',
+            p_message: `A new lead has been assigned to you${lead.customer_name ? ` from ${lead.customer_name}` : ''}`,
+            p_reference_id: lead.id,
+            p_reference_type: 'lead'
+          });
+        } else {
+          // Lead is unassigned - notify all sales team and managers/admins
+          await supabase.rpc('notify_department_and_managers', {
+            p_company_id: body.company_id,
+            p_department: 'sales',
+            p_type: 'new_lead_unassigned',
+            p_title: 'New Unassigned Lead',
+            p_message: `A new unassigned lead has been created${lead.customer_name ? ` from ${lead.customer_name}` : ''}`,
+            p_reference_id: lead.id,
+            p_reference_type: 'lead'
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error creating lead notifications:', notificationError);
+      // Don't fail the request if notification creation fails
     }
 
     return NextResponse.json(lead, { status: 201 });

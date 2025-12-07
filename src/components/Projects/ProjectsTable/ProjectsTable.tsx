@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Edit, Trash2, Calendar, User, Tag } from 'lucide-react';
 import { Project, statusOptions, priorityOptions } from '@/types/project';
 import styles from './ProjectsTable.module.scss';
@@ -18,6 +19,12 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
   onDelete,
   showActions = true,
 }) => {
+  const router = useRouter();
+
+  const handleProjectClick = (projectId: string) => {
+    router.push(`/project-management/${projectId}`);
+  };
+
   const getStatusColor = (status: string) => {
     return statusOptions.find(s => s.value === status)?.color || '#6b7280';
   };
@@ -55,7 +62,7 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
             <th>Requester</th>
             <th>Assigned To</th>
             <th>Due Date</th>
-            <th>Budget</th>
+            <th>Quoted Price</th>
             {showActions && <th>Actions</th>}
           </tr>
         </thead>
@@ -64,7 +71,12 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
             <tr key={project.id}>
               <td>
                 <div className={styles.projectInfo}>
-                  <strong>{project.name}</strong>
+                  <strong
+                    className={styles.projectName}
+                    onClick={() => handleProjectClick(project.id)}
+                  >
+                    {project.name}
+                  </strong>
                   {project.description && (
                     <div className={styles.description}>
                       {project.description.substring(0, 100)}
@@ -131,7 +143,7 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
                   {formatDate(project.due_date)}
                 </div>
               </td>
-              <td>{formatCurrency(project.budget_amount)}</td>
+              <td>{project.is_billable && project.quoted_price ? formatCurrency(project.quoted_price) : '-'}</td>
               {showActions && (
                 <td>
                   <div className={styles.actions}>

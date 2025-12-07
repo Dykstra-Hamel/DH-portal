@@ -47,6 +47,7 @@ export interface QuoteEmailData {
   pestType: string;
   address: string;
   companyName?: string;
+  companyLogo?: string;
   customerEmail: string;
   selectedPlan?: {
     id: string;
@@ -56,6 +57,22 @@ export interface QuoteEmailData {
     billing_frequency: string;
     requires_quote?: boolean;
   };
+}
+
+export interface QuoteSignedEmailData {
+  quoteId: string;
+  leadId: string;
+  companyName: string;
+  customerName: string;
+  customerEmail: string;
+  quoteTotal: number;
+  signedAt: string;
+  quoteUrl?: string;
+  leadUrl: string;
+  assignedUserName: string;
+  assignedUserEmail: string;
+  serviceType?: string;
+  serviceAddress?: string;
 }
 
 export interface CallSummaryEmailData {

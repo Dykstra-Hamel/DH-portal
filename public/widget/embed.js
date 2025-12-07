@@ -1594,6 +1594,7 @@
 
   .dh-input-with-icon .dh-form-input {
   padding-left: 60px;
+  min-height: 55px;
   }
 
   .dh-floating-label {
@@ -4518,8 +4519,6 @@
   .dh-plan-visual {
     width: 100vw;
     max-width: unset !important;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
     margin-bottom: 20px;
   }
   

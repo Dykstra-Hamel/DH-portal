@@ -184,7 +184,7 @@ async function handleCallStarted(supabase: any, callData: any) {
         customer_id: customerId,
         lead_source: 'cold_call',
         lead_type: 'phone_call',
-        lead_status: 'new', // Will be updated based on AI qualification later
+        lead_status: 'unassigned', // Will be updated based on AI qualification later
         priority: 'medium',
         comments: `📞 Inbound call started at ${new Date().toISOString()}`,
         created_at: new Date().toISOString(),
@@ -361,7 +361,7 @@ async function handleCallEnded(supabase: any, callData: any) {
           .from('leads')
           .select('id, customer_id, comments')
           .eq('customer_id', customerId)
-          .eq('lead_status', 'new')
+          .eq('lead_status', 'unassigned')
           .order('created_at', { ascending: false })
           .limit(1);
 
@@ -565,7 +565,7 @@ async function handleCallEnded(supabase: any, callData: any) {
             },
             leadData: {
               id: leadWithCompany.id,
-              lead_status: leadWithCompany.lead_status || 'new',
+              lead_status: leadWithCompany.lead_status || 'unassigned',
               lead_source: leadWithCompany.lead_source || 'cold_call',
               comments: leadWithCompany.comments,
               pest_type: leadWithCompany.pest_type
@@ -613,14 +613,6 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
     retell_llm_dynamic_variables,
     opt_out_sensitive_data_storage,
   } = callData;
-
-  // Debug logging to see if call_analyzed is called for transfers
-  console.log(`[Call Analyzed DEBUG] Processing call ${call_id}:`, {
-    disconnection_reason: callData.disconnection_reason,
-    call_status: callData.call_status,
-    has_transcript: !!transcript,
-    has_analysis: !!call_analysis
-  });
 
   // Extract data from both dynamic variables and call analysis
   const extractedData = extractCallData(
@@ -683,7 +675,7 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
     // Update lead status based on AI qualification decision
     if (isQualified === 'true' || isQualified === true) {
       // AI determined this is a qualified lead - keep as 'new' for follow-up
-      updateData.lead_status = 'new';
+      updateData.lead_status = 'unassigned';
       updateData.comments = `${updateData.comments}\n\n✅ AI Qualification: QUALIFIED - Ready for follow-up`.trim();
     } else if (isQualified === 'false' || isQualified === false) {
       // AI determined this is not a qualified lead
@@ -692,7 +684,7 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
     } else {
       // No qualification decision provided - fallback to old logic for backward compatibility
       if (call_analysis?.call_successful === true) {
-        updateData.lead_status = 'new';
+        updateData.lead_status = 'unassigned';
         updateData.comments = `${updateData.comments}\n\n📞 Call completed successfully - No AI qualification provided`.trim();
       } else if (!isFollowUp) {
         updateData.lead_status = 'contacted';
@@ -1062,20 +1054,7 @@ async function sendCallSummaryEmailsIfEnabled(
   try {
     // Skip sending emails for call transfers - these are successfully handed off to human agents
     const disconnectionReason = callData.disconnection_reason || callRecord.disconnect_reason;
-    
-    // Debug logging to understand what values we're getting
-    console.log(`[Call Summary Emails DEBUG] Call ${callId}:`, {
-      callData_disconnection_reason: callData.disconnection_reason,
-      callRecord_disconnect_reason: callRecord.disconnect_reason,
-      final_disconnectionReason: disconnectionReason,
-      callData_call_status: callData.call_status,
-      callRecord_call_status: callRecord.call_status,
-      disconnectionReasonType: typeof disconnectionReason,
-      disconnectionReasonLength: disconnectionReason?.length,
-      exactMatch: disconnectionReason === 'call_transfer',
-      caseInsensitiveMatch: disconnectionReason?.toLowerCase() === 'call_transfer'
-    });
-    
+
     // Check for call transfer with multiple possible values
     if (disconnectionReason === 'call_transfer' || 
         disconnectionReason === 'call_transferred' ||
