@@ -206,7 +206,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       message: `Test email sent successfully to ${testEmail}`,
-      emailId: emailResult.emailId,
+      messageId: emailResult.messageId,
       templateName: template.name,
     });
   } catch (error) {
