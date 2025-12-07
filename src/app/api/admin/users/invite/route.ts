@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       last_name: sanitizeString(body.last_name || ''),
       company_id: sanitizeString(body.company_id || ''),
       role: sanitizeString(body.role || 'member'),
+      departments: Array.isArray(body.departments) ? body.departments.map((dept: string) => sanitizeString(dept)).filter(Boolean) : [],
     };
 
     // Validate required fields
@@ -44,6 +45,25 @@ export async function POST(request: NextRequest) {
     if (!userData.company_id || !validateUUID(userData.company_id)) {
       return NextResponse.json(
         { error: 'Valid company ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate departments for member/manager roles
+    const canHaveDepartments = ['member', 'manager'].includes(userData.role);
+    if (canHaveDepartments && userData.departments.length === 0) {
+      return NextResponse.json(
+        { error: 'At least one department must be selected for Member and Manager roles' },
+        { status: 400 }
+      );
+    }
+
+    // Validate department values
+    const validDepartments = ['sales', 'support', 'scheduling'];
+    const invalidDepartments = userData.departments.filter((dept: string) => !validDepartments.includes(dept));
+    if (invalidDepartments.length > 0) {
+      return NextResponse.json(
+        { error: `Invalid departments: ${invalidDepartments.join(', ')}` },
         { status: 400 }
       );
     }
@@ -99,6 +119,25 @@ export async function POST(request: NextRequest) {
         role: userData.role,
         is_primary: true, // First company is primary
       });
+
+      // Assign departments if user has member/manager role and departments were specified
+      if (canHaveDepartments && userData.departments.length > 0) {
+        const departmentInserts = userData.departments.map((department: string) => ({
+          user_id: data.user.id,
+          company_id: userData.company_id,
+          department
+        }));
+
+        const { error: departmentError } = await supabase
+          .from('user_departments')
+          .insert(departmentInserts);
+
+        if (departmentError) {
+          console.error('Error assigning departments during invite:', departmentError);
+          // Don't fail the entire invitation if department assignment fails
+          // The departments can be assigned later through the UI
+        }
+      }
     }
 
     return NextResponse.json({
@@ -110,6 +149,7 @@ export async function POST(request: NextRequest) {
             email: data.user.email,
             company: company.name,
             role: userData.role,
+            departments: canHaveDepartments ? userData.departments : [],
           }
         : null,
     });

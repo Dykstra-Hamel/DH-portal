@@ -135,15 +135,16 @@ export async function POST(request: NextRequest) {
       name,
       description,
       project_type,
+      project_subtype,
       requested_by,
       company_id,
       assigned_to,
-      status = 'pending',
+      status = 'coming_up',
       priority = 'medium',
       due_date,
       start_date,
-      estimated_hours,
-      budget_amount,
+      is_billable,
+      quoted_price,
       tags,
       notes,
       primary_file_path,
@@ -167,12 +168,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Convert tags string to array
+    const tagsArray = tags
+      ? (typeof tags === 'string'
+          ? tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
+          : tags)
+      : [];
+
     const { data: project, error } = await supabase
       .from('projects')
       .insert({
         name,
         description,
         project_type,
+        project_subtype: project_subtype || null,
         requested_by,
         company_id,
         assigned_to: assigned_to || null,
@@ -180,9 +189,9 @@ export async function POST(request: NextRequest) {
         priority,
         due_date,
         start_date: start_date || null,
-        estimated_hours,
-        budget_amount,
-        tags,
+        is_billable: is_billable === 'true' || is_billable === true,
+        quoted_price: quoted_price ? parseFloat(quoted_price) : null,
+        tags: tagsArray,
         notes,
         primary_file_path: primary_file_path || null,
       })

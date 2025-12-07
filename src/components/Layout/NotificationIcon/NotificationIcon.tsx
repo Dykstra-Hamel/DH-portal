@@ -1,29 +1,68 @@
 'use client';
 
 import { useState } from 'react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Notification } from '@/types/notification';
+import { NotificationModal } from '../NotificationModal';
 import styles from './NotificationIcon.module.scss';
 
-interface NotificationIconProps {
-  notificationCount?: number;
-}
-
-export function NotificationIcon({ notificationCount = 0 }: NotificationIconProps) {
+export function NotificationIcon() {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    error,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    refreshNotifications,
+    navigateToReference,
+  } = useNotifications();
 
   const toggleDropdown = () => {
     setShowDropdown(!showDropdown);
   };
 
-  const handleNotificationClick = (e: React.MouseEvent) => {
+  const handleIconClick = (e: React.MouseEvent) => {
     e.preventDefault();
     toggleDropdown();
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    navigateToReference(notification);
+    setShowDropdown(false);
+  };
+
+  const handleMarkAllRead = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await markAllAsRead();
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffMs = now.getTime() - date.getTime();
+
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+    if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
+
+    return date.toLocaleDateString();
   };
 
   return (
     <div className={styles.notificationContainer}>
       <button
         className={styles.notificationButton}
-        onClick={handleNotificationClick}
+        onClick={handleIconClick}
         aria-label="View notifications"
       >
         <svg 
@@ -50,9 +89,9 @@ export function NotificationIcon({ notificationCount = 0 }: NotificationIconProp
           />
         </svg>
         
-        {notificationCount > 0 && (
+        {unreadCount > 0 && (
           <span className={styles.notificationBadge}>
-            {notificationCount > 99 ? '99+' : notificationCount}
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
@@ -68,31 +107,79 @@ export function NotificationIcon({ notificationCount = 0 }: NotificationIconProp
               <h3>Notifications</h3>
             </div>
             <div className={styles.dropdownContent}>
-              {notificationCount === 0 ? (
+              {loading ? (
+                <div className={styles.loadingState}>
+                  <p>Loading notifications...</p>
+                </div>
+              ) : error ? (
+                <div className={styles.errorState}>
+                  <p>Error loading notifications</p>
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <p>No new notifications</p>
+                  <p>No notifications</p>
                 </div>
               ) : (
                 <div className={styles.notificationList}>
-                  {/* Placeholder for future notification items */}
-                  <div className={styles.notificationItem}>
-                    <div className={styles.notificationContent}>
-                      <p className={styles.notificationTitle}>Sample Notification</p>
-                      <p className={styles.notificationText}>This is where notifications will appear</p>
-                      <span className={styles.notificationTime}>5 minutes ago</span>
+                  {notifications.slice(0, 5).map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`${styles.notificationItem} ${!notification.read ? styles.unread : ''}`}
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <div className={styles.notificationContent}>
+                        <p className={styles.notificationTitle}>{notification.title}</p>
+                        {notification.message && (
+                          <p className={styles.notificationText}>{notification.message}</p>
+                        )}
+                        <span className={styles.notificationTime}>
+                          {formatTimeAgo(notification.created_at)}
+                        </span>
+                      </div>
+                      {!notification.read && (
+                        <div className={styles.unreadIndicator}></div>
+                      )}
                     </div>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
             <div className={styles.dropdownFooter}>
-              <button className={styles.viewAllButton}>
-                View All Notifications
-              </button>
+              {notifications.length > 0 && (
+                <>
+                  <button
+                    className={styles.markAllReadButton}
+                    onClick={handleMarkAllRead}
+                    disabled={unreadCount === 0}
+                  >
+                    Mark All Read
+                  </button>
+                  <button
+                    className={styles.viewAllButton}
+                    onClick={() => setShowModal(true)}
+                  >
+                    View All Notifications
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </>
       )}
+
+      <NotificationModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        loading={loading}
+        error={error}
+        markAsRead={markAsRead}
+        markAllAsRead={markAllAsRead}
+        deleteNotification={deleteNotification}
+        refreshNotifications={refreshNotifications}
+        navigateToReference={navigateToReference}
+      />
     </div>
   );
 }

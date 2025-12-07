@@ -18,19 +18,42 @@ export async function PUT(
     const resolvedParams = await params;
     const companyId = resolvedParams.id;
 
+    // If slug is being updated, check for uniqueness
+    if (companyData.slug) {
+      const { data: existingCompany } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('slug', companyData.slug.trim())
+        .neq('id', companyId)
+        .single();
+
+      if (existingCompany) {
+        return NextResponse.json(
+          { error: 'Slug already in use by another company' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Sanitize and prepare data - handle website array format
     const sanitizedData = {
       ...companyData
     };
-    
+
     // Handle website as either array (new format) or string (backward compatibility)
     if (sanitizedData.website !== undefined) {
       if (Array.isArray(sanitizedData.website)) {
         sanitizedData.website = sanitizedData.website
           .filter((url: string) => url && typeof url === 'string' && url.trim().length > 0)
-          .map((url: string) => url.trim());
+          .map((url: string) => {
+            // Normalize URL: strip http/https, trim, remove trailing slashes, add https://
+            const normalized = url.replace(/^https?:\/\//i, '').trim().replace(/\/+$/, '');
+            return `https://${normalized}`;
+          });
       } else if (typeof sanitizedData.website === 'string') {
-        sanitizedData.website = sanitizedData.website.trim() ? [sanitizedData.website.trim()] : [];
+        sanitizedData.website = sanitizedData.website.trim()
+          ? [sanitizedData.website.replace(/^https?:\/\//i, '').trim().replace(/\/+$/, '')].map(url => `https://${url}`)
+          : [];
       } else {
         sanitizedData.website = [];
       }

@@ -3,6 +3,43 @@ import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { normalizePhoneNumber } from '@/lib/utils';
 
+/**
+ * Helper function to get customer counts for all tabs
+ */
+async function getCustomerTabCounts(
+  companyId: string | null
+): Promise<{ all: number; active: number; inactive: number; archived: number }> {
+  const supabase = createAdminClient();
+
+  // Build base queries
+  let allQuery = supabase.from('customers').select('id', { count: 'exact', head: true });
+  let activeQuery = supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_status', 'active');
+  let inactiveQuery = supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_status', 'inactive');
+  let archivedQuery = supabase.from('customers').select('id', { count: 'exact', head: true }).eq('customer_status', 'archived');
+
+  // Apply company filtering if specified
+  if (companyId) {
+    allQuery = allQuery.eq('company_id', companyId);
+    activeQuery = activeQuery.eq('company_id', companyId);
+    inactiveQuery = inactiveQuery.eq('company_id', companyId);
+    archivedQuery = archivedQuery.eq('company_id', companyId);
+  }
+
+  const [allCount, activeCount, inactiveCount, archivedCount] = await Promise.all([
+    allQuery,
+    activeQuery,
+    inactiveQuery,
+    archivedQuery,
+  ]);
+
+  return {
+    all: allCount.count || 0,
+    active: activeCount.count || 0,
+    inactive: inactiveCount.count || 0,
+    archived: archivedCount.count || 0,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
 
@@ -17,6 +54,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const startsWith = searchParams.get('startsWith');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
 
@@ -35,6 +73,13 @@ export async function GET(request: NextRequest) {
           id,
           lead_status,
           estimated_value
+        ),
+        tickets:tickets!tickets_customer_id_fkey(
+          id,
+          status
+        ),
+        support_cases:support_cases!support_cases_customer_id_fkey(
+          id
         )
       `);
 
@@ -50,6 +95,10 @@ export async function GET(request: NextRequest) {
       query = query.or(
         `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
       );
+    }
+    if (startsWith) {
+      // Filter by first letter of last name
+      query = query.ilike('last_name', `${startsWith}%`);
     }
 
     // Apply sorting with validation - handle company field specially
@@ -90,13 +139,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get tab counts for all customer statuses
+    const counts = await getCustomerTabCounts(companyId);
+
     if (!customers || customers.length === 0) {
-      return NextResponse.json([]);
+      return NextResponse.json({
+        customers: [],
+        counts
+      });
     }
 
     // Calculate lead statistics efficiently from the joined data
     const enhancedCustomers = customers.map(customer => {
       const customerLeads = customer.leads || [];
+      const customerTickets = customer.tickets || [];
+      const customerSupportCases = customer.support_cases || [];
+
+      // Filter tickets to only count "new" status
+      const newTickets = customerTickets.filter((t: any) => t.status === 'new');
+
       const activeLeads = customerLeads.filter((l: any) =>
         ['new', 'contacted', 'qualified', 'quoted'].includes(l.lead_status)
       );
@@ -105,14 +166,16 @@ export async function GET(request: NextRequest) {
         0
       );
 
-      // Remove leads array to reduce response size
-      const { leads: _, ...customerWithoutLeads } = customer;
+      // Remove arrays to reduce response size
+      const { leads: _, tickets: __, support_cases: ___, ...customerWithoutRelations } = customer;
 
       return {
-        ...customerWithoutLeads,
+        ...customerWithoutRelations,
         full_name: `${customer.first_name} ${customer.last_name}`,
         total_leads: customerLeads.length,
         active_leads: activeLeads.length,
+        total_tickets: newTickets.length,
+        total_support_cases: customerSupportCases.length,
         total_value: totalValue,
         last_activity: customer.updated_at,
       };
@@ -128,7 +191,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(enhancedCustomers);
+    return NextResponse.json({
+      customers: enhancedCustomers,
+      counts
+    });
   } catch (error) {
     console.error('Admin Customers API: Internal error:', error);
     return NextResponse.json(
@@ -196,6 +262,8 @@ export async function POST(request: NextRequest) {
         full_name: `${customer.first_name} ${customer.last_name}`,
         total_leads: 0,
         active_leads: 0,
+        total_tickets: 0,
+        total_support_cases: 0,
         total_value: 0,
         last_activity: customer.updated_at,
       },

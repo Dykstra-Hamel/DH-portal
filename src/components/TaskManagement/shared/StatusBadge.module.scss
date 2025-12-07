@@ -1,0 +1,40 @@
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-weight: 550;
+  white-space: nowrap;
+
+  &.medium {
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  &.small {
+    padding: 2px 8px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  &.todo {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  &.in-progress {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.review {
+    background: #e0e7ff;
+    color: #4338ca;
+  }
+
+  &.completed {
+    background: #d1fae5;
+    color: #065f46;
+  }
+}

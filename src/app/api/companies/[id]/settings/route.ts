@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { 
-  createDomain, 
-  getDomain, 
-  verifyDomain, 
-  deleteDomain,
-  type CreateDomainRequest 
-} from '@/lib/resend-domains';
 
 // GET company settings
 export async function GET(
@@ -89,51 +82,8 @@ export async function GET(
       };
     });
 
-    // If we have domain settings, get the latest info from Resend
-    const resendDomainId = settingsObject.resend_domain_id?.value;
-    if (resendDomainId) {
-      try {
-        const domainInfo = await getDomain(resendDomainId);
-        
-        // Update local database with latest status if different
-        if (domainInfo.status !== settingsObject.email_domain_status?.value) {
-          await supabase.from('company_settings').upsert([
-            {
-              company_id: id,
-              setting_key: 'email_domain_status',
-              setting_value: domainInfo.status,
-              setting_type: 'string'
-            },
-            {
-              company_id: id,
-              setting_key: 'email_domain_records',
-              setting_value: JSON.stringify(domainInfo.records),
-              setting_type: 'json'
-            }
-          ], { onConflict: 'company_id,setting_key' });
-          
-          // Update our response with fresh data
-          settingsObject.email_domain_status.value = domainInfo.status;
-          settingsObject.email_domain_records.value = domainInfo.records;
-        }
-        
-        // Mark domain as verified if status changed
-        if (domainInfo.status === 'verified' && !settingsObject.email_domain_verified_at?.value) {
-          const verifiedAt = new Date().toISOString();
-          await supabase.from('company_settings').upsert({
-            company_id: id,
-            setting_key: 'email_domain_verified_at',
-            setting_value: verifiedAt,
-            setting_type: 'string'
-          }, { onConflict: 'company_id,setting_key' });
-          
-          settingsObject.email_domain_verified_at.value = verifiedAt;
-        }
-      } catch (error) {
-        console.warn('Failed to sync domain status from Resend:', error);
-        // Continue with local data
-      }
-    }
+    // Note: Domain management has been moved to /api/admin/companies/[id]/domain
+    // which uses AWS SES for email identity management
 
     return NextResponse.json({ settings: settingsObject });
   } catch (error) {
@@ -203,7 +153,7 @@ export async function PUT(
 
     // Validate Retell configuration fields
     const retellValidationErrors = []
-    
+
     // Validate Retell API key format
     if (settings.retell_api_key?.value) {
       const apiKey = settings.retell_api_key.value
@@ -286,318 +236,23 @@ export async function PUT(
   }
 }
 
-// POST - Handle domain-specific operations
+/**
+ * POST - Domain operations have been moved
+ *
+ * Domain management (create, verify, delete) is now handled by the dedicated
+ * AWS SES domain management endpoint: /api/admin/companies/[id]/domain
+ *
+ * Please use that endpoint for all domain-related operations.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    // Get the current user and check permissions (same as PUT)
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: userCompany } = await supabase
-      .from('user_companies')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('company_id', id)
-      .single();
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    const isGlobalAdmin = profile?.role === 'admin';
-    const isCompanyAdmin =
-      userCompany && ['admin', 'manager', 'owner'].includes(userCompany.role);
-
-    if (!isGlobalAdmin && !isCompanyAdmin) {
-      return NextResponse.json(
-        { error: 'Access denied. Company admin privileges required.' },
-        { status: 403 }
-      );
-    }
-
-    const { action, ...data } = await request.json();
-
-    switch (action) {
-      case 'create_domain':
-        return await handleCreateDomain(supabase, id, data);
-      case 'verify_domain':
-        return await handleVerifyDomain(supabase, id);
-      case 'delete_domain':
-        return await handleDeleteDomain(supabase, id);
-      default:
-        return NextResponse.json(
-          { error: 'Invalid action' },
-          { status: 400 }
-        );
-    }
-  } catch (error) {
-    console.error('Error in domain operation:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// Domain operation handlers
-async function handleCreateDomain(supabase: any, companyId: string, data: any) {
-  const { domain, region, customReturnPath } = data;
-
-  if (!domain) {
-    return NextResponse.json(
-      { error: 'Domain name is required' },
-      { status: 400 }
-    );
-  }
-
-  // Enhanced domain validation
-  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-  
-  // Validate domain format
-  if (!domainRegex.test(domain)) {
-    return NextResponse.json(
-      { error: 'Domain must be a valid hostname (e.g., mail.company.com)' },
-      { status: 400 }
-    );
-  }
-  
-  // Additional security checks
-  if (domain.length > 253) {
-    return NextResponse.json(
-      { error: 'Domain name is too long' },
-      { status: 400 }
-    );
-  }
-  
-  if (domain.includes('..') || domain.startsWith('.') || domain.endsWith('.')) {
-    return NextResponse.json(
-      { error: 'Invalid domain format' },
-      { status: 400 }
-    );
-  }
-  
-  // Validate custom return path if provided
-  if (customReturnPath) {
-    const pathRegex = /^[a-zA-Z0-9][a-zA-Z0-9-_]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/;
-    if (!pathRegex.test(customReturnPath) || customReturnPath.length > 64) {
-      return NextResponse.json(
-        { error: 'Email prefix must be alphanumeric with hyphens/underscores only' },
-        { status: 400 }
-      );
-    }
-  }
-
-  try {
-    // Get current domain ID if exists
-    const { data: currentSettings } = await supabase
-      .from('company_settings')
-      .select('setting_value')
-      .eq('company_id', companyId)
-      .eq('setting_key', 'resend_domain_id')
-      .single();
-
-    // Delete old domain if exists
-    if (currentSettings?.setting_value) {
-      try {
-        await deleteDomain(currentSettings.setting_value);
-      } catch (error) {
-        console.warn('Failed to delete old domain:', error);
-      }
-    }
-
-    // Create new domain in Resend
-    const createDomainRequest: CreateDomainRequest = {
-      name: domain,
-      region: region || 'us-east-1',
-      ...(customReturnPath && { custom_return_path: customReturnPath })
-    };
-
-    const domainInfo = await createDomain(createDomainRequest);
-
-    // Update settings
-    const settingsToUpdate = [
-      { key: 'email_domain', value: domain, type: 'string' },
-      { key: 'email_domain_status', value: domainInfo.status, type: 'string' },
-      { key: 'email_domain_region', value: region || 'us-east-1', type: 'string' },
-      { key: 'email_domain_prefix', value: customReturnPath || 'noreply', type: 'string' },
-      { key: 'email_domain_records', value: JSON.stringify(domainInfo.records), type: 'json' },
-      { key: 'resend_domain_id', value: domainInfo.id, type: 'string' },
-      { key: 'email_domain_verified_at', value: '', type: 'string' }
-    ];
-
-    await supabase.from('company_settings').upsert(
-      settingsToUpdate.map(setting => ({
-        company_id: companyId,
-        setting_key: setting.key,
-        setting_value: setting.value,
-        setting_type: setting.type,
-        updated_at: new Date().toISOString()
-      })),
-      { onConflict: 'company_id,setting_key' }
-    );
-
-    return NextResponse.json({
-      success: true,
-      domain: {
-        name: domainInfo.name,
-        status: domainInfo.status,
-        records: domainInfo.records,
-        resendDomainId: domainInfo.id
-      }
-    });
-  } catch (error) {
-    console.error('Error creating domain:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create domain';
-    // Sanitize error message to avoid exposing internal details
-    const sanitizedMessage = errorMessage.includes('API') || errorMessage.includes('key') 
-      ? 'Domain configuration failed. Please check your domain settings and try again.'
-      : errorMessage;
-    
-    return NextResponse.json(
-      { error: sanitizedMessage },
-      { status: 500 }
-    );
-  }
-}
-
-async function handleVerifyDomain(supabase: any, companyId: string) {
-  try {
-    // Get current domain ID
-    const { data: domainIdSetting } = await supabase
-      .from('company_settings')
-      .select('setting_value')
-      .eq('company_id', companyId)
-      .eq('setting_key', 'resend_domain_id')
-      .single();
-
-    if (!domainIdSetting?.setting_value) {
-      return NextResponse.json(
-        { error: 'No domain configured' },
-        { status: 404 }
-      );
-    }
-
-    // Trigger verification
-    const verificationResult = await verifyDomain(domainIdSetting.setting_value);
-    if (!verificationResult.success) {
-      return NextResponse.json(
-        { error: verificationResult.message },
-        { status: 400 }
-      );
-    }
-
-    // Get updated domain info
-    const domainInfo = await getDomain(domainIdSetting.setting_value);
-
-    // Update settings
-    const settingsToUpdate = [
-      { key: 'email_domain_status', value: domainInfo.status, type: 'string' },
-      { key: 'email_domain_records', value: JSON.stringify(domainInfo.records), type: 'json' }
-    ];
-
-    if (domainInfo.status === 'verified') {
-      settingsToUpdate.push({
-        key: 'email_domain_verified_at',
-        value: new Date().toISOString(),
-        type: 'string'
-      });
-    }
-
-    await supabase.from('company_settings').upsert(
-      settingsToUpdate.map(setting => ({
-        company_id: companyId,
-        setting_key: setting.key,
-        setting_value: setting.value,
-        setting_type: setting.type,
-        updated_at: new Date().toISOString()
-      })),
-      { onConflict: 'company_id,setting_key' }
-    );
-
-    return NextResponse.json({
-      success: true,
-      domain: {
-        status: domainInfo.status,
-        records: domainInfo.records
-      }
-    });
-  } catch (error) {
-    console.error('Error verifying domain:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to verify domain';
-    // Sanitize error message
-    const sanitizedMessage = errorMessage.includes('API') || errorMessage.includes('key')
-      ? 'Domain verification failed. Please try again later.'
-      : errorMessage;
-    
-    return NextResponse.json(
-      { error: sanitizedMessage },
-      { status: 500 }
-    );
-  }
-}
-
-async function handleDeleteDomain(supabase: any, companyId: string) {
-  try {
-    // Get current domain ID
-    const { data: domainIdSetting } = await supabase
-      .from('company_settings')  
-      .select('setting_value')
-      .eq('company_id', companyId)
-      .eq('setting_key', 'resend_domain_id')
-      .single();
-
-    // Delete from Resend if exists
-    if (domainIdSetting?.setting_value) {
-      try {
-        await deleteDomain(domainIdSetting.setting_value);
-      } catch (error) {
-        console.warn('Failed to delete domain from Resend:', error);
-      }
-    }
-
-    // Reset domain settings
-    const settingsToReset = [
-      { key: 'email_domain', value: '', type: 'string' },
-      { key: 'email_domain_status', value: 'not_configured', type: 'string' },
-      { key: 'email_domain_records', value: '[]', type: 'json' },
-      { key: 'resend_domain_id', value: '', type: 'string' },
-      { key: 'email_domain_verified_at', value: '', type: 'string' }
-    ];
-
-    await supabase.from('company_settings').upsert(
-      settingsToReset.map(setting => ({
-        company_id: companyId,
-        setting_key: setting.key,
-        setting_value: setting.value,
-        setting_type: setting.type,
-        updated_at: new Date().toISOString()
-      })),
-      { onConflict: 'company_id,setting_key' }
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: 'Domain configuration removed'
-    });
-  } catch (error) {
-    console.error('Error deleting domain:', error);
-    return NextResponse.json(
-      { error: 'Failed to remove domain configuration' },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      error: 'Domain operations have been moved to /api/admin/companies/[id]/domain',
+      message: 'Please use the dedicated domain management endpoint for create, verify, and delete operations',
+    },
+    { status: 410 } // 410 Gone - resource has been permanently moved
+  );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { findCompanyByAgentId } from '@/lib/agent-utils';
+import { trackCallEnd } from '@/lib/campaigns/concurrency-manager';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(durationSeconds: number | null): number | null {
@@ -169,7 +170,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
         .select('id, customer_id, company_id, comments, lead_status')
         .eq('customer_id', customerId)
         .eq('company_id', companyId)
-        .in('lead_status', ['new', 'contacted', 'qualified'])
+        .in('lead_status', ['unassigned', 'contacting', 'quoted'])
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -227,6 +228,7 @@ async function handleOutboundCallStarted(supabase: any, callData: any) {
       phone_number: to_number,
       from_number,
       call_status: 'in-progress',
+      call_direction: 'outbound',
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
@@ -277,6 +279,10 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
     opt_out_sensitive_data_storage,
   } = callData;
 
+  // Track call completion for campaign concurrency management
+  const durationSeconds = duration_ms ? Math.round(duration_ms / 1000) : null;
+  await trackCallEnd(call_id, durationSeconds || undefined);
+
   // Extract updated data from dynamic variables (may have changed during call)
   const extractedData = extractCallData(
     retell_llm_dynamic_variables,
@@ -288,7 +294,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
   const { data: existingRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
-      call_status: call_status || 'completed',
+      call_status: 'processing', // Set to processing to show loading state until analysis
       end_timestamp: end_timestamp
         ? new Date(end_timestamp).toISOString()
         : new Date().toISOString(),
@@ -343,7 +349,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
           .from('leads')
           .select('id, customer_id, comments')
           .eq('customer_id', customerId)
-          .eq('lead_status', 'new')
+          .eq('lead_status', 'unassigned')
           .order('created_at', { ascending: false })
           .limit(1);
 
@@ -380,7 +386,8 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
         // parent_call_id: parentCallId, // Temporarily disabled until migration is applied
         phone_number: to_number,
         from_number,
-        call_status: call_status || 'completed',
+        call_status: 'processing', // Set to processing to show loading state until analysis
+        call_direction: 'outbound',
         start_timestamp: start_timestamp
           ? new Date(start_timestamp).toISOString()
           : null,
@@ -501,6 +508,7 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
   const { data: callRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
+      call_status: 'completed', // Set to completed now that analysis is done
       recording_url,
       transcript,
       call_analysis,

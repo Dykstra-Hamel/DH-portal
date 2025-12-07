@@ -1,0 +1,62 @@
+// Import shared section styles
+@import './SharedSection.module.scss';
+
+// Simple container styles for headerless layout
+.simpleContainer {
+  background: #fff;
+  padding: 16px;
+}
+
+.singleColumn {
+  display: flex;
+  flex-direction: column;
+}
+
+.infoField {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  align-items: baseline;
+  gap: 4px;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 10px;
+
+  &:last-of-type {
+    border: none;
+  }
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 450;
+  color: var(--gray-500);
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+  word-break: break-word;
+}
+
+// Legacy styles for editing functionality (if needed in future)
+.select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #006bc2;
+    box-shadow: 0 0 0 3px rgba(0, 107, 194, 0.1);
+  }
+
+  &:disabled {
+    background: #f9fafb;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
+}

@@ -33,14 +33,8 @@ export const useProjects = () => {
     try {
       const processedData = {
         ...projectData,
-        estimated_hours: projectData.estimated_hours
-          ? parseFloat(projectData.estimated_hours)
-          : null,
-        actual_hours: projectData.actual_hours
-          ? parseFloat(projectData.actual_hours)
-          : null,
-        budget_amount: projectData.budget_amount
-          ? parseFloat(projectData.budget_amount)
+        quoted_price: projectData.quoted_price
+          ? parseFloat(projectData.quoted_price)
           : null,
         tags: projectData.tags
           ? projectData.tags
@@ -66,14 +60,8 @@ export const useProjects = () => {
       try {
         const processedData = {
           ...projectData,
-          estimated_hours: projectData.estimated_hours
-            ? parseFloat(projectData.estimated_hours)
-            : null,
-          actual_hours: projectData.actual_hours
-            ? parseFloat(projectData.actual_hours)
-            : null,
-          budget_amount: projectData.budget_amount
-            ? parseFloat(projectData.budget_amount)
+          quoted_price: projectData.quoted_price
+            ? parseFloat(projectData.quoted_price)
             : null,
           tags: projectData.tags
             ? projectData.tags

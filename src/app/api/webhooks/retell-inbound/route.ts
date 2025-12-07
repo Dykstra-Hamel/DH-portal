@@ -335,7 +335,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       customer_id: customerId,
       lead_source: 'cold_call',
       lead_type: 'phone_call',
-      lead_status: 'new', // Will be updated based on AI qualification later
+      lead_status: 'unassigned', // Will be updated based on AI qualification later
       priority: 'medium',
       comments: `📞 Inbound call started at ${new Date().toISOString()}`,
       created_at: new Date().toISOString(),
@@ -364,6 +364,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       phone_number: customerPhone, // Use normalized phone for consistency
       from_number: rawCustomerPhone, // Keep original format from Retell
       call_status: 'in-progress',
+      call_direction: 'inbound',
       start_timestamp: start_timestamp
         ? new Date(start_timestamp).toISOString()
         : new Date().toISOString(),
@@ -420,7 +421,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
   const { data: callRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
-      call_status: call_status || 'completed',
+      call_status: 'processing', // Set to processing to show loading state until analysis
       end_timestamp: end_timestamp
         ? new Date(end_timestamp).toISOString()
         : new Date().toISOString(),
@@ -497,6 +498,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
   const { data: callRecord, error: updateError } = await supabase
     .from('call_records')
     .update({
+      call_status: 'completed', // Set to completed now that analysis is done
       recording_url,
       transcript,
       call_analysis,
@@ -545,7 +547,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     // Update lead status based on AI qualification decision
     if (isQualified === 'true' || isQualified === true) {
       // AI determined this is a qualified lead - keep as 'new' for follow-up
-      updateData.lead_status = 'new';
+      updateData.lead_status = 'unassigned';
       updateData.comments =
         `${updateData.comments}\n\n✅ AI Qualification: QUALIFIED - Ready for follow-up`.trim();
     } else if (isQualified === 'false' || isQualified === false) {
@@ -555,7 +557,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         `${updateData.comments}\n\n❌ AI Qualification: UNQUALIFIED - Not a sales opportunity`.trim();
     } else {
       // No qualification decision provided - keep as 'new' for inbound calls (available for follow-up)
-      updateData.lead_status = 'new';
+      updateData.lead_status = 'unassigned';
     }
 
     await supabase
@@ -761,19 +763,7 @@ async function sendCallSummaryEmailsIfEnabled(
   try {
     // Skip sending emails for call transfers - these are successfully handed off to human agents
     const disconnectionReason = callData.disconnection_reason || callRecord.disconnect_reason;
-    
-    // Debug logging to understand what values we're getting
-    console.log(`[Inbound Call Summary Emails DEBUG] Call ${callId}:`, {
-      callData_disconnection_reason: callData.disconnection_reason,
-      callRecord_disconnect_reason: callRecord.disconnect_reason,
-      final_disconnectionReason: disconnectionReason,
-      callData_call_status: callData.call_status,
-      callRecord_call_status: callRecord.call_status,
-      disconnectionReasonType: typeof disconnectionReason,
-      exactMatch: disconnectionReason === 'call_transfer',
-      caseInsensitiveMatch: disconnectionReason?.toLowerCase() === 'call_transfer'
-    });
-    
+
     // Check for call transfer with multiple possible values
     if (disconnectionReason === 'call_transfer' || 
         disconnectionReason === 'call_transferred' ||

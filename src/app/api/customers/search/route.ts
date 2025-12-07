@@ -47,6 +47,21 @@ export async function GET(request: NextRequest) {
         company:companies!customers_company_id_fkey (
           id,
           name
+        ),
+        primary_service_address:customer_service_addresses!customer_service_addresses_customer_id_fkey(
+          service_address:service_addresses(
+            id,
+            street_address,
+            city,
+            state,
+            zip_code,
+            apartment_unit,
+            address_line_2,
+            address_type,
+            property_notes,
+            home_size_range,
+            yard_size_range
+          )
         )
       `)
       .eq('customer_status', 'active')
@@ -115,6 +130,9 @@ export async function GET(request: NextRequest) {
         `zip_code.ilike.%${searchTerm}%`
       );
     }
+
+    // Filter for primary service addresses only
+    customersQuery = customersQuery.eq('customer_service_addresses.is_primary_address', true);
 
     // Handle company filtering
     if (companyId) {

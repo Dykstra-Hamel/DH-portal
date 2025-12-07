@@ -13,8 +13,10 @@ import {
   Type,
   Mail,
   Settings,
+  Send,
 } from 'lucide-react';
 import styles from './EmailTemplateEditor.module.scss';
+import TestEmailModal from './TestEmailModal/TestEmailModal';
 
 interface EmailTemplate {
   id?: string;
@@ -43,6 +45,18 @@ const TEMPLATE_TYPES = [
   { value: 'quote', label: 'Quote Email' },
   { value: 'reminder', label: 'Reminder Email' },
   { value: 'custom', label: 'Custom Email' },
+];
+
+// Quote-specific variables that should only show for quote templates
+const QUOTE_VARIABLES = [
+  'quoteUrl',
+  'quoteId',
+  'quoteTotalInitialPrice',
+  'quoteTotalRecurringPrice',
+  'quoteLineItems',
+  'quotePestConcerns',
+  'quoteHomeSize',
+  'quoteYardSize',
 ];
 
 export default function EmailTemplateEditor({
@@ -83,6 +97,7 @@ export default function EmailTemplateEditor({
     rating: number;
     reviewCount: number;
   } | null>(null);
+  const [testEmailModalOpen, setTestEmailModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -429,17 +444,35 @@ export default function EmailTemplateEditor({
                 <h4>Variables</h4>
                 <div className={styles.variableSection}>
                   <h5>Common Variables</h5>
-                  {Object.keys(createSampleVariables(companyData, brandData)).map(variable => (
-                    <button
-                      key={variable}
-                      className={styles.variableButton}
-                      onClick={() => insertVariable(variable)}
-                      title={`Insert ${'{{'}${variable}${'}}'}`}
-                    >
-                      {variable}
-                    </button>
-                  ))}
+                  {Object.keys(createSampleVariables(companyData, brandData))
+                    .filter(variable => !QUOTE_VARIABLES.includes(variable))
+                    .map(variable => (
+                      <button
+                        key={variable}
+                        className={styles.variableButton}
+                        onClick={() => insertVariable(variable)}
+                        title={`Insert ${'{{'}${variable}${'}}'}`}
+                      >
+                        {variable}
+                      </button>
+                    ))}
                 </div>
+
+                {formData.template_type === 'quote' && (
+                  <div className={styles.variableSection}>
+                    <h5>Quote Variables</h5>
+                    {QUOTE_VARIABLES.map(variable => (
+                      <button
+                        key={variable}
+                        className={styles.variableButton}
+                        onClick={() => insertVariable(variable)}
+                        title={`Insert ${'{{'}${variable}${'}}'}`}
+                      >
+                        {variable}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {detectedVariables.length > 0 && (
                   <div className={styles.variableSection}>
@@ -533,16 +566,43 @@ export default function EmailTemplateEditor({
           <button onClick={onClose} className={styles.cancelButton}>
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={styles.saveButton}
-          >
-            <Save size={16} />
-            {saving ? 'Saving...' : 'Save Template'}
-          </button>
+          <div className={styles.footerActions}>
+            <button
+              onClick={() => setTestEmailModalOpen(true)}
+              className={styles.testButton}
+              type="button"
+            >
+              <Send size={16} />
+              Send Test Email
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={styles.saveButton}
+            >
+              <Save size={16} />
+              {saving ? 'Saving...' : 'Save Template'}
+            </button>
+          </div>
         </div>
       </div>
+
+      <TestEmailModal
+        isOpen={testEmailModalOpen}
+        onClose={() => setTestEmailModalOpen(false)}
+        companyId={companyId}
+        templateId={template?.id}
+        templateName={formData.name || template?.name}
+        templateData={
+          !template?.id
+            ? {
+                subject_line: formData.subject_line,
+                html_content: formData.html_content,
+                text_content: formData.text_content,
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

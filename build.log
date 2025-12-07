@@ -1,0 +1,295 @@
+
+> dh-portal@0.1.0 prebuild
+> node widget-src/build.js
+
+🔨 Building widget from source files...
+✅ Build complete!
+📁 Output: /Users/austin/Desktop/dh-sites/software/DH-portal/public/widget/embed.js
+📊 Size: 356KB (original: 0KB)
+🏗️ Source files: 9 modular files combined
+
+🎯 PRODUCTION READY:
+  ✅ Functions injected before config declaration
+  ✅ Proper scope and execution order maintained
+  ✅ Ready for testing with existing scripts
+  💡 Original backed up as embed-original.js
+
+> dh-portal@0.1.0 build
+> next build
+
+   ▲ Next.js 15.3.5
+   - Environments: .env.local, .env.production
+
+   Creating an optimized production build ...
+ ⚠ Compiled with warnings in 17.0s
+
+./src/components/Tickets/TicketContent/CallDetails.module.scss
+Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CallDetails.module.scss:1:8:
+Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.
+
+More info and automated migrator: https://sass-lang.com/d/import
+
+1 | @import './SharedSection.module.scss';
+
+src/components/Tickets/TicketContent/CallDetails.module.scss 2:9  root stylesheet
+
+Import trace for requested module:
+./src/components/Tickets/TicketContent/CallDetails.module.scss
+./src/components/Tickets/TicketContent/CallDetails.tsx
+./src/components/Tickets/TicketContent/index.ts
+./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
+./src/components/Tickets/TicketReviewModal/index.ts
+./src/app/connections/incoming/page.tsx
+
+./src/components/Tickets/TicketContent/CallInsights.module.scss
+Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CallInsights.module.scss:1:8:
+Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.
+
+More info and automated migrator: https://sass-lang.com/d/import
+
+1 | @import './SharedSection.module.scss';
+
+src/components/Tickets/TicketContent/CallInsights.module.scss 2:9  root stylesheet
+
+Import trace for requested module:
+./src/components/Tickets/TicketContent/CallInsights.module.scss
+./src/components/Tickets/TicketContent/CallInsights.tsx
+./src/components/Tickets/TicketContent/index.ts
+./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
+./src/components/Tickets/TicketReviewModal/index.ts
+./src/app/connections/incoming/page.tsx
+
+./src/components/Tickets/TicketContent/CustomerInformation.module.scss
+Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/CustomerInformation.module.scss:1:8:
+Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.
+
+More info and automated migrator: https://sass-lang.com/d/import
+
+1 | @import './SharedSection.module.scss';
+
+src/components/Tickets/TicketContent/CustomerInformation.module.scss 2:9  root stylesheet
+
+Import trace for requested module:
+./src/components/Tickets/TicketContent/CustomerInformation.module.scss
+./src/components/Tickets/TicketContent/CustomerInformation.tsx
+./src/components/Common/LeadStepContent/LeadStepContent.tsx
+./src/app/connections/leads/[id]/page.tsx
+
+./src/components/Tickets/TicketContent/ServiceLocation.module.scss
+Deprecation Warning on line 1, column 8 of file:///Users/austin/Desktop/dh-sites/software/DH-portal/src/components/Tickets/TicketContent/ServiceLocation.module.scss:1:8:
+Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.
+
+More info and automated migrator: https://sass-lang.com/d/import
+
+1 | @import './SharedSection.module.scss';
+
+src/components/Tickets/TicketContent/ServiceLocation.module.scss 2:9  root stylesheet
+
+Import trace for requested module:
+./src/components/Tickets/TicketContent/ServiceLocation.module.scss
+./src/components/Tickets/TicketContent/ServiceLocation.tsx
+./src/components/Tickets/TicketContent/index.ts
+./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
+./src/components/Tickets/TicketReviewModal/index.ts
+./src/app/connections/incoming/page.tsx
+
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (108kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled successfully in 21.0s
+   Linting and checking validity of types ...
+
+./src/app/(protected)/campaigns/[id]/page.tsx
+47:6  Warning: React Hook useEffect has missing dependencies: 'fetchCampaignData', 'fetchCompanyTimezone', and 'setupRealtimeSubscription'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/campaigns/page.tsx
+62:6  Warning: React Hook useEffect has missing dependencies: 'fetchCampaigns' and 'fetchCompanyTimezone'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/contact-lists/page.tsx
+34:6  Warning: React Hook useEffect has a missing dependency: 'fetchLists'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/connections/incoming/page.tsx
+515:5  Warning: React Hook useCallback has a missing dependency: 'tickets'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+592:5  Warning: React Hook useCallback has an unnecessary dependency: 'fetchMetrics'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+681:5  Warning: React Hook useCallback has an unnecessary dependency: 'fetchMetrics'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+947:6  Warning: React Hook useEffect has a missing dependency: 'refetchTabCounts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/connections/my-sales-leads/page.tsx
+58:6  Warning: React Hook useEffect has a missing dependency: 'fetchMyLeads'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/connections/my-support-cases/page.tsx
+59:6  Warning: React Hook useEffect has a missing dependency: 'fetchMySupportCases'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/connections/my-tasks/page.tsx
+100:6  Warning: React Hook useEffect has a missing dependency: 'fetchMyTasks'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/AI/InsightsPanel.tsx
+37:6  Warning: React Hook useEffect has a missing dependency: 'fetchInsights'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/AI/PestPressure/AdminControls.tsx
+64:6  Warning: React Hook useEffect has a missing dependency: 'loadStats'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/AI/PestPressure/PestPressureDashboard.tsx
+37:6  Warning: React Hook useEffect has a missing dependency: 'fetchPestPressurePredictions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/AI/PredictionsChart.tsx
+45:6  Warning: React Hook useEffect has a missing dependency: 'fetchPredictions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/DiscountManager.tsx
+26:6  Warning: React Hook useEffect has a missing dependency: 'fetchDiscounts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/DiscountModal.tsx
+59:6  Warning: React Hook useEffect has a missing dependency: 'fetchServicePlans'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/PricingSettingsManager.tsx
+31:6  Warning: React Hook useEffect has a missing dependency: 'loadSettings'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/SalesConfigManager.tsx
+31:6  Warning: React Hook useEffect has a missing dependency: 'loadCadences'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Admin/TestCalling.tsx
+33:6  Warning: React Hook useEffect has a missing dependency: 'loadOutboundAgents'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Agents/AgentsList.tsx
+33:6  Warning: React Hook useEffect has a missing dependency: 'fetchAgents'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Auth/components/AuthHeader.tsx
+30:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Auth/components/BrandingPanel.tsx
+27:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Automation/AutomationSettings.tsx
+698:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Brand/Brand.tsx
+1020:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Campaigns/CampaignContacts.tsx
+36:6  Warning: React Hook useEffect has a missing dependency: 'fetchContactLists'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/CampaignEditor.tsx
+70:6  Warning: React Hook useEffect has missing dependencies: 'fetchCompanyTimezone' and 'fetchDiscounts'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+203:6  Warning: React Hook useEffect has a missing dependency: 'validateCampaignName'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+217:6  Warning: React Hook useEffect has a missing dependency: 'validateCampaignId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/CampaignExecutions.tsx
+45:6  Warning: React Hook useEffect has a missing dependency: 'fetchExecutions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/CampaignLeads.tsx
+23:6  Warning: React Hook useEffect has a missing dependency: 'fetchLeads'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/CampaignSchedulePreview.tsx
+63:6  Warning: React Hook useEffect has missing dependencies: 'fetchSchedulePreview' and 'generateSimplePreview'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/ContactListUpload.tsx
+56:6  Warning: React Hook useEffect has missing dependencies: 'fetchAvailableLists' and 'fetchSelectedLists'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+64:6  Warning: React Hook useEffect has a missing dependency: 'onListsChange'. Either include it or remove the dependency array. If 'onListsChange' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/ContactMembersModal.tsx
+35:6  Warning: React Hook useEffect has a missing dependency: 'fetchMembers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Campaigns/WorkflowSelector.tsx
+29:6  Warning: React Hook useEffect has a missing dependency: 'fetchWorkflows'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Common/ActivityFeed/ActivityFeed.tsx
+29:6  Warning: React Hook useEffect has missing dependencies: 'loadActivities' and 'subscribeToActivities'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Common/ContactInformationCard/ContactInformationCard.tsx
+333:33  Warning: The ref value 'timeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'timeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+334:40  Warning: The ref value 'successTimeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'successTimeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/Common/LeadStepContent/LeadStepContent.tsx
+764:6  Warning: React Hook useEffect has a missing dependency: 'serviceSelections'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Common/ReadyToScheduleModal/ReadyToScheduleModal.tsx
+224:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+262:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+313:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Common/SalesCadenceCard/SalesCadenceCard.tsx
+95:6  Warning: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/ContactLists/ContactListModal.tsx
+35:6  Warning: React Hook useEffect has a missing dependency: 'fetchListDetails'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Layout/Breadcrumbs/Breadcrumbs.tsx
+373:6  Warning: React Hook useEffect has a missing dependency: 'isAdmin'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Layout/GlobalHeader/CompanyDropdown/GlobalCompanyDropdown.tsx
+101:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Layout/UserAvatar/UserAvatar.tsx
+176:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+202:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Projects/ProjectDetail/ProjectDetail.tsx
+193:6  Warning: React Hook React.useEffect has a missing dependency: 'fetchComments'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Quote/QuoteSteps/QuoteSteps.tsx
+222:6  Warning: React Hook useEffect has a missing dependency: 'quote.service_address'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+373:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+643:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+690:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+779:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+826:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+921:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+938:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+1318:15  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/TaskManagement/TaskListView/TaskListView.tsx
+56:6  Warning: React Hook useMemo has a missing dependency: 'getProjectForTask'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/TaskManagement/shared/UserAvatar.tsx
+39:9  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Tasks/TaskForm/TaskForm.tsx
+50:6  Warning: React Hook useEffect has a missing dependency: 'loadRelatedEntities'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+131:6  Warning: React Hook useEffect has a missing dependency: 'validateForm'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Tasks/TaskSection/TaskSection.tsx
+45:6  Warning: React Hook useEffect has a missing dependency: 'loadTasks'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/TestAutomation/AutomationTestPage.tsx
+210:6  Warning: React Hook useEffect has a missing dependency: 'fetchCompanies'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+216:6  Warning: React Hook useEffect has a missing dependency: 'fetchServicePlans'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Tickets/TicketContent/CustomerInformation.tsx
+310:33  Warning: The ref value 'timeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'timeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+311:40  Warning: The ref value 'successTimeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'successTimeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/Tickets/TicketContent/ServiceLocation.tsx
+369:6  Warning: React Hook useEffect has a missing dependency: 'getInitialFieldValues'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+549:33  Warning: The ref value 'timeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'timeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+550:40  Warning: The ref value 'successTimeoutRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'successTimeoutRefs.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/Tickets/TicketForm/TicketForm.tsx
+296:6  Warning: React Hook useEffect has a missing dependency: 'validateForm'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/Tickets/TicketReviewModal/TicketReviewModal.tsx
+432:6  Warning: React Hook useEffect has missing dependencies: 'getDisplayName', 'profile?.email', 'profile?.first_name', 'profile?.last_name', and 'user.email'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/contexts/CompanyContext.tsx
+343:9  Warning: The 'setSelectedCompany' function makes the dependencies of useMemo Hook (at line 442) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'setSelectedCompany' in its own useCallback() Hook.  react-hooks/exhaustive-deps
+366:9  Warning: The 'refreshCompanies' function makes the dependencies of useMemo Hook (at line 442) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'refreshCompanies' in its own useCallback() Hook.  react-hooks/exhaustive-deps
+383:9  Warning: The 'refreshBranding' function makes the dependencies of useMemo Hook (at line 442) change on every render. Move it inside the useMemo callback. Alternatively, wrap the definition of 'refreshBranding' in its own useCallback() Hook.  react-hooks/exhaustive-deps
+
+./src/hooks/usePricingSettings.ts
+53:6  Warning: React Hook useEffect has a missing dependency: 'fetchSettings'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/hooks/useRealtimeCounts.ts
+75:5  Warning: React Hook useCallback has a missing dependency: 'setLastViewedTimestamp'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+174:5  Warning: React Hook useCallback has missing dependencies: 'triggerAnimation' and 'triggerNewItemIndicator'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+635:6  Warning: React Hook useEffect has a missing dependency: 'updateCount'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+[Error [PageNotFoundError]: Cannot find module for page: /campaigns/[id]] {
+  code: 'ENOENT'
+}
+[Error [PageNotFoundError]: Cannot find module for page: /account/update-password] {
+  code: 'ENOENT'
+}
+
+> Build error occurred
+[Error: Failed to collect page data for /campaigns/[id]] {
+  type: 'Error'
+}

@@ -32,7 +32,7 @@ function getSingularPestType(pestType: string): string {
 }
 
 export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
-  const { firstName, pestType, address, selectedPlan } = quoteData;
+  const { firstName, pestType, address, selectedPlan, companyLogo } = quoteData;
   const singularPestType = getSingularPestType(pestType);
 
   // Use selectedPlan pricing if available, otherwise fallback to defaults
@@ -339,7 +339,7 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
                                   <div class="alignment" align="left">
                                     <div style="max-width: 195px">
                                       <img
-                                        src="https://d15k2d11r6t6rl.cloudfront.net/pub/bfra/ikek4pu4/xfw/tu8/smb/northwest%20exterminating%20logo.png"
+                                        src="${companyLogo || 'https://placehold.co/195x80/e2e8f0/64748b?text=Company+Logo'}"
                                         style="
                                           display: block;
                                           height: auto;
@@ -1948,7 +1948,7 @@ ${
                                         href="www.examplelink.com"
                                         target="_blank"
                                         ><img
-                                          src="https://d15k2d11r6t6rl.cloudfront.net/pub/bfra/ikek4pu4/xfw/tu8/smb/northwest%20exterminating%20logo.png"
+                                          src="${companyLogo || 'https://placehold.co/150x62/e2e8f0/64748b?text=Company+Logo'}"
                                           style="
                                             display: block;
                                             height: auto;

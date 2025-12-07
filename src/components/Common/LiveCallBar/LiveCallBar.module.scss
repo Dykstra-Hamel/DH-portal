@@ -1,0 +1,401 @@
+.liveCallBar {
+  display: flex;
+  min-height: 64px;
+  padding: 20px 16px;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+  border-radius: var(--border-radius-md);
+  background: #001c35;
+  box-shadow: var(--box-shadow-card);
+  margin-bottom: 8px;
+
+  &.liveCallBackground {
+    background: linear-gradient(90deg, #00529b 5.43%, #072f4a 99.55%);
+    padding: 16px;
+    gap: 16px;
+  }
+}
+
+// No Live Calls State
+.noCallsContent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.noCallsIcon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.noCallsText {
+  color: var(--white);
+  font-family: var(--font-satoshi);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  margin: 0;
+}
+
+// Live Call State
+.liveCallContent {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.liveCallHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.radioIcon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.liveCallText {
+  color: var(--white);
+  font-family: var(--font-satoshi);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  margin: 0;
+}
+
+// Call Details Grid with smooth animation
+.callDetailsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.expanded {
+    max-height: 1000px;
+    opacity: 1;
+    transform: translateY(0);
+    margin-top: 16px;
+  }
+
+  &.collapsed {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-20px);
+    margin-top: 0;
+  }
+}
+
+.gridHeader {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+  gap: 16px;
+  padding: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.gridRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+  gap: 16px;
+  padding: 8px;
+  animation: fadeInUp 0.4s ease-out;
+  transition: all 0.3s ease;
+
+  &:nth-child(even) {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &.exiting {
+    animation: fadeOutDown 0.3s ease-in forwards;
+  }
+}
+
+.gridCell {
+  color: var(--white);
+  font-family: var(--font-satoshi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  // Header cells styling
+  .gridHeader & {
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 20px;
+  }
+
+  // Data cells styling
+  .gridRow & {
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 750;
+    line-height: 20px;
+  }
+}
+
+.sortableHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.chevronIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+// Status Badge Styling
+.statusBadge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  &.ongoing,
+  &.active {
+    background: #10b981;
+    color: white;
+  }
+
+  &.in_progress {
+    background: #f59e0b;
+    color: white;
+  }
+
+  &.connecting {
+    background: #8b5cf6;
+    color: white;
+  }
+
+  &.processing {
+    background: #6b7280;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    span {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  }
+}
+
+// Status displays without badge backgrounds
+.statusWithSpinner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--white);
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 20px;
+
+  span {
+    font-size: 14px;
+    font-weight: 750;
+  }
+}
+
+.statusWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--white);
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 20px;
+
+  span {
+    font-size: 14px;
+    font-weight: 750;
+  }
+}
+
+// Sound wave icon with subtle shimmer effect
+.soundWaveIcon {
+  width: 18px;
+  height: 19px;
+  flex-shrink: 0;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+// Transfer icon with subtle slide animation
+.transferIcon {
+  width: 18px;
+  height: 19px;
+  flex-shrink: 0;
+  animation: transferSlide 2.5s ease-in-out infinite;
+}
+
+// Expand/Collapse Button
+.expandCollapseButton {
+  border-radius: 6px;
+  border: 1px solid #fff;
+  display: flex;
+  padding: 6px 8px 6px 16px;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  span {
+    color: var(--white);
+    font-family: var(--font-satoshi);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+// Expand/Collapse Icon
+.expandCollapseIcon {
+  width: 24px;
+  height: 25px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+
+  &.expanded {
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes transferSlide {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(2px);
+    opacity: 0.8;
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  80% {
+    filter: brightness(1);
+  }
+  10% {
+    filter: brightness(1.4) drop-shadow(0 0 2px rgba(255, 255, 255, 0.6));
+  }
+  20% {
+    filter: brightness(1);
+  }
+}
+
+// Live Call Bar animations
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 48px;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+    padding: 0;
+    margin: 0;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .liveCallBar {
+    padding: 16px 12px;
+    min-height: 56px;
+
+    &.liveCallBackground {
+      padding: 12px;
+    }
+  }
+
+  .noCallsText,
+  .liveCallText {
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .noCallsIcon,
+  .radioIcon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .gridHeader,
+  .gridRow {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  // Hide less important columns on mobile
+  .gridCell:nth-child(2), // Status
+  .gridCell:nth-child(6)  // Call Ended
+  {
+    display: none;
+  }
+
+  .gridCell {
+    .gridHeader & {
+      font-size: 11px;
+      line-height: 18px;
+    }
+
+    .gridRow & {
+      font-size: 13px;
+      line-height: 18px;
+    }
+  }
+}

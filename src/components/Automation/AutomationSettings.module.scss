@@ -492,6 +492,25 @@
             display: flex;
             gap: 4px;
 
+            .testButton {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 24px;
+              height: 24px;
+              border: none;
+              background: none;
+              color: #3b82f6;
+              cursor: pointer;
+              border-radius: 4px;
+              transition: all 0.2s ease;
+
+              &:hover {
+                background: #eff6ff;
+                color: #2563eb;
+              }
+            }
+
             .editButton {
               display: flex;
               align-items: center;
@@ -504,7 +523,7 @@
               cursor: pointer;
               border-radius: 4px;
               transition: all 0.2s ease;
-              
+
               &:hover {
                 background: #f8fafc;
                 color: #334155;
@@ -523,7 +542,7 @@
               cursor: pointer;
               border-radius: 4px;
               transition: all 0.2s ease;
-              
+
               &:hover {
                 background: #fef2f2;
               }

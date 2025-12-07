@@ -1,0 +1,112 @@
+.pageWrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 0;
+}
+
+.pageContent {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  font-size: 16px;
+  color: var(--gray-600);
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  gap: 16px;
+
+  h2 {
+    font-size: 24px;
+    color: var(--gray-800);
+  }
+}
+
+// Overview Tab - 60/40 Layout
+.overviewContent {
+  display: grid;
+  grid-template-columns: 60fr 40fr;
+  gap: 24px;
+  padding: 24px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.contentLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.contentRight {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.cardContent {
+  padding: 16px;
+}
+
+.placeholderText {
+  color: var(--gray-500);
+  font-size: 14px;
+  line-height: 20px;
+  margin: 0;
+}
+
+// Tickets Tab
+.ticketsContent {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+}
+
+// Property Tab
+.propertyContent {
+  padding: 24px;
+}
+
+// Disabled Content
+.disabledContent {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--gray-500);
+  font-size: 16px;
+}
+
+// Mobile Responsive
+@media (max-width: 768px) {
+  .pageContent {
+    padding: 16px;
+  }
+
+  .overviewContent,
+  .ticketsContent,
+  .propertyContent {
+    padding: 16px;
+  }
+
+  .overviewContent {
+    gap: 16px;
+  }
+
+  .ticketsContent {
+    gap: 16px;
+  }
+}

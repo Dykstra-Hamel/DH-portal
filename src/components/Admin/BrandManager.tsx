@@ -3,83 +3,86 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
-import styles from './AdminManager.module.scss';
+import { ChevronDown, Plus, Trash2, Palette } from 'lucide-react';
+import styles from './BrandManager.module.scss';
+import { useCompany } from '@/contexts/CompanyContext';
+import { BrandData, ColorInfo, LogoInfo } from '@/types/branding';
+import { Toast } from '@/components/Common/Toast/Toast';
+import ColorPickerModal from './ColorPickerModal';
 
-interface Company {
-  id: string;
-  name: string;
+// Collapsible Section Component
+interface CollapsibleSectionProps {
+  title: string;
+  description: string;
+  icon?: React.ReactNode;
+  isExpanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
 }
 
-interface ColorInfo {
-  hex: string;
-  cmyk: string;
-  pantone: string;
-  name?: string;
-}
-
-interface BrandData {
-  id?: string;
-  company_id: string;
-  brand_guidelines?: string;
-  brand_strategy?: string;
-  personality?: string;
-  logo_url?: string;
-  logo_description?: string;
-  primary_color_hex?: string;
-  primary_color_cmyk?: string;
-  primary_color_pantone?: string;
-  secondary_color_hex?: string;
-  secondary_color_cmyk?: string;
-  secondary_color_pantone?: string;
-  alternative_colors?: ColorInfo[];
-  font_primary_name?: string;
-  font_primary_example?: string;
-  font_primary_url?: string;
-  font_secondary_name?: string;
-  font_secondary_example?: string;
-  font_secondary_url?: string;
-  font_tertiary_name?: string;
-  font_tertiary_example?: string;
-  font_tertiary_url?: string;
-  photography_description?: string;
-  photography_images?: string[];
-}
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
+  title,
+  description,
+  icon,
+  isExpanded,
+  onToggle,
+  children,
+}) => {
+  return (
+    <div className={styles.section}>
+      <div
+        className={`${styles.sectionHeader} ${isExpanded ? styles.expanded : ''}`}
+        onClick={onToggle}
+      >
+        <div className={styles.sectionHeaderContent}>
+          <h3>
+            {icon && icon}
+            {title}
+          </h3>
+          <ChevronDown
+            size={20}
+            className={`${styles.chevron} ${isExpanded ? styles.rotated : ''}`}
+          />
+        </div>
+        {description && <p className={styles.sectionDescription}>{description}</p>}
+      </div>
+      {isExpanded && <div className={styles.sectionContent}>{children}</div>}
+    </div>
+  );
+};
 
 export default function BrandManager() {
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  // Use global company context
+  const { selectedCompany, isLoading: contextLoading } = useCompany();
+
   const [brandData, setBrandData] = useState<BrandData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const supabase = createClient();
 
-  const fetchCompanies = useCallback(async () => {
+  // Section expansion state
+  const [expandedSections, setExpandedSections] = useState({
+    guidelines: true,
+    logos: false,
+    colors: false,
+    fonts: false,
+    photography: false,
+  });
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const fetchBrandData = useCallback(async (companyId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setCompanies(data || []);
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-      setMessage({ type: 'error', text: 'Failed to load companies' });
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase]);
-
-  useEffect(() => {
-    fetchCompanies();
-  }, [fetchCompanies]);
-
-  const fetchBrandData = async (companyId: string) => {
-    try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('brands')
         .select('*')
@@ -95,44 +98,51 @@ export default function BrandManager() {
         data || {
           company_id: companyId,
           alternative_colors: [],
+          alternate_logos: [],
           photography_images: [],
         }
       );
     } catch (error) {
       console.error('Error fetching brand data:', error);
-      setMessage({
-        type: 'error',
-        text: `Failed to load brand data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      });
+      setToastMessage(`Failed to load brand data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setToastType('error');
+      setToastVisible(true);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [supabase]);
 
-  const handleCompanySelect = (company: Company) => {
-    setSelectedCompany(company);
-    fetchBrandData(company.id);
-    setMessage(null);
-  };
+  // Fetch brand data when selected company changes
+  useEffect(() => {
+    if (!contextLoading && selectedCompany) {
+      fetchBrandData(selectedCompany.id);
+    } else if (!selectedCompany) {
+      setBrandData(null);
+    }
+  }, [contextLoading, selectedCompany, fetchBrandData]);
 
   const handleInputChange = (field: keyof BrandData, value: string) => {
     setBrandData(prev => (prev ? { ...prev, [field]: value } : null));
   };
 
   const handleColorChange = (
-    colorType: 'primary' | 'secondary',
-    colorField: 'hex' | 'cmyk' | 'pantone',
+    type: 'primary' | 'secondary',
+    field: 'hex' | 'cmyk' | 'pantone',
     value: string
   ) => {
-    const field = `${colorType}_color_${colorField}` as keyof BrandData;
-    setBrandData(prev => (prev ? { ...prev, [field]: value } : null));
+    setBrandData(prev => {
+      if (!prev) return null;
+      return { ...prev, [`${type}_color_${field}`]: value };
+    });
   };
 
   const addAlternativeColor = () => {
     setBrandData(prev => {
       if (!prev) return null;
-      const newColor: ColorInfo = { hex: '', cmyk: '', pantone: '', name: '' };
+      const newColors = prev.alternative_colors || [];
       return {
         ...prev,
-        alternative_colors: [...(prev.alternative_colors || []), newColor],
+        alternative_colors: [...newColors, { name: '', hex: '', cmyk: '', pantone: '' }],
       };
     });
   };
@@ -143,8 +153,8 @@ export default function BrandManager() {
     value: string
   ) => {
     setBrandData(prev => {
-      if (!prev || !prev.alternative_colors) return prev;
-      const updated = [...prev.alternative_colors];
+      if (!prev) return null;
+      const updated = [...(prev.alternative_colors || [])];
       updated[index] = { ...updated[index], [field]: value };
       return { ...prev, alternative_colors: updated };
     });
@@ -152,204 +162,277 @@ export default function BrandManager() {
 
   const removeAlternativeColor = (index: number) => {
     setBrandData(prev => {
-      if (!prev || !prev.alternative_colors) return prev;
-      const updated = prev.alternative_colors.filter((_, i) => i !== index);
+      if (!prev) return null;
+      const updated = (prev.alternative_colors || []).filter((_, i) => i !== index);
       return { ...prev, alternative_colors: updated };
     });
   };
 
-  const createAssetPath = (
-    companyName: string,
-    category: string,
-    fileName: string
-  ): string => {
-    // Create clean company name for folder structure
-    const cleanCompanyName = companyName
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single
-      .trim();
-
-    // Clean and timestamp the filename
-    const fileExt = fileName.split('.').pop();
-    const cleanFileName = fileName
-      .replace(`.${fileExt}`, '') // Remove extension temporarily
-      .replace(/[^a-zA-Z0-9\s-]/g, '') // Remove special chars
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .toLowerCase();
-
-    const timestamp = Date.now();
-    const finalFileName = `${cleanFileName}_${timestamp}.${fileExt}`;
-
-    return `${cleanCompanyName}/${category}/${finalFileName}`;
+  const addAlternateLogo = () => {
+    setBrandData(prev => {
+      if (!prev) return null;
+      const newLogos = prev.alternate_logos || [];
+      return {
+        ...prev,
+        alternate_logos: [...newLogos, { name: '', url: '', description: '' }],
+      };
+    });
   };
 
-  const uploadFile = async (
-    file: File,
-    bucket: string,
-    category: string
-  ): Promise<string | null> => {
-    if (!selectedCompany) return null;
+  const updateAlternateLogo = (
+    index: number,
+    field: keyof LogoInfo,
+    value: string
+  ) => {
+    setBrandData(prev => {
+      if (!prev) return null;
+      const updated = [...(prev.alternate_logos || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, alternate_logos: updated };
+    });
+  };
+
+  const removeAlternateLogo = async (index: number) => {
+    if (!selectedCompany) return;
+
+    const logoUrl = brandData?.alternate_logos?.[index]?.url;
+    if (logoUrl) {
+      try {
+        const path = logoUrl.split('/').pop();
+        if (path) {
+          await supabase.storage
+            .from('brand-assets')
+            .remove([`${selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/alternate-logos/${path}`]);
+        }
+      } catch (error) {
+        console.error('Error deleting logo file:', error);
+      }
+    }
+
+    setBrandData(prev => {
+      if (!prev) return null;
+      const updated = (prev.alternate_logos || []).filter((_, i) => i !== index);
+      return { ...prev, alternate_logos: updated };
+    });
+  };
+
+  const handleAlternateLogoUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    index: number
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompany) return;
 
     try {
-      const filePath = createAssetPath(
-        selectedCompany.name,
-        category,
-        file.name
-      );
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const folderPath = `${selectedCompany.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')}/alternate-logos`;
+      const filePath = `${folderPath}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from(bucket)
+        .from('brand-assets')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      const { data: urlData } = supabase.storage
+        .from('brand-assets')
+        .getPublicUrl(filePath);
 
-      return publicUrl;
+      updateAlternateLogo(index, 'url', urlData.publicUrl);
+
+      setToastMessage('Logo uploaded successfully');
+      setToastType('success');
+      setToastVisible(true);
     } catch (error) {
-      console.error('Error uploading file:', error);
-      return null;
+      console.error('Upload error:', error);
+      setToastMessage('Failed to upload logo');
+      setToastType('error');
+      setToastVisible(true);
     }
   };
 
-  const handleLogoUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompany) return;
 
-    // If there's an existing logo, delete it from storage first
-    if (brandData?.logo_url) {
-      await deleteFileFromStorage(brandData.logo_url);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo.${fileExt}`;
+      const folderPath = `${selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/logos`;
+      const filePath = `${folderPath}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('brand-assets').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('brand-assets').getPublicUrl(filePath);
+      handleInputChange('logo_url', urlData.publicUrl);
+
+      setToastMessage('Logo uploaded successfully');
+      setToastType('success');
+      setToastVisible(true);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setToastMessage('Failed to upload logo');
+      setToastType('error');
+      setToastVisible(true);
     }
+  };
 
-    const url = await uploadFile(file, 'brand-assets', 'logos');
-    if (url) {
-      handleInputChange('logo_url', url);
-      // Clear the input so the same file can be selected again if needed
-      event.target.value = '';
+  const handleIconLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompany) return;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `icon-logo.${fileExt}`;
+      const folderPath = `${selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/icon-logos`;
+      const filePath = `${folderPath}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('brand-assets').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('brand-assets').getPublicUrl(filePath);
+      handleInputChange('icon_logo_url', urlData.publicUrl);
+
+      setToastMessage('Icon logo uploaded successfully');
+      setToastType('success');
+      setToastVisible(true);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setToastMessage('Failed to upload icon logo');
+      setToastType('error');
+      setToastVisible(true);
     }
   };
 
   const handlePhotographyUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+    const files = e.target.files;
+    if (!files || files.length === 0 || !selectedCompany) return;
 
-    const uploadPromises = Array.from(files).map(file =>
-      uploadFile(file, 'brand-assets', 'photography')
-    );
-    const urls = await Promise.all(uploadPromises);
-    const validUrls = urls.filter(url => url !== null) as string[];
+    try {
+      const uploadPromises = Array.from(files).map(async file => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const folderPath = `${selectedCompany.name
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')}/photography`;
+        const filePath = `${folderPath}/${fileName}`;
 
-    if (validUrls.length > 0) {
+        const { error: uploadError } = await supabase.storage
+          .from('brand-assets')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('brand-assets')
+          .getPublicUrl(filePath);
+
+        return urlData.publicUrl;
+      });
+
+      const urls = await Promise.all(uploadPromises);
+
       setBrandData(prev => {
         if (!prev) return null;
-        const currentImages = prev.photography_images || [];
+        const existingImages = prev.photography_images || [];
         return {
           ...prev,
-          photography_images: [...currentImages, ...validUrls],
+          photography_images: [...existingImages, ...urls],
         };
       });
-      // Clear the input so the same files can be selected again if needed
-      event.target.value = '';
-    }
-  };
 
-  const deleteFileFromStorage = async (fileUrl: string): Promise<boolean> => {
-    try {
-      // Extract the file path from the full URL
-      // URL format: https://[project].supabase.co/storage/v1/object/public/brand-assets/[path]
-      const urlParts = fileUrl.split('/storage/v1/object/public/brand-assets/');
-      if (urlParts.length !== 2) {
-        console.error('Invalid file URL format:', fileUrl);
-        return false;
-      }
-
-      const filePath = urlParts[1];
-
-      const { error } = await supabase.storage
-        .from('brand-assets')
-        .remove([filePath]);
-
-      if (error) {
-        console.error('Error deleting file from storage:', error);
-        return false;
-      }
-
-      return true;
+      setToastMessage('Images uploaded successfully');
+      setToastType('success');
+      setToastVisible(true);
     } catch (error) {
-      console.error('Unexpected error deleting file:', error);
-      return false;
+      console.error('Upload error:', error);
+      setToastMessage('Failed to upload images');
+      setToastType('error');
+      setToastVisible(true);
     }
   };
 
   const removePhotographyImage = async (indexToRemove: number) => {
-    if (!brandData?.photography_images) return;
+    if (!selectedCompany || !brandData) return;
 
-    // Confirm deletion
-    if (
-      !confirm(
-        'Are you sure you want to delete this image? This action cannot be undone.'
-      )
-    ) {
-      return;
+    const imageUrl = brandData.photography_images?.[indexToRemove];
+    if (imageUrl) {
+      try {
+        const path = imageUrl.split('/').pop();
+        if (path) {
+          await supabase.storage
+            .from('brand-assets')
+            .remove([`${selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/photography/${path}`]);
+        }
+      } catch (error) {
+        console.error('Error deleting image file:', error);
+      }
     }
 
-    const imageToDelete = brandData.photography_images[indexToRemove];
-
-    // Delete from storage first
-    const deleted = await deleteFileFromStorage(imageToDelete);
-
-    if (deleted) {
-      // Remove from brand data only if storage deletion was successful
-      setBrandData(prev => {
-        if (!prev || !prev.photography_images) return prev;
-        return {
-          ...prev,
-          photography_images: prev.photography_images.filter(
-            (_, index) => index !== indexToRemove
-          ),
-        };
-      });
-      setMessage({ type: 'success', text: 'Image deleted successfully' });
-    } else {
-      setMessage({
-        type: 'error',
-        text: 'Failed to delete image file from storage',
-      });
-    }
+    setBrandData(prev => {
+      if (!prev) return null;
+      const updatedImages = (prev.photography_images || []).filter(
+        (_, index) => index !== indexToRemove
+      );
+      return { ...prev, photography_images: updatedImages };
+    });
   };
 
   const saveBrandData = async () => {
     if (!brandData || !selectedCompany) return;
 
     setSaving(true);
-    setMessage(null);
 
     try {
       const { error } = await supabase.from('brands').upsert(brandData);
 
       if (error) throw error;
 
-      setMessage({ type: 'success', text: 'Brand data saved successfully!' });
+      setToastMessage('Brand data saved successfully!');
+      setToastType('success');
+      setToastVisible(true);
 
       // Refresh data
       await fetchBrandData(selectedCompany.id);
     } catch (error) {
       console.error('Error saving brand data:', error);
-      setMessage({ type: 'error', text: 'Failed to save brand data' });
+      setToastMessage('Failed to save brand data');
+      setToastType('error');
+      setToastVisible(true);
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
+  const handleColorFromPicker = (color: string, colorName?: string) => {
+    if (colorName) {
+      // Add as alternative color
+      addAlternativeColor();
+      // Update the newly added color
+      setTimeout(() => {
+        setBrandData(prev => {
+          if (!prev) return null;
+          const colors = [...(prev.alternative_colors || [])];
+          const lastIndex = colors.length - 1;
+          colors[lastIndex] = { ...colors[lastIndex], name: colorName, hex: color };
+          return { ...prev, alternative_colors: colors };
+        });
+      }, 0);
+    }
+    setToastMessage('Color added!');
+    setToastType('success');
+    setToastVisible(true);
+  };
+
+  if (contextLoading || loading) {
     return <div className={styles.loading}>Loading...</div>;
   }
 
@@ -357,505 +440,644 @@ export default function BrandManager() {
     <div className={styles.manager}>
       <div className={styles.header}>
         <h2>Brand Management</h2>
-        <p>Create and edit brand guidelines for companies</p>
+        {selectedCompany && <p>Managing brand for {selectedCompany.name}</p>}
+        <small>Use the company dropdown in the header to switch companies.</small>
+
+        {selectedCompany && brandData && (
+          <div className={styles.headerActions}>
+            <button
+              onClick={saveBrandData}
+              disabled={saving}
+              className={styles.primaryButton}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+            <a
+              href="/brand"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.secondaryButton}
+            >
+              Preview Brand Page
+            </a>
+          </div>
+        )}
       </div>
 
-      {message && (
-        <div className={`${styles.message} ${styles[message.type]}`}>
-          {message.text}
+      {selectedCompany && brandData ? (
+        <div>
+          {/* Brand Guidelines Section */}
+          <CollapsibleSection
+            title="Brand Guidelines"
+            description="Define your brand strategy, personality, and core guidelines"
+            isExpanded={expandedSections.guidelines}
+            onToggle={() => toggleSection('guidelines')}
+          >
+            <div className={styles.formGroup}>
+              <label>Brand Guidelines</label>
+              <textarea
+                value={brandData.brand_guidelines || ''}
+                onChange={e => handleInputChange('brand_guidelines', e.target.value)}
+                placeholder="Describe your brand guidelines, mission, values, and core principles..."
+                rows={5}
+              />
+              <small>Provide an overview of your brand guidelines</small>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Brand Strategy</label>
+              <textarea
+                value={brandData.brand_strategy || ''}
+                onChange={e => handleInputChange('brand_strategy', e.target.value)}
+                placeholder="Outline your brand strategy, positioning, and market approach..."
+                rows={6}
+              />
+              <small>Describe your brand strategy and positioning</small>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Brand Personality</label>
+              <textarea
+                value={brandData.personality || ''}
+                onChange={e => handleInputChange('personality', e.target.value)}
+                placeholder="Define your brand personality traits, tone, and character..."
+                rows={4}
+              />
+              <small>List the key personality traits that define your brand</small>
+            </div>
+          </CollapsibleSection>
+
+          {/* Logos Section */}
+          <CollapsibleSection
+            title="Logos"
+            description="Upload and manage your brand logos and variations"
+            isExpanded={expandedSections.logos}
+            onToggle={() => toggleSection('logos')}
+          >
+            {/* Main Logo */}
+            <div className={styles.formGroup}>
+              <label>Main Logo</label>
+              <div className={styles.fileUploadButton}>
+                <span>Choose File</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                />
+              </div>
+              <small>
+                Will be saved to: {selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/logos/
+              </small>
+            </div>
+
+            {brandData.logo_url && brandData.logo_url.trim() && (
+              <div className={styles.formGroup}>
+                <label>Logo Preview</label>
+                <div className={styles.imagePreviewLarge}>
+                  <Image
+                    src={brandData.logo_url}
+                    alt="Logo preview"
+                    width={200}
+                    height={200}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className={styles.formGroup}>
+              <label>Logo Description</label>
+              <textarea
+                value={brandData.logo_description || ''}
+                onChange={e => handleInputChange('logo_description', e.target.value)}
+                placeholder="Describe your main logo, its usage, and any specific guidelines..."
+                rows={3}
+              />
+            </div>
+
+            {/* Icon Logo */}
+            <div className={styles.formGroup}>
+              <label>Icon Logo</label>
+              <small>Upload a small icon version of your logo (for favicons, app icons, etc.)</small>
+              <div className={styles.fileUploadButton}>
+                <span>Choose File</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleIconLogoUpload}
+                />
+              </div>
+              <small>
+                Will be saved to: {selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/icon-logos/
+              </small>
+            </div>
+
+            {brandData.icon_logo_url && brandData.icon_logo_url.trim() && (
+              <div className={styles.formGroup}>
+                <label>Icon Logo Preview</label>
+                <div className={styles.imagePreview}>
+                  <Image
+                    src={brandData.icon_logo_url}
+                    alt="Icon logo preview"
+                    width={64}
+                    height={64}
+                    style={{ maxWidth: '64px', maxHeight: '64px', objectFit: 'contain' }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className={styles.formGroup}>
+              <label>Icon Logo Description</label>
+              <textarea
+                value={brandData.icon_logo_description || ''}
+                onChange={e => handleInputChange('icon_logo_description', e.target.value)}
+                placeholder="Describe your icon logo usage..."
+                rows={2}
+              />
+            </div>
+
+            {/* Alternate Logos */}
+            <div className={styles.formGroup}>
+              <label>Alternate Logo Variations</label>
+              <small>Add different logo variations (horizontal, stacked, white version, etc.)</small>
+              <button
+                onClick={addAlternateLogo}
+                className={styles.addButton}
+              >
+                <Plus size={16} />
+                Add Logo Variation
+              </button>
+              <div style={{ marginTop: '20px' }}>
+              {brandData.alternate_logos?.map((logo, index) => (
+                <div key={index} className={styles.arrayItem}>
+                  <div className={styles.arrayItemHeader}>
+                    <h4>Logo Variation {index + 1}</h4>
+                    <button
+                      onClick={() => removeAlternateLogo(index)}
+                      className={styles.dangerButton}
+                    >
+                      <Trash2 size={16} />
+                      Remove
+                    </button>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                      Logo Name
+                    </label>
+                    <input
+                      type="text"
+                      value={logo.name || ''}
+                      onChange={e => updateAlternateLogo(index, 'name', e.target.value)}
+                      placeholder="Logo name (e.g., 'Horizontal', 'Stacked', 'White Version')"
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                      Upload Logo File
+                    </label>
+                    <div className={styles.fileUploadButton}>
+                      <span>Choose File</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={e => handleAlternateLogoUpload(e, index)}
+                      />
+                    </div>
+                    <small>
+                      Will be saved to: {selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/alternate-logos/
+                    </small>
+                  </div>
+
+                  {logo.url && logo.url.trim() && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', marginBottom: '8px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                        Logo Preview
+                      </label>
+                      <div className={styles.imagePreviewLarge}>
+                        <Image
+                          src={logo.url}
+                          alt={`${logo.name || 'Alternate'} logo preview`}
+                          width={200}
+                          height={200}
+                          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                      Description
+                    </label>
+                    <textarea
+                      value={logo.description || ''}
+                      onChange={e => updateAlternateLogo(index, 'description', e.target.value)}
+                      placeholder="Describe this logo variation and when to use it..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              ))}
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* Colors Section */}
+          <CollapsibleSection
+            title="Colors"
+            description="Define your brand color palette"
+            icon={<Palette size={20} />}
+            isExpanded={expandedSections.colors}
+            onToggle={() => toggleSection('colors')}
+          >
+            {/* Color Picker Widget Button */}
+            <div className={styles.formGroup}>
+              <button
+                onClick={() => setColorPickerOpen(true)}
+                className={styles.secondaryButton}
+              >
+                <Palette size={16} />
+                Open Color Picker Widget
+              </button>
+              <small>Use the color picker to generate palettes and find complementary colors</small>
+            </div>
+
+            {/* Primary Color */}
+            <div className={styles.formGroup}>
+              <label>Primary Color</label>
+              <div className={styles.formRow}>
+                <div className={styles.colorInputGroup}>
+                  <div
+                    className={styles.colorPreview}
+                    style={{ backgroundColor: brandData.primary_color_hex || '#000000' }}
+                    title="Color preview"
+                  />
+                  <input
+                    type="text"
+                    value={brandData.primary_color_hex || ''}
+                    onChange={e => handleColorChange('primary', 'hex', e.target.value)}
+                    placeholder="Hex (e.g., #3B82F6)"
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={brandData.primary_color_cmyk || ''}
+                  onChange={e => handleColorChange('primary', 'cmyk', e.target.value)}
+                  placeholder="CMYK (e.g., 76, 44, 0, 4)"
+                />
+                <input
+                  type="text"
+                  value={brandData.primary_color_pantone || ''}
+                  onChange={e => handleColorChange('primary', 'pantone', e.target.value)}
+                  placeholder="Pantone (e.g., PMS 2935)"
+                />
+              </div>
+            </div>
+
+            {/* Secondary Color */}
+            <div className={styles.formGroup}>
+              <label>Secondary Color</label>
+              <div className={styles.formRow}>
+                <div className={styles.colorInputGroup}>
+                  <div
+                    className={styles.colorPreview}
+                    style={{ backgroundColor: brandData.secondary_color_hex || '#000000' }}
+                    title="Color preview"
+                  />
+                  <input
+                    type="text"
+                    value={brandData.secondary_color_hex || ''}
+                    onChange={e => handleColorChange('secondary', 'hex', e.target.value)}
+                    placeholder="Hex (e.g., #1E293B)"
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={brandData.secondary_color_cmyk || ''}
+                  onChange={e => handleColorChange('secondary', 'cmyk', e.target.value)}
+                  placeholder="CMYK"
+                />
+                <input
+                  type="text"
+                  value={brandData.secondary_color_pantone || ''}
+                  onChange={e => handleColorChange('secondary', 'pantone', e.target.value)}
+                  placeholder="Pantone"
+                />
+              </div>
+            </div>
+
+            {/* Alternative Colors */}
+            <div className={styles.formGroup}>
+              <label>Alternative Colors</label>
+              <button
+                onClick={addAlternativeColor}
+                className={styles.addButton}
+              >
+                <Plus size={16} />
+                Add Color
+              </button>
+              {brandData.alternative_colors?.map((color, index) => (
+                <div key={index} className={styles.arrayItem}>
+                  <div className={styles.arrayItemHeader}>
+                    <h4>Color {index + 1}</h4>
+                    <button
+                      onClick={() => removeAlternativeColor(index)}
+                      className={styles.dangerButton}
+                    >
+                      <Trash2 size={16} />
+                      Remove
+                    </button>
+                  </div>
+                  <div className={styles.formRow}>
+                    <div className={styles.colorInputGroup}>
+                      <div
+                        className={styles.colorPreview}
+                        style={{ backgroundColor: color.hex || '#000000' }}
+                        title="Color preview"
+                      />
+                      <input
+                        type="text"
+                        value={color.name || ''}
+                        onChange={e => updateAlternativeColor(index, 'name', e.target.value)}
+                        placeholder="Color name"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      value={color.hex || ''}
+                      onChange={e => updateAlternativeColor(index, 'hex', e.target.value)}
+                      placeholder="Hex"
+                    />
+                    <input
+                      type="text"
+                      value={color.cmyk || ''}
+                      onChange={e => updateAlternativeColor(index, 'cmyk', e.target.value)}
+                      placeholder="CMYK"
+                    />
+                    <input
+                      type="text"
+                      value={color.pantone || ''}
+                      onChange={e => updateAlternativeColor(index, 'pantone', e.target.value)}
+                      placeholder="Pantone"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CollapsibleSection>
+
+          {/* Fonts Section */}
+          <CollapsibleSection
+            title="Typography"
+            description="Configure your brand fonts and typography"
+            isExpanded={expandedSections.fonts}
+            onToggle={() => toggleSection('fonts')}
+          >
+            <small style={{ display: 'block', marginBottom: '20px', color: '#6b7280' }}>
+              Provide Google Fonts URLs for easy reference and direct font URLs for loading/displaying fonts.
+            </small>
+
+            {/* Primary Font */}
+            <div className={styles.formGroup}>
+              <label>Primary Font</label>
+              <input
+                type="text"
+                value={brandData.font_primary_name || ''}
+                onChange={e => handleInputChange('font_primary_name', e.target.value)}
+                placeholder="Font name (e.g., Roboto, Open Sans, Lato)"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Link to the font&apos;s page on Google Fonts</label>
+              <input
+                type="url"
+                value={brandData.font_primary_google_url || ''}
+                onChange={e => handleInputChange('font_primary_google_url', e.target.value)}
+                placeholder="https://fonts.google.com/specimen/Roboto"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Direct link to font file or embed URL</label>
+              <input
+                type="url"
+                value={brandData.font_primary_url || ''}
+                onChange={e => handleInputChange('font_primary_url', e.target.value)}
+                placeholder="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Example Text</label>
+              <textarea
+                value={brandData.font_primary_example || ''}
+                onChange={e => handleInputChange('font_primary_example', e.target.value)}
+                placeholder="Example text in this font"
+                rows={2}
+              />
+            </div>
+
+            {/* Secondary Font */}
+            <div className={styles.formGroup}>
+              <label>Secondary Font</label>
+              <input
+                type="text"
+                value={brandData.font_secondary_name || ''}
+                onChange={e => handleInputChange('font_secondary_name', e.target.value)}
+                placeholder="Font name (e.g., Montserrat, Raleway, Poppins)"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Link to the font&apos;s page on Google Fonts</label>
+              <input
+                type="url"
+                value={brandData.font_secondary_google_url || ''}
+                onChange={e => handleInputChange('font_secondary_google_url', e.target.value)}
+                placeholder="https://fonts.google.com/specimen/Montserrat"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Direct link to font file or embed URL</label>
+              <input
+                type="url"
+                value={brandData.font_secondary_url || ''}
+                onChange={e => handleInputChange('font_secondary_url', e.target.value)}
+                placeholder="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Example Text</label>
+              <textarea
+                value={brandData.font_secondary_example || ''}
+                onChange={e => handleInputChange('font_secondary_example', e.target.value)}
+                placeholder="Example text in this font"
+                rows={2}
+              />
+            </div>
+
+            {/* Tertiary Font */}
+            <div className={styles.formGroup}>
+              <label>Tertiary Font (Optional)</label>
+              <input
+                type="text"
+                value={brandData.font_tertiary_name || ''}
+                onChange={e => handleInputChange('font_tertiary_name', e.target.value)}
+                placeholder="Font name (e.g., Playfair Display, Merriweather)"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Link to the font&apos;s page on Google Fonts</label>
+              <input
+                type="url"
+                value={brandData.font_tertiary_google_url || ''}
+                onChange={e => handleInputChange('font_tertiary_google_url', e.target.value)}
+                placeholder="https://fonts.google.com/specimen/Playfair+Display"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Direct link to font file or embed URL</label>
+              <input
+                type="url"
+                value={brandData.font_tertiary_url || ''}
+                onChange={e => handleInputChange('font_tertiary_url', e.target.value)}
+                placeholder="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Example Text</label>
+              <textarea
+                value={brandData.font_tertiary_example || ''}
+                onChange={e => handleInputChange('font_tertiary_example', e.target.value)}
+                placeholder="Example text in this font"
+                rows={2}
+              />
+            </div>
+          </CollapsibleSection>
+
+          {/* Photography Section */}
+          <CollapsibleSection
+            title="Photography"
+            description="Define your photography style and upload example images"
+            isExpanded={expandedSections.photography}
+            onToggle={() => toggleSection('photography')}
+          >
+            <div className={styles.formGroup}>
+              <label>Photography Style Description</label>
+              <textarea
+                value={brandData.photography_description || ''}
+                onChange={e => handleInputChange('photography_description', e.target.value)}
+                placeholder="Describe your photography style, mood, lighting preferences, composition guidelines..."
+                rows={5}
+              />
+              <small>Provide guidelines for photography style and composition</small>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Photography Examples</label>
+              <div className={styles.fileUploadButton}>
+                <span>Choose Files</span>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handlePhotographyUpload}
+                />
+              </div>
+              <small>
+                Will be saved to: {selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/photography/
+              </small>
+              {brandData.photography_images && brandData.photography_images.length > 0 && (
+                <div className={styles.formRow}>
+                  {brandData.photography_images
+                    .filter(image => image && image.trim())
+                    .map((image, index) => (
+                      <div key={index} className={styles.arrayItem}>
+                        <div className={styles.imagePreviewLarge}>
+                          <Image
+                            src={image}
+                            alt={`Photography ${index + 1}`}
+                            width={300}
+                            height={200}
+                            style={{ maxWidth: '100%', height: 'auto', objectFit: 'cover' }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => removePhotographyImage(index)}
+                          className={styles.dangerButton}
+                        >
+                          <Trash2 size={16} />
+                          Remove Image
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Google Drive Link</label>
+              <input
+                type="url"
+                value={brandData.photography_google_drive_link || ''}
+                onChange={e => handleInputChange('photography_google_drive_link', e.target.value)}
+                placeholder="https://drive.google.com/drive/folders/..."
+              />
+              <small>Link to a Google Drive folder with additional photography resources</small>
+            </div>
+          </CollapsibleSection>
+
+          {/* Bottom Save Button */}
+          <div className={styles.headerActions} style={{ marginTop: '24px' }}>
+            <button
+              onClick={saveBrandData}
+              disabled={saving}
+              className={styles.primaryButton}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+            <a
+              href="/brand"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.secondaryButton}
+            >
+              Preview Brand Page
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div className={styles.placeholder}>
+          <h3>No Company Selected</h3>
+          <p>
+            Please select a company from the dropdown in the header to view and edit its brand guidelines.
+          </p>
         </div>
       )}
 
-      <div className={styles.content}>
-        <div className={styles.sidebar}>
-          <h3>Companies</h3>
-          <div className={styles.list}>
-            {companies.map(company => (
-              <div
-                key={company.id}
-                className={`${styles.listItem} ${selectedCompany?.id === company.id ? styles.selected : ''}`}
-                onClick={() => handleCompanySelect(company)}
-              >
-                <span>{company.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      <Toast
+        message={toastMessage}
+        isVisible={toastVisible}
+        onClose={() => setToastVisible(false)}
+        type={toastType}
+        duration={3000}
+      />
 
-        <div className={styles.main}>
-          {selectedCompany && brandData ? (
-            <div className={styles.form}>
-              <div className={styles.formHeader}>
-                <h3>Brand Guidelines for {selectedCompany.name}</h3>
-                <button
-                  onClick={saveBrandData}
-                  disabled={saving}
-                  className={styles.saveButton}
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-
-              <div className={styles.formSection}>
-                <h4>Brand Guidelines</h4>
-                <textarea
-                  value={brandData.brand_guidelines || ''}
-                  onChange={e =>
-                    handleInputChange('brand_guidelines', e.target.value)
-                  }
-                  placeholder="Brand guidelines overview..."
-                  className={styles.textarea}
-                  rows={4}
-                />
-              </div>
-
-              <div className={styles.formSection}>
-                <h4>Brand Strategy</h4>
-                <textarea
-                  value={brandData.brand_strategy || ''}
-                  onChange={e =>
-                    handleInputChange('brand_strategy', e.target.value)
-                  }
-                  placeholder="Brand strategy description..."
-                  className={styles.textarea}
-                  rows={6}
-                />
-              </div>
-
-              <div className={styles.formSection}>
-                <h4>Personality</h4>
-                <textarea
-                  value={brandData.personality || ''}
-                  onChange={e =>
-                    handleInputChange('personality', e.target.value)
-                  }
-                  placeholder="Brand personality traits..."
-                  className={styles.textarea}
-                  rows={4}
-                />
-              </div>
-
-              <div className={styles.formSection}>
-                <h4>Logo</h4>
-                <div className={styles.logoSection}>
-                  <div className={styles.uploadInfo}>
-                    <small>
-                      Files will be organized:{' '}
-                      <code>
-                        {selectedCompany?.name
-                          .toLowerCase()
-                          .replace(/[^a-z0-9\s-]/g, '')
-                          .replace(/\s+/g, '-')}
-                        /logos/
-                      </code>
-                    </small>
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    className={styles.fileInput}
-                  />
-                  {brandData.logo_url && brandData.logo_url.trim() && (
-                    <div className={styles.logoPreview}>
-                      <Image
-                        src={brandData.logo_url}
-                        alt="Logo preview"
-                        width={200}
-                        height={100}
-                        style={{ maxWidth: '100%', height: 'auto' }}
-                      />
-                    </div>
-                  )}
-                  <textarea
-                    value={brandData.logo_description || ''}
-                    onChange={e =>
-                      handleInputChange('logo_description', e.target.value)
-                    }
-                    placeholder="Logo description..."
-                    className={styles.textarea}
-                    rows={3}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.formSection}>
-                <h4>Colors</h4>
-
-                <div className={styles.colorSection}>
-                  <h5>Primary Color</h5>
-                  <div className={styles.colorInputs}>
-                    <input
-                      type="color"
-                      value={brandData.primary_color_hex || '#000000'}
-                      onChange={e =>
-                        handleColorChange('primary', 'hex', e.target.value)
-                      }
-                      className={styles.colorPicker}
-                    />
-                    <input
-                      type="text"
-                      value={brandData.primary_color_hex || ''}
-                      onChange={e =>
-                        handleColorChange('primary', 'hex', e.target.value)
-                      }
-                      placeholder="Hex"
-                      className={styles.input}
-                    />
-                    <input
-                      type="text"
-                      value={brandData.primary_color_cmyk || ''}
-                      onChange={e =>
-                        handleColorChange('primary', 'cmyk', e.target.value)
-                      }
-                      placeholder="CMYK"
-                      className={styles.input}
-                    />
-                    <input
-                      type="text"
-                      value={brandData.primary_color_pantone || ''}
-                      onChange={e =>
-                        handleColorChange('primary', 'pantone', e.target.value)
-                      }
-                      placeholder="Pantone"
-                      className={styles.input}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.colorSection}>
-                  <h5>Secondary Color</h5>
-                  <div className={styles.colorInputs}>
-                    <input
-                      type="color"
-                      value={brandData.secondary_color_hex || '#000000'}
-                      onChange={e =>
-                        handleColorChange('secondary', 'hex', e.target.value)
-                      }
-                      className={styles.colorPicker}
-                    />
-                    <input
-                      type="text"
-                      value={brandData.secondary_color_hex || ''}
-                      onChange={e =>
-                        handleColorChange('secondary', 'hex', e.target.value)
-                      }
-                      placeholder="Hex"
-                      className={styles.input}
-                    />
-                    <input
-                      type="text"
-                      value={brandData.secondary_color_cmyk || ''}
-                      onChange={e =>
-                        handleColorChange('secondary', 'cmyk', e.target.value)
-                      }
-                      placeholder="CMYK"
-                      className={styles.input}
-                    />
-                    <input
-                      type="text"
-                      value={brandData.secondary_color_pantone || ''}
-                      onChange={e =>
-                        handleColorChange(
-                          'secondary',
-                          'pantone',
-                          e.target.value
-                        )
-                      }
-                      placeholder="Pantone"
-                      className={styles.input}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.colorSection}>
-                  <div className={styles.sectionHeader}>
-                    <h5>Alternative Colors</h5>
-                    <button
-                      onClick={addAlternativeColor}
-                      className={styles.addButton}
-                    >
-                      Add Color
-                    </button>
-                  </div>
-                  {brandData.alternative_colors?.map((color, index) => (
-                    <div key={index} className={styles.alternativeColor}>
-                      <div className={styles.colorInputs}>
-                        <input
-                          type="color"
-                          value={color.hex || '#000000'}
-                          onChange={e =>
-                            updateAlternativeColor(index, 'hex', e.target.value)
-                          }
-                          className={styles.colorPicker}
-                        />
-                        <input
-                          type="text"
-                          value={color.name || ''}
-                          onChange={e =>
-                            updateAlternativeColor(
-                              index,
-                              'name',
-                              e.target.value
-                            )
-                          }
-                          placeholder="Color name"
-                          className={styles.input}
-                        />
-                        <input
-                          type="text"
-                          value={color.hex || ''}
-                          onChange={e =>
-                            updateAlternativeColor(index, 'hex', e.target.value)
-                          }
-                          placeholder="Hex"
-                          className={styles.input}
-                        />
-                        <input
-                          type="text"
-                          value={color.cmyk || ''}
-                          onChange={e =>
-                            updateAlternativeColor(
-                              index,
-                              'cmyk',
-                              e.target.value
-                            )
-                          }
-                          placeholder="CMYK"
-                          className={styles.input}
-                        />
-                        <input
-                          type="text"
-                          value={color.pantone || ''}
-                          onChange={e =>
-                            updateAlternativeColor(
-                              index,
-                              'pantone',
-                              e.target.value
-                            )
-                          }
-                          placeholder="Pantone"
-                          className={styles.input}
-                        />
-                        <button
-                          onClick={() => removeAlternativeColor(index)}
-                          className={styles.removeButton}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className={styles.formSection}>
-                <h4>Typography</h4>
-
-                <div className={styles.fontSection}>
-                  <h5>Primary Font</h5>
-                  <div className={styles.fontInputs}>
-                    <input
-                      type="text"
-                      value={brandData.font_primary_name || ''}
-                      onChange={e =>
-                        handleInputChange('font_primary_name', e.target.value)
-                      }
-                      placeholder="Font name"
-                      className={styles.input}
-                    />
-                    <input
-                      type="url"
-                      value={brandData.font_primary_url || ''}
-                      onChange={e =>
-                        handleInputChange('font_primary_url', e.target.value)
-                      }
-                      placeholder="Font URL"
-                      className={styles.input}
-                    />
-                    <textarea
-                      value={brandData.font_primary_example || ''}
-                      onChange={e =>
-                        handleInputChange(
-                          'font_primary_example',
-                          e.target.value
-                        )
-                      }
-                      placeholder="Example text"
-                      className={styles.textarea}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.fontSection}>
-                  <h5>Secondary Font</h5>
-                  <div className={styles.fontInputs}>
-                    <input
-                      type="text"
-                      value={brandData.font_secondary_name || ''}
-                      onChange={e =>
-                        handleInputChange('font_secondary_name', e.target.value)
-                      }
-                      placeholder="Font name"
-                      className={styles.input}
-                    />
-                    <input
-                      type="url"
-                      value={brandData.font_secondary_url || ''}
-                      onChange={e =>
-                        handleInputChange('font_secondary_url', e.target.value)
-                      }
-                      placeholder="Font URL"
-                      className={styles.input}
-                    />
-                    <textarea
-                      value={brandData.font_secondary_example || ''}
-                      onChange={e =>
-                        handleInputChange(
-                          'font_secondary_example',
-                          e.target.value
-                        )
-                      }
-                      placeholder="Example text"
-                      className={styles.textarea}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.fontSection}>
-                  <h5>Tertiary Font</h5>
-                  <div className={styles.fontInputs}>
-                    <input
-                      type="text"
-                      value={brandData.font_tertiary_name || ''}
-                      onChange={e =>
-                        handleInputChange('font_tertiary_name', e.target.value)
-                      }
-                      placeholder="Font name"
-                      className={styles.input}
-                    />
-                    <input
-                      type="url"
-                      value={brandData.font_tertiary_url || ''}
-                      onChange={e =>
-                        handleInputChange('font_tertiary_url', e.target.value)
-                      }
-                      placeholder="Font URL"
-                      className={styles.input}
-                    />
-                    <textarea
-                      value={brandData.font_tertiary_example || ''}
-                      onChange={e =>
-                        handleInputChange(
-                          'font_tertiary_example',
-                          e.target.value
-                        )
-                      }
-                      placeholder="Example text"
-                      className={styles.textarea}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.formSection}>
-                <h4>Photography</h4>
-                <textarea
-                  value={brandData.photography_description || ''}
-                  onChange={e =>
-                    handleInputChange('photography_description', e.target.value)
-                  }
-                  placeholder="Photography style description..."
-                  className={styles.textarea}
-                  rows={4}
-                />
-
-                <div className={styles.photographyUpload}>
-                  <h5>Photography Images</h5>
-                  <div className={styles.uploadInfo}>
-                    <small>
-                      Files will be organized:{' '}
-                      <code>
-                        {selectedCompany?.name
-                          .toLowerCase()
-                          .replace(/[^a-z0-9\s-]/g, '')
-                          .replace(/\s+/g, '-')}
-                        /photography/
-                      </code>
-                    </small>
-                  </div>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handlePhotographyUpload}
-                    className={styles.fileInput}
-                  />
-
-                  {brandData.photography_images &&
-                    brandData.photography_images.length > 0 && (
-                      <div className={styles.photographyGrid}>
-                        {brandData.photography_images
-                          .filter(image => image && image.trim())
-                          .map((image, index) => (
-                            <div
-                              key={index}
-                              className={styles.photographyImageItem}
-                            >
-                              <Image
-                                src={image}
-                                alt={`Photography ${index + 1}`}
-                                className={styles.photographyPreview}
-                                width={300}
-                                height={200}
-                                style={{ maxWidth: '100%', height: 'auto' }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removePhotographyImage(index)}
-                                className={styles.removeImageButton}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                </div>
-              </div>
-
-              <div className={styles.formFooter}>
-                <button
-                  onClick={saveBrandData}
-                  disabled={saving}
-                  className={styles.saveButton}
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-                <a
-                  href="/brand"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.previewLink}
-                >
-                  Preview Brand Page
-                </a>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.placeholder}>
-              <h3>Select a company to manage its brand</h3>
-              <p>
-                Choose a company from the list to create or edit its brand
-                guidelines.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      {colorPickerOpen && (
+        <ColorPickerModal
+          onClose={() => setColorPickerOpen(false)}
+          onSelectColor={handleColorFromPicker}
+        />
+      )}
     </div>
   );
 }

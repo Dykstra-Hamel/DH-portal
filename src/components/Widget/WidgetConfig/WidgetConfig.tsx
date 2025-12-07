@@ -45,29 +45,6 @@ interface ColorState {
   value: string;
   source: 'brand' | 'override' | 'default';
 }
-interface DomainRecord {
-  record: string;
-  name: string;
-  value: string;
-  type: string;
-  ttl?: string;
-  priority?: string;
-  status?: 'verified' | 'pending' | 'failed';
-}
-
-interface DomainConfiguration {
-  name?: string;
-  configured: boolean;
-  status:
-    | 'not_configured'
-    | 'pending'
-    | 'verified'
-    | 'failed'
-    | 'temporary_failure';
-  records: DomainRecord[];
-  verifiedAt?: string;
-  resendDomainId?: string;
-}
 
 interface PestType {
   id: string;
@@ -189,9 +166,8 @@ interface WidgetConfigData {
   };
 }
 interface WidgetConfigProps {
-  companies: Company[];
-  selectedCompanyId?: string;
-  onCompanyChange?: (companyId: string) => void;
+  companyId: string;
+  companyName: string;
 }
 
 // Collapsible Section Component - moved outside to prevent re-creation on renders
@@ -232,11 +208,10 @@ const CollapsibleSection: React.FC<{
   );
 };
 const WidgetConfig: React.FC<WidgetConfigProps> = ({
-  companies,
-  selectedCompanyId,
-  onCompanyChange,
+  companyId,
+  companyName,
 }) => {
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [companyDetails, setCompanyDetails] = useState<Company | null>(null);
   const [config, setConfig] = useState<WidgetConfigData>({
     branding: {
       companyName: '',
@@ -327,7 +302,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     welcome: false,
     serviceAreas: false,
     emailNotifications: false,
-    emailDomain: false,
     addressApi: false,
     embedCode: true, // Expanded by default
   });
@@ -368,19 +342,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     lng: number;
   } | null>(null);
 
-  // Domain configuration state
-  const [domainConfig, setDomainConfig] = useState<DomainConfiguration>({
-    configured: false,
-    status: 'not_configured',
-    records: [],
-  });
-  const [domainForm, setDomainForm] = useState({
-    domain: '',
-    region: 'us-east-1',
-    customReturnPath: 'noreply',
-  });
-  const [domainLoading, setDomainLoading] = useState(false);
-  const [domainError, setDomainError] = useState<string | null>(null);
   // Default color values - memoized to prevent re-creation on every render
   const defaultColors = useMemo(
     () => ({
@@ -658,45 +619,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   }, []);
 
-  const loadDomainConfiguration = useCallback(async (companyId: string) => {
-    try {
-      const response = await fetch(`/api/companies/${companyId}/settings`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.settings) {
-          const settings = data.settings;
-
-          // Convert settings to domain config format
-          const domainName = settings.email_domain?.value || '';
-          const configured =
-            domainName !== '' &&
-            settings.email_domain_status?.value !== 'not_configured';
-
-          setDomainConfig({
-            name: domainName,
-            configured,
-            status: settings.email_domain_status?.value || 'not_configured',
-            records: settings.email_domain_records?.value || [],
-            verifiedAt: settings.email_domain_verified_at?.value || undefined,
-            resendDomainId: settings.resend_domain_id?.value || undefined,
-          });
-
-          if (domainName) {
-            setDomainForm(prev => ({
-              ...prev,
-              domain: domainName,
-              region: settings.email_domain_region?.value || 'us-east-1',
-              customReturnPath:
-                settings.email_domain_prefix?.value || 'noreply',
-            }));
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error loading domain configuration:', error);
-    }
-  }, []);
-
   const loadServiceAreas = useCallback(async (companyId: string) => {
     try {
       const response = await fetch(`/api/service-areas/${companyId}`);
@@ -750,206 +672,44 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   }, []);
 
-  // Load company data when selected company changes
+  // Load company data when companyId changes
   useEffect(() => {
-    if (selectedCompanyId) {
-      const company = companies.find(c => c.id === selectedCompanyId);
-      if (company) {
-        setSelectedCompany(company);
-        loadCompanyConfig(company);
-        fetchBrandColors(selectedCompanyId);
-        loadServiceAreas(selectedCompanyId);
-        loadPestOptions(selectedCompanyId);
-        loadServicePlans(selectedCompanyId);
-        geocodeCompanyAddress(company);
-        loadDomainConfiguration(selectedCompanyId);
+    const loadCompanyData = async () => {
+      if (companyId) {
+        try {
+          // Fetch company details
+          const companies = await adminAPI.getCompanies();
+          const company = companies.find((c: Company) => c.id === companyId);
+
+          if (company) {
+            setCompanyDetails(company);
+            loadCompanyConfig(company);
+            fetchBrandColors(companyId);
+            loadServiceAreas(companyId);
+            loadPestOptions(companyId);
+            loadServicePlans(companyId);
+            geocodeCompanyAddress(company);
+          }
+        } catch (error) {
+          console.error('Error loading company data:', error);
+        }
       }
-    }
+    };
+
+    loadCompanyData();
   }, [
-    selectedCompanyId,
-    companies,
+    companyId,
     loadCompanyConfig,
     fetchBrandColors,
     loadServiceAreas,
     loadPestOptions,
     loadServicePlans,
     geocodeCompanyAddress,
-    loadDomainConfiguration,
   ]);
-
-  // Create or update domain
-  const handleDomainSubmit = async () => {
-    if (!selectedCompany || !domainForm.domain.trim()) return;
-
-    setDomainLoading(true);
-    setDomainError(null);
-
-    try {
-      const response = await fetch(
-        `/api/companies/${selectedCompany.id}/settings`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'create_domain',
-            domain: domainForm.domain.trim(),
-            region: domainForm.region,
-            customReturnPath: domainForm.customReturnPath,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        setDomainConfig({
-          name: data.domain.name,
-          configured: true,
-          status: data.domain.status,
-          records: data.domain.records,
-          resendDomainId: data.domain.resendDomainId,
-        });
-        setSaveStatus('success');
-        setTimeout(() => setSaveStatus('idle'), 3000);
-      } else {
-        setDomainError(data.error || 'Failed to configure domain');
-      }
-    } catch (error) {
-      console.error('Error configuring domain:', error);
-      setDomainError('Network error occurred');
-    } finally {
-      setDomainLoading(false);
-    }
-  };
-
-  // Verify domain
-  const handleDomainVerify = async () => {
-    if (!selectedCompany || !domainConfig.resendDomainId) return;
-
-    setDomainLoading(true);
-    setDomainError(null);
-
-    try {
-      const response = await fetch(
-        `/api/companies/${selectedCompany.id}/settings`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'verify_domain',
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        setDomainConfig(prev => ({
-          ...prev,
-          status: data.domain.status,
-          records: data.domain.records,
-        }));
-      } else {
-        setDomainError(data.error || 'Failed to verify domain');
-      }
-    } catch (error) {
-      console.error('Error verifying domain:', error);
-      setDomainError('Network error occurred');
-    } finally {
-      setDomainLoading(false);
-    }
-  };
-
-  // Delete domain configuration
-  const handleDomainDelete = async () => {
-    if (!selectedCompany || !domainConfig.configured) return;
-
-    if (
-      !confirm(
-        'Are you sure you want to remove the domain configuration? This will revert to using the default email domain.'
-      )
-    ) {
-      return;
-    }
-
-    setDomainLoading(true);
-    setDomainError(null);
-
-    try {
-      const response = await fetch(
-        `/api/companies/${selectedCompany.id}/settings`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'delete_domain',
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        setDomainConfig({
-          configured: false,
-          status: 'not_configured',
-          records: [],
-        });
-        setDomainForm(prev => ({
-          ...prev,
-          domain: '',
-        }));
-      } else {
-        setDomainError(data.error || 'Failed to remove domain');
-      }
-    } catch (error) {
-      console.error('Error removing domain:', error);
-      setDomainError('Network error occurred');
-    } finally {
-      setDomainLoading(false);
-    }
-  };
-
-  // Get domain status icon
-  const getDomainStatusIcon = (status: DomainConfiguration['status']) => {
-    switch (status) {
-      case 'verified':
-        return <CheckCircle size={16} className={styles.statusIconSuccess} />;
-      case 'pending':
-        return <Clock size={16} className={styles.statusIconPending} />;
-      case 'failed':
-      case 'temporary_failure':
-        return <AlertTriangle size={16} className={styles.statusIconError} />;
-      default:
-        return <Globe size={16} className={styles.statusIconDefault} />;
-    }
-  };
-
-  // Get record status icon
-  const getRecordStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'verified':
-        return (
-          <CheckCircle size={14} className={styles.recordStatusVerified} />
-        );
-      case 'pending':
-        return <Clock size={14} className={styles.recordStatusPending} />;
-      case 'failed':
-        return <X size={14} className={styles.recordStatusFailed} />;
-      default:
-        return <Clock size={14} className={styles.recordStatusDefault} />;
-    }
-  };
 
   const savePestOptions = useCallback(
     async (pestOptions: CompanyPestOption[]) => {
-      if (!selectedCompany) return;
+      if (!companyDetails) return;
       try {
         const updateData = {
           pestOptions: pestOptions.map((option, index) => ({
@@ -964,7 +724,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         };
 
         const response = await fetch(
-          `/api/admin/pest-options/${selectedCompany.id}`,
+          `/api/admin/pest-options/${companyDetails.id}`,
           {
             method: 'POST',
             headers: {
@@ -987,7 +747,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
         setTimeout(() => setSaveStatus('idle'), 2000);
       }
     },
-    [selectedCompany, setSaveStatus, setCompanyPestOptions]
+    [companyDetails, setSaveStatus, setCompanyPestOptions]
   );
 
   const addPestOption = (pestType: PestType) => {
@@ -1168,10 +928,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
   // Service Plans Management Functions
   const createServicePlan = async (planData: Partial<ServicePlan>) => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
     try {
       const response = await fetch(
-        `/api/admin/service-plans/${selectedCompany.id}`,
+        `/api/admin/service-plans/${companyDetails.id}`,
         {
           method: 'POST',
           headers: {
@@ -1183,7 +943,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
       const data = await response.json();
       if (data.success) {
-        await loadServicePlans(selectedCompany.id);
+        await loadServicePlans(companyDetails.id);
         setShowPlanModal(false);
         setEditingPlan(null);
         setSaveStatus('success');
@@ -1197,10 +957,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const updateServicePlan = async (planData: Partial<ServicePlan>) => {
-    if (!selectedCompany || !editingPlan) return;
+    if (!companyDetails || !editingPlan) return;
     try {
       const response = await fetch(
-        `/api/admin/service-plans/${selectedCompany.id}`,
+        `/api/admin/service-plans/${companyDetails.id}`,
         {
           method: 'PUT',
           headers: {
@@ -1215,7 +975,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
       const data = await response.json();
       if (data.success) {
-        await loadServicePlans(selectedCompany.id);
+        await loadServicePlans(companyDetails.id);
         setShowPlanModal(false);
         setEditingPlan(null);
         setSaveStatus('success');
@@ -1230,13 +990,13 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
   const deleteServicePlan = async (planId: string) => {
     if (
-      !selectedCompany ||
+      !companyDetails ||
       !confirm('Are you sure you want to delete this service plan?')
     )
       return;
     try {
       const response = await fetch(
-        `/api/admin/service-plans/${selectedCompany.id}?id=${planId}`,
+        `/api/admin/service-plans/${companyDetails.id}?id=${planId}`,
         {
           method: 'DELETE',
         }
@@ -1244,7 +1004,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
 
       const data = await response.json();
       if (data.success) {
-        await loadServicePlans(selectedCompany.id);
+        await loadServicePlans(companyDetails.id);
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }
@@ -1261,9 +1021,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const saveServiceAreas = async (areas: any[]) => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
     try {
-      const response = await fetch(`/api/service-areas/${selectedCompany.id}`, {
+      const response = await fetch(`/api/service-areas/${companyDetails.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1306,17 +1066,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             : prev.colorOverrides?.secondary,
         },
       }));
-    }
-  };
-  const handleCompanySelect = (companyId: string) => {
-    if (onCompanyChange) {
-      onCompanyChange(companyId);
-    } else {
-      const company = companies.find(c => c.id === companyId);
-      if (company) {
-        setSelectedCompany(company);
-        loadCompanyConfig(company);
-      }
     }
   };
   const handleConfigChange = (
@@ -1475,12 +1224,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     bucket: string,
     category: string
   ): Promise<string | null> => {
-    if (!selectedCompany) return null;
+    if (!companyDetails) return null;
 
     try {
       const supabase = createClient();
       const filePath = createAssetPath(
-        selectedCompany.name,
+        companyDetails.name,
         category,
         file.name
       );
@@ -1900,11 +1649,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const saveConfig = async () => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
     setIsSaving(true);
     setSaveStatus('idle');
     try {
-      await adminAPI.updateCompany(selectedCompany.id, {
+      await adminAPI.updateCompany(companyDetails.id, {
         widget_config: config,
       });
       setSaveStatus('success');
@@ -1918,10 +1667,10 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
   const generateFullEmbedCode = () => {
-    if (!selectedCompany) return '';
+    if (!companyDetails) return '';
     let embedCode = `<script 
   src="${window.location.origin}/widget.js"
-  data-company-id="${selectedCompany.id}"
+  data-company-id="${companyDetails.id}"
   data-base-url="${window.location.origin}"`;
     // Add all configuration as data attributes
     if (config.headers.headerText) {
@@ -1968,7 +1717,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     return embedCode;
   };
   const generateMinimalEmbedCode = () => {
-    if (!selectedCompany) return '';
+    if (!companyDetails) return '';
 
     // New minimal embed code without company-id or base-url
     // Widget will automatically detect company from domain
@@ -1978,11 +1727,11 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const generateButtonEmbedCode = () => {
-    if (!selectedCompany) return '';
+    if (!companyDetails) return '';
 
     let embedCode = `<script 
   src="${window.location.origin}/widget.js"
-  data-company-id="${selectedCompany.id}"
+  data-company-id="${companyDetails.id}"
   data-base-url="${window.location.origin}"
   data-display-mode="button"`;
 
@@ -2026,7 +1775,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const copyFullEmbedCode = async () => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
 
     setCopyStatusFull('copying');
     try {
@@ -2042,7 +1791,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
   const copyMinimalEmbedCode = async () => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
     setCopyStatusMinimal('copying');
     try {
       await navigator.clipboard.writeText(generateMinimalEmbedCode());
@@ -2058,7 +1807,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const copyButtonEmbedCode = async () => {
-    if (!selectedCompany) return;
+    if (!companyDetails) return;
 
     setCopyStatusButton('copying');
 
@@ -2076,23 +1825,12 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     }
   };
 
-  if (!selectedCompany) {
+  if (!companyDetails) {
     return (
       <div className={styles.container}>
         <div className={styles.header}>
           <h2>Widget Configuration</h2>
-          <p>Select a company to configure their AI-powered widget.</p>
-        </div>
-        <div className={styles.companySelector}>
-          <label>Select Company:</label>
-          <select onChange={e => handleCompanySelect(e.target.value)} value="">
-            <option value="">Choose a company...</option>
-            {companies.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
+          <p>Loading widget configuration...</p>
         </div>
       </div>
     );
@@ -2102,7 +1840,8 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     <div className={styles.container}>
       <div className={styles.header}>
         <h2>Widget Configuration</h2>
-        <p>Configure the AI-powered widget for {selectedCompany.name}</p>
+        <p>Configure the AI-powered widget for {companyDetails.name}</p>
+        <small>Use the company dropdown in the header to switch companies.</small>
         <div className={styles.headerActions}>
           <button
             type="button"
@@ -2126,20 +1865,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             {isSaving ? 'Saving...' : 'Save Configuration'}
           </button>
         </div>
-      </div>
-      <div className={styles.companySelector}>
-        <label>Select Company:</label>
-        <select
-          onChange={e => handleCompanySelect(e.target.value)}
-          value={selectedCompany.id}
-        >
-          <option value="">Choose a company...</option>
-          {companies.map(company => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
       </div>
       {saveStatus !== 'idle' && (
         <div className={`${styles.statusMessage} ${styles[saveStatus]}`}>
@@ -3394,7 +3119,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               <div className={styles.geographicSection}>
                 {googleApiKey ? (
                   <ServiceAreaMap
-                    companyId={selectedCompany.id}
+                    companyId={companyDetails.id}
                     existingAreas={serviceAreas}
                     onAreasChange={setServiceAreas}
                     onSave={saveServiceAreas}
@@ -3513,260 +3238,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                       .replace(/\{priority\}/g, 'HIGH')
                       .replace(/\{address\}/g, '123 Main St, City, State')}
                   </div>
-                </div>
-
-                {/* Email Domain Configuration */}
-                <div className={styles.domainSection}>
-                  <h4>Custom Email Domain</h4>
-                  <p className={styles.domainSectionDescription}>
-                    Configure a custom domain for sending emails to customers.
-                    This allows emails to be sent from your domain (e.g.,
-                    noreply@
-                    {config.branding.companyName
-                      .toLowerCase()
-                      .replace(/\s+/g, '')}
-                    .com) instead of the default system domain.
-                  </p>
-
-                  {domainError && (
-                    <div className={styles.domainError}>
-                      <AlertTriangle size={16} />
-                      {domainError}
-                    </div>
-                  )}
-
-                  {!domainConfig.configured ? (
-                    <div className={styles.domainForm}>
-                      <div className={styles.formGroup}>
-                        <label>Domain Name</label>
-                        <input
-                          type="text"
-                          value={domainForm.domain}
-                          onChange={e =>
-                            setDomainForm(prev => ({
-                              ...prev,
-                              domain: e.target.value,
-                            }))
-                          }
-                          placeholder="example.com"
-                          disabled={domainLoading}
-                        />
-                        <small className={styles.fieldNote}>
-                          Enter your company&apos;s domain name (without www or
-                          http://)
-                        </small>
-                      </div>
-
-                      <div className={styles.formGroup}>
-                        <label>Email Sending Region</label>
-                        <select
-                          value={domainForm.region}
-                          onChange={e =>
-                            setDomainForm(prev => ({
-                              ...prev,
-                              region: e.target.value,
-                            }))
-                          }
-                          disabled={domainLoading}
-                        >
-                          <option value="us-east-1">
-                            US East (N. Virginia)
-                          </option>
-                          <option value="eu-west-1">EU West (Ireland)</option>
-                          <option value="sa-east-1">
-                            South America (São Paulo)
-                          </option>
-                          <option value="ap-northeast-1">
-                            Asia Pacific (Tokyo)
-                          </option>
-                        </select>
-                        <small className={styles.fieldNote}>
-                          Choose the region closest to your customers for better
-                          delivery
-                        </small>
-                      </div>
-
-                      <div className={styles.formGroup}>
-                        <label>Email Prefix</label>
-                        <input
-                          type="text"
-                          value={domainForm.customReturnPath}
-                          onChange={e =>
-                            setDomainForm(prev => ({
-                              ...prev,
-                              customReturnPath: e.target.value,
-                            }))
-                          }
-                          placeholder="noreply"
-                          disabled={domainLoading}
-                        />
-                        <small className={styles.fieldNote}>
-                          The prefix for your email address (e.g.,
-                          &quot;noreply&quot; creates noreply@yourdomain.com)
-                        </small>
-                      </div>
-
-                      <button
-                        onClick={handleDomainSubmit}
-                        disabled={domainLoading || !domainForm.domain.trim()}
-                        className={styles.domainButton}
-                        type="button"
-                      >
-                        {domainLoading ? (
-                          <RefreshCw size={16} className={styles.spinning} />
-                        ) : (
-                          <Globe size={16} />
-                        )}
-                        {domainLoading ? 'Configuring...' : 'Configure Domain'}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className={styles.domainConfigured}>
-                      <div className={styles.domainHeader}>
-                        <div className={styles.domainInfo}>
-                          {getDomainStatusIcon(domainConfig.status)}
-                          <div>
-                            <strong>{domainConfig.name}</strong>
-                            <div className={styles.domainStatus}>
-                              Status:{' '}
-                              {domainConfig.status === 'verified'
-                                ? 'Verified'
-                                : domainConfig.status === 'pending'
-                                  ? 'Verification Pending'
-                                  : domainConfig.status === 'failed'
-                                    ? 'Verification Failed'
-                                    : domainConfig.status ===
-                                        'temporary_failure'
-                                      ? 'Temporary Failure'
-                                      : 'Not Started'}
-                              {domainConfig.verifiedAt && (
-                                <span className={styles.verifiedDate}>
-                                  (Verified{' '}
-                                  {new Date(
-                                    domainConfig.verifiedAt
-                                  ).toLocaleDateString()}
-                                  )
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className={styles.domainActions}>
-                          <button
-                            onClick={handleDomainVerify}
-                            disabled={domainLoading}
-                            className={styles.verifyButton}
-                            type="button"
-                          >
-                            {domainLoading ? (
-                              <RefreshCw
-                                size={16}
-                                className={styles.spinning}
-                              />
-                            ) : (
-                              <RefreshCw size={16} />
-                            )}
-                            Check Status
-                          </button>
-                          <button
-                            onClick={handleDomainDelete}
-                            disabled={domainLoading}
-                            className={styles.deleteButton}
-                            type="button"
-                          >
-                            <X size={16} />
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-
-                      {domainConfig.records.length > 0 && (
-                        <div className={styles.dnsRecords}>
-                          <h5>DNS Records to Add</h5>
-                          <p className={styles.dnsInstructions}>
-                            Add these DNS records to your domain&apos;s DNS
-                            settings. Contact your domain provider if you need
-                            help.
-                          </p>
-                          <div className={styles.recordsList}>
-                            {domainConfig.records.map((record, index) => (
-                              <div key={index} className={styles.dnsRecord}>
-                                <div className={styles.recordHeader}>
-                                  <div className={styles.recordType}>
-                                    {record.type}
-                                  </div>
-                                  <div className={styles.recordStatus}>
-                                    {getRecordStatusIcon(record.status)}
-                                    <span className={styles.recordStatusText}>
-                                      {record.status === 'verified'
-                                        ? 'Verified'
-                                        : record.status === 'pending'
-                                          ? 'Pending'
-                                          : record.status === 'failed'
-                                            ? 'Failed'
-                                            : 'Not Checked'}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className={styles.recordDetails}>
-                                  <div className={styles.recordField}>
-                                    <label>Name:</label>
-                                    <code>{record.name}</code>
-                                  </div>
-                                  <div className={styles.recordField}>
-                                    <label>Value:</label>
-                                    <code className={styles.recordValue}>
-                                      {record.value}
-                                    </code>
-                                  </div>
-                                  {record.priority && (
-                                    <div className={styles.recordField}>
-                                      <label>Priority:</label>
-                                      <code>{record.priority}</code>
-                                    </div>
-                                  )}
-                                  {record.ttl && (
-                                    <div className={styles.recordField}>
-                                      <label>TTL:</label>
-                                      <code>{record.ttl}</code>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-
-                          {domainConfig.status !== 'verified' && (
-                            <div className={styles.verificationNote}>
-                              <AlertTriangle size={16} />
-                              <div>
-                                <strong>Domain not yet verified</strong>
-                                <p>
-                                  After adding these DNS records, click
-                                  &quot;Check Status&quot; to verify your
-                                  domain. Verification can take up to 72 hours.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {domainConfig.status === 'verified' && (
-                            <div className={styles.successNote}>
-                              <CheckCircle size={16} />
-                              <div>
-                                <strong>Domain verified successfully!</strong>
-                                <p>
-                                  Emails will now be sent from{' '}
-                                  {domainForm.customReturnPath}@
-                                  {domainConfig.name}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               </>
             )}
@@ -3930,7 +3401,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           <div className={styles.previewSection}>
             <h3>Widget Preview</h3>
             <div className={styles.previewContainer}>
-              <EmbedPreview companyId={selectedCompany.id} />
+              <EmbedPreview companyId={companyDetails.id} />
             </div>
           </div>
         )}

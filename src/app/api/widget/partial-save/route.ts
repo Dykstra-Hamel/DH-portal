@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { handleCorsPrelight, createCorsResponse, createCorsErrorResponse, validateOrigin } from '@/lib/cors';
 import { sendEvent } from '@/lib/inngest/client';
+import { createOrFindServiceAddress, extractAddressData } from '@/lib/service-addresses';
 
 interface PartialSaveRequest {
   companyId: string;
@@ -201,6 +202,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create service address if this is an address validation step
+    let serviceAddressId = null;
+    if (['address', 'confirm-address'].includes(stepCompleted) && formData.addressDetails) {
+      try {
+        const addressData = extractAddressData(
+          formData.addressDetails,
+          formData.address,
+          formData.latitude && formData.longitude ? {
+            latitude: formData.latitude,
+            longitude: formData.longitude
+          } : undefined
+        );
+
+        if (addressData) {
+          const serviceAddressResult = await createOrFindServiceAddress(companyId, addressData);
+          
+          if (serviceAddressResult.success && serviceAddressResult.serviceAddressId) {
+            serviceAddressId = serviceAddressResult.serviceAddressId;
+            
+            // Update the partial lead with the service address ID
+            const { error: updateError } = await supabase
+              .from('partial_leads')
+              .update({ service_address_id: serviceAddressId })
+              .eq('id', partialLead.id);
+
+            if (updateError) {
+              console.error('Error updating partial lead with service address:', updateError);
+              // Don't fail the request, just log the error
+            }
+
+            console.log(`✅ Service address ${serviceAddressResult.isExisting ? 'found' : 'created'}: ${serviceAddressId} for partial lead ${partialLead.id}`);
+          } else {
+            console.error('Failed to create service address:', serviceAddressResult.error);
+            // Don't fail the request, continue without service address
+          }
+        }
+      } catch (error) {
+        console.error('Error processing service address for partial lead:', error);
+        // Don't fail the request, continue without service address
+      }
+    }
+
     // Send Inngest event for partial lead created
     try {
       await sendEvent({
@@ -238,7 +281,8 @@ export async function POST(request: NextRequest) {
       partialLeadId: partialLead.id,
       sessionId: sessionId,
       stepCompleted: stepCompleted,
-      serviceAreaServed: serviceAreaData?.served || null
+      serviceAreaServed: serviceAreaData?.served || null,
+      serviceAddressId: serviceAddressId
     }, origin, 'widget');
 
   } catch (error) {

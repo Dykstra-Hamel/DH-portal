@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api-client';
+import { useRouter } from 'next/navigation';
 import styles from './AdminManager.module.scss';
+import { generateSlug } from '@/lib/slug-utils';
 
 interface GooglePlaceListing {
   id?: string;
@@ -14,6 +16,7 @@ interface GooglePlaceListing {
 interface Company {
   id: string;
   name: string;
+  slug: string;
   description: string | null;
   website: string[] | null; // Now an array of website domains
   email: string | null;
@@ -34,30 +37,20 @@ interface Company {
 }
 
 export default function CompaniesManager() {
+  const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [googlePlacesListings, setGooglePlacesListings] = useState<GooglePlaceListing[]>([]);
   const [websites, setWebsites] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    slug: '',
     description: '',
-    website: [] as string[], // Now an array
+    website: [] as string[],
     email: '',
     phone: '',
-    address: '',
-    city: '',
-    state: '',
-    zip_code: '',
-    country: 'United States',
-    industry: '',
-    size: '',
-    ga_property_id: '',
-    callrail_api_token: '',
-    callrail_account_id: '',
-    google_place_id: '',
   });
 
   useEffect(() => {
@@ -103,10 +96,8 @@ export default function CompaniesManager() {
     setError(null);
 
     try {
-      const { ga_property_id, callrail_api_token, callrail_account_id, google_place_id, ...companyData } = formData;
-      
       // Client-side validation
-      if (!companyData.name || companyData.name.trim().length === 0) {
+      if (!formData.name || formData.name.trim().length === 0) {
         setError('Company name is required');
         return;
       }
@@ -118,77 +109,25 @@ export default function CompaniesManager() {
         return;
       }
       
-      // Use websites from state (for create form) or from formData (for edit)
-      const websitesToSubmit = (websites.length > 0 ? websites : companyData.website)
+      // Use websites from state (for create form)
+      const websitesToSubmit = websites
         .filter((url: string) => url && url.trim().length > 0);
       const companyDataWithWebsites = {
-        ...companyData,
-        website: websitesToSubmit
+        ...formData,
+        website: websitesToSubmit,
+        // Set default values for required fields
+        country: 'United States'
       };
       
       const newCompany = await adminAPI.createCompany(companyDataWithWebsites);
-      
-      // Save settings to company_settings if provided
-      const settingsToSave: any = {};
-      
-      if (ga_property_id && ga_property_id.trim()) {
-        settingsToSave.ga_property_id = {
-          value: ga_property_id.trim(),
-          type: 'string'
-        };
-      }
-      
-      if (callrail_api_token && callrail_api_token.trim()) {
-        settingsToSave.callrail_api_token = {
-          value: callrail_api_token.trim(),
-          type: 'string'
-        };
-      }
-      
-      if (callrail_account_id && callrail_account_id.trim()) {
-        settingsToSave.callrail_account_id = {
-          value: callrail_account_id.trim(),
-          type: 'string'
-        };
-      }
-      
-      if (google_place_id && google_place_id.trim()) {
-        settingsToSave.google_place_id = {
-          value: google_place_id.trim(),
-          type: 'string'
-        };
-      }
-      
-      if (Object.keys(settingsToSave).length > 0) {
-        try {
-          await fetch(`/api/companies/${newCompany.id}/settings`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ settings: settingsToSave }),
-          });
-        } catch (settingsError) {
-          console.error('Error saving company settings:', settingsError);
-          setError('Company created but failed to save some settings. You can edit the company to add them.');
-        }
-      }
 
       setFormData({
         name: '',
+        slug: '',
         description: '',
         website: [],
         email: '',
         phone: '',
-        address: '',
-        city: '',
-        state: '',
-        zip_code: '',
-        country: 'United States',
-        industry: '',
-        size: '',
-        ga_property_id: '',
-        callrail_api_token: '',
-        callrail_account_id: '',
-        google_place_id: '',
       });
       setWebsites([]);
       setShowCreateForm(false);
@@ -209,83 +148,6 @@ export default function CompaniesManager() {
     }
   };
 
-  const handleUpdateCompany = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCompany) return;
-
-    try {
-      const { ga_property_id, callrail_api_token, callrail_account_id, google_place_id, ...companyData } = editingCompany;
-      
-      // Validate websites
-      const websiteErrors = validateWebsites();
-      if (websiteErrors.length > 0) {
-        setError(websiteErrors.join('; '));
-        return;
-      }
-      
-      // Update company data (without settings fields)
-      const websitesToSubmit = (websites.length > 0 ? websites : (companyData.website || []))
-        .filter((url: string) => url && url.trim().length > 0);
-      await adminAPI.updateCompany(editingCompany.id, {
-        name: companyData.name,
-        description: companyData.description,
-        website: websitesToSubmit,
-        email: companyData.email,
-        phone: companyData.phone,
-        address: companyData.address,
-        city: companyData.city,
-        state: companyData.state,
-        zip_code: companyData.zip_code,
-        country: companyData.country,
-        industry: companyData.industry,
-        size: companyData.size,
-      });
-      
-      // Update settings
-      try {
-        await fetch(`/api/companies/${editingCompany.id}/settings`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            settings: {
-              ga_property_id: {
-                value: ga_property_id?.trim() || '',
-                type: 'string'
-              },
-              callrail_api_token: {
-                value: callrail_api_token?.trim() || '',
-                type: 'string'
-              },
-              callrail_account_id: {
-                value: callrail_account_id?.trim() || '',
-                type: 'string'
-              },
-              google_place_id: {
-                value: google_place_id?.trim() || '',
-                type: 'string'
-              }
-            }
-          }),
-        });
-      } catch (error) {
-        console.error('Error updating company settings:', error);
-      }
-
-      // Save Google Places listings
-      try {
-        await saveGooglePlacesListings(editingCompany.id);
-      } catch (error) {
-        console.error('Error saving Google Places listings:', error);
-      }
-
-      setEditingCompany(null);
-      setGooglePlacesListings([]); // Clear listings
-      setWebsites([]); // Clear websites
-      loadCompanies();
-    } catch (error) {
-      console.error('Error updating company:', error);
-    }
-  };
 
   const handleDeleteCompany = async (companyId: string) => {
     if (
@@ -421,11 +283,9 @@ export default function CompaniesManager() {
     return <div>Loading companies...</div>;
   }
 
-  const renderForm = (
-    company: Company | null,
-    onSubmit: (e: React.FormEvent) => void
-  ) => (
-    <form onSubmit={onSubmit}>
+  // Simplified form for creation only
+  const renderCreateForm = () => (
+    <form onSubmit={handleCreateCompany}>
       {error && (
         <div style={{
           backgroundColor: '#fee2e2',
@@ -443,29 +303,39 @@ export default function CompaniesManager() {
         <label>Name *:</label>
         <input
           type="text"
-          value={company ? company.name : formData.name}
+          value={formData.name}
           onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, name: e.target.value });
-            } else {
-              setFormData({ ...formData, name: e.target.value });
-            }
+            const newName = e.target.value;
+            setFormData({
+              ...formData,
+              name: newName,
+              // Auto-generate slug from name if slug hasn't been manually edited
+              slug: generateSlug(newName)
+            });
           }}
           required
         />
       </div>
 
       <div className={styles.formGroup}>
+        <label>Slug (URL identifier) *:</label>
+        <input
+          type="text"
+          value={formData.slug}
+          onChange={e => setFormData({ ...formData, slug: e.target.value })}
+          placeholder="company-name"
+          required
+        />
+        <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+          Used for company login page: yoursite.com/login/{formData.slug || 'slug'}
+        </small>
+      </div>
+
+      <div className={styles.formGroup}>
         <label>Description:</label>
         <textarea
-          value={company ? company.description || '' : formData.description}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, description: e.target.value });
-            } else {
-              setFormData({ ...formData, description: e.target.value });
-            }
-          }}
+          value={formData.description}
+          onChange={e => setFormData({ ...formData, description: e.target.value })}
         />
       </div>
 
@@ -530,7 +400,7 @@ export default function CompaniesManager() {
           + Add Website
         </button>
         <small style={{ color: '#666', fontSize: '12px', display: 'block' }}>
-          Add multiple websites/domains for this company. The first website will be considered the primary domain.
+          Add multiple websites/domains for this company.
         </small>
       </div>
 
@@ -538,14 +408,8 @@ export default function CompaniesManager() {
         <label>Email:</label>
         <input
           type="email"
-          value={company ? company.email || '' : formData.email}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, email: e.target.value });
-            } else {
-              setFormData({ ...formData, email: e.target.value });
-            }
-          }}
+          value={formData.email}
+          onChange={e => setFormData({ ...formData, email: e.target.value })}
         />
       </div>
 
@@ -553,268 +417,30 @@ export default function CompaniesManager() {
         <label>Phone:</label>
         <input
           type="tel"
-          value={company ? company.phone || '' : formData.phone}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, phone: e.target.value });
-            } else {
-              setFormData({ ...formData, phone: e.target.value });
-            }
-          }}
+          value={formData.phone}
+          onChange={e => setFormData({ ...formData, phone: e.target.value })}
         />
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>Address:</label>
-        <input
-          type="text"
-          value={company ? company.address || '' : formData.address}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, address: e.target.value });
-            } else {
-              setFormData({ ...formData, address: e.target.value });
-            }
-          }}
-        />
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>City:</label>
-        <input
-          type="text"
-          value={company ? company.city || '' : formData.city}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, city: e.target.value });
-            } else {
-              setFormData({ ...formData, city: e.target.value });
-            }
-          }}
-        />
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>State:</label>
-        <input
-          type="text"
-          value={company ? company.state || '' : formData.state}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, state: e.target.value });
-            } else {
-              setFormData({ ...formData, state: e.target.value });
-            }
-          }}
-        />
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>ZIP Code:</label>
-        <input
-          type="text"
-          value={company ? company.zip_code || '' : formData.zip_code}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, zip_code: e.target.value });
-            } else {
-              setFormData({ ...formData, zip_code: e.target.value });
-            }
-          }}
-        />
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>Industry:</label>
-        <input
-          type="text"
-          value={company ? company.industry || '' : formData.industry}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, industry: e.target.value });
-            } else {
-              setFormData({ ...formData, industry: e.target.value });
-            }
-          }}
-        />
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>Size:</label>
-        <select
-          value={company ? company.size || '' : formData.size}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, size: e.target.value });
-            } else {
-              setFormData({ ...formData, size: e.target.value });
-            }
-          }}
-        >
-          <option value="">Select size</option>
-          <option value="1-10">1-10 employees</option>
-          <option value="11-50">11-50 employees</option>
-          <option value="51-200">51-200 employees</option>
-          <option value="201-500">201-500 employees</option>
-          <option value="501-1000">501-1000 employees</option>
-          <option value="1000+">1000+ employees</option>
-        </select>
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>Google Analytics Property ID:</label>
-        <input
-          type="text"
-          placeholder="e.g., 123456789"
-          value={company ? company.ga_property_id || '' : formData.ga_property_id}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, ga_property_id: e.target.value });
-            } else {
-              setFormData({ ...formData, ga_property_id: e.target.value });
-            }
-          }}
-        />
-        <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-          Enter the GA4 Property ID (numbers only) to enable analytics dashboard for this company
-        </small>
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>CallRail API Token:</label>
-        <input
-          type="password"
-          placeholder="Enter CallRail API token"
-          value={company ? company.callrail_api_token || '' : formData.callrail_api_token}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, callrail_api_token: e.target.value });
-            } else {
-              setFormData({ ...formData, callrail_api_token: e.target.value });
-            }
-          }}
-        />
-        <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-          Enter your CallRail API token to enable call analytics dashboard for this company
-        </small>
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>CallRail Account ID:</label>
-        <input
-          type="text"
-          placeholder="e.g., ACC28a0b8ba54bf4a1bbc85e8c5bb9aa15d"
-          value={company ? company.callrail_account_id || '' : formData.callrail_account_id}
-          onChange={e => {
-            if (company) {
-              setEditingCompany({ ...company, callrail_account_id: e.target.value });
-            } else {
-              setFormData({ ...formData, callrail_account_id: e.target.value });
-            }
-          }}
-        />
-        <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-          Enter the specific CallRail Account ID to use for this company (found in CallRail dashboard URL)
-        </small>
-      </div>
-
-      <div className={styles.formGroup}>
-        <label>Google Places Listings:</label>
-        <div style={{ marginBottom: '12px' }}>
-          {googlePlacesListings.length === 0 ? (
-            <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
-              No Google Places listings added yet.
-            </p>
-          ) : (
-            googlePlacesListings.map((listing, index) => (
-              <div key={index} style={{ 
-                border: '1px solid #ddd', 
-                borderRadius: '4px', 
-                padding: '12px', 
-                marginBottom: '8px',
-                backgroundColor: listing.is_primary ? '#f0f9ff' : '#f9f9f9'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                  <input
-                    type="text"
-                    placeholder="Google Place ID (e.g., ChIJN1t_tDeuEmsRUsoyG83frY4)"
-                    value={listing.place_id}
-                    onChange={e => updateGooglePlaceListing(index, 'place_id', e.target.value)}
-                    style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeGooglePlaceListing(index)}
-                    style={{ 
-                      padding: '6px 12px', 
-                      backgroundColor: '#dc2626', 
-                      color: 'white', 
-                      border: 'none', 
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <input
-                    type="text"
-                    placeholder="Business name (optional)"
-                    value={listing.place_name || ''}
-                    onChange={e => updateGooglePlaceListing(index, 'place_name', e.target.value)}
-                    style={{ flex: 1, padding: '6px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px' }}
-                  />
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                    <input
-                      type="checkbox"
-                      checked={listing.is_primary}
-                      onChange={e => updateGooglePlaceListing(index, 'is_primary', e.target.checked)}
-                    />
-                    Primary Location
-                  </label>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={addGooglePlaceListing}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#059669',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            marginBottom: '8px'
-          }}
-        >
-          + Add Google Places Listing
-        </button>
-        <small style={{ color: '#666', fontSize: '12px', display: 'block' }}>
-          Add multiple Google Places listings to aggregate review counts. Reviews from all listings will be combined and displayed on your widget. Find Place IDs using <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener noreferrer" style={{ color: '#1d4ed8', textDecoration: 'underline' }}>Google&apos;s Place ID Finder</a>
-        </small>
       </div>
 
       <div className={styles.formActions}>
         <button type="submit" className={styles.saveButton}>
-          {company ? 'Save' : 'Create'}
+          Create
         </button>
         <button
           type="button"
           className={styles.cancelButton}
           onClick={() => {
-            if (company) {
-              setEditingCompany(null);
-            } else {
-              setShowCreateForm(false);
-            }
+            setShowCreateForm(false);
             setError(null);
             setWebsites([]);
+            setFormData({
+              name: '',
+              slug: '',
+              description: '',
+              website: [],
+              email: '',
+              phone: '',
+            });
           }}
         >
           Cancel
@@ -843,19 +469,11 @@ export default function CompaniesManager() {
         <div className={styles.modal}>
           <div className={styles.modalContent}>
             <h3>Create New Company</h3>
-            {renderForm(null, handleCreateCompany)}
+            {renderCreateForm()}
           </div>
         </div>
       )}
 
-      {editingCompany && (
-        <div className={styles.modal}>
-          <div className={styles.modalContent}>
-            <h3>Edit Company</h3>
-            {renderForm(editingCompany, handleUpdateCompany)}
-          </div>
-        </div>
-      )}
 
       <div className={styles.table}>
         <table>
@@ -912,15 +530,10 @@ export default function CompaniesManager() {
                 <td>
                   <div className={styles.actions}>
                     <button
-                      className={styles.editButton}
-                      onClick={() => {
-                        setEditingCompany(company);
-                        loadGooglePlacesListings(company.id);
-                        // Load websites for editing
-                        setWebsites(company.website || []);
-                      }}
+                      className={styles.manageButton}
+                      onClick={() => router.push(`/admin/companies/${company.id}`)}
                     >
-                      Edit
+                      Manage
                     </button>
                     <button
                       className={styles.deleteButton}

@@ -48,34 +48,40 @@ function getGlobalWhitelistedDomains(): string[] {
 }
 
 /**
- * Get allowed widget origins (base + all active widget domains)
+ * Get allowed widget origins (base + all domains from companies.website)
  */
 async function getWidgetOrigins(): Promise<string[]> {
   try {
-    // Get from new widget_domains table
+    // Get domains from companies.website JSONB array
     const supabase = createAdminClient();
-    
-    const { data: domains, error } = await supabase
-      .from('widget_domains')
-      .select('domain')
-      .eq('is_active', true);
+
+    const { data: companies, error } = await supabase
+      .from('companies')
+      .select('website');
 
     let widgetDomains: string[] = [];
-    
-    if (!error && domains) {
-      widgetDomains = domains.map(d => d.domain).filter(Boolean);
+
+    if (!error && companies) {
+      // Extract all domains from all companies' website arrays
+      companies.forEach(company => {
+        if (company.website && Array.isArray(company.website)) {
+          widgetDomains.push(...company.website);
+        }
+      });
+      // Remove duplicates
+      widgetDomains = [...new Set(widgetDomains)].filter(Boolean);
     } else {
-      console.error('Failed to fetch widget domains:', error);
+      console.error('Failed to fetch company domains:', error);
       // Fall back to environment variable
       widgetDomains = getGlobalWhitelistedDomains();
     }
 
     const allOrigins = [...BASE_WIDGET_ORIGINS, ...widgetDomains];
-    
+
 
     return allOrigins;
   } catch (error) {
-    console.error('Failed to fetch widget domains:', error);
+    console.error('Failed to fetch company domains:', error);
     // Fall back to environment variable only
     return [...BASE_WIDGET_ORIGINS, ...getGlobalWhitelistedDomains()];
   }
@@ -98,9 +104,14 @@ export async function isOriginAllowed(origin: string | null, configType: CorsCon
     // This is common for same-origin requests from localhost
     return true;
   }
-  
+
+  // In development, allow ngrok tunnels for testing
+  if (process.env.NODE_ENV === 'development' && origin.includes('.ngrok')) {
+    return true;
+  }
+
   let allowedOrigins: string[];
-  
+
   if (configType === 'widget') {
     // For widget endpoints, get dynamic list from database
     allowedOrigins = await getWidgetOrigins();
@@ -108,13 +119,13 @@ export async function isOriginAllowed(origin: string | null, configType: CorsCon
     // For other endpoints, use static configuration
     allowedOrigins = STATIC_ORIGIN_CONFIGS[configType];
   }
-  
+
   const isAllowed = allowedOrigins.some(allowedOrigin => {
     // Exact match
     if (allowedOrigin === origin) {
       return true;
     }
-    
+
     // Subdomain match (for widget integrations)
     if (configType === 'widget') {
       const domain = allowedOrigin.replace(/^https?:\/\//, '');
@@ -196,20 +207,58 @@ export async function createCorsErrorResponse(
 }
 
 /**
+ * Find company by origin from companies.website JSONB array
+ */
+async function findCompanyByOrigin(origin: string): Promise<{
+  companyId: string | null;
+  companyName: string | null;
+}> {
+  try {
+    const supabase = createAdminClient();
+
+    // Query companies table where website JSONB array contains the domain
+    const { data: companies, error } = await supabase
+      .from('companies')
+      .select('id, name, website')
+      .filter('website', 'cs', JSON.stringify([origin]));
+
+    if (error || !companies || companies.length === 0) {
+      return { companyId: null, companyName: null };
+    }
+
+    // Return the first matching company
+    return {
+      companyId: companies[0].id,
+      companyName: companies[0].name
+    };
+  } catch (error) {
+    console.error('Failed to find company by origin:', error);
+    return { companyId: null, companyName: null };
+  }
+}
+
+/**
  * Middleware function to validate origin before processing request
  */
-export async function validateOrigin(request: NextRequest, configType: CorsConfigType): Promise<{
+export async function validateOrigin(
+  request: NextRequest,
+  configType: CorsConfigType,
+  payloadPageUrl?: string | null
+): Promise<{
   isValid: boolean;
   origin: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
   response?: NextResponse;
 }> {
   const origin = request.headers.get('origin');
-  
+  const referer = request.headers.get('referer');
+
   // Webhook endpoints don't need origin validation
   if (configType === 'webhook') {
     return { isValid: true, origin };
   }
-  
+
   if (!(await isOriginAllowed(origin, configType))) {
     return {
       isValid: false,
@@ -217,8 +266,44 @@ export async function validateOrigin(request: NextRequest, configType: CorsConfi
       response: await createCorsErrorResponse('Unauthorized origin', origin, configType, 403)
     };
   }
-  
-  return { isValid: true, origin };
+
+  // For widget endpoints, also return the company info if needed
+  let companyId: string | null = null;
+  let companyName: string | null = null;
+
+  if (configType === 'widget') {
+    // Priority order for company lookup:
+    // 1. payloadPageUrl (from Webflow or other platforms)
+    // 2. In dev with ngrok: Referer (actual form domain) over Origin (ngrok URL)
+    // 3. Origin header
+    // 4. Referer header
+    const isNgrokInDev = process.env.NODE_ENV === 'development' && origin?.includes('.ngrok');
+
+    let lookupUrl: string | null = null;
+    if (payloadPageUrl) {
+      lookupUrl = payloadPageUrl;
+    } else if (isNgrokInDev) {
+      lookupUrl = referer || origin;
+    } else {
+      lookupUrl = origin || referer || null;
+    }
+
+    if (lookupUrl) {
+      // Extract origin from URL
+      const urlOrigin = lookupUrl.startsWith('http') ? new URL(lookupUrl).origin : lookupUrl;
+
+      const companyInfo = await findCompanyByOrigin(urlOrigin);
+      companyId = companyInfo.companyId;
+      companyName = companyInfo.companyName;
+
+      // Log when company lookup fails (helpful for debugging production issues)
+      if (!companyId) {
+        console.warn(`⚠️ [CORS] No company found for origin: ${urlOrigin}`);
+      }
+    }
+  }
+
+  return { isValid: true, origin, companyId, companyName };
 }
 
 /**

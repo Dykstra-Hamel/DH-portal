@@ -1,0 +1,247 @@
+// Inline Redemption Card Styles
+
+.redemptionCard {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  position: sticky;
+  top: 120px;
+  max-width: 500px;
+
+  @media (max-width: 768px) {
+    position: relative;
+    top: 0;
+    margin-top: 32px;
+  }
+}
+
+.heading {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  line-height: 1.4;
+
+  :global(.strikethrough) {
+    text-decoration: line-through;
+    color: #DC2626;
+    margin-right: 8px;
+  }
+
+  :global(.highlight) {
+    color: var(--accent-color, #00B142);
+  }
+}
+
+.strikethrough {
+  text-decoration: line-through;
+  color: #DC2626;
+  margin-right: 8px;
+}
+
+.highlight {
+  color: var(--accent-color, #00B142);
+}
+
+.subheading {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2B2B2B;
+  margin-bottom: 16px;
+}
+
+.inputGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inputField {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  background: white;
+  transition: border-color 0.2s;
+
+  &:focus-within {
+    border-color: var(--accent-color, #00B142);
+    box-shadow: 0 0 0 3px rgba(0, 177, 66, 0.1);
+  }
+
+  .icon {
+    flex-shrink: 0;
+    color: #6B7280;
+    width: 20px;
+    height: 20px;
+  }
+
+  input,
+  select {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    color: #1F2937;
+    background: transparent;
+    font-family: inherit;
+
+    &::placeholder {
+      color: #9CA3AF;
+    }
+  }
+
+  select {
+    cursor: pointer;
+
+    &.placeholder {
+      color: #9CA3AF;
+    }
+  }
+
+  input[type='date'] {
+    cursor: pointer;
+
+    &::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+    }
+  }
+}
+
+.phoneField {
+  margin-bottom: 16px;
+
+  label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #D1D5DB;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1F2937;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent-color, #00B142);
+      box-shadow: 0 0 0 3px rgba(0, 177, 66, 0.1);
+    }
+
+    &::placeholder {
+      color: #9CA3AF;
+    }
+  }
+}
+
+.addonsField {
+  margin-bottom: 20px;
+
+  label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+}
+
+.selectWrapper {
+  position: relative;
+
+  select {
+    width: 100%;
+    padding: 12px 16px;
+    padding-right: 40px; // Make room for custom arrow
+    border: 1px solid #D1D5DB;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1F2937;
+    background: white;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: none; // Remove default browser arrow
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent-color, #00B142);
+      box-shadow: 0 0 0 3px rgba(0, 177, 66, 0.1);
+    }
+
+    &.placeholder {
+      color: #9CA3AF;
+    }
+
+    option {
+      color: #1F2937;
+    }
+  }
+}
+
+.dropdownArrow {
+  position: absolute;
+  right: 16px; // 16px from the edge
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; // Allow clicks to pass through to select
+}
+
+.redeemButton {
+  width: 100%;
+  background: var(--accent-color, #00B142);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s, transform 0.1s;
+  margin-bottom: 12px;
+
+  &:hover:not(:disabled) {
+    background: var(--accent-color-dark, #009935);
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.disclaimer {
+  font-size: 12px;
+  color: #6B7280;
+  text-align: center;
+  line-height: 1.5;
+
+  a {
+    color: var(--accent-color, #00B142);
+    text-decoration: underline;
+
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+}

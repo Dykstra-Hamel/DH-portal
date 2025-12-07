@@ -30,22 +30,30 @@ export async function authenticatedFetch(
     try {
       errorData = await response.json();
     } catch (parseError) {
-      errorData = { 
+      errorData = {
         error: 'Request failed - invalid JSON response',
-        responseText: await response.text().catch(() => 'Unable to read response')
+        responseText: await response
+          .text()
+          .catch(() => 'Unable to read response'),
       };
     }
-    
+
     const errorDetails = {
       url,
+      method: options?.method || 'GET',
+      requestBody: options?.body,
       status: response.status,
       statusText: response.statusText,
       error: errorData,
       headers: Object.fromEntries(response.headers.entries()),
     };
-    
+
     console.error('API Error:', errorDetails);
-    throw new Error(errorData?.error || errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
+    throw new Error(
+      errorData?.error ||
+        errorData?.message ||
+        `HTTP ${response.status}: ${response.statusText}`
+    );
   }
 
   return response.json();
@@ -75,6 +83,7 @@ export const adminAPI = {
     last_name: string;
     company_id: string;
     role: string;
+    departments?: string[];
   }) {
     return authenticatedFetch('/api/admin/users/invite', {
       method: 'POST',
@@ -195,6 +204,7 @@ export const adminAPI = {
       sortOrder?: string;
       dateFrom?: string;
       dateTo?: string;
+      startsWith?: string | null;
     } = {}
   ) {
     const queryParams = new URLSearchParams();
@@ -205,6 +215,8 @@ export const adminAPI = {
     if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+    if (filters.startsWith)
+      queryParams.append('startsWith', filters.startsWith);
 
     const url = `/api/admin/customers${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
@@ -256,7 +268,13 @@ export const adminAPI = {
 
   // Leads
   async getLeads(
-    filters: { companyId?: string; status?: string; priority?: string; dateFrom?: string; dateTo?: string } = {}
+    filters: {
+      companyId?: string;
+      status?: string;
+      priority?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    } = {}
   ) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('companyId', filters.companyId);
@@ -270,7 +288,13 @@ export const adminAPI = {
   },
 
   async getArchivedLeads(
-    filters: { companyId?: string; status?: string; priority?: string; dateFrom?: string; dateTo?: string } = {}
+    filters: {
+      companyId?: string;
+      status?: string;
+      priority?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    } = {}
   ) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('companyId', filters.companyId);
@@ -317,28 +341,59 @@ export const adminAPI = {
   },
 
   // All Calls (admin)
-  async getAllCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number } = {}) {
+  async getAllCalls(
+    filters: {
+      companyId?: string;
+      page?: number;
+      limit?: number;
+      archived?: boolean;
+    } = {}
+  ) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('companyId', filters.companyId);
-    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
-    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
-    if (filters.page) queryParams.append('page', filters.page.toString());
-    if (filters.limit) queryParams.append('limit', filters.limit.toString());
 
     const url = `/api/admin/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
   },
 
   // Calls for regular users
-  async getUserCalls(filters: { companyId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number } = {}) {
+  async getUserCalls(
+    filters: {
+      companyId?: string;
+      page?: number;
+      limit?: number;
+      archived?: boolean;
+    } = {}
+  ) {
     const queryParams = new URLSearchParams();
     if (filters.companyId) queryParams.append('company_id', filters.companyId);
-    if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
-    if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+    const url = `/api/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
+    return authenticatedFetch(url);
+  },
+
+  // Form Submissions (admin and regular users)
+  async getAllFormSubmissions(
+    filters: { companyId?: string; page?: number; limit?: number } = {}
+  ) {
+    const queryParams = new URLSearchParams();
+    if (filters.companyId) queryParams.append('companyId', filters.companyId);
     if (filters.page) queryParams.append('page', filters.page.toString());
     if (filters.limit) queryParams.append('limit', filters.limit.toString());
 
-    const url = `/api/calls${queryParams.toString() ? `?${queryParams}` : ''}`;
+    const url = `/api/admin/form-submissions${queryParams.toString() ? `?${queryParams}` : ''}`;
+    return authenticatedFetch(url);
+  },
+
+  async getUserFormSubmissions(
+    filters: { companyId?: string; page?: number; limit?: number } = {}
+  ) {
+    const queryParams = new URLSearchParams();
+    if (filters.companyId) queryParams.append('companyId', filters.companyId);
+    if (filters.page) queryParams.append('page', filters.page.toString());
+    if (filters.limit) queryParams.append('limit', filters.limit.toString());
+
+    const url = `/api/admin/form-submissions${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
   },
 
@@ -348,16 +403,26 @@ export const adminAPI = {
   },
 
   // Non-admin leads endpoints
-  async getUserLeads(companyId: string, filters: { dateFrom?: string; dateTo?: string } = {}) {
+  async getUserLeads(
+    companyId: string,
+    filters: { dateFrom?: string; dateTo?: string } = {}
+  ) {
     const queryParams = new URLSearchParams();
     queryParams.append('companyId', companyId);
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
-    return authenticatedFetch(`/api/leads?${queryParams.toString()}`);
+    const response = await authenticatedFetch(
+      `/api/leads?${queryParams.toString()}`
+    );
+
+    return response;
   },
 
-  async getUserArchivedLeads(companyId: string, filters: { dateFrom?: string; dateTo?: string } = {}) {
+  async getUserArchivedLeads(
+    companyId: string,
+    filters: { dateFrom?: string; dateTo?: string } = {}
+  ) {
     const queryParams = new URLSearchParams();
     queryParams.append('companyId', companyId);
     queryParams.append('includeArchived', 'true');
@@ -376,6 +441,7 @@ export const adminAPI = {
     sortOrder?: string;
     dateFrom?: string;
     dateTo?: string;
+    startsWith?: string | null;
   }) {
     const queryParams = new URLSearchParams();
     queryParams.append('companyId', filters.companyId);
@@ -385,6 +451,8 @@ export const adminAPI = {
     if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+    if (filters.startsWith)
+      queryParams.append('startsWith', filters.startsWith);
 
     const url = `/api/customers?${queryParams.toString()}`;
     return authenticatedFetch(url);
@@ -409,10 +477,10 @@ export const adminAPI = {
   // Tickets
   tickets: {
     async list(
-      filters: { 
-        companyId?: string; 
-        status?: string; 
-        priority?: string; 
+      filters: {
+        companyId?: string;
+        status?: string;
+        priority?: string;
         includeArchived?: boolean;
         dateFrom?: string;
         dateTo?: string;
@@ -422,7 +490,8 @@ export const adminAPI = {
       if (filters.companyId) queryParams.append('companyId', filters.companyId);
       if (filters.status) queryParams.append('status', filters.status);
       if (filters.priority) queryParams.append('priority', filters.priority);
-      if (filters.includeArchived) queryParams.append('includeArchived', 'true');
+      if (filters.includeArchived)
+        queryParams.append('includeArchived', 'true');
       if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
 
@@ -459,6 +528,85 @@ export const adminAPI = {
     },
   },
 
+  // Support Cases
+  supportCases: {
+    async list(
+      filters: {
+        companyId?: string;
+        status?: string;
+        issueType?: string;
+        priority?: string;
+        assignedTo?: string;
+        includeArchived?: boolean;
+        dateFrom?: string;
+        dateTo?: string;
+      } = {}
+    ) {
+      const queryParams = new URLSearchParams();
+      if (filters.companyId) queryParams.append('companyId', filters.companyId);
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.issueType) queryParams.append('issueType', filters.issueType);
+      if (filters.priority) queryParams.append('priority', filters.priority);
+      if (filters.assignedTo)
+        queryParams.append('assignedTo', filters.assignedTo);
+      if (filters.includeArchived)
+        queryParams.append('includeArchived', 'true');
+      if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+      const url = `/api/support-cases${queryParams.toString() ? `?${queryParams}` : ''}`;
+      return authenticatedFetch(url);
+    },
+
+    async get(supportCaseId: string) {
+      return authenticatedFetch(`/api/support-cases/${supportCaseId}`);
+    },
+
+    async create(supportCaseData: any) {
+      return authenticatedFetch('/api/support-cases', {
+        method: 'POST',
+        body: JSON.stringify(supportCaseData),
+      });
+    },
+
+    async update(supportCaseId: string, supportCaseData: any) {
+      return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+        method: 'PUT',
+        body: JSON.stringify(supportCaseData),
+      });
+    },
+
+    async updateStatus(supportCaseId: string, status: string, notes?: string) {
+      return authenticatedFetch(
+        `/api/support-cases/${supportCaseId}/update-status`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ status, notes }),
+        }
+      );
+    },
+
+    async archive(supportCaseId: string) {
+      return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async addSatisfactionRating(
+      supportCaseId: string,
+      rating: number,
+      feedback?: string
+    ) {
+      return authenticatedFetch(
+        `/api/support-cases/${supportCaseId}/satisfaction`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating, feedback }),
+        }
+      );
+    },
+  },
+
   // Non-admin individual customer endpoints
   async getUserCustomer(customerId: string) {
     return authenticatedFetch(`/api/customers/${customerId}`);
@@ -468,6 +616,79 @@ export const adminAPI = {
     return authenticatedFetch(`/api/customers/${customerId}`, {
       method: 'PUT',
       body: JSON.stringify(customerData),
+    });
+  },
+
+  // Pest Options
+  async getPestOptions(companyId: string) {
+    return authenticatedFetch(`/api/pest-options/${companyId}`);
+  },
+
+  // Service Plans
+  async getServicePlansByPest(companyId: string, pestId: string) {
+    return authenticatedFetch(
+      `/api/service-plans/${companyId}/by-pest/${pestId}`
+    );
+  },
+
+  // Branding
+  async getBranding(companyId: string) {
+    return authenticatedFetch(`/api/admin/brands?company_id=${companyId}`);
+  },
+
+  async createBranding(brandData: any) {
+    return authenticatedFetch('/api/admin/brands', {
+      method: 'POST',
+      body: JSON.stringify(brandData),
+    });
+  },
+
+  async updateBranding(brandData: any) {
+    return authenticatedFetch('/api/admin/brands', {
+      method: 'PUT',
+      body: JSON.stringify(brandData),
+    });
+  },
+
+  async deleteBranding(brandId: string) {
+    return authenticatedFetch(`/api/admin/brands?id=${brandId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Support Cases (Admin)
+  async getSupportCase(supportCaseId: string) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`);
+  },
+
+  async updateSupportCase(supportCaseId: string, supportCaseData: any) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+      method: 'PUT',
+      body: JSON.stringify(supportCaseData),
+    });
+  },
+
+  async archiveSupportCase(supportCaseId: string) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // User Support Cases (Non-admin methods)
+  async getUserSupportCase(supportCaseId: string) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`);
+  },
+
+  async updateUserSupportCase(supportCaseId: string, supportCaseData: any) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+      method: 'PUT',
+      body: JSON.stringify(supportCaseData),
+    });
+  },
+
+  async archiveUserSupportCase(supportCaseId: string) {
+    return authenticatedFetch(`/api/support-cases/${supportCaseId}`, {
+      method: 'DELETE',
     });
   },
 };

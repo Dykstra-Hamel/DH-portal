@@ -1,0 +1,386 @@
+// Modal component styles
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 764px;
+  max-height: 90vh;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: all 0.3s ease;
+  opacity: 1;
+  overflow: auto;
+  transform: translateY(0);
+}
+
+// Modal Top Section
+.modalTop {
+  padding: 24px;
+  flex-direction: row;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.topRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.title {
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 28px;
+  color: #111827;
+  margin: 0;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+}
+
+.topControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+
+  &.reviewerOnly {
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+.dropdownSection {
+  flex: 1;
+  max-width: 300px;
+
+  @media (max-width: 768px) {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.reviewerSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reviewingText {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+  color: var(--action-500);
+}
+
+.reviewerInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatarContainer {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarInitials {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #006bc2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.reviewerName {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+
+// Modal Middle Section
+.modalMiddle {
+  padding: 24px 24px 0;
+  width: 100%;
+  flex: 1;
+  background: #fff;
+}
+
+// Modal Bottom Section
+.modalBottom {
+  padding: 0 24px 24px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  @media (max-width: 768px) {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+}
+
+// Utility classes for common dropdown styling
+.dropdown {
+  display: flex;
+  width: 300px;
+  height: 36px;
+  padding: 8px 12px;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1px solid #006bc2;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 107, 194, 0.1);
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+}
+
+// Common button styles for modal actions
+.buttonGroup {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  margin-top: 10px;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.leftButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.rightButtons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+
+  @media (max-width: 768px) {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+.fullWidthButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+}
+
+.primaryButton {
+  background: var(--action-500);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+
+  &:hover:not(:disabled) {
+    background: #0070d4;
+  }
+
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+  }
+}
+
+.secondaryButton {
+  background: white;
+  color: var(--gray-800);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  box-shadow:
+    0 0 0 0 #fff inset,
+    0 0 0 1px #d1d5db inset,
+    0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+  &:hover:not(:disabled) {
+    background: var(--slate-100);
+  }
+
+  &:disabled {
+    background: white;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
+
+  &.bluebutton {
+    background: blue;
+  }
+}
+
+.backButton {
+  background: white;
+  color: var(--gray-800);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+
+  &:hover:not(:disabled) {
+    background: var(--slate-100);
+  }
+}
+
+.junkButton {
+  background: transparent;
+  color: var(--gray-800);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+
+  &:hover:not(:disabled) {
+    background: #f9fafb;
+  }
+
+  &:disabled {
+    background: transparent;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
+}
+
+.disabledButton {
+  background: var(--gray-100);
+  color: #9ca3af;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+}
+
+// Loading spinner
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

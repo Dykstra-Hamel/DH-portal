@@ -80,7 +80,8 @@ const TEST_SCENARIOS: TestScenario[] = [
   {
     id: 'urgent-termites',
     name: 'Urgent Termite Problem',
-    description: 'Large home with urgent termite infestation requiring immediate attention',
+    description:
+      'Large home with urgent termite infestation requiring immediate attention',
     data: {
       customerName: 'Sarah Johnson',
       customerEmail: 'sarah.johnson+test@example.com',
@@ -93,7 +94,8 @@ const TEST_SCENARIOS: TestScenario[] = [
       startDate: '2024-10-15',
       arrivalTime: 'morning',
       leadSource: 'widget_submission',
-      comments: 'Found termite damage in the basement. Need immediate inspection.',
+      comments:
+        'Found termite damage in the basement. Need immediate inspection.',
     },
   },
   {
@@ -150,7 +152,8 @@ const TEST_SCENARIOS: TestScenario[] = [
       startDate: '2024-10-20',
       arrivalTime: 'evening',
       leadSource: 'referral',
-      comments: 'Referred by John Smith (existing customer). Mice in garage and attic.',
+      comments:
+        'Referred by John Smith (existing customer). Mice in garage and attic.',
     },
   },
 ];
@@ -173,19 +176,31 @@ const TRIGGER_TYPES = [
   },
 ];
 
-export default function AutomationTestPage({ user, profile }: AutomationTestPageProps) {
+export default function AutomationTestPage({
+  user,
+  profile,
+}: AutomationTestPageProps) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>('');
-  const [selectedScenario, setSelectedScenario] = useState<string>(TEST_SCENARIOS[0].id);
-  const [selectedTrigger, setSelectedTrigger] = useState<string>('widget/schedule-completed');
+  const [selectedScenario, setSelectedScenario] = useState<string>(
+    TEST_SCENARIOS[0].id
+  );
+  const [selectedTrigger, setSelectedTrigger] = useState<string>(
+    'widget/schedule-completed'
+  );
   const [customData, setCustomData] = useState<TestLeadData | null>(null);
   const [useCustomData, setUseCustomData] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+  const [expandedResults, setExpandedResults] = useState<Set<string>>(
+    new Set()
+  );
 
   const supabase = createClient();
 
@@ -226,11 +241,13 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
 
   const fetchServicePlans = async () => {
     if (!selectedCompany) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('service_plans')
-        .select('id, plan_name, plan_description, initial_price, recurring_price, billing_frequency, highlight_badge')
+        .select(
+          'id, plan_name, plan_description, initial_price, recurring_price, billing_frequency, highlight_badge'
+        )
         .eq('company_id', selectedCompany)
         .eq('is_active', true)
         .order('display_order');
@@ -281,11 +298,11 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
 
     const testData = getCurrentTestData();
     const scenario = TEST_SCENARIOS.find(s => s.id === selectedScenario);
-    
+
     const testResult: TestResult = {
       id: `test-${Date.now()}`,
       timestamp: new Date().toISOString(),
-      scenario: useCustomData ? 'Custom' : (scenario?.name || 'Unknown'),
+      scenario: useCustomData ? 'Custom' : scenario?.name || 'Unknown',
       trigger: selectedTrigger,
       status: 'running',
     };
@@ -318,14 +335,14 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
           executionTime: result.executionTime,
         };
 
-        const updatedResults = newResults.map(r => 
+        const updatedResults = newResults.map(r =>
           r.id === testResult.id ? updatedResult : r
         );
         saveTestResults(updatedResults);
 
-        setMessage({ 
-          type: 'success', 
-          text: `Test completed successfully! Lead ID: ${result.leadId}` 
+        setMessage({
+          type: 'success',
+          text: `Test completed successfully! Lead ID: ${result.leadId}`,
         });
       } else {
         const updatedResult = {
@@ -334,7 +351,7 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
           error: result.error,
         };
 
-        const updatedResults = newResults.map(r => 
+        const updatedResults = newResults.map(r =>
           r.id === testResult.id ? updatedResult : r
         );
         saveTestResults(updatedResults);
@@ -343,14 +360,14 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
       }
     } catch (error) {
       console.error('Error running test:', error);
-      
+
       const updatedResult = {
         ...testResult,
         status: 'failed' as const,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
 
-      const updatedResults = newResults.map(r => 
+      const updatedResults = newResults.map(r =>
         r.id === testResult.id ? updatedResult : r
       );
       saveTestResults(updatedResults);
@@ -386,24 +403,33 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
 
   const initializeCustomData = () => {
     const scenario = TEST_SCENARIOS.find(s => s.id === selectedScenario);
-    setCustomData({ ...scenario?.data || TEST_SCENARIOS[0].data });
+    setCustomData({ ...(scenario?.data || TEST_SCENARIOS[0].data) });
     setUseCustomData(true);
   };
 
   if (loading) {
-    return <div className={styles.loading}>Loading automation test page...</div>;
+    return (
+      <div className={styles.loading}>Loading automation test page...</div>
+    );
   }
 
   return (
     <div className={styles.testPage}>
       <div className={styles.header}>
         <h1>Automation Testing</h1>
-        <p>Test automation workflows manually without going through the full form process</p>
+        <p>
+          Test automation workflows manually without going through the full form
+          process
+        </p>
       </div>
 
       {message && (
         <div className={`${styles.message} ${styles[message.type]}`}>
-          {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+          {message.type === 'success' ? (
+            <CheckCircle size={16} />
+          ) : (
+            <AlertCircle size={16} />
+          )}
           {message.text}
         </div>
       )}
@@ -412,12 +438,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
         <div className={styles.testSetup}>
           <div className={styles.section}>
             <h2>Test Configuration</h2>
-            
+
             <div className={styles.formGroup}>
               <label>Company</label>
               <select
                 value={selectedCompany}
-                onChange={(e) => setSelectedCompany(e.target.value)}
+                onChange={e => setSelectedCompany(e.target.value)}
                 disabled={testing}
               >
                 <option value="">Select company...</option>
@@ -433,7 +459,7 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
               <label>Trigger Type</label>
               <select
                 value={selectedTrigger}
-                onChange={(e) => setSelectedTrigger(e.target.value)}
+                onChange={e => setSelectedTrigger(e.target.value)}
                 disabled={testing}
               >
                 {TRIGGER_TYPES.map(trigger => (
@@ -442,35 +468,57 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                   </option>
                 ))}
               </select>
-              <small>{TRIGGER_TYPES.find(t => t.value === selectedTrigger)?.description}</small>
+              <small>
+                {
+                  TRIGGER_TYPES.find(t => t.value === selectedTrigger)
+                    ?.description
+                }
+              </small>
             </div>
 
             <div className={styles.formGroup}>
               <label>Service Plan (Optional)</label>
               <select
-                value={useCustomData ? (customData?.selectedPlanId || '') : (getCurrentTestData().selectedPlanId || '')}
-                onChange={(e) => {
+                value={
+                  useCustomData
+                    ? customData?.selectedPlanId || ''
+                    : getCurrentTestData().selectedPlanId || ''
+                }
+                onChange={e => {
                   if (useCustomData && customData) {
-                    setCustomData({...customData, selectedPlanId: e.target.value || undefined});
+                    setCustomData({
+                      ...customData,
+                      selectedPlanId: e.target.value || undefined,
+                    });
                   } else {
                     // Update the scenario data for non-custom data
-                    const scenario = TEST_SCENARIOS.find(s => s.id === selectedScenario);
+                    const scenario = TEST_SCENARIOS.find(
+                      s => s.id === selectedScenario
+                    );
                     if (scenario) {
-                      scenario.data.selectedPlanId = e.target.value || undefined;
+                      scenario.data.selectedPlanId =
+                        e.target.value || undefined;
                     }
                   }
                 }}
-                disabled={testing || !selectedCompany || servicePlans.length === 0}
+                disabled={
+                  testing || !selectedCompany || servicePlans.length === 0
+                }
               >
                 <option value="">No plan selected</option>
                 {servicePlans.map(plan => (
                   <option key={plan.id} value={plan.id}>
-                    {plan.plan_name} (${plan.recurring_price}/{plan.billing_frequency === 'monthly' ? 'mo' : plan.billing_frequency})
-                    {plan.highlight_badge && ` - ${plan.highlight_badge}`}
+                    {plan.plan_name} (${plan.recurring_price}/
+                    {plan.billing_frequency === 'monthly'
+                      ? 'mo'
+                      : plan.billing_frequency}
+                    ){plan.highlight_badge && ` - ${plan.highlight_badge}`}
                   </option>
                 ))}
               </select>
-              <small>Select a service plan to test plan-related email variables</small>
+              <small>
+                Select a service plan to test plan-related email variables
+              </small>
             </div>
 
             <div className={styles.formGroup}>
@@ -478,7 +526,7 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                 <input
                   type="checkbox"
                   checked={useCustomData}
-                  onChange={(e) => {
+                  onChange={e => {
                     setUseCustomData(e.target.checked);
                     if (e.target.checked && !customData) {
                       initializeCustomData();
@@ -495,7 +543,7 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                 <label>Test Scenario</label>
                 <select
                   value={selectedScenario}
-                  onChange={(e) => setSelectedScenario(e.target.value)}
+                  onChange={e => setSelectedScenario(e.target.value)}
                   disabled={testing}
                 >
                   {TEST_SCENARIOS.map(scenario => (
@@ -504,7 +552,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                     </option>
                   ))}
                 </select>
-                <small>{TEST_SCENARIOS.find(s => s.id === selectedScenario)?.description}</small>
+                <small>
+                  {
+                    TEST_SCENARIOS.find(s => s.id === selectedScenario)
+                      ?.description
+                  }
+                </small>
               </div>
             )}
           </div>
@@ -520,7 +573,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                       <input
                         type="text"
                         value={customData.customerName}
-                        onChange={(e) => setCustomData({...customData, customerName: e.target.value})}
+                        onChange={e =>
+                          setCustomData({
+                            ...customData,
+                            customerName: e.target.value,
+                          })
+                        }
                         disabled={testing}
                       />
                     </div>
@@ -529,19 +587,29 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                       <input
                         type="email"
                         value={customData.customerEmail}
-                        onChange={(e) => setCustomData({...customData, customerEmail: e.target.value})}
+                        onChange={e =>
+                          setCustomData({
+                            ...customData,
+                            customerEmail: e.target.value,
+                          })
+                        }
                         disabled={testing}
                       />
                     </div>
                   </div>
-                  
+
                   <div className={styles.formRow}>
                     <div className={styles.formGroup}>
                       <label>Phone</label>
                       <input
                         type="tel"
                         value={customData.customerPhone}
-                        onChange={(e) => setCustomData({...customData, customerPhone: e.target.value})}
+                        onChange={e =>
+                          setCustomData({
+                            ...customData,
+                            customerPhone: e.target.value,
+                          })
+                        }
                         disabled={testing}
                       />
                     </div>
@@ -549,7 +617,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                       <label>Pest Type</label>
                       <select
                         value={customData.pestType}
-                        onChange={(e) => setCustomData({...customData, pestType: e.target.value})}
+                        onChange={e =>
+                          setCustomData({
+                            ...customData,
+                            pestType: e.target.value,
+                          })
+                        }
                         disabled={testing}
                       >
                         <option value="ants">Ants</option>
@@ -558,7 +631,7 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                         <option value="mice">Mice</option>
                         <option value="rats">Rats</option>
                         <option value="termites">Termites</option>
-                        <option value="bed bugs">Bed Bugs</option>
+                        <option value="bed bugs">Bedbugs</option>
                         <option value="wasps">Wasps</option>
                         <option value="mosquitoes">Mosquitoes</option>
                         <option value="other">Other</option>
@@ -571,7 +644,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                       <label>Urgency</label>
                       <select
                         value={customData.urgency}
-                        onChange={(e) => setCustomData({...customData, urgency: e.target.value as any})}
+                        onChange={e =>
+                          setCustomData({
+                            ...customData,
+                            urgency: e.target.value as any,
+                          })
+                        }
                         disabled={testing}
                       >
                         <option value="low">Low</option>
@@ -585,7 +663,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                       <input
                         type="number"
                         value={customData.homeSize || ''}
-                        onChange={(e) => setCustomData({...customData, homeSize: parseInt(e.target.value) || undefined})}
+                        onChange={e =>
+                          setCustomData({
+                            ...customData,
+                            homeSize: parseInt(e.target.value) || undefined,
+                          })
+                        }
                         disabled={testing}
                       />
                     </div>
@@ -596,7 +679,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                     <input
                       type="text"
                       value={customData.address}
-                      onChange={(e) => setCustomData({...customData, address: e.target.value})}
+                      onChange={e =>
+                        setCustomData({
+                          ...customData,
+                          address: e.target.value,
+                        })
+                      }
                       disabled={testing}
                     />
                   </div>
@@ -607,7 +695,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                       <input
                         type="date"
                         value={customData.startDate || ''}
-                        onChange={(e) => setCustomData({...customData, startDate: e.target.value || undefined})}
+                        onChange={e =>
+                          setCustomData({
+                            ...customData,
+                            startDate: e.target.value || undefined,
+                          })
+                        }
                         disabled={testing}
                       />
                     </div>
@@ -615,7 +708,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                       <label>Arrival Time</label>
                       <select
                         value={customData.arrivalTime || ''}
-                        onChange={(e) => setCustomData({...customData, arrivalTime: e.target.value || undefined})}
+                        onChange={e =>
+                          setCustomData({
+                            ...customData,
+                            arrivalTime: e.target.value || undefined,
+                          })
+                        }
                         disabled={testing}
                       >
                         <option value="">Not specified</option>
@@ -631,7 +729,12 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                     <label>Comments</label>
                     <textarea
                       value={customData.comments || ''}
-                      onChange={(e) => setCustomData({...customData, comments: e.target.value})}
+                      onChange={e =>
+                        setCustomData({
+                          ...customData,
+                          comments: e.target.value,
+                        })
+                      }
                       disabled={testing}
                       rows={3}
                     />
@@ -676,11 +779,19 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                             <strong>Arrival Time:</strong> {data.arrivalTime}
                           </div>
                         )}
-                        {data.selectedPlanId && servicePlans.find(p => p.id === data.selectedPlanId) && (
-                          <div className={styles.dataItem}>
-                            <strong>Selected Plan:</strong> {servicePlans.find(p => p.id === data.selectedPlanId)?.plan_name}
-                          </div>
-                        )}
+                        {data.selectedPlanId &&
+                          servicePlans.find(
+                            p => p.id === data.selectedPlanId
+                          ) && (
+                            <div className={styles.dataItem}>
+                              <strong>Selected Plan:</strong>{' '}
+                              {
+                                servicePlans.find(
+                                  p => p.id === data.selectedPlanId
+                                )?.plan_name
+                              }
+                            </div>
+                          )}
                         {data.comments && (
                           <div className={styles.dataItem}>
                             <strong>Comments:</strong> {data.comments}
@@ -691,7 +802,7 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                   })()}
                 </div>
               )}
-              
+
               <div className={styles.previewActions}>
                 <button
                   onClick={() => copyTestData(getCurrentTestData())}
@@ -711,7 +822,11 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
               disabled={testing || !selectedCompany}
               className={styles.runButton}
             >
-              {testing ? <RefreshCw size={16} className={styles.spinning} /> : <Play size={16} />}
+              {testing ? (
+                <RefreshCw size={16} className={styles.spinning} />
+              ) : (
+                <Play size={16} />
+              )}
               {testing ? 'Running Test...' : 'Run Test'}
             </button>
           </div>
@@ -739,7 +854,10 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
             <div className={styles.resultsList}>
               {testResults.map(result => (
                 <div key={result.id} className={styles.resultItem}>
-                  <div className={styles.resultHeader} onClick={() => toggleResultExpansion(result.id)}>
+                  <div
+                    className={styles.resultHeader}
+                    onClick={() => toggleResultExpansion(result.id)}
+                  >
                     <div className={styles.resultInfo}>
                       <div className={styles.resultTitle}>
                         {result.scenario} - {result.trigger}
@@ -750,10 +868,18 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                       </div>
                     </div>
                     <div className={styles.resultStatus}>
-                      <span className={`${styles.statusBadge} ${styles[result.status]}`}>
-                        {result.status === 'running' && <RefreshCw size={12} className={styles.spinning} />}
-                        {result.status === 'completed' && <CheckCircle size={12} />}
-                        {result.status === 'failed' && <AlertCircle size={12} />}
+                      <span
+                        className={`${styles.statusBadge} ${styles[result.status]}`}
+                      >
+                        {result.status === 'running' && (
+                          <RefreshCw size={12} className={styles.spinning} />
+                        )}
+                        {result.status === 'completed' && (
+                          <CheckCircle size={12} />
+                        )}
+                        {result.status === 'failed' && (
+                          <AlertCircle size={12} />
+                        )}
                         {result.status}
                       </span>
                       <Eye size={16} />
@@ -778,12 +904,15 @@ export default function AutomationTestPage({ user, profile }: AutomationTestPage
                           <strong>Error:</strong> {result.error}
                         </div>
                       )}
-                      {result.workflowResults && result.workflowResults.length > 0 && (
-                        <div className={styles.workflowResults}>
-                          <strong>Workflow Results:</strong>
-                          <pre>{JSON.stringify(result.workflowResults, null, 2)}</pre>
-                        </div>
-                      )}
+                      {result.workflowResults &&
+                        result.workflowResults.length > 0 && (
+                          <div className={styles.workflowResults}>
+                            <strong>Workflow Results:</strong>
+                            <pre>
+                              {JSON.stringify(result.workflowResults, null, 2)}
+                            </pre>
+                          </div>
+                        )}
                     </div>
                   )}
                 </div>

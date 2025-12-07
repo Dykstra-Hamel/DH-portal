@@ -1,0 +1,74 @@
+.tagSelectorContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-800);
+  font-family: var(--font-satoshi);
+}
+
+.tagsGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tagButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 550;
+  font-family: var(--font-satoshi);
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(.selected) {
+    border-color: var(--action-400);
+    background: var(--gray-50);
+  }
+
+  &.selected {
+    background: var(--action-500);
+    border-color: var(--action-500);
+    color: white;
+    font-weight: 650;
+  }
+}
+
+.tagText {
+  line-height: 1;
+}
+
+.checkIcon {
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.selectedCount {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+  padding-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .tagsGrid {
+    gap: 6px;
+  }
+
+  .tagButton {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}

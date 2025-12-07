@@ -1,0 +1,94 @@
+// Import shared section styles
+@import './SharedSection.module.scss';
+
+// CallDetails-specific styles
+.section {
+  // Extend the shared section styles with CallDetails-specific properties
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; // Allow flexbox to shrink properly
+}
+
+.infoGrid {
+  // Extend shared infoGrid with flex properties
+  flex: 1;
+  min-height: 0;
+}
+
+// Recording section styles
+.recordingSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// Transcript section styles
+.transcriptSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.transcriptBox {
+  height: 250px; // Limit height to prevent modal growth
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.transcriptContent {
+  padding: 16px;
+}
+
+.transcriptLine {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  line-height: 1.5;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.speaker {
+  font-weight: 600;
+  color: #374151;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.message {
+  color: #6b7280;
+  flex: 1;
+}
+
+// Form details styles
+.messageBox {
+  padding: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-top: 4px;
+
+  p {
+    margin: 0;
+    color: #374151;
+    line-height: 1.5;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .transcriptLine {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .speaker {
+    min-width: auto;
+  }
+}

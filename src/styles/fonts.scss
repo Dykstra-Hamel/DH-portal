@@ -30,6 +30,8 @@
   font-style: italic;
 }
 
+// Vegan Days font is loaded via Next.js localFont in layout.tsx
+
 // Define Satoshi as a CSS custom property
 :root {
   --font-satoshi: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;

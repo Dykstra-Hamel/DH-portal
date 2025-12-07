@@ -21,6 +21,14 @@ interface ServicePlan {
   requires_quote: boolean;
   plan_image_url: string | null;
   plan_disclaimer: string | null;
+  home_size_pricing: {
+    initial_cost_per_interval: number;
+    recurring_cost_per_interval: number;
+  };
+  yard_size_pricing: {
+    initial_cost_per_interval: number;
+    recurring_cost_per_interval: number;
+  };
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -44,6 +52,14 @@ interface CreateServicePlanRequest {
   requires_quote?: boolean;
   plan_image_url?: string;
   plan_disclaimer?: string;
+  home_size_pricing?: {
+    initial_cost_per_interval: number;
+    recurring_cost_per_interval: number;
+  };
+  yard_size_pricing?: {
+    initial_cost_per_interval: number;
+    recurring_cost_per_interval: number;
+  };
   pest_coverage?: Array<{ pest_id: string; coverage_level: string }>;
 }
 

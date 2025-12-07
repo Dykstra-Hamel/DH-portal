@@ -19,11 +19,13 @@ import {
   BookOpen,
   Upload,
   Image as ImageIcon,
+  Send,
 } from 'lucide-react';
 import WorkflowEditor from './WorkflowEditor';
 import EmailTemplateEditor from './EmailTemplateEditor';
 import ABTestManager from './ABTestManager/ABTestManager';
 import TemplateLibraryBrowser from './TemplateLibraryBrowser';
+import TestEmailModal from './TestEmailModal/TestEmailModal';
 import styles from './AutomationSettings.module.scss';
 
 interface AutomationWorkflow {
@@ -77,6 +79,8 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
   });
   const [logoOverrideUrl, setLogoOverrideUrl] = useState<string>('');
   const [logoUploading, setLogoUploading] = useState(false);
+  const [testEmailModalOpen, setTestEmailModalOpen] = useState(false);
+  const [testingTemplate, setTestingTemplate] = useState<EmailTemplate | null>(null);
 
   const fetchAutomationData = useCallback(async () => {
     if (!companyId) return;
@@ -86,14 +90,14 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
       const supabase = createClient();
 
       // Fetch company information
-      const { data: company } = await supabase
+      const { data: companyData } = await supabase
         .from('companies')
         .select('*')
         .eq('id', companyId)
         .single();
 
-      if (company) {
-        setCompanyName(company.name || '');
+      if (companyData) {
+        setCompanyName(companyData.name || '');
       }
 
       // Fetch workflows
@@ -775,15 +779,25 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
                       {template.template_type.replace('_', ' ').toUpperCase()}
                     </div>
                     <div className={styles.templateActions}>
-                      <button 
+                      <button
+                        onClick={() => {
+                          setTestingTemplate(template);
+                          setTestEmailModalOpen(true);
+                        }}
+                        className={styles.testButton}
+                        title="Send test email"
+                      >
+                        <Send size={14} />
+                      </button>
+                      <button
                         onClick={() => handleEditTemplate(template)}
                         className={styles.editButton}
                       >
                         <Edit size={14} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => template.id && handleDeleteTemplate(template.id, template.name)}
-                        className={styles.deleteButton} 
+                        className={styles.deleteButton}
                         title="Delete template"
                       >
                         <Trash2 size={14} />
@@ -856,6 +870,18 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
         companyId={companyId}
         template={editingTemplate || undefined}
         onSave={handleTemplateSaved}
+      />
+
+      {/* Test Email Modal */}
+      <TestEmailModal
+        isOpen={testEmailModalOpen}
+        onClose={() => {
+          setTestEmailModalOpen(false);
+          setTestingTemplate(null);
+        }}
+        companyId={companyId}
+        templateId={testingTemplate?.id}
+        templateName={testingTemplate?.name}
       />
     </div>
   );

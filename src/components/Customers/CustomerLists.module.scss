@@ -1,0 +1,7 @@
+// Remove border from DataTable when used in customer detail page
+.noBorder {
+  // Target the contentArea div that's a descendant of this container
+  :global(div[class*="contentArea"]) {
+    border: none !important;
+  }
+}
