@@ -13,8 +13,10 @@ import {
   Type,
   Mail,
   Settings,
+  Send,
 } from 'lucide-react';
 import styles from './EmailTemplateEditor.module.scss';
+import TestEmailModal from './TestEmailModal/TestEmailModal';
 
 interface EmailTemplate {
   id?: string;
@@ -95,6 +97,7 @@ export default function EmailTemplateEditor({
     rating: number;
     reviewCount: number;
   } | null>(null);
+  const [testEmailModalOpen, setTestEmailModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -563,16 +566,43 @@ export default function EmailTemplateEditor({
           <button onClick={onClose} className={styles.cancelButton}>
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={styles.saveButton}
-          >
-            <Save size={16} />
-            {saving ? 'Saving...' : 'Save Template'}
-          </button>
+          <div className={styles.footerActions}>
+            <button
+              onClick={() => setTestEmailModalOpen(true)}
+              className={styles.testButton}
+              type="button"
+            >
+              <Send size={16} />
+              Send Test Email
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={styles.saveButton}
+            >
+              <Save size={16} />
+              {saving ? 'Saving...' : 'Save Template'}
+            </button>
+          </div>
         </div>
       </div>
+
+      <TestEmailModal
+        isOpen={testEmailModalOpen}
+        onClose={() => setTestEmailModalOpen(false)}
+        companyId={companyId}
+        templateId={template?.id}
+        templateName={formData.name || template?.name}
+        templateData={
+          !template?.id
+            ? {
+                subject_line: formData.subject_line,
+                html_content: formData.html_content,
+                text_content: formData.text_content,
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

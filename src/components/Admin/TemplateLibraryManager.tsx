@@ -19,8 +19,10 @@ import {
   Code,
   Type,
   Mail,
+  Send,
 } from 'lucide-react';
 import styles from './TemplateLibraryManager.module.scss';
+import TestEmailModal from '../Automation/TestEmailModal/TestEmailModal';
 
 // Quote-specific variables that should only show for quote templates
 const QUOTE_VARIABLES = [
@@ -69,6 +71,8 @@ export default function TemplateLibraryManager() {
   } | null>(null);
   const [activeTab, setActiveTab] = useState<'html' | 'text' | 'preview'>('html');
   const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
+  const [testEmailModalOpen, setTestEmailModalOpen] = useState(false);
+  const [testingTemplate, setTestingTemplate] = useState<LibraryTemplate | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -379,6 +383,16 @@ export default function TemplateLibraryManager() {
                 )}
               </div>
               <div className={styles.templateActions}>
+                <button
+                  onClick={() => {
+                    setTestingTemplate(template);
+                    setTestEmailModalOpen(true);
+                  }}
+                  className={styles.testButton}
+                  title="Send test email"
+                >
+                  <Send size={14} />
+                </button>
                 <button onClick={() => handleEdit(template)} title="Edit">
                   <Edit size={14} />
                 </button>
@@ -763,22 +777,50 @@ export default function TemplateLibraryManager() {
               >
                 Cancel
               </button>
-              <button
-                onClick={handleSave}
-                className={styles.saveButton}
-                disabled={
-                  !formData.name ||
-                  !formData.subject_line ||
-                  (!formData.html_content && !formData.text_content)
-                }
-              >
-                <Save size={16} />
-                {editingTemplate ? 'Update' : 'Create'} Template
-              </button>
+              <div className={styles.footerActions}>
+                <button
+                  onClick={() => {
+                    if (editingTemplate) {
+                      setTestingTemplate(editingTemplate);
+                    }
+                    setTestEmailModalOpen(true);
+                  }}
+                  className={styles.testButton}
+                  type="button"
+                  disabled={!editingTemplate?.id}
+                  title={!editingTemplate?.id ? 'Save template first to send test email' : 'Send test email'}
+                >
+                  <Send size={16} />
+                  Send Test Email
+                </button>
+                <button
+                  onClick={handleSave}
+                  className={styles.saveButton}
+                  disabled={
+                    !formData.name ||
+                    !formData.subject_line ||
+                    (!formData.html_content && !formData.text_content)
+                  }
+                >
+                  <Save size={16} />
+                  {editingTemplate ? 'Update' : 'Create'} Template
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <TestEmailModal
+        isOpen={testEmailModalOpen}
+        onClose={() => {
+          setTestEmailModalOpen(false);
+          setTestingTemplate(null);
+        }}
+        companyId="admin"
+        templateId={testingTemplate?.id}
+        templateName={testingTemplate?.name || formData.name}
+      />
     </div>
   );
 }
