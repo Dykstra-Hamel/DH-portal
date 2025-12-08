@@ -223,6 +223,20 @@ export const workflowExecuteHandler = inngest.createFunction(
       );
 
       if (!statusCheck.shouldContinue) {
+        // Send workflow completion event for campaign tracking
+        await inngest.send({
+          name: 'workflow/completed',
+          data: {
+            executionId,
+            workflowId,
+            companyId,
+            triggerType,
+            success: false,
+            cancelled: true,
+            cancellationReason: statusCheck.cancellationReason,
+          },
+        });
+
         return {
           success: true,
           cancelled: true,
@@ -362,6 +376,20 @@ export const workflowExecuteHandler = inngest.createFunction(
                 })
                 .eq('automation_execution_id', executionId);
             }
+
+            // Send workflow completion event for campaign tracking
+            await inngest.send({
+              name: 'workflow/completed',
+              data: {
+                executionId,
+                workflowId,
+                companyId,
+                triggerType,
+                success: false,
+                failed: true,
+                error: errorMessage,
+              },
+            });
 
             throw error;
           }
