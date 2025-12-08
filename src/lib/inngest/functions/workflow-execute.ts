@@ -666,7 +666,7 @@ async function executeEmailStep(
   // Get brand data for company logo and colors
   const { data: brandData } = await supabase
     .from('brands')
-    .select('logo_url, primary_color_hex, secondary_color_hex')
+    .select('logo_url, primary_color_hex, secondary_color_hex, signature_url')
     .eq('company_id', companyId)
     .single();
 
@@ -906,6 +906,7 @@ async function executeEmailStep(
     companyPhone: company?.phone || '',
     companyWebsite: company?.website || '',
     companyLogo: logoUrl,
+    companySignature: brandData?.signature_url || '',
 
     // Brand colors
     brandPrimaryColor: brandData?.primary_color_hex || '',
