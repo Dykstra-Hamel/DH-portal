@@ -154,7 +154,7 @@ export const bulkLeadUploadHandler = inngest.createFunction(
               service_address_id: serviceAddressId,
               lead_type: 'bulk_add',
               lead_source: (leadData.lead_source as any) || 'other',
-              lead_status: 'unassigned',
+              lead_status: 'new',
               priority: leadData.priority || 'medium',
               pest_type: leadData.pest_type,
               comments: leadData.comments,

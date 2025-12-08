@@ -185,7 +185,7 @@ export async function POST(
       const { error: updateLeadError } = await supabase
         .from('leads')
         .update({
-          lead_status: 'ready_to_schedule',
+          lead_status: 'scheduling',
         })
         .eq('id', quote.lead_id);
 

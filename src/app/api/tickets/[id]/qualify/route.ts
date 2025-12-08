@@ -142,16 +142,16 @@ export async function POST(
       if (ticket.converted_to_lead_id) {
         // Update the existing lead instead of creating a new one
         const updateData: any = {
-          lead_status: customStatus || (assignedTo ? 'contacting' : 'unassigned'),
+          lead_status: customStatus || (assignedTo ? 'in_process' : 'new'),
           priority: ticket.priority,
           estimated_value: ticket.estimated_value || 0,
           comments: ticket.description || '',
           updated_at: new Date().toISOString(),
         };
 
-        // If jumping straight to quoted (live call), set furthest_completed_stage to contacting
+        // If jumping straight to quoted (live call), set furthest_completed_stage to in_process
         if (customStatus === 'quoted') {
-          updateData.furthest_completed_stage = 'contacting';
+          updateData.furthest_completed_stage = 'in_process';
         }
 
         // Add assignment if provided
@@ -227,7 +227,7 @@ export async function POST(
         lead_type: ticket.type,
         service_type: ticket.service_type,
         lead_status:
-          customStatus || (assignedTo || ticket.assigned_to ? 'contacting' : 'unassigned'),
+          customStatus || (assignedTo || ticket.assigned_to ? 'in_process' : 'new'),
         priority: ticket.priority,
         estimated_value: ticket.estimated_value || 0,
         comments: ticket.description || '',
@@ -244,9 +244,9 @@ export async function POST(
         converted_from_ticket_id: ticket.id, // Required for database trigger validation
       };
 
-      // If jumping straight to quoted (live call), set furthest_completed_stage to contacting
+      // If jumping straight to quoted (live call), set furthest_completed_stage to in_process
       if (customStatus === 'quoted') {
-        leadInsertData.furthest_completed_stage = 'contacting';
+        leadInsertData.furthest_completed_stage = 'in_process';
       }
 
       // Start a transaction for lead creation and ticket update
@@ -604,7 +604,7 @@ export async function POST(
       if (ticket.converted_to_support_case_id) {
         // Update the existing support case instead of creating a new one
         const updateData: any = {
-          status: customStatus || (assignedTo ? 'in_progress' : 'unassigned'),
+          status: customStatus || (assignedTo ? 'in_progress' : 'new'),
           priority: ticket.priority || 'medium',
           updated_at: new Date().toISOString(),
         };
@@ -688,7 +688,7 @@ export async function POST(
         issue_type: issueType,
         summary: summary.substring(0, 255), // Ensure it fits in summary field
         description: ticket.description,
-        status: customStatus || (assignedTo || ticket.assigned_to ? 'in_progress' : 'unassigned'),
+        status: customStatus || (assignedTo || ticket.assigned_to ? 'in_progress' : 'new'),
         priority: ticket.priority || 'medium',
         assigned_to: assignedTo || ticket.assigned_to || null,
         archived: false,

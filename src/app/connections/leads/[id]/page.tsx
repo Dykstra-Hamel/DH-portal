@@ -75,7 +75,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       status: 'upcoming',
     },
     {
-      id: 'contacting',
+      id: 'in_process',
       label: 'Communication Stage',
       subLabel: 'Pending',
       status: 'upcoming',
@@ -87,7 +87,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       status: 'upcoming',
     },
     {
-      id: 'ready_to_schedule',
+      id: 'scheduling',
       label: 'Schedule Stage',
       subLabel: 'Pending',
       status: 'disabled',
@@ -103,15 +103,15 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
     // Map lead status to step IDs
     const statusToStep: { [key: string]: string } = {
-      unassigned: 'qualify',
-      contacting: 'contacting',
+      new: 'qualify',
+      in_process: 'in_process',
       quoted: 'quoted',
-      ready_to_schedule: 'ready_to_schedule',
+      scheduling: 'scheduling',
     };
 
     const currentStepId = statusToStep[currentStatus];
     const furthestStepId = furthestStage ? statusToStep[furthestStage] : null;
-    const stepOrder = ['qualify', 'contacting', 'quoted', 'ready_to_schedule'];
+    const stepOrder = ['qualify', 'in_process', 'quoted', 'scheduling'];
     const currentIndex = stepOrder.indexOf(currentStepId);
     const furthestIndex = furthestStepId
       ? stepOrder.indexOf(furthestStepId)
@@ -146,20 +146,20 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const handleStepClick = async (stepId: string) => {
     if (!lead || !leadId) return;
 
-    // Don't allow clicking on Ready To Schedule step
-    if (stepId === 'ready_to_schedule') return;
+    // Don't allow clicking on scheduling step
+    if (stepId === 'scheduling') return;
 
     // Map step IDs to lead statuses
     const stepToStatus: { [key: string]: string } = {
-      qualify: 'unassigned',
-      contacting: 'contacting',
+      qualify: 'new',
+      in_process: 'in_process',
       quoted: 'quoted',
     };
 
     // Map step IDs to success messages
     const stepToMessage: { [key: string]: string } = {
       qualify: 'Lead moved to Qualify stage successfully!',
-      contacting: 'Lead moved to Contact stage successfully!',
+      in_process: 'Lead moved to Contact stage successfully!',
       quoted: 'Lead moved to Quote stage successfully!',
     };
 
@@ -213,16 +213,16 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     let successMessage: string;
 
     switch (lead.lead_status) {
-      case 'unassigned':
-        newStatus = 'contacting';
+      case 'new':
+        newStatus = 'in_process';
         successMessage = 'Lead moved to Contact stage successfully!';
         break;
-      case 'contacting':
+      case 'in_process':
         newStatus = 'quoted';
         successMessage = 'Lead moved to Quote stage successfully!';
         break;
       case 'quoted':
-        newStatus = 'ready_to_schedule';
+        newStatus = 'scheduling';
         successMessage = 'Lead marked as Ready to Schedule successfully!';
         break;
       default:
@@ -295,8 +295,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     if (!lead) return 'Next Step';
 
     switch (lead.lead_status) {
-      case 'unassigned':
-      case 'contacting':
+      case 'new':
+      case 'in_process':
         return (
           <>
             <Headset size={18} />
@@ -311,7 +311,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
             <ChevronRight size={18} />
           </>
         );
-      case 'ready_to_schedule':
+      case 'scheduling':
         return (
           <>
             <CalendarCheck size={18} />
@@ -328,13 +328,13 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     if (!lead) return;
 
     if (
-      lead.lead_status === 'unassigned' ||
-      lead.lead_status === 'contacting'
+      lead.lead_status === 'new' ||
+      lead.lead_status === 'in_process'
     ) {
       handleLiveCall();
     } else if (lead.lead_status === 'quoted') {
       handleReadyToSchedule();
-    } else if (lead.lead_status === 'ready_to_schedule') {
+    } else if (lead.lead_status === 'scheduling') {
       handleFinalizeSale();
     } else {
       handleProgressStatus();
@@ -351,7 +351,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   // Determine if primary button should be shown
   const shouldShowPrimaryButton = () => {
     if (!lead) return false;
-    return ['unassigned', 'contacting', 'quoted', 'ready_to_schedule'].includes(
+    return ['new', 'in_process', 'quoted', 'scheduling'].includes(
       lead.lead_status
     );
   };
@@ -380,10 +380,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         successMessage = 'Lead assigned to sales team successfully!';
       } else {
         updateData.assigned_to = assigneeId;
-        // Auto-progress status only if currently unassigned
-        if (lead?.lead_status === 'unassigned') {
-          updateData.lead_status = 'contacting';
-          successMessage = 'Lead assigned and status updated to contacting!';
+        // Auto-progress status only if currently new
+        if (lead?.lead_status === 'new') {
+          updateData.lead_status = 'in_process';
+          successMessage = 'Lead assigned and status updated to in process!';
         } else {
           successMessage = 'Lead reassigned successfully!';
         }
@@ -413,11 +413,11 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
     switch (lead.lead_status) {
       case 'quoted':
-        previousStatus = 'contacting';
+        previousStatus = 'in_process';
         successMessage = 'Lead moved back to Contact stage successfully!';
         break;
-      case 'contacting':
-        previousStatus = 'unassigned';
+      case 'in_process':
+        previousStatus = 'new';
         successMessage = 'Lead moved back to Qualify stage successfully!';
         break;
       default:
@@ -472,7 +472,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   // Check if previous step is available
   const canMoveToPrevious = () => {
     if (!lead) return false;
-    return ['quoted', 'contacting'].includes(lead.lead_status);
+    return ['quoted', 'in_process'].includes(lead.lead_status);
   };
 
   // Create dropdown actions
@@ -502,7 +502,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       const previousStepLabel =
         lead.lead_status === 'quoted'
           ? 'Move to Contact'
-          : lead.lead_status === 'contacting'
+          : lead.lead_status === 'in_process'
             ? 'Move to Qualify'
             : '';
       if (previousStepLabel) {
@@ -665,7 +665,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const handleLiveCallSubmit = async (option: 'quote' | 'schedule') => {
     if (!lead || !leadId) return;
 
-    const newStatus = option === 'quote' ? 'quoted' : 'ready_to_schedule';
+    const newStatus = option === 'quote' ? 'quoted' : 'scheduling';
     const successMessage =
       option === 'quote'
         ? 'Lead jumped to Quote stage successfully!'
@@ -808,7 +808,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
     try {
       const updateData: any = {
-        lead_status: 'ready_to_schedule',
+        lead_status: 'scheduling',
       };
 
       if (option === 'someone_else' && assignedTo) {
@@ -876,26 +876,26 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         updatedAt={lead.updated_at}
         steps={getUpdatedSteps()}
         currentStep={
-          lead.lead_status === 'unassigned'
+          lead.lead_status === 'new'
             ? 'qualify'
-            : lead.lead_status === 'contacting'
-              ? 'contacting'
+            : lead.lead_status === 'in_process'
+              ? 'in_process'
               : lead.lead_status === 'quoted'
                 ? 'quoted'
-                : lead.lead_status === 'ready_to_schedule'
-                  ? 'ready_to_schedule'
+                : lead.lead_status === 'scheduling'
+                  ? 'scheduling'
                   : 'qualify'
         }
         onStepClick={handleStepClick}
         disabledSteps={
-          lead.lead_status === 'ready_to_schedule' ? [] : ['ready_to_schedule']
+          lead.lead_status === 'scheduling' ? [] : ['scheduling']
         }
         primaryButtonText={getPrimaryButtonText()}
         onPrimaryButtonClick={handlePrimaryAction}
         showPrimaryButton={shouldShowPrimaryButton()}
         secondaryButtonText={
           lead.lead_status === 'quoted' ||
-          lead.lead_status === 'ready_to_schedule' ? (
+          lead.lead_status === 'scheduling' ? (
             'Not Interested'
           ) : (
             <>
@@ -906,13 +906,13 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         }
         onSecondaryButtonClick={
           lead.lead_status === 'quoted' ||
-          lead.lead_status === 'ready_to_schedule'
+          lead.lead_status === 'scheduling'
             ? handleNotInterested
             : handleAddTask
         }
         showSecondaryButton={true}
         middleButtonText={
-          lead.lead_status === 'contacting' ? (
+          lead.lead_status === 'in_process' ? (
             <>
               <RefreshCcwDot size={18} />
               Convert to Automation
@@ -922,7 +922,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
               <Mail size={18} />
               Email Quote
             </>
-          ) : lead.lead_status === 'ready_to_schedule' ? (
+          ) : lead.lead_status === 'scheduling' ? (
             <>
               <ExternalLink size={18} />
               Open PestPac
@@ -930,25 +930,25 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           ) : null
         }
         showMiddleButton={
-          lead.lead_status === 'contacting' ||
+          lead.lead_status === 'in_process' ||
           lead.lead_status === 'quoted' ||
-          lead.lead_status === 'ready_to_schedule'
+          lead.lead_status === 'scheduling'
         }
-        middleButtonDisabled={lead.lead_status === 'contacting'}
+        middleButtonDisabled={lead.lead_status === 'in_process'}
         middleButtonTooltip={
-          lead.lead_status === 'contacting'
+          lead.lead_status === 'in_process'
             ? 'Functionality Coming Soon'
             : undefined
         }
         onMiddleButtonClick={
           lead.lead_status === 'quoted'
             ? handleEmailQuoteButton
-            : lead.lead_status === 'ready_to_schedule'
+            : lead.lead_status === 'scheduling'
               ? () => window.open('https://pestpac.com', '_blank')
               : undefined
         }
         primaryButtonVariant={
-          lead.lead_status === 'ready_to_schedule' ? 'success' : 'default'
+          lead.lead_status === 'scheduling' ? 'success' : 'default'
         }
         // dropdownActions={getDropdownActions()}
         // showDropdown={true}
