@@ -2,7 +2,8 @@
 
 > **Automated lead management and workflow system for pest control companies**
 
-Staging url located at staging.pmpcentral.io
+Production URL: https://pmpcentral.io
+Staging URL: https://staging.pmpcentral.io
 
 ## 📚 Documentation
 
