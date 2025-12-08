@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { captureDeviceData } from '@/lib/device-utils';
+import { inngest } from '@/lib/inngest/client';
 
 interface RedeemRequest {
   customerId: string;
@@ -611,6 +612,85 @@ export async function POST(
       .update({ lead_id: lead.id })
       .eq('id', updatedMember.id);
 
+    // CANCEL WORKFLOW: If a workflow execution is running for this customer + campaign, cancel it
+    // This prevents unnecessary follow-up steps (like AI calls) after the customer has already redeemed
+    console.log('[REDEEM] Checking for active workflow executions to cancel...');
+    const { data: campaignExecution } = await supabase
+      .from('campaign_executions')
+      .select('automation_execution_id, execution_status')
+      .eq('campaign_id', campaign.id)
+      .eq('customer_id', body.customerId)
+      .in('execution_status', ['pending', 'running'])
+      .maybeSingle();
+
+    if (campaignExecution?.automation_execution_id) {
+      console.log(`[REDEEM] Found active workflow execution ${campaignExecution.automation_execution_id}, cancelling...`);
+
+      // Update automation execution status to cancelled
+      const { error: cancelError } = await supabase
+        .from('automation_executions')
+        .update({
+          execution_status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          execution_data: {
+            cancellationReason: 'Lead redeemed offer via landing page',
+            cancellationProcessed: true,
+            cancelledAtStep: 'redemption',
+            cancelledBy: 'system',
+            cancelledAt: new Date().toISOString(),
+          },
+        })
+        .eq('id', campaignExecution.automation_execution_id)
+        .in('execution_status', ['pending', 'running']); // Only cancel if still active
+
+      if (cancelError) {
+        console.error('[REDEEM] Error cancelling workflow execution:', cancelError);
+        // Don't fail redemption if cancellation fails - log and continue
+      } else {
+        // Also update campaign execution status
+        await supabase
+          .from('campaign_executions')
+          .update({
+            execution_status: 'cancelled',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('automation_execution_id', campaignExecution.automation_execution_id);
+
+        // Update member status to 'processed' since customer completed the workflow by redeeming
+        await supabase
+          .from('campaign_contact_list_members')
+          .update({
+            status: 'processed',
+            processed_at: new Date().toISOString(),
+          })
+          .eq('execution_id', campaignExecution.automation_execution_id);
+
+        // Send workflow completion event for campaign tracking
+        // This ensures campaign completion logic runs even if workflow doesn't send it
+        try {
+          await inngest.send({
+            name: 'workflow/completed',
+            data: {
+              executionId: campaignExecution.automation_execution_id,
+              workflowId: null,
+              companyId: campaign.company_id,
+              triggerType: 'campaign',
+              success: false,
+              cancelled: true,
+              cancellationReason: 'Lead redeemed offer via landing page',
+            },
+          });
+        } catch (eventError) {
+          console.error('[REDEEM] Failed to send workflow completion event:', eventError);
+          // Don't fail redemption if event sending fails
+        }
+
+        console.log(`[REDEEM] Successfully cancelled workflow execution ${campaignExecution.automation_execution_id}`);
+      }
+    } else {
+      console.log('[REDEEM] No active workflow execution found for this customer + campaign');
+    }
+
     // Log activity
     const { error: activityError } = await supabase
       .from('activities')
@@ -631,6 +711,8 @@ export async function POST(
           previous_lead_status: existingLead?.lead_status || null,
           new_lead_status: 'scheduling',
           selected_addon_ids: body.selected_addon_ids || [],
+          workflow_cancelled: !!campaignExecution?.automation_execution_id,
+          cancelled_execution_id: campaignExecution?.automation_execution_id || null,
         },
       });
 

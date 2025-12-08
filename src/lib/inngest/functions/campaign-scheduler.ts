@@ -644,7 +644,17 @@ export const campaignWorkflowCompletionHandler = inngest.createFunction(
       }
 
       // Update member status based on campaign execution result
-      const newStatus = campaignExecution.execution_status === 'completed' ? 'processed' : 'failed';
+      // 'completed' → 'processed' (successful)
+      // 'failed' → 'failed' (execution error)
+      // 'cancelled' → 'processed' (cancelled due to customer action, counts as processed)
+      let newStatus: string;
+      if (campaignExecution.execution_status === 'completed') {
+        newStatus = 'processed';
+      } else if (campaignExecution.execution_status === 'cancelled') {
+        newStatus = 'processed'; // Cancelled workflows count as processed (customer took action)
+      } else {
+        newStatus = 'failed'; // Failed or any other status
+      }
 
       await supabase
         .from('campaign_contact_list_members')
