@@ -20,16 +20,14 @@ const formatCustomerName = (lead: Lead): string => {
 
 const getLeadActionButtonText = (status: string): string => {
   switch (status) {
-    case 'unassigned':
+    case 'new':
       return 'Assign Lead';
-    case 'contacting':
+    case 'in_process':
       return 'Manage Lead';
     case 'quoted':
       return 'Manage Lead';
-    case 'ready_to_schedule':
+    case 'scheduling':
       return 'Schedule Service';
-    case 'scheduled':
-      return 'View Lead';
     case 'won':
       return 'View Lead';
     case 'lost':
@@ -167,7 +165,7 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
     sortKey: 'lead_status',
     render: (lead: Lead) => (
       <div className={styles.statusWithAssignment}>
-        {lead.lead_status === 'unassigned' ? (
+        {lead.lead_status === 'new' ? (
           <span className={`${styles.statusBadge} ${styles.statusUnassigned}`}>
             Unassigned
           </span>
@@ -285,18 +283,18 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
     key: 'unassigned',
     label: 'Unassigned',
     filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'unassigned'),
+      leads.filter(lead => !lead.archived && lead.lead_status === 'new'),
     getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'unassigned')
+      leads.filter(lead => !lead.archived && lead.lead_status === 'new')
         .length,
   },
   {
     key: 'contacting',
     label: 'Contacting',
     filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'contacting'),
+      leads.filter(lead => !lead.archived && lead.lead_status === 'in_process'),
     getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'contacting')
+      leads.filter(lead => !lead.archived && lead.lead_status === 'in_process')
         .length,
   },
   {
@@ -338,13 +336,13 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
       leads.filter(
         lead =>
           !lead.archived &&
-          ['unassigned', 'contacting', 'quoted'].includes(lead.lead_status)
+          ['new', 'in_process', 'quoted'].includes(lead.lead_status)
       ),
     getCount: (leads: Lead[]) =>
       leads.filter(
         lead =>
           !lead.archived &&
-          ['unassigned', 'contacting', 'quoted'].includes(lead.lead_status)
+          ['new', 'in_process', 'quoted'].includes(lead.lead_status)
       ).length,
   },
 ];
@@ -355,9 +353,9 @@ export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
     key: 'contacting',
     label: 'Contacting',
     filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'contacting'),
+      leads.filter(lead => !lead.archived && lead.lead_status === 'in_process'),
     getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'contacting')
+      leads.filter(lead => !lead.archived && lead.lead_status === 'in_process')
         .length,
   },
   {
@@ -392,12 +390,12 @@ export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
     filter: (leads: Lead[]) =>
       leads.filter(
         lead =>
-          !lead.archived && ['contacting', 'quoted'].includes(lead.lead_status)
+          !lead.archived && ['in_process', 'quoted'].includes(lead.lead_status)
       ),
     getCount: (leads: Lead[]) =>
       leads.filter(
         lead =>
-          !lead.archived && ['contacting', 'quoted'].includes(lead.lead_status)
+          !lead.archived && ['in_process', 'quoted'].includes(lead.lead_status)
       ).length,
   },
 ];

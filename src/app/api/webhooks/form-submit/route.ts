@@ -453,7 +453,7 @@ export async function POST(request: NextRequest) {
         lead_source: 'campaign',
         lead_type: 'web_form',
         service_type: geminiResult.ticket.service_type || 'Pest Control',
-        lead_status: 'unassigned',
+        lead_status: 'new',
         comments: geminiResult.ticket.description || 'Campaign form submission',
         priority: geminiResult.ticket.priority || 'medium',
         utm_campaign: campaignId, // Also store in UTM for tracking purposes

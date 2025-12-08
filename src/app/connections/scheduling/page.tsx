@@ -82,7 +82,7 @@ export default function SchedulingPage() {
     try {
       setLeadsLoading(true);
 
-      // Fetch all scheduling-related leads (ready_to_schedule, scheduled, won, lost)
+      // Fetch all scheduling-related leads (scheduling, won, lost)
       const response = await fetch(`/api/leads?companyId=${selectedCompany.id}`);
 
       if (!response.ok) {
@@ -94,7 +94,7 @@ export default function SchedulingPage() {
       // Filter to only include scheduling-related statuses
       const filteredLeads = Array.isArray(leadsData)
         ? leadsData.filter((lead: Lead) =>
-            ['ready_to_schedule', 'scheduled', 'won', 'lost'].includes(lead.lead_status)
+            ['scheduling', 'won', 'lost'].includes(lead.lead_status)
           )
         : [];
 

@@ -213,13 +213,13 @@ export function useRealtimeCounts() {
         fetch(
           `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false&countOnly=true`
         ),
-        // Active leads (unassigned, contacting, quoted)
+        // Active leads (new, in_process, quoted)
         fetch(
-          `/api/leads?companyId=${selectedCompany.id}&status=unassigned,contacting,quoted`
+          `/api/leads?companyId=${selectedCompany.id}&status=new,in_process,quoted`
         ),
-        // Unassigned leads with specific statuses (for red dot logic) - assigned to sales team (assigned_to IS NULL) with unassigned, contacting, or quoted status
+        // Unassigned leads with specific statuses (for red dot logic) - assigned to sales team (assigned_to IS NULL) with new, in_process, or quoted status
         fetch(
-          `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=unassigned,contacting,quoted`
+          `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=new,in_process,quoted`
         ),
         // Active support cases
         fetch(
@@ -229,9 +229,9 @@ export function useRealtimeCounts() {
         fetch(`/api/support-cases?companyId=${selectedCompany.id}&status=new`),
         // Total customers
         fetch(`/api/customers?companyId=${selectedCompany.id}`),
-        // Ready to schedule and scheduled leads for scheduling
+        // Scheduling and won leads for scheduling
         fetch(
-          `/api/leads?companyId=${selectedCompany.id}&status=ready_to_schedule,scheduled`
+          `/api/leads?companyId=${selectedCompany.id}&status=scheduling,won`
         ),
         // My assigned leads
         fetch(
@@ -452,13 +452,13 @@ export function useRealtimeCounts() {
                   myLeadsResponse,
                 ] = await Promise.all([
                   fetch(
-                    `/api/leads?companyId=${selectedCompany.id}&status=unassigned,contacting,quoted`
+                    `/api/leads?companyId=${selectedCompany.id}&status=new,in_process,quoted`
                   ),
                   fetch(
-                    `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=unassigned,contacting,quoted`
+                    `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=new,in_process,quoted`
                   ),
                   fetch(
-                    `/api/leads?companyId=${selectedCompany.id}&status=ready_to_schedule,scheduled`
+                    `/api/leads?companyId=${selectedCompany.id}&status=scheduling,won`
                   ),
                   fetch(
                     `/api/leads?companyId=${selectedCompany.id}&assignedTo=${user.id}`

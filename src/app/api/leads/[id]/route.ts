@@ -242,16 +242,14 @@ export async function PUT(
     });
 
     // Track furthest completed stage for editing detection
-    // Stage progression order: new -> unassigned -> contacting -> quoted -> ready_to_schedule -> scheduled -> completed/lost/won
+    // Stage progression order: new -> in_process -> quoted -> scheduling -> won -> completed/lost
     const stageOrder: Record<string, number> = {
-      'new': 0,
-      'unassigned': 1,
-      'contacting': 2,
+      'new': 1,
+      'in_process': 2,
       'quoted': 3,
-      'ready_to_schedule': 4,
-      'scheduled': 5,
+      'scheduling': 4,
+      'won': 5,
       'completed': 6,
-      'won': 6, // Won is terminal like completed
       'lost': 6, // Lost is terminal like completed
     };
 
