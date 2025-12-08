@@ -179,8 +179,8 @@ export async function GET(request: NextRequest) {
         lost: leads.filter((l: any) => l.lead_status === 'lost').length,
       };
 
-      // Calculate active leads (unassigned, contacting, quoted)
-      const activeLeads = leadCounts.unassigned + leadCounts.contacting + leadCounts.quoted;
+      // Calculate active leads (new, in_process, quoted)
+      const activeLeads = leadCounts.new + leadCounts.in_process + leadCounts.quoted;
 
       // Calculate total estimated value
       const totalEstimatedValue = leads.reduce(
