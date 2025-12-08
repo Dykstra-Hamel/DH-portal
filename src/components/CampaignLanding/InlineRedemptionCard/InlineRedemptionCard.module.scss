@@ -3,11 +3,10 @@
 .redemptionCard {
   background: white;
   border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 31px 27px 14px 27px;
+  box-shadow: 0 0 24px 0 rgba(0, 0, 0, 0.15);
   position: sticky;
   top: 120px;
-  max-width: 500px;
 
   @media (max-width: 768px) {
     position: relative;
@@ -17,36 +16,36 @@
 }
 
 .heading {
-  font-size: 24px;
+  font-size: 27px;
   font-weight: 700;
-  margin-bottom: 24px;
-  line-height: 1.4;
+  margin-bottom: 25px;
+  line-height: 33px;
 
   :global(.strikethrough) {
     text-decoration: line-through;
-    color: #DC2626;
-    margin-right: 8px;
+    color: #e52c51;
   }
 
   :global(.highlight) {
-    color: var(--accent-color, #00B142);
+    color: var(--accent-color, #00b142);
   }
 }
 
 .strikethrough {
   text-decoration: line-through;
-  color: #DC2626;
+  color: #dc2626;
   margin-right: 8px;
 }
 
 .highlight {
-  color: var(--accent-color, #00B142);
+  color: var(--accent-color, #00b142);
 }
 
 .subheading {
   font-size: 16px;
   font-weight: 600;
-  color: #2B2B2B;
+  color: #2b2b2b;
+  text-align: center;
   margin-bottom: 16px;
 }
 
@@ -62,54 +61,73 @@
 }
 
 .inputField {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border: 1px solid #D1D5DB;
-  border-radius: 8px;
+  border: 1px solid #bfbfbf;
+  border-radius: 10px;
   background: white;
   transition: border-color 0.2s;
 
   &:focus-within {
-    border-color: var(--accent-color, #00B142);
+    border-color: var(--accent-color, #00b142);
     box-shadow: 0 0 0 3px rgba(0, 177, 66, 0.1);
   }
 
   .icon {
     flex-shrink: 0;
-    color: #6B7280;
+    color: #6b7280;
     width: 20px;
     height: 20px;
+    pointer-events: none;
+    position: relative;
+    z-index: 1;
   }
 
   input,
   select {
-    flex: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 12px 16px 12px 44px;
     border: none;
     outline: none;
     font-size: 14px;
-    color: #1F2937;
+    color: #1f2937;
     background: transparent;
     font-family: inherit;
+    cursor: pointer;
+    border-radius: 10px;
 
     &::placeholder {
-      color: #9CA3AF;
+      color: #9ca3af;
     }
   }
 
   select {
-    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
 
     &.placeholder {
-      color: #9CA3AF;
+      color: #9ca3af;
     }
   }
 
   input[type='date'] {
-    cursor: pointer;
-
     &::-webkit-calendar-picker-indicator {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
       cursor: pointer;
     }
   }
@@ -129,20 +147,22 @@
   input {
     width: 100%;
     padding: 12px 16px;
-    border: 1px solid #D1D5DB;
+    border: 1px solid #d1d5db;
     border-radius: 8px;
     font-size: 14px;
-    color: #1F2937;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    color: #1f2937;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
 
     &:focus {
       outline: none;
-      border-color: var(--accent-color, #00B142);
+      border-color: var(--accent-color, #00b142);
       box-shadow: 0 0 0 3px rgba(0, 177, 66, 0.1);
     }
 
     &::placeholder {
-      color: #9CA3AF;
+      color: #9ca3af;
     }
   }
 }
@@ -166,30 +186,32 @@
     width: 100%;
     padding: 12px 16px;
     padding-right: 40px; // Make room for custom arrow
-    border: 1px solid #D1D5DB;
+    border: 1px solid #d1d5db;
     border-radius: 8px;
     font-size: 14px;
-    color: #1F2937;
+    color: #1f2937;
     background: white;
     cursor: pointer;
     font-family: inherit;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
     appearance: none; // Remove default browser arrow
     -webkit-appearance: none;
     -moz-appearance: none;
 
     &:focus {
       outline: none;
-      border-color: var(--accent-color, #00B142);
+      border-color: var(--accent-color, #00b142);
       box-shadow: 0 0 0 3px rgba(0, 177, 66, 0.1);
     }
 
     &.placeholder {
-      color: #9CA3AF;
+      color: #9ca3af;
     }
 
     option {
-      color: #1F2937;
+      color: #1f2937;
     }
   }
 }
@@ -204,7 +226,7 @@
 
 .redeemButton {
   width: 100%;
-  background: var(--accent-color, #00B142);
+  background: var(--accent-color, #00b142);
   color: white;
   padding: 16px 24px;
   border-radius: 8px;
@@ -212,7 +234,9 @@
   font-size: 16px;
   cursor: pointer;
   border: none;
-  transition: background 0.2s, transform 0.1s;
+  transition:
+    background 0.2s,
+    transform 0.1s;
   margin-bottom: 12px;
 
   &:hover:not(:disabled) {
@@ -232,12 +256,12 @@
 
 .disclaimer {
   font-size: 12px;
-  color: #6B7280;
+  color: #6b7280;
   text-align: center;
   line-height: 1.5;
 
   a {
-    color: var(--accent-color, #00B142);
+    color: var(--accent-color, #00b142);
     text-decoration: underline;
 
     &:hover {

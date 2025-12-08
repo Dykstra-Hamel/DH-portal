@@ -110,6 +110,10 @@ interface CampaignData {
     terms: {
       content: string | null;
     };
+    redemptionCard: {
+      heading: string | null;
+      disclaimer: string | null;
+    };
     branding: {
       logoUrl: string | null;
       primaryColor: string;

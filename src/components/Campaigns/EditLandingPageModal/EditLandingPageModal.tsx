@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Eye } from 'lucide-react';
 import styles from './EditLandingPageModal.module.scss';
 import CampaignLandingPageEditorStep, {
   LandingPageFormData,
@@ -60,6 +60,7 @@ export default function EditLandingPageModal({
     footer_company_tagline: '',
     footer_links: [],
     terms_content: '',
+    redemption_card_heading: '',
     override_logo_url: '',
     override_primary_color: '',
     override_secondary_color: '',
@@ -121,6 +122,7 @@ export default function EditLandingPageModal({
             footer_company_tagline: 'Personal. Urgent. Reliable.',
             footer_links: [],
             terms_content: '',
+            redemption_card_heading: '',
             override_logo_url: '',
             override_primary_color: '',
             override_secondary_color: '',
@@ -183,6 +185,9 @@ export default function EditLandingPageModal({
         // Terms
         terms_content: apiData.landingPage.terms.content || '',
 
+        // Redemption Card
+        redemption_card_heading: apiData.landingPage.redemptionCard?.heading || '',
+
         // Branding overrides
         override_logo_url: apiData.landingPage.branding.logoUrl || '',
         override_primary_color: apiData.landingPage.branding.primaryColor || '',
@@ -232,6 +237,13 @@ export default function EditLandingPageModal({
     }
   };
 
+  const handlePreview = () => {
+    // Open preview in new tab with special "preview" customerId
+    // This triggers admin preview mode in the API
+    const previewUrl = `/campaign/${campaign.id}/preview`;
+    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -275,6 +287,15 @@ export default function EditLandingPageModal({
             disabled={saving}
           >
             Cancel
+          </button>
+          <button
+            className={styles.previewButton}
+            onClick={handlePreview}
+            disabled={loading}
+            title="Preview saved landing page"
+          >
+            <Eye size={16} />
+            Preview
           </button>
           <button
             className={styles.saveButton}

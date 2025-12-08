@@ -60,6 +60,9 @@ export interface LandingPageFormData {
   // Terms
   terms_content: string;
 
+  // Redemption Card
+  redemption_card_heading: string;
+
   // Brand Overrides
   override_logo_url: string;
   override_primary_color: string;
@@ -81,6 +84,7 @@ type SectionKey =
   | 'serviceplan'
   | 'hero'
   | 'pricing'
+  | 'redemption'
   | 'letter'
   | 'features'
   | 'services'
@@ -107,7 +111,7 @@ export default function CampaignLandingPageEditorStep({
 }: CampaignLandingPageEditorStepProps) {
   const supabase = createClient();
   const [expandedSections, setExpandedSections] = useState<Set<SectionKey>>(
-    new Set(['serviceplan', 'hero', 'pricing'])
+    new Set(['serviceplan', 'hero', 'pricing', 'redemption'])
   );
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [selectedServicePlan, setSelectedServicePlan] = useState<ServicePlan | null>(null);
@@ -169,6 +173,36 @@ export default function CampaignLandingPageEditorStep({
     if (onServicePlanChange) {
       onServicePlanChange(newPlanId);
     }
+  };
+
+  const insertVariableIntoField = (textareaId: string, fieldName: keyof LandingPageFormData, variable: string) => {
+    // Special handling for RichTextEditor (letter_content)
+    if (fieldName === 'letter_content') {
+      const currentValue = data[fieldName] as string;
+      // Append variable with a space if content exists
+      const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+      updateField(fieldName, newValue);
+      return;
+    }
+
+    const element = document.getElementById(textareaId) as HTMLTextAreaElement | HTMLInputElement;
+    if (!element) return;
+
+    const start = element.selectionStart || 0;
+    const end = element.selectionEnd || 0;
+    const currentValue = data[fieldName] as string;
+
+    const newValue =
+      currentValue.substring(0, start) +
+      variable +
+      currentValue.substring(end);
+
+    updateField(fieldName, newValue);
+
+    setTimeout(() => {
+      element.setSelectionRange(start + variable.length, start + variable.length);
+      element.focus();
+    }, 0);
   };
 
   // Field configurations for dynamic lists
@@ -375,7 +409,65 @@ export default function CampaignLandingPageEditorStep({
                 placeholder="e.g., Quarterly Pest Control starting at only $44/mo"
                 className={styles.textarea}
                 rows={2}
+                id="hero-title-textarea"
               />
+              <p className={styles.helpText}>
+                Use variables like {'{first_name}'}, {'{display_price}'}, {'{company_name}'} for personalization.
+              </p>
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{email}')}>
+                  {'{email}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{phone_number}')}>
+                  {'{phone_number}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{service_address}')}>
+                  {'{service_address}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{city}')}>
+                  {'{city}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{state}')}>
+                  {'{state}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{zip_code}')}>
+                  {'{zip_code}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{display_price}')}>
+                  {'{display_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{original_price}')}>
+                  {'{original_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{savings}')}>
+                  {'{savings}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{price_amount}')}>
+                  {'{price_amount}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{price_frequency}')}>
+                  {'{price_frequency}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{service_name}')}>
+                  {'{service_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{company_phone}')}>
+                  {'{company_phone}'}
+                </button>
+              </div>
             </div>
 
             <div className={styles.field}>
@@ -397,7 +489,65 @@ export default function CampaignLandingPageEditorStep({
                 placeholder="Additional hero section text (optional)"
                 className={styles.textarea}
                 rows={3}
+                id="hero-description-textarea"
               />
+              <p className={styles.helpText}>
+                Use variables for personalization.
+              </p>
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{email}')}>
+                  {'{email}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{phone_number}')}>
+                  {'{phone_number}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{service_address}')}>
+                  {'{service_address}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{city}')}>
+                  {'{city}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{state}')}>
+                  {'{state}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{zip_code}')}>
+                  {'{zip_code}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{display_price}')}>
+                  {'{display_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{original_price}')}>
+                  {'{original_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{savings}')}>
+                  {'{savings}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{price_amount}')}>
+                  {'{price_amount}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{price_frequency}')}>
+                  {'{price_frequency}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{service_name}')}>
+                  {'{service_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{company_phone}')}>
+                  {'{company_phone}'}
+                </button>
+              </div>
             </div>
 
             <div className={styles.field}>
@@ -467,6 +617,84 @@ export default function CampaignLandingPageEditorStep({
           </>
         )}
 
+        {/* Redemption Card Section */}
+        {renderSection(
+          'redemption',
+          'Redemption Card',
+          'Customize the offer heading in the redemption card',
+          <>
+            <div className={styles.field}>
+              <label className={styles.label}>Redemption Card Heading</label>
+              <textarea
+                value={data.redemption_card_heading}
+                onChange={(e) => updateField('redemption_card_heading', e.target.value)}
+                placeholder="e.g., {original_price} {display_price} Initial Startup Fee* & Only {display_price} Thereafter"
+                className={styles.textarea}
+                rows={3}
+                id="redemption-heading-textarea"
+              />
+              <p className={styles.helpText}>
+                Pricing variables like {'{original_price}'}, {'{display_price}'}, and {'{savings}'}
+                will be automatically styled (strikethrough for original price, highlight for display price/savings).
+              </p>
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{email}')}>
+                  {'{email}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{phone_number}')}>
+                  {'{phone_number}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{service_address}')}>
+                  {'{service_address}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{city}')}>
+                  {'{city}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{state}')}>
+                  {'{state}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{zip_code}')}>
+                  {'{zip_code}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{display_price}')}>
+                  {'{display_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{original_price}')}>
+                  {'{original_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{savings}')}>
+                  {'{savings}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{price_amount}')}>
+                  {'{price_amount}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{price_frequency}')}>
+                  {'{price_frequency}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{service_name}')}>
+                  {'{service_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{company_phone}')}>
+                  {'{company_phone}'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Letter Section */}
         {renderSection(
           'letter',
@@ -491,11 +719,67 @@ export default function CampaignLandingPageEditorStep({
                   <RichTextEditor
                     value={data.letter_content}
                     onChange={(value) => updateField('letter_content', value)}
-                    placeholder="Write a personalized message. Use {customer_first_name} for personalization."
+                    placeholder="Write a personalized message. Use variables for personalization."
                   />
+                </div>
+
+                <div className={styles.variableButtons}>
+                  <label className={styles.label}>Insert Variables:</label>
+                  <div className={styles.buttonGrid}>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{first_name}')}>
+                      {'{first_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{last_name}')}>
+                      {'{last_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{email}')}>
+                      {'{email}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{phone_number}')}>
+                      {'{phone_number}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{service_address}')}>
+                      {'{service_address}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{city}')}>
+                      {'{city}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{state}')}>
+                      {'{state}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{zip_code}')}>
+                      {'{zip_code}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{display_price}')}>
+                      {'{display_price}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{original_price}')}>
+                      {'{original_price}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{savings}')}>
+                      {'{savings}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{price_amount}')}>
+                      {'{price_amount}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{price_frequency}')}>
+                      {'{price_frequency}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{company_name}')}>
+                      {'{company_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{service_name}')}>
+                      {'{service_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{company_phone}')}>
+                      {'{company_phone}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{signature}')}>
+                      {'{signature}'}
+                    </button>
+                  </div>
                   <p className={styles.helpText}>
-                    Available placeholders: {'{customer_first_name}'}, {'{customer_last_name}'},
-                    {'{service_address}'}, {'{city}'}, {'{state}'}, {'{signature}'}
+                    Click a variable to append it to the letter content. Format with bold, italic, and links using the toolbar above.
                   </p>
                 </div>
 
@@ -557,7 +841,62 @@ export default function CampaignLandingPageEditorStep({
                     onChange={(e) => updateField('feature_heading', e.target.value)}
                     placeholder="e.g., No initial cost to get started"
                     className={styles.input}
+                    id="feature-heading-input"
                   />
+                </div>
+
+                <div className={styles.variableButtons}>
+                  <label className={styles.label}>Insert Variables:</label>
+                  <div className={styles.buttonGrid}>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{first_name}')}>
+                      {'{first_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{last_name}')}>
+                      {'{last_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{email}')}>
+                      {'{email}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{phone_number}')}>
+                      {'{phone_number}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{service_address}')}>
+                      {'{service_address}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{city}')}>
+                      {'{city}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{state}')}>
+                      {'{state}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{zip_code}')}>
+                      {'{zip_code}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{display_price}')}>
+                      {'{display_price}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{original_price}')}>
+                      {'{original_price}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{savings}')}>
+                      {'{savings}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{price_amount}')}>
+                      {'{price_amount}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{price_frequency}')}>
+                      {'{price_frequency}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_name}')}>
+                      {'{company_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{service_name}')}>
+                      {'{service_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_phone}')}>
+                      {'{company_phone}'}
+                    </button>
+                  </div>
                 </div>
 
                 <DynamicListEditor
@@ -610,7 +949,62 @@ export default function CampaignLandingPageEditorStep({
                     onChange={(e) => updateField('additional_services_heading', e.target.value)}
                     placeholder="e.g., And that's not all, we offer additional add-on programs as well including:"
                     className={styles.input}
+                    id="services-heading-input"
                   />
+                </div>
+
+                <div className={styles.variableButtons}>
+                  <label className={styles.label}>Insert Variables:</label>
+                  <div className={styles.buttonGrid}>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{first_name}')}>
+                      {'{first_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{last_name}')}>
+                      {'{last_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{email}')}>
+                      {'{email}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{phone_number}')}>
+                      {'{phone_number}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{service_address}')}>
+                      {'{service_address}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{city}')}>
+                      {'{city}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{state}')}>
+                      {'{state}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{zip_code}')}>
+                      {'{zip_code}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{display_price}')}>
+                      {'{display_price}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{original_price}')}>
+                      {'{original_price}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{savings}')}>
+                      {'{savings}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{price_amount}')}>
+                      {'{price_amount}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{price_frequency}')}>
+                      {'{price_frequency}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{company_name}')}>
+                      {'{company_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{service_name}')}>
+                      {'{service_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{company_phone}')}>
+                      {'{company_phone}'}
+                    </button>
+                  </div>
                 </div>
 
                 <DynamicListEditor
@@ -685,7 +1079,62 @@ export default function CampaignLandingPageEditorStep({
                         onChange={(e) => updateField('faq_heading', e.target.value)}
                         placeholder="e.g., Frequently Asked Questions"
                         className={styles.input}
+                        id="faq-heading-input"
                       />
+                    </div>
+
+                    <div className={styles.variableButtons}>
+                      <label className={styles.label}>Insert Variables:</label>
+                      <div className={styles.buttonGrid}>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{first_name}')}>
+                          {'{first_name}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{last_name}')}>
+                          {'{last_name}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{email}')}>
+                          {'{email}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{phone_number}')}>
+                          {'{phone_number}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{service_address}')}>
+                          {'{service_address}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{city}')}>
+                          {'{city}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{state}')}>
+                          {'{state}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{zip_code}')}>
+                          {'{zip_code}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{display_price}')}>
+                          {'{display_price}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{original_price}')}>
+                          {'{original_price}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{savings}')}>
+                          {'{savings}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{price_amount}')}>
+                          {'{price_amount}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{price_frequency}')}>
+                          {'{price_frequency}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{company_name}')}>
+                          {'{company_name}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{service_name}')}>
+                          {'{service_name}'}
+                        </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{company_phone}')}>
+                          {'{company_phone}'}
+                        </button>
+                      </div>
                     </div>
 
                     <DynamicListEditor
@@ -762,7 +1211,62 @@ export default function CampaignLandingPageEditorStep({
                 onChange={(e) => updateField('footer_company_tagline', e.target.value)}
                 placeholder="e.g., Personal. Urgent. Reliable."
                 className={styles.input}
+                id="footer-tagline-input"
               />
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{email}')}>
+                  {'{email}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{phone_number}')}>
+                  {'{phone_number}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{service_address}')}>
+                  {'{service_address}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{city}')}>
+                  {'{city}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{state}')}>
+                  {'{state}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{zip_code}')}>
+                  {'{zip_code}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{display_price}')}>
+                  {'{display_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{original_price}')}>
+                  {'{original_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{savings}')}>
+                  {'{savings}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{price_amount}')}>
+                  {'{price_amount}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{price_frequency}')}>
+                  {'{price_frequency}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{service_name}')}>
+                  {'{service_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{company_phone}')}>
+                  {'{company_phone}'}
+                </button>
+              </div>
             </div>
 
             <DynamicListEditor

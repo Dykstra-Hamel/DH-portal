@@ -22,7 +22,7 @@ export async function GET(
     // Check if this is an authenticated admin request (for editing) or public request (for viewing)
     const authSupabase = await createClient();
     const { data: { user } } = await authSupabase.auth.getUser();
-    const isAdminRequest = !!user && !customerId;
+    const isAdminRequest = !!user && (!customerId || customerId === 'preview');
 
     // For public requests, customerId is required
     if (!isAdminRequest && !customerId) {
@@ -419,6 +419,10 @@ export async function GET(
       terms: {
         content: landingPageData?.terms_content || null,
       },
+      redemptionCard: {
+        heading: landingPageData?.redemption_card_heading || null,
+        disclaimer: landingPageData?.redemption_card_disclaimer || null,
+      },
       branding,
     };
 
@@ -624,6 +628,9 @@ export async function POST(
 
         // Terms
         terms_content: body.terms_content || null,
+
+        // Redemption Card
+        redemption_card_heading: body.redemption_card_heading || null,
       })
       .select()
       .single();
@@ -792,6 +799,9 @@ export async function PUT(
 
     // Terms
     if (body.terms_content !== undefined) updateData.terms_content = body.terms_content;
+
+    // Redemption Card
+    if (body.redemption_card_heading !== undefined) updateData.redemption_card_heading = body.redemption_card_heading;
 
     // Add updated_at timestamp
     updateData.updated_at = new Date().toISOString();
