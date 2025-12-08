@@ -24,6 +24,7 @@ export interface EmailVariables {
   companyPhone: string;
   companyWebsite: string;
   companyLogo: string;
+  companySignature: string;
 
   // Google Reviews variables
   googleRating: string;
@@ -107,7 +108,7 @@ export function createSampleVariables(
     phone?: string;
     website?: string;
   } | null,
-  brandData?: { logo_url?: string } | null,
+  brandData?: { logo_url?: string; signature_url?: string } | null,
   reviewsData?: { rating?: number; reviewCount?: number } | null
 ): EmailVariables {
   return {
@@ -124,6 +125,7 @@ export function createSampleVariables(
     companyPhone: companyData?.phone || '(555) 000-0000',
     companyWebsite: companyData?.website || 'https://yourcompany.com',
     companyLogo: brandData?.logo_url || '/pcocentral-logo.png',
+    companySignature: brandData?.signature_url || 'https://via.placeholder.com/200x80?text=Signature',
 
     // Google Reviews (use real data when available)
     googleRating: reviewsData?.rating ? reviewsData.rating.toString() : '4.8',

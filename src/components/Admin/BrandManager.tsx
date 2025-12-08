@@ -309,6 +309,33 @@ export default function BrandManager() {
     }
   };
 
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompany) return;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `signature.${fileExt}`;
+      const folderPath = `${selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/signature`;
+      const filePath = `${folderPath}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('brand-assets').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('brand-assets').getPublicUrl(filePath);
+      handleInputChange('signature_url', urlData.publicUrl);
+
+      setToastMessage('Signature uploaded successfully');
+      setToastType('success');
+      setToastVisible(true);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setToastMessage('Failed to upload signature');
+      setToastType('error');
+      setToastVisible(true);
+    }
+  };
+
   const handlePhotographyUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -504,6 +531,47 @@ export default function BrandManager() {
                 rows={4}
               />
               <small>List the key personality traits that define your brand</small>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Company Representative Signature</label>
+              <small>Upload a signature image to be used on landing pages, emails, etc.</small>
+              <div className={styles.fileUploadButton}>
+                <span>Choose File</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSignatureUpload}
+                />
+              </div>
+              <small>
+                Will be saved to: {selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/signature/
+              </small>
+            </div>
+
+            {brandData.signature_url && brandData.signature_url.trim() && (
+              <div className={styles.formGroup}>
+                <label>Signature Preview</label>
+                <div className={styles.imagePreviewLarge}>
+                  <Image
+                    src={brandData.signature_url}
+                    alt="Signature preview"
+                    width={200}
+                    height={80}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className={styles.formGroup}>
+              <label>Signature Description</label>
+              <textarea
+                value={brandData.signature_description || ''}
+                onChange={e => handleInputChange('signature_description', e.target.value)}
+                placeholder="Describe how and where this signature should be used..."
+                rows={2}
+              />
             </div>
           </CollapsibleSection>
 
