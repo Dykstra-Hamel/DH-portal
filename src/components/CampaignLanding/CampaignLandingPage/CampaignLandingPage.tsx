@@ -116,6 +116,10 @@ interface CampaignLandingPageProps {
     terms: {
       content: string | null;
     };
+    redemptionCard: {
+      heading: string | null;
+      disclaimer: string | null;
+    };
     branding: {
       logoUrl: string | null;
       primaryColor: string;
@@ -279,6 +283,12 @@ export default function CampaignLandingPage({
                   priceFrequency: landingPage.pricing.displayPrice.split('/')[1] || 'mo',
                 }}
                 addons={landingPage.addons}
+                landingPage={{
+                  redemptionCard: {
+                    heading: landingPage.redemptionCard.heading || undefined,
+                    disclaimer: landingPage.redemptionCard.disclaimer || undefined,
+                  },
+                }}
                 company={company}
                 branding={landingPage.branding}
                 serviceName={landingPage.faq.serviceName}
@@ -298,6 +308,7 @@ export default function CampaignLandingPage({
           company={company}
           branding={landingPage.branding}
           serviceName={landingPage.faq.serviceName}
+          buttonText={landingPage.hero.buttonText}
           onCtaClick={() => handleImmediateRedeem()}
         />
       )}
@@ -313,6 +324,7 @@ export default function CampaignLandingPage({
             company={company}
             branding={landingPage.branding}
             serviceName={landingPage.faq.serviceName}
+            buttonText={landingPage.hero.buttonText}
             onCtaClick={() => handleImmediateRedeem()}
           />
         )}

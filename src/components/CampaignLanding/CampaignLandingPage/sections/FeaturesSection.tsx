@@ -19,6 +19,7 @@ interface FeaturesSectionProps {
   company: VariableContext['company'];
   branding?: VariableContext['branding'];
   serviceName?: string;
+  buttonText: string;
   onCtaClick: () => void;
 }
 
@@ -29,6 +30,7 @@ export default function FeaturesSection({
   company,
   branding,
   serviceName,
+  buttonText,
   onCtaClick,
 }: FeaturesSectionProps) {
   // Create variable context for text processing
@@ -117,7 +119,7 @@ export default function FeaturesSection({
 
           <div className={styles.featuresActions}>
             <button className={styles.featuresCta} onClick={onCtaClick}>
-              Upgrade Today!
+              {buttonText}
             </button>
             <button className={styles.featuresLink} onClick={scrollToFaq}>
               View Program FAQ&apos;s

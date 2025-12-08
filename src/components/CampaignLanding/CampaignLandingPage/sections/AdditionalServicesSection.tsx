@@ -24,6 +24,7 @@ interface AdditionalServicesSectionProps {
   company: VariableContext['company'];
   branding?: VariableContext['branding'];
   serviceName?: string;
+  buttonText: string;
   onCtaClick: () => void;
 }
 
@@ -35,6 +36,7 @@ export default function AdditionalServicesSection({
   company,
   branding,
   serviceName,
+  buttonText,
   onCtaClick,
 }: AdditionalServicesSectionProps) {
   // Create variable context for text processing
@@ -113,7 +115,7 @@ export default function AdditionalServicesSection({
 
           <div className={styles.additionalServicesActions}>
             <button className={styles.additionalServicesCta} onClick={onCtaClick}>
-              Upgrade Today!
+              {buttonText}
             </button>
             <button className={styles.additionalServicesLink} onClick={scrollToFaq}>
               View Add-On FAQ&apos;s

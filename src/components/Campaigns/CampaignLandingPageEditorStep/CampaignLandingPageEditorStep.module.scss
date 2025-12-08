@@ -334,3 +334,43 @@
     line-height: 1.5;
   }
 }
+
+.variableButtons {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.buttonGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+
+  &:not(:last-child) {
+    margin-bottom: 8px;
+  }
+}
+
+.variableButton {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #374151;
+
+  &:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}

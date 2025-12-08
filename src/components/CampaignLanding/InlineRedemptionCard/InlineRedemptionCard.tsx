@@ -8,7 +8,7 @@
 
 import { useState, useMemo } from 'react';
 import styles from './InlineRedemptionCard.module.scss';
-import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
+import { processTextWithVariables, processRedemptionHeading, type VariableContext } from '@/lib/campaign-text-processing';
 
 interface InlineRedemptionCardProps {
   customer: {
@@ -98,16 +98,19 @@ export default function InlineRedemptionCard({
     [customer, pricing, company, branding, serviceName]
   );
 
-  // Process heading with variables
-  const defaultHeading = `<span class="${styles.strikethrough}">{original_price}</span> <span class="${styles.highlight}">{display_price}</span> Initial Startup Fee* & Only {display_price} Thereafter`;
+  // Process heading with variables and automatic styling
+  const defaultHeading = `{original_price} {display_price} Initial Startup Fee* & Only {display_price} Thereafter`;
   const headingText = landingPage?.redemptionCard?.heading || defaultHeading;
   const processedHeading = useMemo(
-    () => processTextWithVariables(headingText, variableContext),
+    () => processRedemptionHeading(headingText, variableContext, {
+      strikethrough: styles.strikethrough,
+      highlight: styles.highlight,
+    }),
     [headingText, variableContext]
   );
 
   // Process disclaimer with variables
-  const defaultDisclaimer = 'Limited time offer. Subject to service availability. See terms for details.';
+  const defaultDisclaimer = '*With purchase of a year-round pest control program & not be combined with any other offers';
   const disclaimerText = landingPage?.redemptionCard?.disclaimer || defaultDisclaimer;
   const processedDisclaimer = useMemo(
     () => processTextWithVariables(disclaimerText, variableContext),

@@ -270,7 +270,7 @@
 }
 
 .priceUnit {
-  font-size: 35px;
+  font-size: 32px;
 }
 
 .heroDescription {
@@ -414,7 +414,7 @@
   margin: 0 auto;
   @include contentSectionPadding;
   display: grid;
-  grid-template-columns: 639px 1fr;
+  grid-template-columns: 587px 1fr;
   gap: 60px;
   align-items: start;
 
@@ -427,10 +427,6 @@
     grid-template-columns: 1fr;
     gap: 32px;
   }
-}
-
-.letterColumn {
-  align-self: center;
 }
 
 // ========================================

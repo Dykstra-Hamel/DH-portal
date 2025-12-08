@@ -181,3 +181,56 @@ export function processTextWithVariables(text: string, context: VariableContext)
 
   return processed;
 }
+
+/**
+ * Process redemption card heading with automatic styling for pricing variables
+ * - Wraps {original_price} with strikethrough class
+ * - Wraps {display_price} and {savings} with highlight class
+ * - Then replaces variables with actual values
+ *
+ * @param text - The text containing variable placeholders
+ * @param context - Variable context with customer, pricing, company data
+ * @param styles - CSS module class names for strikethrough and highlight
+ * @returns Processed HTML string with styled variables
+ */
+export function processRedemptionHeading(
+  text: string,
+  context: VariableContext,
+  styles: { strikethrough: string; highlight: string }
+): string {
+  if (!text) return '';
+
+  let processed = text;
+
+  // Step 1: Wrap pricing variables with styling classes BEFORE variable replacement
+  // This ensures the styling is applied to the placeholder, then the variable gets replaced
+
+  // Wrap {original_price} with strikethrough
+  processed = processed.replace(
+    /\{original_price\}/g,
+    `<span class="${styles.strikethrough}">{original_price}</span>`
+  );
+
+  // Wrap {display_price} with highlight
+  processed = processed.replace(
+    /\{display_price\}/g,
+    `<span class="${styles.highlight}">{display_price}</span>`
+  );
+
+  // Wrap {savings} with highlight
+  processed = processed.replace(
+    /\{savings\}/g,
+    `<span class="${styles.highlight}">{savings}</span>`
+  );
+
+  // Step 2: Process markdown links
+  processed = processMarkdownLinks(processed);
+
+  // Step 3: Replace all variables with actual values
+  processed = replaceVariables(processed, context);
+
+  // Step 4: Sanitize HTML (allows span tags with class attributes)
+  processed = sanitizeHtml(processed);
+
+  return processed;
+}

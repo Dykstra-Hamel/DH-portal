@@ -23,14 +23,14 @@
  * // Returns: http://localhost:3000/campaign/PEST26/uuid
  *
  * @example
- * // Staging with vanity subdomain (prettier for emails)
+ * // Production with vanity subdomain (prettier for emails)
  * generateCampaignLandingUrl('northwest-exterminating', 'PEST26', 'uuid', true)
- * // Returns: https://northwest-exterminating.staging.pmpcentral.io/campaign/PEST26/uuid
+ * // Returns: https://northwest-exterminating.pmpcentral.io/campaign/PEST26/uuid
  *
  * @example
- * // Staging without vanity subdomain (always works)
+ * // Production without vanity subdomain (always works)
  * generateCampaignLandingUrl('northwest-exterminating', 'PEST26', 'uuid', false)
- * // Returns: https://staging.pmpcentral.io/campaign/PEST26/uuid
+ * // Returns: https://pmpcentral.io/campaign/PEST26/uuid
  */
 export function generateCampaignLandingUrl(
   companySlug: string,
@@ -46,12 +46,12 @@ export function generateCampaignLandingUrl(
   }
 
   if (useVanityUrl) {
-    // Vanity URL: company.staging.pmpcentral.io/campaign/X/Y
-    const domain = env === 'production' ? 'app.pmpcentral.io' : 'staging.pmpcentral.io';
+    // Vanity URL: company.pmpcentral.io/campaign/X/Y
+    const domain = env === 'production' ? 'pmpcentral.io' : 'staging.pmpcentral.io';
     return `https://${companySlug}.${domain}/campaign/${campaignId}/${customerId}`;
   } else {
-    // Non-vanity URL: staging.pmpcentral.io/campaign/X/Y
-    const domain = env === 'production' ? 'app.pmpcentral.io' : 'staging.pmpcentral.io';
+    // Non-vanity URL: pmpcentral.io/campaign/X/Y
+    const domain = env === 'production' ? 'pmpcentral.io' : 'staging.pmpcentral.io';
     return `https://${domain}/campaign/${campaignId}/${customerId}`;
   }
 }
