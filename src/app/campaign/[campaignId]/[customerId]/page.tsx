@@ -3,7 +3,7 @@
 /**
  * Campaign Landing Page (Subdomain-based)
  *
- * Accessible via: company.staging.pmpcentral.io/campaign/{campaignId}/{customerId}
+ * Accessible via: company.pmpcentral.io/campaign/{campaignId}/{customerId}
  * Company is extracted from subdomain and validated against campaign/customer data.
  */
 

@@ -191,7 +191,7 @@ export function createSampleVariables(
 
     // Campaign Variables (sample data)
     campaignLandingUrl:
-      'https://your-company.staging.pmpcentral.io/campaign/PEST26/abc123',
+      'https://your-company.pmpcentral.io/campaign/PEST26/abc123',
     campaignId: 'PEST26',
     campaignName: 'Spring Special - Save on Pest Control',
     campaignDiscountText: '15% OFF',
