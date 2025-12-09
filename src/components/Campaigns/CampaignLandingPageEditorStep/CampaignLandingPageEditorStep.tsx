@@ -71,6 +71,23 @@ export interface LandingPageFormData {
   override_secondary_color: string;
   override_phone: string;
   accent_color_preference: 'primary' | 'secondary';
+
+  // Thank You Page
+  thankyou_greeting: string;
+  thankyou_content: string;
+  thankyou_show_expect: boolean;
+  thankyou_expect_heading: string;
+  thankyou_expect_col1_image: string;
+  thankyou_expect_col1_heading: string;
+  thankyou_expect_col1_content: string;
+  thankyou_expect_col2_image: string;
+  thankyou_expect_col2_heading: string;
+  thankyou_expect_col2_content: string;
+  thankyou_expect_col3_image: string;
+  thankyou_expect_col3_heading: string;
+  thankyou_expect_col3_content: string;
+  thankyou_cta_text: string;
+  thankyou_cta_url: string;
 }
 
 interface CampaignLandingPageEditorStepProps {
@@ -94,6 +111,7 @@ type SectionKey =
   | 'header'
   | 'footer'
   | 'terms'
+  | 'thankyou'
   | 'branding';
 
 interface ServicePlan {
@@ -126,6 +144,10 @@ export default function CampaignLandingPageEditorStep({
   const [selectedServicePlan, setSelectedServicePlan] = useState<ServicePlan | null>(null);
   const [loadingServicePlans, setLoadingServicePlans] = useState(true);
   const letterEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const thankyouContentEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const thankyouCol1EditorRef = useRef<RichTextEditorHandle | null>(null);
+  const thankyouCol2EditorRef = useRef<RichTextEditorHandle | null>(null);
+  const thankyouCol3EditorRef = useRef<RichTextEditorHandle | null>(null);
   const [availableAddons, setAvailableAddons] = useState<AddOn[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(false);
   const selectionInitializedRef = useRef(false);
@@ -278,6 +300,52 @@ export default function CampaignLandingPageEditorStep({
     if (fieldName === 'letter_content') {
       if (letterEditorRef.current?.insertText) {
         letterEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Thank You content RichTextEditor
+    if (fieldName === 'thankyou_content') {
+      if (thankyouContentEditorRef.current?.insertText) {
+        thankyouContentEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Thank You column RichTextEditors
+    if (fieldName === 'thankyou_expect_col1_content') {
+      if (thankyouCol1EditorRef.current?.insertText) {
+        thankyouCol1EditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    if (fieldName === 'thankyou_expect_col2_content') {
+      if (thankyouCol2EditorRef.current?.insertText) {
+        thankyouCol2EditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    if (fieldName === 'thankyou_expect_col3_content') {
+      if (thankyouCol3EditorRef.current?.insertText) {
+        thankyouCol3EditorRef.current.insertText(variable);
       } else {
         const currentValue = data[fieldName] as string;
         const newValue = currentValue ? `${currentValue} ${variable}` : variable;
@@ -1405,6 +1473,269 @@ export default function CampaignLandingPageEditorStep({
                 className={styles.textarea}
                 rows={8}
               />
+            </div>
+          </>
+        )}
+
+        {/* Thank You Page Section */}
+        {renderSection(
+          'thankyou',
+          'Thank You Page',
+          'Customize the page shown after campaign redemption',
+          <>
+            {/* Greeting */}
+            <div className={styles.field}>
+              <label className={styles.label}>Greeting</label>
+              <input
+                type="text"
+                value={data.thankyou_greeting}
+                onChange={(e) => updateField('thankyou_greeting', e.target.value)}
+                placeholder="e.g., Thanks {first_name}!"
+                className={styles.input}
+                id="thankyou-greeting-input"
+              />
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('thankyou-greeting-input', 'thankyou_greeting', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('thankyou-greeting-input', 'thankyou_greeting', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('thankyou-greeting-input', 'thankyou_greeting', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className={styles.field}>
+              <label className={styles.label}>Content (Rich Text)</label>
+              <RichTextEditor
+                ref={thankyouContentEditorRef}
+                value={data.thankyou_content}
+                onChange={(html) => updateField('thankyou_content', html)}
+                placeholder="Add content to appear below the greeting..."
+              />
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_content', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_content', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_content', '{email}')}>
+                  {'{email}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_content', '{phone_number}')}>
+                  {'{phone_number}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_content', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+              </div>
+            </div>
+
+            {/* What To Expect Section */}
+            <div className={styles.field}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={data.thankyou_show_expect}
+                  onChange={(e) => updateField('thankyou_show_expect', e.target.checked)}
+                />
+                <span>Show &quot;What To Expect&quot; section</span>
+              </label>
+            </div>
+
+            {data.thankyou_show_expect && (
+              <>
+                <div className={styles.field}>
+                  <label className={styles.label}>Section Heading</label>
+                  <input
+                    type="text"
+                    value={data.thankyou_expect_heading}
+                    onChange={(e) => updateField('thankyou_expect_heading', e.target.value)}
+                    placeholder="e.g., What To Expect"
+                    className={styles.input}
+                  />
+                </div>
+
+                <p className={styles.helpText}>
+                  Configure up to 3 columns. Only columns with a heading or content will be displayed.
+                </p>
+
+                {/* Column 1 */}
+                <div className={styles.expectColumnEditor}>
+                  <h4 className={styles.columnTitle}>Column 1</h4>
+
+                  <ImageUploadField
+                    label="Image (Optional)"
+                    value={data.thankyou_expect_col1_image || null}
+                    onChange={(url) => updateField('thankyou_expect_col1_image', url || '')}
+                    campaignId={campaignId}
+                    companyId={companyId}
+                  />
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>Heading</label>
+                    <input
+                      type="text"
+                      value={data.thankyou_expect_col1_heading}
+                      onChange={(e) => updateField('thankyou_expect_col1_heading', e.target.value)}
+                      placeholder="e.g., We'll Contact You"
+                      className={styles.input}
+                    />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>Content (Rich Text)</label>
+                    <RichTextEditor
+                      ref={thankyouCol1EditorRef}
+                      value={data.thankyou_expect_col1_content}
+                      onChange={(html) => updateField('thankyou_expect_col1_content', html)}
+                      placeholder="Add column content..."
+                    />
+                  </div>
+
+                  <div className={styles.variableButtons}>
+                    <label className={styles.label}>Insert Variables:</label>
+                    <div className={styles.buttonGrid}>
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_expect_col1_content', '{first_name}')}>
+                        {'{first_name}'}
+                      </button>
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_expect_col1_content', '{company_name}')}>
+                        {'{company_name}'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2 */}
+                <div className={styles.expectColumnEditor}>
+                  <h4 className={styles.columnTitle}>Column 2</h4>
+
+                  <ImageUploadField
+                    label="Image (Optional)"
+                    value={data.thankyou_expect_col2_image || null}
+                    onChange={(url) => updateField('thankyou_expect_col2_image', url || '')}
+                    campaignId={campaignId}
+                    companyId={companyId}
+                  />
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>Heading</label>
+                    <input
+                      type="text"
+                      value={data.thankyou_expect_col2_heading}
+                      onChange={(e) => updateField('thankyou_expect_col2_heading', e.target.value)}
+                      placeholder="e.g., Schedule Your Service"
+                      className={styles.input}
+                    />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>Content (Rich Text)</label>
+                    <RichTextEditor
+                      ref={thankyouCol2EditorRef}
+                      value={data.thankyou_expect_col2_content}
+                      onChange={(html) => updateField('thankyou_expect_col2_content', html)}
+                      placeholder="Add column content..."
+                    />
+                  </div>
+
+                  <div className={styles.variableButtons}>
+                    <label className={styles.label}>Insert Variables:</label>
+                    <div className={styles.buttonGrid}>
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_expect_col2_content', '{first_name}')}>
+                        {'{first_name}'}
+                      </button>
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_expect_col2_content', '{company_name}')}>
+                        {'{company_name}'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 3 */}
+                <div className={styles.expectColumnEditor}>
+                  <h4 className={styles.columnTitle}>Column 3</h4>
+
+                  <ImageUploadField
+                    label="Image (Optional)"
+                    value={data.thankyou_expect_col3_image || null}
+                    onChange={(url) => updateField('thankyou_expect_col3_image', url || '')}
+                    campaignId={campaignId}
+                    companyId={companyId}
+                  />
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>Heading</label>
+                    <input
+                      type="text"
+                      value={data.thankyou_expect_col3_heading}
+                      onChange={(e) => updateField('thankyou_expect_col3_heading', e.target.value)}
+                      placeholder="e.g., Enjoy Peace of Mind"
+                      className={styles.input}
+                    />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>Content (Rich Text)</label>
+                    <RichTextEditor
+                      ref={thankyouCol3EditorRef}
+                      value={data.thankyou_expect_col3_content}
+                      onChange={(html) => updateField('thankyou_expect_col3_content', html)}
+                      placeholder="Add column content..."
+                    />
+                  </div>
+
+                  <div className={styles.variableButtons}>
+                    <label className={styles.label}>Insert Variables:</label>
+                    <div className={styles.buttonGrid}>
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_expect_col3_content', '{first_name}')}>
+                        {'{first_name}'}
+                      </button>
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'thankyou_expect_col3_content', '{company_name}')}>
+                        {'{company_name}'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* CTA Button */}
+            <div className={styles.field}>
+              <label className={styles.label}>CTA Button Text</label>
+              <input
+                type="text"
+                value={data.thankyou_cta_text}
+                onChange={(e) => updateField('thankyou_cta_text', e.target.value)}
+                placeholder="e.g., Go Back To Homepage"
+                className={styles.input}
+              />
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>CTA Button URL (Optional)</label>
+              <input
+                type="url"
+                value={data.thankyou_cta_url}
+                onChange={(e) => updateField('thankyou_cta_url', e.target.value)}
+                placeholder="Leave empty to use company website"
+                className={styles.input}
+              />
+              <p className={styles.helpText}>
+                If left empty, the button will link to your company&apos;s website.
+              </p>
             </div>
           </>
         )}

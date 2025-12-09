@@ -16,6 +16,8 @@ interface HeaderSectionProps {
   secondaryButtonText: string;
   phoneNumber: string | null;
   onPrimaryClick: () => void;
+  hidePrimaryButton?: boolean;
+  removeBackground?: boolean;
 }
 
 const PhoneIcon = () => (
@@ -43,6 +45,8 @@ export default function HeaderSection({
   secondaryButtonText,
   phoneNumber,
   onPrimaryClick,
+  hidePrimaryButton = false,
+  removeBackground = false,
 }: HeaderSectionProps) {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -64,7 +68,10 @@ export default function HeaderSection({
   };
 
   return (
-    <header className={styles.header}>
+    <header
+      className={styles.header}
+      style={removeBackground ? { '--header-bg-opacity': '0' } as React.CSSProperties : undefined}
+    >
       <div className={styles.headerContainer}>
         <div className={styles.headerLogo}>
           {logo ? (
@@ -85,11 +92,13 @@ export default function HeaderSection({
               <PhoneIcon />
             </button>
           ) : (
-            // Desktop: Show both buttons
+            // Desktop: Show both buttons (or just secondary if primary hidden)
             <>
-              <button className={styles.headerPrimaryButton} onClick={onPrimaryClick}>
-                {primaryButtonText}
-              </button>
+              {!hidePrimaryButton && (
+                <button className={styles.headerPrimaryButton} onClick={onPrimaryClick}>
+                  {primaryButtonText}
+                </button>
+              )}
               <button className={styles.headerSecondaryButton} onClick={handlePhoneClick}>
                 {secondaryButtonText}
               </button>

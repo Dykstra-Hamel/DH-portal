@@ -37,6 +37,7 @@ export default function CampaignDetailPage({
     useState<string>('America/New_York');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLandingPageModal, setShowLandingPageModal] = useState(false);
+  const [isClonedCampaign, setIsClonedCampaign] = useState(false);
 
   useEffect(() => {
     params.then(p => setCampaignId(p.id));
@@ -165,6 +166,38 @@ export default function CampaignDetailPage({
     fetchCampaignData();
   };
 
+  const handleDuplicateCampaign = async () => {
+    if (!campaign) return;
+
+    const confirmed = confirm(`Duplicate campaign "${campaign.name}"?`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/campaigns/${campaign.id}/clone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          new_name: `${campaign.name} (Copy)`,
+          copy_contact_lists: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Open edit modal with cloned campaign
+        setCampaign(result.campaign);
+        setIsClonedCampaign(true);
+        setShowEditModal(true);
+      } else {
+        alert(result.error || 'Failed to duplicate campaign');
+      }
+    } catch (error) {
+      console.error('Error duplicating campaign:', error);
+      alert('Failed to duplicate campaign');
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
@@ -207,6 +240,7 @@ export default function CampaignDetailPage({
         onUpdate={handleCampaignUpdate}
         onEdit={() => setShowEditModal(true)}
         onEditLandingPage={() => setShowLandingPageModal(true)}
+        onDuplicate={handleDuplicateCampaign}
         companyTimezone={companyTimezone}
       />
 
@@ -285,12 +319,17 @@ export default function CampaignDetailPage({
       {/* Edit Campaign Modal */}
       <CampaignEditor
         isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
+        onClose={() => {
+          setShowEditModal(false);
+          setIsClonedCampaign(false);
+        }}
         companyId={campaign.company_id}
         campaign={campaign}
+        isCloned={isClonedCampaign}
         onSuccess={() => {
           fetchCampaignData();
           setShowEditModal(false);
+          setIsClonedCampaign(false);
         }}
       />
 

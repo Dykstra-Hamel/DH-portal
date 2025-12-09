@@ -9,6 +9,7 @@ import CampaignEditor from '@/components/Campaigns/CampaignEditor';
 import {
   Play,
   Pause,
+  Copy,
   Calendar,
   Users,
   Mail,
@@ -45,6 +46,9 @@ export default function CampaignsPage() {
   const [activeTab, setActiveTab] = useState<'active' | 'scheduled' | 'draft' | 'past'>('active');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [companyTimezone, setCompanyTimezone] = useState<string>('America/New_York');
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [isClonedCampaign, setIsClonedCampaign] = useState(false);
 
   // Register the Create Campaign action button in the page header
   useEffect(() => {
@@ -155,6 +159,36 @@ export default function CampaignsPage() {
     }
   };
 
+  const handleDuplicateCampaign = async (campaignId: string, originalName: string) => {
+    setDuplicatingId(campaignId);
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/clone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          new_name: `${originalName} (Copy)`,
+          copy_contact_lists: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Open modal with cloned campaign data
+        setEditingCampaign(result.campaign);
+        setIsClonedCampaign(true);
+        setShowCreateModal(true);
+      } else {
+        alert(result.error || 'Failed to duplicate campaign');
+      }
+    } catch (error) {
+      console.error('Error duplicating campaign:', error);
+      alert('Failed to duplicate campaign');
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       draft: { label: 'Draft', className: styles.statusDraft },
@@ -243,6 +277,14 @@ export default function CampaignsPage() {
                       <Pause size={16} />
                     </button>
                   ) : null}
+                  <button
+                    className={styles.actionButton}
+                    onClick={() => handleDuplicateCampaign(campaign.id, campaign.name)}
+                    title="Duplicate campaign"
+                    disabled={duplicatingId === campaign.id}
+                  >
+                    <Copy size={16} />
+                  </button>
                 </div>
               </div>
 
@@ -312,11 +354,19 @@ export default function CampaignsPage() {
 
       <CampaignEditor
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditingCampaign(null);
+          setIsClonedCampaign(false);
+        }}
         companyId={selectedCompany?.id || ''}
+        campaign={editingCampaign}
+        isCloned={isClonedCampaign}
         onSuccess={() => {
           fetchCampaigns();
           setShowCreateModal(false);
+          setEditingCampaign(null);
+          setIsClonedCampaign(false);
         }}
       />
     </div>
