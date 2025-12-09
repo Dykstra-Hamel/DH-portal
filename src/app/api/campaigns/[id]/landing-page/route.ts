@@ -356,6 +356,34 @@ export async function GET(
       fontPrimaryUrl: brandData?.font_primary_url || null,
     };
 
+    // Parse additional services config (supports legacy array or new object structure)
+    const additionalServicesConfig = landingPageData?.additional_services;
+    const additionalServicesItems = Array.isArray(additionalServicesConfig?.items)
+      ? additionalServicesConfig.items
+      : Array.isArray(additionalServicesConfig)
+        ? additionalServicesConfig
+        : [];
+
+    const storedSelectedAddonIds =
+      additionalServicesConfig &&
+      typeof additionalServicesConfig === 'object' &&
+      Array.isArray((additionalServicesConfig as any).selectedAddonIds)
+        ? (additionalServicesConfig as any).selectedAddonIds
+        : null;
+
+    const selectedAddonIdsSet = storedSelectedAddonIds
+      ? new Set(storedSelectedAddonIds)
+      : null;
+
+    let selectedAddons = selectedAddonIdsSet
+      ? eligibleAddOns.filter((addon) => selectedAddonIdsSet.has(addon.id))
+      : eligibleAddOns;
+
+    // If the stored selection is now invalid (e.g., plan changed), fall back to all eligible add-ons
+    if (selectedAddonIdsSet && selectedAddons.length === 0) {
+      selectedAddons = eligibleAddOns;
+    }
+
     // Build landing page object with defaults
     const landingPage = {
       hero: {
@@ -365,6 +393,7 @@ export async function GET(
         buttonText: landingPageData?.hero_button_text || 'Upgrade Today!',
         // Use single hero image (hero_image_url) or fall back to first image from old array format
         imageUrl: landingPageData?.hero_image_url || landingPageData?.hero_image_urls?.[0] || null,
+        buttonIconUrl: landingPageData?.hero_button_icon_url || null,
       },
       pricing: {
         displayPrice: landingPageData?.display_price || '$44/mo',
@@ -386,10 +415,10 @@ export async function GET(
       additionalServices: {
         show: landingPageData?.show_additional_services ?? true,
         heading: landingPageData?.additional_services_heading || 'And thats not all, we offer additional add-on programs as well including:',
-        services: landingPageData?.additional_services || [],
+        services: additionalServicesItems,
         imageUrl: landingPageData?.additional_services_image_url || null,
       },
-      addons: eligibleAddOns.map(addon => ({
+      addons: selectedAddons.map(addon => ({
         id: addon.id,
         name: addon.addon_name,
         description: addon.addon_description,
@@ -401,7 +430,7 @@ export async function GET(
         heading: landingPageData?.faq_heading || 'Frequently Asked Questions',
         serviceName: servicePlan?.plan_name || 'Quarterly Services',
         serviceFaqs: servicePlan?.plan_faqs || landingPageData?.faq_items || [],
-        addonFaqs: eligibleAddOns.map(addon => ({
+        addonFaqs: selectedAddons.map(addon => ({
           addonId: addon.id,
           addonName: addon.addon_name,
           faqs: addon.addon_faqs || [],
@@ -424,6 +453,7 @@ export async function GET(
         disclaimer: landingPageData?.redemption_card_disclaimer || null,
       },
       branding,
+      selectedAddonIds: selectedAddons.map((addon) => addon.id),
     };
 
     // Return formatted data
@@ -435,6 +465,7 @@ export async function GET(
           campaign_id: campaign.campaign_id,
           name: campaign.name,
           description: campaign.description,
+          service_plan_id: campaign.service_plan_id,
           discount: discount ? {
             id: discount.id,
             discount_type: discount.discount_type,
@@ -582,6 +613,7 @@ export async function POST(
         hero_description: body.hero_description || null,
         hero_button_text: body.hero_button_text || 'Upgrade Today!',
         hero_image_url: body.hero_image_url || null,
+        hero_button_icon_url: body.hero_button_icon_url || null,
 
         // Pricing
         display_price: body.display_price,
@@ -602,7 +634,10 @@ export async function POST(
         // Additional Services
         show_additional_services: body.show_additional_services ?? true,
         additional_services_heading: body.additional_services_heading || 'And thats not all, we offer additional add-on programs as well including:',
-        additional_services: body.additional_services || [],
+        additional_services: {
+          items: body.additional_services || [],
+          selectedAddonIds: body.selected_addon_ids || [],
+        },
         additional_services_image_url: body.additional_services_image_url || null,
 
         // FAQ
@@ -619,7 +654,7 @@ export async function POST(
         override_logo_url: body.override_logo_url || null,
         override_primary_color: body.override_primary_color || null,
         override_secondary_color: body.override_secondary_color || null,
-        override_phone: body.override_phone || null,
+        override_phone: body.override_phone === '' ? null : body.override_phone || null,
         accent_color_preference: body.accent_color_preference || 'primary',
 
         // Footer
@@ -753,6 +788,7 @@ export async function PUT(
     if (body.hero_description !== undefined) updateData.hero_description = body.hero_description;
     if (body.hero_button_text !== undefined) updateData.hero_button_text = body.hero_button_text;
     if (body.hero_image_url !== undefined) updateData.hero_image_url = body.hero_image_url;
+    if (body.hero_button_icon_url !== undefined) updateData.hero_button_icon_url = body.hero_button_icon_url;
 
     // Pricing
     if (body.display_price !== undefined) updateData.display_price = body.display_price;
@@ -773,7 +809,12 @@ export async function PUT(
     // Additional Services
     if (body.show_additional_services !== undefined) updateData.show_additional_services = body.show_additional_services;
     if (body.additional_services_heading !== undefined) updateData.additional_services_heading = body.additional_services_heading;
-    if (body.additional_services !== undefined) updateData.additional_services = body.additional_services;
+    if (body.additional_services !== undefined || body.selected_addon_ids !== undefined) {
+      updateData.additional_services = {
+        items: body.additional_services ?? [],
+        selectedAddonIds: body.selected_addon_ids ?? [],
+      };
+    }
     if (body.additional_services_image_url !== undefined) updateData.additional_services_image_url = body.additional_services_image_url;
 
     // FAQ
@@ -790,7 +831,9 @@ export async function PUT(
     if (body.override_logo_url !== undefined) updateData.override_logo_url = body.override_logo_url;
     if (body.override_primary_color !== undefined) updateData.override_primary_color = body.override_primary_color;
     if (body.override_secondary_color !== undefined) updateData.override_secondary_color = body.override_secondary_color;
-    if (body.override_phone !== undefined) updateData.override_phone = body.override_phone;
+    if (body.override_phone !== undefined) {
+      updateData.override_phone = body.override_phone === '' ? null : body.override_phone;
+    }
     if (body.accent_color_preference !== undefined) updateData.accent_color_preference = body.accent_color_preference;
 
     // Footer

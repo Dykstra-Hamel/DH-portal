@@ -9,9 +9,11 @@
   top: 120px;
 
   @media (max-width: 768px) {
+    text-align: center;
     position: relative;
     top: 0;
-    margin-top: 32px;
+    margin-top: 0px;
+    padding: 30px 12px;
   }
 }
 
@@ -29,12 +31,14 @@
   :global(.highlight) {
     color: var(--accent-color, #00b142);
   }
+  @media (max-width: 480px) {
+    font-size: 25px;
+  }
 }
 
 .strikethrough {
   text-decoration: line-through;
   color: #dc2626;
-  margin-right: 8px;
 }
 
 .highlight {
@@ -225,27 +229,41 @@
 }
 
 .redeemButton {
+  position: relative;
+  isolation: isolate;
   width: 100%;
-  background: var(--accent-color, #00b142);
+  --btn-bg: var(--accent-color, #00b142);
+  background: transparent;
   color: white;
-  padding: 16px 24px;
+  padding: 14px 24px;
   border-radius: 8px;
   font-weight: 700;
   font-size: 16px;
   cursor: pointer;
   border: none;
-  transition:
-    background 0.2s,
-    transform 0.1s;
+  transition: background 0.2s ease;
   margin-bottom: 12px;
 
-  &:hover:not(:disabled) {
-    background: var(--accent-color-dark, #009935);
-    transform: translateY(-1px);
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--btn-bg);
+    border-radius: inherit;
+    z-index: -1;
+    transform: scale(1);
+    transition: transform 0.2s ease;
   }
 
-  &:active:not(:disabled) {
-    transform: translateY(0);
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &:hover:not(:disabled) {
+    &::before {
+      transform: scale(1.02);
+    }
   }
 
   &:disabled {

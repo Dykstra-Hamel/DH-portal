@@ -57,6 +57,7 @@ interface CampaignData {
       description: string | null;
       buttonText: string;
       imageUrl: string | null;
+      buttonIconUrl: string | null;
     };
     pricing: {
       displayPrice: string;

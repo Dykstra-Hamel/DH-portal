@@ -6,11 +6,11 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from './CampaignLandingPageEditorStep.module.scss';
 import ImageUploadField from '../ImageUploadField/ImageUploadField';
 import DynamicListEditor, { FieldConfig } from '../DynamicListEditor/DynamicListEditor';
-import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
+import RichTextEditor, { RichTextEditorHandle } from '@/components/Common/RichTextEditor/RichTextEditor';
 import { createClient } from '@/lib/supabase/client';
 
 export interface LandingPageFormData {
@@ -20,6 +20,7 @@ export interface LandingPageFormData {
   hero_description: string;
   hero_button_text: string;
   hero_image_url: string; // Changed from hero_image_urls array to single image
+  hero_button_icon_url: string; // Icon next to CTA button
 
   // Pricing
   display_price: string;
@@ -42,6 +43,7 @@ export interface LandingPageFormData {
   additional_services_heading: string;
   additional_services: Array<{ name: string; description?: string }>;
   additional_services_image_url: string;
+  selected_addon_ids: string[];
 
   // FAQ
   show_faq: boolean;
@@ -101,6 +103,13 @@ interface ServicePlan {
   plan_features?: string[];
 }
 
+interface AddOn {
+  id: string;
+  addon_name: string;
+  addon_description: string | null;
+  recurring_price: number | null;
+}
+
 export default function CampaignLandingPageEditorStep({
   campaignId,
   companyId,
@@ -116,6 +125,10 @@ export default function CampaignLandingPageEditorStep({
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [selectedServicePlan, setSelectedServicePlan] = useState<ServicePlan | null>(null);
   const [loadingServicePlans, setLoadingServicePlans] = useState(true);
+  const letterEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const [availableAddons, setAvailableAddons] = useState<AddOn[]>([]);
+  const [loadingAddons, setLoadingAddons] = useState(false);
+  const selectionInitializedRef = useRef(false);
 
   // Fetch available service plans for this company
   useEffect(() => {
@@ -149,7 +162,84 @@ export default function CampaignLandingPageEditorStep({
     } else {
       setSelectedServicePlan(null);
     }
+    selectionInitializedRef.current = false;
   }, [servicePlanId, servicePlans]);
+
+  // Fetch eligible add-ons for the selected service plan
+  useEffect(() => {
+    const fetchAddons = async () => {
+      if (!servicePlanId) {
+        setAvailableAddons([]);
+        return;
+      }
+
+      try {
+        setLoadingAddons(true);
+        const { data: eligible } = await supabase
+          .rpc('get_eligible_addons_for_plan', {
+            p_service_plan_id: servicePlanId,
+            p_company_id: companyId,
+          });
+
+        const eligibleIds =
+          eligible
+            ?.filter((addon: any) => addon.is_eligible)
+            .map((addon: any) => addon.addon_id) || [];
+
+        if (eligibleIds.length === 0) {
+          setAvailableAddons([]);
+          return;
+        }
+
+        const { data: addons } = await supabase
+          .from('add_on_services')
+          .select('id, addon_name, addon_description, recurring_price')
+          .in('id', eligibleIds)
+          .eq('is_active', true)
+          .order('display_order', { ascending: true })
+          .order('addon_name');
+
+        setAvailableAddons(addons || []);
+      } catch (error) {
+        console.error('Error fetching add-ons:', error);
+        setAvailableAddons([]);
+      } finally {
+        setLoadingAddons(false);
+      }
+    };
+
+    fetchAddons();
+  }, [servicePlanId, companyId, supabase]);
+
+  // Ensure selected add-ons stay in sync with available options
+  useEffect(() => {
+    const availableIds = availableAddons.map((addon) => addon.id);
+    const currentSelected = data.selected_addon_ids || [];
+
+    // Initialize selection when add-ons load or plan changes
+    if (!selectionInitializedRef.current) {
+      const initialSelection =
+        currentSelected.length > 0
+          ? currentSelected.filter((id) => availableIds.includes(id))
+          : availableIds;
+
+      selectionInitializedRef.current = true;
+
+      if (initialSelection.join('|') !== currentSelected.join('|')) {
+        updateField('selected_addon_ids', initialSelection);
+      }
+      return;
+    }
+
+    // After initialization, only prune invalid selections
+    const filteredSelection = currentSelected.filter((id) =>
+      availableIds.includes(id)
+    );
+
+    if (filteredSelection.length !== currentSelected.length) {
+      updateField('selected_addon_ids', filteredSelection);
+    }
+  }, [availableAddons]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSection = (section: SectionKey) => {
     const newExpanded = new Set(expandedSections);
@@ -175,13 +265,24 @@ export default function CampaignLandingPageEditorStep({
     }
   };
 
+  const toggleAddonSelection = (addonId: string) => {
+    const current = data.selected_addon_ids || [];
+    const next = current.includes(addonId)
+      ? current.filter((id) => id !== addonId)
+      : [...current, addonId];
+    updateField('selected_addon_ids', next);
+  };
+
   const insertVariableIntoField = (textareaId: string, fieldName: keyof LandingPageFormData, variable: string) => {
     // Special handling for RichTextEditor (letter_content)
     if (fieldName === 'letter_content') {
-      const currentValue = data[fieldName] as string;
-      // Append variable with a space if content exists
-      const newValue = currentValue ? `${currentValue} ${variable}` : variable;
-      updateField(fieldName, newValue);
+      if (letterEditorRef.current?.insertText) {
+        letterEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
       return;
     }
 
@@ -213,22 +314,6 @@ export default function CampaignLandingPageEditorStep({
       type: 'text',
       placeholder: 'e.g., Covers Ants, Spiders, Wasps & More',
       required: true,
-    },
-  ];
-
-  const additionalServicesFields: FieldConfig[] = [
-    {
-      name: 'name',
-      label: 'Service Name',
-      type: 'text',
-      placeholder: 'e.g., Weed Control Services',
-      required: true,
-    },
-    {
-      name: 'description',
-      label: 'Description (Optional)',
-      type: 'textarea',
-      placeholder: 'Brief description of the service',
     },
   ];
 
@@ -562,6 +647,15 @@ export default function CampaignLandingPageEditorStep({
             </div>
 
             <ImageUploadField
+              label="Button Icon (Optional)"
+              value={data.hero_button_icon_url || null}
+              onChange={(url) => updateField('hero_button_icon_url', url || '')}
+              campaignId={campaignId}
+              companyId={companyId}
+              helpText="Optional badge/icon displayed next to the CTA button (e.g., BBB accreditation, trust badges)"
+            />
+
+            <ImageUploadField
               label="Hero Image"
               value={data.hero_image_url || null}
               onChange={(url) => updateField('hero_image_url', url || '')}
@@ -717,6 +811,7 @@ export default function CampaignLandingPageEditorStep({
                 <div className={styles.field}>
                   <label className={styles.label}>Letter Content</label>
                   <RichTextEditor
+                    ref={letterEditorRef}
                     value={data.letter_content}
                     onChange={(value) => updateField('letter_content', value)}
                     placeholder="Write a personalized message. Use variables for personalization."
@@ -812,6 +907,72 @@ export default function CampaignLandingPageEditorStep({
           'Features Section',
           'Highlight key features with bullet points',
           <>
+            <div className={styles.field}>
+              <label className={styles.label}>Features Heading</label>
+              <input
+                type="text"
+                value={data.feature_heading}
+                onChange={(e) => updateField('feature_heading', e.target.value)}
+                placeholder="e.g., No initial cost to get started"
+                className={styles.input}
+                id="feature-heading-input"
+              />
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{email}')}>
+                  {'{email}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{phone_number}')}>
+                  {'{phone_number}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{service_address}')}>
+                  {'{service_address}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{city}')}>
+                  {'{city}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{state}')}>
+                  {'{state}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{zip_code}')}>
+                  {'{zip_code}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{display_price}')}>
+                  {'{display_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{original_price}')}>
+                  {'{original_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{savings}')}>
+                  {'{savings}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{price_amount}')}>
+                  {'{price_amount}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{price_frequency}')}>
+                  {'{price_frequency}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{service_name}')}>
+                  {'{service_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_phone}')}>
+                  {'{company_phone}'}
+                </button>
+              </div>
+            </div>
+
             {selectedServicePlan ? (
               <>
                 <div className={styles.notice}>
@@ -832,84 +993,16 @@ export default function CampaignLandingPageEditorStep({
                 )}
               </>
             ) : (
-              <>
-                <div className={styles.field}>
-                  <label className={styles.label}>Features Heading</label>
-                  <input
-                    type="text"
-                    value={data.feature_heading}
-                    onChange={(e) => updateField('feature_heading', e.target.value)}
-                    placeholder="e.g., No initial cost to get started"
-                    className={styles.input}
-                    id="feature-heading-input"
-                  />
-                </div>
-
-                <div className={styles.variableButtons}>
-                  <label className={styles.label}>Insert Variables:</label>
-                  <div className={styles.buttonGrid}>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{first_name}')}>
-                      {'{first_name}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{last_name}')}>
-                      {'{last_name}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{email}')}>
-                      {'{email}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{phone_number}')}>
-                      {'{phone_number}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{service_address}')}>
-                      {'{service_address}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{city}')}>
-                      {'{city}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{state}')}>
-                      {'{state}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{zip_code}')}>
-                      {'{zip_code}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{display_price}')}>
-                      {'{display_price}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{original_price}')}>
-                      {'{original_price}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{savings}')}>
-                      {'{savings}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{price_amount}')}>
-                      {'{price_amount}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{price_frequency}')}>
-                      {'{price_frequency}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_name}')}>
-                      {'{company_name}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{service_name}')}>
-                      {'{service_name}'}
-                    </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_phone}')}>
-                      {'{company_phone}'}
-                    </button>
-                  </div>
-                </div>
-
-                <DynamicListEditor
-                  label="Feature Bullets"
-                  items={data.feature_bullets.map((b) => ({ value: b }))}
-                  onChange={(items) =>
-                    updateField('feature_bullets', items.map((i: any) => i.value))
-                  }
-                  fields={featureBulletsFields}
-                  addButtonText="Add Feature"
-                  emptyText="No features added yet."
-                />
-              </>
+              <DynamicListEditor
+                label="Feature Bullets"
+                items={data.feature_bullets.map((b) => ({ value: b }))}
+                onChange={(items) =>
+                  updateField('feature_bullets', items.map((i: any) => i.value))
+                }
+                fields={featureBulletsFields}
+                addButtonText="Add Feature"
+                emptyText="No features added yet."
+              />
             )}
 
             <ImageUploadField
@@ -1007,14 +1100,42 @@ export default function CampaignLandingPageEditorStep({
                   </div>
                 </div>
 
-                <DynamicListEditor
-                  label="Services"
-                  items={data.additional_services}
-                  onChange={(items) => updateField('additional_services', items)}
-                  fields={additionalServicesFields}
-                  addButtonText="Add Service"
-                  emptyText="No services added yet."
-                />
+                <div className={styles.field}>
+                  <label className={styles.label}>Available Add-Ons</label>
+                  {!servicePlanId && (
+                    <p className={styles.helpText}>
+                      Link a service plan to select eligible add-ons.
+                    </p>
+                  )}
+                  {servicePlanId && loadingAddons && (
+                    <p className={styles.helpText}>Loading add-ons…</p>
+                  )}
+                  {servicePlanId && !loadingAddons && availableAddons.length === 0 && (
+                    <p className={styles.helpText}>No eligible add-ons for this plan.</p>
+                  )}
+                  {availableAddons.length > 0 && (
+                    <div className={styles.checkboxGrid}>
+                      {availableAddons.map((addon) => (
+                        <label key={addon.id} className={styles.checkboxLabel}>
+                          <input
+                            type="checkbox"
+                            checked={data.selected_addon_ids?.includes(addon.id)}
+                            onChange={() => toggleAddonSelection(addon.id)}
+                          />
+                          <div>
+                            <div className={styles.addonName}>{addon.addon_name}</div>
+                            {addon.addon_description && (
+                              <div className={styles.addonDescription}>{addon.addon_description}</div>
+                            )}
+                            {addon.recurring_price !== null && (
+                              <div className={styles.addonPrice}>${addon.recurring_price}</div>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <ImageUploadField
                   label="Services Image (Optional)"
@@ -1178,17 +1299,6 @@ export default function CampaignLandingPageEditorStep({
                     value={data.header_primary_button_text}
                     onChange={(e) => updateField('header_primary_button_text', e.target.value)}
                     placeholder="e.g., Upgrade Now"
-                    className={styles.input}
-                  />
-                </div>
-
-                <div className={styles.field}>
-                  <label className={styles.label}>Secondary Button Text</label>
-                  <input
-                    type="text"
-                    value={data.header_secondary_button_text}
-                    onChange={(e) => updateField('header_secondary_button_text', e.target.value)}
-                    placeholder="e.g., Call (888) 888-8888"
                     className={styles.input}
                   />
                 </div>

@@ -251,18 +251,21 @@ export function extractVariables(content: string): string[] {
  * @param campaignId - Campaign identifier (e.g., "PEST26")
  * @param customerId - Customer UUID
  * @param leadId - Optional existing lead UUID (if updating)
+ * @param companyId - Optional company UUID (used as a fallback if email log lacks company_id)
  * @returns SES tags attribute string in format: ses:tags="key:value;key:value;"
  */
 export function generateLeadTrackingTags(
   campaignId: string | null,
   customerId: string | null,
-  leadId?: string | null
+  leadId?: string | null,
+  companyId?: string | null
 ): string {
   const tags: string[] = ['generateLead:true'];
 
   if (campaignId) tags.push(`campaignId:${campaignId}`);
   if (customerId) tags.push(`customerId:${customerId}`);
   if (leadId) tags.push(`leadId:${leadId}`);
+   if (companyId) tags.push(`companyId:${companyId}`);
 
   return `ses:tags="${tags.join(';')};"`;
 }
