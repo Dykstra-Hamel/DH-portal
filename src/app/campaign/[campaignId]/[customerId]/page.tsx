@@ -43,6 +43,7 @@ interface CampaignData {
     id: string;
     name: string;
     slug: string;
+    website: string[];
   };
   redemption: {
     isRedeemed: boolean;
@@ -125,6 +126,19 @@ interface CampaignData {
       accentColorPreference: 'primary' | 'secondary';
       fontPrimaryName: string | null;
       fontPrimaryUrl: string | null;
+    };
+    thankYou: {
+      greeting: string;
+      content: string | null;
+      showExpect: boolean;
+      expectHeading: string;
+      expectColumns: Array<{
+        imageUrl: string | null;
+        heading: string | null;
+        content: string | null;
+      }>;
+      ctaText: string;
+      ctaUrl: string | null;
     };
   };
 }

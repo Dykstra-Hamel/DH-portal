@@ -68,6 +68,21 @@ export default function EditLandingPageModal({
     override_secondary_color: '',
     override_phone: '',
     accent_color_preference: 'primary',
+    thankyou_greeting: '',
+    thankyou_content: '',
+    thankyou_show_expect: false,
+    thankyou_expect_heading: '',
+    thankyou_expect_col1_image: '',
+    thankyou_expect_col1_heading: '',
+    thankyou_expect_col1_content: '',
+    thankyou_expect_col2_image: '',
+    thankyou_expect_col2_heading: '',
+    thankyou_expect_col2_content: '',
+    thankyou_expect_col3_image: '',
+    thankyou_expect_col3_heading: '',
+    thankyou_expect_col3_content: '',
+    thankyou_cta_text: '',
+    thankyou_cta_url: '',
   });
 
   const [servicePlanId, setServicePlanId] = useState<string | null>(
@@ -132,6 +147,21 @@ export default function EditLandingPageModal({
             override_secondary_color: '',
             override_phone: '',
             accent_color_preference: 'primary',
+            thankyou_greeting: 'Thank you, {first_name}!',
+            thankyou_content: '<p>Your request has been received and we&apos;ll be in touch soon.</p>',
+            thankyou_show_expect: true,
+            thankyou_expect_heading: 'What to Expect Next',
+            thankyou_expect_col1_image: '',
+            thankyou_expect_col1_heading: 'Confirmation',
+            thankyou_expect_col1_content: '<p>You&apos;ll receive a confirmation email shortly.</p>',
+            thankyou_expect_col2_image: '',
+            thankyou_expect_col2_heading: 'Contact',
+            thankyou_expect_col2_content: '<p>Our team will reach out to schedule your service.</p>',
+            thankyou_expect_col3_image: '',
+            thankyou_expect_col3_heading: 'Service',
+            thankyou_expect_col3_content: '<p>We&apos;ll provide exceptional service at your scheduled time.</p>',
+            thankyou_cta_text: 'Visit Our Website',
+            thankyou_cta_url: '',
           });
           return;
         }
@@ -203,6 +233,23 @@ export default function EditLandingPageModal({
         override_secondary_color: apiData.landingPage.branding.secondaryColor || '',
         override_phone: apiData.landingPage.branding.phoneNumber || '',
         accent_color_preference: apiData.landingPage.branding.accentColorPreference || 'primary',
+
+        // Thank You Page
+        thankyou_greeting: apiData.landingPage.thankYou?.greeting || 'Thank you, {first_name}!',
+        thankyou_content: apiData.landingPage.thankYou?.content || '<p>Your request has been received and we&apos;ll be in touch soon.</p>',
+        thankyou_show_expect: apiData.landingPage.thankYou?.showExpect ?? true,
+        thankyou_expect_heading: apiData.landingPage.thankYou?.expectHeading || 'What to Expect Next',
+        thankyou_expect_col1_image: apiData.landingPage.thankYou?.expectColumns?.[0]?.imageUrl || '',
+        thankyou_expect_col1_heading: apiData.landingPage.thankYou?.expectColumns?.[0]?.heading || '',
+        thankyou_expect_col1_content: apiData.landingPage.thankYou?.expectColumns?.[0]?.content || '',
+        thankyou_expect_col2_image: apiData.landingPage.thankYou?.expectColumns?.[1]?.imageUrl || '',
+        thankyou_expect_col2_heading: apiData.landingPage.thankYou?.expectColumns?.[1]?.heading || '',
+        thankyou_expect_col2_content: apiData.landingPage.thankYou?.expectColumns?.[1]?.content || '',
+        thankyou_expect_col3_image: apiData.landingPage.thankYou?.expectColumns?.[2]?.imageUrl || '',
+        thankyou_expect_col3_heading: apiData.landingPage.thankYou?.expectColumns?.[2]?.heading || '',
+        thankyou_expect_col3_content: apiData.landingPage.thankYou?.expectColumns?.[2]?.content || '',
+        thankyou_cta_text: apiData.landingPage.thankYou?.ctaText || 'Visit Our Website',
+        thankyou_cta_url: apiData.landingPage.thankYou?.ctaUrl || '',
       };
 
       setFormData(mappedData);

@@ -1,146 +1,343 @@
 // Thank You Page Styles
 // Full-page version shown when campaign already redeemed
+// Matches Figma design specifications
+
+// Mixin for content section containers (matches landing page)
+@mixin contentSectionPadding {
+  padding: 0 276px;
+
+  @media (max-width: 1400px) {
+    padding: 0 60px;
+  }
+
+  @media (max-width: 768px) {
+    padding: 0 20px;
+  }
+}
 
 .thankYouPage {
-  min-height: 100vh;
-  background: #f9fafb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-
-  // CSS variables for branding
+  // CSS variables for branding (set via inline styles from API)
   --brand-primary: #00529b;
   --brand-secondary: #00b142;
+  --accent-color: var(--brand-primary);
+  --font-primary: 'Inter Tight', sans-serif;
+
+  // Fixed design system colors
+  --color-text: #2b2b2b;
+  --color-text-gray: #4e4e4e;
+  --color-white: #ffffff;
+  --color-bg-light: #f9fafb;
+
+  // Shadows
+  --shadow-button: 0px 1px 2px rgba(0, 0, 0, 0.12);
+
+  font-family: var(--font-primary);
+  background: var(--color-white);
+  color: var(--color-text);
+  min-height: 100vh;
+  max-width: 1626px;
 }
 
 .container {
-  max-width: 900px;
-  width: 100%;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 60px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  @include contentSectionPadding;
+  padding-top: 60px;
+  padding-bottom: 60px;
 
   @media (max-width: 768px) {
-    padding: 40px 24px;
+    padding-top: 40px;
+    padding-bottom: 40px;
   }
 }
 
-.logo {
+// Greeting Section
+.greetingSection {
   text-align: center;
-  margin-bottom: 40px;
-
-  img {
-    max-width: 200px;
-    height: auto;
-  }
-}
-
-.completionHeader {
-  text-align: center;
-  margin-bottom: 50px;
-
-  h1 {
-    font-size: 36px;
-    font-weight: 700;
-    color: #2b2b2b;
-    margin-bottom: 16px;
-
-    @media (max-width: 768px) {
-      font-size: 28px;
-    }
-  }
-
-  p {
-    font-size: 18px;
-    color: #4e4e4e;
-    margin: 8px 0;
-  }
-}
-
-.redeemedDate {
-  font-size: 14px;
-  color: #9ca3af;
-  font-style: italic;
-}
-
-.checkmark {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background: var(--accent-color);
-  color: #ffffff;
-  font-size: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 30px;
-  animation: scaleIn 0.5s ease-out;
-}
-
-.summaryGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  margin-bottom: 60px;
 
   @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+    margin-bottom: 40px;
   }
 }
 
-.summaryCard {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 24px;
-
-  h3 {
-    font-size: 18px;
-    font-weight: 700;
-    color: #2b2b2b;
-    margin-bottom: 16px;
-  }
-
-  p {
-    margin: 8px 0;
-    color: #4e4e4e;
-    font-size: 14px;
-    line-height: 1.6;
-
-    strong {
-      color: #2b2b2b;
-      font-weight: 600;
-    }
-  }
-
-  ul {
-    padding-left: 20px;
-    margin: 12px 0;
-
-    li {
-      margin: 8px 0;
-      color: #4e4e4e;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-  }
-}
-
-.discountSummary {
-  font-size: 20px;
+.greeting {
+  font-family: var(--font-primary);
+  font-size: 40px;
   font-weight: 700;
   color: var(--brand-secondary);
-  margin-top: 12px;
+  margin: 0 0 24px 0;
+  line-height: 1.2;
+
+  @media (max-width: 768px) {
+    font-size: 32px;
+    margin-bottom: 20px;
+  }
 }
 
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
+.description {
+  font-family: var(--font-primary);
+  font-size: 16px;
+  color: #484848;
+  line-height: 1.6;
+  margin: 0 auto;
+  max-width: 800px;
+
+  p {
+    margin: 12px 0;
   }
-  to {
-    opacity: 1;
+
+  strong {
+    font-weight: 600;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 15px;
+  }
+}
+
+// 3-Column Info Section
+.infoSection {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 109px; // 54px + 1px separator + 54px
+  margin-bottom: 80px;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 32px;
+    margin-bottom: 60px;
+  }
+}
+
+.infoColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 0 0 auto;
+  position: relative;
+
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    width: 1px;
+    height: 122px;
+    background: #bfbfbf;
+    right: -55px; // Half of gap (109px / 2) to center the separator
+    top: 0;
+
+    @media (max-width: 768px) {
+      display: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+}
+
+.infoHeading {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-secondary);
+  margin: 0 0 20px 0;
+  line-height: 1.3;
+  text-align: center;
+
+  @media (max-width: 768px) {
+    font-size: 14px;
+  }
+}
+
+.infoContent {
+  font-family: var(--font-primary);
+  font-size: 18px;
+  font-weight: 600;
+  color: #2b2b2b;
+  line-height: 28px;
+  text-align: center;
+
+  p {
+    margin: 0;
+  }
+
+  strong {
+    font-weight: 600;
+    color: #2b2b2b;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+  }
+}
+
+// What To Expect Section
+.expectSection {
+  margin-bottom: 80px;
+
+  @media (max-width: 768px) {
+    margin-bottom: 60px;
+  }
+}
+
+.expectHeading {
+  font-family: var(--font-primary);
+  font-size: 38px;
+  font-weight: 600;
+  color: #484848;
+  text-align: center;
+  margin: 0 0 48px 0;
+  line-height: 1.3;
+
+  @media (max-width: 768px) {
+    font-size: 28px;
+    margin-bottom: 32px;
+  }
+}
+
+.expectColumns {
+  display: grid;
+  gap: 111px;
+  justify-content: center;
+
+  // Dynamic grid columns set via inline style
+  // grid-template-columns: repeat(N, 1fr)
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr !important;
+    gap: 32px;
+  }
+}
+
+.expectColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 376px;
+
+  // When parent has 2 columns, make wider
+  .expectColumns:has(.expectColumn:nth-child(2):last-child) & {
+    max-width: 500px;
+  }
+
+  @media (max-width: 1024px) {
+    max-width: 100%;
+  }
+}
+
+.expectImage {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #f9fafb;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.expectColumnHeading {
+  font-family: var(--font-primary);
+  font-size: 30px;
+  font-weight: 700;
+  color: #484848;
+  margin: 0;
+  line-height: 1.3;
+
+  @media (max-width: 768px) {
+    font-size: 24px;
+  }
+}
+
+.expectColumnContent {
+  font-family: var(--font-primary);
+  font-size: 16px;
+  font-weight: 500;
+  color: #484848;
+  line-height: 28px;
+
+  p {
+    margin: 12px 0;
+  }
+
+  strong {
+    font-weight: 600;
+  }
+
+  ul,
+  ol {
+    margin: 12px 0;
+    padding-left: 24px;
+  }
+
+  li {
+    margin: 8px 0;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 15px;
+    line-height: 24px;
+  }
+}
+
+// CTA Section
+.ctaSection {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.ctaButton {
+  position: relative;
+  isolation: isolate;
+  --btn-bg: var(--brand-primary);
+  font-family: var(--font-primary);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-white);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+  box-shadow: var(--shadow-button);
+  width: fit-content;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--btn-bg);
+    border-radius: inherit;
+    z-index: -1;
     transform: scale(1);
+    transition: transform 0.2s ease;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &:hover:not(:disabled) {
+    &::before {
+      transform: scale(1.02);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
   }
 }

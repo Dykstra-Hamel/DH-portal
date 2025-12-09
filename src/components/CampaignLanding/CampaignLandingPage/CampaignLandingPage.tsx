@@ -49,6 +49,7 @@ interface CampaignLandingPageProps {
     id: string;
     name: string;
     slug: string;
+    website: string[];
   };
   redemption: {
     isRedeemed: boolean;
@@ -132,6 +133,19 @@ interface CampaignLandingPageProps {
       fontPrimaryName: string | null;
       fontPrimaryUrl: string | null;
     };
+    thankYou: {
+      greeting: string;
+      content: string | null;
+      showExpect: boolean;
+      expectHeading: string;
+      expectColumns: Array<{
+        imageUrl: string | null;
+        heading: string | null;
+        content: string | null;
+      }>;
+      ctaText: string;
+      ctaUrl: string | null;
+    };
   };
 }
 
@@ -180,7 +194,10 @@ export default function CampaignLandingPage({
         customer={customer}
         company={company}
         redemption={redemption}
+        thankYou={landingPage.thankYou}
         branding={landingPage.branding}
+        header={landingPage.header}
+        footer={landingPage.footer}
       />
     );
   }

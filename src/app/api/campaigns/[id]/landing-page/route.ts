@@ -158,7 +158,7 @@ export async function GET(
     // Fetch company information (including phone for branding)
     const { data: company, error: companyError } = await supabase
       .from('companies')
-      .select('id, name, slug, phone, email')
+      .select('id, name, slug, phone, email, website')
       .eq('id', campaign.company_id)
       .single();
 
@@ -452,6 +452,31 @@ export async function GET(
         heading: landingPageData?.redemption_card_heading || null,
         disclaimer: landingPageData?.redemption_card_disclaimer || null,
       },
+      thankYou: {
+        greeting: landingPageData?.thankyou_greeting || 'Thanks {first_name}!',
+        content: landingPageData?.thankyou_content || null,
+        showExpect: landingPageData?.thankyou_show_expect ?? true,
+        expectHeading: landingPageData?.thankyou_expect_heading || 'What To Expect',
+        expectColumns: [
+          {
+            imageUrl: landingPageData?.thankyou_expect_col1_image || null,
+            heading: landingPageData?.thankyou_expect_col1_heading || null,
+            content: landingPageData?.thankyou_expect_col1_content || null,
+          },
+          {
+            imageUrl: landingPageData?.thankyou_expect_col2_image || null,
+            heading: landingPageData?.thankyou_expect_col2_heading || null,
+            content: landingPageData?.thankyou_expect_col2_content || null,
+          },
+          {
+            imageUrl: landingPageData?.thankyou_expect_col3_image || null,
+            heading: landingPageData?.thankyou_expect_col3_heading || null,
+            content: landingPageData?.thankyou_expect_col3_content || null,
+          },
+        ].filter(col => col.heading || col.content), // Only include filled columns
+        ctaText: landingPageData?.thankyou_cta_text || 'Go Back To Homepage',
+        ctaUrl: landingPageData?.thankyou_cta_url || null,
+      },
       branding,
       selectedAddonIds: selectedAddons.map((addon) => addon.id),
     };
@@ -485,6 +510,7 @@ export async function GET(
           id: company.id,
           name: company.name,
           slug: company.slug,
+          website: company.website || [],
         },
         redemption: {
           isRedeemed: !!redemption.redeemed_at,
@@ -666,6 +692,23 @@ export async function POST(
 
         // Redemption Card
         redemption_card_heading: body.redemption_card_heading || null,
+
+        // Thank You Page
+        thankyou_greeting: body.thankyou_greeting || 'Thanks {first_name}!',
+        thankyou_content: body.thankyou_content || null,
+        thankyou_show_expect: body.thankyou_show_expect ?? true,
+        thankyou_expect_heading: body.thankyou_expect_heading || 'What To Expect',
+        thankyou_expect_col1_image: body.thankyou_expect_col1_image || null,
+        thankyou_expect_col1_heading: body.thankyou_expect_col1_heading || null,
+        thankyou_expect_col1_content: body.thankyou_expect_col1_content || null,
+        thankyou_expect_col2_image: body.thankyou_expect_col2_image || null,
+        thankyou_expect_col2_heading: body.thankyou_expect_col2_heading || null,
+        thankyou_expect_col2_content: body.thankyou_expect_col2_content || null,
+        thankyou_expect_col3_image: body.thankyou_expect_col3_image || null,
+        thankyou_expect_col3_heading: body.thankyou_expect_col3_heading || null,
+        thankyou_expect_col3_content: body.thankyou_expect_col3_content || null,
+        thankyou_cta_text: body.thankyou_cta_text || 'Go Back To Homepage',
+        thankyou_cta_url: body.thankyou_cta_url || null,
       })
       .select()
       .single();
@@ -845,6 +888,23 @@ export async function PUT(
 
     // Redemption Card
     if (body.redemption_card_heading !== undefined) updateData.redemption_card_heading = body.redemption_card_heading;
+
+    // Thank You Page
+    if (body.thankyou_greeting !== undefined) updateData.thankyou_greeting = body.thankyou_greeting;
+    if (body.thankyou_content !== undefined) updateData.thankyou_content = body.thankyou_content;
+    if (body.thankyou_show_expect !== undefined) updateData.thankyou_show_expect = body.thankyou_show_expect;
+    if (body.thankyou_expect_heading !== undefined) updateData.thankyou_expect_heading = body.thankyou_expect_heading;
+    if (body.thankyou_expect_col1_image !== undefined) updateData.thankyou_expect_col1_image = body.thankyou_expect_col1_image;
+    if (body.thankyou_expect_col1_heading !== undefined) updateData.thankyou_expect_col1_heading = body.thankyou_expect_col1_heading;
+    if (body.thankyou_expect_col1_content !== undefined) updateData.thankyou_expect_col1_content = body.thankyou_expect_col1_content;
+    if (body.thankyou_expect_col2_image !== undefined) updateData.thankyou_expect_col2_image = body.thankyou_expect_col2_image;
+    if (body.thankyou_expect_col2_heading !== undefined) updateData.thankyou_expect_col2_heading = body.thankyou_expect_col2_heading;
+    if (body.thankyou_expect_col2_content !== undefined) updateData.thankyou_expect_col2_content = body.thankyou_expect_col2_content;
+    if (body.thankyou_expect_col3_image !== undefined) updateData.thankyou_expect_col3_image = body.thankyou_expect_col3_image;
+    if (body.thankyou_expect_col3_heading !== undefined) updateData.thankyou_expect_col3_heading = body.thankyou_expect_col3_heading;
+    if (body.thankyou_expect_col3_content !== undefined) updateData.thankyou_expect_col3_content = body.thankyou_expect_col3_content;
+    if (body.thankyou_cta_text !== undefined) updateData.thankyou_cta_text = body.thankyou_cta_text;
+    if (body.thankyou_cta_url !== undefined) updateData.thankyou_cta_url = body.thankyou_cta_url;
 
     // Add updated_at timestamp
     updateData.updated_at = new Date().toISOString();

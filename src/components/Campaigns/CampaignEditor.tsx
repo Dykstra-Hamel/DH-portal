@@ -26,6 +26,7 @@ interface CampaignEditorProps {
   onClose: () => void;
   companyId: string;
   campaign?: any; // For editing existing campaigns
+  isCloned?: boolean; // True when campaign was just cloned
   onSuccess: () => void;
 }
 
@@ -36,6 +37,7 @@ export default function CampaignEditor({
   onClose,
   companyId,
   campaign,
+  isCloned = false,
   onSuccess,
 }: CampaignEditorProps) {
   const [currentStep, setCurrentStep] = useState<Step>('basic');
@@ -113,6 +115,21 @@ export default function CampaignEditor({
     override_secondary_color: '',
     override_phone: '',
     accent_color_preference: 'primary',
+    thankyou_greeting: 'Thanks {first_name}!',
+    thankyou_content: '',
+    thankyou_show_expect: true,
+    thankyou_expect_heading: 'What To Expect',
+    thankyou_expect_col1_image: '',
+    thankyou_expect_col1_heading: '',
+    thankyou_expect_col1_content: '',
+    thankyou_expect_col2_image: '',
+    thankyou_expect_col2_heading: '',
+    thankyou_expect_col2_content: '',
+    thankyou_expect_col3_image: '',
+    thankyou_expect_col3_heading: '',
+    thankyou_expect_col3_content: '',
+    thankyou_cta_text: 'Go Back To Homepage',
+    thankyou_cta_url: '',
   });
 
   // Fetch company data on mount
@@ -283,6 +300,21 @@ export default function CampaignEditor({
           override_phone: lp.branding.phoneNumber || '',
           accent_color_preference:
             lp.branding.accentColorPreference || 'primary',
+          thankyou_greeting: lp.thankYou?.greeting || 'Thanks {first_name}!',
+          thankyou_content: lp.thankYou?.content || '',
+          thankyou_show_expect: lp.thankYou?.showExpect ?? true,
+          thankyou_expect_heading: lp.thankYou?.expectHeading || 'What To Expect',
+          thankyou_expect_col1_image: lp.thankYou?.expectColumns?.[0]?.imageUrl || '',
+          thankyou_expect_col1_heading: lp.thankYou?.expectColumns?.[0]?.heading || '',
+          thankyou_expect_col1_content: lp.thankYou?.expectColumns?.[0]?.content || '',
+          thankyou_expect_col2_image: lp.thankYou?.expectColumns?.[1]?.imageUrl || '',
+          thankyou_expect_col2_heading: lp.thankYou?.expectColumns?.[1]?.heading || '',
+          thankyou_expect_col2_content: lp.thankYou?.expectColumns?.[1]?.content || '',
+          thankyou_expect_col3_image: lp.thankYou?.expectColumns?.[2]?.imageUrl || '',
+          thankyou_expect_col3_heading: lp.thankYou?.expectColumns?.[2]?.heading || '',
+          thankyou_expect_col3_content: lp.thankYou?.expectColumns?.[2]?.content || '',
+          thankyou_cta_text: lp.thankYou?.ctaText || 'Go Back To Homepage',
+          thankyou_cta_url: lp.thankYou?.ctaUrl || '',
         });
       }
     } catch (error) {
@@ -477,9 +509,9 @@ export default function CampaignEditor({
       }
 
       // Determine campaign_id for landing page operations
-      const campaignIdForLandingPage = campaign
-        ? campaign.campaign_id // Use existing campaign_id when editing
-        : formData.campaign_id; // Use new campaign_id when creating
+      const campaignIdForLandingPage = campaign && !isCloned
+        ? campaign.campaign_id // Use existing campaign_id when editing (not cloned)
+        : formData.campaign_id; // Use new/updated campaign_id when creating or cloning
 
       // If creating a new campaign, assign ALL contact lists
       if (!campaign && result.campaign?.id) {
@@ -646,6 +678,21 @@ export default function CampaignEditor({
       override_secondary_color: '',
       override_phone: '',
       accent_color_preference: 'primary',
+      thankyou_greeting: 'Thanks {first_name}!',
+      thankyou_content: '',
+      thankyou_show_expect: true,
+      thankyou_expect_heading: 'What To Expect',
+      thankyou_expect_col1_image: '',
+      thankyou_expect_col1_heading: '',
+      thankyou_expect_col1_content: '',
+      thankyou_expect_col2_image: '',
+      thankyou_expect_col2_heading: '',
+      thankyou_expect_col2_content: '',
+      thankyou_expect_col3_image: '',
+      thankyou_expect_col3_heading: '',
+      thankyou_expect_col3_content: '',
+      thankyou_cta_text: 'Go Back To Homepage',
+      thankyou_cta_url: '',
     });
 
     // Close the modal
@@ -746,7 +793,7 @@ export default function CampaignEditor({
                   }}
                   placeholder="e.g., PEST26"
                   maxLength={50}
-                  disabled={!!campaign}
+                  disabled={!!campaign && !isCloned}
                 />
                 {campaignIdValidating && (
                   <small style={{ color: '#666' }}>
