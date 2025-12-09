@@ -336,6 +336,7 @@ export async function POST(
           lead_status: 'scheduling',
           service_address_id: addressData?.id || existingLead.service_address_id,
           requested_date: body.requested_date || null,
+          requested_time: body.requested_time || null,
           comments: updatedComments,
           updated_at: new Date().toISOString(),
         })
@@ -366,6 +367,7 @@ export async function POST(
           lead_status: 'scheduling',
           comments: leadComments,
           requested_date: body.requested_date || null,
+          requested_time: body.requested_time || null,
         })
         .select()
         .single();
