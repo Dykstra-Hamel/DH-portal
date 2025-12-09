@@ -80,6 +80,7 @@ export default function CampaignEditor({
     hero_subtitle: 'Special Offer',
     hero_description: '',
     hero_button_text: 'Upgrade Today!',
+    hero_button_icon_url: '',
     hero_image_url: '',
     display_price: '$44/mo',
     display_original_price: '',
@@ -96,6 +97,7 @@ export default function CampaignEditor({
       'And thats not all, we offer additional add-on programs as well including:',
     additional_services: [],
     additional_services_image_url: '',
+    selected_addon_ids: [],
     show_faq: true,
     faq_heading: 'Frequently Asked Questions',
     faq_items: [],
@@ -239,6 +241,7 @@ export default function CampaignEditor({
           hero_subtitle: lp.hero.subtitle || 'Special Offer',
           hero_description: lp.hero.description || '',
           hero_button_text: lp.hero.buttonText || 'Upgrade Today!',
+          hero_button_icon_url: lp.hero.buttonIconUrl || '',
           hero_image_url: lp.hero.imageUrl || '',
           display_price: lp.pricing.displayPrice || '$44/mo',
           display_original_price: lp.pricing.originalPrice || '',
@@ -249,14 +252,18 @@ export default function CampaignEditor({
           letter_image_url: lp.letter.imageUrl || '',
           feature_heading:
             lp.features.heading || 'No initial cost to get started',
-          feature_bullets: lp.features.bullets || [],
-          feature_image_url: lp.features.imageUrl || '',
-          show_additional_services: lp.additionalServices.show,
-          additional_services_heading:
-            lp.additionalServices.heading ||
+        feature_bullets: lp.features.bullets || [],
+        feature_image_url: lp.features.imageUrl || '',
+        show_additional_services: lp.additionalServices.show,
+        additional_services_heading:
+          lp.additionalServices.heading ||
             'And thats not all, we offer additional add-on programs as well including:',
-          additional_services: lp.additionalServices.services || [],
-          additional_services_image_url: lp.additionalServices.imageUrl || '',
+        additional_services: lp.additionalServices.services || [],
+        additional_services_image_url: lp.additionalServices.imageUrl || '',
+        selected_addon_ids:
+          lp.selectedAddonIds && lp.selectedAddonIds.length > 0
+            ? lp.selectedAddonIds
+            : (lp.addons || []).map((addon: any) => addon.id),
           show_faq: lp.faq.show,
           faq_heading: lp.faq.heading || 'Frequently Asked Questions',
           faq_items: lp.faq.items || [],
@@ -607,6 +614,7 @@ export default function CampaignEditor({
       hero_description: '',
       hero_button_text: 'Upgrade Today!',
       hero_image_url: '',
+      hero_button_icon_url: '',
       display_price: '$44/mo',
       display_original_price: '',
       display_savings: '',
@@ -622,6 +630,7 @@ export default function CampaignEditor({
         'And thats not all, we offer additional add-on programs as well including:',
       additional_services: [],
       additional_services_image_url: '',
+      selected_addon_ids: [],
       show_faq: true,
       faq_heading: 'Frequently Asked Questions',
       faq_items: [],

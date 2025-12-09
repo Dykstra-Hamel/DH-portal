@@ -4,7 +4,7 @@
  * Two-column hero with content left, image collage right
  */
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import styles from '../CampaignLandingPage.module.scss';
 import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
 
@@ -15,6 +15,7 @@ interface HeroSectionProps {
     description: string | null;
     buttonText: string;
     imageUrl: string | null; // Changed from imageUrls array to single image
+    buttonIconUrl: string | null;
   };
   pricing: {
     displayPrice: string;
@@ -50,20 +51,83 @@ export default function HeroSection({
   );
 
   // Process text fields with variables
+  const processHeroTextWithOriginalPriceStyling = useCallback(
+    (text: string) => {
+      if (!text) return '';
+
+      const styledText =
+        pricing.originalPrice && text.includes('{original_price}')
+          ? text.replace(
+              /\{original_price\}/g,
+              `<span class="${styles.strikethrough}">{original_price}</span>`
+            )
+          : text;
+
+      return processTextWithVariables(styledText, variableContext);
+    },
+    [pricing.originalPrice, variableContext]
+  );
+
   const processedTitle = useMemo(
     () => processTextWithVariables(hero.title, variableContext),
     [hero.title, variableContext]
   );
 
   const processedSubtitle = useMemo(
-    () => processTextWithVariables(hero.subtitle, variableContext),
-    [hero.subtitle, variableContext]
+    () => processHeroTextWithOriginalPriceStyling(hero.subtitle),
+    [hero.subtitle, processHeroTextWithOriginalPriceStyling]
   );
 
   const processedDescription = useMemo(
-    () => (hero.description ? processTextWithVariables(hero.description, variableContext) : null),
-    [hero.description, variableContext]
+    () =>
+      hero.description
+        ? processHeroTextWithOriginalPriceStyling(hero.description)
+        : null,
+    [hero.description, processHeroTextWithOriginalPriceStyling]
   );
+
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const renderPriceParts = (text: string, keyPrefix: string | number) =>
+    text.split('$').map((part, index) => {
+      if (index === 0) return <span key={`${keyPrefix}-${index}`}>{part}</span>;
+
+      // Extract price pattern like "44/mo"
+      const pricePattern = part.match(/^(\d+)(\/mo)/);
+      if (pricePattern) {
+        return (
+          <span key={`${keyPrefix}-${index}`}>
+            <span className={styles.priceHighlight}>
+              <sup>$</sup>
+              {pricePattern[1]}
+              <span className={styles.priceUnit}>{pricePattern[2]}</span>
+            </span>
+            {part.substring(pricePattern[0].length)}
+          </span>
+        );
+      }
+      return <span key={`${keyPrefix}-${index}`}>${part}</span>;
+    });
+
+  const renderTitleWithStyles = () => {
+    const originalPrice = pricing.originalPrice?.trim();
+    const titleSegments =
+      originalPrice && processedTitle
+        ? processedTitle.split(new RegExp(`(${escapeRegExp(originalPrice)})`, 'g')).filter(Boolean)
+        : [processedTitle];
+
+    return titleSegments.map((segment, idx) => {
+      if (originalPrice && segment === originalPrice) {
+        return (
+          <span key={`orig-${idx}`} className={styles.strikethrough}>
+            {segment}
+          </span>
+        );
+      }
+
+      return renderPriceParts(segment, `seg-${idx}`);
+    });
+  };
 
   // Extract price components for highlighting
   const priceMatch = pricing.displayPrice.match(/\$(\d+)\/mo/);
@@ -74,37 +138,32 @@ export default function HeroSection({
       <div className={styles.heroContainer}>
         {/* Left column - Content */}
         <div className={styles.heroContent}>
-          <div className={styles.heroBadge}>{processedSubtitle}</div>
+          <div
+            className={styles.heroBadge}
+            dangerouslySetInnerHTML={{ __html: processedSubtitle }}
+          />
 
-          <h1 className={styles.heroTitle}>
-            {/* Parse the processed title to highlight the price */}
-            {processedTitle.split('$').map((part, index) => {
-              if (index === 0) return <span key={index}>{part}</span>;
-
-              // Extract price pattern like "44/mo"
-              const pricePattern = part.match(/^(\d+)(\/mo)/);
-              if (pricePattern) {
-                return (
-                  <span key={index}>
-                    <span className={styles.priceHighlight}>
-                      <sup>$</sup>{pricePattern[1]}
-                      <span className={styles.priceUnit}>{pricePattern[2]}</span>
-                    </span>
-                    {part.substring(pricePattern[0].length)}
-                  </span>
-                );
-              }
-              return <span key={index}>${part}</span>;
-            })}
-          </h1>
+          <h1 className={styles.heroTitle}>{renderTitleWithStyles()}</h1>
 
           {processedDescription && (
-            <p className={styles.heroDescription}>{processedDescription}</p>
+            <p
+              className={styles.heroDescription}
+              dangerouslySetInnerHTML={{ __html: processedDescription }}
+            />
           )}
 
-          <button className={styles.heroCta} onClick={onCtaClick}>
-            {hero.buttonText}
-          </button>
+          <div className={styles.heroCtaContainer}>
+            <button className={styles.heroCta} onClick={onCtaClick}>
+              {hero.buttonText}
+            </button>
+            {hero.buttonIconUrl && (
+              <img
+                src={hero.buttonIconUrl}
+                alt="Badge"
+                className={styles.heroButtonIcon}
+              />
+            )}
+          </div>
         </div>
 
         {/* Right column - Single Hero Image */}

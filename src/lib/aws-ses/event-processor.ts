@@ -325,7 +325,7 @@ async function handleLeadCreationFromClick(
 ): Promise<void> {
   const customerId = linkTags.customerId?.[0] || emailLog.customer_id;
   const campaignId = linkTags.campaignId?.[0] || emailLog.campaign_id;
-  const companyId = emailLog.company_id;
+  const companyId = linkTags.companyId?.[0] || emailLog.company_id;
 
   if (!customerId || !companyId) {
     console.warn('Missing customerId or companyId for lead creation from click');

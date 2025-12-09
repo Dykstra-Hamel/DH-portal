@@ -6,7 +6,7 @@
  * Main landing page with customizable sections based on campaign configuration
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from './CampaignLandingPage.module.scss';
 import ThankYouPage from '../ThankYouPage/ThankYouPage';
 import InlineRedemptionCard from '../InlineRedemptionCard/InlineRedemptionCard';
@@ -63,6 +63,7 @@ interface CampaignLandingPageProps {
       description: string | null;
       buttonText: string;
       imageUrl: string | null; // Changed from imageUrls array to single image
+      buttonIconUrl: string | null;
     };
     pricing: {
       displayPrice: string;
@@ -142,6 +143,7 @@ export default function CampaignLandingPage({
   landingPage,
 }: CampaignLandingPageProps) {
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const redemptionCardRef = useRef<HTMLDivElement | null>(null);
 
   // Load brand primary font dynamically
   useEffect(() => {
@@ -156,6 +158,19 @@ export default function CampaignLandingPage({
       };
     }
   }, [landingPage.branding.fontPrimaryUrl]);
+
+  // Scroll to redemption card callback - must be defined before any conditional returns
+  const scrollToRedemptionCard = useCallback(() => {
+    if (!redemptionCardRef.current) return;
+
+    const offset = 70;
+    const targetY =
+      redemptionCardRef.current.getBoundingClientRect().top +
+      window.scrollY -
+      offset;
+
+    window.scrollTo({ top: Math.max(targetY, 0), behavior: 'smooth' });
+  }, []);
 
   // If already redeemed, show full-page thank you
   if (redemption.isRedeemed) {
@@ -217,6 +232,10 @@ export default function CampaignLandingPage({
     }
   };
 
+  const secondaryButtonText = landingPage.branding.phoneNumber
+    ? `Call ${landingPage.branding.phoneNumber}`
+    : landingPage.header.secondaryButtonText || 'Call';
+
   return (
     <div
       className={styles.landingPage}
@@ -240,9 +259,9 @@ export default function CampaignLandingPage({
           logo={landingPage.branding.logoUrl}
           companyName={landingPage.branding.companyName}
           primaryButtonText={landingPage.header.primaryButtonText}
-          secondaryButtonText={landingPage.header.secondaryButtonText}
+          secondaryButtonText={secondaryButtonText}
           phoneNumber={landingPage.branding.phoneNumber}
-          onPrimaryClick={() => handleImmediateRedeem()}
+          onPrimaryClick={scrollToRedemptionCard}
         />
       )}
 
@@ -254,26 +273,32 @@ export default function CampaignLandingPage({
         company={company}
         branding={landingPage.branding}
         serviceName={landingPage.faq.serviceName}
-        onCtaClick={() => handleImmediateRedeem()}
+        onCtaClick={scrollToRedemptionCard}
       />
 
       {/* Letter Section with Redemption Card (2-column layout) */}
-      {landingPage.letter.show && landingPage.letter.content && (
+      {landingPage.letter.show && (
         <section className={styles.letterAndRedemptionSection}>
           <div className={styles.letterAndRedemptionContainer}>
-            <div className={styles.letterColumn}>
-              <LetterSection
-                letter={landingPage.letter}
-                pricing={landingPage.pricing}
-                customer={customer}
-                campaign={campaign}
-                company={company}
-                branding={landingPage.branding}
-                serviceName={landingPage.faq.serviceName}
-                onCtaClick={() => handleImmediateRedeem()}
-              />
-            </div>
-            <div className={styles.redemptionColumn}>
+            {landingPage.letter.content && (
+              <div className={styles.letterColumn}>
+                <LetterSection
+                  letter={landingPage.letter}
+                  pricing={landingPage.pricing}
+                  customer={customer}
+                  campaign={campaign}
+                  company={company}
+                  branding={landingPage.branding}
+                  serviceName={landingPage.faq.serviceName}
+                  onCtaClick={scrollToRedemptionCard}
+                />
+              </div>
+            )}
+            <div
+              className={styles.redemptionColumn}
+              id="inline-redemption-card"
+              ref={redemptionCardRef}
+            >
               <InlineRedemptionCard
                 customer={customer}
                 campaign={campaign}
@@ -309,7 +334,7 @@ export default function CampaignLandingPage({
           branding={landingPage.branding}
           serviceName={landingPage.faq.serviceName}
           buttonText={landingPage.hero.buttonText}
-          onCtaClick={() => handleImmediateRedeem()}
+          onCtaClick={scrollToRedemptionCard}
         />
       )}
 
@@ -325,7 +350,7 @@ export default function CampaignLandingPage({
             branding={landingPage.branding}
             serviceName={landingPage.faq.serviceName}
             buttonText={landingPage.hero.buttonText}
-            onCtaClick={() => handleImmediateRedeem()}
+            onCtaClick={scrollToRedemptionCard}
           />
         )}
 

@@ -1095,7 +1095,7 @@ async function executeEmailStep(
     campaignHeroImage: campaignLandingPage?.hero_image_url || '',
     createLeadLink:
       campaignId && customerId
-        ? generateLeadTrackingTags(campaignId, customerId)
+        ? generateLeadTrackingTags(campaignId, customerId, undefined, companyId)
         : '',
     // Unsubscribe variables
     unsubscribeUrl,

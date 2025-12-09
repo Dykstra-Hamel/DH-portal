@@ -36,6 +36,7 @@ export default function EditLandingPageModal({
     hero_subtitle: '',
     hero_description: '',
     hero_button_text: '',
+    hero_button_icon_url: '',
     hero_image_url: '',
     display_price: '',
     display_original_price: '',
@@ -51,6 +52,7 @@ export default function EditLandingPageModal({
     additional_services_heading: '',
     additional_services: [],
     additional_services_image_url: '',
+    selected_addon_ids: [],
     show_faq: true,
     faq_heading: '',
     faq_items: [],
@@ -98,6 +100,7 @@ export default function EditLandingPageModal({
             hero_description: '',
             hero_button_text: 'Upgrade Today!',
             hero_image_url: '',
+            hero_button_icon_url: '',
             display_price: '$44/mo',
             display_original_price: '',
             display_savings: '',
@@ -113,6 +116,7 @@ export default function EditLandingPageModal({
               'And thats not all, we offer additional add-on programs as well including:',
             additional_services: [],
             additional_services_image_url: '',
+            selected_addon_ids: [],
             show_faq: true,
             faq_heading: 'Frequently Asked Questions',
             faq_items: [],
@@ -145,6 +149,7 @@ export default function EditLandingPageModal({
         hero_description: apiData.landingPage.hero.description || '',
         hero_button_text: apiData.landingPage.hero.buttonText || '',
         hero_image_url: apiData.landingPage.hero.imageUrl || '',
+        hero_button_icon_url: apiData.landingPage.hero.buttonIconUrl || '',
 
         // Pricing
         display_price: apiData.landingPage.pricing.displayPrice || '',
@@ -167,6 +172,10 @@ export default function EditLandingPageModal({
         additional_services_heading: apiData.landingPage.additionalServices.heading || '',
         additional_services: apiData.landingPage.additionalServices.services || [],
         additional_services_image_url: apiData.landingPage.additionalServices.imageUrl || '',
+        selected_addon_ids:
+          apiData.landingPage.selectedAddonIds && apiData.landingPage.selectedAddonIds.length > 0
+            ? apiData.landingPage.selectedAddonIds
+            : (apiData.landingPage.addons || []).map((addon: any) => addon.id),
 
         // FAQ
         show_faq: apiData.landingPage.faq.show ?? true,

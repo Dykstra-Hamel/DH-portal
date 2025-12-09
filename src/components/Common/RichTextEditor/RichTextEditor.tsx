@@ -10,7 +10,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import styles from './RichTextEditor.module.scss';
 import LinkModal from './LinkModal';
 
@@ -21,12 +21,14 @@ interface RichTextEditorProps {
   className?: string;
 }
 
-export default function RichTextEditor({
-  value,
-  onChange,
-  placeholder = 'Start typing...',
-  className,
-}: RichTextEditorProps) {
+export interface RichTextEditorHandle {
+  insertText: (text: string) => void;
+}
+
+const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function RichTextEditor(
+  { value, onChange, placeholder = 'Start typing...', className }: RichTextEditorProps,
+  ref
+) {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkOpenInNewTab, setLinkOpenInNewTab] = useState(true);
@@ -95,6 +97,18 @@ export default function RichTextEditor({
       editor.commands.setContent(value);
     }
   }, [value, editor]);
+
+  // Expose insertText to allow variable insertion at cursor from parent
+  useImperativeHandle(
+    ref,
+    () => ({
+      insertText: (text: string) => {
+        if (!editor) return;
+        editor.chain().focus().insertContent(text).run();
+      },
+    }),
+    [editor]
+  );
 
   if (!editor) {
     return null;
@@ -197,4 +211,6 @@ export default function RichTextEditor({
       />
     </div>
   );
-}
+});
+
+export default RichTextEditor;
