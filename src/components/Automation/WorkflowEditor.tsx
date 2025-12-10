@@ -262,7 +262,7 @@ export default function WorkflowEditor({
           trigger_type: 'widget_schedule_completed',
           trigger_conditions: {},
           workflow_steps: [],
-          is_active: false,
+          is_active: true,
           auto_cancel_on_status: true,
           cancel_on_statuses: ['won', 'closed_won', 'converted'],
           agent_id: '',
@@ -1185,21 +1185,23 @@ export default function WorkflowEditor({
             )}
 
             <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label className={styles.checkbox}>
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={e =>
-                      setFormData(prev => ({
-                        ...prev,
-                        is_active: e.target.checked,
-                      }))
-                    }
-                  />
-                  Active (workflow will run when triggered)
-                </label>
-              </div>
+              {workflow && (
+                <div className={styles.formGroup}>
+                  <label className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_active}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          is_active: e.target.checked,
+                        }))
+                      }
+                    />
+                    Active (workflow will run when triggered)
+                  </label>
+                </div>
+              )}
 
               <div className={styles.formGroup}>
                 <label className={styles.checkbox}>
