@@ -240,15 +240,15 @@ export default function CampaignEditor({
       const response = await fetch(`/api/campaigns/${campaignId}/landing-page`);
       const result = await response.json();
 
-      if (result.success && result.landingPage) {
-        const lp = result.landingPage;
+      if (result.success && result.data?.landingPage) {
+        const lp = result.data.landingPage;
 
         // Enable landing page if data exists
         setLandingPageEnabled(true);
 
         // Set service plan ID
-        if (result.campaign?.service_plan_id) {
-          setServicePlanId(result.campaign.service_plan_id);
+        if (result.data.campaign?.service_plan_id) {
+          setServicePlanId(result.data.campaign.service_plan_id);
         }
 
         // Map API response to form data
@@ -506,12 +506,60 @@ export default function CampaignEditor({
         throw new Error(result.error || 'Failed to save campaign');
       }
 
+      // Check if campaign should transition from draft to scheduled
+      // This applies to both new campaigns AND cloned campaigns
+      const savedCampaignId = campaign ? campaign.id : result.campaign?.id;
+
+      if (savedCampaignId) {
+        try {
+          // Fetch current campaign status and contact lists
+          const [statusCheckResponse, contactListsResponse] = await Promise.all([
+            fetch(`/api/campaigns/${savedCampaignId}`),
+            fetch(`/api/campaigns/${savedCampaignId}/contact-lists`)
+          ]);
+
+          const statusCheckResult = await statusCheckResponse.json();
+          const contactListsResult = await contactListsResponse.json();
+
+          if (statusCheckResult.success && statusCheckResult.campaign?.status === 'draft') {
+            // Calculate actual total contacts from assigned contact lists
+            const actualTotalContacts = contactListsResult.success && contactListsResult.contactLists
+              ? contactListsResult.contactLists.reduce((sum: number, list: any) => sum + (list.total_contacts || 0), 0)
+              : 0;
+
+            // Check if all requirements for scheduling are met
+            const hasWorkflow = !!formData.workflow_id;
+            const hasStartTime = !!formData.start_datetime;
+            const hasContacts = actualTotalContacts > 0;
+
+            if (hasWorkflow && hasStartTime && hasContacts) {
+              const startDate = new Date(formData.start_datetime);
+              const now = new Date();
+
+              // Only schedule if start time is in the future
+              if (startDate > now) {
+                // Use PATCH endpoint to transition status
+                await fetch(`/api/campaigns/${savedCampaignId}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'scheduled' }),
+                });
+              }
+            }
+          }
+        } catch (statusErr) {
+          // Don't throw - campaign is already saved, status transition is optional
+          console.error('Error checking/updating campaign status:', statusErr);
+        }
+      }
+
       // Determine campaign_id for landing page operations
       const campaignIdForLandingPage = campaign && !isCloned
         ? campaign.campaign_id // Use existing campaign_id when editing (not cloned)
         : formData.campaign_id; // Use new/updated campaign_id when creating or cloning
 
       // If creating a new campaign, assign ALL contact lists
+      // Note: For cloned/existing campaigns, ContactListUpload handles assignment immediately when user selects lists
       if (!campaign && result.campaign?.id) {
         const newCampaignId = result.campaign.id;
 

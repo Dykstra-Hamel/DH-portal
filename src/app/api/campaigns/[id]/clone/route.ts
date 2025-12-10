@@ -27,7 +27,7 @@ export async function POST(
     const {
       new_name,
       new_campaign_id,
-      copy_contact_lists = true,
+      copy_contact_lists = false, // Don't copy contact lists by default
     } = body;
 
     // Load source campaign
@@ -74,8 +74,54 @@ export async function POST(
       }
     }
 
-    // Generate unique identifiers
-    const clonedName = new_name || `${sourceCampaign.name} (Copy)`;
+    // Generate unique identifiers with auto-increment for default names
+    let clonedName = new_name;
+    let attempt = 0;
+    const maxAttempts = 50;
+
+    if (!new_name) {
+      // Auto-generate and auto-increment name only if not provided by user
+      const baseName = `${sourceCampaign.name} (Copy)`;
+
+      while (attempt < maxAttempts) {
+        clonedName = attempt === 0 ? baseName : `${sourceCampaign.name} (Copy ${attempt + 1})`;
+
+        const { data: conflict } = await supabase
+          .from('campaigns')
+          .select('id')
+          .eq('company_id', sourceCampaign.company_id)
+          .eq('name', clonedName)
+          .maybeSingle();
+
+        if (!conflict) break;
+        attempt++;
+      }
+
+      if (attempt >= maxAttempts) {
+        // Fallback to timestamp-based name
+        clonedName = `${sourceCampaign.name} (Copy ${Date.now()})`;
+      }
+    } else {
+      // User provided custom name - check uniqueness only once, return error if conflict
+      const { data: conflict } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('company_id', sourceCampaign.company_id)
+        .eq('name', clonedName)
+        .maybeSingle();
+
+      if (conflict) {
+        return NextResponse.json({
+          success: false,
+          error: 'Campaign name already exists in this company',
+          suggestions: [
+            `${clonedName} 2`,
+            `${clonedName} ${new Date().toISOString().split('T')[0]}`,
+          ]
+        }, { status: 400 });
+      }
+    }
+
     let clonedCampaignId = new_campaign_id;
 
     // If no campaign_id provided, generate from name
@@ -84,25 +130,6 @@ export async function POST(
       const baseName = clonedName.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 15);
       const timestamp = Date.now().toString().substring(-6);
       clonedCampaignId = `${baseName}${timestamp}`;
-    }
-
-    // Validate uniqueness of name (within company)
-    const { data: nameConflict } = await supabase
-      .from('campaigns')
-      .select('id')
-      .eq('company_id', sourceCampaign.company_id)
-      .eq('name', clonedName)
-      .single();
-
-    if (nameConflict) {
-      return NextResponse.json({
-        success: false,
-        error: 'Campaign name already exists in this company',
-        suggestions: [
-          `${clonedName} 2`,
-          `${clonedName} ${new Date().toISOString().split('T')[0]}`,
-        ]
-      }, { status: 400 });
     }
 
     // Validate uniqueness of campaign_id (global)
@@ -191,7 +218,7 @@ export async function POST(
       const { data: sourceLandingPage } = await supabase
         .from('campaign_landing_pages')
         .select('*')
-        .eq('campaign_id', sourceCampaign.campaign_id)
+        .eq('campaign_id', sourceCampaign.id)
         .single();
 
       if (sourceLandingPage) {
@@ -202,7 +229,7 @@ export async function POST(
           .from('campaign_landing_pages')
           .insert({
             ...landingPageFields,
-            campaign_id: clonedCampaign.campaign_id, // Link to cloned campaign
+            campaign_id: clonedCampaign.id, // Link to cloned campaign using UUID
           });
 
         if (lpError) {
