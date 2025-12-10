@@ -165,6 +165,10 @@
     border-color: var(--action-600);
     color: var(--white);
   }
+
+  svg {
+    display: block;
+  }
 }
 
 .statusBadge {

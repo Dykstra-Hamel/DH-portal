@@ -105,7 +105,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background: var(--primary-color);
+  background: var(--action-500);
   color: white;
   border: none;
   border-radius: 8px;
@@ -114,7 +114,7 @@
   transition: all 0.2s;
 
   &:hover:not(:disabled) {
-    background: var(--primary-hover);
+    background: var(--action-600);
     transform: translateY(-1px);
   }
 
@@ -130,8 +130,8 @@
 
     &:hover:not(:disabled) {
       background: var(--background-secondary);
-      border-color: var(--primary-color);
-      color: var(--primary-color);
+      border-color: var(--action-500);
+      color: var(--action-500);
     }
   }
 

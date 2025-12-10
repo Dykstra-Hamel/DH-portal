@@ -396,14 +396,8 @@ export default function CampaignEditor({
     { key: 'basic', label: 'Basic Info', number: 1 },
     { key: 'workflow', label: 'Select Workflow', number: 2 },
     { key: 'contacts', label: 'Add Contacts', number: 3 },
-    ...(landingPageEnabled
-      ? [{ key: 'landing-page' as Step, label: 'Landing Page', number: 4 }]
-      : []),
-    {
-      key: 'review',
-      label: 'Review & Launch',
-      number: landingPageEnabled ? 5 : 4,
-    },
+    { key: 'landing-page', label: 'Landing Page', number: 4 },
+    { key: 'review', label: 'Review & Launch', number: 5 },
   ];
 
   const currentStepIndex = steps.findIndex(s => s.key === currentStep);
@@ -422,11 +416,15 @@ export default function CampaignEditor({
       case 'contacts':
         return contactLists.length > 0 && totalContacts > 0;
       case 'landing-page':
-        // Require hero_title and display_price if landing page is enabled
-        return (
-          landingPageData.hero_title.trim() !== '' &&
-          landingPageData.display_price.trim() !== ''
-        );
+        // Can always proceed from landing page step
+        // If enabled, require hero_title and display_price
+        if (landingPageEnabled) {
+          return (
+            landingPageData.hero_title.trim() !== '' &&
+            landingPageData.display_price.trim() !== ''
+          );
+        }
+        return true; // Can skip if not enabled
       case 'review':
         return true;
       default:
@@ -967,40 +965,39 @@ export default function CampaignEditor({
                     )}
                   </div>
                 )}
-
-                {/* Landing Page Option */}
-                <div className={styles.landingPageOption}>
-                  <h3>Landing Page (Optional)</h3>
-                  <div className={styles.formGroup}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={landingPageEnabled}
-                        onChange={e => setLandingPageEnabled(e.target.checked)}
-                        style={{ width: 'auto', marginRight: '8px' }}
-                      />
-                      Create custom landing page for this campaign
-                    </label>
-                    <small>
-                      Add a customized landing page with images, text, and
-                      branding specific to this campaign
-                    </small>
-                  </div>
-                </div>
               </div>
             </div>
           )}
 
           {currentStep === 'landing-page' && (
             <div className={styles.landingPageStep}>
-              <CampaignLandingPageEditorStep
-                campaignId={formData.campaign_id}
-                companyId={companyId}
-                data={landingPageData}
-                onChange={setLandingPageData}
-                servicePlanId={servicePlanId}
-                onServicePlanChange={setServicePlanId}
-              />
+              <h3>Landing Page</h3>
+              <div className={styles.formGroup}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={landingPageEnabled}
+                    onChange={e => setLandingPageEnabled(e.target.checked)}
+                    style={{ width: 'auto', marginRight: '8px' }}
+                  />
+                  Create custom landing page for this campaign
+                </label>
+                <small>
+                  Add a customized landing page with images, text, and branding
+                  specific to this campaign
+                </small>
+              </div>
+
+              {landingPageEnabled && (
+                <CampaignLandingPageEditorStep
+                  campaignId={formData.campaign_id}
+                  companyId={companyId}
+                  data={landingPageData}
+                  onChange={setLandingPageData}
+                  servicePlanId={servicePlanId}
+                  onServicePlanChange={setServicePlanId}
+                />
+              )}
             </div>
           )}
 

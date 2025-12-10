@@ -289,7 +289,16 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       case 'admin-pest-pressure':
         return (
           <div>
-            <p>Navigate to <Link href="/admin/pest-pressure" style={{ color: 'var(--primary-color)' }}>/admin/pest-pressure</Link> to view the cross-company pest pressure dashboard.</p>
+            <p>
+              Navigate to{' '}
+              <Link
+                href="/admin/pest-pressure"
+                style={{ color: 'var(--action-500)' }}
+              >
+                /admin/pest-pressure
+              </Link>{' '}
+              to view the cross-company pest pressure dashboard.
+            </p>
           </div>
         );
       default:
@@ -344,23 +353,24 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       })()}
 
       {/* Company Selection for Workflow Executions and Add-Ons */}
-      {(activeSubsection === 'executions' || activeSubsection === 'add-ons') && companies.length > 0 && (
-        <div className={styles.companySelector}>
-          <label htmlFor="company-select">Select Company:</label>
-          <select
-            id="company-select"
-            value={selectedCompanyId}
-            onChange={e => setSelectedCompanyId(e.target.value)}
-            className={styles.companySelect}
-          >
-            {companies.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      {(activeSubsection === 'executions' || activeSubsection === 'add-ons') &&
+        companies.length > 0 && (
+          <div className={styles.companySelector}>
+            <label htmlFor="company-select">Select Company:</label>
+            <select
+              id="company-select"
+              value={selectedCompanyId}
+              onChange={e => setSelectedCompanyId(e.target.value)}
+              className={styles.companySelect}
+            >
+              {companies.map(company => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
       <main className={styles.content}>{renderSection()}</main>
     </div>
