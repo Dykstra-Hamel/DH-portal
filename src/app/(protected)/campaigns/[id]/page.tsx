@@ -185,8 +185,8 @@ export default function CampaignDetailPage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          new_name: `${campaign.name} (Copy)`,
-          copy_contact_lists: true,
+          // Let backend auto-increment the name (Copy, Copy 2, Copy 3, etc.)
+          copy_contact_lists: false, // Don't copy contact lists
         }),
       });
 
