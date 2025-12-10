@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import { ArrowLeft } from 'lucide-react';
 import styles from './page.module.scss';
 import CampaignDetailHeader from '@/components/Campaigns/CampaignDetailHeader';
@@ -26,6 +27,7 @@ export default function CampaignDetailPage({
 }: CampaignDetailPageProps) {
   const router = useRouter();
   const { selectedCompany } = useCompany();
+  const { setPageHeader } = usePageActions();
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<any>(null);
   const [metrics, setMetrics] = useState<any>(null);
@@ -65,6 +67,12 @@ export default function CampaignDetailPage({
       }
 
       setCampaign(campaignResult.campaign);
+
+      // Update page header with campaign name
+      setPageHeader({
+        title: campaignResult.campaign.name,
+        description: 'View campaign performance, manage contacts and leads, and track execution metrics.',
+      });
 
       // Fetch metrics
       const metricsResponse = await fetch(

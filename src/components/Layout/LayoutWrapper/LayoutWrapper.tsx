@@ -209,6 +209,22 @@ function LayoutContent({ children }: LayoutWrapperProps) {
         };
       // Handle individual record pages (hide lower header)
       default:
+        // Show lower header for campaign detail pages
+        if (pathname.match(/^\/campaigns\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise use default
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+            };
+          }
+          return {
+            title: 'Campaign Details',
+            description: 'View campaign performance, manage contacts and leads, and track execution metrics.',
+            showAddButton: false,
+          };
+        }
         // Show lower header for lead detail pages
         if (pathname.match(/^\/connections\/leads\/[^\/]+$/)) {
           return {
