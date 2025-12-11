@@ -276,17 +276,23 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
   },
 ];
 
-// Define tabs for leads filtering - reordered with Unassigned as default
-// Scheduling-related statuses (Ready To Schedule, Scheduled, Won, Lost) moved to Scheduling page
+// Define tabs for leads filtering - simplified for Leads page
 export const getLeadTabs = (): TabDefinition<Lead>[] => [
   {
-    key: 'unassigned',
-    label: 'Unassigned',
+    key: 'all',
+    label: 'All Leads',
     filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'new'),
+      leads.filter(
+        lead =>
+          !lead.archived &&
+          ['new', 'in_process', 'quoted'].includes(lead.lead_status)
+      ),
     getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'new')
-        .length,
+      leads.filter(
+        lead =>
+          !lead.archived &&
+          ['new', 'in_process', 'quoted'].includes(lead.lead_status)
+      ).length,
   },
   {
     key: 'contacting',
@@ -305,45 +311,6 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
     getCount: (leads: Lead[]) =>
       leads.filter(lead => !lead.archived && lead.lead_status === 'quoted')
         .length,
-  },
-  {
-    key: 'won',
-    label: 'Won',
-    filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'won'),
-    getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'won').length,
-  },
-  {
-    key: 'lost',
-    label: 'Lost',
-    filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'lost'),
-    getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'lost')
-        .length,
-  },
-  {
-    key: 'archived',
-    label: 'Archived',
-    filter: (leads: Lead[]) => leads.filter(lead => lead.archived),
-    getCount: (leads: Lead[]) => leads.filter(lead => lead.archived).length,
-  },
-  {
-    key: 'all',
-    label: 'All Leads',
-    filter: (leads: Lead[]) =>
-      leads.filter(
-        lead =>
-          !lead.archived &&
-          ['new', 'in_process', 'quoted'].includes(lead.lead_status)
-      ),
-    getCount: (leads: Lead[]) =>
-      leads.filter(
-        lead =>
-          !lead.archived &&
-          ['new', 'in_process', 'quoted'].includes(lead.lead_status)
-      ).length,
   },
 ];
 

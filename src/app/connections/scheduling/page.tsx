@@ -31,7 +31,7 @@ export default function SchedulingPage() {
   const router = useRouter();
 
   // Use global company context
-  const { selectedCompany, isAdmin } = useCompany();
+  const { selectedCompany, isAdmin, isLoading: companyLoading } = useCompany();
 
   useEffect(() => {
     const supabase = createClient();
@@ -157,22 +157,67 @@ export default function SchedulingPage() {
   return (
     <div style={{ width: '100%' }}>
       {selectedCompany && (
-            <div>
-              <LeadsList
-                leads={schedulingLeads}
-                loading={leadsLoading}
-                onLeadUpdated={() => {
-                  fetchSchedulingLeads();
-                }}
-                onEdit={handleEditLead}
-                showCompanyColumn={isAdmin && !selectedCompany}
-                userProfile={profile}
-                customTabs={getSchedulingLeadTabs()}
-              />
-            </div>
-          )}
+        <div>
+          <LeadsList
+            leads={schedulingLeads}
+            loading={leadsLoading}
+            onLeadUpdated={() => {
+              fetchSchedulingLeads();
+            }}
+            onEdit={handleEditLead}
+            showCompanyColumn={isAdmin && !selectedCompany}
+            userProfile={profile}
+            customTabs={getSchedulingLeadTabs()}
+          />
+        </div>
+      )}
 
-      {!selectedCompany && (
+      {companyLoading && (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '800px',
+              margin: '0 auto',
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }}
+          >
+            <div
+              style={{
+                height: '60px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '16px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '12px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '12px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {!selectedCompany && !companyLoading && (
         <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
           Please select a company to view scheduling.
         </div>

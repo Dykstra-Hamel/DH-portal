@@ -45,6 +45,10 @@ export default function ContactListUpload({
     file: null,
     parsedData: null,
   });
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [previewListName, setPreviewListName] = useState('');
+  const [previewTotalContacts, setPreviewTotalContacts] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -114,6 +118,10 @@ export default function ContactListUpload({
       return;
     }
 
+    // Clear previous preview
+    setShowPreview(false);
+    setPreviewData([]);
+
     setCurrentUpload({
       ...currentUpload,
       file,
@@ -154,6 +162,14 @@ export default function ContactListUpload({
         file,
         parsedData: result,
       });
+
+      // Show preview of first 5 contacts
+      if (result.leads && result.leads.length > 0) {
+        setPreviewData(result.leads.slice(0, 5));
+        setPreviewListName(currentUpload.listName || file.name.replace('.csv', ''));
+        setPreviewTotalContacts(result.validRows || result.leads.length);
+        setShowPreview(true);
+      }
     } catch (err) {
       console.error('Error parsing CSV:', err);
       setError(err instanceof Error ? err.message : 'Failed to parse CSV');
@@ -197,12 +213,14 @@ export default function ContactListUpload({
       // Refresh available lists
       await fetchAvailableLists();
 
-      // Reset upload form
+      // Reset upload form and preview
       setCurrentUpload({
         listName: '',
         file: null,
         parsedData: null,
       });
+      setShowPreview(false);
+      setPreviewData([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -227,6 +245,26 @@ export default function ContactListUpload({
     }
 
     try {
+      // Fetch list details to show preview
+      const detailsResponse = await fetch(`/api/contact-lists/${listId}`);
+      const detailsResult = await detailsResponse.json();
+
+      if (detailsResult.success && detailsResult.list?.members) {
+        // Show preview of first 5 members
+        const members = detailsResult.list.members.slice(0, 5).map((member: any) => ({
+          first_name: member.customer?.first_name || '',
+          last_name: member.customer?.last_name || '',
+          email: member.customer?.email || '',
+          phone_number: member.customer?.phone || '',
+          street_address: '', // Not included in member data
+        }));
+
+        setPreviewData(members);
+        setPreviewListName(list.name || list.list_name);
+        setPreviewTotalContacts(list.total_contacts || 0);
+        setShowPreview(true);
+      }
+
       // If we have a campaignId, assign it via API
       if (campaignId) {
         const response = await fetch(
@@ -416,6 +454,40 @@ export default function ContactListUpload({
               </span>
             </div>
           )}
+
+          {/* Preview Section for Selected List */}
+          {showPreview && previewData.length > 0 && (
+            <div className={styles.preview}>
+              <h4>Preview: {previewListName}</h4>
+              <div className={styles.previewTable}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.map((contact, index) => (
+                      <tr key={index}>
+                        <td>{contact.first_name} {contact.last_name}</td>
+                        <td>{contact.email || '-'}</td>
+                        <td>{contact.phone_number || '-'}</td>
+                        <td>{contact.street_address || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {previewTotalContacts > 5 && (
+                  <p className={styles.tableFooter}>
+                    ...and {previewTotalContacts - 5} more contacts
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -471,6 +543,40 @@ export default function ContactListUpload({
               </div>
             )}
           </div>
+
+          {/* Preview Section */}
+          {showPreview && previewData.length > 0 && (
+            <div className={styles.preview}>
+              <h4>Preview: {previewListName}</h4>
+              <div className={styles.previewTable}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.map((contact, index) => (
+                      <tr key={index}>
+                        <td>{contact.first_name} {contact.last_name}</td>
+                        <td>{contact.email || '-'}</td>
+                        <td>{contact.phone_number || '-'}</td>
+                        <td>{contact.street_address || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {previewTotalContacts > 5 && (
+                  <p className={styles.tableFooter}>
+                    ...and {previewTotalContacts - 5} more contacts
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {currentUpload.parsedData && (
             <>

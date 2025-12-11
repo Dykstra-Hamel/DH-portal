@@ -107,6 +107,9 @@ export function replaceVariables(text: string, context: VariableContext): string
     '{company_name}': context.company.name || '',
     '{service_name}': context.serviceName || '',
     '{company_phone}': context.branding?.phoneNumber || '',
+
+    // Formatting variables
+    '{line_break}': '<br>',
   };
 
   // Replace all standard variables

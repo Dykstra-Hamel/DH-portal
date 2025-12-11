@@ -26,7 +26,13 @@ interface TicketsListProps {
   onLoadMore?: () => void;
   loadingMore?: boolean;
   // Tab counts
-  tabCounts?: { all: number; incoming: number; outbound: number; forms: number };
+  tabCounts?: {
+    all: number;
+    calls?: number;
+    forms: number;
+    incoming?: number;
+    outbound?: number;
+  };
   // Callbacks for data fetching
   onTabChange?: (tab: string) => void;
   onSortChange?: (field: string, order: 'asc' | 'desc') => void;

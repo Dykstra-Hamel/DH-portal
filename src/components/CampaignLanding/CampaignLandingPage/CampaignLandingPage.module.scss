@@ -43,6 +43,11 @@
   color: var(--color-text);
   min-height: 100vh;
   max-width: 1626px;
+
+  // Ensure all child elements inherit the brand's primary font
+  * {
+    font-family: inherit;
+  }
 }
 
 // ========================================
@@ -493,7 +498,7 @@
   margin: 0 auto;
   @include contentSectionPadding;
   display: grid;
-  grid-template-columns: 1fr 384px;
+  grid-template-columns: 1fr 400px;
   gap: 60px;
   align-items: start;
 
@@ -568,7 +573,7 @@
 .letterSignature {
   font-family: var(--font-vegan-days), cursive !important;
   font-size: 45px;
-  color: var(--brand-primary);
+  color: var(--signature-color);
   margin: 12px 0;
   transform: rotate(-3deg);
 
@@ -938,13 +943,35 @@
   }
 }
 
+.additionalServicesImage {
+  @media (max-width: 992px) {
+    order: -1;
+  }
+}
+
+.additionalServicesImage,
+.featuresImage {
+  align-self: stretch;
+  img {
+    height: 100%;
+  }
+}
+
 .servicesList {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  gap: 12px 12px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-auto-flow: row;
+  }
 }
 
 .serviceItem {
@@ -1080,8 +1107,16 @@
 .faqContainer {
   margin: 0 auto;
   padding: 0 30px;
+  display: grid;
+  grid-template-columns: 234px 1fr;
+  gap: 0 65px;
+
+  @media (max-width: 968px) {
+    grid-template-columns: 234px 1fr;
+  }
 
   @media (max-width: 768px) {
+    display: block;
     padding: 0 20px;
   }
 }
@@ -1089,13 +1124,15 @@
 .faqHeading {
   font-size: 33px;
   font-weight: 600;
-  text-align: center;
+  text-align: left;
   letter-spacing: -0.33px;
   color: var(--color-text);
   margin-bottom: 48px;
+  grid-column: 2; // Align with content column
 
   @media (max-width: 768px) {
     font-size: 28px;
+    grid-column: auto;
     font-weight: 700;
     line-height: 30px;
     letter-spacing: -0.28px;
@@ -1105,6 +1142,7 @@
 
 .faqDropdownContainer {
   display: none; // Hidden on desktop
+  grid-column: 1 / -1; // Span both columns on grid
 
   @media (max-width: 768px) {
     display: flex;
@@ -1112,6 +1150,7 @@
     gap: 8px;
     margin: 0 20px;
     margin-bottom: 32px;
+    grid-column: auto;
   }
 }
 
@@ -1147,17 +1186,10 @@
 }
 
 .faqLayout {
-  display: flex;
-  gap: 65px;
-  align-items: start;
-
-  @media (max-width: 968px) {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
+  display: contents; // Make children participate in parent grid
 
   @media (max-width: 768px) {
-    display: block; // Change to block on mobile
+    display: block;
   }
 }
 
@@ -1168,6 +1200,7 @@
   min-width: 234px;
   position: sticky;
   top: 24px;
+  grid-column: 1; // First column
 
   @media (max-width: 968px) {
     overflow-x: auto;
@@ -1187,6 +1220,7 @@
 
   @media (max-width: 768px) {
     display: none; // Hide tabs on mobile, show dropdown instead
+    grid-column: auto; // Reset grid column
   }
 }
 
@@ -1224,6 +1258,11 @@
 
 .faqContent {
   flex: 1;
+  grid-column: 2; // Second column
+
+  @media (max-width: 768px) {
+    grid-column: auto; // Reset on mobile
+  }
 }
 
 .noFaqs {
@@ -1348,6 +1387,7 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 40px;
+  padding-right: 45px;
 
   @media (max-width: 768px) {
     flex-direction: column;
@@ -1380,21 +1420,64 @@
   margin: 0;
 }
 
-.footerSupport {
+.footerOffers {
   text-align: left;
   align-self: center;
+  display: flex;
+  margin: 0 80px 0 auto;
+  flex-direction: column;
+  gap: 16px;
 
   h4 {
     font-size: 17px;
     font-weight: 700;
     color: var(--color-text);
-    margin-bottom: 16px;
+    margin-bottom: 4px;
+  }
+
+  @media (max-width: 768px) {
+    text-align: center;
+    margin: 0;
+  }
+}
+
+.footerLink {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 16px;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--faq-color);
+  }
+
+  @media (max-width: 768px) {
+    text-align: center;
+  }
+}
+
+.footerSupport {
+  text-align: left;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  h4 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 4px;
   }
 
   p {
     font-size: 16px;
     color: var(--color-text);
-    margin: 8px 0;
+    margin: 0;
   }
 
   @media (max-width: 768px) {

@@ -11,6 +11,7 @@ import PricingSettingsManager from './PricingSettingsManager';
 import SalesConfigManager from './SalesConfigManager';
 import DiscountManager from './DiscountManager';
 import EmailDomainManager from './EmailDomainManager';
+import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -752,23 +753,37 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     size: company.size || '',
   });
   const [timezone, setTimezone] = useState<string>('America/New_York');
+  const [businessHours, setBusinessHours] = useState<BusinessHoursData>({
+    monday: { start: '09:00', end: '17:00', closed: false },
+    tuesday: { start: '09:00', end: '17:00', closed: false },
+    wednesday: { start: '09:00', end: '17:00', closed: false },
+    thursday: { start: '09:00', end: '17:00', closed: false },
+    friday: { start: '09:00', end: '17:00', closed: false },
+    saturday: { start: '09:00', end: '17:00', closed: true },
+    sunday: { start: '09:00', end: '17:00', closed: true },
+  });
   const [loadingTimezone, setLoadingTimezone] = useState(true);
 
   useEffect(() => {
-    const loadTimezone = async () => {
+    const loadSettings = async () => {
       try {
         const response = await fetch(`/api/companies/${company.id}/settings`);
         if (response.ok) {
           const { settings } = await response.json();
           setTimezone(settings.company_timezone?.value || 'America/New_York');
+
+          // Load business hours if they exist
+          if (settings.business_hours?.value) {
+            setBusinessHours(settings.business_hours.value);
+          }
         }
       } catch (error) {
-        console.error('Error loading timezone:', error);
+        console.error('Error loading settings:', error);
       } finally {
         setLoadingTimezone(false);
       }
     };
-    loadTimezone();
+    loadSettings();
   }, [company.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -777,7 +792,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     // Save business info
     await onSave(formData);
 
-    // Save timezone setting separately
+    // Save timezone and business hours settings separately
     try {
       await fetch(`/api/companies/${company.id}/settings`, {
         method: 'PUT',
@@ -787,12 +802,16 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
             company_timezone: {
               value: timezone,
               type: 'string'
+            },
+            business_hours: {
+              value: businessHours,
+              type: 'json'
             }
           }
         }),
       });
     } catch (error) {
-      console.error('Error saving timezone:', error);
+      console.error('Error saving settings:', error);
     }
   };
 
@@ -850,6 +869,13 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
             </optgroup>
           </select>
           <small>This timezone will be used for scheduling tasks and business hours</small>
+        </div>
+
+        <div className={styles.formGroup}>
+          <BusinessHoursEditor
+            businessHours={businessHours}
+            onChange={setBusinessHours}
+          />
         </div>
 
         <button type="submit" disabled={saving} className={styles.saveButton}>
