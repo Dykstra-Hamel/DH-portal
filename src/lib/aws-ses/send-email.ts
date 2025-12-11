@@ -12,6 +12,10 @@ import { isEmailSuppressed } from '@/lib/suppression';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { generateTenantName } from './tenants';
 import { generateConfigSetName } from './config-sets';
+import { generateUnsubscribeToken, getUnsubscribeUrl } from '@/lib/suppression/tokens';
+import { generateUnsubscribeFooter, generatePlainTextUnsubscribeFooter } from '@/lib/email/unsubscribe-footer';
+import { injectFooterIntoHtml, injectFooterIntoPlainText } from '@/lib/email/inject-footer';
+import { shouldSkipUnsubscribeFooter } from '@/lib/email/config';
 
 /**
  * Send an email via AWS SES
@@ -65,6 +69,73 @@ export async function sendEmail(
       }
     }
 
+    // Auto-inject unsubscribe footer (unless this is a system email)
+    let finalHtml = html;
+    let finalText = text;
+    let footerInjected = false;
+
+    if (!shouldSkipUnsubscribeFooter(source)) {
+      // Get company info for footer
+      const supabase = createAdminClient();
+      const { data: company } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', companyId)
+        .single();
+
+      const companyName = company?.name || 'us';
+
+      // Generate unsubscribe token
+      const recipientEmail = recipients[0]; // Use first recipient for token
+      const tokenResult = await generateUnsubscribeToken({
+        companyId,
+        customerId,
+        email: recipientEmail,
+        source: source || 'automation_workflow',
+        metadata: {
+          leadId,
+          templateId,
+          executionId,
+          campaignId,
+        },
+      });
+
+      if (tokenResult.success && tokenResult.data) {
+        const unsubscribeUrl = getUnsubscribeUrl(tokenResult.data.token);
+
+        // Generate footer HTML and plain text
+        const footerHtml = generateUnsubscribeFooter({
+          unsubscribeUrl,
+          companyName,
+        });
+
+        const footerText = generatePlainTextUnsubscribeFooter({
+          unsubscribeUrl,
+          companyName,
+        });
+
+        // Inject footer into email content
+        finalHtml = injectFooterIntoHtml(html, footerHtml);
+        if (text) {
+          finalText = injectFooterIntoPlainText(text, footerText);
+        }
+
+        footerInjected = true;
+        console.log(
+          `✓ Unsubscribe footer injected for email to ${recipientEmail} (company: ${companyId}, source: ${source})`
+        );
+      } else {
+        console.error(
+          `✗ Failed to generate unsubscribe token for ${recipientEmail}: ${tokenResult.error}`,
+          { companyId, source, customerId, leadId, templateId }
+        );
+      }
+    } else {
+      console.log(
+        `Skipping unsubscribe footer for system email (source: ${source})`
+      );
+    }
+
     // Generate tenant and config set names if not provided
     const tenantName = providedTenantName || generateTenantName(companyId);
     const configurationSetName =
@@ -73,7 +144,7 @@ export async function sendEmail(
     // Build from address with name if provided
     const fromAddress = fromName ? `"${fromName}" <${from}>` : from;
 
-    // Prepare email content
+    // Prepare email content (use finalHtml/finalText with injected footer)
     const emailContent = {
       Simple: {
         Subject: {
@@ -82,12 +153,12 @@ export async function sendEmail(
         },
         Body: {
           Html: {
-            Data: html,
+            Data: finalHtml,
             Charset: 'UTF-8',
           },
-          ...(text && {
+          ...(finalText && {
             Text: {
-              Data: text,
+              Data: finalText,
               Charset: 'UTF-8',
             },
           }),
@@ -149,7 +220,10 @@ export async function sendEmail(
         delivery_status: 'sent',
         source: source,
         scheduled_for: scheduledFor || sentAt,
-        tracking_data: trackingData || {},
+        tracking_data: {
+          ...trackingData,
+          unsubscribe_footer_injected: footerInjected,
+        },
         sent_at: sentAt,
       });
     } catch (logError) {
@@ -186,7 +260,10 @@ export async function sendEmail(
         delivery_status: 'failed',
         source: source,
         scheduled_for: scheduledFor || new Date().toISOString(),
-        tracking_data: trackingData || {},
+        tracking_data: {
+          ...trackingData,
+          unsubscribe_footer_injected: false,
+        },
         sent_at: new Date().toISOString(),
         ses_event_data: {
           error: error instanceof Error ? error.message : 'Unknown error',

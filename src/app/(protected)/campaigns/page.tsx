@@ -284,6 +284,7 @@ export default function CampaignsPage() {
                     disabled={duplicatingId === campaign.id}
                   >
                     <Copy size={16} />
+                    <span className={styles.actionLabel}>Duplicate</span>
                   </button>
                 </div>
               </div>

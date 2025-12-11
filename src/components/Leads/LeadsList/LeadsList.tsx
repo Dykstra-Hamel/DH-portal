@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Lead } from '@/types/lead';
 import { DataTable, SortConfig } from '@/components/Common/DataTable';
 import { getLeadColumns, getLeadTabs } from './LeadsListConfig';
@@ -220,6 +220,30 @@ function LeadsList({
     }
   };
 
+  const sortedLeads = useMemo(() => {
+    const scopedLeads = leads.filter(lead =>
+      !showArchived ? !lead.archived : lead.archived
+    );
+
+    const unassigned = scopedLeads
+      .filter(lead => lead.lead_status === 'new')
+      .sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime()
+      );
+
+    const others = scopedLeads
+      .filter(lead => lead.lead_status !== 'new')
+      .sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime()
+      );
+
+    return [...unassigned, ...others];
+  }, [leads, showArchived]);
+
   return (
     <>
       {/* Custom Toast with Undo */}
@@ -234,7 +258,7 @@ function LeadsList({
 
       {/* DataTable Component */}
       <DataTable
-        data={leads}
+        data={sortedLeads}
         loading={loading}
         title="Leads Overview"
         columns={getLeadColumns()}

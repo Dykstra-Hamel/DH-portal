@@ -19,9 +19,19 @@ interface FooterSectionProps {
     phoneNumber: string | null;
     email: string | null;
   };
+  serviceName: string;
 }
 
-export default function FooterSection({ footer, branding }: FooterSectionProps) {
+export default function FooterSection({ footer, branding, serviceName }: FooterSectionProps) {
+  const scrollToSection = (sectionId: string) => {
+    const section = document.getElementById(sectionId);
+    if (section) {
+      const offset = 70; // Account for fixed header
+      const targetY = section.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(targetY, 0), behavior: 'smooth' });
+    }
+  };
+
   return (
     <footer className={styles.footer}>
       <div className={styles.footerContainer}>
@@ -41,6 +51,23 @@ export default function FooterSection({ footer, branding }: FooterSectionProps) 
               <div className={styles.footerCompanyName}>{branding.companyName}</div>
             )}
             <p className={styles.footerTagline}>{footer.tagline}</p>
+          </div>
+
+          {/* Offers column */}
+          <div className={styles.footerOffers}>
+            <h4>Offers</h4>
+            <button
+              className={styles.footerLink}
+              onClick={() => scrollToSection('hero-section')}
+            >
+              {serviceName}
+            </button>
+            <button
+              className={styles.footerLink}
+              onClick={() => scrollToSection('additional-services-section')}
+            >
+              Additional Add-On Services
+            </button>
           </div>
 
           {/* Support column */}

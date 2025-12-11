@@ -516,8 +516,7 @@ export default function CampaignEditor({
         throw new Error(result.error || 'Failed to save campaign');
       }
 
-      // Check if campaign should transition from draft to scheduled
-      // This applies to both new campaigns AND cloned campaigns
+      // Store campaign ID for later use
       const savedCampaignId = campaign ? campaign.id : result.campaign?.id;
 
       if (savedCampaignId) {
@@ -651,6 +650,7 @@ export default function CampaignEditor({
         }
       }
 
+      // Campaign saved as draft - user will manually start it when ready
       // Show success message based on start time
       const startDate = new Date(formData.start_datetime);
       const now = new Date();

@@ -12,10 +12,6 @@ import {
   formatDiscount,
 } from '@/lib/campaign-utils';
 import { isPhoneSuppressed } from '@/lib/suppression';
-import {
-  generateUnsubscribeToken,
-  getUnsubscribeUrl,
-} from '@/lib/suppression/tokens';
 
 interface StepResult {
   stepIndex: number;
@@ -855,38 +851,12 @@ async function executeEmailStep(
     return `<div class="faq-section">${faqItems}</div>`;
   };
 
-  // Generate unsubscribe token for this email
-  let unsubscribeUrl = '';
-  let unsubscribeLink = '';
-
-  try {
-    const tokenResult = await generateUnsubscribeToken({
-      companyId,
-      customerId: customerId || undefined,
-      email: customerEmail,
-      phoneNumber:
-        leadData.customerPhone ||
-        leadData.phone ||
-        fullLeadData?.customer?.phone ||
-        undefined,
-      source: campaignId ? 'email_campaign' : 'automation_workflow',
-      metadata: {
-        campaignId,
-        executionId,
-        workflowId,
-        leadId,
-        templateId: template.id,
-      },
-    });
-
-    if (tokenResult.success && tokenResult.data) {
-      unsubscribeUrl = getUnsubscribeUrl(tokenResult.data.token);
-      unsubscribeLink = `<a href="${unsubscribeUrl}">Unsubscribe</a>`;
-    }
-  } catch (error) {
-    console.error('Error generating unsubscribe token:', error);
-    // Continue with empty unsubscribe links rather than failing the entire email
-  }
+  // NOTE: Unsubscribe footer is now automatically injected by the sendEmail() function
+  // These variables are kept for backward compatibility with older templates that may
+  // manually reference {{unsubscribeUrl}} or {{unsubscribeLink}} in their content.
+  // New emails will have the footer automatically appended regardless of these variables.
+  const unsubscribeUrl = '';
+  const unsubscribeLink = '';
 
   // Extract plan data with fallbacks for partial leads
   const planData = fullLeadData?.service_plans || leadData.selectedPlan;

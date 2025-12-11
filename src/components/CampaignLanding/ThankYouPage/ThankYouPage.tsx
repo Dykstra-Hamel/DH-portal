@@ -286,7 +286,7 @@ export default function ThankYouPage({
       </div>
 
       {/* Footer Section */}
-      <FooterSection footer={footer} branding={branding} />
+      <FooterSection footer={footer} branding={branding} serviceName={campaign.name} />
     </div>
   );
 }

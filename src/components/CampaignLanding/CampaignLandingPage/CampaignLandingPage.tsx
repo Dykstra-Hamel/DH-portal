@@ -162,13 +162,25 @@ export default function CampaignLandingPage({
   // Load brand primary font dynamically
   useEffect(() => {
     if (landingPage.branding.fontPrimaryUrl) {
+      // Remove any existing campaign font link to prevent duplicates
+      const existingLink = document.getElementById('campaign-custom-font');
+      if (existingLink) {
+        existingLink.remove();
+      }
+
+      // Add new font link with ID for tracking
       const link = document.createElement('link');
+      link.id = 'campaign-custom-font';
       link.rel = 'stylesheet';
       link.href = landingPage.branding.fontPrimaryUrl;
       document.head.appendChild(link);
 
+      // Cleanup on unmount
       return () => {
-        document.head.removeChild(link);
+        const linkToRemove = document.getElementById('campaign-custom-font');
+        if (linkToRemove) {
+          linkToRemove.remove();
+        }
       };
     }
   }, [landingPage.branding.fontPrimaryUrl]);
@@ -263,6 +275,9 @@ export default function CampaignLandingPage({
           ? landingPage.branding.primaryColor
           : landingPage.branding.secondaryColor,
         '--faq-color': landingPage.branding.accentColorPreference === 'primary'
+          ? landingPage.branding.secondaryColor
+          : landingPage.branding.primaryColor,
+        '--signature-color': landingPage.branding.accentColorPreference === 'primary'
           ? landingPage.branding.secondaryColor
           : landingPage.branding.primaryColor,
         '--font-primary': landingPage.branding.fontPrimaryName
@@ -387,6 +402,7 @@ export default function CampaignLandingPage({
       <FooterSection
         footer={landingPage.footer}
         branding={landingPage.branding}
+        serviceName={landingPage.faq.serviceName}
       />
     </div>
   );

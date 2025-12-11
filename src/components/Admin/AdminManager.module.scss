@@ -931,65 +931,6 @@
   background: #f9fafb !important;
 }
 
-// Business Hours Styles
-.businessHoursDay {
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  background: white;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.dayHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.dayName {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
-}
-
-.timeSettings {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-end;
-}
-
-.timeInputGroup {
-  flex: 1;
-  min-width: 0;
-
-  label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #6b7280;
-    margin-bottom: 0.25rem;
-    display: block;
-  }
-
-  input[type='time'] {
-    width: 100%;
-    padding: 0.375rem 0.5rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.25rem;
-    font-size: 0.8125rem;
-
-    &:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-    }
-  }
-}
-
 // Responsive design updates
 @media (max-width: 768px) {
   .recordsHeader {
@@ -1027,15 +968,6 @@
 
   .tabNavigation {
     flex-wrap: wrap;
-  }
-
-  .timeSettings {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .businessHoursDay {
-    padding: 0.5rem;
   }
 }
 

@@ -12,6 +12,7 @@ import { Toast } from '@/components/Common/Toast';
 import DefaultItemRow from './DefaultItemRow';
 import { DataTableProps, SortConfig } from './DataTable.types';
 import styles from './DataTable.module.scss';
+import { Search as SearchIcon } from 'lucide-react';
 
 export default function DataTable<T>({
   data,
@@ -43,6 +44,7 @@ export default function DataTable<T>({
   const [activeTab, setActiveTab] = useState<string>(tabs?.[0]?.key || 'all');
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(defaultSort || null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Handler functions - update internal state AND notify parent
   const handleTabChange = useCallback((newTab: string) => {
@@ -54,6 +56,13 @@ export default function DataTable<T>({
     setSearchQuery(newQuery);
     onSearchChange?.(newQuery); // Notify parent to fetch filtered data
   }, [onSearchChange]);
+
+  // Keep search visible when there's a query
+  useEffect(() => {
+    if (searchQuery) {
+      setIsSearchOpen(true);
+    }
+  }, [searchQuery]);
 
   // Toast state
   const [toastMessage, setToastMessage] = useState('');
@@ -151,15 +160,6 @@ export default function DataTable<T>({
       return aStr.localeCompare(bStr) * modifier;
     });
   }, [searchedData, sortConfig, columns]);
-
-  // Calculate counts for each tab
-  const tabsWithCounts = useMemo(() => {
-    if (!tabs) return [];
-    return tabs.map(tab => ({
-      ...tab,
-      count: tab.getCount(data),
-    }));
-  }, [tabs, data]);
 
   // Infinite scroll intersection observer
   const handleLoadMore = useCallback(() => {
@@ -264,30 +264,39 @@ export default function DataTable<T>({
         }
       >
         <div className={styles.topContent}>
-          <h1 className={styles.pageTitle}>{title}</h1>
-          {/* Search Field */}
           {searchEnabled && (
-            <div className={styles.searchContainer}>
-              <input
-                type="text"
-                className={styles.searchInput}
-                placeholder={searchPlaceholder}
-                value={searchQuery}
-                onChange={e => handleSearchChange(e.target.value)}
-              />
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={`${styles.iconButton} ${isSearchOpen ? styles.iconButtonActive : ''}`}
+                onClick={() => setIsSearchOpen(open => !open)}
+                aria-label={isSearchOpen ? 'Hide search' : 'Show search'}
+              >
+                <SearchIcon size={18} />
+              </button>
+              <div
+                className={`${styles.searchContainer} ${isSearchOpen ? styles.searchOpen : ''}`}
+              >
+                <input
+                  type="text"
+                  className={styles.searchInput}
+                  placeholder={searchPlaceholder}
+                  value={searchQuery}
+                  onChange={e => handleSearchChange(e.target.value)}
+                />
+              </div>
             </div>
           )}
           {/* Tab Navigation */}
           {tabs && tabs.length > 0 && (
             <div className={styles.tabsContainer}>
-              {tabsWithCounts.map(tab => (
+              {tabs.map(tab => (
                 <button
                   key={tab.key}
                   className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
                   onClick={() => handleTabChange(tab.key)}
                 >
                   <span className={styles.tabText}>{tab.label}</span>
-                  <span className={styles.tabCount}>{tab.count}</span>
                 </button>
               ))}
             </div>
