@@ -20,6 +20,17 @@ export interface BusinessHoursSettings {
 }
 
 /**
+ * Internal interface matching the new database format
+ */
+interface BusinessHoursDBFormat {
+  [day: string]: {
+    start: string;   // HH:MM format
+    end: string;     // HH:MM format
+    closed: boolean; // true = business closed, false = business open
+  };
+}
+
+/**
  * Fetches company business hours settings from database
  */
 export async function fetchCompanyBusinessHours(companyId: string): Promise<BusinessHoursSettings> {
@@ -32,13 +43,7 @@ export async function fetchCompanyBusinessHours(companyId: string): Promise<Busi
     .in('setting_key', [
       'company_timezone',
       'automation_business_hours_only',
-      'business_hours_monday',
-      'business_hours_tuesday',
-      'business_hours_wednesday',
-      'business_hours_thursday',
-      'business_hours_friday',
-      'business_hours_saturday',
-      'business_hours_sunday',
+      'business_hours', // New consolidated format
     ]);
 
   if (error || !settings) {
@@ -80,20 +85,34 @@ export function parseBusinessHoursSettings(settings: any[]): BusinessHoursSettin
   const businessHoursByDay: BusinessHoursSettings['businessHoursByDay'] = {};
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-  for (const day of days) {
-    const key = `business_hours_${day}`;
-    const dayHours = settingsMap[key];
+  // Check for new consolidated format first
+  const businessHoursData = settingsMap.business_hours as BusinessHoursDBFormat | undefined;
 
-    if (dayHours && typeof dayHours === 'object') {
+  if (businessHoursData && typeof businessHoursData === 'object') {
+    // Parse new consolidated format
+    for (const day of days) {
+      const dayData = businessHoursData[day];
+
+      if (dayData && typeof dayData === 'object') {
+        businessHoursByDay[day] = {
+          enabled: !dayData.closed,  // INVERT: closed: true → enabled: false
+          start: dayData.start || '09:00',
+          end: dayData.end || '17:00',
+        };
+      } else {
+        // Default fallback
+        businessHoursByDay[day] = {
+          enabled: day !== 'saturday' && day !== 'sunday',
+          start: '09:00',
+          end: '17:00',
+        };
+      }
+    }
+  } else {
+    // No data found, use defaults
+    for (const day of days) {
       businessHoursByDay[day] = {
-        enabled: dayHours.enabled ?? true,
-        start: dayHours.start || '09:00',
-        end: dayHours.end || '17:00',
-      };
-    } else {
-      // Default to 9am-5pm if not set
-      businessHoursByDay[day] = {
-        enabled: day !== 'saturday' && day !== 'sunday', // Weekdays only by default
+        enabled: day !== 'saturday' && day !== 'sunday',
         start: '09:00',
         end: '17:00',
       };

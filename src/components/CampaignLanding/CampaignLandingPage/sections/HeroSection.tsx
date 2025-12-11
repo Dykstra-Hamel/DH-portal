@@ -68,8 +68,15 @@ export default function HeroSection({
     [pricing.originalPrice, variableContext]
   );
 
+  // Decode HTML entities for rendering as JSX
+  const decodeHtmlEntities = (text: string): string => {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+  };
+
   const processedTitle = useMemo(
-    () => processTextWithVariables(hero.title, variableContext),
+    () => decodeHtmlEntities(processTextWithVariables(hero.title, variableContext)),
     [hero.title, variableContext]
   );
 
@@ -88,26 +95,38 @@ export default function HeroSection({
 
   const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  const renderPriceParts = (text: string, keyPrefix: string | number) =>
-    text.split('$').map((part, index) => {
-      if (index === 0) return <span key={`${keyPrefix}-${index}`}>{part}</span>;
+  const renderPriceParts = (text: string, keyPrefix: string | number) => {
+    // Split by <br> tags first to handle line breaks
+    const lines = text.split('<br>');
 
-      // Extract price pattern like "44/mo"
-      const pricePattern = part.match(/^(\d+)(\/mo)/);
-      if (pricePattern) {
-        return (
-          <span key={`${keyPrefix}-${index}`}>
-            <span className={styles.priceHighlight}>
-              <sup>$</sup>
-              {pricePattern[1]}
-              <span className={styles.priceUnit}>{pricePattern[2]}</span>
+    return lines.flatMap((line, lineIndex) => {
+      const parts = line.split('$').map((part, index) => {
+        if (index === 0) return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>{part}</span>;
+
+        // Extract price pattern like "44/mo"
+        const pricePattern = part.match(/^(\d+)(\/mo)/);
+        if (pricePattern) {
+          return (
+            <span key={`${keyPrefix}-line${lineIndex}-${index}`}>
+              <span className={styles.priceHighlight}>
+                <sup>$</sup>
+                {pricePattern[1]}
+                <span className={styles.priceUnit}>{pricePattern[2]}</span>
+              </span>
+              {part.substring(pricePattern[0].length)}
             </span>
-            {part.substring(pricePattern[0].length)}
-          </span>
-        );
+          );
+        }
+        return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>${part}</span>;
+      });
+
+      // Add line break between lines (but not after the last line)
+      if (lineIndex < lines.length - 1) {
+        return [...parts, <br key={`${keyPrefix}-br${lineIndex}`} />];
       }
-      return <span key={`${keyPrefix}-${index}`}>${part}</span>;
+      return parts;
     });
+  };
 
   const renderTitleWithStyles = () => {
     const originalPrice = pricing.originalPrice?.trim();
@@ -129,12 +148,8 @@ export default function HeroSection({
     });
   };
 
-  // Extract price components for highlighting
-  const priceMatch = pricing.displayPrice.match(/\$(\d+)\/mo/);
-  const priceAmount = priceMatch ? priceMatch[1] : null;
-
   return (
-    <section className={styles.heroSection}>
+    <section id="hero-section" className={styles.heroSection}>
       <div className={styles.heroContainer}>
         {/* Left column - Content */}
         <div className={styles.heroContent}>

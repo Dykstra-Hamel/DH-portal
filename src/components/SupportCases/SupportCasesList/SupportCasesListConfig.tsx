@@ -205,14 +205,6 @@ export const getSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
     getCount: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived).length,
   },
   {
-    key: 'unassigned',
-    label: 'Unassigned',
-    filter: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && !sc.assigned_to),
-    getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && !sc.assigned_to).length,
-  },
-  {
     key: 'in_progress',
     label: 'In Progress',
     filter: (supportCases: SupportCase[]) =>

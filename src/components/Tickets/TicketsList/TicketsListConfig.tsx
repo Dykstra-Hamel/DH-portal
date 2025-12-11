@@ -343,7 +343,13 @@ export const getTicketColumns = (
 // Define tabs for tickets filtering
 export const getTicketTabs = (
   callRecords: CallRecord[] = [],
-  tabCounts?: { all: number; incoming: number; outbound: number; forms: number }
+  tabCounts?: {
+    all: number;
+    calls?: number;
+    forms: number;
+    incoming?: number;
+    outbound?: number;
+  }
 ): TabDefinition<Ticket>[] => [
   {
     key: 'all',
@@ -352,16 +358,17 @@ export const getTicketTabs = (
     getCount: (tickets: Ticket[]) => tabCounts?.all ?? tickets.length,
   },
   {
-    key: 'incoming',
-    label: 'Incoming Calls',
-    filter: (tickets: Ticket[]) => tickets, // API already filters - no client-side filtering needed
-    getCount: (tickets: Ticket[]) => tabCounts?.incoming ?? tickets.length,
-  },
-  {
-    key: 'outbound',
-    label: 'Outbound Calls',
-    filter: (tickets: Ticket[]) => tickets, // API already filters - no client-side filtering needed
-    getCount: (tickets: Ticket[]) => tabCounts?.outbound ?? tickets.length,
+    key: 'calls',
+    label: 'Calls',
+    filter: (tickets: Ticket[]) =>
+      tickets.filter(ticket => ticket.type === 'phone_call'),
+    getCount: (tickets: Ticket[]) => {
+      const callCountFromTabs =
+        (tabCounts?.incoming ?? 0) + (tabCounts?.outbound ?? 0);
+      if (tabCounts?.calls !== undefined) return tabCounts.calls;
+      if (tabCounts) return callCountFromTabs;
+      return tickets.filter(ticket => ticket.type === 'phone_call').length;
+    },
   },
   {
     key: 'forms',

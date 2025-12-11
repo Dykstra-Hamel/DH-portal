@@ -64,16 +64,17 @@ export default function AdditionalServicesSection({
   };
 
   return (
-    <section className={styles.additionalServicesSection}>
+    <section id="additional-services-section" className={styles.additionalServicesSection}>
       <div className={styles.additionalServicesContainer}>
         {/* Left column - Content */}
         <div className={styles.additionalServicesContent}>
-          <h2 className={styles.additionalServicesHeading}>
-            {processedHeading}
-          </h2>
+          <h2
+            className={styles.additionalServicesHeading}
+            dangerouslySetInnerHTML={{ __html: processedHeading }}
+          />
 
           <ul className={styles.servicesList}>
-            {addons.map((addon) => (
+            {addons.slice(0, 6).map((addon) => (
               <li key={addon.id} className={styles.serviceItem}>
                 <svg
                   className={styles.checkIcon}

@@ -10,17 +10,11 @@ import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import {
-  MetricsCard,
-  styles as metricsStyles,
-} from '@/components/Common/MetricsCard';
-import { MetricsResponse } from '@/services/metricsService';
-import {
   createLeadChannel,
   subscribeToLeadUpdates,
   LeadUpdatePayload,
 } from '@/lib/realtime/lead-channel';
 import { AddLeadModal } from '@/components/Leads/AddLeadModal/AddLeadModal';
-import styles from './page.module.scss';
 
 interface Profile {
   id: string;
@@ -36,13 +30,11 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
-  const [metricsLoading, setMetricsLoading] = useState(false);
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
   const router = useRouter();
 
   // Use global company context
-  const { selectedCompany, isAdmin } = useCompany();
+  const { selectedCompany, isAdmin, isLoading: companyLoading } = useCompany();
 
   // Register page action for Add Lead button
   const { registerPageAction } = usePageActions();
@@ -130,36 +122,12 @@ export default function LeadsPage() {
     router.push(`/connections/leads/${lead.id}?edit=true`);
   };
 
-  const fetchMetrics = useCallback(async (companyId: string) => {
-    if (!companyId) return;
-
-    setMetricsLoading(true);
-    try {
-      const params = new URLSearchParams({
-        companyId,
-      });
-
-      const response = await fetch(`/api/metrics?${params}`);
-      if (response.ok) {
-        const metricsData = await response.json();
-        setMetrics(metricsData);
-      } else {
-        console.error('Error fetching metrics:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Error fetching metrics:', error);
-    } finally {
-      setMetricsLoading(false);
-    }
-  }, []);
-
-  // Fetch leads and metrics when selectedCompany changes or isAdmin changes
+  // Fetch leads when selectedCompany changes or isAdmin changes
   useEffect(() => {
     if (selectedCompany?.id) {
       fetchLeads();
-      fetchMetrics(selectedCompany.id);
     }
-  }, [selectedCompany, isAdmin, fetchLeads, fetchMetrics]);
+  }, [selectedCompany, isAdmin, fetchLeads]);
 
   // Real-time subscription for lead updates
   useEffect(() => {
@@ -263,113 +231,64 @@ export default function LeadsPage() {
   return (
     <div style={{ width: '100%' }}>
       {selectedCompany && (
-        <>
-          {/* Metrics Cards */}
-          <div className={metricsStyles.metricsCardWrapper}>
-            {metrics && !metricsLoading ? (
-              <>
-                <MetricsCard
-                  title={metrics.totalCalls.title}
-                  value={metrics.totalCalls.value}
-                  comparisonValue={metrics.totalCalls.comparisonValue}
-                  comparisonPeriod={metrics.totalCalls.comparisonPeriod}
-                  trend={metrics.totalCalls.trend}
-                />
-                <MetricsCard
-                  title={metrics.totalForms.title}
-                  value={metrics.totalForms.value}
-                  comparisonValue={metrics.totalForms.comparisonValue}
-                  comparisonPeriod={metrics.totalForms.comparisonPeriod}
-                  trend={metrics.totalForms.trend}
-                />
-                <MetricsCard
-                  title={metrics.avgTimeToAssign.title}
-                  value={metrics.avgTimeToAssign.value}
-                  comparisonValue={metrics.avgTimeToAssign.comparisonValue}
-                  comparisonPeriod={metrics.avgTimeToAssign.comparisonPeriod}
-                  trend={metrics.avgTimeToAssign.trend}
-                />
-                <MetricsCard
-                  title={metrics.hangupCalls.title}
-                  value={metrics.hangupCalls.value}
-                  comparisonValue={metrics.hangupCalls.comparisonValue}
-                  comparisonPeriod={metrics.hangupCalls.comparisonPeriod}
-                  trend={metrics.hangupCalls.trend}
-                />
-                <MetricsCard
-                  title={metrics.customerServiceCalls.title}
-                  value={metrics.customerServiceCalls.value}
-                  comparisonValue={metrics.customerServiceCalls.comparisonValue}
-                  comparisonPeriod={
-                    metrics.customerServiceCalls.comparisonPeriod
-                  }
-                  trend={metrics.customerServiceCalls.trend}
-                />
-              </>
-            ) : (
-              <>
-                <MetricsCard
-                  title="Total Calls"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Total Forms"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Avg Time To Be Assigned"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Hang-up Calls"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Customer Service Calls"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-              </>
-            )}
-          </div>
-        </>
-      )}
-
-      {selectedCompany && (
         <LeadsList
           leads={leads}
           loading={leadsLoading}
           onLeadUpdated={() => {
             fetchLeads();
-            fetchMetrics(selectedCompany.id);
           }}
           onEdit={handleEditLead}
           showCompanyColumn={isAdmin && !selectedCompany}
           userProfile={profile}
-          defaultSort={{ key: 'created_at', direction: 'asc' }}
         />
       )}
 
-      {!selectedCompany && (
+      {companyLoading && (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '800px',
+              margin: '0 auto',
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }}
+          >
+            <div
+              style={{
+                height: '60px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '16px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '12px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                marginBottom: '12px',
+              }}
+            />
+            <div
+              style={{
+                height: '40px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {!selectedCompany && !companyLoading && (
         <div
           style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}
         >
@@ -385,7 +304,6 @@ export default function LeadsPage() {
           companyId={selectedCompany.id}
           onSuccess={() => {
             fetchLeads();
-            fetchMetrics(selectedCompany.id);
           }}
         />
       )}

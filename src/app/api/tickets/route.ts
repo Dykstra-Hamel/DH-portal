@@ -15,7 +15,13 @@ import {
 async function getTicketTabCounts(
   companyId: string,
   includeArchived: boolean
-): Promise<{ all: number; incoming: number; outbound: number; forms: number }> {
+): Promise<{
+  all: number;
+  calls: number;
+  forms: number;
+  incoming?: number;
+  outbound?: number;
+}> {
   const adminSupabase = createAdminClient();
 
   // Try to use the optimized RPC function first
@@ -26,7 +32,10 @@ async function getTicketTabCounts(
 
   // Return RPC results if available
   if (countsData) {
-    return countsData;
+    const calls =
+      countsData.calls ??
+      (countsData.incoming || 0) + (countsData.outbound || 0);
+    return { ...countsData, calls };
   }
 
   // Fallback: Use parallel queries if RPC doesn't exist yet
@@ -37,8 +46,11 @@ async function getTicketTabCounts(
     adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'web_form').neq('status', 'live').neq('status', 'closed').or('archived.is.null,archived.eq.false'),
   ]);
 
+  const calls = (incomingCount.count || 0) + (outboundCount.count || 0);
+
   return {
     all: allCount.count || 0,
+    calls,
     incoming: incomingCount.count || 0,
     outbound: outboundCount.count || 0,
     forms: formsCount.count || 0,
@@ -132,7 +144,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply tab filter with status exclusions
-    if (tabFilter === 'incoming') {
+    if (tabFilter === 'calls') {
+      query = query
+        .eq('type', 'phone_call')
+        .neq('status', 'live')
+        .neq('status', 'closed');
+    } else if (tabFilter === 'incoming') {
       query = query
         .eq('type', 'phone_call')
         .eq('call_direction', 'inbound')
@@ -179,6 +196,9 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Failed to fetch tickets');
     }
 
+    // Always fetch tab counts so UI badges stay accurate, even when the current tab has no rows
+    const counts = await getTicketTabCounts(companyId, includeArchived);
+
     if (!tickets || tickets.length === 0) {
       return createSuccessResponse({
         tickets: [],
@@ -189,6 +209,7 @@ export async function GET(request: NextRequest) {
           totalPages: Math.ceil((totalCount || 0) / limit),
           hasMore: false,
         },
+        counts,
       });
     }
 
@@ -274,9 +295,6 @@ export async function GET(request: NextRequest) {
         : null,
       call_records: callRecordsMap.get(ticket.id) || [],
     }));
-
-    // Get tab counts using the optimized helper function
-    const counts = await getTicketTabCounts(companyId, includeArchived);
 
     return createSuccessResponse({
       tickets: enhancedTickets,

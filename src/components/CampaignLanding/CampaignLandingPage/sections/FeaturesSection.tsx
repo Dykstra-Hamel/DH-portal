@@ -45,15 +45,24 @@ export default function FeaturesSection({
     [customer, pricing, company, branding, serviceName]
   );
 
+  // Decode HTML entities for rendering as JSX
+  const decodeHtmlEntities = (text: string): string => {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+  };
+
   // Process heading with variables
   const processedHeading = useMemo(
-    () => processTextWithVariables(features.heading, variableContext),
+    () => decodeHtmlEntities(processTextWithVariables(features.heading, variableContext)),
     [features.heading, variableContext]
   );
 
   // Process each bullet with variables
   const processedBullets = useMemo(
-    () => features.bullets.map((bullet) => processTextWithVariables(bullet, variableContext)),
+    () => features.bullets.map((bullet) =>
+      decodeHtmlEntities(processTextWithVariables(bullet, variableContext))
+    ),
     [features.bullets, variableContext]
   );
 
@@ -67,27 +76,39 @@ export default function FeaturesSection({
   const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   // Render price parts with accent color styling
-  const renderPriceParts = (text: string, keyPrefix: string | number) =>
-    text.split('$').map((part, index) => {
-      if (index === 0) return <span key={`${keyPrefix}-${index}`}>{part}</span>;
+  const renderPriceParts = (text: string, keyPrefix: string | number) => {
+    // Split by <br> tags first to handle line breaks
+    const lines = text.split('<br>');
 
-      // Extract price pattern like "44/mo"
-      const pricePattern = part.match(/^(\d+)(\/mo)/);
-      if (pricePattern) {
-        return (
-          <span key={`${keyPrefix}-${index}`}>
-            <span className={styles.priceHighlight}>
-              <sup>$</sup>
-              {pricePattern[1]}
-              <span className={styles.priceUnit}>{pricePattern[2]}</span>
+    return lines.flatMap((line, lineIndex) => {
+      const parts = line.split('$').map((part, index) => {
+        if (index === 0) return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>{part}</span>;
+
+        // Extract price pattern like "44/mo"
+        const pricePattern = part.match(/^(\d+)(\/mo)/);
+        if (pricePattern) {
+          return (
+            <span key={`${keyPrefix}-line${lineIndex}-${index}`}>
+              <span className={styles.priceHighlight}>
+                <sup>$</sup>
+                {pricePattern[1]}
+                <span className={styles.priceUnit}>{pricePattern[2]}</span>
+              </span>
+              {part.slice(pricePattern[0].length)}
             </span>
-            {part.slice(pricePattern[0].length)}
-          </span>
-        );
-      }
+          );
+        }
 
-      return <span key={`${keyPrefix}-${index}`}>${part}</span>;
+        return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>${part}</span>;
+      });
+
+      // Add line break between lines (but not after the last line)
+      if (lineIndex < lines.length - 1) {
+        return [...parts, <br key={`${keyPrefix}-br${lineIndex}`} />];
+      }
+      return parts;
     });
+  };
 
   // Render heading with styled prices and original price strikethrough
   const renderHeadingWithStyles = () => {

@@ -16,11 +16,6 @@ import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
-import {
-  MetricsCard,
-  styles as metricsStyles,
-} from '@/components/Common/MetricsCard';
-import { MetricsResponse } from '@/services/metricsService';
 import { CallRecord } from '@/types/call-record';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import {
@@ -36,15 +31,37 @@ import {
   subscribeToTicketUpdates,
   TicketUpdatePayload,
 } from '@/lib/realtime/ticket-channel';
-import styles from './page.module.scss';
+
+const TicketsListSkeleton = () => (
+  <div style={{ padding: '24px' }}>
+    <div
+      style={{
+        background: '#f3f4f6',
+        height: '48px',
+        borderRadius: '8px',
+        marginBottom: '12px',
+      }}
+    />
+    {[...Array(5)].map((_, idx) => (
+      <div
+        key={idx}
+        style={{
+          background: '#f9fafb',
+          borderRadius: '10px',
+          height: '72px',
+          marginBottom: '10px',
+          border: '1px solid #e5e7eb',
+        }}
+      />
+    ))}
+  </div>
+);
 
 function TicketsPageContent() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [callRecords, setCallRecords] = useState<any[]>([]);
+  const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
-  const [metricsLoading, setMetricsLoading] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -230,12 +247,15 @@ function TicketsPageContent() {
   };
 
   // Handle filter changes - update refs and fetch new data
-  const handleTabChange = useCallback((tab: string) => {
-    if (!selectedCompany?.id) return;
-    currentTabRef.current = tab;
-    setCurrentPage(1);
-    fetchTickets(selectedCompany.id, 1, false);
-  }, [selectedCompany?.id, fetchTickets]);
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      if (!selectedCompany?.id) return;
+      currentTabRef.current = tab;
+      setCurrentPage(1);
+      fetchTickets(selectedCompany.id, 1, false);
+    },
+    [selectedCompany?.id, fetchTickets]
+  );
 
   const handleSortChange = useCallback(
     (field: string, order: 'asc' | 'desc') => {
@@ -248,12 +268,15 @@ function TicketsPageContent() {
     [selectedCompany?.id, fetchTickets]
   );
 
-  const handleSearchChange = useCallback((query: string) => {
-    if (!selectedCompany?.id) return;
-    searchQueryRef.current = query;
-    setCurrentPage(1);
-    fetchTickets(selectedCompany.id, 1, false);
-  }, [selectedCompany?.id, fetchTickets]);
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      if (!selectedCompany?.id) return;
+      searchQueryRef.current = query;
+      setCurrentPage(1);
+      fetchTickets(selectedCompany.id, 1, false);
+    },
+    [selectedCompany?.id, fetchTickets]
+  );
 
   // Granular update handlers for real-time changes (no full page refreshes)
   const handleCallRecordChange = useCallback(
@@ -515,29 +538,6 @@ function TicketsPageContent() {
     [selectedCompany?.id]
   );
 
-  const fetchMetrics = useCallback(async (companyId: string) => {
-    if (!companyId) return;
-
-    setMetricsLoading(true);
-    try {
-      const params = new URLSearchParams({
-        companyId,
-      });
-
-      const response = await fetch(`/api/metrics?${params}`);
-      if (response.ok) {
-        const metricsData = await response.json();
-        setMetrics(metricsData);
-      } else {
-        console.error('Error fetching metrics:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Error fetching metrics:', error);
-    } finally {
-      setMetricsLoading(false);
-    }
-  }, []);
-
   // Handle modal close - clear URL parameter
   const handleModalClose = useCallback(() => {
     setShowTicketModal(false);
@@ -589,13 +589,7 @@ function TicketsPageContent() {
         setIsQualifying(false);
       }
     },
-    [
-      selectedTicket,
-      selectedCompany,
-      fetchTickets,
-      fetchMetrics,
-      handleModalClose,
-    ]
+    [selectedTicket, selectedCompany, fetchTickets, handleModalClose]
   );
 
   const handleCreateTicket = useCallback(
@@ -678,7 +672,7 @@ function TicketsPageContent() {
         setSubmitting(false);
       }
     },
-    [selectedCompany, fetchTickets, fetchMetrics]
+    [selectedCompany, fetchTickets]
   );
 
   const handleCancelForm = useCallback(() => {
@@ -690,9 +684,8 @@ function TicketsPageContent() {
   useEffect(() => {
     if (selectedCompany?.id) {
       fetchTickets(selectedCompany.id, 1, false);
-      fetchMetrics(selectedCompany.id);
     }
-  }, [selectedCompany?.id, fetchTickets, fetchMetrics]);
+  }, [selectedCompany?.id, fetchTickets]);
 
   // Supabase Realtime broadcast subscription for live updates
   useEffect(() => {
@@ -709,7 +702,6 @@ function TicketsPageContent() {
     currentChannelRef.current = channel;
 
     subscribeToTicketUpdates(channel, async (payload: TicketUpdatePayload) => {
-
       const { table, company_id, action, record_id, ticket_id } = payload;
 
       // Verify this is for our selected company (use ref to avoid stale closure)
@@ -859,9 +851,7 @@ function TicketsPageContent() {
             refetchTabCounts(currentCompanyUpdate.id);
           }
         } else if (action === 'DELETE') {
-          setTickets(prev =>
-            prev.filter(ticket => ticket.id !== record_id)
-          );
+          setTickets(prev => prev.filter(ticket => ticket.id !== record_id));
 
           // Refetch tab counts after DELETE
           const currentCompanyDelete = selectedCompanyRef.current;
@@ -961,118 +951,28 @@ function TicketsPageContent() {
   return (
     <div style={{ width: '100%' }}>
       {selectedCompany && (
-        <>
-          {/* Metrics Cards */}
-          <div className={metricsStyles.metricsCardWrapper}>
-            {metrics && !metricsLoading ? (
-              <>
-                <MetricsCard
-                  title={metrics.totalCalls.title}
-                  value={metrics.totalCalls.value}
-                  comparisonValue={metrics.totalCalls.comparisonValue}
-                  comparisonPeriod={metrics.totalCalls.comparisonPeriod}
-                  trend={metrics.totalCalls.trend}
-                />
-                <MetricsCard
-                  title={metrics.totalForms.title}
-                  value={metrics.totalForms.value}
-                  comparisonValue={metrics.totalForms.comparisonValue}
-                  comparisonPeriod={metrics.totalForms.comparisonPeriod}
-                  trend={metrics.totalForms.trend}
-                />
-                <MetricsCard
-                  title={metrics.avgTimeToAssign.title}
-                  value={metrics.avgTimeToAssign.value}
-                  comparisonValue={metrics.avgTimeToAssign.comparisonValue}
-                  comparisonPeriod={metrics.avgTimeToAssign.comparisonPeriod}
-                  trend={metrics.avgTimeToAssign.trend}
-                />
-                <MetricsCard
-                  title={metrics.hangupCalls.title}
-                  value={metrics.hangupCalls.value}
-                  comparisonValue={metrics.hangupCalls.comparisonValue}
-                  comparisonPeriod={metrics.hangupCalls.comparisonPeriod}
-                  trend={metrics.hangupCalls.trend}
-                />
-                <MetricsCard
-                  title={metrics.customerServiceCalls.title}
-                  value={metrics.customerServiceCalls.value}
-                  comparisonValue={metrics.customerServiceCalls.comparisonValue}
-                  comparisonPeriod={
-                    metrics.customerServiceCalls.comparisonPeriod
-                  }
-                  trend={metrics.customerServiceCalls.trend}
-                />
-              </>
-            ) : (
-              <>
-                <MetricsCard
-                  title="Total Calls"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Total Forms"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Avg Time To Be Assigned"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Hang-up Calls"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Customer Service Calls"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-              </>
-            )}
-          </div>
-        </>
-      )}
-
-      {selectedCompany && (
-        <TicketsList
-          tickets={tickets}
-          liveTickets={liveTickets}
-          callRecords={callRecords}
-          loading={loading}
-          onTicketUpdated={() => {
-            fetchTickets(selectedCompany.id, 1, false);
-          }}
-          // Infinite scroll props
-          infiniteScrollEnabled={true}
-          hasMore={hasMore}
-          onLoadMore={handleLoadMore}
-          loadingMore={loadingMore}
-          // Tab counts
-          tabCounts={tabCounts}
-          // Callbacks for data fetching
-          onTabChange={handleTabChange}
-          onSortChange={handleSortChange}
-          onSearchChange={handleSearchChange}
-        />
+        <Suspense fallback={<TicketsListSkeleton />}>
+          <TicketsList
+            tickets={tickets}
+            liveTickets={liveTickets}
+            callRecords={callRecords}
+            loading={loading}
+            onTicketUpdated={() => {
+              fetchTickets(selectedCompany.id, 1, false);
+            }}
+            // Infinite scroll props
+            infiniteScrollEnabled={true}
+            hasMore={hasMore}
+            onLoadMore={handleLoadMore}
+            loadingMore={loadingMore}
+            // Tab counts
+            tabCounts={tabCounts}
+            // Callbacks for data fetching
+            onTabChange={handleTabChange}
+            onSortChange={handleSortChange}
+            onSearchChange={handleSearchChange}
+          />
+        </Suspense>
       )}
 
       {/* Show loading state while company is being loaded */}

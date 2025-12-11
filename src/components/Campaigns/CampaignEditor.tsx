@@ -506,52 +506,8 @@ export default function CampaignEditor({
         throw new Error(result.error || 'Failed to save campaign');
       }
 
-      // Check if campaign should transition from draft to scheduled
-      // This applies to both new campaigns AND cloned campaigns
+      // Store campaign ID for later use
       const savedCampaignId = campaign ? campaign.id : result.campaign?.id;
-
-      if (savedCampaignId) {
-        try {
-          // Fetch current campaign status and contact lists
-          const [statusCheckResponse, contactListsResponse] = await Promise.all([
-            fetch(`/api/campaigns/${savedCampaignId}`),
-            fetch(`/api/campaigns/${savedCampaignId}/contact-lists`)
-          ]);
-
-          const statusCheckResult = await statusCheckResponse.json();
-          const contactListsResult = await contactListsResponse.json();
-
-          if (statusCheckResult.success && statusCheckResult.campaign?.status === 'draft') {
-            // Calculate actual total contacts from assigned contact lists
-            const actualTotalContacts = contactListsResult.success && contactListsResult.contactLists
-              ? contactListsResult.contactLists.reduce((sum: number, list: any) => sum + (list.total_contacts || 0), 0)
-              : 0;
-
-            // Check if all requirements for scheduling are met
-            const hasWorkflow = !!formData.workflow_id;
-            const hasStartTime = !!formData.start_datetime;
-            const hasContacts = actualTotalContacts > 0;
-
-            if (hasWorkflow && hasStartTime && hasContacts) {
-              const startDate = new Date(formData.start_datetime);
-              const now = new Date();
-
-              // Only schedule if start time is in the future
-              if (startDate > now) {
-                // Use PATCH endpoint to transition status
-                await fetch(`/api/campaigns/${savedCampaignId}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ status: 'scheduled' }),
-                });
-              }
-            }
-          }
-        } catch (statusErr) {
-          // Don't throw - campaign is already saved, status transition is optional
-          console.error('Error checking/updating campaign status:', statusErr);
-        }
-      }
 
       // Determine campaign_id for landing page operations
       const campaignIdForLandingPage = campaign && !isCloned
@@ -630,6 +586,7 @@ export default function CampaignEditor({
         }
       }
 
+      // Campaign saved as draft - user will manually start it when ready
       // Show success message based on start time
       const startDate = new Date(formData.start_datetime);
       const now = new Date();

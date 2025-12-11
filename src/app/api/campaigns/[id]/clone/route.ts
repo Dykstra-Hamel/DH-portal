@@ -174,7 +174,7 @@ export async function POST(
         // Reset/Generate new fields
         status: 'draft', // Always start as draft
         start_datetime: sourceCampaign.start_datetime, // Copy from source (user can change in editor)
-        end_datetime: sourceCampaign.end_datetime,
+        end_datetime: null, // Don't copy end date - let user set it if needed
         total_contacts: 0,
         processed_contacts: 0,
         successful_contacts: 0,

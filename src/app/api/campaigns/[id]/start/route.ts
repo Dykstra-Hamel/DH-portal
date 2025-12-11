@@ -58,13 +58,13 @@ export async function POST(
       return NextResponse.json({ error: 'Campaign must have a workflow assigned' }, { status: 400 });
     }
 
-    // Check if campaign has contact lists
-    const { data: contactLists, error: listsError } = await queryClient
-      .from('campaign_contact_lists')
-      .select('id')
+    // Check if campaign has contact lists (using new reusable contact list system)
+    const { data: contactListAssignments, error: listsError } = await queryClient
+      .from('campaign_contact_list_assignments')
+      .select('contact_list_id')
       .eq('campaign_id', id);
 
-    if (listsError || !contactLists || contactLists.length === 0) {
+    if (listsError || !contactListAssignments || contactListAssignments.length === 0) {
       return NextResponse.json(
         { error: 'Campaign must have at least one contact list' },
         { status: 400 }
