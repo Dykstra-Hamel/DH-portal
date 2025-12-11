@@ -159,15 +159,15 @@ export default function CampaignsPage() {
     }
   };
 
-  const handleDuplicateCampaign = async (campaignId: string, originalName: string) => {
+  const handleDuplicateCampaign = async (campaignId: string) => {
     setDuplicatingId(campaignId);
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/clone`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          new_name: `${originalName} (Copy)`,
-          copy_contact_lists: true,
+          // Let backend auto-increment the name (Copy, Copy 2, Copy 3, etc.)
+          copy_contact_lists: false, // Don't copy contact lists
         }),
       });
 
@@ -279,7 +279,7 @@ export default function CampaignsPage() {
                   ) : null}
                   <button
                     className={styles.actionButton}
-                    onClick={() => handleDuplicateCampaign(campaign.id, campaign.name)}
+                    onClick={() => handleDuplicateCampaign(campaign.id)}
                     title="Duplicate campaign"
                     disabled={duplicatingId === campaign.id}
                   >

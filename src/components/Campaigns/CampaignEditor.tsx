@@ -247,7 +247,7 @@ export default function CampaignEditor({
         setLandingPageEnabled(true);
 
         // Set service plan ID
-        if (result.data?.campaign?.service_plan_id) {
+        if (result.data.campaign?.service_plan_id) {
           setServicePlanId(result.data.campaign.service_plan_id);
         }
 
@@ -269,18 +269,18 @@ export default function CampaignEditor({
           letter_image_url: lp.letter.imageUrl || '',
           feature_heading:
             lp.features.heading || 'No initial cost to get started',
-        feature_bullets: lp.features.bullets || [],
-        feature_image_url: lp.features.imageUrl || '',
-        show_additional_services: lp.additionalServices.show,
-        additional_services_heading:
-          lp.additionalServices.heading ||
+          feature_bullets: lp.features.bullets || [],
+          feature_image_url: lp.features.imageUrl || '',
+          show_additional_services: lp.additionalServices.show,
+          additional_services_heading:
+            lp.additionalServices.heading ||
             'And thats not all, we offer additional add-on programs as well including:',
-        additional_services: lp.additionalServices.services || [],
-        additional_services_image_url: lp.additionalServices.imageUrl || '',
-        selected_addon_ids:
-          lp.selectedAddonIds && lp.selectedAddonIds.length > 0
-            ? lp.selectedAddonIds
-            : (lp.addons || []).map((addon: any) => addon.id),
+          additional_services: lp.additionalServices.services || [],
+          additional_services_image_url: lp.additionalServices.imageUrl || '',
+          selected_addon_ids:
+            lp.selectedAddonIds && lp.selectedAddonIds.length > 0
+              ? lp.selectedAddonIds
+              : (lp.addons || []).map((addon: any) => addon.id),
           show_faq: lp.faq.show,
           faq_heading: lp.faq.heading || 'Frequently Asked Questions',
           faq_items: lp.faq.items || [],
@@ -303,16 +303,26 @@ export default function CampaignEditor({
           thankyou_greeting: lp.thankYou?.greeting || 'Thanks {first_name}!',
           thankyou_content: lp.thankYou?.content || '',
           thankyou_show_expect: lp.thankYou?.showExpect ?? true,
-          thankyou_expect_heading: lp.thankYou?.expectHeading || 'What To Expect',
-          thankyou_expect_col1_image: lp.thankYou?.expectColumns?.[0]?.imageUrl || '',
-          thankyou_expect_col1_heading: lp.thankYou?.expectColumns?.[0]?.heading || '',
-          thankyou_expect_col1_content: lp.thankYou?.expectColumns?.[0]?.content || '',
-          thankyou_expect_col2_image: lp.thankYou?.expectColumns?.[1]?.imageUrl || '',
-          thankyou_expect_col2_heading: lp.thankYou?.expectColumns?.[1]?.heading || '',
-          thankyou_expect_col2_content: lp.thankYou?.expectColumns?.[1]?.content || '',
-          thankyou_expect_col3_image: lp.thankYou?.expectColumns?.[2]?.imageUrl || '',
-          thankyou_expect_col3_heading: lp.thankYou?.expectColumns?.[2]?.heading || '',
-          thankyou_expect_col3_content: lp.thankYou?.expectColumns?.[2]?.content || '',
+          thankyou_expect_heading:
+            lp.thankYou?.expectHeading || 'What To Expect',
+          thankyou_expect_col1_image:
+            lp.thankYou?.expectColumns?.[0]?.imageUrl || '',
+          thankyou_expect_col1_heading:
+            lp.thankYou?.expectColumns?.[0]?.heading || '',
+          thankyou_expect_col1_content:
+            lp.thankYou?.expectColumns?.[0]?.content || '',
+          thankyou_expect_col2_image:
+            lp.thankYou?.expectColumns?.[1]?.imageUrl || '',
+          thankyou_expect_col2_heading:
+            lp.thankYou?.expectColumns?.[1]?.heading || '',
+          thankyou_expect_col2_content:
+            lp.thankYou?.expectColumns?.[1]?.content || '',
+          thankyou_expect_col3_image:
+            lp.thankYou?.expectColumns?.[2]?.imageUrl || '',
+          thankyou_expect_col3_heading:
+            lp.thankYou?.expectColumns?.[2]?.heading || '',
+          thankyou_expect_col3_content:
+            lp.thankYou?.expectColumns?.[2]?.content || '',
           thankyou_cta_text: lp.thankYou?.ctaText || 'Go Back To Homepage',
           thankyou_cta_url: lp.thankYou?.ctaUrl || '',
         });
@@ -506,12 +516,71 @@ export default function CampaignEditor({
         throw new Error(result.error || 'Failed to save campaign');
       }
 
+      // Check if campaign should transition from draft to scheduled
+      // This applies to both new campaigns AND cloned campaigns
+      const savedCampaignId = campaign ? campaign.id : result.campaign?.id;
+
+      if (savedCampaignId) {
+        try {
+          // Fetch current campaign status and contact lists
+          const [statusCheckResponse, contactListsResponse] = await Promise.all(
+            [
+              fetch(`/api/campaigns/${savedCampaignId}`),
+              fetch(`/api/campaigns/${savedCampaignId}/contact-lists`),
+            ]
+          );
+
+          const statusCheckResult = await statusCheckResponse.json();
+          const contactListsResult = await contactListsResponse.json();
+
+          if (
+            statusCheckResult.success &&
+            statusCheckResult.campaign?.status === 'draft'
+          ) {
+            // Calculate actual total contacts from assigned contact lists
+            const actualTotalContacts =
+              contactListsResult.success && contactListsResult.contactLists
+                ? contactListsResult.contactLists.reduce(
+                    (sum: number, list: any) =>
+                      sum + (list.total_contacts || 0),
+                    0
+                  )
+                : 0;
+
+            // Check if all requirements for scheduling are met
+            const hasWorkflow = !!formData.workflow_id;
+            const hasStartTime = !!formData.start_datetime;
+            const hasContacts = actualTotalContacts > 0;
+
+            if (hasWorkflow && hasStartTime && hasContacts) {
+              const startDate = new Date(formData.start_datetime);
+              const now = new Date();
+
+              // Only schedule if start time is in the future
+              if (startDate > now) {
+                // Use PATCH endpoint to transition status
+                await fetch(`/api/campaigns/${savedCampaignId}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'scheduled' }),
+                });
+              }
+            }
+          }
+        } catch (statusErr) {
+          // Don't throw - campaign is already saved, status transition is optional
+          console.error('Error checking/updating campaign status:', statusErr);
+        }
+      }
+
       // Determine campaign_id for landing page operations
-      const campaignIdForLandingPage = campaign && !isCloned
-        ? campaign.campaign_id // Use existing campaign_id when editing (not cloned)
-        : formData.campaign_id; // Use new/updated campaign_id when creating or cloning
+      const campaignIdForLandingPage =
+        campaign && !isCloned
+          ? campaign.campaign_id // Use existing campaign_id when editing (not cloned)
+          : formData.campaign_id; // Use new/updated campaign_id when creating or cloning
 
       // If creating a new campaign, assign ALL contact lists
+      // Note: For cloned/existing campaigns, ContactListUpload handles assignment immediately when user selects lists
       if (!campaign && result.campaign?.id) {
         const newCampaignId = result.campaign.id;
 
