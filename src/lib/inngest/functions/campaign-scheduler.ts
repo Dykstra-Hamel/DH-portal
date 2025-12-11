@@ -2,7 +2,7 @@ import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { fetchCompanyBusinessHours, isBusinessHours, getNextBusinessHourSlot } from '@/lib/campaigns/business-hours';
 import { canStartNewCall, trackCallStart, cleanupStaleCalls } from '@/lib/campaigns/concurrency-manager';
-import { bulkCheckSuppression, bulkCheckPhoneSuppression } from '@/lib/suppression';
+import { bulkCheckSuppression, bulkCheckPhoneSuppression, bulkCheckMarketingSuppression } from '@/lib/suppression';
 
 export const campaignSchedulerHandler = inngest.createFunction(
   {
@@ -194,22 +194,14 @@ export const campaignSchedulerHandler = inngest.createFunction(
           }
         }
 
-        // Bulk check suppressions
-        const [emailSuppressionResult, phoneSuppressionResult, smsSuppressionResult] = await Promise.all([
-          hasEmailSteps && emailsToCheck.length > 0
-            ? bulkCheckSuppression(emailsToCheck, campaign.company_id)
-            : Promise.resolve({ success: true, data: {} }),
-          hasPhoneSteps && phonesToCheck.length > 0
-            ? bulkCheckPhoneSuppression(phonesToCheck, campaign.company_id, 'phone')
-            : Promise.resolve({ success: true, data: {} }),
-          hasSmsSteps && phonesToCheck.length > 0
-            ? bulkCheckPhoneSuppression(phonesToCheck, campaign.company_id, 'sms')
-            : Promise.resolve({ success: true, data: {} }),
-        ]);
+        // Check marketing suppression (blocks ALL campaign workflows)
+        const marketingSuppressionResult = await bulkCheckMarketingSuppression(
+          emailsToCheck,
+          phonesToCheck,
+          campaign.company_id
+        );
 
-        // Filter contacts and mark suppressed ones as excluded
-        // IMPORTANT: Only exclude if suppressed for ALL communication types the workflow uses
-        // This allows partial suppression (e.g., email-only unsubscribe while phone calls still work)
+        // Filter contacts - exclude anyone suppressed for marketing
         const validContacts = [];
         const suppressedContactIds = [];
 
@@ -217,33 +209,11 @@ export const campaignSchedulerHandler = inngest.createFunction(
           const email = contactEmailMap.get(contact.id);
           const phone = contactPhoneMap.get(contact.id);
 
-          const emailSuppressed = email && emailSuppressionResult.data ?
-            (emailSuppressionResult.data as Record<string, boolean>)[email] ?? false : false;
-          const phoneSuppressed = phone && phoneSuppressionResult.data ?
-            (phoneSuppressionResult.data as Record<string, boolean>)[phone] ?? false : false;
-          const smsSuppressed = phone && smsSuppressionResult.data ?
-            (smsSuppressionResult.data as Record<string, boolean>)[phone] ?? false : false;
+          // Check if suppressed for marketing (email OR phone)
+          const emailSuppressed = email && marketingSuppressionResult.data?.emails[email];
+          const phoneSuppressed = phone && marketingSuppressionResult.data?.phones[phone];
 
-          // Count which step types are suppressed vs available
-          let suppressedStepTypes = 0;
-          let totalStepTypes = 0;
-
-          if (hasEmailSteps) {
-            totalStepTypes++;
-            if (emailSuppressed) suppressedStepTypes++;
-          }
-          if (hasPhoneSteps) {
-            totalStepTypes++;
-            if (phoneSuppressed) suppressedStepTypes++;
-          }
-          if (hasSmsSteps) {
-            totalStepTypes++;
-            if (smsSuppressed) suppressedStepTypes++;
-          }
-
-          // Only exclude if ALL communication types the workflow needs are suppressed
-          // If at least one type is available, allow the workflow to proceed
-          if (suppressedStepTypes === totalStepTypes && totalStepTypes > 0) {
+          if (emailSuppressed || phoneSuppressed) {
             suppressedContactIds.push(contact.id);
           } else {
             validContacts.push(contact);
@@ -256,12 +226,12 @@ export const campaignSchedulerHandler = inngest.createFunction(
             .from('campaign_contact_list_members')
             .update({
               status: 'excluded',
-              error_message: 'Contact is on suppression list (unsubscribed)',
+              error_message: 'Contact unsubscribed from marketing communications',
               processed_at: new Date().toISOString()
             })
             .in('id', suppressedContactIds);
 
-          console.log(`Campaign ${campaign.id}: Excluded ${suppressedContactIds.length} suppressed contacts`);
+          console.log(`Campaign ${campaign.id}: Excluded ${suppressedContactIds.length} contacts (marketing suppression)`);
         }
 
         if (validContacts.length === 0) {

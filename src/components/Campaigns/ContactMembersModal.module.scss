@@ -15,7 +15,7 @@
 .modalContent {
   background: white;
   border-radius: 8px;
-  max-width: 900px;
+  max-width: 1200px;
   width: 100%;
   max-height: 80vh;
   display: flex;
@@ -220,4 +220,29 @@
 
 .dateCell {
   color: #6b7280;
+}
+
+.viewCountCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  svg {
+    color: #3b82f6;
+    flex-shrink: 0;
+  }
+
+  span {
+    font-weight: 500;
+  }
+}
+
+.viewedDate {
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.statusRedeemed {
+  background: #dcfce7;
+  color: #14532d;
 }

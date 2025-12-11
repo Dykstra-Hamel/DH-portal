@@ -33,12 +33,14 @@ export async function POST(
     // Load source campaign
     const { data: sourceCampaign, error: fetchError } = await supabase
       .from('campaigns')
-      .select(`
+      .select(
+        `
         *,
         workflow:automation_workflows(id),
         discount:company_discounts(id),
         service_plan:service_plans(id)
-      `)
+      `
+      )
       .eq('id', sourceCampaignId)
       .single();
 
@@ -68,7 +70,9 @@ export async function POST(
       // Require admin, manager, or owner role to clone campaigns
       if (!['admin', 'manager', 'owner'].includes(userCompany.role)) {
         return NextResponse.json(
-          { error: 'Unauthorized - insufficient permissions to clone campaigns' },
+          {
+            error: 'Unauthorized - insufficient permissions to clone campaigns',
+          },
           { status: 403 }
         );
       }
@@ -84,7 +88,10 @@ export async function POST(
       const baseName = `${sourceCampaign.name} (Copy)`;
 
       while (attempt < maxAttempts) {
-        clonedName = attempt === 0 ? baseName : `${sourceCampaign.name} (Copy ${attempt + 1})`;
+        clonedName =
+          attempt === 0
+            ? baseName
+            : `${sourceCampaign.name} (Copy ${attempt + 1})`;
 
         const { data: conflict } = await supabase
           .from('campaigns')
@@ -111,14 +118,17 @@ export async function POST(
         .maybeSingle();
 
       if (conflict) {
-        return NextResponse.json({
-          success: false,
-          error: 'Campaign name already exists in this company',
-          suggestions: [
-            `${clonedName} 2`,
-            `${clonedName} ${new Date().toISOString().split('T')[0]}`,
-          ]
-        }, { status: 400 });
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Campaign name already exists in this company',
+            suggestions: [
+              `${clonedName} 2`,
+              `${clonedName} ${new Date().toISOString().split('T')[0]}`,
+            ],
+          },
+          { status: 400 }
+        );
       }
     }
 
@@ -127,7 +137,10 @@ export async function POST(
     // If no campaign_id provided, generate from name
     if (!clonedCampaignId) {
       // Generate ID from name: uppercase, remove special chars, add timestamp
-      const baseName = clonedName.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 15);
+      const baseName = clonedName
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .substring(0, 15);
       const timestamp = Date.now().toString().substring(-6);
       clonedCampaignId = `${baseName}${timestamp}`;
     }
@@ -140,14 +153,17 @@ export async function POST(
       .single();
 
     if (idConflict) {
-      return NextResponse.json({
-        success: false,
-        error: 'Campaign ID already exists',
-        suggestions: [
-          `${clonedCampaignId}_COPY`,
-          `${clonedCampaignId}_${Date.now().toString().substring(-4)}`,
-        ]
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Campaign ID already exists',
+          suggestions: [
+            `${clonedCampaignId}_COPY`,
+            `${clonedCampaignId}_${Date.now().toString().substring(-4)}`,
+          ],
+        },
+        { status: 400 }
+      );
     }
 
     // Clone campaign record
@@ -187,7 +203,8 @@ export async function POST(
         created_by: user.id,
         // created_at and updated_at set by database
       })
-      .select(`
+      .select(
+        `
         *,
         workflow:automation_workflows(
           id,
@@ -200,15 +217,19 @@ export async function POST(
           discount_type,
           discount_value
         )
-      `)
+      `
+      )
       .single();
 
     if (cloneError) {
       console.error('Error cloning campaign:', cloneError);
-      return NextResponse.json({
-        error: 'Failed to clone campaign',
-        details: cloneError.message
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: 'Failed to clone campaign',
+          details: cloneError.message,
+        },
+        { status: 500 }
+      );
     }
 
     const warnings: string[] = [];
@@ -223,7 +244,13 @@ export async function POST(
 
       if (sourceLandingPage) {
         // Remove id, campaign_id, created_at, updated_at from source data
-        const { id: _, campaign_id: __, created_at: ___, updated_at: ____, ...landingPageFields } = sourceLandingPage;
+        const {
+          id: _,
+          campaign_id: __,
+          created_at: ___,
+          updated_at: ____,
+          ...landingPageFields
+        } = sourceLandingPage;
 
         const { error: lpError } = await supabase
           .from('campaign_landing_pages')
@@ -234,12 +261,16 @@ export async function POST(
 
         if (lpError) {
           console.error('Error cloning landing page:', lpError);
-          warnings.push('Landing page could not be cloned. You can set it up manually.');
+          warnings.push(
+            'Landing page could not be cloned. You can set it up manually.'
+          );
         }
       }
     } catch (lpCatchError) {
       console.error('Error in landing page cloning process:', lpCatchError);
-      warnings.push('Landing page could not be cloned. You can set it up manually.');
+      warnings.push(
+        'Landing page could not be cloned. You can set it up manually.'
+      );
     }
 
     // Clone contact list assignments (if requested)
@@ -252,35 +283,46 @@ export async function POST(
 
         if (sourceAssignments && sourceAssignments.length > 0) {
           // Insert assignments for cloned campaign
-          const assignmentsToInsert = sourceAssignments.map((assignment: { contact_list_id: string }) => ({
-            campaign_id: clonedCampaign.id,
-            contact_list_id: assignment.contact_list_id,
-            assigned_by: user.id,
-            // assigned_at set by database
-          }));
+          const assignmentsToInsert = sourceAssignments.map(
+            (assignment: { contact_list_id: string }) => ({
+              campaign_id: clonedCampaign.id,
+              contact_list_id: assignment.contact_list_id,
+              assigned_by: user.id,
+              // assigned_at set by database
+            })
+          );
 
           const { error: assignError } = await supabase
             .from('campaign_contact_list_assignments')
             .insert(assignmentsToInsert);
 
           if (assignError) {
-            console.error('Error cloning contact list assignments:', assignError);
-            warnings.push('Contact lists could not be linked. You can add them manually.');
+            console.error(
+              'Error cloning contact list assignments:',
+              assignError
+            );
+            warnings.push(
+              'Contact lists could not be linked. You can add them manually.'
+            );
           }
         }
       } catch (clCatchError) {
         console.error('Error in contact list cloning process:', clCatchError);
-        warnings.push('Contact lists could not be linked. You can add them manually.');
+        warnings.push(
+          'Contact lists could not be linked. You can add them manually.'
+        );
       }
     }
 
     // Return success response
-    return NextResponse.json({
-      success: true,
-      campaign: clonedCampaign,
-      warnings: warnings.length > 0 ? warnings : undefined,
-    }, { status: 201 });
-
+    return NextResponse.json(
+      {
+        success: true,
+        campaign: clonedCampaign,
+        warnings: warnings.length > 0 ? warnings : undefined,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error in campaign clone endpoint:', error);
     return NextResponse.json(

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Mail, TrendingUp, AlertTriangle, CheckCircle, XCircle, RefreshCw, Download, Printer } from 'lucide-react';
-import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Mail, TrendingUp, AlertTriangle, CheckCircle, XCircle, RefreshCw, Download, Printer, Eye } from 'lucide-react';
+import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts';
 import styles from './CampaignReport.module.scss';
 
 interface CampaignReportProps {
@@ -84,6 +84,13 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
       ['Soft Bounces', emailMetrics.soft_bounces, emailMetrics.bounced > 0 ? `${((emailMetrics.soft_bounces / emailMetrics.bounced) * 100).toFixed(1)}%` : '0.0%'],
       ['Complained', emailMetrics.complained, emailMetrics.complaint_rate != null ? `${emailMetrics.complaint_rate.toFixed(1)}%` : 'N/A'],
       ['Failed', emailMetrics.failed, emailMetrics.sent > 0 ? `${((emailMetrics.failed / emailMetrics.sent) * 100).toFixed(1)}%` : 'N/A'],
+      [''],
+      ['Landing Page Views'],
+      ['Total Views', metrics.views?.total_views || 0, ''],
+      ['Unique Viewers', metrics.views?.unique_viewers || 0, ''],
+      ['Total Redeemed', metrics.views?.total_redeemed || 0, ''],
+      ['Viewed Not Redeemed', metrics.views?.viewed_not_redeemed || 0, ''],
+      ['View to Redemption Rate', '', metrics.views?.view_to_redemption_rate != null ? `${metrics.views.view_to_redemption_rate}%` : 'N/A'],
     ];
 
     return rows.map(row =>
@@ -124,6 +131,23 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
     { name: 'Hard Bounces', value: emailMetrics.hard_bounces, color: '#e7000b' },
     { name: 'Soft Bounces', value: emailMetrics.soft_bounces, color: '#f59e0b' },
   ].filter(item => item.value > 0);
+
+  // Landing page view metrics
+  const viewMetrics = metrics.views || {
+    total_views: 0,
+    unique_viewers: 0,
+    total_redeemed: 0,
+    viewed_not_redeemed: 0,
+    view_to_redemption_rate: 0,
+  };
+
+  // View time-series data (last 30 days)
+  const viewTimeSeriesData = metrics.viewsByDate
+    ? Object.entries(metrics.viewsByDate).map(([date, count]) => ({
+        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        views: count,
+      }))
+    : [];
 
   return (
     <div className={styles.report}>
@@ -246,6 +270,34 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
             </p>
           </div>
         </div>
+
+        {/* Landing Page Views */}
+        <div className={styles.kpiCard}>
+          <div className={`${styles.kpiIcon} ${styles.purple}`}>
+            <Eye size={20} />
+          </div>
+          <div className={styles.kpiContent}>
+            <p className={styles.kpiValue}>{viewMetrics.unique_viewers.toLocaleString()}</p>
+            <p className={styles.kpiLabel}>Landing Page Views</p>
+            <p className={styles.kpiPercent}>
+              {viewMetrics.total_views.toLocaleString()} total
+            </p>
+          </div>
+        </div>
+
+        {/* View to Redemption Rate */}
+        <div className={styles.kpiCard}>
+          <div className={`${styles.kpiIcon} ${getRateColorClass(viewMetrics.view_to_redemption_rate)}`}>
+            <TrendingUp size={20} />
+          </div>
+          <div className={styles.kpiContent}>
+            <p className={styles.kpiValue}>{viewMetrics.total_redeemed.toLocaleString()}</p>
+            <p className={styles.kpiLabel}>Redeemed</p>
+            <p className={`${styles.kpiPercent} ${getRateColorClass(viewMetrics.view_to_redemption_rate)}`}>
+              {viewMetrics.view_to_redemption_rate}% conversion
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Email Funnel Chart */}
@@ -262,6 +314,30 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Landing Page Views Chart */}
+      {viewTimeSeriesData.length > 0 && (
+        <div className={styles.chartSection}>
+          <h3 className={styles.sectionTitle}>Landing Page Views (Last 30 Days)</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={viewTimeSeriesData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="views"
+                name="Page Views"
+                stroke="#8b5cf6"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Charts Grid */}
       <div className={styles.chartsGrid}>
@@ -388,6 +464,35 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
               <td>Complained</td>
               <td>{emailMetrics.complained.toLocaleString()}</td>
               <td>{emailMetrics.complaint_rate != null ? `${emailMetrics.complaint_rate.toFixed(1)}%` : 'N/A'}</td>
+            </tr>
+
+            <tr className={styles.categoryRow}>
+              <td colSpan={3}><strong>Landing Page Views</strong></td>
+            </tr>
+            <tr>
+              <td>Total Views</td>
+              <td>{viewMetrics.total_views.toLocaleString()}</td>
+              <td>-</td>
+            </tr>
+            <tr>
+              <td>Unique Viewers</td>
+              <td>{viewMetrics.unique_viewers.toLocaleString()}</td>
+              <td>{emailMetrics.sent > 0 ? `${((viewMetrics.unique_viewers / emailMetrics.sent) * 100).toFixed(1)}%` : 'N/A'}</td>
+            </tr>
+            <tr>
+              <td>Total Redeemed</td>
+              <td>{viewMetrics.total_redeemed.toLocaleString()}</td>
+              <td>{emailMetrics.sent > 0 ? `${((viewMetrics.total_redeemed / emailMetrics.sent) * 100).toFixed(1)}%` : 'N/A'}</td>
+            </tr>
+            <tr>
+              <td>Viewed Not Redeemed</td>
+              <td>{viewMetrics.viewed_not_redeemed.toLocaleString()}</td>
+              <td>-</td>
+            </tr>
+            <tr>
+              <td>View to Redemption Rate</td>
+              <td>-</td>
+              <td>{viewMetrics.view_to_redemption_rate}%</td>
             </tr>
           </tbody>
         </table>

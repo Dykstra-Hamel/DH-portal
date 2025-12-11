@@ -155,7 +155,7 @@ export async function GET(
 
     const { data: members } = await queryClient
       .from('campaign_contact_list_members')
-      .select('status')
+      .select('status, redeemed_at, first_viewed_at, last_viewed_at, view_count')
       .eq('campaign_id', campaignId);
 
     if (members) {
@@ -169,6 +169,38 @@ export async function GET(
         excluded: members.filter((m: any) => m.status === 'excluded').length,
       };
     }
+
+    // Calculate view tracking metrics
+    const viewMetrics = {
+      total_views: members?.reduce((sum: number, m: any) => sum + (m.view_count || 0), 0) || 0,
+      unique_viewers: members?.filter((m: any) => m.view_count > 0).length || 0,
+      total_redeemed: members?.filter((m: any) => m.redeemed_at !== null).length || 0,
+      viewed_not_redeemed: members?.filter((m: any) =>
+        m.view_count > 0 && m.redeemed_at === null
+      ).length || 0,
+      view_to_redemption_rate: 0,
+    };
+
+    // Calculate conversion rate (views -> redemptions)
+    if (viewMetrics.unique_viewers > 0) {
+      viewMetrics.view_to_redemption_rate =
+        Math.round((viewMetrics.total_redeemed / viewMetrics.unique_viewers) * 100);
+    }
+
+    // Get time-series view data (last 30 days)
+    const { data: viewHistory } = await queryClient
+      .from('campaign_landing_page_views')
+      .select('viewed_at')
+      .eq('campaign_id', campaignId)
+      .gte('viewed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .order('viewed_at', { ascending: true });
+
+    // Group views by date for charting
+    const viewsByDate: Record<string, number> = {};
+    viewHistory?.forEach((view: any) => {
+      const date = new Date(view.viewed_at).toISOString().split('T')[0];
+      viewsByDate[date] = (viewsByDate[date] || 0) + 1;
+    });
 
     // Calculate progress percentage
     const progressPercentage = campaign.total_contacts > 0
@@ -191,6 +223,8 @@ export async function GET(
       },
       email: emailMetrics,
       workflow: workflowMetrics,
+      views: viewMetrics,
+      viewsByDate,
       memberStatus: memberStatusCounts,
       contactLists: contactLists || [],
       totalExecutions: executions?.length || 0,
