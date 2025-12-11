@@ -75,8 +75,38 @@ export async function POST(
     }
 
     // Generate unique identifiers
-    const clonedName = new_name || `${sourceCampaign.name} (Copy)`;
+    let clonedName = new_name || `${sourceCampaign.name} (Copy)`;
     let clonedCampaignId = new_campaign_id;
+
+    // Ensure unique name (within company) by appending counter if needed
+    let nameAttempt = clonedName;
+    let counter = 2;
+    let finalName = clonedName;
+
+    while (counter <= 100) {
+      const { data: nameConflict } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('company_id', sourceCampaign.company_id)
+        .eq('name', nameAttempt)
+        .maybeSingle();
+
+      if (!nameConflict) {
+        finalName = nameAttempt;
+        break;
+      }
+
+      // Try next number
+      nameAttempt = `${clonedName} ${counter}`;
+      counter++;
+    }
+
+    // Safety fallback: if we hit 100 attempts, use timestamp
+    if (counter > 100) {
+      finalName = `${clonedName} ${Date.now()}`;
+    }
+
+    clonedName = finalName;
 
     // If no campaign_id provided, generate from name
     if (!clonedCampaignId) {
@@ -84,25 +114,6 @@ export async function POST(
       const baseName = clonedName.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 15);
       const timestamp = Date.now().toString().substring(-6);
       clonedCampaignId = `${baseName}${timestamp}`;
-    }
-
-    // Validate uniqueness of name (within company)
-    const { data: nameConflict } = await supabase
-      .from('campaigns')
-      .select('id')
-      .eq('company_id', sourceCampaign.company_id)
-      .eq('name', clonedName)
-      .single();
-
-    if (nameConflict) {
-      return NextResponse.json({
-        success: false,
-        error: 'Campaign name already exists in this company',
-        suggestions: [
-          `${clonedName} 2`,
-          `${clonedName} ${new Date().toISOString().split('T')[0]}`,
-        ]
-      }, { status: 400 });
     }
 
     // Validate uniqueness of campaign_id (global)
@@ -191,7 +202,7 @@ export async function POST(
       const { data: sourceLandingPage } = await supabase
         .from('campaign_landing_pages')
         .select('*')
-        .eq('campaign_id', sourceCampaign.campaign_id)
+        .eq('campaign_id', sourceCampaign.id)
         .single();
 
       if (sourceLandingPage) {
@@ -202,7 +213,7 @@ export async function POST(
           .from('campaign_landing_pages')
           .insert({
             ...landingPageFields,
-            campaign_id: clonedCampaign.campaign_id, // Link to cloned campaign
+            campaign_id: clonedCampaign.id, // Link to cloned campaign (use database UUID, not campaign_id string)
           });
 
         if (lpError) {

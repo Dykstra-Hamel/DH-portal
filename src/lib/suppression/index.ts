@@ -10,7 +10,7 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export type SuppressionReason = 'bounce' | 'complaint' | 'manual';
 export type SuppressionType = 'hard_bounce' | 'soft_bounce' | 'complaint' | 'unsubscribe';
-export type CommunicationType = 'email' | 'phone' | 'sms' | 'all';
+export type CommunicationType = 'email' | 'phone' | 'sms' | 'all' | 'marketing';
 
 export interface SuppressionEntry {
   id: string;
@@ -44,7 +44,7 @@ export async function addToSuppressionList(
   type: SuppressionType,
   sesEventData?: any,
   notes?: string,
-  communicationType: 'email' | 'all' = 'email'
+  communicationType: 'email' | 'all' | 'marketing' = 'email'
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createAdminClient();
@@ -115,7 +115,7 @@ export async function addToSuppressionList(
  *
  * @param phone - Phone number to suppress (E.164 format recommended)
  * @param companyId - UUID of the company
- * @param communicationType - Type of communication to suppress: phone, sms, or all
+ * @param communicationType - Type of communication to suppress: phone, sms, all, or marketing
  * @param reason - Reason for suppression
  * @param type - Specific type
  * @param notes - Optional notes about the suppression
@@ -124,7 +124,7 @@ export async function addToSuppressionList(
 export async function addPhoneToSuppressionList(
   phone: string,
   companyId: string,
-  communicationType: 'phone' | 'sms' | 'all',
+  communicationType: 'phone' | 'sms' | 'all' | 'marketing',
   reason: SuppressionReason,
   type: SuppressionType,
   notes?: string
@@ -646,6 +646,90 @@ export async function bulkCheckPhoneSuppression(
       success: false,
       error:
         error instanceof Error ? error.message : 'Failed to bulk check phone suppression',
+    };
+  }
+}
+
+/**
+ * Bulk check if contacts are suppressed for marketing communications
+ * Checks both email and phone for communication_type = 'marketing' or 'all'
+ *
+ * @param emails - Array of email addresses to check
+ * @param phones - Array of phone numbers to check
+ * @param companyId - UUID of the company
+ * @returns Object with separate maps for emails and phones
+ */
+export async function bulkCheckMarketingSuppression(
+  emails: string[],
+  phones: string[],
+  companyId: string
+): Promise<{
+  success: boolean;
+  data?: {
+    emails: Record<string, boolean>;
+    phones: Record<string, boolean>;
+  };
+  error?: string;
+}> {
+  try {
+    const supabase = createAdminClient();
+
+    const lowerEmails = emails.map((e) => e.toLowerCase());
+    const normalizedPhones = phones.map((p) => p.replace(/[\s\-\(\)]/g, ''));
+
+    // Query suppression list for both marketing and all communication types
+    const { data, error } = await supabase
+      .from('suppression_list')
+      .select('email_address, phone_number, communication_type')
+      .eq('company_id', companyId)
+      .in('communication_type', ['marketing', 'all'])
+      .or(`email_address.in.(${lowerEmails.join(',')}),phone_number.in.(${normalizedPhones.join(',')})`);
+
+    if (error) {
+      throw error;
+    }
+
+    // Build suppressed email set
+    const suppressedEmailSet = new Set(
+      (data || [])
+        .filter((r) => r.email_address)
+        .map((r) => r.email_address.toLowerCase())
+    );
+
+    // Build suppressed phone set
+    const suppressedPhoneSet = new Set(
+      (data || [])
+        .filter((r) => r.phone_number)
+        .map((r) => r.phone_number.toLowerCase())
+    );
+
+    // Map results
+    const emailResults: Record<string, boolean> = {};
+    for (const email of emails) {
+      emailResults[email] = suppressedEmailSet.has(email.toLowerCase());
+    }
+
+    const phoneResults: Record<string, boolean> = {};
+    for (const phone of phones) {
+      const normalized = phone.replace(/[\s\-\(\)]/g, '').toLowerCase();
+      phoneResults[phone] = suppressedPhoneSet.has(normalized);
+    }
+
+    return {
+      success: true,
+      data: {
+        emails: emailResults,
+        phones: phoneResults,
+      },
+    };
+  } catch (error) {
+    console.error('Error bulk checking marketing suppression:', error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to bulk check marketing suppression',
     };
   }
 }

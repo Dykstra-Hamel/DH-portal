@@ -8,7 +8,7 @@
  */
 
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import CampaignLandingPage from '@/components/CampaignLanding/CampaignLandingPage/CampaignLandingPage';
 import LoadingSpinner from '@/components/CampaignLanding/LoadingSpinner/LoadingSpinner';
 
@@ -151,6 +151,7 @@ export default function SubdomainCampaignLandingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fadeIn, setFadeIn] = useState(false);
+  const viewTrackedRef = useRef(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -184,6 +185,46 @@ export default function SubdomainCampaignLandingPage() {
     if (campaignId && customerId) {
       fetchData();
     }
+  }, [campaignId, customerId]);
+
+  // Track page view (run once per session)
+  useEffect(() => {
+    async function trackView() {
+      if (viewTrackedRef.current || !campaignId || !customerId) {
+        return;
+      }
+
+      viewTrackedRef.current = true;
+
+      try {
+        // Generate session ID for deduplication
+        const sessionId = sessionStorage.getItem('campaign_session_id') ||
+          `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        sessionStorage.setItem('campaign_session_id', sessionId);
+
+        // Capture client-side device data
+        const clientDeviceData = {
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          screen_resolution: `${window.screen.width}x${window.screen.height}`,
+          language: navigator.language,
+        };
+
+        await fetch(`/api/campaigns/${campaignId}/track-view`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerId,
+            sessionId,
+            client_device_data: clientDeviceData,
+          }),
+        });
+      } catch (err) {
+        // Silent failure - don't block page if tracking fails
+        console.error('Error tracking page view:', err);
+      }
+    }
+
+    trackView();
   }, [campaignId, customerId]);
 
   if (loading) {

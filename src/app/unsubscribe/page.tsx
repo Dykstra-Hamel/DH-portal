@@ -22,13 +22,6 @@ function UnsubscribeContent() {
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const [preferences, setPreferences] = useState({
-    email: false,
-    phone: false,
-    sms: false,
-    all: false,
-  });
-
   // Validate token on mount
   useEffect(() => {
     async function validateToken() {
@@ -64,38 +57,7 @@ function UnsubscribeContent() {
     validateToken();
   }, [token]);
 
-  const handleCheckboxChange = (field: keyof typeof preferences) => {
-    setPreferences((prev) => {
-      const newPreferences = { ...prev, [field]: !prev[field] };
-
-      // If "all" is checked, uncheck individual options
-      if (field === 'all' && !prev.all) {
-        return {
-          email: false,
-          phone: false,
-          sms: false,
-          all: true,
-        };
-      }
-
-      // If any individual option is checked, uncheck "all"
-      if (field !== 'all' && !prev[field]) {
-        newPreferences.all = false;
-      }
-
-      return newPreferences;
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate at least one option is selected
-    if (!preferences.email && !preferences.phone && !preferences.sms && !preferences.all) {
-      setError('Please select at least one communication type to unsubscribe from');
-      return;
-    }
-
+  const handleSubmit = async () => {
     setSubmitting(true);
     setError(null);
 
@@ -107,7 +69,6 @@ function UnsubscribeContent() {
         },
         body: JSON.stringify({
           token,
-          preferences,
         }),
       });
 
@@ -167,18 +128,9 @@ function UnsubscribeContent() {
           <div className={styles.success}>
             <div className={styles.successIcon}>✓</div>
             <h1>Successfully Unsubscribed</h1>
-            <p>You have been unsubscribed from the selected communication types.</p>
-            <div className={styles.summaryBox}>
-              <h3>Unsubscribed from:</h3>
-              <ul>
-                {preferences.all && <li>All marketing communications</li>}
-                {!preferences.all && preferences.email && <li>Marketing emails</li>}
-                {!preferences.all && preferences.phone && <li>AI phone calls</li>}
-                {!preferences.all && preferences.sms && <li>SMS messages</li>}
-              </ul>
-            </div>
+            <p>You have been unsubscribed from all marketing communications.</p>
             <p className={styles.note}>
-              You may still receive transactional communications related to your service. Processing may take up to 10 business days.
+              You may still receive transactional communications related to your service, such as appointment confirmations and service updates. Processing may take up to 10 business days.
             </p>
           </div>
         </div>
@@ -191,14 +143,14 @@ function UnsubscribeContent() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <h1>Unsubscribe from Communications</h1>
+          <h1>Unsubscribe from Marketing Communications</h1>
           {tokenData?.customerName && (
             <p className={styles.greeting}>Hello, {tokenData.customerName}</p>
           )}
         </div>
 
         <div className={styles.info}>
-          <p>We&apos;re sorry to see you go! Please select which types of communications you&apos;d like to unsubscribe from:</p>
+          <p>We&apos;re sorry to see you go! By clicking the button below, you will be unsubscribed from all marketing communications, including promotional emails, phone calls, and text messages.</p>
 
           {tokenData?.email && (
             <div className={styles.contactInfo}>
@@ -213,66 +165,7 @@ function UnsubscribeContent() {
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.options}>
-            {tokenData?.email && (
-              <label className={styles.option}>
-                <input
-                  type="checkbox"
-                  checked={preferences.email}
-                  onChange={() => handleCheckboxChange('email')}
-                  disabled={preferences.all}
-                />
-                <div className={styles.optionContent}>
-                  <strong>Marketing Emails</strong>
-                  <span>Promotional emails, newsletters, and marketing campaigns</span>
-                </div>
-              </label>
-            )}
-
-            {tokenData?.phoneNumber && (
-              <>
-                <label className={styles.option}>
-                  <input
-                    type="checkbox"
-                    checked={preferences.phone}
-                    onChange={() => handleCheckboxChange('phone')}
-                    disabled={preferences.all}
-                  />
-                  <div className={styles.optionContent}>
-                    <strong>AI Phone Calls</strong>
-                    <span>Automated phone calls and voice messages</span>
-                  </div>
-                </label>
-
-                <label className={styles.option}>
-                  <input
-                    type="checkbox"
-                    checked={preferences.sms}
-                    onChange={() => handleCheckboxChange('sms')}
-                    disabled={preferences.all}
-                  />
-                  <div className={styles.optionContent}>
-                    <strong>SMS Messages</strong>
-                    <span>Text messages and SMS notifications</span>
-                  </div>
-                </label>
-              </>
-            )}
-
-            <label className={styles.option}>
-              <input
-                type="checkbox"
-                checked={preferences.all}
-                onChange={() => handleCheckboxChange('all')}
-              />
-              <div className={styles.optionContent}>
-                <strong>All Marketing Communications</strong>
-                <span>Unsubscribe from all marketing emails, calls, and messages</span>
-              </div>
-            </label>
-          </div>
-
+        <div className={styles.form}>
           {error && (
             <div className={styles.errorMessage}>
               {error}
@@ -281,18 +174,18 @@ function UnsubscribeContent() {
 
           <div className={styles.actions}>
             <button
-              type="submit"
+              onClick={handleSubmit}
               className={styles.submitButton}
               disabled={submitting}
             >
-              {submitting ? 'Processing...' : 'Unsubscribe'}
+              {submitting ? 'Processing...' : 'Unsubscribe from Marketing Communications'}
             </button>
           </div>
 
           <p className={styles.disclaimer}>
             Note: You may still receive important transactional communications related to your service, such as appointment confirmations and service updates.
           </p>
-        </form>
+        </div>
       </div>
     </div>
   );

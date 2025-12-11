@@ -240,15 +240,15 @@ export default function CampaignEditor({
       const response = await fetch(`/api/campaigns/${campaignId}/landing-page`);
       const result = await response.json();
 
-      if (result.success && result.landingPage) {
-        const lp = result.landingPage;
+      if (result.success && result.data?.landingPage) {
+        const lp = result.data.landingPage;
 
         // Enable landing page if data exists
         setLandingPageEnabled(true);
 
         // Set service plan ID
-        if (result.campaign?.service_plan_id) {
-          setServicePlanId(result.campaign.service_plan_id);
+        if (result.data?.campaign?.service_plan_id) {
+          setServicePlanId(result.data.campaign.service_plan_id);
         }
 
         // Map API response to form data
