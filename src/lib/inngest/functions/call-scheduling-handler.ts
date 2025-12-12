@@ -1,6 +1,7 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { getDefaultAgentConfig } from '@/lib/retell-config';
+import { isBusinessHours, getNextBusinessHourSlot } from '@/lib/campaigns/business-hours';
 
 interface CallSchedulingEvent {
   name: 'automation/schedule_call';
@@ -69,39 +70,35 @@ export const callSchedulingHandler = inngest.createFunction(
     });
 
     // Check business hours if this is a scheduled call
-    const shouldScheduleNow = await step.run('check-business-hours', async () => {
+    const businessHoursResult = await step.run('check-business-hours', async () => {
       if (callType === 'immediate' || callType === 'urgent') {
-        return true;
+        return { shouldScheduleNow: true, nextSlot: null };
       }
 
-      // Get company business hours settings
+      // Check if business hours enforcement is enabled
       const { data: settings } = await supabase
         .from('company_settings')
-        .select('setting_key, setting_value')
+        .select('setting_value')
         .eq('company_id', companyId)
-        .in('setting_key', [
-          'business_hours_start',
-          'business_hours_end',
-          'automation_business_hours_only'
-        ]);
+        .eq('setting_key', 'automation_business_hours_only')
+        .single();
 
-      const settingsMap = settings?.reduce((acc, s) => {
-        acc[s.setting_key] = s.setting_value;
-        return acc;
-      }, {} as Record<string, string>) || {};
-
-      // If business hours only is disabled, call now
-      if (settingsMap.automation_business_hours_only === 'false') {
-        return true;
+      // If business hours enforcement is disabled, call now
+      if (settings?.setting_value === 'false') {
+        return { shouldScheduleNow: true, nextSlot: null };
       }
 
-      // Check if it's within business hours
+      // Check if current time is within business hours using the library
       const now = new Date();
-      const currentHour = now.getHours();
-      const startHour = parseInt(settingsMap.business_hours_start?.split(':')[0] || '9');
-      const endHour = parseInt(settingsMap.business_hours_end?.split(':')[0] || '17');
+      const isDuringBusinessHours = await isBusinessHours(now, companyId);
 
-      return currentHour >= startHour && currentHour < endHour;
+      if (isDuringBusinessHours) {
+        return { shouldScheduleNow: true, nextSlot: null };
+      }
+
+      // Not during business hours - find next available slot
+      const nextSlot = await getNextBusinessHourSlot(now, companyId);
+      return { shouldScheduleNow: false, nextSlot };
     });
 
     // If delayMinutes is set, schedule for later
@@ -147,7 +144,7 @@ export const callSchedulingHandler = inngest.createFunction(
     }
 
     // Execute call immediately if no delay and within business hours (or override)
-    if (shouldScheduleNow) {
+    if (businessHoursResult.shouldScheduleNow) {
       return await step.run('execute-immediate-call', async () => {
         try {
           // Check if the workflow has a specific agent configured
@@ -317,11 +314,18 @@ export const callSchedulingHandler = inngest.createFunction(
         }
       });
     } else {
-      // Schedule for next business day if outside business hours
+      // Schedule for next business hours slot
       return await step.run('schedule-for-business-hours', async () => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(9, 0, 0, 0); // 9 AM next day
+        // Use calculated next slot, or fall back to tomorrow at 9 AM if no slot found
+        const nextSlot = businessHoursResult.nextSlot || (() => {
+          const fallback = new Date();
+          fallback.setDate(fallback.getDate() + 1);
+          fallback.setHours(9, 0, 0, 0);
+          return fallback;
+        })();
+
+        // Ensure scheduledTime is always a Date object
+        const scheduledTime = nextSlot instanceof Date ? nextSlot : new Date(nextSlot);
 
         // Insert call automation log entry as scheduled
         const { data: logEntry, error: logError } = await supabase
@@ -331,7 +335,7 @@ export const callSchedulingHandler = inngest.createFunction(
             company_id: companyId,
             lead_id: leadId,
             call_type: callType,
-            scheduled_for: tomorrow.toISOString(),
+            scheduled_for: scheduledTime.toISOString(),
             call_status: 'scheduled'
           })
           .select()
@@ -347,14 +351,14 @@ export const callSchedulingHandler = inngest.createFunction(
           data: {
             ...event.data,
             logEntryId: logEntry.id,
-            scheduledFor: tomorrow.toISOString()
+            scheduledFor: scheduledTime.toISOString()
           },
-          timestamp: tomorrow.getTime()
+          timestamp: scheduledTime.getTime()
         });
 
-        return { 
-          status: 'scheduled_business_hours', 
-          scheduledFor: tomorrow.toISOString(),
+        return {
+          status: 'scheduled_business_hours',
+          scheduledFor: scheduledTime.toISOString(),
           logEntryId: logEntry.id
         };
       });

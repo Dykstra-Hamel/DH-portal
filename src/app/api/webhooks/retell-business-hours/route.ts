@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { Retell } from 'retell-sdk';
 import { findCompanyByAgentId } from '@/lib/agent-utils';
+import { isBusinessHours } from '@/lib/campaigns/business-hours';
 
 // Simple rate limiting store (in production, use Redis or similar)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
@@ -122,92 +123,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get company settings for business hours and off-hour calling
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('setting_key, setting_value, setting_type')
-      .eq('company_id', companyId)
-      .in('setting_key', [
-        'off_hour_calling_enabled',
-        'company_timezone',
-        'business_hours_monday',
-        'business_hours_tuesday', 
-        'business_hours_wednesday',
-        'business_hours_thursday',
-        'business_hours_friday',
-        'business_hours_saturday',
-        'business_hours_sunday'
-      ]);
-
-    if (!settings) {
-      console.error(`❌ [${requestId}] Failed to fetch company settings`);
-      return NextResponse.json(
-        { error: 'Failed to fetch company settings' },
-        { status: 500 }
-      );
-    }
-
-    // Convert settings array to object for easier access
-    const settingsMap = settings.reduce((acc: any, setting: any) => {
-      let value = setting.setting_value;
-      
-      // Parse JSON settings
-      if (setting.setting_type === 'json' && typeof value === 'string') {
-        try {
-          value = JSON.parse(value);
-        } catch (e) {
-          console.warn(`⚠️ [${requestId}] Failed to parse JSON setting ${setting.setting_key}:`, e);
-        }
-      }
-      
-      // Parse boolean settings
-      if (setting.setting_type === 'boolean') {
-        value = value === 'true' || value === true;
-      }
-      
-      acc[setting.setting_key] = value;
-      return acc;
-    }, {});
+    // Use business hours library to check current time
+    const now = new Date();
+    const isDuringBusinessHours = await isBusinessHours(now, companyId);
 
     // Get off-hour calling setting
-    const offHourCallingEnabled = settingsMap.off_hour_calling_enabled ?? true;
-    
-    // Get company timezone (default to UTC if not set)
-    const companyTimezone = settingsMap.company_timezone || 'UTC';
-    
-    // Calculate current time in company timezone
-    const now = new Date();
-    let currentTime: Date;
-    
-    try {
-      // Convert to company timezone
-      currentTime = new Date(now.toLocaleString('en-US', { timeZone: companyTimezone }));
-    } catch (error) {
-      console.warn(`⚠️ [${requestId}] Invalid timezone ${companyTimezone}, using UTC`);
-      currentTime = now;
-    }
-    
-    const currentDay = currentTime.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-    const currentTimeStr = currentTime.toTimeString().slice(0, 5); // HH:MM format
-    
-    
-    // Check if current time is during business hours
-    let isDuringBusinessHours = false;
-    
-    const dayHours = settingsMap[`business_hours_${currentDay}`];
-    if (dayHours && dayHours.enabled) {
-      const startTime = dayHours.start;
-      const endTime = dayHours.end;
-      
-      if (startTime && endTime) {
-        // Compare time strings (HH:MM format)
-        const isAfterStart = currentTimeStr >= startTime;
-        const isBeforeEnd = currentTimeStr <= endTime;
-        isDuringBusinessHours = isAfterStart && isBeforeEnd;
-        
-      }
-    } else {
-    }
+    const { data: offHourSetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'off_hour_calling_enabled')
+      .single();
+
+    const offHourCallingEnabled = offHourSetting?.setting_value === 'true' || offHourSetting?.setting_value === true || true;
     
     const duration = Date.now() - startTime;
     

@@ -57,6 +57,13 @@ interface CampaignLandingPageProps {
     requestedDate: string | null;
     requestedTime: string | null;
   };
+  businessHours?: {
+    [day: string]: {
+      start: string;
+      end: string;
+      closed: boolean;
+    };
+  } | null;
   landingPage: {
     hero: {
       title: string;
@@ -114,6 +121,8 @@ interface CampaignLandingPageProps {
     footer: {
       tagline: string;
       links: Array<{ label: string; url: string }>;
+      termsUrl?: string | null;
+      privacyUrl?: string | null;
     };
     terms: {
       content: string | null;
@@ -154,6 +163,7 @@ export default function CampaignLandingPage({
   customer,
   company,
   redemption,
+  businessHours,
   landingPage,
 }: CampaignLandingPageProps) {
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -210,6 +220,7 @@ export default function CampaignLandingPage({
         branding={landingPage.branding}
         header={landingPage.header}
         footer={landingPage.footer}
+        businessHours={businessHours || null}
       />
     );
   }

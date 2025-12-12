@@ -762,6 +762,8 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     saturday: { start: '09:00', end: '17:00', closed: true },
     sunday: { start: '09:00', end: '17:00', closed: true },
   });
+  const [termsUrl, setTermsUrl] = useState<string>('');
+  const [privacyUrl, setPrivacyUrl] = useState<string>('');
   const [loadingTimezone, setLoadingTimezone] = useState(true);
 
   useEffect(() => {
@@ -776,6 +778,10 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
           if (settings.business_hours?.value) {
             setBusinessHours(settings.business_hours.value);
           }
+
+          // Load Terms & Privacy URLs
+          setTermsUrl(settings.terms_conditions_url?.value || '');
+          setPrivacyUrl(settings.privacy_policy_url?.value || '');
         }
       } catch (error) {
         console.error('Error loading settings:', error);
@@ -792,7 +798,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     // Save business info
     await onSave(formData);
 
-    // Save timezone and business hours settings separately
+    // Save timezone, business hours, and URLs settings separately
     try {
       await fetch(`/api/companies/${company.id}/settings`, {
         method: 'PUT',
@@ -806,6 +812,14 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
             business_hours: {
               value: businessHours,
               type: 'json'
+            },
+            terms_conditions_url: {
+              value: termsUrl,
+              type: 'string'
+            },
+            privacy_policy_url: {
+              value: privacyUrl,
+              type: 'string'
             }
           }
         }),
@@ -876,6 +890,28 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
             businessHours={businessHours}
             onChange={setBusinessHours}
           />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Terms & Conditions URL:</label>
+          <input
+            type="url"
+            value={termsUrl}
+            onChange={(e) => setTermsUrl(e.target.value)}
+            placeholder="https://example.com/terms"
+          />
+          <small>Link to your company&apos;s Terms & Conditions page</small>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Privacy Policy URL:</label>
+          <input
+            type="url"
+            value={privacyUrl}
+            onChange={(e) => setPrivacyUrl(e.target.value)}
+            placeholder="https://example.com/privacy"
+          />
+          <small>Link to your company&apos;s Privacy Policy page</small>
         </div>
 
         <button type="submit" disabled={saving} className={styles.saveButton}>

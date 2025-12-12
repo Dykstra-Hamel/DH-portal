@@ -47,9 +47,9 @@ export const FOOTER_STYLES = {
  */
 export const COMPLIANCE_TEXT = {
   default: (companyName: string) =>
-    `You are receiving this email because you are a customer of ${companyName}. If you no longer wish to receive emails from us, you can unsubscribe.`,
+    `You’re receiving this email because you opted in or have done business with ${companyName}. You may unsubscribe at any time.`,
   marketing: (companyName: string) =>
-    `This is a marketing email from ${companyName}. You can unsubscribe at any time.`,
+    `You’re receiving this email because you opted in or have done business with ${companyName}. You may unsubscribe at any time.`,
 } as const;
 
 /**
