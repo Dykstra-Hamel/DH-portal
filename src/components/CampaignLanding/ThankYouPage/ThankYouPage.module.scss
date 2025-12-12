@@ -61,23 +61,26 @@
 
 .greeting {
   font-family: var(--font-primary);
-  font-size: 40px;
+  font-size: 50px;
   font-weight: 700;
-  color: var(--brand-secondary);
+  color: var(--Gray-Text, #4e4e4e);
+  text-align: center;
   margin: 0 0 24px 0;
-  line-height: 1.2;
+  line-height: 50px;
 
   @media (max-width: 768px) {
     font-size: 32px;
+    line-height: 36px;
     margin-bottom: 20px;
   }
 }
 
 .description {
   font-family: var(--font-primary);
-  font-size: 16px;
+  font-size: 26px;
+  font-weight: 500;
   color: #484848;
-  line-height: 1.6;
+  line-height: 30px;
   margin: 0 auto;
   max-width: 800px;
 
@@ -90,7 +93,8 @@
   }
 
   @media (max-width: 768px) {
-    font-size: 15px;
+    font-size: 20px;
+    line-height: 24px;
   }
 }
 
@@ -102,7 +106,7 @@
   gap: 109px; // 54px + 1px separator + 54px
   margin-bottom: 80px;
 
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     flex-direction: column;
     gap: 32px;
     margin-bottom: 60px;
@@ -126,12 +130,12 @@
     right: -55px; // Half of gap (109px / 2) to center the separator
     top: 0;
 
-    @media (max-width: 768px) {
+    @media (max-width: 1024px) {
       display: none;
     }
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     width: 100%;
   }
 }
@@ -340,4 +344,55 @@
   @media (max-width: 768px) {
     width: 100%;
   }
+}
+
+// Office Hours Section
+.officeHoursSection {
+  text-align: center;
+  margin: 60px 0;
+  padding: 0 20px;
+
+  @media (max-width: 768px) {
+    margin: 40px 0;
+  }
+}
+
+.officeHoursHeading {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 16px;
+
+  @media (max-width: 768px) {
+    font-size: 20px;
+  }
+}
+
+.officeHoursList {
+  display: inline-block;
+  text-align: center;
+}
+
+.officeHourRow {
+  margin-bottom: 8px;
+  font-size: 18px;
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.officeHourDays {
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 120px;
+  margin-right: 5px;
+}
+
+.officeHourTime {
+  color: var(--color-text-gray);
 }

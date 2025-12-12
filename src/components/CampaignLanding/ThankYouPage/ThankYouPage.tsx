@@ -10,6 +10,7 @@
 import { useEffect } from 'react';
 import HeaderSection from '../CampaignLandingPage/sections/HeaderSection';
 import FooterSection from '../CampaignLandingPage/sections/FooterSection';
+import { formatBusinessHoursForDisplay } from '@/lib/format-business-hours';
 import styles from './ThankYouPage.module.scss';
 
 interface ThankYouPageProps {
@@ -75,7 +76,16 @@ interface ThankYouPageProps {
   footer: {
     tagline: string;
     links: Array<{ label: string; url: string }>;
+    termsUrl?: string | null;
+    privacyUrl?: string | null;
   };
+  businessHours?: {
+    [day: string]: {
+      start: string;
+      end: string;
+      closed: boolean;
+    };
+  } | null;
 }
 
 const timeLabels: Record<string, string> = {
@@ -112,6 +122,7 @@ export default function ThankYouPage({
   branding,
   header,
   footer,
+  businessHours,
 }: ThankYouPageProps) {
   // Load brand primary font dynamically
   useEffect(() => {
@@ -273,6 +284,27 @@ export default function ThankYouPage({
           </div>
         )}
 
+        {/* Office Hours Section */}
+        {businessHours && (() => {
+          const formattedHours = formatBusinessHoursForDisplay(businessHours);
+
+          if (formattedHours.length === 0) return null;
+
+          return (
+            <div className={styles.officeHoursSection}>
+              <h3 className={styles.officeHoursHeading}>Office Hours</h3>
+              <div className={styles.officeHoursList}>
+                {formattedHours.map((item, index) => (
+                  <div key={index} className={styles.officeHourRow}>
+                    <span className={styles.officeHourDays}>{item.days}:</span>
+                    <span className={styles.officeHourTime}>{item.hours}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* CTA Button */}
         <div className={styles.ctaSection}>
           <button
@@ -286,7 +318,12 @@ export default function ThankYouPage({
       </div>
 
       {/* Footer Section */}
-      <FooterSection footer={footer} branding={branding} serviceName={campaign.name} />
+      <FooterSection
+        footer={footer}
+        branding={branding}
+        serviceName={campaign.name}
+        hideOffers={true}
+      />
     </div>
   );
 }

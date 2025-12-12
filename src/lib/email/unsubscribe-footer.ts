@@ -16,7 +16,9 @@ export interface UnsubscribeFooterOptions {
  * @param options - Footer configuration options
  * @returns HTML string with inline styles for email compatibility
  */
-export function generateUnsubscribeFooter(options: UnsubscribeFooterOptions): string {
+export function generateUnsubscribeFooter(
+  options: UnsubscribeFooterOptions
+): string {
   const { unsubscribeUrl, companyName = 'us' } = options;
 
   return `
@@ -28,7 +30,7 @@ export function generateUnsubscribeFooter(options: UnsubscribeFooterOptions): st
         <tr>
           <td style="padding: 0 0 10px 0;">
             <p style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 18px; color: #666666;">
-              You are receiving this email because you are a customer of ${companyName}. If you no longer wish to receive emails from us, you can unsubscribe.
+You’re receiving this email because you opted in or have done business with ${companyName}. You may unsubscribe at any time.
             </p>
           </td>
         </tr>
@@ -53,14 +55,16 @@ export function generateUnsubscribeFooter(options: UnsubscribeFooterOptions): st
  * @param options - Footer configuration options
  * @returns Plain text footer string
  */
-export function generatePlainTextUnsubscribeFooter(options: UnsubscribeFooterOptions): string {
+export function generatePlainTextUnsubscribeFooter(
+  options: UnsubscribeFooterOptions
+): string {
   const { unsubscribeUrl, companyName = 'us' } = options;
 
   return `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-You are receiving this email because you are a customer of ${companyName}.
-If you no longer wish to receive emails from us, you can unsubscribe:
+You are receiving this email from ${companyName}.
+If you no longer wish to receive marketing emails from us, you can unsubscribe:
 
 ${unsubscribeUrl}
 

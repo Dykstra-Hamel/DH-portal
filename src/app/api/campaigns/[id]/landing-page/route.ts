@@ -183,6 +183,48 @@ export async function GET(
       .eq('company_id', campaign.company_id)
       .maybeSingle();
 
+    // Fetch business hours (optional)
+    const { data: businessHoursData, error: businessHoursError } = await supabase
+      .from('company_settings')
+      .select('setting_value, setting_type')
+      .eq('company_id', campaign.company_id)
+      .eq('setting_key', 'business_hours')
+      .maybeSingle();
+
+    // Parse JSON if needed (business_hours is stored as JSON in database)
+    let businessHours = null;
+    if (businessHoursData?.setting_value) {
+      if (businessHoursData.setting_type === 'json' && typeof businessHoursData.setting_value === 'string') {
+        try {
+          businessHours = JSON.parse(businessHoursData.setting_value);
+        } catch (e) {
+          console.error('Failed to parse business hours JSON:', e);
+          businessHours = null;
+        }
+      } else {
+        businessHours = businessHoursData.setting_value;
+      }
+    }
+
+    // Fetch Terms & Conditions URL
+    const { data: termsUrlData } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', campaign.company_id)
+      .eq('setting_key', 'terms_conditions_url')
+      .maybeSingle();
+
+    // Fetch Privacy Policy URL
+    const { data: privacyUrlData } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', campaign.company_id)
+      .eq('setting_key', 'privacy_policy_url')
+      .maybeSingle();
+
+    const termsUrl = termsUrlData?.setting_value || null;
+    const privacyUrl = privacyUrlData?.setting_value || null;
+
     // Fetch service plan if campaign is linked to one
     let servicePlan = null;
     let eligibleAddOns: any[] = [];
@@ -444,6 +486,8 @@ export async function GET(
       footer: {
         tagline: landingPageData?.footer_company_tagline || 'Personal. Urgent. Reliable.',
         links: landingPageData?.footer_links || [],
+        termsUrl,
+        privacyUrl,
       },
       terms: {
         content: landingPageData?.terms_content || null,
@@ -518,6 +562,7 @@ export async function GET(
           requestedDate: redemption.requested_date,
           requestedTime: redemption.requested_time,
         },
+        businessHours,
         landingPage,
       },
     });

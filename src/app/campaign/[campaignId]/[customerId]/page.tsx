@@ -51,6 +51,13 @@ interface CampaignData {
     requestedDate: string | null;
     requestedTime: string | null;
   } | null;
+  businessHours?: {
+    [day: string]: {
+      start: string;
+      end: string;
+      closed: boolean;
+    };
+  } | null;
   landingPage: {
     hero: {
       title: string;
@@ -108,6 +115,8 @@ interface CampaignData {
     footer: {
       tagline: string;
       links: Array<{ label: string; url: string }>;
+      termsUrl: string | null;
+      privacyUrl: string | null;
     };
     terms: {
       content: string | null;
@@ -267,6 +276,7 @@ export default function SubdomainCampaignLandingPage() {
           requestedDate: null,
           requestedTime: null,
         }}
+        businessHours={data.businessHours || null}
         landingPage={data.landingPage}
       />
     </div>
