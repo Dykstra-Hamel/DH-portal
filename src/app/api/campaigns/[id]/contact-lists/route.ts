@@ -101,6 +101,13 @@ export async function GET(
           .eq('campaign_id', campaignId)
           .eq('status', 'failed');
 
+        const { count: excludedCount } = await queryClient
+          .from('campaign_contact_list_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('contact_list_id', list.id)
+          .eq('campaign_id', campaignId)
+          .eq('status', 'excluded');
+
         return {
           ...list,
           list_name: list.name, // Maintain backward compatibility with old field name
@@ -110,6 +117,7 @@ export async function GET(
           processing_count: processingCount || 0,
           processed_count: processedCount || 0,
           failed_count: failedCount || 0,
+          excluded_count: excludedCount || 0,
         };
       })
     );
