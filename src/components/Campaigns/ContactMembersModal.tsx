@@ -60,6 +60,7 @@ export default function ContactMembersModal({ campaignId, listId, listName, onCl
       processing: { icon: <Loader size={14} />, label: 'Processing', className: styles.statusProcessing },
       processed: { icon: <CheckCircle size={14} />, label: 'Processed', className: styles.statusProcessed },
       failed: { icon: <XCircle size={14} />, label: 'Failed', className: styles.statusFailed },
+      excluded: { icon: <XCircle size={14} />, label: 'Excluded', className: styles.statusExcluded },
     };
 
     const config = statusConfig[status] || statusConfig.pending;
@@ -172,7 +173,16 @@ export default function ContactMembersModal({ campaignId, listId, listName, onCl
                           )}
                         </div>
                       </td>
-                      <td>{getStatusBadge(member.status)}</td>
+                      <td>
+                        <div>
+                          {getStatusBadge(member.status)}
+                          {member.error_message && (
+                            <div className={styles.errorMessage} title={member.error_message}>
+                              {member.error_message}
+                            </div>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         <div className={styles.viewCountCell}>
                           {member.view_count > 0 ? (

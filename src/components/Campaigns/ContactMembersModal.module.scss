@@ -218,6 +218,22 @@
   color: #991b1b;
 }
 
+.statusExcluded {
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #fcd34d;
+}
+
+.errorMessage {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #78350f;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dateCell {
   color: #6b7280;
 }
