@@ -7,7 +7,7 @@
 -- Purpose: Store reusable images for company campaigns
 -- =====================================================
 CREATE TABLE company_images (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   file_path TEXT NOT NULL,  -- Storage path: {companyId}/library/{filename}
   file_name TEXT NOT NULL,  -- Original filename
@@ -78,7 +78,7 @@ CREATE POLICY "Users can delete company images"
 -- Purpose: Track which images are used in which campaigns
 -- =====================================================
 CREATE TABLE campaign_image_usage (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_landing_page_id UUID NOT NULL REFERENCES campaign_landing_pages(id) ON DELETE CASCADE,
   company_image_id UUID NOT NULL REFERENCES company_images(id) ON DELETE CASCADE,
   image_field TEXT NOT NULL,  -- 'hero_image', 'features_image', 'additional_services_image'
