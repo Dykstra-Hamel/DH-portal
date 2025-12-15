@@ -1,12 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Lead } from '@/types/lead';
-import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { TabCard, TabItem } from '@/components/Common/TabCard/TabCard';
 import { QuoteSummaryCard } from '@/components/Common/QuoteSummaryCard/QuoteSummaryCard';
 import { SalesCadenceCard } from '@/components/Common/SalesCadenceCard/SalesCadenceCard';
-import { ContactInformationCard } from '@/components/Common/ContactInformationCard/ContactInformationCard';
-import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
 import { ManageLeadModal } from '@/components/Common/ManageLeadModal/ManageLeadModal';
 import { AssignSuccessModal } from '@/components/Common/AssignSuccessModal/AssignSuccessModal';
 import { CompleteTaskModal } from '@/components/Common/CompleteTaskModal/CompleteTaskModal';
@@ -15,9 +12,6 @@ import { PestSelection } from '@/components/Common/PestSelection/PestSelection';
 import { AdditionalPestsSelection } from '@/components/Common/AdditionalPestsSelection/AdditionalPestsSelection';
 import { CustomDropdown } from '@/components/Common/CustomDropdown/CustomDropdown';
 import EligibleAddOnSelector from '@/components/Quotes/EligibleAddOnSelector/EligibleAddOnSelector';
-import CustomerInformation from '@/components/Tickets/TicketContent/CustomerInformation';
-import { ActivityFeed } from '@/components/Common/ActivityFeed/ActivityFeed';
-import { NotesSection } from '@/components/Common/NotesSection/NotesSection';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
@@ -25,17 +19,10 @@ import { useQuoteRealtime } from '@/hooks/useQuoteRealtime';
 import { authenticatedFetch, adminAPI } from '@/lib/api-client';
 import {
   createCustomerChannel,
-  broadcastCustomerUpdate,
   removeCustomerChannel,
   subscribeToCustomerUpdates,
 } from '@/lib/realtime/customer-channel';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
-import {
-  AddressAutocomplete,
-  AddressComponents,
-} from '@/components/Common/AddressAutocomplete/AddressAutocomplete';
-import { StreetViewImage } from '@/components/Common/StreetViewImage/StreetViewImage';
-import { ServiceAddressData } from '@/lib/service-addresses';
 import {
   generateHomeSizeOptions,
   generateYardSizeOptions,
@@ -55,10 +42,12 @@ import {
   Mail,
   X,
   CalendarCheck,
+  ListCollapse,
 } from 'lucide-react';
 import styles from './LeadStepContent.module.scss';
 import cadenceStyles from '../SalesCadenceCard/SalesCadenceCard.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
+import { LeadDetailsSidebar } from './components/LeadDetailsSidebar/LeadDetailsSidebar';
 
 interface LeadStepContentProps {
   lead: Lead;
@@ -83,6 +72,7 @@ export function LeadStepContent({
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [isAssignmentDropdownOpen, setIsAssignmentDropdownOpen] =
     useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [showCallSummary, setShowCallSummary] = useState(false);
   const [showManageLeadModal, setShowManageLeadModal] = useState(false);
@@ -99,28 +89,15 @@ export function LeadStepContent({
   } | null>(null);
 
   // Service Confirmation state
-  const [showServiceConfirmationModal, setShowServiceConfirmationModal] = useState(false);
-  const [scheduledDate, setScheduledDate] = useState<string>(lead.scheduled_date || '');
-  const [scheduledTime, setScheduledTime] = useState<string>(lead.scheduled_time || '');
+  const [showServiceConfirmationModal, setShowServiceConfirmationModal] =
+    useState(false);
+  const [scheduledDate, setScheduledDate] = useState<string>(
+    lead.scheduled_date || ''
+  );
+  const [scheduledTime, setScheduledTime] = useState<string>(
+    lead.scheduled_time || ''
+  );
   const [confirmationNote, setConfirmationNote] = useState<string>('');
-
-  // Create a ticket-like object for the CustomerInformation component
-  // Include lead.customer in dependencies to update when customer data changes
-  const createTicketFromLead = useMemo(() => {
-    return {
-      id: lead.id,
-      customer: lead.customer || undefined,
-      company_id: lead.company_id,
-      created_at: lead.created_at,
-      updated_at: lead.updated_at,
-    } as any;
-  }, [
-    lead.id,
-    lead.customer,
-    lead.company_id,
-    lead.created_at,
-    lead.updated_at,
-  ]);
 
   // Refs
   const pestDropdownRef = useRef<HTMLDivElement>(null);
@@ -128,20 +105,6 @@ export function LeadStepContent({
   const assignmentDropdownRef = useRef<HTMLDivElement>(null);
   const customerChannelRef = useRef<any>(null);
 
-  // Service Location form state
-  const [serviceLocationData, setServiceLocationData] =
-    useState<ServiceAddressData>({
-      street_address: '',
-      city: '',
-      state: '',
-      zip_code: '',
-      latitude: undefined,
-      longitude: undefined,
-      address_type: 'residential',
-    });
-  const [originalServiceAddress, setOriginalServiceAddress] =
-    useState<ServiceAddressData | null>(null);
-  const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [homeSize, setHomeSize] = useState<number | ''>('');
   const [yardSize, setYardSize] = useState<number | ''>('');
   const [selectedHomeSizeOption, setSelectedHomeSizeOption] =
@@ -238,8 +201,7 @@ export function LeadStepContent({
   } = useQuoteRealtime({
     leadId: lead.id,
     userId: user?.id,
-    enabled:
-      lead.lead_status === 'quoted' || lead.lead_status === 'scheduling',
+    enabled: lead.lead_status === 'quoted' || lead.lead_status === 'scheduling',
   });
 
   // Helper functions for managing service selections
@@ -469,62 +431,6 @@ export function LeadStepContent({
     }
   }, [quote?.line_items, serviceFrequency, discount]);
 
-  // Pre-fill service location with primary service address when component loads
-  useEffect(() => {
-    // Only pre-fill if we haven't already set the service location data
-    if (originalServiceAddress === null) {
-      let addressData: ServiceAddressData;
-
-      if (lead.primary_service_address) {
-        addressData = {
-          street_address: lead.primary_service_address.street_address || '',
-          city: lead.primary_service_address.city || '',
-          state: lead.primary_service_address.state || '',
-          zip_code: lead.primary_service_address.zip_code || '',
-          apartment_unit: lead.primary_service_address.apartment_unit,
-          address_line_2: lead.primary_service_address.address_line_2,
-          latitude: lead.primary_service_address.latitude,
-          longitude: lead.primary_service_address.longitude,
-          address_type:
-            lead.primary_service_address.address_type || 'residential',
-          property_notes: lead.primary_service_address.property_notes,
-        };
-      } else if (lead.customer) {
-        // Fallback to customer address if no primary service address exists
-        addressData = {
-          street_address: lead.customer?.address || '',
-          city: lead.customer?.city || '',
-          state: lead.customer?.state || '',
-          zip_code: lead.customer?.zip_code || '',
-          latitude: lead.customer?.latitude,
-          longitude: lead.customer?.longitude,
-          address_type: 'residential',
-        };
-      } else {
-        // No existing address - initialize with empty values
-        addressData = {
-          street_address: '',
-          city: '',
-          state: '',
-          zip_code: '',
-          apartment_unit: undefined,
-          address_line_2: undefined,
-          latitude: undefined,
-          longitude: undefined,
-          address_type: 'residential',
-        };
-      }
-
-      // Store original service address for change detection
-      setOriginalServiceAddress(addressData);
-
-      setServiceLocationData(prev => ({
-        ...prev,
-        ...addressData,
-      }));
-    }
-  }, [lead.primary_service_address, lead.customer, originalServiceAddress]);
-
   // Load pest options when component loads (for Quote step)
   useEffect(() => {
     const loadPestOptions = async () => {
@@ -641,27 +547,31 @@ export function LeadStepContent({
    * Fetches available discounts for a specific service plan
    * Memoized with useCallback to prevent unnecessary re-renders
    */
-  const fetchDiscountsForPlan = useCallback(async (planId: string) => {
-    if (!profile) return [];
+  const fetchDiscountsForPlan = useCallback(
+    async (planId: string) => {
+      if (!profile) return [];
 
-    try {
-      const isManager = profile?.role === 'admin' || profile?.role === 'super_admin';
-      const response = await fetch(
-        `/api/companies/${lead.company_id}/discounts/available?planId=${planId}&userIsManager=${isManager}`
-      );
+      try {
+        const isManager =
+          profile?.role === 'admin' || profile?.role === 'super_admin';
+        const response = await fetch(
+          `/api/companies/${lead.company_id}/discounts/available?planId=${planId}&userIsManager=${isManager}`
+        );
 
-      if (!response.ok) {
-        console.error('Failed to fetch discounts');
+        if (!response.ok) {
+          console.error('Failed to fetch discounts');
+          return [];
+        }
+
+        const data = await response.json();
+        return data.discounts || [];
+      } catch (err) {
+        console.error('Error fetching discounts:', err);
         return [];
       }
-
-      const data = await response.json();
-      return data.discounts || [];
-    } catch (err) {
-      console.error('Error fetching discounts:', err);
-      return [];
-    }
-  }, [profile, lead.company_id]);
+    },
+    [profile, lead.company_id]
+  );
 
   // Re-fetch discounts when profile loads if we have service selections but missing discounts
   useEffect(() => {
@@ -677,9 +587,11 @@ export function LeadStepContent({
     // Check if we're missing discounts for any of these plans
     const missingDiscounts = planIds.filter(planId => {
       // Either never fetched, or fetched but got empty results
-      return !discountsFetchedRef.current.has(planId) ||
-             !availableDiscounts[planId] ||
-             availableDiscounts[planId].length === 0;
+      return (
+        !discountsFetchedRef.current.has(planId) ||
+        !availableDiscounts[planId] ||
+        availableDiscounts[planId].length === 0
+      );
     });
 
     if (missingDiscounts.length === 0) return;
@@ -712,7 +624,9 @@ export function LeadStepContent({
       allServicePlans.length > 0
     ) {
       // Separate line items by type
-      const servicePlanItems = quote.line_items.filter(item => item.service_plan_id);
+      const servicePlanItems = quote.line_items.filter(
+        item => item.service_plan_id
+      );
       const addonItems = quote.line_items.filter(item => item.addon_service_id);
 
       // Map service plan line items to service selections
@@ -729,7 +643,10 @@ export function LeadStepContent({
             servicePlan: servicePlan || null,
             displayOrder: lineItem.display_order,
             frequency: lineItem.service_frequency || '',
-            discount: (lineItem as any).discount_id || lineItem.discount_percentage?.toString() || '',
+            discount:
+              (lineItem as any).discount_id ||
+              lineItem.discount_percentage?.toString() ||
+              '',
           };
         });
 
@@ -785,7 +702,11 @@ export function LeadStepContent({
     if (activeServiceTab === 'service-selection') {
       // Check if any service plans need discounts fetched (using ref to avoid circular dependency)
       const plansMissingDiscounts = serviceSelections
-        .filter(s => s.servicePlan?.id && !discountsFetchedRef.current.has(s.servicePlan.id))
+        .filter(
+          s =>
+            s.servicePlan?.id &&
+            !discountsFetchedRef.current.has(s.servicePlan.id)
+        )
         .map(s => s.servicePlan?.id)
         .filter((id): id is string => !!id);
 
@@ -1009,98 +930,6 @@ export function LeadStepContent({
     }
   }, [yardSize, yardSizeOptions]);
 
-  // Check if we have a complete address (all required fields)
-  const hasCompleteAddress = useMemo(() => {
-    return !!(
-      serviceLocationData.street_address &&
-      serviceLocationData.city &&
-      serviceLocationData.state &&
-      serviceLocationData.zip_code
-    );
-  }, [serviceLocationData]);
-
-  // Check if we have a complete, unchanged address from original
-  const hasCompleteUnchangedAddress = useMemo(() => {
-    if (!hasCompleteAddress || !originalServiceAddress) return false;
-
-    // Check if current address matches original (no changes made)
-    return (
-      serviceLocationData.street_address ===
-        originalServiceAddress.street_address &&
-      serviceLocationData.city === originalServiceAddress.city &&
-      serviceLocationData.state === originalServiceAddress.state &&
-      serviceLocationData.zip_code === originalServiceAddress.zip_code &&
-      serviceLocationData.apartment_unit ===
-        originalServiceAddress.apartment_unit &&
-      serviceLocationData.address_line_2 ===
-        originalServiceAddress.address_line_2
-    );
-  }, [serviceLocationData, originalServiceAddress, hasCompleteAddress]);
-
-  // Build formatted address string from current service location data
-  // Build the best possible address string with available fields
-  const currentFormattedAddress = useMemo(() => {
-    const parts = [];
-
-    // Add street address if available
-    if (serviceLocationData.street_address?.trim()) {
-      parts.push(serviceLocationData.street_address.trim());
-    }
-
-    // Add city if available
-    if (serviceLocationData.city?.trim()) {
-      parts.push(serviceLocationData.city.trim());
-    }
-
-    // Add state and zip together if available
-    const state = serviceLocationData.state?.trim();
-    const zip = serviceLocationData.zip_code?.trim();
-    if (state && zip) {
-      parts.push(`${state} ${zip}`);
-    } else if (state) {
-      parts.push(state);
-    } else if (zip) {
-      parts.push(zip);
-    }
-
-    // Return formatted address if we have at least a street address or city
-    return parts.length >= 1 &&
-      (serviceLocationData.street_address?.trim() ||
-        serviceLocationData.city?.trim())
-      ? parts.join(', ')
-      : '';
-  }, [serviceLocationData]);
-
-  // Detect address changes by comparing current serviceLocationData with originalServiceAddress
-  const hasAddressChanges = useMemo(() => {
-    if (!originalServiceAddress) return false;
-
-    // Check if any field has changed from the original
-    const hasChanges =
-      serviceLocationData.street_address !==
-        originalServiceAddress.street_address ||
-      serviceLocationData.city !== originalServiceAddress.city ||
-      serviceLocationData.state !== originalServiceAddress.state ||
-      serviceLocationData.zip_code !== originalServiceAddress.zip_code ||
-      serviceLocationData.apartment_unit !==
-        originalServiceAddress.apartment_unit ||
-      serviceLocationData.address_line_2 !==
-        originalServiceAddress.address_line_2;
-
-    // Only return true if there are changes AND at least one meaningful value exists
-    if (hasChanges) {
-      const hasMeaningfulData = !!(
-        serviceLocationData.street_address ||
-        serviceLocationData.city ||
-        serviceLocationData.state ||
-        serviceLocationData.zip_code
-      );
-      return hasMeaningfulData;
-    }
-
-    return false;
-  }, [serviceLocationData, originalServiceAddress]);
-
   const currentUser = user
     ? {
         id: user.id,
@@ -1127,186 +956,6 @@ export function LeadStepContent({
     if (onShowToast) {
       onShowToast(message, 'error');
     }
-  };
-
-  // State name to abbreviation mapping
-  const stateNameToAbbreviation: { [key: string]: string } = {
-    Alabama: 'AL',
-    Alaska: 'AK',
-    Arizona: 'AZ',
-    Arkansas: 'AR',
-    California: 'CA',
-    Colorado: 'CO',
-    Connecticut: 'CT',
-    Delaware: 'DE',
-    Florida: 'FL',
-    Georgia: 'GA',
-    Hawaii: 'HI',
-    Idaho: 'ID',
-    Illinois: 'IL',
-    Indiana: 'IN',
-    Iowa: 'IA',
-    Kansas: 'KS',
-    Kentucky: 'KY',
-    Louisiana: 'LA',
-    Maine: 'ME',
-    Maryland: 'MD',
-    Massachusetts: 'MA',
-    Michigan: 'MI',
-    Minnesota: 'MN',
-    Mississippi: 'MS',
-    Missouri: 'MO',
-    Montana: 'MT',
-    Nebraska: 'NE',
-    Nevada: 'NV',
-    'New Hampshire': 'NH',
-    'New Jersey': 'NJ',
-    'New Mexico': 'NM',
-    'New York': 'NY',
-    'North Carolina': 'NC',
-    'North Dakota': 'ND',
-    Ohio: 'OH',
-    Oklahoma: 'OK',
-    Oregon: 'OR',
-    Pennsylvania: 'PA',
-    'Rhode Island': 'RI',
-    'South Carolina': 'SC',
-    'South Dakota': 'SD',
-    Tennessee: 'TN',
-    Texas: 'TX',
-    Utah: 'UT',
-    Vermont: 'VT',
-    Virginia: 'VA',
-    Washington: 'WA',
-    'West Virginia': 'WV',
-    Wisconsin: 'WI',
-    Wyoming: 'WY',
-  };
-
-  // Service Location handlers
-  const handleAddressSelect = (addressComponents: AddressComponents) => {
-    // Build street address from components instead of using full formatted address
-    let streetAddress = '';
-    if (addressComponents.street_number && addressComponents.route) {
-      streetAddress = `${addressComponents.street_number} ${addressComponents.route}`;
-    } else if (addressComponents.route) {
-      streetAddress = addressComponents.route;
-    } else {
-      // Fallback to formatted address if components not available
-      streetAddress = addressComponents.formatted_address || '';
-    }
-
-    // Convert state name to abbreviation
-    let stateAbbreviation = addressComponents.administrative_area_level_1 || '';
-    if (stateNameToAbbreviation[stateAbbreviation]) {
-      stateAbbreviation = stateNameToAbbreviation[stateAbbreviation];
-    }
-
-    const newLocationData = {
-      ...serviceLocationData,
-      street_address: streetAddress,
-      city: addressComponents.locality || '',
-      state: stateAbbreviation,
-      zip_code: addressComponents.postal_code || '',
-      latitude: addressComponents.latitude,
-      longitude: addressComponents.longitude,
-      hasStreetView: addressComponents.hasStreetView,
-    };
-
-    setServiceLocationData(newLocationData);
-  };
-
-  const handleServiceLocationChange = (
-    field: keyof ServiceAddressData,
-    value: string
-  ) => {
-    setServiceLocationData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleSaveAddress = async () => {
-    if (!lead.customer || !hasAddressChanges) return;
-
-    setIsSavingAddress(true);
-    try {
-      // Check if we have an existing primary service address to update
-      if (lead.primary_service_address?.id) {
-        // UPDATE existing service address via API
-        const result = await authenticatedFetch(
-          `/api/leads/${lead.id}/service-address`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              serviceAddressId: lead.primary_service_address.id,
-              addressData: serviceLocationData,
-            }),
-          }
-        );
-
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to update service address');
-        }
-
-        showSuccessToast('Service address updated successfully');
-      } else {
-        // CREATE new service address and link to both customer and lead via API
-        const isPrimary = !lead.primary_service_address; // Set as primary if no existing primary address
-
-        const result = await authenticatedFetch(
-          `/api/leads/${lead.id}/service-address`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              companyId: lead.company_id,
-              customerId: lead.customer.id,
-              isPrimary,
-              addressData: serviceLocationData,
-            }),
-          }
-        );
-
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to save service address');
-        }
-
-        if (result.data?.isExisting) {
-          showSuccessToast('Service address linked successfully');
-        } else {
-          showSuccessToast('Service address created and linked successfully');
-        }
-      }
-
-      // Update the original service address to reflect the saved state
-      // Preserve hasStreetView property so Street View doesn't switch to satellite after save
-      setOriginalServiceAddress({
-        ...serviceLocationData,
-      });
-
-      // Note: We don't call onLeadUpdate() here to avoid refreshing the lead data
-      // which would reset the serviceLocationData and lose the hasStreetView property
-    } catch (error) {
-      console.error('Error saving service address:', error);
-      showErrorToast(
-        error instanceof Error
-          ? error.message
-          : 'Failed to save service address'
-      );
-    } finally {
-      setIsSavingAddress(false);
-    }
-  };
-
-  const handleCancelAddressChanges = () => {
-    if (!originalServiceAddress) return;
-
-    // Revert service location back to original service address
-    setServiceLocationData({
-      ...originalServiceAddress,
-    });
   };
 
   const handleUpdateServiceAddressSize = async (
@@ -1950,7 +1599,7 @@ export function LeadStepContent({
       onShowToast?.('Sale finalized successfully!', 'success');
 
       // Redirect to All Leads page
-      window.location.href = '/connections/leads';
+      window.location.href = '/tickets/leads';
     } catch (error) {
       console.error('Failed to finalize sale:', error);
       onShowToast?.('Failed to finalize sale', 'error');
@@ -2104,13 +1753,17 @@ export function LeadStepContent({
 
     try {
       // Fetch add-on details
-      const response = await fetch(`/api/add-on-services/${lead.company_id}/${addonId}`);
+      const response = await fetch(
+        `/api/add-on-services/${lead.company_id}/${addonId}`
+      );
       const result = await response.json();
 
       if (!result.success) throw new Error('Failed to fetch add-on');
 
       const addon = result.addon;
-      const maxOrder = Math.max(...(quote.line_items?.map(i => i.display_order) || [0]));
+      const maxOrder = Math.max(
+        ...(quote.line_items?.map(i => i.display_order) || [0])
+      );
 
       // Create line item
       const lineItemData = {
@@ -2228,713 +1881,6 @@ export function LeadStepContent({
   const DefaultAvatar = ({ name }: { name: string }) => (
     <div className={styles.defaultAvatar}>{name.charAt(0).toUpperCase()}</div>
   );
-
-  const renderQualifyContent = () => {
-    // Define tabs for the left column
-    const qualifyTabs: TabItem[] = [
-      {
-        id: 'assign',
-        label: 'Assign Ticket',
-        content: (
-          <div className={styles.cardContent}>
-            {/* Customer Information */}
-            <div className={styles.customerSection}>
-              <div className={cardStyles.defaultText}>
-                {lead.customer
-                  ? `${lead.customer.first_name} ${lead.customer.last_name}`
-                  : 'No Customer Name'}
-              </div>
-              <div className={cardStyles.lightText}>
-                {lead.customer?.phone || 'No phone number'}
-              </div>
-              <div className={cardStyles.lightText}>
-                {(() => {
-                  // Display primary service address if available, fallback to customer billing address
-                  if (lead.primary_service_address) {
-                    const parts = [];
-                    if (lead.primary_service_address.street_address) {
-                      parts.push(lead.primary_service_address.street_address);
-                    }
-                    if (lead.primary_service_address.city) {
-                      parts.push(lead.primary_service_address.city);
-                    }
-                    if (
-                      lead.primary_service_address.state &&
-                      lead.primary_service_address.zip_code
-                    ) {
-                      parts.push(
-                        `${lead.primary_service_address.state} ${lead.primary_service_address.zip_code}`
-                      );
-                    }
-                    return parts.length > 0
-                      ? parts.join(', ')
-                      : 'No service address available';
-                  }
-                  // Fallback to customer billing address
-                  return lead.customer?.address || 'No address available';
-                })()}
-              </div>
-            </div>
-
-            {/* Ticket Type Section */}
-            <div className={styles.section}>
-              <div
-                className={`${cardStyles.defaultText} ${styles.sectionLabel}`}
-              >
-                Ticket Type:
-              </div>
-              <div className={styles.radioGroup}>
-                <label className={styles.radioOption}>
-                  <input
-                    type="radio"
-                    name="ticketType"
-                    value="sales"
-                    checked={ticketType === 'sales'}
-                    onChange={e => setTicketType(e.target.value)}
-                  />
-                  <span className={styles.radioCustom}></span>
-                  <span className={cardStyles.defaultText}>Sales Lead</span>
-                </label>
-                <label className={styles.radioOption}>
-                  <input
-                    type="radio"
-                    name="ticketType"
-                    value="support"
-                    checked={ticketType === 'support'}
-                    onChange={e => setTicketType(e.target.value)}
-                  />
-                  <span className={styles.radioCustom}></span>
-                  <span className={cardStyles.defaultText}>Support Case</span>
-                </label>
-                <label className={styles.radioOption}>
-                  <input
-                    type="radio"
-                    name="ticketType"
-                    value="junk"
-                    checked={ticketType === 'junk'}
-                    onChange={e => setTicketType(e.target.value)}
-                  />
-                  <span className={styles.radioCustom}></span>
-                  <span className={cardStyles.defaultText}>Junk</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Assign To Section - only show if not junk */}
-            {ticketType !== 'junk' && (
-              <div className={styles.section}>
-                <div
-                  className={`${cardStyles.defaultText} ${styles.sectionLabel}`}
-                >
-                  Assign to:
-                </div>
-                <div className={styles.dropdown} ref={assignmentDropdownRef}>
-                  <button
-                    className={styles.dropdownButton}
-                    onClick={() =>
-                      setIsAssignmentDropdownOpen(!isAssignmentDropdownOpen)
-                    }
-                  >
-                    <div className={styles.dropdownContent}>
-                      <div className={styles.avatarContainer}>
-                        {(() => {
-                          const display = getSelectedAssigneeDisplay();
-                          if (display.isTeam) {
-                            return <TeamAvatar />;
-                          }
-                          if (display.avatar) {
-                            return (
-                              <Image
-                                src={display.avatar}
-                                alt={display.name}
-                                width={32}
-                                height={32}
-                                className={styles.avatar}
-                              />
-                            );
-                          }
-                          return <DefaultAvatar name={display.name} />;
-                        })()}
-                      </div>
-                      <div className={styles.userInfo}>
-                        <div
-                          className={cardStyles.defaultText}
-                          style={{ color: 'var(--action-500)' }}
-                        >
-                          {getSelectedAssigneeDisplay().name}
-                        </div>
-                        <div className={cardStyles.lightText}>
-                          {getSelectedAssigneeDisplay().subtitle}
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronDown
-                      size={24}
-                      className={`${styles.chevronIcon} ${isAssignmentDropdownOpen ? styles.rotated : ''}`}
-                    />
-                  </button>
-                  {isAssignmentDropdownOpen && (
-                    <div className={styles.dropdownMenu}>
-                      {/* Current user first */}
-                      {currentUser && (
-                        <button
-                          className={`${styles.dropdownOption} ${selectedAssignee === user?.id ? styles.selected : ''}`}
-                          onClick={() => handleAssigneeSelect(user?.id || '')}
-                        >
-                          <div className={styles.avatarContainer}>
-                            {currentUser.avatar ? (
-                              <Image
-                                src={currentUser.avatar}
-                                alt={currentUser.name}
-                                width={32}
-                                height={32}
-                                className={styles.avatar}
-                              />
-                            ) : (
-                              <DefaultAvatar name={currentUser.name} />
-                            )}
-                          </div>
-                          <div className={styles.userInfo}>
-                            <div className={cardStyles.defaultText}>
-                              {currentUser.name}
-                            </div>
-                            <div className={cardStyles.lightText}>Myself</div>
-                          </div>
-                        </button>
-                      )}
-
-                      {/* Team option - Sales Team when ticket type is sales, Support Team when support */}
-                      {ticketType === 'sales' && (
-                        <button
-                          className={`${styles.dropdownOption} ${selectedAssignee === 'sales_team' ? styles.selected : ''}`}
-                          onClick={() => handleAssigneeSelect('sales_team')}
-                        >
-                          <div className={styles.avatarContainer}>
-                            <TeamAvatar />
-                          </div>
-                          <div className={styles.userInfo}>
-                            <div className={cardStyles.defaultText}>
-                              Sales Team
-                            </div>
-                            <div className={cardStyles.lightText}>
-                              {getTeamCount()} members
-                            </div>
-                          </div>
-                        </button>
-                      )}
-
-                      {ticketType === 'support' && (
-                        <button
-                          className={`${styles.dropdownOption} ${selectedAssignee === 'support_team' ? styles.selected : ''}`}
-                          onClick={() => handleAssigneeSelect('support_team')}
-                        >
-                          <div className={styles.avatarContainer}>
-                            <TeamAvatar />
-                          </div>
-                          <div className={styles.userInfo}>
-                            <div className={cardStyles.defaultText}>
-                              Support Team
-                            </div>
-                            <div className={cardStyles.lightText}>
-                              {getTeamCount()} members
-                            </div>
-                          </div>
-                        </button>
-                      )}
-
-                      {/* Team members - filtered by department */}
-                      {(ticketType === 'sales' || ticketType === 'support') &&
-                        assignableUsers
-                          .filter(companyUser => companyUser.id !== user?.id)
-                          .map(companyUser => (
-                            <button
-                              key={companyUser.id}
-                              className={`${styles.dropdownOption} ${selectedAssignee === companyUser.id ? styles.selected : ''}`}
-                              onClick={() =>
-                                handleAssigneeSelect(companyUser.id)
-                              }
-                            >
-                              <div className={styles.avatarContainer}>
-                                {companyUser.avatar_url ? (
-                                  <Image
-                                    src={companyUser.avatar_url}
-                                    alt={companyUser.display_name}
-                                    width={32}
-                                    height={32}
-                                    className={styles.avatar}
-                                  />
-                                ) : (
-                                  <DefaultAvatar
-                                    name={companyUser.display_name}
-                                  />
-                                )}
-                              </div>
-                              <div className={styles.userInfo}>
-                                <div className={cardStyles.defaultText}>
-                                  {companyUser.display_name}
-                                </div>
-                                <div className={cardStyles.lightText}>
-                                  {companyUser.email}
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Action Button */}
-            <div className={styles.actionSection}>
-              <button
-                className={styles.assignButton}
-                onClick={
-                  selectedAssignee === user?.id
-                    ? handleManageLead
-                    : handleAssignTicket
-                }
-                disabled={isAssigning || !selectedAssignee}
-              >
-                {isAssigning ? (
-                  'Processing...'
-                ) : (
-                  <>
-                    {ticketType === 'junk' && (
-                      <Trash2
-                        size={13.5}
-                        width={13.5}
-                        height={15}
-                        color="white"
-                      />
-                    )}
-                    {getButtonText()}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: 'call',
-        label:
-          lead.lead_type === 'web_form' ? 'Form Details' : 'Call Information',
-        content: (
-          <div className={styles.cardContent}>
-            {lead.lead_type === 'web_form' ? (
-              <>
-                {/* Widget Details Section - only for widget submissions */}
-                {lead.lead_source === 'widget_submission' && (
-                  <div>
-                    <div className={styles.callInsightsSection}>
-                      <h4 className={cardStyles.defaultText}>
-                        Widget Details:
-                      </h4>
-                    </div>
-                    <div className={styles.callInsightsGrid}>
-                      <div className={styles.callDetailItem}>
-                        <span className={cardStyles.dataLabel}>Pest Type</span>
-                        <span className={cardStyles.dataText}>
-                          {capitalizeFirst(lead.pest_type)}
-                        </span>
-                      </div>
-                      <div className={styles.callDetailItem}>
-                        <span className={cardStyles.dataLabel}>
-                          Estimated Price
-                        </span>
-                        <span className={cardStyles.dataText}>
-                          {lead.estimated_value
-                            ? `$${lead.estimated_value.toLocaleString()}`
-                            : 'Not specified'}
-                        </span>
-                      </div>
-                      <div className={styles.callDetailItem}>
-                        <span className={cardStyles.dataLabel}>
-                          Selected Plan
-                        </span>
-                        <span className={cardStyles.dataText}>
-                          {lead.selected_plan_id
-                            ? 'Plan Selected'
-                            : 'Not selected'}
-                        </span>
-                      </div>
-                      <div className={styles.callDetailItem}>
-                        <span className={cardStyles.dataLabel}>
-                          Recommended Plan
-                        </span>
-                        <span className={cardStyles.dataText}>
-                          {lead.recommended_plan_name || 'None provided'}
-                        </span>
-                      </div>
-                      <div className={styles.callDetailItem}>
-                        <span className={cardStyles.dataLabel}>
-                          Requested Date
-                        </span>
-                        <span className={cardStyles.dataText}>
-                          {lead.requested_date
-                            ? new Date(lead.requested_date).toLocaleDateString()
-                            : 'Not specified'}
-                        </span>
-                      </div>
-                      <div className={styles.callDetailItem}>
-                        <span className={cardStyles.dataLabel}>
-                          Requested Time
-                        </span>
-                        <span className={cardStyles.dataText}>
-                          {capitalizeFirst(lead.requested_time || 'anytime')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Form Insights Section */}
-                <div>
-                  <div className={styles.callInsightsSection}>
-                    <h4 className={cardStyles.defaultText}>Form Insights:</h4>
-                  </div>
-                  <div className={styles.callInsightsGrid}>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>Source</span>
-                      <span className={cardStyles.dataText}>
-                        {getLeadSourceDisplay(lead.lead_source)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>Lead Status</span>
-                      <span className={cardStyles.dataText}>
-                        {capitalizeFirst(lead.lead_status.replace('_', ' '))}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>Priority</span>
-                      <span className={cardStyles.dataText}>
-                        {capitalizeFirst(lead.priority)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>
-                        Estimated Value
-                      </span>
-                      <span className={cardStyles.dataText}>
-                        {lead.estimated_value
-                          ? `$${lead.estimated_value.toLocaleString()}`
-                          : 'Not specified'}
-                      </span>
-                    </div>
-                    {lead.attribution_data?.page_url && (
-                      <div className={styles.callDetailItem}>
-                        <span className={cardStyles.dataLabel}>Page URL</span>
-                        <span
-                          className={cardStyles.dataText}
-                          title={lead.attribution_data.page_url}
-                        >
-                          {lead.attribution_data.page_url}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Form Details Section */}
-                <div className={styles.callDetailsSection}>
-                  <div className={styles.callDetailsHeader}>
-                    <h4 className={cardStyles.defaultText}>Form Details:</h4>
-                  </div>
-                  <div className={styles.callInsightsGrid}>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>
-                        Form Submitted
-                      </span>
-                      <span className={cardStyles.dataText}>
-                        {formatCallTimestamp(lead.created_at)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>Service Type</span>
-                      <span className={cardStyles.dataText}>
-                        {lead.service_type || 'Not specified'}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>UTM Source</span>
-                      <span className={cardStyles.dataText}>
-                        {lead.utm_source || 'Direct'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Form Message Section */}
-                {lead.comments && (
-                  <div className={styles.transcriptSection}>
-                    <div className={styles.transcriptHeader}>
-                      <h4 className={cardStyles.dataLabel}>
-                        Form Submission Details
-                      </h4>
-                    </div>
-                    <div className={styles.transcriptContent}>
-                      <span className={cardStyles.transcriptText}>
-                        {lead.comments}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : lead.call_record ? (
-              <>
-                {/* Call Insights Section */}
-                <div>
-                  <div className={styles.callInsightsSection}>
-                    <h4 className={cardStyles.defaultText}>Call Insights:</h4>
-                  </div>
-                  <div className={styles.callInsightsGrid}>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>Method</span>
-                      <span className={cardStyles.dataText}>
-                        {getCallMethod()}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>Source</span>
-                      <span className={cardStyles.dataText}>
-                        {getLeadSourceDisplay(lead.lead_source)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>
-                        AI Qualification
-                      </span>
-                      <span className={cardStyles.dataText}>
-                        {getAIQualification(lead.lead_status)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>
-                        Caller Sentiment
-                      </span>
-                      <span className={cardStyles.dataText}>
-                        {capitalizeFirst(lead.call_record.sentiment)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>
-                        Primary Pest Issue
-                      </span>
-                      <span className={cardStyles.dataText}>
-                        {capitalizeFirst(lead.call_record.pest_issue)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>
-                        Preferred Service Time
-                      </span>
-                      <span className={cardStyles.dataText}>
-                        {capitalizeFirst(
-                          lead.call_record.preferred_service_time
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Call Details Section */}
-                <div className={styles.callDetailsSection}>
-                  <div className={styles.callDetailsHeader}>
-                    <h4 className={cardStyles.defaultText}>Call Details:</h4>
-                  </div>
-                  <div className={styles.callInsightsGrid}>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>Call Started</span>
-                      <span className={cardStyles.dataText}>
-                        {formatCallTimestamp(lead.call_record.start_timestamp)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>Call Ended</span>
-                      <span className={cardStyles.dataText}>
-                        {formatCallTimestamp(lead.call_record.end_timestamp)}
-                      </span>
-                    </div>
-                    <div className={styles.callDetailItem}>
-                      <span className={cardStyles.dataLabel}>
-                        Disconnect Reason
-                      </span>
-                      <span className={cardStyles.dataText}>
-                        {capitalizeFirst(lead.call_record.disconnect_reason)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Call Recording Section */}
-                {lead.call_record.recording_url && (
-                  <div className={styles.recordingSection}>
-                    <h4 className={cardStyles.dataLabel}>Call Recording</h4>
-                    <AudioPlayer
-                      src={lead.call_record.recording_url}
-                      title={`Call Recording - ${lead.customer?.first_name} ${lead.customer?.last_name}`.trim()}
-                    />
-                  </div>
-                )}
-
-                {/* Call Transcript/Summary Section */}
-                {(lead.call_record.transcript ||
-                  lead.call_record.call_analysis?.call_summary) && (
-                  <div className={styles.transcriptSection}>
-                    <div className={styles.transcriptHeader}>
-                      <h4 className={cardStyles.dataLabel}>
-                        {showCallSummary ? 'Call Summary' : 'Call Transcript'}
-                      </h4>
-                      {lead.call_record.call_analysis?.call_summary && (
-                        <div
-                          className={`${styles.toggleContainer} ${showCallSummary ? styles.active : ''}`}
-                        >
-                          <button
-                            className={`${styles.transcriptToggle} ${showCallSummary ? styles.active : ''}`}
-                            onClick={() => setShowCallSummary(!showCallSummary)}
-                            aria-label={
-                              showCallSummary
-                                ? 'Switch to transcript'
-                                : 'Switch to summary'
-                            }
-                          >
-                            <div className={styles.toggleCircle}></div>
-                          </button>
-                          <span className={styles.toggleLabel}>
-                            Call Summary
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.transcriptContent}>
-                      <span className={cardStyles.transcriptText}>
-                        {showCallSummary
-                          ? lead.call_record.call_analysis?.call_summary
-                          : lead.call_record.transcript}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className={styles.noCallData}>
-                <p>No call data available for this lead.</p>
-              </div>
-            )}
-          </div>
-        ),
-      },
-    ];
-
-    return (
-      <>
-        <div className={styles.contentLeft}>
-          <TabCard tabs={qualifyTabs} defaultTabId="assign" />
-        </div>
-
-        <div className={styles.contentRight}>
-          <InfoCard
-            title="Contact Information"
-            icon={<SquareUserRound size={20} />}
-            startExpanded={true}
-          >
-            <CustomerInformation
-              ticket={createTicketFromLead}
-              activityEntityType="lead"
-              activityEntityId={lead.id}
-              onShowToast={onShowToast}
-              onRequestUndo={onRequestUndo}
-              onUpdate={async updatedCustomer => {
-                // Update the lead's customer data optimistically
-                if (lead.customer && updatedCustomer) {
-                  // Merge the updated customer data into the lead
-                  const updatedLead = {
-                    ...lead,
-                    customer: {
-                      ...lead.customer,
-                      ...updatedCustomer,
-                    },
-                  };
-
-                  // Call onLeadUpdate with the updated lead data
-                  // This will update the parent state without a full page reload
-                  if (onLeadUpdate) {
-                    onLeadUpdate(updatedLead);
-                  }
-
-                  // Broadcast the customer update via realtime channel
-                  if (customerChannelRef.current && lead.customer.id) {
-                    await broadcastCustomerUpdate(customerChannelRef.current, {
-                      customer_id: lead.customer.id,
-                      first_name: updatedCustomer.first_name,
-                      last_name: updatedCustomer.last_name,
-                      email: updatedCustomer.email,
-                      phone: updatedCustomer.phone,
-                      updated_by: user?.id,
-                      timestamp: new Date().toISOString(),
-                    });
-                  }
-                }
-
-                if (onShowToast) {
-                  onShowToast(
-                    'Customer information updated successfully.',
-                    'success'
-                  );
-                }
-              }}
-            />
-          </InfoCard>
-
-          <ServiceLocationCard
-            serviceAddress={lead.primary_service_address || null}
-            startExpanded={false}
-            showSizeInputs
-            pricingSettings={pricingSettings || undefined}
-            onShowToast={onShowToast}
-            onRequestUndo={onRequestUndo}
-            editable={true}
-            onAddressSelect={handleAddressSelect}
-            onSaveAddress={handleSaveAddress}
-            onCancelAddress={handleCancelAddressChanges}
-            hasAddressChanges={hasAddressChanges}
-            isSavingAddress={isSavingAddress}
-            serviceLocationData={serviceLocationData}
-            onServiceLocationChange={handleServiceLocationChange}
-            hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
-            currentFormattedAddress={currentFormattedAddress}
-          />
-
-          <InfoCard
-            title="Activity"
-            icon={<SquareActivity size={20} />}
-            startExpanded={false}
-          >
-            <ActivityFeed
-              entityType="lead"
-              entityId={lead.id}
-              companyId={lead.company_id}
-            />
-          </InfoCard>
-
-          <InfoCard
-            title="Notes"
-            icon={<NotebookPen size={20} />}
-            startExpanded={false}
-          >
-            <NotesSection
-              entityType="lead"
-              entityId={lead.id}
-              companyId={lead.company_id}
-              userId={user?.id || ''}
-            />
-          </InfoCard>
-        </div>
-      </>
-    );
-  };
 
   const renderContactingContent = () => {
     const contactingTabs: TabItem[] = [
@@ -3240,112 +2186,7 @@ export function LeadStepContent({
       },
     ];
 
-    return (
-      <>
-        <div className={styles.contentLeft}>
-          <TabCard tabs={contactingTabs} defaultTabId="contact" />
-        </div>
-
-        <div className={styles.contentRight}>
-          <InfoCard
-            title="Contact Information"
-            icon={<SquareUserRound size={20} />}
-            startExpanded={true}
-          >
-            <CustomerInformation
-              ticket={createTicketFromLead}
-              activityEntityType="lead"
-              activityEntityId={lead.id}
-              onShowToast={onShowToast}
-              onRequestUndo={onRequestUndo}
-              onUpdate={async updatedCustomer => {
-                // Update the lead's customer data optimistically
-                if (lead.customer && updatedCustomer) {
-                  // Merge the updated customer data into the lead
-                  const updatedLead = {
-                    ...lead,
-                    customer: {
-                      ...lead.customer,
-                      ...updatedCustomer,
-                    },
-                  };
-
-                  // Call onLeadUpdate with the updated lead data
-                  // This will update the parent state without a full page reload
-                  if (onLeadUpdate) {
-                    onLeadUpdate(updatedLead);
-                  }
-
-                  // Broadcast the customer update via realtime channel
-                  if (customerChannelRef.current && lead.customer.id) {
-                    await broadcastCustomerUpdate(customerChannelRef.current, {
-                      customer_id: lead.customer.id,
-                      first_name: updatedCustomer.first_name,
-                      last_name: updatedCustomer.last_name,
-                      email: updatedCustomer.email,
-                      phone: updatedCustomer.phone,
-                      updated_by: user?.id,
-                      timestamp: new Date().toISOString(),
-                    });
-                  }
-                }
-
-                if (onShowToast) {
-                  onShowToast(
-                    'Customer information updated successfully.',
-                    'success'
-                  );
-                }
-              }}
-            />
-          </InfoCard>
-
-          <ServiceLocationCard
-            serviceAddress={lead.primary_service_address || null}
-            startExpanded={false}
-            showSizeInputs
-            pricingSettings={pricingSettings || undefined}
-            onShowToast={onShowToast}
-            onRequestUndo={onRequestUndo}
-            editable={true}
-            onAddressSelect={handleAddressSelect}
-            onSaveAddress={handleSaveAddress}
-            onCancelAddress={handleCancelAddressChanges}
-            hasAddressChanges={hasAddressChanges}
-            isSavingAddress={isSavingAddress}
-            serviceLocationData={serviceLocationData}
-            onServiceLocationChange={handleServiceLocationChange}
-            hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
-            currentFormattedAddress={currentFormattedAddress}
-          />
-
-          <InfoCard
-            title="Activity"
-            icon={<SquareActivity size={20} />}
-            startExpanded={false}
-          >
-            <ActivityFeed
-              entityType="lead"
-              entityId={lead.id}
-              companyId={lead.company_id}
-            />
-          </InfoCard>
-
-          <InfoCard
-            title="Notes"
-            icon={<NotebookPen size={20} />}
-            startExpanded={false}
-          >
-            <NotesSection
-              entityType="lead"
-              entityId={lead.id}
-              companyId={lead.company_id}
-              userId={user?.id || ''}
-            />
-          </InfoCard>
-        </div>
-      </>
-    );
+    return <TabCard tabs={contactingTabs} defaultTabId="contact" />;
   };
 
   const renderQuotedContent = () => {
@@ -3561,15 +2402,24 @@ export function LeadStepContent({
                                       throw new Error('Failed to undo change');
                                     }
 
-                                    const revertData = await revertResponse.json();
+                                    const revertData =
+                                      await revertResponse.json();
                                     if (revertData.success && revertData.data) {
-                                      await broadcastQuoteUpdate(revertData.data);
+                                      await broadcastQuoteUpdate(
+                                        revertData.data
+                                      );
                                     }
 
                                     onShowToast?.('Change undone', 'success');
                                   } catch (error) {
-                                    console.error('Error undoing change:', error);
-                                    onShowToast?.('Failed to undo change', 'error');
+                                    console.error(
+                                      'Error undoing change:',
+                                      error
+                                    );
+                                    onShowToast?.(
+                                      'Failed to undo change',
+                                      'error'
+                                    );
                                   }
                                 };
 
@@ -3667,15 +2517,24 @@ export function LeadStepContent({
                                       throw new Error('Failed to undo change');
                                     }
 
-                                    const revertData = await revertResponse.json();
+                                    const revertData =
+                                      await revertResponse.json();
                                     if (revertData.success && revertData.data) {
-                                      await broadcastQuoteUpdate(revertData.data);
+                                      await broadcastQuoteUpdate(
+                                        revertData.data
+                                      );
                                     }
 
                                     onShowToast?.('Change undone', 'success');
                                   } catch (error) {
-                                    console.error('Error undoing change:', error);
-                                    onShowToast?.('Failed to undo change', 'error');
+                                    console.error(
+                                      'Error undoing change:',
+                                      error
+                                    );
+                                    onShowToast?.(
+                                      'Failed to undo change',
+                                      'error'
+                                    );
                                   }
                                 };
 
@@ -3797,8 +2656,11 @@ export function LeadStepContent({
                               ? [{ value: '', label: 'Loading discounts...' }]
                               : [
                                   { value: '', label: 'No Discount' },
-                                  ...(selection.servicePlan && availableDiscounts[selection.servicePlan.id]
-                                    ? availableDiscounts[selection.servicePlan.id].map(discount => ({
+                                  ...(selection.servicePlan &&
+                                  availableDiscounts[selection.servicePlan.id]
+                                    ? availableDiscounts[
+                                        selection.servicePlan.id
+                                      ].map(discount => ({
                                         value: discount.id,
                                         label: discount.name,
                                       }))
@@ -3820,12 +2682,17 @@ export function LeadStepContent({
                                 selection.servicePlan,
                                 selection.displayOrder,
                                 {
-                                  discount_id: newDiscountId === '' ? null : newDiscountId,
+                                  discount_id:
+                                    newDiscountId === '' ? null : newDiscountId,
                                 }
                               );
                             }
                           }}
-                          placeholder={loadingDiscounts ? 'Loading discounts...' : 'Select Discount'}
+                          placeholder={
+                            loadingDiscounts
+                              ? 'Loading discounts...'
+                              : 'Select Discount'
+                          }
                           disabled={loadingDiscounts}
                         />
                       </div>
@@ -3917,7 +2784,13 @@ export function LeadStepContent({
 
                 {/* Add-On Services Section */}
                 {serviceSelections[0]?.servicePlan && (
-                  <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
+                  <div
+                    style={{
+                      marginTop: '32px',
+                      paddingTop: '24px',
+                      borderTop: '1px solid #e5e7eb',
+                    }}
+                  >
                     <EligibleAddOnSelector
                       companyId={lead.company_id}
                       servicePlanId={serviceSelections[0].servicePlan.id}
@@ -3953,13 +2826,18 @@ export function LeadStepContent({
                                   Initial Price
                                 </div>
                                 <div className={styles.initialPrice}>
-                                  ${Math.round(quote?.line_items?.[0]
-                                    ?.final_initial_price || 0)}
+                                  $
+                                  {Math.round(
+                                    quote?.line_items?.[0]
+                                      ?.final_initial_price || 0
+                                  )}
                                 </div>
                                 {quote?.line_items?.[0]?.discount_percentage ? (
                                   <div className={styles.originalPrice}>
                                     Originally $
-                                    {Math.round(quote?.line_items?.[0]?.initial_price || 0)}{' '}
+                                    {Math.round(
+                                      quote?.line_items?.[0]?.initial_price || 0
+                                    )}{' '}
                                     (-
                                     {
                                       quote?.line_items?.[0]
@@ -4015,7 +2893,10 @@ export function LeadStepContent({
                                           styles.lineItemRecurringPrice
                                         }
                                       >
-                                        ${Math.round(lineItem?.final_recurring_price || 0)}
+                                        $
+                                        {Math.round(
+                                          lineItem?.final_recurring_price || 0
+                                        )}
                                         <span
                                           className={styles.lineItemPerMonth}
                                         >
@@ -4030,7 +2911,10 @@ export function LeadStepContent({
                                       <div
                                         className={styles.lineItemInitialPrice}
                                       >
-                                        ${Math.round(lineItem?.final_initial_price || 0)}
+                                        $
+                                        {Math.round(
+                                          lineItem?.final_initial_price || 0
+                                        )}
                                       </div>
                                       {lineItem?.discount_percentage ? (
                                         <div
@@ -4039,7 +2923,10 @@ export function LeadStepContent({
                                           }
                                         >
                                           Originally $
-                                          {Math.round(lineItem?.initial_price || 0)} (-
+                                          {Math.round(
+                                            lineItem?.initial_price || 0
+                                          )}{' '}
+                                          (-
                                           {lineItem?.discount_percentage}%)
                                         </div>
                                       ) : null}
@@ -4076,7 +2963,10 @@ export function LeadStepContent({
                                   Total Recurring
                                 </div>
                                 <div className={styles.totalRecurringPrice}>
-                                  ${Math.round(quote?.total_recurring_price || 0)}
+                                  $
+                                  {Math.round(
+                                    quote?.total_recurring_price || 0
+                                  )}
                                   <span className={styles.totalPerMonth}>
                                     /mo
                                   </span>
@@ -4586,114 +3476,11 @@ export function LeadStepContent({
     const defaultTab = hasLineItems ? 'service' : 'pest';
 
     return (
-      <>
-        <div className={styles.contentLeft}>
-          <TabCard
-            key={`quoted-tabs-${quote?.id}`}
-            tabs={quotedTabs}
-            defaultTabId={defaultTab}
-          />
-        </div>
-
-        <div className={styles.contentRight}>
-          <InfoCard
-            title="Contact Information"
-            icon={<SquareUserRound size={20} />}
-            startExpanded={true}
-          >
-            <CustomerInformation
-              ticket={createTicketFromLead}
-              activityEntityType="lead"
-              activityEntityId={lead.id}
-              onShowToast={onShowToast}
-              onRequestUndo={onRequestUndo}
-              onUpdate={async updatedCustomer => {
-                // Update the lead's customer data optimistically
-                if (lead.customer && updatedCustomer) {
-                  // Merge the updated customer data into the lead
-                  const updatedLead = {
-                    ...lead,
-                    customer: {
-                      ...lead.customer,
-                      ...updatedCustomer,
-                    },
-                  };
-
-                  // Call onLeadUpdate with the updated lead data
-                  // This will update the parent state without a full page reload
-                  if (onLeadUpdate) {
-                    onLeadUpdate(updatedLead);
-                  }
-
-                  // Broadcast the customer update via realtime channel
-                  if (customerChannelRef.current && lead.customer.id) {
-                    await broadcastCustomerUpdate(customerChannelRef.current, {
-                      customer_id: lead.customer.id,
-                      first_name: updatedCustomer.first_name,
-                      last_name: updatedCustomer.last_name,
-                      email: updatedCustomer.email,
-                      phone: updatedCustomer.phone,
-                      updated_by: user?.id,
-                      timestamp: new Date().toISOString(),
-                    });
-                  }
-                }
-
-                if (onShowToast) {
-                  onShowToast(
-                    'Customer information updated successfully.',
-                    'success'
-                  );
-                }
-              }}
-            />
-          </InfoCard>
-
-          <ServiceLocationCard
-            serviceAddress={lead.primary_service_address || null}
-            startExpanded={false}
-            showSizeInputs
-            pricingSettings={pricingSettings || undefined}
-            onShowToast={onShowToast}
-            onRequestUndo={onRequestUndo}
-            editable={true}
-            onAddressSelect={handleAddressSelect}
-            onSaveAddress={handleSaveAddress}
-            onCancelAddress={handleCancelAddressChanges}
-            hasAddressChanges={hasAddressChanges}
-            isSavingAddress={isSavingAddress}
-            serviceLocationData={serviceLocationData}
-            onServiceLocationChange={handleServiceLocationChange}
-            hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
-            currentFormattedAddress={currentFormattedAddress}
-          />
-
-          <InfoCard
-            title="Activity"
-            icon={<SquareActivity size={20} />}
-            startExpanded={false}
-          >
-            <ActivityFeed
-              entityType="lead"
-              entityId={lead.id}
-              companyId={lead.company_id}
-            />
-          </InfoCard>
-
-          <InfoCard
-            title="Notes"
-            icon={<NotebookPen size={20} />}
-            startExpanded={false}
-          >
-            <NotesSection
-              entityType="lead"
-              entityId={lead.id}
-              companyId={lead.company_id}
-              userId={user?.id || ''}
-            />
-          </InfoCard>
-        </div>
-      </>
+      <TabCard
+        key={`quoted-tabs-${quote?.id}`}
+        tabs={quotedTabs}
+        defaultTabId={defaultTab}
+      />
     );
   };
 
@@ -4719,9 +3506,7 @@ export function LeadStepContent({
         label: 'Service Confirmation',
         content: (
           <div className={styles.cardContent}>
-            <h3 className={styles.scheduleTabHeading}>
-              Service Confirmation
-            </h3>
+            <h3 className={styles.scheduleTabHeading}>Service Confirmation</h3>
             <div className={styles.confirmationForm}>
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
@@ -4730,7 +3515,7 @@ export function LeadStepContent({
                     type="date"
                     className={styles.formInput}
                     value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
+                    onChange={e => setScheduledDate(e.target.value)}
                   />
                 </div>
                 <div className={styles.formGroup}>
@@ -4739,7 +3524,7 @@ export function LeadStepContent({
                     type="time"
                     className={styles.formInput}
                     value={scheduledTime}
-                    onChange={(e) => setScheduledTime(e.target.value)}
+                    onChange={e => setScheduledTime(e.target.value)}
                   />
                 </div>
               </div>
@@ -4750,7 +3535,7 @@ export function LeadStepContent({
                   placeholder="Add any notes about the scheduled service..."
                   rows={4}
                   value={confirmationNote}
-                  onChange={(e) => setConfirmationNote(e.target.value)}
+                  onChange={e => setConfirmationNote(e.target.value)}
                 />
               </div>
               <div className={styles.formActions}>
@@ -4769,120 +3554,39 @@ export function LeadStepContent({
       },
     ];
 
-    return (
-      <>
-        <div className={styles.contentLeft}>
-          <TabCard tabs={scheduleTabs} defaultTabId="quote_summary" />
-        </div>
-        <div className={styles.contentRight}>
-        <InfoCard
-          title="Contact Information"
-          icon={<SquareUserRound size={20} />}
-          startExpanded={true}
-        >
-          <CustomerInformation
-            ticket={createTicketFromLead}
-            onShowToast={onShowToast}
-            onRequestUndo={onRequestUndo}
-            onUpdate={async updatedCustomer => {
-              // Update the lead's customer data optimistically
-              if (lead.customer && updatedCustomer) {
-                // Merge the updated customer data into the lead
-                const updatedLead = {
-                  ...lead,
-                  customer: {
-                    ...lead.customer,
-                    ...updatedCustomer,
-                  },
-                };
-
-                // Call onLeadUpdate with the updated lead data
-                // This will update the parent state without a full page reload
-                if (onLeadUpdate) {
-                  onLeadUpdate(updatedLead);
-                }
-
-                // Broadcast the customer update via realtime channel
-                if (customerChannelRef.current && lead.customer.id) {
-                  await broadcastCustomerUpdate(customerChannelRef.current, {
-                    customer_id: lead.customer.id,
-                    first_name: updatedCustomer.first_name,
-                    last_name: updatedCustomer.last_name,
-                    email: updatedCustomer.email,
-                    phone: updatedCustomer.phone,
-                    updated_by: user?.id,
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-              }
-
-              if (onShowToast) {
-                onShowToast(
-                  'Customer information updated successfully.',
-                  'success'
-                );
-              }
-            }}
-          />
-        </InfoCard>
-
-        <ServiceLocationCard
-          serviceAddress={lead.primary_service_address || null}
-          showSizeInputs
-          pricingSettings={pricingSettings || undefined}
-          onShowToast={onShowToast}
-          onRequestUndo={onRequestUndo}
-        />
-
-        <InfoCard
-          title="Activity"
-          icon={<SquareActivity size={20} />}
-          startExpanded={false}
-        >
-          <ActivityFeed
-            entityType="lead"
-            entityId={lead.id}
-            companyId={lead.company_id}
-          />
-        </InfoCard>
-
-        <InfoCard
-          title="Notes"
-          icon={<NotebookPen size={20} />}
-          startExpanded={false}
-        >
-          <NotesSection
-            entityType="lead"
-            entityId={lead.id}
-            companyId={lead.company_id}
-            userId={user?.id || ''}
-          />
-        </InfoCard>
-      </div>
-    </>
-    );
+    return <TabCard tabs={scheduleTabs} defaultTabId="quote_summary" />;
   };
 
   // Render content based on lead status
   const renderContent = () => {
-    switch (lead.lead_status) {
-      case 'new':
-        return renderQualifyContent();
-      case 'in_process':
-        return renderContactingContent();
-      case 'quoted':
-        return renderQuotedContent();
-      case 'scheduling':
-        return renderReadyToScheduleContent();
-      default:
-        return renderQualifyContent(); // Default to qualify content
-    }
+    // Show all sections simultaneously instead of conditionally based on status
+    return (
+      <div
+        className={styles.leadContentWrapper}
+        data-sidebar-expanded={isSidebarExpanded}
+      >
+        <div className={styles.contentLeft}>
+          {renderContactingContent()}
+          {renderQuotedContent()}
+          {renderReadyToScheduleContent()}
+        </div>
+        <LeadDetailsSidebar
+          lead={lead}
+          onShowToast={onShowToast}
+          onLeadUpdate={onLeadUpdate}
+          onRequestUndo={onRequestUndo}
+          customerChannelRef={customerChannelRef}
+          isSidebarExpanded={isSidebarExpanded}
+          setIsSidebarExpanded={setIsSidebarExpanded}
+        />
+      </div>
+    );
   };
 
   const handleReturnToLeads = () => {
     setShowAssignSuccessModal(false);
     // Navigate to leads page
-    window.location.href = '/connections/leads';
+    window.location.href = '/tickets/leads';
   };
 
   return (

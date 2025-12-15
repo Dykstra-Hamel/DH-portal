@@ -107,7 +107,7 @@ export default function TasksPage() {
   }, [registerPageAction, unregisterPageAction]);
 
   const handleViewTask = (task: Task) => {
-    router.push(`/connections/tasks/${task.id}`);
+    router.push(`/tickets/tasks/${task.id}`);
   };
 
   const handleCreateTask = async (formData: TaskFormData) => {

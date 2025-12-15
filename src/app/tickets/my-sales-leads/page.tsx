@@ -166,7 +166,7 @@ export default function MySalesLeadsPage() {
 
   const handleAction = (action: string, lead: Lead) => {
     if (action === 'edit') {
-      router.push(`/connections/leads/${lead.id}`);
+      router.push(`/tickets/leads/${lead.id}`);
     }
   };
 

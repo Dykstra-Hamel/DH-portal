@@ -119,7 +119,7 @@ export default function LeadsPage() {
   }, [selectedCompany, isAdmin]);
 
   const handleEditLead = (lead: Lead) => {
-    router.push(`/connections/leads/${lead.id}?edit=true`);
+    router.push(`/tickets/leads/${lead.id}?edit=true`);
   };
 
   // Fetch leads when selectedCompany changes or isAdmin changes

@@ -70,8 +70,8 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       text: 'Home',
     },
     {
-      id: 'connections' as PrimaryNavItem,
-      href: '/connections',
+      id: 'tickets' as PrimaryNavItem,
+      href: '/tickets',
       disabled: false,
       icon: (
         <svg
@@ -97,7 +97,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
           />
         </svg>
       ),
-      text: 'Connections',
+      text: 'Tickets',
     },
     {
       id: 'campaigns' as PrimaryNavItem,
@@ -248,8 +248,8 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     if (href === '/dashboard') {
       return pathname.startsWith('/dashboard');
     }
-    if (href === '/connections') {
-      return pathname.startsWith('/connections');
+    if (href === '/tickets') {
+      return pathname.startsWith('/tickets');
     }
     if (href === '/campaigns') {
       return pathname.startsWith('/campaigns');

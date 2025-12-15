@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
     const assignedTo = searchParams.get('assignedTo');
+    const assignedScheduler = searchParams.get('assignedScheduler');
     const unassigned = searchParams.get('unassigned') === 'true';
+    const unassignedScheduler = searchParams.get('unassignedScheduler') === 'true';
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
     if (!companyId) {
@@ -76,6 +78,7 @@ export async function GET(request: NextRequest) {
         lead_status,
         comments,
         assigned_to,
+        assigned_scheduler,
         last_contacted_at,
         next_follow_up_at,
         estimated_value,
@@ -126,9 +129,16 @@ export async function GET(request: NextRequest) {
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo);
     }
+    if (assignedScheduler) {
+      query = query.eq('assigned_scheduler', assignedScheduler);
+    }
     if (unassigned) {
       // Filter for leads assigned to sales team (assigned_to IS NULL)
       query = query.is('assigned_to', null);
+    }
+    if (unassignedScheduler) {
+      // Filter for leads without a scheduler assigned (assigned_scheduler IS NULL)
+      query = query.is('assigned_scheduler', null);
     }
 
     const { data: leads, error } = await query;
@@ -145,11 +155,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Get all unique user IDs from leads (assigned_to field)
+    // Get all unique user IDs from leads (assigned_to and assigned_scheduler fields)
     const userIds = new Set<string>();
     leads.forEach((lead: Lead) => {
       if (lead.assigned_to) {
         userIds.add(lead.assigned_to);
+      }
+      if (lead.assigned_scheduler) {
+        userIds.add(lead.assigned_scheduler);
       }
     });
 
@@ -183,6 +196,9 @@ export async function GET(request: NextRequest) {
       ...lead,
       assigned_user: lead.assigned_to
         ? profileMap.get(lead.assigned_to) || null
+        : null,
+      scheduler_user: lead.assigned_scheduler
+        ? profileMap.get(lead.assigned_scheduler) || null
         : null,
     }));
 

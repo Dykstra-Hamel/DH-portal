@@ -287,7 +287,7 @@ export default function MyTasksPage() {
     if (action === 'edit') {
       setEditingTask(task);
     } else if (action === 'view') {
-      router.push(`/connections/tasks/${task.id}`);
+      router.push(`/tickets/tasks/${task.id}`);
     } else if (action === 'complete') {
       handleCompleteTask(task.id);
     }

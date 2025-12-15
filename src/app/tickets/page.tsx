@@ -3,12 +3,12 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function ConnectionsPage() {
+export default function TicketsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to tickets page which is now the main connections page
-    router.replace('/connections/incoming');
+    // Redirect to tickets page which is now the main tickets page
+    router.replace('/tickets/incoming');
   }, [router]);
 
   return null;

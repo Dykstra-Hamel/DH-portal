@@ -189,7 +189,7 @@ export default function MySupportCasesPage() {
 
   const handleAction = (action: string, supportCase: SupportCase) => {
     if (action === 'view' || action === 'edit') {
-      router.push(`/connections/customer-service/${supportCase.id}`);
+      router.push(`/tickets/customer-service/${supportCase.id}`);
     }
   };
 

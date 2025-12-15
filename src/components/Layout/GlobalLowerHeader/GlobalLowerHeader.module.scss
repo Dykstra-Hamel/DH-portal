@@ -11,12 +11,184 @@
   align-items: center;
   max-width: 1240px;
   margin: 0 auto;
+  gap: 24px;
 }
 
 .leftSection {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.controlsSection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.controlGroup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controlLabel {
+  font-family: 'Satoshi Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  white-space: nowrap;
+}
+
+.controlDropdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-width: 160px;
+  background: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Satoshi Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  &:hover {
+    border-color: var(--gray-400);
+    background-color: var(--gray-50);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-600);
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+  }
+}
+
+.controlValue {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  text-align: left;
+}
+
+.assignedToContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.chevron {
+  color: var(--gray-600);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 50;
+  overflow: hidden;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdownOption {
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--white);
+  border: none;
+  cursor: pointer;
+  font-family: 'Satoshi Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--gray-50);
+  }
+
+  &.selected {
+    background-color: var(--action-50);
+    color: var(--action-600);
+  }
+
+  &:focus {
+    outline: none;
+    background-color: var(--gray-100);
+  }
+}
+
+.optionContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.optionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.optionName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+}
+
+.optionSubtitle {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--gray-500);
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.defaultAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--action-100);
+  color: var(--action-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.teamAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--action-50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .title {
@@ -47,6 +219,10 @@
   line-height: 20px;
   color: var(--gray-500);
   margin: 0;
+
+  span {
+    color: var(--gray-900);
+  }
 }
 
 .rightSection {

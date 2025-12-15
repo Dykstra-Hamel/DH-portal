@@ -123,6 +123,20 @@ export async function GET(
       }
     }
 
+    // Get assigned scheduler profile if lead has one
+    let schedulerUser = null;
+    if (lead.assigned_scheduler) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('id', lead.assigned_scheduler)
+        .single();
+
+      if (!profileError && profileData) {
+        schedulerUser = profileData;
+      }
+    }
+
     // Get customer's primary service address if lead has a customer
     let primaryServiceAddress = null;
     if (lead.customer_id) {
@@ -143,6 +157,7 @@ export async function GET(
       ...lead,
       call_record: callRecord || null,
       assigned_user: assignedUser,
+      scheduler_user: schedulerUser,
       primary_service_address: primaryServiceAddress,
     };
 
@@ -453,6 +468,54 @@ export async function PUT(
       }
     }
 
+    // Check if scheduler assignment changed and trigger notifications
+    const oldAssignedScheduler = existingLead.assigned_scheduler;
+    const newAssignedScheduler = body.assigned_scheduler;
+
+    if (newAssignedScheduler !== oldAssignedScheduler) {
+      try {
+        const adminSupabase = createAdminClient();
+
+        if (newAssignedScheduler && !oldAssignedScheduler) {
+          // Scheduler became assigned (was unassigned, now assigned)
+          await adminSupabase.rpc('notify_assigned_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_assigned_user_id: newAssignedScheduler,
+            p_type: 'scheduler_assigned',
+            p_title: 'Lead Assigned to You for Scheduling',
+            p_message: `A lead has been assigned to you for scheduling${lead.customer?.first_name ? ` - ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        } else if (!newAssignedScheduler && oldAssignedScheduler) {
+          // Scheduler became unassigned (was assigned, now unassigned)
+          await adminSupabase.rpc('notify_department_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_department: 'scheduling',
+            p_type: 'scheduler_unassigned',
+            p_title: 'Lead Unassigned - Needs Scheduler',
+            p_message: `A lead has been unassigned from scheduling and needs a new scheduler${lead.customer?.first_name ? ` - ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        } else if (newAssignedScheduler && oldAssignedScheduler && newAssignedScheduler !== oldAssignedScheduler) {
+          // Scheduler assignment changed from one user to another
+          await adminSupabase.rpc('notify_assigned_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_assigned_user_id: newAssignedScheduler,
+            p_type: 'scheduler_assigned',
+            p_title: 'Lead Reassigned to You for Scheduling',
+            p_message: `A lead has been reassigned to you for scheduling${lead.customer?.first_name ? ` - ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error creating scheduler assignment notifications:', notificationError);
+        // Don't fail the API call if notification creation fails
+      }
+    }
+
     // Get call record separately using lead_id foreign key
     const { data: callRecord, error: callError } = await supabase
       .from('call_records')
@@ -476,6 +539,20 @@ export async function PUT(
       }
     }
 
+    // Get assigned scheduler profile if lead has one
+    let schedulerUser = null;
+    if (lead.assigned_scheduler) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('id', lead.assigned_scheduler)
+        .single();
+
+      if (!profileError && profileData) {
+        schedulerUser = profileData;
+      }
+    }
+
     // Get customer's primary service address if lead has a customer
     let primaryServiceAddress = null;
     if (lead.customer_id) {
@@ -496,6 +573,7 @@ export async function PUT(
       ...lead,
       call_record: callRecord || null,
       assigned_user: assignedUser,
+      scheduler_user: schedulerUser,
       primary_service_address: primaryServiceAddress,
     };
 

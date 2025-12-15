@@ -271,7 +271,7 @@ const TicketsTable: React.FC<TicketsTableProps> = ({
       // If converted to lead, optionally redirect
       if (qualification === 'sales' && result.lead?.id) {
         setTimeout(() => {
-          router.push(`/connections/leads/${result.lead.id}`);
+          router.push(`/tickets/leads/${result.lead.id}`);
         }, 1000);
       }
     } catch (error) {

@@ -45,6 +45,7 @@ export interface Lead {
   lead_status: LeadStatus;
   comments?: string;
   assigned_to?: string;
+  assigned_scheduler?: string;
   last_contacted_at?: string;
   next_follow_up_at?: string;
   estimated_value?: number;
@@ -118,6 +119,13 @@ export interface Lead {
     last_name?: string;
     avatar_url?: string | null;
   };
+  scheduler_user?: {
+    id: string;
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    avatar_url?: string | null;
+  };
   company?: {
     id: string;
     name: string;
@@ -170,6 +178,7 @@ export interface LeadFormData {
   lead_status: LeadStatus;
   comments?: string;
   assigned_to?: string;
+  assigned_scheduler?: string;
   last_contacted_at?: string;
   next_follow_up_at?: string;
   estimated_value?: number;

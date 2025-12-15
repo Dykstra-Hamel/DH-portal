@@ -195,7 +195,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
   }, [task, isEditing, taskLoading, handleEdit, searchParams]);
 
   const handleBack = () => {
-    router.push('/connections/tasks');
+    router.push('/tickets/tasks');
   };
 
   const handleBackToRelatedEntity = () => {
@@ -205,10 +205,10 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
 
       switch (entityType) {
         case 'leads':
-          router.push(`/connections/leads/${entityId}`);
+          router.push(`/tickets/leads/${entityId}`);
           break;
         case 'support_cases':
-          router.push(`/connections/incoming/${entityId}`);
+          router.push(`/tickets/incoming/${entityId}`);
           break;
         case 'customers':
           router.push(`/customers/${entityId}`);
@@ -317,7 +317,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
       }
 
       // Redirect to tasks page after successful deletion
-      router.push('/connections/tasks');
+      router.push('/tickets/tasks');
     } catch (error) {
       console.error('Error deleting task:', error);
       alert('Failed to delete task. Please try again.');

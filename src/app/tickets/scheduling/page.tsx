@@ -108,7 +108,7 @@ export default function SchedulingPage() {
   }, [selectedCompany?.id]);
 
   const handleEditLead = (lead: Lead) => {
-    router.push(`/connections/leads/${lead.id}?edit=true`);
+    router.push(`/tickets/leads/${lead.id}?edit=true`);
   };
 
   // Fetch scheduling leads when selectedCompany changes

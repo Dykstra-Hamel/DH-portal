@@ -31,7 +31,7 @@ export default function SupportCasesList({
     // Handle any support case specific actions here
     if (action === 'view') {
       // Navigate to the support case detail page
-      router.push(`/connections/customer-service/${supportCase.id}`);
+      router.push(`/tickets/customer-service/${supportCase.id}`);
     }
   };
 

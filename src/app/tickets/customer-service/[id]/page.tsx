@@ -424,7 +424,7 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
   }, [supportCaseId, loading, fetchSupportCase]);
 
   const handleBack = () => {
-    router.push('/connections/customer-service');
+    router.push('/tickets/customer-service');
   };
 
   const handleShowToast = (message: string, type: 'success' | 'error') => {

@@ -23,7 +23,7 @@ export function CustomerSupportCasesList({
   // Handle item actions (mainly navigation to support case detail)
   const handleItemAction = (action: string, supportCase: SupportCase) => {
     if (action === 'navigate' || !action) {
-      router.push(`/connections/customer-service/${supportCase.id}`);
+      router.push(`/tickets/customer-service/${supportCase.id}`);
     }
   };
 

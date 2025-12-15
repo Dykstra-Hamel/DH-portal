@@ -2,9 +2,41 @@
 
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
+interface AssignableUser {
+  id: string;
+  email: string;
+  display_name: string;
+  avatar_url?: string | null;
+  departments: string[];
+}
+
+interface AssignedUser {
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string | null;
+}
+
+interface LeadAssignmentControls {
+  leadType: string;
+  leadStatus: string;
+  assignedTo?: string;
+  assignedScheduler?: string;
+  assignedUser?: AssignedUser | null;
+  schedulerUser?: AssignedUser | null;
+  assignableUsers: AssignableUser[];
+  currentUser: { id: string; name: string; email: string; avatar?: string };
+  onLeadTypeChange: (type: string) => void;
+  onAssigneeChange: (id: string) => void;
+  onSchedulerChange: (id: string) => void;
+  onStatusChange: (status: string) => void;
+}
+
 interface PageHeaderConfig {
   title: string;
   description: string;
+  leadAssignmentControls?: LeadAssignmentControls;
 }
 
 interface PageActionsContextType {

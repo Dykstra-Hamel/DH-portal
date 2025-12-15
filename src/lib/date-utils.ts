@@ -114,3 +114,27 @@ export function formatDateWithOrdinal(date: Date | string): string {
 
   return `${day}${getOrdinalSuffix(day)} ${month} ${time}`;
 }
+
+/**
+ * Format date for display in headers (e.g., "8/20/2024, 11:23 am")
+ */
+export function formatHeaderDate(date: Date | string, includeTime: boolean = true): string {
+  const dateObj = new Date(date);
+  if (isNaN(dateObj.getTime())) return 'Invalid Date';
+
+  const month = dateObj.getMonth() + 1; // 0-indexed
+  const day = dateObj.getDate();
+  const year = dateObj.getFullYear();
+
+  if (!includeTime) {
+    return `${month}/${day}/${year}`;
+  }
+
+  const hours = dateObj.getHours();
+  const minutes = dateObj.getMinutes();
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  const displayHours = hours % 12 || 12; // Convert to 12-hour format
+  const displayMinutes = minutes.toString().padStart(2, '0');
+
+  return `${month}/${day}/${year}, ${displayHours}:${displayMinutes} ${ampm}`;
+}

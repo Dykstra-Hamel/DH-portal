@@ -74,7 +74,7 @@ export default function CallDetails({ ticket, callRecord, formSubmission }: Call
                 <span className={styles.label}>⚠️ Processing Failed</span>
                 <span className={styles.value}>
                   <a
-                    href={`/connections/form-submissions?submissionId=${formSubmission.id}`}
+                    href={`/tickets/form-submissions?submissionId=${formSubmission.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: '#3b82f6', textDecoration: 'underline' }}

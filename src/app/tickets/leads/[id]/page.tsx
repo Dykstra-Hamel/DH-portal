@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -27,6 +27,11 @@ import { NotInterestedModal } from '@/components/Common/NotInterestedModal/NotIn
 import { ReadyToScheduleModal } from '@/components/Common/ReadyToScheduleModal/ReadyToScheduleModal';
 import { EmailQuoteModal } from '@/components/Common/EmailQuoteModal/EmailQuoteModal';
 import { Toast } from '@/components/Common/Toast';
+import { GlobalLowerHeader } from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import { formatHeaderDate } from '@/lib/date-utils';
+import { useUser } from '@/hooks/useUser';
+import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -52,7 +57,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
-  const [undoHandler, setUndoHandler] = useState<(() => Promise<void>) | null>(null);
+  const [undoHandler, setUndoHandler] = useState<(() => Promise<void>) | null>(
+    null
+  );
   const [isUndoing, setIsUndoing] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [showLiveCallModal, setShowLiveCallModal] = useState(false);
@@ -62,6 +69,45 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     useState(false);
   const [showEmailQuoteModal, setShowEmailQuoteModal] = useState(false);
   const router = useRouter();
+  const { setPageHeader } = usePageActions();
+
+  // Assignment state
+  const [ticketType, setTicketType] = useState('sales');
+  const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [selectedScheduler, setSelectedScheduler] = useState('');
+
+  // Hooks
+  const { user: currentUser } = useUser();
+  const { users: assignableUsers } = useAssignableUsers({
+    companyId: lead?.company_id,
+    departmentType: ticketType === 'support' ? 'support' : 'sales',
+    enabled: ticketType !== 'junk',
+  });
+
+  // Create stable currentUser object to prevent infinite loops
+  const stableCurrentUser = useMemo(() => {
+    if (!currentUser) return null;
+    return {
+      id: currentUser.id,
+      name: `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.email,
+      email: currentUser.email,
+      avatar: currentUser.avatar_url || undefined,
+      first_name: currentUser.first_name,
+      last_name: currentUser.last_name,
+      avatar_url: currentUser.avatar_url,
+    };
+  }, [
+    currentUser?.id,
+    currentUser?.email,
+    currentUser?.first_name,
+    currentUser?.last_name,
+    currentUser?.avatar_url,
+  ]);
+
+  // Create stable assignableUsers array to prevent infinite loops
+  const stableAssignableUsers = useMemo(() => {
+    return assignableUsers || [];
+  }, [JSON.stringify(assignableUsers)]);
 
   // Ref to store the finalize sale modal trigger function from LeadStepContent
   const finalizeSaleModalTrigger = useRef<(() => void) | null>(null);
@@ -327,10 +373,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const handlePrimaryAction = () => {
     if (!lead) return;
 
-    if (
-      lead.lead_status === 'new' ||
-      lead.lead_status === 'in_process'
-    ) {
+    if (lead.lead_status === 'new' || lead.lead_status === 'in_process') {
       handleLiveCall();
     } else if (lead.lead_status === 'quoted') {
       handleReadyToSchedule();
@@ -526,6 +569,14 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     return actions;
   };
 
+  // Initialize assignment state from lead
+  useEffect(() => {
+    if (lead) {
+      setSelectedAssignee(lead.assigned_to || '');
+      setSelectedScheduler(lead.assigned_scheduler || '');
+    }
+  }, [lead]);
+
   useEffect(() => {
     const resolveParams = async () => {
       const resolvedParams = await params;
@@ -616,14 +667,157 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   }, [leadId, loading, fetchLead]);
 
   const handleBack = () => {
-    router.push('/connections/leads');
+    router.push('/tickets/leads');
   };
 
-  const handleShowToast = (message: string, type: 'success' | 'error') => {
+  const handleShowToast = useCallback((message: string, type: 'success' | 'error') => {
     setToastMessage(message);
     setToastType(type);
     setShowToast(true);
-  };
+  }, []);
+
+  // Handle ticket type change
+  const handleLeadTypeChange = useCallback((type: string) => {
+    setTicketType(type);
+    setSelectedAssignee(''); // Reset assignee when type changes
+  }, []);
+
+  // Handle assignee change
+  const handleAssigneeChange = useCallback(async (assigneeId: string) => {
+    if (!leadId) return;
+
+    setSelectedAssignee(assigneeId);
+
+    try {
+      const updateData: any = {};
+      let successMessage = 'Lead assigned successfully!';
+
+      if (ticketType === 'sales') {
+        if (assigneeId === 'sales_team') {
+          updateData.assigned_to = null;
+          successMessage = 'Lead assigned to sales team successfully!';
+        } else {
+          updateData.assigned_to = assigneeId;
+          successMessage = 'Lead assigned successfully!';
+        }
+      } else if (ticketType === 'support') {
+        if (assigneeId === 'support_team') {
+          updateData.assigned_to = null;
+          successMessage = 'Case assigned to support team successfully!';
+        } else {
+          updateData.assigned_to = assigneeId;
+          successMessage = 'Case assigned successfully!';
+        }
+      } else if (ticketType === 'junk') {
+        updateData.lead_status = 'lost';
+        updateData.lost_reason = 'junk';
+        successMessage = 'Lead marked as junk successfully!';
+      }
+
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, updateData);
+      } else {
+        await adminAPI.updateUserLead(leadId, updateData);
+      }
+
+      await fetchLead();
+      handleShowToast(successMessage, 'success');
+    } catch (error) {
+      console.error('Error assigning lead:', error);
+      handleShowToast('Failed to assign lead. Please try again.', 'error');
+    }
+  }, [leadId, ticketType, isAdmin, fetchLead, handleShowToast]);
+
+  // Handle scheduler change
+  const handleSchedulerChange = useCallback(async (schedulerId: string) => {
+    if (!leadId) return;
+
+    setSelectedScheduler(schedulerId);
+
+    try {
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, { assigned_scheduler: schedulerId });
+      } else {
+        await adminAPI.updateUserLead(leadId, { assigned_scheduler: schedulerId });
+      }
+
+      await fetchLead();
+      handleShowToast('Scheduler assigned successfully!', 'success');
+    } catch (error) {
+      console.error('Error assigning scheduler:', error);
+      handleShowToast('Failed to assign scheduler. Please try again.', 'error');
+    }
+  }, [leadId, isAdmin, fetchLead, handleShowToast]);
+
+  // Handle status change
+  const handleStatusChange = useCallback(async (status: string) => {
+    if (!leadId || !lead) return;
+
+    try {
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, { lead_status: status });
+      } else {
+        await adminAPI.updateUserLead(leadId, { lead_status: status });
+      }
+
+      await fetchLead();
+      handleShowToast('Lead status updated successfully!', 'success');
+    } catch (error) {
+      console.error('Error updating lead status:', error);
+      handleShowToast('Failed to update lead status. Please try again.', 'error');
+    }
+  }, [leadId, lead, isAdmin, fetchLead, handleShowToast]);
+
+  // Update page header when lead data changes
+  useEffect(() => {
+    if (lead && lead.customer && stableCurrentUser) {
+      const customerName =
+        `${lead.customer.first_name || ''} ${lead.customer.last_name || ''}`.trim() ||
+        'Lead Details';
+
+      // Format timestamps with HTML formatting
+      const createdDate = formatHeaderDate(lead.created_at, true);
+      const updatedDate = formatHeaderDate(lead.updated_at, true);
+      const description = `Created: <span>${createdDate}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Last update: <span>${updatedDate}</span>`;
+
+      setPageHeader({
+        title: customerName,
+        description: description,
+        leadAssignmentControls: {
+          leadType: ticketType,
+          leadStatus: lead.lead_status,
+          assignedTo: selectedAssignee,
+          assignedScheduler: selectedScheduler,
+          assignedUser: lead.assigned_user,
+          schedulerUser: lead.scheduler_user,
+          assignableUsers: stableAssignableUsers,
+          currentUser: stableCurrentUser,
+          onLeadTypeChange: handleLeadTypeChange,
+          onAssigneeChange: handleAssigneeChange,
+          onSchedulerChange: handleSchedulerChange,
+          onStatusChange: handleStatusChange,
+        },
+      });
+    }
+
+    // Cleanup: clear the header when component unmounts
+    return () => {
+      setPageHeader(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    lead,
+    stableCurrentUser,
+    ticketType,
+    selectedAssignee,
+    selectedScheduler,
+    stableAssignableUsers,
+    // setPageHeader is intentionally omitted - it's a stable context setter
+    handleLeadTypeChange,
+    handleAssigneeChange,
+    handleSchedulerChange,
+    handleStatusChange,
+  ]);
 
   const handleToastClose = () => {
     setShowToast(false);
@@ -734,7 +928,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       }
 
       handleShowToast('Lead marked as not interested', 'success');
-      router.push('/connections/leads');
+      router.push('/tickets/leads');
     } catch (error) {
       console.error('Error marking lead as not interested:', error);
       handleShowToast('Failed to mark lead as not interested', 'error');
@@ -813,7 +1007,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
       if (option === 'someone_else' && assignedTo) {
         // Handle team assignment (null) vs individual assignment (UUID)
-        updateData.assigned_to = assignedTo === 'scheduling_team' ? null : assignedTo;
+        updateData.assigned_to =
+          assignedTo === 'scheduling_team' ? null : assignedTo;
       }
 
       if (isAdmin) {
@@ -832,10 +1027,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         // TODO: Navigate to scheduling page when implemented
       } else if (option === 'later') {
         handleShowToast('Lead marked as ready to schedule!', 'success');
-        router.push('/connections/leads');
+        router.push('/tickets/leads');
       } else {
         handleShowToast('Lead assigned for scheduling!', 'success');
-        router.push('/connections/leads');
+        router.push('/tickets/leads');
       }
     } catch (error) {
       console.error('Error updating lead to ready to schedule:', error);
@@ -864,179 +1059,92 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   }
 
   return (
-    <div className="container">
-      {/* Lead Step Wrapper Component */}
-      <LeadStepWrapper
-        customerName={
-          lead.customer
-            ? `${lead.customer.first_name} ${lead.customer.last_name}`
-            : 'No Customer Assigned'
-        }
-        createdAt={lead.created_at}
-        updatedAt={lead.updated_at}
-        steps={getUpdatedSteps()}
-        currentStep={
-          lead.lead_status === 'new'
-            ? 'qualify'
-            : lead.lead_status === 'in_process'
-              ? 'in_process'
-              : lead.lead_status === 'quoted'
-                ? 'quoted'
-                : lead.lead_status === 'scheduling'
-                  ? 'scheduling'
-                  : 'qualify'
-        }
-        onStepClick={handleStepClick}
-        disabledSteps={
-          lead.lead_status === 'scheduling' ? [] : ['scheduling']
-        }
-        primaryButtonText={getPrimaryButtonText()}
-        onPrimaryButtonClick={handlePrimaryAction}
-        showPrimaryButton={shouldShowPrimaryButton()}
-        secondaryButtonText={
-          lead.lead_status === 'quoted' ||
-          lead.lead_status === 'scheduling' ? (
-            'Not Interested'
-          ) : (
-            <>
-              <Plus size={18} />
-              Add Task
-            </>
-          )
-        }
-        onSecondaryButtonClick={
-          lead.lead_status === 'quoted' ||
-          lead.lead_status === 'scheduling'
-            ? handleNotInterested
-            : handleAddTask
-        }
-        showSecondaryButton={true}
-        middleButtonText={
-          lead.lead_status === 'in_process' ? (
-            <>
-              <RefreshCcwDot size={18} />
-              Convert to Automation
-            </>
-          ) : lead.lead_status === 'quoted' ? (
-            <>
-              <Mail size={18} />
-              Email Quote
-            </>
-          ) : lead.lead_status === 'scheduling' ? (
-            <>
-              <ExternalLink size={18} />
-              Open PestPac
-            </>
-          ) : null
-        }
-        showMiddleButton={
-          lead.lead_status === 'in_process' ||
-          lead.lead_status === 'quoted' ||
-          lead.lead_status === 'scheduling'
-        }
-        middleButtonDisabled={lead.lead_status === 'in_process'}
-        middleButtonTooltip={
-          lead.lead_status === 'in_process'
-            ? 'Functionality Coming Soon'
-            : undefined
-        }
-        onMiddleButtonClick={
-          lead.lead_status === 'quoted'
-            ? handleEmailQuoteButton
-            : lead.lead_status === 'scheduling'
-              ? () => window.open('https://pestpac.com', '_blank')
-              : undefined
-        }
-        primaryButtonVariant={
-          lead.lead_status === 'scheduling' ? 'success' : 'default'
-        }
-        // dropdownActions={getDropdownActions()}
-        // showDropdown={true}
-      />
+    <>
+      <div className="container">
+        <div className={styles.content}>
+          <LeadStepContent
+            lead={lead}
+            isAdmin={isAdmin}
+            onLeadUpdate={fetchLead}
+            onShowToast={handleShowToast}
+            onRequestUndo={handleRequestUndo}
+            onEmailQuote={handleEmailQuoteButton}
+            onFinalizeSale={trigger => {
+              finalizeSaleModalTrigger.current = trigger;
+            }}
+          />
+        </div>
 
-      <div className={styles.content}>
-        <LeadStepContent
-          lead={lead}
-          isAdmin={isAdmin}
-          onLeadUpdate={fetchLead}
-          onShowToast={handleShowToast}
-          onRequestUndo={handleRequestUndo}
-          onEmailQuote={handleEmailQuoteButton}
-          onFinalizeSale={(trigger) => {
-            finalizeSaleModalTrigger.current = trigger;
-          }}
+        <Toast
+          message={toastMessage}
+          isVisible={showToast}
+          onClose={handleToastClose}
+          type={toastType}
+          showUndo={!!undoHandler}
+          onUndo={handleUndo}
+          undoLoading={isUndoing}
+        />
+
+        <ReassignModal
+          isOpen={showReassignModal}
+          onClose={() => setShowReassignModal(false)}
+          onAssign={handleReassignSubmit}
+          customerName={
+            lead.customer
+              ? `${lead.customer.first_name} ${lead.customer.last_name}`
+              : 'No Customer Assigned'
+          }
+          customerEmail={lead.customer?.email}
+          customerPhone={lead.customer?.phone}
+          companyId={lead.company_id}
+          currentAssigneeId={lead.assigned_to}
+          type="lead"
+        />
+
+        <LiveCallModal
+          isOpen={showLiveCallModal}
+          onClose={() => setShowLiveCallModal(false)}
+          onSubmit={handleLiveCallSubmit}
+        />
+
+        <QuickTaskModal
+          isOpen={showTaskModal}
+          onClose={() => setShowTaskModal(false)}
+          onTaskCreated={handleTaskCreated}
+          companyId={lead.company_id}
+          relatedEntityType="leads"
+          relatedEntityId={lead.id}
+        />
+
+        <NotInterestedModal
+          isOpen={showNotInterestedModal}
+          onClose={() => setShowNotInterestedModal(false)}
+          onSubmit={handleNotInterestedSubmit}
+        />
+
+        <ReadyToScheduleModal
+          isOpen={showReadyToScheduleModal}
+          onClose={() => setShowReadyToScheduleModal(false)}
+          onSubmit={handleReadyToScheduleSubmit}
+          companyId={lead.company_id}
+        />
+
+        <EmailQuoteModal
+          isOpen={showEmailQuoteModal}
+          onClose={() => setShowEmailQuoteModal(false)}
+          onSubmit={handleEmailQuoteSubmit}
+          companyId={lead.company_id}
+          customerEmail={lead.customer?.email || ''}
+          customerName={
+            lead.customer
+              ? `${lead.customer.first_name} ${lead.customer.last_name}`
+              : 'Customer'
+          }
+          customerFirstName={lead.customer?.first_name}
+          customerLastName={lead.customer?.last_name}
         />
       </div>
-
-      <Toast
-        message={toastMessage}
-        isVisible={showToast}
-        onClose={handleToastClose}
-        type={toastType}
-        showUndo={!!undoHandler}
-        onUndo={handleUndo}
-        undoLoading={isUndoing}
-      />
-
-      <ReassignModal
-        isOpen={showReassignModal}
-        onClose={() => setShowReassignModal(false)}
-        onAssign={handleReassignSubmit}
-        customerName={
-          lead.customer
-            ? `${lead.customer.first_name} ${lead.customer.last_name}`
-            : 'No Customer Assigned'
-        }
-        customerEmail={lead.customer?.email}
-        customerPhone={lead.customer?.phone}
-        companyId={lead.company_id}
-        currentAssigneeId={lead.assigned_to}
-        type="lead"
-      />
-
-      <LiveCallModal
-        isOpen={showLiveCallModal}
-        onClose={() => setShowLiveCallModal(false)}
-        onSubmit={handleLiveCallSubmit}
-      />
-
-      <QuickTaskModal
-        isOpen={showTaskModal}
-        onClose={() => setShowTaskModal(false)}
-        onTaskCreated={handleTaskCreated}
-        companyId={lead.company_id}
-        relatedEntityType="leads"
-        relatedEntityId={lead.id}
-      />
-
-      <NotInterestedModal
-        isOpen={showNotInterestedModal}
-        onClose={() => setShowNotInterestedModal(false)}
-        onSubmit={handleNotInterestedSubmit}
-      />
-
-      <ReadyToScheduleModal
-        isOpen={showReadyToScheduleModal}
-        onClose={() => setShowReadyToScheduleModal(false)}
-        onSubmit={handleReadyToScheduleSubmit}
-        companyId={lead.company_id}
-      />
-
-      <EmailQuoteModal
-        isOpen={showEmailQuoteModal}
-        onClose={() => setShowEmailQuoteModal(false)}
-        onSubmit={handleEmailQuoteSubmit}
-        companyId={lead.company_id}
-        customerEmail={lead.customer?.email || ''}
-        customerName={
-          lead.customer
-            ? `${lead.customer.first_name} ${lead.customer.last_name}`
-            : 'Customer'
-        }
-        customerFirstName={lead.customer?.first_name}
-        customerLastName={lead.customer?.last_name}
-      />
-    </div>
+    </>
   );
 }
 

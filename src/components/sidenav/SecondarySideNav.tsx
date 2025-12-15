@@ -180,7 +180,7 @@ export function SecondarySideNav({
             />
           </svg>
         );
-      case 'connections':
+      case 'tickets':
         return (
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -512,42 +512,42 @@ export function SecondarySideNav({
             ],
           },
         ];
-      case 'connections':
+      case 'tickets':
       default:
         return [
           {
             items: [
               {
                 text: 'New',
-                href: '/connections/incoming',
+                href: '/tickets/incoming',
                 count: counts.tickets,
                 countType: 'tickets',
                 showRedDot:
                   newItemIndicators.tickets &&
-                  pathname !== '/connections/incoming' &&
-                  !pathname.startsWith('/connections/incoming/') &&
-                  !pathname.startsWith('/connections/calls-and-forms'),
+                  pathname !== '/tickets/incoming' &&
+                  !pathname.startsWith('/tickets/incoming/') &&
+                  !pathname.startsWith('/tickets/calls-and-forms'),
               },
               {
                 text: 'Sales Leads',
-                href: '/connections/leads',
+                href: '/tickets/leads',
                 count: counts.leads,
                 countType: 'leads',
                 showRedDot: counts.unassigned_leads > 0,
               },
               {
                 text: 'Scheduling',
-                href: '/connections/scheduling',
+                href: '/tickets/scheduling',
                 count: counts.scheduling,
                 countType: 'scheduling',
                 showRedDot:
                   newItemIndicators.scheduling &&
-                  pathname !== '/connections/scheduling' &&
-                  !pathname.startsWith('/connections/scheduling/'),
+                  pathname !== '/tickets/scheduling' &&
+                  !pathname.startsWith('/tickets/scheduling/'),
               },
               {
                 text: 'Customer Service',
-                href: '/connections/customer-service',
+                href: '/tickets/customer-service',
                 count: counts.cases,
                 countType: 'cases',
                 showRedDot: counts.unassigned_cases > 0,
@@ -561,13 +561,13 @@ export function SecondarySideNav({
                 ? [
                     {
                       text: 'My Sales Leads',
-                      href: '/connections/my-sales-leads',
+                      href: '/tickets/my-sales-leads',
                       count: counts.my_leads,
                       countType: 'my_leads',
                       hasNewItems:
                         newItemIndicators.my_leads &&
-                        pathname !== '/connections/my-sales-leads' &&
-                        !pathname.startsWith('/connections/my-sales-leads/'),
+                        pathname !== '/tickets/my-sales-leads' &&
+                        !pathname.startsWith('/tickets/my-sales-leads/'),
                     },
                   ]
                 : []),
@@ -575,25 +575,25 @@ export function SecondarySideNav({
                 ? [
                     {
                       text: 'My Support Cases',
-                      href: '/connections/my-support-cases',
+                      href: '/tickets/my-support-cases',
                       count: counts.my_cases,
                       countType: 'my_cases',
                       hasNewItems:
                         newItemIndicators.my_cases &&
-                        pathname !== '/connections/my-support-cases' &&
-                        !pathname.startsWith('/connections/my-support-cases/'),
+                        pathname !== '/tickets/my-support-cases' &&
+                        !pathname.startsWith('/tickets/my-support-cases/'),
                     },
                   ]
                 : []),
               {
                 text: 'My Tasks',
-                href: '/connections/my-tasks',
+                href: '/tickets/my-tasks',
                 count: counts.my_tasks,
                 countType: 'my_tasks',
                 hasNewItems:
                   newItemIndicators.my_tasks &&
-                  pathname !== '/connections/my-tasks' &&
-                  !pathname.startsWith('/connections/my-tasks/'),
+                  pathname !== '/tickets/my-tasks' &&
+                  !pathname.startsWith('/tickets/my-tasks/'),
               },
             ],
           },
@@ -602,18 +602,18 @@ export function SecondarySideNav({
             items: [
               {
                 text: 'Reports',
-                href: '/connections/reports',
+                href: '/tickets/reports',
                 disabled: false,
                 icon: <ReportsIcon />,
               },
               {
                 text: 'Calls',
-                href: '/connections/call-records',
+                href: '/tickets/call-records',
                 icon: <CallsIcon />,
               },
               {
                 text: 'Forms',
-                href: '/connections/form-submissions',
+                href: '/tickets/form-submissions',
                 icon: <CallsIcon />,
               },
               {
@@ -656,10 +656,10 @@ export function SecondarySideNav({
                     pathname === item.href ||
                     (item.href === '/customers' &&
                       pathname.startsWith('/customers/')) ||
-                    (item.href === '/connections/incoming' &&
-                      (pathname.startsWith('/connections/incoming') ||
-                        pathname.startsWith('/connections/calls-and-forms'))) ||
-                    (item.href.startsWith('/connections/') &&
+                    (item.href === '/tickets/incoming' &&
+                      (pathname.startsWith('/tickets/incoming') ||
+                        pathname.startsWith('/tickets/calls-and-forms'))) ||
+                    (item.href.startsWith('/tickets/') &&
                       pathname.startsWith(item.href));
 
                   return (

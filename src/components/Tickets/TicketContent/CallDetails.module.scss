@@ -1,5 +1,5 @@
 // Import shared section styles
-@import './SharedSection.module.scss';
+@use './shared';
 
 // CallDetails-specific styles
 .section {
