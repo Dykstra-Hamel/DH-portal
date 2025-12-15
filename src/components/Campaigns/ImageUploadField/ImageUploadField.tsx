@@ -12,6 +12,7 @@
 'use client';
 
 import { useState, useRef, ChangeEvent, DragEvent } from 'react';
+import Image from 'next/image';
 import styles from './ImageUploadField.module.scss';
 
 interface ImageUploadFieldProps {
@@ -225,7 +226,14 @@ export default function ImageUploadField({
         </div>
       ) : (
         <div className={styles.preview}>
-          <img src={value} alt={label} className={styles.previewImage} />
+          <Image
+            src={value}
+            alt={label}
+            width={400}
+            height={300}
+            className={styles.previewImage}
+            style={{ objectFit: 'contain' }}
+          />
           <button
             type="button"
             onClick={handleDelete}

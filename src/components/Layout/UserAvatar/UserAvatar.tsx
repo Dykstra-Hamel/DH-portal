@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { User, Settings, LogOut, Shield } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
@@ -173,14 +174,13 @@ export function UserAvatar() {
       >
         <div className={styles.avatar}>
           {getAvatarUrl() ? (
-            <img
+            <Image
               src={getAvatarUrl()!}
               alt={getDisplayName()}
+              width={40}
+              height={40}
               className={styles.avatarImage}
               onError={handleAvatarError}
-              referrerPolicy="no-referrer"
-              crossOrigin="anonymous"
-              loading="lazy"
             />
           ) : (
             <span className={styles.avatarInitials}>{getInitials()}</span>
@@ -199,14 +199,13 @@ export function UserAvatar() {
               <div className={styles.userInfo}>
                 <div className={styles.avatarLarge}>
                   {getAvatarUrl() ? (
-                    <img
+                    <Image
                       src={getAvatarUrl()!}
                       alt={getDisplayName()}
+                      width={80}
+                      height={80}
                       className={styles.avatarImageLarge}
                       onError={handleAvatarError}
-                      referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
-                      loading="lazy"
                     />
                   ) : (
                     <span className={styles.avatarInitials}>

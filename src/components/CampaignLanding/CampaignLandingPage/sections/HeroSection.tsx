@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
+import Image from 'next/image';
 import styles from '../CampaignLandingPage.module.scss';
 import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
 
@@ -172,9 +173,11 @@ export default function HeroSection({
               {hero.buttonText}
             </button>
             {hero.buttonIconUrl && (
-              <img
+              <Image
                 src={hero.buttonIconUrl}
                 alt="Badge"
+                width={80}
+                height={80}
                 className={styles.heroButtonIcon}
               />
             )}
@@ -184,7 +187,15 @@ export default function HeroSection({
         {/* Right column - Single Hero Image */}
         <div className={styles.heroImage}>
           {hero.imageUrl ? (
-            <img src={hero.imageUrl} alt="Campaign hero" className={styles.heroImageDisplay} />
+            <Image
+              src={hero.imageUrl}
+              alt="Campaign hero"
+              width={522}
+              height={418}
+              quality={85}
+              className={styles.heroImageDisplay}
+              priority={true}
+            />
           ) : (
             <div className={styles.imagePlaceholder}>
               <svg

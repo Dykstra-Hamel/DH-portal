@@ -59,6 +59,11 @@ export interface QuoteLineItem {
   discount_percentage?: number;
   discount_amount?: number;
 
+  // Custom pricing fields
+  custom_initial_price?: number;
+  custom_recurring_price?: number;
+  is_custom_priced: boolean;
+
   // Final pricing
   final_initial_price: number;
   final_recurring_price: number;
@@ -97,6 +102,9 @@ export interface UpdateQuoteRequest {
     discount_amount?: number;
     display_order?: number;
     service_frequency?: string;
+    custom_initial_price?: number;
+    custom_recurring_price?: number;
+    is_custom_priced?: boolean;
   }>;
 }
 

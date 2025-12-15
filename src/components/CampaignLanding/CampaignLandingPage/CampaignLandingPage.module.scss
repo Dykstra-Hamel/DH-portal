@@ -48,6 +48,11 @@
   * {
     font-family: inherit;
   }
+
+  img {
+    object-fit: cover;
+    height: auto;
+  }
 }
 
 // ========================================
