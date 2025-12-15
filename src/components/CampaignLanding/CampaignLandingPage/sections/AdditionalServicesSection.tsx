@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from 'react';
+import Image from 'next/image';
 import styles from '../CampaignLandingPage.module.scss';
 import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
 
@@ -127,7 +128,13 @@ export default function AdditionalServicesSection({
         {/* Right column - Image */}
         <div className={styles.additionalServicesImage}>
           {additionalServices.imageUrl ? (
-            <img src={additionalServices.imageUrl} alt="Additional Services" />
+            <Image
+              src={additionalServices.imageUrl}
+              alt="Additional Services"
+              width={1516}
+              height={1134}
+              quality={80}
+            />
           ) : (
             <div className={styles.imagePlaceholder} />
           )}

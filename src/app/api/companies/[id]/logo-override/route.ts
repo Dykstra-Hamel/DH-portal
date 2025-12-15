@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { STORAGE_CONFIG, cleanCompanyName, getCompanyName, generateImagePath } from '@/lib/storage-utils';
 
 export async function POST(
   request: NextRequest,
@@ -61,27 +62,10 @@ export async function POST(
       return NextResponse.json({ error: 'File size must be less than 10MB' }, { status: 400 });
     }
 
-    // Get company name for folder structure
-    const { data: company } = await supabase
-      .from('companies')
-      .select('name')
-      .eq('id', companyId)
-      .single();
-
-    // Create clean filename with timestamp
-    const fileExt = file.name.split('.').pop();
-    const timestamp = Date.now();
-    const finalFileName = `logo-override_${timestamp}.${fileExt}`;
-
-    // Create company-specific path in brand-assets bucket
-    const cleanCompanyName = (company?.name || 'company')
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .trim();
-
-    const filePath = `${cleanCompanyName}/email-logos/${finalFileName}`;
+    // Get company name and generate storage path
+    const companyName = await getCompanyName(supabase, companyId);
+    const cleaned = cleanCompanyName(companyName);
+    const filePath = await generateImagePath(cleaned, STORAGE_CONFIG.CATEGORIES.EMAIL_LOGOS, file.name, supabase);
 
     // Upload file to storage
     const { error: uploadError } = await supabase.storage
@@ -167,21 +151,10 @@ export async function DELETE(
     const filePath = urlParts[1];
 
     // Verify it&apos;s an email logo for this company (security check)
-    const cleanCompanyName = await supabase
-      .from('companies')
-      .select('name')
-      .eq('id', companyId)
-      .single()
-      .then(({ data }) => 
-        (data?.name || 'company')
-          .toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, '')
-          .replace(/\s+/g, '-')
-          .replace(/-+/g, '-')
-          .trim()
-      );
+    const companyName = await getCompanyName(supabase, companyId);
+    const cleaned = cleanCompanyName(companyName);
 
-    if (!filePath.startsWith(`${cleanCompanyName}/email-logos/`)) {
+    if (!filePath.startsWith(`${cleaned}/email-logos/`)) {
       return NextResponse.json({ error: 'Can only delete this company&apos;s email logo overrides' }, { status: 403 });
     }
 

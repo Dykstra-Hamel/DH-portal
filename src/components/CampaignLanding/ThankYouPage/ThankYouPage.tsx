@@ -8,6 +8,7 @@
  */
 
 import { useEffect } from 'react';
+import Image from 'next/image';
 import HeaderSection from '../CampaignLandingPage/sections/HeaderSection';
 import FooterSection from '../CampaignLandingPage/sections/FooterSection';
 import { formatBusinessHoursForDisplay } from '@/lib/format-business-hours';
@@ -266,7 +267,13 @@ export default function ThankYouPage({
                 <div key={index} className={styles.expectColumn}>
                   {column.imageUrl && (
                     <div className={styles.expectImage}>
-                      <img src={column.imageUrl} alt={column.heading || ''} />
+                      <Image
+                        src={column.imageUrl}
+                        alt={column.heading || ''}
+                        width={200}
+                        height={200}
+                        style={{ objectFit: 'contain' }}
+                      />
                     </div>
                   )}
                   {column.heading && (

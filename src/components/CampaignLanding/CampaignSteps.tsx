@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import SignatureCanvas from 'react-signature-canvas';
 import { getClientDeviceData } from '@/lib/device-utils';
 import { formatDiscount } from '@/lib/campaign-utils';
@@ -206,10 +207,13 @@ export default function CampaignSteps({
 
             <div className={styles.dhPestHero}>
               <div className={styles.dhPestBgImage} />
-              <img
+              <Image
                 className={styles.dhPestHeroImage}
                 src="/images/campaign-hero-placeholder.svg"
                 alt="Campaign Offer"
+                width={600}
+                height={400}
+                priority={true}
               />
             </div>
           </div>
@@ -295,10 +299,13 @@ export default function CampaignSteps({
 
             <div className={styles.dhPestHero}>
               <div className={styles.dhPestBgImage} />
-              <img
+              <Image
                 className={styles.dhPestHeroImage}
                 src="/images/campaign-hero-placeholder.svg"
                 alt="Campaign Offer"
+                width={600}
+                height={400}
+                priority={true}
               />
             </div>
           </div>
@@ -396,10 +403,13 @@ export default function CampaignSteps({
 
             <div className={styles.dhPestHero}>
               <div className={styles.dhPestBgImage} />
-              <img
+              <Image
                 className={styles.dhPestHeroImage}
                 src="/images/campaign-hero-placeholder.svg"
                 alt="Campaign Offer"
+                width={600}
+                height={400}
+                priority={true}
               />
             </div>
           </div>
@@ -471,10 +481,13 @@ export default function CampaignSteps({
 
             <div className={styles.dhPestHero}>
               <div className={styles.dhPestBgImage} />
-              <img
+              <Image
                 className={styles.dhPestHeroImage}
                 src="/images/campaign-hero-placeholder.svg"
                 alt="Campaign Offer"
+                width={600}
+                height={400}
+                priority={true}
               />
             </div>
           </div>

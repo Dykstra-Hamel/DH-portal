@@ -7,10 +7,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { STORAGE_CONFIG, cleanCompanyName, getCompanyName, generateImagePath } from '@/lib/storage-utils';
 
-const BUCKET_NAME = 'campaign-landing-pages';
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const BUCKET_NAME = STORAGE_CONFIG.BUCKET_NAME; // 'brand-assets'
+const MAX_FILE_SIZE = STORAGE_CONFIG.MAX_FILE_SIZE; // 10MB
+const ALLOWED_TYPES = STORAGE_CONFIG.ALLOWED_TYPES;
 
 export async function POST(
   request: NextRequest,
@@ -68,7 +69,7 @@ export async function POST(
     }
 
     // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!(ALLOWED_TYPES as readonly string[]).includes(file.type)) {
       return NextResponse.json(
         {
           success: false,
@@ -89,11 +90,11 @@ export async function POST(
       );
     }
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(7);
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `${campaignId}/${timestamp}-${randomString}.${fileExtension}`;
+    // Generate unique filename using brand-assets bucket structure
+    // ALL campaign uploads go to {companyName}/image-library/ folder
+    const companyName = await getCompanyName(supabase, companyId);
+    const cleaned = cleanCompanyName(companyName);
+    const fileName = await generateImagePath(cleaned, STORAGE_CONFIG.CATEGORIES.IMAGE_LIBRARY, file.name, supabase);
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();

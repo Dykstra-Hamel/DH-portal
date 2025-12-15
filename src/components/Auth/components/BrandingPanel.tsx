@@ -24,12 +24,15 @@ export function BrandingPanel({
       <div className={styles.brandingImages}>
         {brandingImages &&
           brandingImages.map((image, index) => (
-            <img
+            <Image
               src={image}
               alt=""
+              fill
               className={styles.brandingImageItem}
               id={`image${index + 1}`}
               key={`image${index + 1}`}
+              quality={80}
+              style={{ objectFit: 'cover' }}
             />
           ))}
       </div>

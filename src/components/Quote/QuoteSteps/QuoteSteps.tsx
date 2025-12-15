@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import SignatureCanvas from 'react-signature-canvas';
 import { getClientDeviceData } from '@/lib/device-utils';
 import styles from './quotesteps.module.scss';
@@ -370,7 +371,13 @@ export default function QuoteSteps({
             <div className={styles.dhFormContentArea}>
               {branding?.logo_url && (
                 <div className={styles.companyLogo}>
-                  <img src={branding.logo_url} alt={company.name} />
+                  <Image
+                    src={branding.logo_url}
+                    alt={company.name}
+                    width={150}
+                    height={50}
+                    style={{ objectFit: 'contain' }}
+                  />
                 </div>
               )}
 
@@ -640,10 +647,13 @@ export default function QuoteSteps({
 
             <div className={styles.dhPestHero}>
               <div className={styles.dhPestBgImage} />
-              <img
+              <Image
                 className={styles.dhPestHeroImage}
                 src={heroImageUrl}
                 alt="Pest Control Hero"
+                width={600}
+                height={400}
+                priority={true}
               />
             </div>
           </div>
@@ -687,7 +697,13 @@ export default function QuoteSteps({
 
               {branding?.logo_url && (
                 <div className={styles.companyLogo}>
-                  <img src={branding.logo_url} alt={company.name} />
+                  <Image
+                    src={branding.logo_url}
+                    alt={company.name}
+                    width={150}
+                    height={50}
+                    style={{ objectFit: 'contain' }}
+                  />
                 </div>
               )}
 
@@ -776,10 +792,13 @@ export default function QuoteSteps({
 
             <div className={styles.dhPestHero}>
               <div className={styles.dhPestBgImage} />
-              <img
+              <Image
                 className={styles.dhPestHeroImage}
                 src={heroImageUrl}
                 alt="Pest Control Hero"
+                width={600}
+                height={400}
+                priority={true}
               />
             </div>
           </div>
@@ -823,7 +842,13 @@ export default function QuoteSteps({
 
               {branding?.logo_url && (
                 <div className={styles.companyLogo}>
-                  <img src={branding.logo_url} alt={company.name} />
+                  <Image
+                    src={branding.logo_url}
+                    alt={company.name}
+                    width={150}
+                    height={50}
+                    style={{ objectFit: 'contain' }}
+                  />
                 </div>
               )}
 
@@ -918,10 +943,13 @@ export default function QuoteSteps({
 
             <div className={styles.dhPestHero}>
               <div className={styles.dhPestBgImage} />
-              <img
+              <Image
                 className={styles.dhPestHeroImage}
                 src={heroImageUrl}
                 alt="Pest Control Hero"
+                width={600}
+                height={400}
+                priority={true}
               />
             </div>
           </div>
@@ -935,7 +963,13 @@ export default function QuoteSteps({
             <div className={styles.dhFormContentArea}>
               {branding?.logo_url && (
                 <div className={styles.companyLogo}>
-                  <img src={branding.logo_url} alt={company.name} />
+                  <Image
+                    src={branding.logo_url}
+                    alt={company.name}
+                    width={150}
+                    height={50}
+                    style={{ objectFit: 'contain' }}
+                  />
                 </div>
               )}
 
@@ -1315,10 +1349,13 @@ export default function QuoteSteps({
 
             <div className={styles.dhPestHero}>
               <div className={styles.dhPestBgImage} />
-              <img
+              <Image
                 className={styles.dhPestHeroImage}
                 src={heroImageUrl}
                 alt="Pest Control Hero"
+                width={600}
+                height={400}
+                priority={true}
               />
             </div>
           </div>

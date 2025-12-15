@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import styles from '../CampaignLandingPage.module.scss';
 
 interface HeaderSectionProps {
@@ -75,7 +76,13 @@ export default function HeaderSection({
       <div className={styles.headerContainer}>
         <div className={styles.headerLogo}>
           {logo ? (
-            <img src={logo} alt={companyName} />
+            <Image
+              src={logo}
+              alt={companyName}
+              width={150}
+              height={50}
+              style={{ objectFit: 'contain' }}
+            />
           ) : (
             <span className={styles.companyName}>{companyName}</span>
           )}

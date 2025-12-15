@@ -65,6 +65,11 @@ async function recalculateAllLineItemPrices(
 
   // Recalculate each line item
   for (const lineItem of lineItems) {
+    // Skip custom-priced items - they don't get recalculated
+    if (lineItem.is_custom_priced) {
+      continue;
+    }
+
     const servicePlan = lineItem.service_plan;
     if (!servicePlan) continue;
 
@@ -394,6 +399,30 @@ export async function PUT(
         .eq('company_id', quote.company_id)
         .single();
 
+      // Validate custom pricing if provided
+      if (body.line_items) {
+        for (const lineItem of body.line_items) {
+          if ((lineItem as any).is_custom_priced) {
+            const customInitial = (lineItem as any).custom_initial_price;
+            const customRecurring = (lineItem as any).custom_recurring_price;
+
+            if (customInitial === undefined || customRecurring === undefined) {
+              return NextResponse.json(
+                { error: 'Custom pricing requires both initial and recurring prices' },
+                { status: 400 }
+              );
+            }
+
+            if (customInitial < 0 || customRecurring < 0) {
+              return NextResponse.json(
+                { error: 'Custom prices cannot be negative' },
+                { status: 400 }
+              );
+            }
+          }
+        }
+      }
+
       // Fetch discount configurations if discount_ids are provided
       const discountIds = body.line_items
         .map(item => (item as any).discount_id)
@@ -424,134 +453,156 @@ export async function PUT(
             .single();
 
           if (servicePlan) {
-            const baseInitialPrice = servicePlan.initial_price || 0;
-            const baseRecurringPrice = servicePlan.recurring_price || 0;
+            // Check if custom pricing is being used
+            const isCustomPriced = (lineItem as any).is_custom_priced === true;
+            const customInitialPrice = (lineItem as any).custom_initial_price;
+            const customRecurringPrice = (lineItem as any).custom_recurring_price;
 
-            // Calculate size-based price increases if pricing settings exist
-            let homeInitialIncrease = 0;
-            let homeRecurringIncrease = 0;
-            let yardInitialIncrease = 0;
-            let yardRecurringIncrease = 0;
+            let initialPriceWithSize: number;
+            let recurringPriceWithSize: number;
+            let finalInitialPrice: number;
+            let finalRecurringPrice: number;
+            let discountPercentage = 0;
+            let discountAmount = 0;
+            let discountId: string | null = null;
 
-            if (pricingSettings && servicePlan.home_size_pricing && servicePlan.yard_size_pricing) {
-              const homeRangeValue = parseRangeValue(homeSizeRange);
-              const yardRangeValue = parseRangeValue(yardSizeRange);
-
-              const servicePlanPricing = {
-                home_size_pricing: servicePlan.home_size_pricing,
-                yard_size_pricing: servicePlan.yard_size_pricing,
-              };
-
-              const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
-              const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
-
-              const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
-              const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
-
-              homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
-              homeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
-              yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
-              yardRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
-            }
-
-            const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
-            const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
-
-            // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
-            let discountAmount = lineItem.discount_amount || 0;
-            let discountPercentage = lineItem.discount_percentage || 0;
-            let recurringDiscountAmount = 0;
-            let recurringDiscountPercentage = 0;
-            let appliesToPrice = 'both'; // Default to applying to both prices
-            let discountId = (lineItem as any).discount_id || null;
-
-            // If discount_id is provided, use pre-fetched discount configuration
-            if (discountId) {
-              const discountConfig = discountConfigs.find(d => d.id === discountId);
-
-              if (discountConfig) {
-                appliesToPrice = discountConfig.applies_to_price;
-
-                // Initial discount settings
-                if (discountConfig.discount_type === 'percentage') {
-                  discountPercentage = discountConfig.discount_value;
-                  discountAmount = 0;
-                } else {
-                  discountAmount = discountConfig.discount_value;
-                  discountPercentage = 0;
-                }
-
-                // Recurring discount settings (for 'both' - use separate values if set)
-                if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
-                  if (discountConfig.recurring_discount_type === 'percentage') {
-                    recurringDiscountPercentage = discountConfig.recurring_discount_value;
-                    recurringDiscountAmount = 0;
-                  } else {
-                    recurringDiscountAmount = discountConfig.recurring_discount_value;
-                    recurringDiscountPercentage = 0;
-                  }
-                } else {
-                  // Fall back to same as initial
-                  recurringDiscountAmount = discountAmount;
-                  recurringDiscountPercentage = discountPercentage;
-                }
-              }
+            if (isCustomPriced && customInitialPrice !== undefined && customRecurringPrice !== undefined) {
+              // Use custom prices - bypass all calculations and discounts
+              initialPriceWithSize = customInitialPrice;
+              recurringPriceWithSize = customRecurringPrice;
+              finalInitialPrice = Math.max(0, customInitialPrice);
+              finalRecurringPrice = Math.max(0, customRecurringPrice);
             } else {
-              // If discount_id is explicitly null, clear all discounts
-              if ((lineItem as any).discount_id === null) {
-                discountAmount = 0;
-                discountPercentage = 0;
-                recurringDiscountAmount = 0;
-                recurringDiscountPercentage = 0;
-                discountId = null;
-              } else {
-                // If no discount_id provided (undefined), check for existing discounts on the line item
-                const { data: existingLineItem } = await supabase
-                  .from('quote_line_items')
-                  .select('discount_percentage, discount_amount, discount_id')
-                  .eq('id', lineItem.id)
-                  .single();
+              // Standard pricing flow
+              const baseInitialPrice = servicePlan.initial_price || 0;
+              const baseRecurringPrice = servicePlan.recurring_price || 0;
 
-                if (existingLineItem) {
-                  if (lineItem.discount_amount === undefined) {
-                    discountAmount = existingLineItem.discount_amount || 0;
+              // Calculate size-based price increases if pricing settings exist
+              let homeInitialIncrease = 0;
+              let homeRecurringIncrease = 0;
+              let yardInitialIncrease = 0;
+              let yardRecurringIncrease = 0;
+
+              if (pricingSettings && servicePlan.home_size_pricing && servicePlan.yard_size_pricing) {
+                const homeRangeValue = parseRangeValue(homeSizeRange);
+                const yardRangeValue = parseRangeValue(yardSizeRange);
+
+                const servicePlanPricing = {
+                  home_size_pricing: servicePlan.home_size_pricing,
+                  yard_size_pricing: servicePlan.yard_size_pricing,
+                };
+
+                const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
+                const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+
+                const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+
+                homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
+                homeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
+                yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
+                yardRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
+              }
+
+              initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
+              recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
+
+              // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
+              discountAmount = lineItem.discount_amount || 0;
+              discountPercentage = lineItem.discount_percentage || 0;
+              let recurringDiscountAmount = 0;
+              let recurringDiscountPercentage = 0;
+              let appliesToPrice = 'both'; // Default to applying to both prices
+              discountId = (lineItem as any).discount_id || null;
+
+              // If discount_id is provided, use pre-fetched discount configuration
+              if (discountId) {
+                const discountConfig = discountConfigs.find(d => d.id === discountId);
+
+                if (discountConfig) {
+                  appliesToPrice = discountConfig.applies_to_price;
+
+                  // Initial discount settings
+                  if (discountConfig.discount_type === 'percentage') {
+                    discountPercentage = discountConfig.discount_value;
+                    discountAmount = 0;
+                  } else {
+                    discountAmount = discountConfig.discount_value;
+                    discountPercentage = 0;
                   }
-                  if (lineItem.discount_percentage === undefined) {
-                    discountPercentage = existingLineItem.discount_percentage || 0;
+
+                  // Recurring discount settings (for 'both' - use separate values if set)
+                  if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
+                    if (discountConfig.recurring_discount_type === 'percentage') {
+                      recurringDiscountPercentage = discountConfig.recurring_discount_value;
+                      recurringDiscountAmount = 0;
+                    } else {
+                      recurringDiscountAmount = discountConfig.recurring_discount_value;
+                      recurringDiscountPercentage = 0;
+                    }
+                  } else {
+                    // Fall back to same as initial
+                    recurringDiscountAmount = discountAmount;
+                    recurringDiscountPercentage = discountPercentage;
                   }
-                  if (!(lineItem as any).discount_id && existingLineItem.discount_id) {
-                    discountId = existingLineItem.discount_id;
+                }
+              } else {
+                // If discount_id is explicitly null, clear all discounts
+                if ((lineItem as any).discount_id === null) {
+                  discountAmount = 0;
+                  discountPercentage = 0;
+                  recurringDiscountAmount = 0;
+                  recurringDiscountPercentage = 0;
+                  discountId = null;
+                } else {
+                  // If no discount_id provided (undefined), check for existing discounts on the line item
+                  const { data: existingLineItem } = await supabase
+                    .from('quote_line_items')
+                    .select('discount_percentage, discount_amount, discount_id')
+                    .eq('id', lineItem.id)
+                    .single();
+
+                  if (existingLineItem) {
+                    if (lineItem.discount_amount === undefined) {
+                      discountAmount = existingLineItem.discount_amount || 0;
+                    }
+                    if (lineItem.discount_percentage === undefined) {
+                      discountPercentage = existingLineItem.discount_percentage || 0;
+                    }
+                    if (!(lineItem as any).discount_id && existingLineItem.discount_id) {
+                      discountId = existingLineItem.discount_id;
+                    }
+                    // For legacy line items without discount_id, use same values for recurring
+                    recurringDiscountAmount = discountAmount;
+                    recurringDiscountPercentage = discountPercentage;
                   }
-                  // For legacy line items without discount_id, use same values for recurring
-                  recurringDiscountAmount = discountAmount;
-                  recurringDiscountPercentage = discountPercentage;
                 }
               }
-            }
 
-            // Calculate final prices based on discount configuration
-            let finalInitialPrice = initialPriceWithSize;
-            let finalRecurringPrice = recurringPriceWithSize;
+              // Calculate final prices based on discount configuration
+              finalInitialPrice = initialPriceWithSize;
+              finalRecurringPrice = recurringPriceWithSize;
 
-            // Apply discount to initial price if configured
-            if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
-              finalInitialPrice = initialPriceWithSize - discountAmount;
-              if (discountPercentage > 0) {
-                finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
+              // Apply discount to initial price if configured
+              if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
+                finalInitialPrice = initialPriceWithSize - discountAmount;
+                if (discountPercentage > 0) {
+                  finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
+                }
               }
-            }
 
-            // Apply discount to recurring price if configured
-            if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
-              finalRecurringPrice = recurringPriceWithSize - recurringDiscountAmount;
-              if (recurringDiscountPercentage > 0) {
-                finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
+              // Apply discount to recurring price if configured
+              if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
+                finalRecurringPrice = recurringPriceWithSize - recurringDiscountAmount;
+                if (recurringDiscountPercentage > 0) {
+                  finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
+                }
               }
-            }
 
-            // Ensure prices don't go negative
-            finalInitialPrice = Math.max(0, finalInitialPrice);
-            finalRecurringPrice = Math.max(0, finalRecurringPrice);
+              // Ensure prices don't go negative
+              finalInitialPrice = Math.max(0, finalInitialPrice);
+              finalRecurringPrice = Math.max(0, finalRecurringPrice);
+            }
 
             // UPDATE the existing line item with new service plan
             const updateData: any = {
@@ -565,6 +616,9 @@ export async function PUT(
               discount_percentage: discountPercentage,
               discount_amount: discountAmount,
               discount_id: discountId,
+              custom_initial_price: isCustomPriced ? customInitialPrice : null,
+              custom_recurring_price: isCustomPriced ? customRecurringPrice : null,
+              is_custom_priced: isCustomPriced,
               final_initial_price: finalInitialPrice,
               final_recurring_price: finalRecurringPrice,
             };
@@ -680,107 +734,129 @@ export async function PUT(
             .single();
 
           if (servicePlan) {
-            const baseInitialPrice = servicePlan.initial_price || 0;
-            const baseRecurringPrice = servicePlan.recurring_price || 0;
+            // Check if custom pricing is being used
+            const isCustomPriced = (lineItem as any).is_custom_priced === true;
+            const customInitialPrice = (lineItem as any).custom_initial_price;
+            const customRecurringPrice = (lineItem as any).custom_recurring_price;
 
-            // Calculate size-based price increases if pricing settings exist
-            let homeInitialIncrease = 0;
-            let homeRecurringIncrease = 0;
-            let yardInitialIncrease = 0;
-            let yardRecurringIncrease = 0;
+            let initialPriceWithSize: number;
+            let recurringPriceWithSize: number;
+            let finalInitialPrice: number;
+            let finalRecurringPrice: number;
+            let discountPercentage = 0;
+            let discountAmount = 0;
+            let discountId: string | null = null;
 
-            if (pricingSettings && servicePlan.home_size_pricing && servicePlan.yard_size_pricing) {
-              // Parse range values
-              const homeRangeValue = parseRangeValue(homeSizeRange);
-              const yardRangeValue = parseRangeValue(yardSizeRange);
+            if (isCustomPriced && customInitialPrice !== undefined && customRecurringPrice !== undefined) {
+              // Use custom prices - bypass all calculations
+              initialPriceWithSize = customInitialPrice;
+              recurringPriceWithSize = customRecurringPrice;
+              finalInitialPrice = Math.max(0, customInitialPrice);
+              finalRecurringPrice = Math.max(0, customRecurringPrice);
+            } else {
+              // Standard pricing flow
+              const baseInitialPrice = servicePlan.initial_price || 0;
+              const baseRecurringPrice = servicePlan.recurring_price || 0;
 
-              // Generate options to find interval indices
-              const servicePlanPricing = {
-                home_size_pricing: servicePlan.home_size_pricing,
-                yard_size_pricing: servicePlan.yard_size_pricing,
-              };
+              // Calculate size-based price increases if pricing settings exist
+              let homeInitialIncrease = 0;
+              let homeRecurringIncrease = 0;
+              let yardInitialIncrease = 0;
+              let yardRecurringIncrease = 0;
 
-              const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
-              const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+              if (pricingSettings && servicePlan.home_size_pricing && servicePlan.yard_size_pricing) {
+                // Parse range values
+                const homeRangeValue = parseRangeValue(homeSizeRange);
+                const yardRangeValue = parseRangeValue(yardSizeRange);
 
-              // Find appropriate options
-              const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
-              const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+                // Generate options to find interval indices
+                const servicePlanPricing = {
+                  home_size_pricing: servicePlan.home_size_pricing,
+                  yard_size_pricing: servicePlan.yard_size_pricing,
+                };
 
-              // Get price increases
-              homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
-              homeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
-              yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
-              yardRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
-            }
+                const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
+                const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
 
-            // Calculate prices with size increases
-            const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
-            const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
+                // Find appropriate options
+                const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
 
-            // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
-            let discountAmount = lineItem.discount_amount || 0;
-            let discountPercentage = lineItem.discount_percentage || 0;
-            let recurringDiscountAmount = discountAmount;
-            let recurringDiscountPercentage = discountPercentage;
-            let appliesToPrice = 'both';
-            const discountId = (lineItem as any).discount_id || null;
+                // Get price increases
+                homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
+                homeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
+                yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
+                yardRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
+              }
 
-            // If discount_id is provided, use pre-fetched discount configuration
-            if (discountId) {
-              const discountConfig = discountConfigs.find(d => d.id === discountId);
+              // Calculate prices with size increases
+              initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
+              recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
 
-              if (discountConfig) {
-                appliesToPrice = discountConfig.applies_to_price;
+              // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
+              discountAmount = lineItem.discount_amount || 0;
+              discountPercentage = lineItem.discount_percentage || 0;
+              let recurringDiscountAmount = discountAmount;
+              let recurringDiscountPercentage = discountPercentage;
+              let appliesToPrice = 'both';
+              discountId = (lineItem as any).discount_id || null;
 
-                // Initial discount settings
-                if (discountConfig.discount_type === 'percentage') {
-                  discountPercentage = discountConfig.discount_value;
-                  discountAmount = 0;
-                } else {
-                  discountAmount = discountConfig.discount_value;
-                  discountPercentage = 0;
-                }
+              // If discount_id is provided, use pre-fetched discount configuration
+              if (discountId) {
+                const discountConfig = discountConfigs.find(d => d.id === discountId);
 
-                // Recurring discount settings (for 'both' - use separate values if set)
-                if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
-                  if (discountConfig.recurring_discount_type === 'percentage') {
-                    recurringDiscountPercentage = discountConfig.recurring_discount_value;
-                    recurringDiscountAmount = 0;
+                if (discountConfig) {
+                  appliesToPrice = discountConfig.applies_to_price;
+
+                  // Initial discount settings
+                  if (discountConfig.discount_type === 'percentage') {
+                    discountPercentage = discountConfig.discount_value;
+                    discountAmount = 0;
                   } else {
-                    recurringDiscountAmount = discountConfig.recurring_discount_value;
-                    recurringDiscountPercentage = 0;
+                    discountAmount = discountConfig.discount_value;
+                    discountPercentage = 0;
                   }
-                } else {
-                  recurringDiscountAmount = discountAmount;
-                  recurringDiscountPercentage = discountPercentage;
+
+                  // Recurring discount settings (for 'both' - use separate values if set)
+                  if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
+                    if (discountConfig.recurring_discount_type === 'percentage') {
+                      recurringDiscountPercentage = discountConfig.recurring_discount_value;
+                      recurringDiscountAmount = 0;
+                    } else {
+                      recurringDiscountAmount = discountConfig.recurring_discount_value;
+                      recurringDiscountPercentage = 0;
+                    }
+                  } else {
+                    recurringDiscountAmount = discountAmount;
+                    recurringDiscountPercentage = discountPercentage;
+                  }
                 }
               }
-            }
 
-            // Calculate final prices based on discount configuration
-            let finalInitialPrice = initialPriceWithSize;
-            let finalRecurringPrice = recurringPriceWithSize;
+              // Calculate final prices based on discount configuration
+              finalInitialPrice = initialPriceWithSize;
+              finalRecurringPrice = recurringPriceWithSize;
 
-            // Apply discount to initial price if configured
-            if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
-              finalInitialPrice = initialPriceWithSize - discountAmount;
-              if (discountPercentage > 0) {
-                finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
+              // Apply discount to initial price if configured
+              if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
+                finalInitialPrice = initialPriceWithSize - discountAmount;
+                if (discountPercentage > 0) {
+                  finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
+                }
               }
-            }
 
-            // Apply discount to recurring price if configured
-            if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
-              finalRecurringPrice = recurringPriceWithSize - recurringDiscountAmount;
-              if (recurringDiscountPercentage > 0) {
-                finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
+              // Apply discount to recurring price if configured
+              if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
+                finalRecurringPrice = recurringPriceWithSize - recurringDiscountAmount;
+                if (recurringDiscountPercentage > 0) {
+                  finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
+                }
               }
-            }
 
-            // Ensure prices don't go negative
-            finalInitialPrice = Math.max(0, finalInitialPrice);
-            finalRecurringPrice = Math.max(0, finalRecurringPrice);
+              // Ensure prices don't go negative
+              finalInitialPrice = Math.max(0, finalInitialPrice);
+              finalRecurringPrice = Math.max(0, finalRecurringPrice);
+            }
 
             const insertData: any = {
               quote_id: id,
@@ -794,6 +870,9 @@ export async function PUT(
               discount_percentage: discountPercentage,
               discount_amount: discountAmount,
               discount_id: discountId,
+              custom_initial_price: isCustomPriced ? customInitialPrice : null,
+              custom_recurring_price: isCustomPriced ? customRecurringPrice : null,
+              is_custom_priced: isCustomPriced,
               final_initial_price: finalInitialPrice,
               final_recurring_price: finalRecurringPrice,
               display_order: lineItem.display_order || 0,
