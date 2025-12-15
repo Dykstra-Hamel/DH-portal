@@ -1166,6 +1166,84 @@
     font-weight: 400;
     color: var(--gray-500);
   }
+
+  // Add-Ons Breakdown (Single Plan)
+  .addOnsBreakdown {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--gray-200);
+  }
+
+  .addOnsHeader {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 12px;
+  }
+
+  .addonLineItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--gray-50);
+    border-radius: 6px;
+    margin-bottom: 8px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .addonName {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-900);
+  }
+
+  .addonPrices {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .addonRecurring {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4caf50;
+  }
+
+  .addonInitial {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-600);
+  }
+
+  // Single Plan Total
+  .singlePlanTotal {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 2px solid var(--gray-300);
+  }
+
+  .totalRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+
+    .totalLabel {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray-700);
+    }
+
+    .totalValue {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gray-900);
+    }
+  }
 }
 
 // Multiple Plans Pricing
@@ -1309,6 +1387,22 @@
   font-size: 12px;
   font-weight: 450;
   color: var(--gray-500);
+}
+
+// Add-Ons Section (Multiple Plans)
+.addOnsSection {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 2px dashed var(--gray-300);
+}
+
+.addOnsSectionHeader {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gray-200);
 }
 
 // Plan Information - Multiple Plans Support
@@ -1460,5 +1554,130 @@
 
   &:hover {
     background: var(--success-700);
+  }
+}
+
+// Custom Pricing Styles
+.customPricingSection {
+  margin-top: 16px;
+}
+
+.customPricingToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: auto;
+
+  &:hover {
+    background-color: #e9ecef;
+    border-color: #ced4da;
+  }
+}
+
+.toggleIcon {
+  font-size: 10px;
+  color: #6c757d;
+}
+
+.customPricingFields {
+  margin-top: 12px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.customPriceLabel {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: #495057;
+}
+
+.priceInputRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.priceInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+
+  &:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+
+  &::placeholder {
+    color: #6c757d;
+  }
+}
+
+.customPriceNote {
+  display: block;
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.customPricingActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.saveCustomPriceButton {
+  padding: 8px 16px;
+  background: #4caf50;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #43a047;
+  }
+
+  &:active {
+    background: #388e3c;
+  }
+}
+
+.clearCustomPriceButton {
+  padding: 8px 16px;
+  background: #f44336;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #d32f2f;
+  }
+
+  &:active {
+    background: #c62828;
   }
 }

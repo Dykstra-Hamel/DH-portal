@@ -130,6 +130,9 @@ export function LeadStepContent({
       displayOrder: number;
       frequency: string;
       discount: string;
+      customInitialPrice?: number;
+      customRecurringPrice?: number;
+      isCustomPriced?: boolean;
     }>
   >([
     {
@@ -140,6 +143,16 @@ export function LeadStepContent({
       discount: '',
     }, // First selection always exists
   ]);
+
+  const [calculatedPrices, setCalculatedPrices] = useState<
+    Record<
+      number,
+      {
+        initial: number;
+        recurring: number;
+      }
+    >
+  >({});
   const [allServicePlans, setAllServicePlans] = useState<any[]>([]);
   const [loadingPestOptions, setLoadingPestOptions] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState(false);
@@ -165,6 +178,11 @@ export function LeadStepContent({
 
   // Add-on services state
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+
+  // Custom pricing expansion state (tracks which service selection has custom pricing expanded)
+  const [customPricingExpanded, setCustomPricingExpanded] = useState<
+    Record<number, boolean>
+  >({});
   const [eligibleAddOns, setEligibleAddOns] = useState<any[]>([]);
   const [loadingAddOns, setLoadingAddOns] = useState(false);
 
@@ -494,6 +512,34 @@ export function LeadStepContent({
 
     loadCadenceData();
   }, [lead.id]);
+
+  // Calculate and store calculated prices for custom pricing display
+  useEffect(() => {
+    if (!quote || !pricingSettings) return;
+
+    const newCalculatedPrices: Record<
+      number,
+      { initial: number; recurring: number }
+    > = {};
+
+    serviceSelections.forEach(selection => {
+      if (!selection.servicePlan) return;
+
+      const lineItem = quote.line_items?.find(
+        item => item.display_order === selection.displayOrder
+      );
+
+      if (lineItem && !lineItem.is_custom_priced) {
+        // Use initial_price and recurring_price which are the calculated values before discounts
+        newCalculatedPrices[selection.displayOrder] = {
+          initial: lineItem.initial_price,
+          recurring: lineItem.recurring_price,
+        };
+      }
+    });
+
+    setCalculatedPrices(newCalculatedPrices);
+  }, [quote, serviceSelections, pricingSettings]);
 
   // Pre-populate pests from quote or lead - runs separately to avoid reloading pest options
   useEffect(() => {
@@ -1642,6 +1688,9 @@ export function LeadStepContent({
       service_frequency?: string;
       discount_percentage?: number;
       discount_id?: string | null;
+      custom_initial_price?: number;
+      custom_recurring_price?: number;
+      is_custom_priced?: boolean;
     }
   ) => {
     // Check if already creating/updating this display order
@@ -1686,18 +1735,35 @@ export function LeadStepContent({
         lineItemData.service_frequency = additionalData.service_frequency;
       }
 
-      // Add discount if provided
-      if (additionalData?.discount_percentage !== undefined) {
-        lineItemData.discount_percentage = additionalData.discount_percentage;
-      }
+      // Handle custom pricing vs standard pricing
+      if (
+        additionalData?.is_custom_priced &&
+        additionalData?.custom_initial_price !== undefined &&
+        additionalData?.custom_recurring_price !== undefined
+      ) {
+        // Custom pricing - set custom prices and flag
+        lineItemData.custom_initial_price = additionalData.custom_initial_price;
+        lineItemData.custom_recurring_price =
+          additionalData.custom_recurring_price;
+        lineItemData.is_custom_priced = true;
+        // Don't send discount data when using custom pricing
+      } else {
+        // Standard pricing - handle discounts
+        lineItemData.is_custom_priced = false;
 
-      // Add discount_id if provided (new discount system)
-      if (additionalData?.discount_id !== undefined) {
-        lineItemData.discount_id = additionalData.discount_id;
-        // If explicitly setting to null (removing discount), also clear discount values
-        if (additionalData.discount_id === null) {
-          lineItemData.discount_percentage = 0;
-          lineItemData.discount_amount = 0;
+        // Add discount if provided
+        if (additionalData?.discount_percentage !== undefined) {
+          lineItemData.discount_percentage = additionalData.discount_percentage;
+        }
+
+        // Add discount_id if provided (new discount system)
+        if (additionalData?.discount_id !== undefined) {
+          lineItemData.discount_id = additionalData.discount_id;
+          // If explicitly setting to null (removing discount), also clear discount values
+          if (additionalData.discount_id === null) {
+            lineItemData.discount_percentage = 0;
+            lineItemData.discount_amount = 0;
+          }
         }
       }
 
@@ -1807,6 +1873,14 @@ export function LeadStepContent({
       );
 
       if (response.ok) {
+        // Refetch the quote to get the updated state
+        const quoteResponse = await fetch(`/api/quotes/${quote.id}`);
+        if (quoteResponse.ok) {
+          const quoteData = await quoteResponse.json();
+          if (quoteData.success && quoteData.data) {
+            await broadcastQuoteUpdate(quoteData.data);
+          }
+        }
         onShowToast?.('Add-on service removed', 'success');
       }
     } catch (error) {
@@ -2648,6 +2722,7 @@ export function LeadStepContent({
                           placeholder="Select Frequency"
                         />
                       </div>
+                      {/* Discount selector - disabled when custom pricing is active */}
                       <div className={styles.formField}>
                         <label className={styles.fieldLabel}>Discount</label>
                         <CustomDropdown
@@ -2667,7 +2742,9 @@ export function LeadStepContent({
                                     : []),
                                 ]
                           }
-                          value={selection.discount}
+                          value={
+                            selection.isCustomPriced ? '' : selection.discount
+                          }
                           onChange={async newDiscountId => {
                             setServiceSelections(prev =>
                               prev.map((sel, idx) =>
@@ -2691,12 +2768,237 @@ export function LeadStepContent({
                           placeholder={
                             loadingDiscounts
                               ? 'Loading discounts...'
-                              : 'Select Discount'
+                              : selection.isCustomPriced
+                                ? 'Disabled (Custom Pricing Active)'
+                                : 'Select Discount'
                           }
-                          disabled={loadingDiscounts}
+                          disabled={
+                            loadingDiscounts || selection.isCustomPriced
+                          }
                         />
                       </div>
                     </div>
+
+                    {/* Custom Pricing - Collapsible Section */}
+                    {selection.servicePlan?.allow_custom_pricing && (
+                      <div className={styles.customPricingSection}>
+                        <button
+                          type="button"
+                          className={styles.customPricingToggle}
+                          onClick={() => {
+                            const isExpanding =
+                              !customPricingExpanded[selection.displayOrder];
+
+                            setCustomPricingExpanded(prev => ({
+                              ...prev,
+                              [selection.displayOrder]: isExpanding,
+                            }));
+
+                            // Pre-fill with calculated prices when expanding for the first time
+                            if (
+                              isExpanding &&
+                              selection.customInitialPrice === undefined &&
+                              selection.customRecurringPrice === undefined
+                            ) {
+                              setServiceSelections(prev =>
+                                prev.map((sel, idx) =>
+                                  idx === index
+                                    ? {
+                                        ...sel,
+                                        customInitialPrice:
+                                          calculatedPrices[
+                                            selection.displayOrder
+                                          ]?.initial || 0,
+                                        customRecurringPrice:
+                                          calculatedPrices[
+                                            selection.displayOrder
+                                          ]?.recurring || 0,
+                                      }
+                                    : sel
+                                )
+                              );
+                            }
+                          }}
+                        >
+                          <span className={styles.toggleIcon}>
+                            {customPricingExpanded[selection.displayOrder]
+                              ? '▼'
+                              : '▶'}
+                          </span>
+                          Custom Pricing
+                        </button>
+
+                        {customPricingExpanded[selection.displayOrder] && (
+                          <div className={styles.customPricingFields}>
+                            <div className={styles.customPriceLabel}>
+                              Override calculated price
+                            </div>
+                            <div className={styles.priceInputRow}>
+                              <div className={styles.formField}>
+                                <label className={styles.fieldLabel}>
+                                  Initial Price ($)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className={styles.priceInput}
+                                  value={
+                                    selection.customInitialPrice ??
+                                    calculatedPrices[selection.displayOrder]
+                                      ?.initial ??
+                                    ''
+                                  }
+                                  onChange={e => {
+                                    const value =
+                                      parseFloat(e.target.value) || 0;
+                                    if (value < 0) return; // Prevent negative prices
+
+                                    // Update state only (don't save yet)
+                                    setServiceSelections(prev =>
+                                      prev.map((sel, idx) =>
+                                        idx === index
+                                          ? {
+                                              ...sel,
+                                              customInitialPrice: value,
+                                            }
+                                          : sel
+                                      )
+                                    );
+                                  }}
+                                  placeholder="Enter custom initial price"
+                                />
+                              </div>
+                              <div className={styles.formField}>
+                                <label className={styles.fieldLabel}>
+                                  Recurring Price ($)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className={styles.priceInput}
+                                  value={
+                                    selection.customRecurringPrice ??
+                                    calculatedPrices[selection.displayOrder]
+                                      ?.recurring ??
+                                    ''
+                                  }
+                                  onChange={e => {
+                                    const value =
+                                      parseFloat(e.target.value) || 0;
+                                    if (value < 0) return; // Prevent negative prices
+
+                                    // Update state only (don't save yet)
+                                    setServiceSelections(prev =>
+                                      prev.map((sel, idx) =>
+                                        idx === index
+                                          ? {
+                                              ...sel,
+                                              customRecurringPrice: value,
+                                            }
+                                          : sel
+                                      )
+                                    );
+                                  }}
+                                  placeholder="Enter custom recurring price"
+                                />
+                              </div>
+                            </div>
+                            <small className={styles.customPriceNote}>
+                              Calculated price: $
+                              {calculatedPrices[
+                                selection.displayOrder
+                              ]?.initial?.toFixed(2) || '0.00'}{' '}
+                              initial, $
+                              {calculatedPrices[
+                                selection.displayOrder
+                              ]?.recurring?.toFixed(2) || '0.00'}
+                              /mo recurring
+                            </small>
+
+                            {/* Action Buttons */}
+                            <div className={styles.customPricingActions}>
+                              <button
+                                type="button"
+                                className={styles.saveCustomPriceButton}
+                                onClick={async () => {
+                                  if (
+                                    selection.servicePlan &&
+                                    selection.customInitialPrice !==
+                                      undefined &&
+                                    selection.customRecurringPrice !== undefined
+                                  ) {
+                                    // Mark as custom priced and clear discount
+                                    setServiceSelections(prev =>
+                                      prev.map((sel, idx) =>
+                                        idx === index
+                                          ? {
+                                              ...sel,
+                                              isCustomPriced: true,
+                                              discount: '', // Clear discount when using custom pricing
+                                            }
+                                          : sel
+                                      )
+                                    );
+
+                                    // Save to backend
+                                    await createOrUpdateQuoteLineItem(
+                                      selection.servicePlan,
+                                      selection.displayOrder,
+                                      {
+                                        custom_initial_price:
+                                          selection.customInitialPrice,
+                                        custom_recurring_price:
+                                          selection.customRecurringPrice,
+                                        is_custom_priced: true,
+                                        discount_id: null, // Clear discount when using custom pricing
+                                      }
+                                    );
+                                  }
+                                }}
+                              >
+                                Save Custom Price
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.clearCustomPriceButton}
+                                onClick={async () => {
+                                  if (selection.servicePlan) {
+                                    // Clear custom pricing from state
+                                    setServiceSelections(prev =>
+                                      prev.map((sel, idx) =>
+                                        idx === index
+                                          ? {
+                                              ...sel,
+                                              customInitialPrice: undefined,
+                                              customRecurringPrice: undefined,
+                                              isCustomPriced: false,
+                                            }
+                                          : sel
+                                      )
+                                    );
+
+                                    // Clear from backend
+                                    await createOrUpdateQuoteLineItem(
+                                      selection.servicePlan,
+                                      selection.displayOrder,
+                                      {
+                                        custom_initial_price: undefined,
+                                        custom_recurring_price: undefined,
+                                        is_custom_priced: false,
+                                      }
+                                    );
+                                  }
+                                }}
+                              >
+                                Clear Custom Pricing
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -2862,6 +3164,90 @@ export function LeadStepContent({
                                 </div>
                               </div>
                             </div>
+
+                            {/* Add-Ons for Single Plan */}
+                            {quote?.line_items &&
+                              quote.line_items.filter(
+                                item =>
+                                  item.addon_service_id != null &&
+                                  item.addon_service_id !== ''
+                              ).length > 0 && (
+                                <div className={styles.addOnsBreakdown}>
+                                  <div className={styles.addOnsHeader}>
+                                    Add-On Services:
+                                  </div>
+                                  {quote.line_items
+                                    .filter(
+                                      item =>
+                                        item.addon_service_id != null &&
+                                        item.addon_service_id !== ''
+                                    )
+                                    .map(addonItem => (
+                                      <div
+                                        key={addonItem.id}
+                                        className={styles.addonLineItem}
+                                      >
+                                        <div className={styles.addonName}>
+                                          {addonItem.plan_name}
+                                        </div>
+                                        <div className={styles.addonPrices}>
+                                          <span
+                                            className={styles.addonRecurring}
+                                          >
+                                            +${addonItem.final_recurring_price}
+                                            /mo
+                                          </span>
+                                          {addonItem.final_initial_price >
+                                            0 && (
+                                            <span
+                                              className={styles.addonInitial}
+                                            >
+                                              $
+                                              {Math.round(
+                                                addonItem.final_initial_price
+                                              )}{' '}
+                                              initial
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
+
+                            {/* Total with Add-Ons */}
+                            {quote?.line_items &&
+                              quote.line_items.filter(
+                                item =>
+                                  item.addon_service_id != null &&
+                                  item.addon_service_id !== ''
+                              ).length > 0 && (
+                                <div className={styles.singlePlanTotal}>
+                                  <div className={styles.totalRow}>
+                                    <span className={styles.totalLabel}>
+                                      Total Recurring:
+                                    </span>
+                                    <span className={styles.totalValue}>
+                                      $
+                                      {Math.round(
+                                        quote?.total_recurring_price || 0
+                                      )}
+                                      /mo
+                                    </span>
+                                  </div>
+                                  <div className={styles.totalRow}>
+                                    <span className={styles.totalLabel}>
+                                      Total Initial:
+                                    </span>
+                                    <span className={styles.totalValue}>
+                                      $
+                                      {Math.round(
+                                        quote?.total_initial_price || 0
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
                           </div>
                         )
                       ) : (
@@ -2951,6 +3337,76 @@ export function LeadStepContent({
                                 </div>
                               );
                             })}
+
+                          {/* Add-Ons Section */}
+                          {quote?.line_items &&
+                            quote.line_items.filter(
+                              item =>
+                                item.addon_service_id != null &&
+                                item.addon_service_id !== ''
+                            ).length > 0 && (
+                              <div className={styles.addOnsSection}>
+                                <div className={styles.addOnsSectionHeader}>
+                                  Add-On Services
+                                </div>
+                                {quote.line_items
+                                  .filter(
+                                    item =>
+                                      item.addon_service_id != null &&
+                                      item.addon_service_id !== ''
+                                  )
+                                  .map(addonItem => (
+                                    <div
+                                      key={addonItem.id}
+                                      className={styles.planLineItem}
+                                    >
+                                      <div className={styles.lineItemHeader}>
+                                        {addonItem.plan_name}
+                                      </div>
+                                      <div className={styles.lineItemPricing}>
+                                        <div className={styles.lineItemColumn}>
+                                          <div className={styles.lineItemLabel}>
+                                            Recurring Price
+                                          </div>
+                                          <div
+                                            className={
+                                              styles.lineItemRecurringPrice
+                                            }
+                                          >
+                                            $
+                                            {Math.round(
+                                              addonItem.final_recurring_price ||
+                                                0
+                                            )}
+                                            <span
+                                              className={
+                                                styles.lineItemPerMonth
+                                              }
+                                            >
+                                              /mo
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className={styles.lineItemColumn}>
+                                          <div className={styles.lineItemLabel}>
+                                            Initial Price
+                                          </div>
+                                          <div
+                                            className={
+                                              styles.lineItemInitialPrice
+                                            }
+                                          >
+                                            $
+                                            {Math.round(
+                                              addonItem.final_initial_price || 0
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            )}
 
                           {/* Total Cost Section */}
                           <div className={styles.totalCostSection}>

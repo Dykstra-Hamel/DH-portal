@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import {
   Save,
@@ -699,10 +700,13 @@ export default function AutomationSettings({ companyId }: AutomationSettingsProp
             
             {logoOverrideUrl ? (
               <div className={styles.logoPreview}>
-                <img 
-                  src={logoOverrideUrl} 
-                  alt="Logo override preview" 
+                <Image
+                  src={logoOverrideUrl}
+                  alt="Logo override preview"
+                  width={150}
+                  height={50}
                   className={styles.logoImage}
+                  style={{ objectFit: 'contain' }}
                 />
                 <div className={styles.logoActions}>
                   <button 

@@ -1,0 +1,303 @@
+.imagePicker {
+  margin-bottom: 24px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.aspectRatioHint {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.currentImage {
+  position: relative;
+  margin-bottom: 16px;
+  display: inline-block;
+
+  img {
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+  }
+}
+
+.removeButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 6px 12px;
+  background-color: rgba(220, 53, 69, 0.9);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: rgba(200, 35, 51, 0.9);
+  }
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+
+  &:hover {
+    color: #007bff;
+  }
+
+  &.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+  }
+}
+
+.tabContent {
+  min-height: 200px;
+}
+
+// Upload Tab
+.uploadTab {
+  padding: 20px;
+  border: 2px dashed #e0e0e0;
+  border-radius: 8px;
+  text-align: center;
+  background-color: #f9f9f9;
+}
+
+.fileInput {
+  margin-bottom: 12px;
+}
+
+.uploadHint {
+  p {
+    margin: 4px 0;
+    font-size: 13px;
+    color: #666;
+  }
+}
+
+// Library Tab
+.libraryTab {
+  padding: 16px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  min-height: 400px;
+}
+
+.folderFilter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.filterLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}
+
+.folderSelect {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  }
+}
+
+.searchBar {
+  margin-bottom: 20px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: white;
+
+  &:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  }
+}
+
+.loading,
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+
+  p {
+    margin: 8px 0;
+    font-size: 14px;
+  }
+}
+
+.imageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.imageCard {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.imagePreview {
+  width: 100%;
+  height: 180px;
+  position: relative;
+  background-color: #f5f5f5;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.imageInfo {
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.imageName {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.imageDimensions {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.imageRatio {
+  color: #999;
+}
+
+.selectButton {
+  width: 100%;
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #0056b3;
+  }
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px 0;
+}
+
+.paginationButton {
+  padding: 8px 16px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background-color: #f5f5f5;
+    border-color: #007bff;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.pageInfo {
+  font-size: 14px;
+  color: #666;
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .tabs {
+    .tab {
+      padding: 10px 16px;
+      font-size: 13px;
+    }
+  }
+
+  .imageGrid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .imagePreview {
+    height: 140px;
+  }
+
+  .libraryTab {
+    padding: 12px;
+  }
+}

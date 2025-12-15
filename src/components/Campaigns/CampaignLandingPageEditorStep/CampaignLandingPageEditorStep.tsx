@@ -9,6 +9,7 @@
 import { useState, useEffect, useRef } from 'react';
 import styles from './CampaignLandingPageEditorStep.module.scss';
 import ImageUploadField from '../ImageUploadField/ImageUploadField';
+import ImagePicker from '../ImagePicker/ImagePicker';
 import DynamicListEditor, { FieldConfig } from '../DynamicListEditor/DynamicListEditor';
 import RichTextEditor, { RichTextEditorHandle } from '@/components/Common/RichTextEditor/RichTextEditor';
 import { createClient } from '@/lib/supabase/client';
@@ -723,13 +724,16 @@ export default function CampaignLandingPageEditorStep({
               helpText="Optional badge/icon displayed next to the CTA button (e.g., BBB accreditation, trust badges)"
             />
 
-            <ImageUploadField
+            <ImagePicker
               label="Hero Image"
               value={data.hero_image_url || null}
               onChange={(url) => updateField('hero_image_url', url || '')}
               campaignId={campaignId}
               companyId={companyId}
-              helpText="Single hero image displayed on the landing page"
+              aspectRatio={754/725}
+              recommendedWidth={754}
+              recommendedHeight={725}
+              imageField="hero_image"
             />
           </>
         )}
@@ -1073,12 +1077,16 @@ export default function CampaignLandingPageEditorStep({
               />
             )}
 
-            <ImageUploadField
+            <ImagePicker
               label="Features Image (Optional)"
               value={data.feature_image_url || null}
               onChange={(url) => updateField('feature_image_url', url || '')}
               campaignId={campaignId}
               companyId={companyId}
+              aspectRatio={4/3}
+              recommendedWidth={1516}
+              recommendedHeight={1134}
+              imageField="features_image"
             />
           </>
         )}
@@ -1205,12 +1213,16 @@ export default function CampaignLandingPageEditorStep({
                   )}
                 </div>
 
-                <ImageUploadField
+                <ImagePicker
                   label="Services Image (Optional)"
                   value={data.additional_services_image_url || null}
                   onChange={(url) => updateField('additional_services_image_url', url || '')}
                   campaignId={campaignId}
                   companyId={companyId}
+                  aspectRatio={4/3}
+                  recommendedWidth={1516}
+                  recommendedHeight={1134}
+                  imageField="additional_services_image"
                 />
               </>
             )}

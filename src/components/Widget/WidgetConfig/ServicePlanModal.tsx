@@ -84,6 +84,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_image_url: '',
     plan_disclaimer: '',
     is_active: true,
+    allow_custom_pricing: false,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
     home_size_pricing: {
       initial_cost_per_interval: 20.00,
@@ -118,6 +119,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_image_url: plan.plan_image_url || '',
         plan_disclaimer: plan.plan_disclaimer || '',
         is_active: plan.is_active,
+        allow_custom_pricing: (plan as any).allow_custom_pricing || false,
         pest_coverage: plan.pest_coverage?.map(pc => ({
           pest_id: pc.pest_id,
           coverage_level: pc.coverage_level,
@@ -151,6 +153,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_image_url: '',
         plan_disclaimer: '',
         is_active: true,
+        allow_custom_pricing: false,
         pest_coverage: [],
         home_size_pricing: {
           initial_cost_per_interval: 20.00,
@@ -785,6 +788,26 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                 <strong>Note:</strong> These prices are applied for each interval step above the base size.
                 For example, if a home is in the second interval (1501-2000 sq ft), the initial cost increase
                 would be 1 × Initial Cost Per Interval.
+              </div>
+
+              <hr style={{ margin: '24px 0', border: 'none', borderTop: '1px solid #e9ecef' }} />
+
+              <h4>Custom Pricing Options</h4>
+              <div className={styles.checkboxGroup}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.allow_custom_pricing}
+                    onChange={(e) => handleInputChange('allow_custom_pricing', e.target.checked)}
+                    style={{ marginTop: '3px' }}
+                  />
+                  <div>
+                    <div>Allow custom pricing for this plan</div>
+                    <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                      When enabled, sales representatives can set custom prices when adding this plan to quotes instead of using calculated prices.
+                    </small>
+                  </div>
+                </label>
               </div>
             </div>
           )}

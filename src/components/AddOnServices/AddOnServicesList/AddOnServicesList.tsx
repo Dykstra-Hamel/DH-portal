@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import styles from './AddOnServicesList.module.scss';
 import { AddOnService } from '@/types/addon-service';
@@ -80,7 +81,13 @@ export default function AddOnServicesList({
             <div key={addon.id} className={styles.card}>
               {addon.addon_image_url && (
                 <div className={styles.cardImage}>
-                  <img src={addon.addon_image_url} alt={addon.addon_name} />
+                  <Image
+                    src={addon.addon_image_url}
+                    alt={addon.addon_name}
+                    width={200}
+                    height={200}
+                    quality={85}
+                  />
                 </div>
               )}
 

@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from 'react';
+import Image from 'next/image';
 import styles from '../CampaignLandingPage.module.scss';
 import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
 
@@ -137,7 +138,13 @@ export default function FeaturesSection({
         {/* Left column - Image */}
         <div className={styles.featuresImage}>
           {features.imageUrl ? (
-            <img src={features.imageUrl} alt="Features" />
+            <Image
+              src={features.imageUrl}
+              alt="Features"
+              width={1516}
+              height={1134}
+              quality={80}
+            />
           ) : (
             <div className={styles.imagePlaceholder} />
           )}

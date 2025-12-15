@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import { useCompany } from '@/contexts/CompanyContext';
 import styles from './GlobalCompanyDropdown.module.scss';
 
@@ -98,10 +99,13 @@ export function GlobalCompanyDropdown() {
     <div className={styles.companyDropdown} ref={dropdownRef}>
       {iconLogo && (
         <div className={styles.iconLogoWrapper}>
-          <img
+          <Image
             src={iconLogo}
-            alt={selectedCompany?.name}
+            alt={selectedCompany?.name || ''}
+            width={32}
+            height={32}
             className={styles.iconLogo}
+            style={{ objectFit: 'contain' }}
           />
         </div>
       )}
