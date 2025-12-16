@@ -48,6 +48,8 @@ import styles from './LeadStepContent.module.scss';
 import cadenceStyles from '../SalesCadenceCard/SalesCadenceCard.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 import { LeadDetailsSidebar } from './components/LeadDetailsSidebar/LeadDetailsSidebar';
+import { LeadSchedulingSection } from './components/LeadSchedulingSection';
+import { LeadContactSection } from './components/LeadContactSection';
 
 interface LeadStepContentProps {
   lead: Lead;
@@ -1147,6 +1149,46 @@ export function LeadStepContent({
     setPendingActivity(null);
   };
 
+  const handleLogActivityFromSection = async (
+    type: string,
+    notes: string,
+    matchesTask: boolean
+  ) => {
+    if (matchesTask) {
+      // Show modal to ask if they want to mark task complete
+      setPendingActivity({ type, notes });
+      setShowCompleteTaskModal(true);
+      return;
+    }
+
+    // If doesn't match, just log the activity without asking
+    setIsLoggingActivity(true);
+    try {
+      const response = await fetch(`/api/leads/${lead.id}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activity_type: type,
+          notes: notes || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to log activity');
+      }
+
+      onShowToast?.('Activity logged successfully', 'success');
+      setActivityNotes('');
+      setSelectedActionType('');
+      onLeadUpdate?.();
+    } catch (error) {
+      console.error('Error logging activity:', error);
+      onShowToast?.('Failed to log activity', 'error');
+    } finally {
+      setIsLoggingActivity(false);
+    }
+  };
+
   const handleManageLeadProceed = async (
     option: 'communication' | 'quote' | 'schedule'
   ) => {
@@ -1955,313 +1997,6 @@ export function LeadStepContent({
   const DefaultAvatar = ({ name }: { name: string }) => (
     <div className={styles.defaultAvatar}>{name.charAt(0).toUpperCase()}</div>
   );
-
-  const renderContactingContent = () => {
-    const contactingTabs: TabItem[] = [
-      {
-        id: 'contact',
-        label: 'Contact Log',
-        content: (
-          <div className={styles.cardContent}>
-            <div>
-              <h4 className={cardStyles.defaultText}>
-                Next Recommended Action:
-              </h4>
-              {loadingNextTask ? (
-                <div className={cardStyles.dataLabel}>Loading...</div>
-              ) : hasActiveCadence ? (
-                // Active cadence exists - show next task or completion message
-                nextTask ? (
-                  <div className={cadenceStyles.stepItem}>
-                    <div className={cadenceStyles.stepIcon}>
-                      {nextTask.action_type === 'live_call' ||
-                      nextTask.action_type === 'outbound_call' ||
-                      nextTask.action_type === 'ai_call' ? (
-                        <Phone size={16} />
-                      ) : nextTask.action_type === 'text_message' ? (
-                        <MessageSquareMore size={16} />
-                      ) : nextTask.action_type === 'email' ? (
-                        <Mail size={16} />
-                      ) : (
-                        <MessageSquareMore size={16} />
-                      )}
-                    </div>
-                    <div className={cadenceStyles.stepContent}>
-                      <div className={cadenceStyles.stepHeader}>
-                        <span className={cardStyles.inputText}>
-                          Day {nextTask.day_number}:{' '}
-                          {nextTask.time_of_day === 'AM'
-                            ? 'Morning'
-                            : nextTask.time_of_day === 'PM'
-                              ? 'Afternoon'
-                              : nextTask.time_of_day}{' '}
-                          {nextTask.action_type === 'live_call'
-                            ? 'Call'
-                            : nextTask.action_type === 'outbound_call'
-                              ? 'Outbound Call'
-                              : nextTask.action_type === 'ai_call'
-                                ? 'AI Call'
-                                : nextTask.action_type === 'text_message'
-                                  ? 'Text'
-                                  : nextTask.action_type === 'email'
-                                    ? 'Email'
-                                    : nextTask.action_type}
-                        </span>
-                        <div className={cadenceStyles.priorityIndicator}>
-                          <span className={cardStyles.inputText}>
-                            {nextTask.priority.charAt(0).toUpperCase() +
-                              nextTask.priority.slice(1)}
-                          </span>
-                          <div
-                            className={`${cadenceStyles.priorityDot} ${
-                              nextTask.priority === 'urgent'
-                                ? cadenceStyles.priorityDotUrgent
-                                : nextTask.priority === 'high'
-                                  ? cadenceStyles.priorityDotHigh
-                                  : nextTask.priority === 'low'
-                                    ? cadenceStyles.priorityDotLow
-                                    : cadenceStyles.priorityDotMedium
-                            }`}
-                          >
-                            <div className={cadenceStyles.priorityDotInner} />
-                          </div>
-                        </div>
-                      </div>
-                      {nextTask.due_date && nextTask.due_time ? (
-                        <div className={cardStyles.dataLabel}>
-                          Target:{' '}
-                          {new Date(
-                            nextTask.due_date + 'T00:00:00'
-                          ).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'numeric',
-                            day: 'numeric',
-                          })}{' '}
-                          |{' '}
-                          {new Date(
-                            `1970-01-01T${nextTask.due_time}`
-                          ).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true,
-                          })}
-                        </div>
-                      ) : nextTask.due_date ? (
-                        <div className={cardStyles.dataLabel}>
-                          Target:{' '}
-                          {new Date(
-                            nextTask.due_date + 'T00:00:00'
-                          ).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'numeric',
-                            day: 'numeric',
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : (
-                  <div className={cardStyles.dataLabel}>
-                    All cadence steps completed! 🎉
-                  </div>
-                )
-              ) : (
-                <div
-                  style={{
-                    padding: '12px 16px',
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #93c5fd',
-                    borderRadius: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <circle
-                      cx="10"
-                      cy="10"
-                      r="9"
-                      stroke="#3b82f6"
-                      strokeWidth="2"
-                    />
-                    <path
-                      d="M10 6V10M10 14H10.01"
-                      stroke="#3b82f6"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <span style={{ color: '#3b82f6', fontSize: '14px' }}>
-                    Select a sales cadence to automatically create and schedule
-                    your tasks!
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h4 className={cardStyles.defaultText}>
-                Select activity to log:
-              </h4>
-              <div className={styles.tabContainer}>
-                {[
-                  { id: 'outbound_call', label: 'Outbound Call' },
-                  { id: 'text_message', label: 'Text Message' },
-                  { id: 'ai_call', label: 'AI Call' },
-                  { id: 'email', label: 'Email' },
-                ].map((tab, index, array) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setSelectedActionType(tab.id)}
-                    className={`${styles.tabButton} ${
-                      selectedActionType === tab.id
-                        ? styles.active
-                        : styles.inactive
-                    } ${index === 0 ? styles.firstTab : ''} ${
-                      index === array.length - 1 ? styles.lastTab : ''
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label
-                className={cardStyles.inputLabels}
-                style={{ display: 'block' }}
-              >
-                Comment <span className={cardStyles.dataLabel}>(optional)</span>
-              </label>
-              <textarea
-                value={activityNotes}
-                onChange={e => setActivityNotes(e.target.value)}
-                placeholder={
-                  selectedActionType === 'outbound_call'
-                    ? 'Add details about this call'
-                    : selectedActionType === 'text_message'
-                      ? 'Add details about this text message'
-                      : selectedActionType === 'ai_call'
-                        ? 'Add details about this AI call'
-                        : selectedActionType === 'email'
-                          ? 'Add details about this email'
-                          : 'Add a comment to ticket history'
-                }
-                style={{
-                  width: '100%',
-                  minHeight: '80px',
-                  padding: '8px 12px',
-                  border: '1px solid var(--gray-300)',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical',
-                  backgroundColor: 'white',
-                }}
-              />
-            </div>
-
-            {selectedActionType && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '12px',
-                }}
-              >
-                <button
-                  onClick={async () => {
-                    // Check if this activity matches the next recommended action
-                    const activityMatchesTask =
-                      nextTask && nextTask.action_type === selectedActionType;
-
-                    if (activityMatchesTask) {
-                      // Show modal to ask if they want to mark task complete
-                      setPendingActivity({
-                        type: selectedActionType,
-                        notes: activityNotes || '',
-                      });
-                      setShowCompleteTaskModal(true);
-                      return;
-                    }
-
-                    // If doesn't match, just log the activity without asking
-                    setIsLoggingActivity(true);
-                    try {
-                      const response = await fetch(
-                        `/api/leads/${lead.id}/activities`,
-                        {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            activity_type: selectedActionType,
-                            notes: activityNotes || null,
-                          }),
-                        }
-                      );
-
-                      if (!response.ok) {
-                        throw new Error('Failed to log activity');
-                      }
-
-                      onShowToast?.('Activity logged successfully', 'success');
-                      setActivityNotes('');
-                      setSelectedActionType('');
-                      onLeadUpdate?.();
-                    } catch (error) {
-                      console.error('Error logging activity:', error);
-                      onShowToast?.('Failed to log activity', 'error');
-                    } finally {
-                      setIsLoggingActivity(false);
-                    }
-                  }}
-                  disabled={isLoggingActivity}
-                  style={{
-                    padding: '8px 16px',
-                    border: 'none',
-                    borderRadius: '6px',
-                    backgroundColor: '#3b82f6',
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: isLoggingActivity ? 'not-allowed' : 'pointer',
-                    opacity: isLoggingActivity ? 0.6 : 1,
-                  }}
-                >
-                  {isLoggingActivity ? 'Logging...' : 'Log Activity'}
-                </button>
-              </div>
-            )}
-          </div>
-        ),
-      },
-      {
-        id: 'cadence',
-        label: 'Sales Cadence',
-        content: (
-          <SalesCadenceCard
-            leadId={lead.id}
-            companyId={lead.company_id}
-            leadCreatedAt={lead.created_at}
-            onCadenceSelect={setSelectedCadenceId}
-            onStartCadence={handleStartCadence}
-            isStartingCadence={isStartingCadence}
-            hideCard={true}
-          />
-        ),
-      },
-    ];
-
-    return <TabCard tabs={contactingTabs} defaultTabId="contact" />;
-  };
 
   const renderQuotedContent = () => {
     const selectedPlan = serviceSelections[0]?.servicePlan;
@@ -3940,79 +3675,6 @@ export function LeadStepContent({
     );
   };
 
-  const renderReadyToScheduleContent = () => {
-    const scheduleTabs: TabItem[] = [
-      {
-        id: 'quote_summary',
-        label: 'Quote Summary',
-        content: (
-          <div className={styles.cardContent}>
-            <QuoteSummaryCard
-              quote={quote}
-              lead={lead}
-              isUpdating={isQuoteUpdating}
-              onEmailQuote={handleEmailQuote}
-              hideCard={true}
-            />
-          </div>
-        ),
-      },
-      {
-        id: 'service_confirmation',
-        label: 'Service Confirmation',
-        content: (
-          <div className={styles.cardContent}>
-            <h3 className={styles.scheduleTabHeading}>Service Confirmation</h3>
-            <div className={styles.confirmationForm}>
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Scheduled Date</label>
-                  <input
-                    type="date"
-                    className={styles.formInput}
-                    value={scheduledDate}
-                    onChange={e => setScheduledDate(e.target.value)}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Scheduled Time</label>
-                  <input
-                    type="time"
-                    className={styles.formInput}
-                    value={scheduledTime}
-                    onChange={e => setScheduledTime(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Notes</label>
-                <textarea
-                  className={styles.formTextarea}
-                  placeholder="Add any notes about the scheduled service..."
-                  rows={4}
-                  value={confirmationNote}
-                  onChange={e => setConfirmationNote(e.target.value)}
-                />
-              </div>
-              <div className={styles.formActions}>
-                <button
-                  type="button"
-                  className={styles.finalizeSaleButton}
-                  onClick={() => setShowServiceConfirmationModal(true)}
-                >
-                  <CalendarCheck size={18} />
-                  Finalize Sale
-                </button>
-              </div>
-            </div>
-          </div>
-        ),
-      },
-    ];
-
-    return <TabCard tabs={scheduleTabs} defaultTabId="quote_summary" />;
-  };
-
   // Render content based on lead status
   const renderContent = () => {
     // Show all sections simultaneously instead of conditionally based on status
@@ -4022,9 +3684,40 @@ export function LeadStepContent({
         data-sidebar-expanded={isSidebarExpanded}
       >
         <div className={styles.contentLeft}>
-          {renderContactingContent()}
+          <LeadContactSection
+            lead={lead}
+            nextTask={nextTask}
+            loadingNextTask={loadingNextTask}
+            hasActiveCadence={hasActiveCadence}
+            selectedActionType={selectedActionType}
+            activityNotes={activityNotes}
+            isLoggingActivity={isLoggingActivity}
+            selectedCadenceId={selectedCadenceId}
+            isStartingCadence={isStartingCadence}
+            onActionTypeChange={setSelectedActionType}
+            onActivityNotesChange={setActivityNotes}
+            onLogActivity={handleLogActivityFromSection}
+            onCadenceSelect={setSelectedCadenceId}
+            onStartCadence={handleStartCadence}
+            onShowToast={onShowToast}
+            onLeadUpdate={onLeadUpdate}
+          />
           {renderQuotedContent()}
-          {renderReadyToScheduleContent()}
+          <LeadSchedulingSection
+            lead={lead}
+            quote={quote}
+            isQuoteUpdating={isQuoteUpdating}
+            scheduledDate={scheduledDate}
+            scheduledTime={scheduledTime}
+            confirmationNote={confirmationNote}
+            onScheduledDateChange={setScheduledDate}
+            onScheduledTimeChange={setScheduledTime}
+            onConfirmationNoteChange={setConfirmationNote}
+            onShowServiceConfirmationModal={() =>
+              setShowServiceConfirmationModal(true)
+            }
+            onEmailQuote={handleEmailQuote}
+          />
         </div>
         <LeadDetailsSidebar
           lead={lead}

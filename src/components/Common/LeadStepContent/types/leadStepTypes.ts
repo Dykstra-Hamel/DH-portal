@@ -50,3 +50,42 @@ export interface BaseLeadStepProps {
   onRequestUndo?: RequestUndoCallback;
   onLeadUpdate?: LeadUpdateCallback;
 }
+
+// Lead Scheduling Section Props
+export interface LeadSchedulingSectionProps {
+  lead: Lead;
+  quote: any;
+  isQuoteUpdating: boolean;
+  scheduledDate: string;
+  scheduledTime: string;
+  confirmationNote: string;
+  onScheduledDateChange: (date: string) => void;
+  onScheduledTimeChange: (time: string) => void;
+  onConfirmationNoteChange: (note: string) => void;
+  onShowServiceConfirmationModal: () => void;
+  onEmailQuote: () => void;
+}
+
+// Lead Contact Section Props
+export interface LeadContactSectionProps {
+  lead: Lead;
+  nextTask: CadenceTask | null;
+  loadingNextTask: boolean;
+  hasActiveCadence: boolean | null;
+  selectedActionType: string;
+  activityNotes: string;
+  isLoggingActivity: boolean;
+  selectedCadenceId: string | null;
+  isStartingCadence: boolean;
+  onActionTypeChange: (type: string) => void;
+  onActivityNotesChange: (notes: string) => void;
+  onLogActivity: (
+    type: string,
+    notes: string,
+    matchesTask: boolean
+  ) => Promise<void>;
+  onCadenceSelect: (cadenceId: string | null) => void;
+  onStartCadence: () => Promise<void>;
+  onShowToast?: ShowToastCallback;
+  onLeadUpdate?: LeadUpdateCallback;
+}
