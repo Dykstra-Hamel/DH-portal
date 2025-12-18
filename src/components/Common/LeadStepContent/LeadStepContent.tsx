@@ -1,19 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import Image from 'next/image';
 import { Lead } from '@/types/lead';
-import { TabCard, TabItem } from '@/components/Common/TabCard/TabCard';
-import { QuoteSummaryCard } from '@/components/Common/QuoteSummaryCard/QuoteSummaryCard';
-import { SalesCadenceCard } from '@/components/Common/SalesCadenceCard/SalesCadenceCard';
-import { ManageLeadModal } from '@/components/Common/ManageLeadModal/ManageLeadModal';
-import { AssignSuccessModal } from '@/components/Common/AssignSuccessModal/AssignSuccessModal';
 import { CompleteTaskModal } from '@/components/Common/CompleteTaskModal/CompleteTaskModal';
 import { ServiceConfirmationModal } from '@/components/Common/ServiceConfirmationModal/ServiceConfirmationModal';
-import { PestSelection } from '@/components/Common/PestSelection/PestSelection';
-import { AdditionalPestsSelection } from '@/components/Common/AdditionalPestsSelection/AdditionalPestsSelection';
-import { CustomDropdown } from '@/components/Common/CustomDropdown/CustomDropdown';
-import EligibleAddOnSelector from '@/components/Quotes/EligibleAddOnSelector/EligibleAddOnSelector';
 import { useUser } from '@/hooks/useUser';
-import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { useQuoteRealtime } from '@/hooks/useQuoteRealtime';
 import { authenticatedFetch, adminAPI } from '@/lib/api-client';
@@ -22,34 +11,16 @@ import {
   removeCustomerChannel,
   subscribeToCustomerUpdates,
 } from '@/lib/realtime/customer-channel';
-import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import {
   generateHomeSizeOptions,
   generateYardSizeOptions,
   findSizeOptionByValue,
 } from '@/lib/pricing-calculations';
-import {
-  SquareUserRound,
-  SquareActivity,
-  NotebookPen,
-  ChevronDown,
-  Users,
-  Trash2,
-  MessageSquareMore,
-  Plus,
-  CircleOff,
-  Phone,
-  Mail,
-  X,
-  CalendarCheck,
-  ListCollapse,
-} from 'lucide-react';
 import styles from './LeadStepContent.module.scss';
-import cadenceStyles from '../SalesCadenceCard/SalesCadenceCard.module.scss';
-import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 import { LeadDetailsSidebar } from './components/LeadDetailsSidebar/LeadDetailsSidebar';
 import { LeadSchedulingSection } from './components/LeadSchedulingSection';
 import { LeadContactSection } from './components/LeadContactSection';
+import { LeadQuoteSection } from './components/LeadQuoteSection';
 
 interface LeadStepContentProps {
   lead: Lead;
@@ -70,20 +41,11 @@ export function LeadStepContent({
   onEmailQuote,
   onFinalizeSale,
 }: LeadStepContentProps) {
-  const [ticketType, setTicketType] = useState('sales');
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [isAssignmentDropdownOpen, setIsAssignmentDropdownOpen] =
     useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [showCallSummary, setShowCallSummary] = useState(false);
-  const [showManageLeadModal, setShowManageLeadModal] = useState(false);
-  const [showAssignSuccessModal, setShowAssignSuccessModal] = useState(false);
-  const [assignedUserInfo, setAssignedUserInfo] = useState<{
-    name: string;
-    title: string;
-    avatar?: string | null;
-  } | null>(null);
+
   const [showCompleteTaskModal, setShowCompleteTaskModal] = useState(false);
   const [pendingActivity, setPendingActivity] = useState<{
     type: string;
@@ -123,7 +85,6 @@ export function LeadStepContent({
   const [pestOptions, setPestOptions] = useState<any[]>([]);
   const initialLineItemCreatedRef = useRef(false);
   const lineItemCreationLockRef = useRef<Set<number>>(new Set());
-  const initialTabSetRef = useRef(false);
   const discountsFetchedRef = useRef<Set<string>>(new Set());
   const [serviceSelections, setServiceSelections] = useState<
     Array<{
@@ -160,7 +121,6 @@ export function LeadStepContent({
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [loadingServicePlans, setLoadingServicePlans] = useState(false);
   const [loadingDiscounts, setLoadingDiscounts] = useState(false);
-  const [activeServiceTab, setActiveServiceTab] = useState('overview');
   const [serviceFrequency, setServiceFrequency] = useState<string>('');
   const [discount, setDiscount] = useState<string>('');
   const [availableDiscounts, setAvailableDiscounts] = useState<
@@ -181,10 +141,6 @@ export function LeadStepContent({
   // Add-on services state
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
 
-  // Custom pricing expansion state (tracks which service selection has custom pricing expanded)
-  const [customPricingExpanded, setCustomPricingExpanded] = useState<
-    Record<number, boolean>
-  >({});
   const [eligibleAddOns, setEligibleAddOns] = useState<any[]>([]);
   const [loadingAddOns, setLoadingAddOns] = useState(false);
 
@@ -200,17 +156,11 @@ export function LeadStepContent({
   const [hasActiveCadence, setHasActiveCadence] = useState<boolean | null>(
     null
   );
-  const [isStartingCadence, setIsStartingCadence] = useState(false);
   const [selectedCadenceId, setSelectedCadenceId] = useState<string | null>(
     null
   );
 
   const { user, profile } = useUser();
-  const { users: assignableUsers } = useAssignableUsers({
-    companyId: lead.company_id,
-    departmentType: ticketType === 'support' ? 'support' : 'sales',
-    enabled: ticketType !== 'junk',
-  });
   const { settings: pricingSettings } = usePricingSettings(lead.company_id);
 
   // Real-time quote updates - single source of truth
@@ -223,98 +173,6 @@ export function LeadStepContent({
     userId: user?.id,
     enabled: lead.lead_status === 'quoted' || lead.lead_status === 'scheduling',
   });
-
-  // Helper functions for managing service selections
-  const addServiceSelection = () => {
-    if (serviceSelections.length >= 3) return;
-
-    const nextId = (serviceSelections.length + 1).toString();
-    const nextDisplayOrder = serviceSelections.length;
-
-    setServiceSelections([
-      ...serviceSelections,
-      {
-        id: nextId,
-        servicePlan: null,
-        displayOrder: nextDisplayOrder,
-        frequency: '',
-        discount: '',
-      },
-    ]);
-  };
-
-  const removeServiceSelection = async (displayOrder: number) => {
-    // Don't allow removing the first selection
-    if (displayOrder === 0) return;
-
-    // Remove from local state first
-    const updatedSelections = serviceSelections
-      .filter(sel => sel.displayOrder !== displayOrder)
-      .map((sel, index) => ({
-        ...sel,
-        displayOrder: index,
-      }));
-
-    setServiceSelections(updatedSelections);
-
-    // If there's a corresponding line item in the database, we need to delete it
-    // This is done by fetching all current line items and removing the one at this display order
-    const lineItemToDelete = quote?.line_items?.find(
-      item => item.display_order === displayOrder
-    );
-
-    if (lineItemToDelete && quote) {
-      try {
-        // Use the Supabase admin client to delete the line item directly
-        const response = await fetch(
-          `/api/quote-line-items/${lineItemToDelete.id}`,
-          {
-            method: 'DELETE',
-          }
-        );
-
-        if (!response.ok) {
-          // If delete fails, just refresh the quote to get updated state
-          console.warn('Failed to delete line item, refreshing quote');
-        }
-
-        // Fetch updated quote to refresh state
-        const quoteResponse = await fetch(`/api/quotes/${quote.id}`);
-        if (quoteResponse.ok) {
-          const quoteData = await quoteResponse.json();
-          if (quoteData.success && quoteData.data) {
-            await broadcastQuoteUpdate(quoteData.data);
-          }
-        }
-
-        onShowToast?.('Service removed successfully', 'success');
-      } catch (error) {
-        console.error('Error removing service selection:', error);
-        onShowToast?.('Failed to remove service from database', 'error');
-      }
-    }
-  };
-
-  const updateServiceSelection = async (displayOrder: number, plan: any) => {
-    // Update local state
-    setServiceSelections(
-      serviceSelections.map(sel =>
-        sel.displayOrder === displayOrder ? { ...sel, servicePlan: plan } : sel
-      )
-    );
-
-    // Fetch available discounts for this plan
-    if (plan?.id) {
-      const discounts = await fetchDiscountsForPlan(plan.id);
-      setAvailableDiscounts(prev => ({
-        ...prev,
-        [plan.id]: discounts,
-      }));
-    }
-
-    // Update quote line item
-    await createOrUpdateQuoteLineItem(plan, displayOrder);
-  };
 
   // Set default assignee to current user when component loads
   useEffect(() => {
@@ -745,43 +603,6 @@ export function LeadStepContent({
     }
   }, [quote?.line_items, allServicePlans, profile, fetchDiscountsForPlan]);
 
-  // Watch for Service Selection tab activation and ensure discounts are loaded
-  useEffect(() => {
-    if (activeServiceTab === 'service-selection') {
-      // Check if any service plans need discounts fetched (using ref to avoid circular dependency)
-      const plansMissingDiscounts = serviceSelections
-        .filter(
-          s =>
-            s.servicePlan?.id &&
-            !discountsFetchedRef.current.has(s.servicePlan.id)
-        )
-        .map(s => s.servicePlan?.id)
-        .filter((id): id is string => !!id);
-
-      if (plansMissingDiscounts.length > 0) {
-        const fetchMissingDiscounts = async () => {
-          setLoadingDiscounts(true);
-          try {
-            for (const planId of plansMissingDiscounts) {
-              const discounts = await fetchDiscountsForPlan(planId);
-              setAvailableDiscounts(prev => ({
-                ...prev,
-                [planId]: discounts,
-              }));
-              // Only mark as fetched if we have a profile (prevents marking empty fetches)
-              if (profile) {
-                discountsFetchedRef.current.add(planId);
-              }
-            }
-          } finally {
-            setLoadingDiscounts(false);
-          }
-        };
-        fetchMissingDiscounts();
-      }
-    }
-  }, [activeServiceTab, serviceSelections, profile, fetchDiscountsForPlan]);
-
   // Fetch eligible add-ons when primary service plan changes
   useEffect(() => {
     const fetchEligibleAddOns = async (planId: string) => {
@@ -989,90 +810,12 @@ export function LeadStepContent({
       }
     : null;
 
-  const handleAssigneeSelect = (assigneeId: string) => {
-    setSelectedAssignee(assigneeId);
-    setIsAssignmentDropdownOpen(false);
-  };
-
-  const showSuccessToast = (message: string) => {
-    if (onShowToast) {
-      onShowToast(message, 'success');
-    }
-  };
-
   const showErrorToast = (message: string) => {
     if (onShowToast) {
       onShowToast(message, 'error');
     }
   };
 
-  const handleUpdateServiceAddressSize = async (
-    field: 'home_size_range' | 'yard_size_range',
-    value: string,
-    label: string
-  ) => {
-    if (!lead.primary_service_address?.id || !value) return;
-
-    try {
-      await authenticatedFetch(
-        `/api/service-addresses/${lead.primary_service_address.id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [field]: value }),
-        }
-      );
-      showSuccessToast(`${label} updated`);
-    } catch (error) {
-      console.error(`Error updating ${label.toLowerCase()}:`, error);
-      showErrorToast(`Failed to update ${label.toLowerCase()}`);
-    }
-  };
-
-  const handleStartCadence = async () => {
-    setIsStartingCadence(true);
-    try {
-      const body = selectedCadenceId
-        ? JSON.stringify({ cadence_id: selectedCadenceId })
-        : JSON.stringify({});
-
-      const result = await authenticatedFetch(`/api/leads/${lead.id}/cadence`, {
-        method: 'POST',
-        body,
-      });
-
-      if (!result.ok && result.error) {
-        throw new Error(result.error);
-      }
-
-      onShowToast?.('Sales cadence started successfully', 'success');
-
-      // Reload cadence data and next task
-      setHasActiveCadence(true);
-
-      try {
-        const taskResult = await authenticatedFetch(
-          `/api/leads/${lead.id}/next-task`
-        );
-        if (taskResult && taskResult.data) {
-          setNextTask(taskResult.data);
-        }
-      } catch (taskError) {
-        console.error('Error fetching next task:', taskError);
-        // Don't fail the whole operation if we can't fetch the next task
-      }
-    } catch (error: any) {
-      console.error('Error starting cadence:', error);
-      showErrorToast(error.message || 'Failed to start sales cadence');
-    } finally {
-      setIsStartingCadence(false);
-    }
-  };
-
-  const handleManageLead = () => {
-    // Open modal to choose next step
-    setShowManageLeadModal(true);
-  };
 
   const handleCompleteTaskConfirm = async () => {
     if (!pendingActivity) return;
@@ -1189,293 +932,149 @@ export function LeadStepContent({
     }
   };
 
-  const handleManageLeadProceed = async (
-    option: 'communication' | 'quote' | 'schedule'
-  ) => {
-    // Handler for when "Myself" is selected - assigns to current user
-    if (!user?.id) {
-      showErrorToast('User information not available');
-      return;
+  // Wrapper handlers for LeadQuoteSection
+  const handlePestsChange = async (primary: string, additional: string[]) => {
+    if (primary) {
+      await updatePrimaryPest(primary);
     }
-
-    setIsAssigning(true);
-
-    try {
-      if (ticketType === 'sales') {
-        // Map option to lead status
-        const statusMap = {
-          communication: 'in_process',
-          quote: 'quoted',
-          schedule: 'scheduling',
-        };
-
-        const newStatus = statusMap[option];
-
-        // Assign lead to current user and update status
-        if (isAdmin) {
-          await adminAPI.updateLead(lead.id, {
-            assigned_to: user.id,
-            lead_status: newStatus,
-          });
-        } else {
-          await adminAPI.updateUserLead(lead.id, {
-            assigned_to: user.id,
-            lead_status: newStatus,
-          });
-        }
-
-        if (onLeadUpdate) {
-          await onLeadUpdate();
-        }
-        showSuccessToast(
-          `Sales lead assigned to you and moved to ${option === 'communication' ? 'Communication' : option === 'quote' ? 'Quote' : 'Scheduling'} stage`
-        );
-      } else if (ticketType === 'support') {
-        // Create support case assigned to current user
-        const supportCaseData = {
-          customer_id: lead.customer_id,
-          company_id: lead.company_id,
-          issue_type: 'general_inquiry',
-          summary: `Support case for ${lead.customer ? `${lead.customer.first_name} ${lead.customer.last_name}` : 'Customer'}`,
-          description: lead.comments || 'Converted from sales lead',
-          status: 'open',
-          priority: lead.priority,
-          assigned_to: user.id,
-        };
-
-        await adminAPI.supportCases.create(supportCaseData);
-
-        // Archive the lead after creating support case
-        if (isAdmin) {
-          await adminAPI.updateLead(lead.id, {
-            lead_status: 'lost',
-            archived: true,
-          });
-        } else {
-          await adminAPI.updateUserLead(lead.id, {
-            lead_status: 'lost',
-            archived: true,
-          });
-        }
-
-        if (onLeadUpdate) {
-          await onLeadUpdate();
-        }
-        showSuccessToast('Support case created and assigned to you');
-      }
-    } catch (error) {
-      console.error('Error managing ticket:', error);
-      showErrorToast(
-        error instanceof Error ? error.message : 'Failed to manage ticket'
-      );
-    } finally {
-      setIsAssigning(false);
+    if (additional.length > 0) {
+      await updateAdditionalPests(additional);
     }
   };
 
-  const handleAssignTicket = async () => {
-    if (!selectedAssignee) {
-      showErrorToast('Please select an assignee');
-      return;
+  const handleHomeSizeChange = async (rangeValue: string) => {
+    const oldValue = selectedHomeSizeOption;
+    const oldHomeSize = homeSize;
+
+    setSelectedHomeSizeOption(rangeValue);
+    const option = homeSizeOptions.find(opt => opt.value === rangeValue);
+    if (option) {
+      setHomeSize(option.rangeStart);
     }
 
-    setIsAssigning(true);
-    let shouldShowModal = false;
-    let assigneeInfo = null;
+    // Update quote (which will also update service_address via API)
+    if (quote && rangeValue) {
+      try {
+        const response = await fetch(`/api/quotes/${quote.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ home_size_range: rangeValue }),
+        });
 
-    try {
-      if (ticketType === 'sales') {
-        // Sales Lead logic
-        if (selectedAssignee === 'sales_team') {
-          // Assigned to Sales Team - keep as new lead
-          if (isAdmin) {
-            await adminAPI.updateLead(lead.id, {
-              assigned_to: null,
-              lead_status: 'new',
-            });
-          } else {
-            await adminAPI.updateUserLead(lead.id, {
-              assigned_to: null,
-              lead_status: 'new',
-            });
-          }
+        if (!response.ok) {
+          throw new Error('Failed to update home size range');
+        }
 
-          // Show modal for sales team assignment
-          const teamCount = assignableUsers.filter(user =>
-            user.departments.includes('sales')
-          ).length;
-          assigneeInfo = {
-            name: 'Sales Team',
-            title: `${teamCount} members`,
-            avatar: null,
-          };
-          shouldShowModal = true;
-          setAssignedUserInfo(assigneeInfo);
-          setShowAssignSuccessModal(true);
-        } else {
-          // Assigned to specific person - update to in_process status
-          if (isAdmin) {
-            await adminAPI.updateLead(lead.id, {
-              assigned_to: selectedAssignee,
-              lead_status: 'in_process',
-            });
-          } else {
-            await adminAPI.updateUserLead(lead.id, {
-              assigned_to: selectedAssignee,
-              lead_status: 'in_process',
-            });
-          }
+        const data = await response.json();
 
-          // Get assignee info for modal
-          const assignedUser = assignableUsers.find(
-            u => u.id === selectedAssignee
-          );
-          if (assignedUser) {
-            assigneeInfo = {
-              name: assignedUser.display_name,
-              title: assignedUser.email,
-              avatar: assignedUser.avatar_url || null,
+        if (data.success && data.data) {
+          await broadcastQuoteUpdate(data.data);
+          onShowToast?.('Home size updated successfully', 'success');
+
+          // Provide undo handler
+          if (onRequestUndo) {
+            const undoHandler = async () => {
+              try {
+                setSelectedHomeSizeOption(oldValue);
+                setHomeSize(oldHomeSize);
+
+                const revertResponse = await fetch(`/api/quotes/${quote.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ home_size_range: oldValue || null }),
+                });
+
+                if (!revertResponse.ok) {
+                  throw new Error('Failed to undo change');
+                }
+
+                const revertData = await revertResponse.json();
+                if (revertData.success && revertData.data) {
+                  await broadcastQuoteUpdate(revertData.data);
+                }
+
+                onShowToast?.('Change undone', 'success');
+              } catch (error) {
+                console.error('Error undoing change:', error);
+                onShowToast?.('Failed to undo change', 'error');
+              }
             };
-            shouldShowModal = true;
 
-            // Set assignee info and show modal BEFORE onLeadUpdate
-            setAssignedUserInfo(assigneeInfo);
-            setShowAssignSuccessModal(true);
+            onRequestUndo(undoHandler);
           }
         }
-      } else if (ticketType === 'support') {
-        // Support Case logic - create support case first, then archive lead only if successful
-        const supportCaseData = {
-          customer_id: lead.customer_id,
-          company_id: lead.company_id, // Explicitly include company_id
-          issue_type: 'general_inquiry',
-          summary: `Converted from sales lead${lead.customer ? ` - ${lead.customer.first_name} ${lead.customer.last_name}` : ''}`,
-          description: lead.comments || 'Converted from sales lead',
-          status: 'new',
-          priority: 'medium',
-          assigned_to:
-            selectedAssignee === 'support_team' ? undefined : selectedAssignee,
-        };
+      } catch (error) {
+        console.error('Error updating home size range:', error);
+        onShowToast?.('Failed to update home size', 'error');
+      }
+    }
+  };
 
-        try {
-          // Create support case first
-          await adminAPI.supportCases.create(supportCaseData);
+  const handleYardSizeChange = async (rangeValue: string) => {
+    const oldValue = selectedYardSizeOption;
+    const oldYardSize = yardSize;
 
-          // Only archive the lead if support case creation was successful
-          if (isAdmin) {
-            await adminAPI.updateLead(lead.id, {
-              archived: true,
-            });
-          } else {
-            await adminAPI.updateUserLead(lead.id, {
-              archived: true,
-            });
+    setSelectedYardSizeOption(rangeValue);
+    const option = yardSizeOptions.find(opt => opt.value === rangeValue);
+    if (option) {
+      setYardSize(option.rangeStart);
+    }
+
+    // Update quote (which will also update service_address via API)
+    if (quote && rangeValue) {
+      try {
+        const response = await fetch(`/api/quotes/${quote.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ yard_size_range: rangeValue }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update yard size range');
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          await broadcastQuoteUpdate(data.data);
+          onShowToast?.('Yard size updated successfully', 'success');
+
+          // Provide undo handler
+          if (onRequestUndo) {
+            const undoHandler = async () => {
+              try {
+                setSelectedYardSizeOption(oldValue);
+                setYardSize(oldYardSize);
+
+                const revertResponse = await fetch(`/api/quotes/${quote.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ yard_size_range: oldValue || null }),
+                });
+
+                if (!revertResponse.ok) {
+                  throw new Error('Failed to undo change');
+                }
+
+                const revertData = await revertResponse.json();
+                if (revertData.success && revertData.data) {
+                  await broadcastQuoteUpdate(revertData.data);
+                }
+
+                onShowToast?.('Change undone', 'success');
+              } catch (error) {
+                console.error('Error undoing change:', error);
+                onShowToast?.('Failed to undo change', 'error');
+              }
+            };
+
+            onRequestUndo(undoHandler);
           }
-
-          showSuccessToast('Support case created and lead archived');
-        } catch (supportCaseError) {
-          console.error('Failed to create support case:', supportCaseError);
-          throw new Error(
-            `Failed to create support case: ${supportCaseError instanceof Error ? supportCaseError.message : 'Unknown error'}`
-          );
         }
-      } else if (ticketType === 'junk') {
-        // Archive the lead as junk
-        if (isAdmin) {
-          await adminAPI.updateLead(lead.id, {
-            archived: true,
-          });
-        } else {
-          await adminAPI.updateUserLead(lead.id, {
-            archived: true,
-          });
-        }
-        showSuccessToast('Lead marked as junk and archived');
+      } catch (error) {
+        console.error('Error updating yard size range:', error);
+        onShowToast?.('Failed to update yard size', 'error');
       }
-
-      // Only call onLeadUpdate if modal is not being shown
-      // The modal's "Return to Leads" button will handle navigation
-      if (!shouldShowModal && onLeadUpdate) {
-        await onLeadUpdate();
-      }
-    } catch (error) {
-      console.error('Error assigning ticket:', error);
-      showErrorToast(
-        error instanceof Error ? error.message : 'Failed to assign ticket'
-      );
-    } finally {
-      setIsAssigning(false);
-    }
-  };
-
-  const getTeamCount = () => {
-    const department = ticketType === 'support' ? 'support' : 'sales';
-    return assignableUsers.filter(user => user.departments.includes(department))
-      .length;
-  };
-
-  const getSelectedAssigneeDisplay = () => {
-    if (selectedAssignee === 'sales_team') {
-      return {
-        name: 'Sales Team',
-        subtitle: `${getTeamCount()} members`,
-        avatar: null,
-        isTeam: true,
-      };
-    }
-
-    if (selectedAssignee === 'support_team') {
-      return {
-        name: 'Support Team',
-        subtitle: `${getTeamCount()} members`,
-        avatar: null,
-        isTeam: true,
-      };
-    }
-
-    if (selectedAssignee === user?.id) {
-      return {
-        name: currentUser?.name || 'Unknown',
-        subtitle: 'Myself',
-        avatar: currentUser?.avatar,
-        isTeam: false,
-      };
-    }
-
-    const assignee = assignableUsers.find(u => u.id === selectedAssignee);
-    if (assignee) {
-      return {
-        name: assignee.display_name,
-        subtitle: assignee.email,
-        avatar: assignee.avatar_url,
-        isTeam: false,
-      };
-    }
-
-    return {
-      name: 'Select assignee',
-      subtitle: '',
-      avatar: null,
-      isTeam: false,
-    };
-  };
-
-  const updateLeadRequestedDate = async (date: string) => {
-    try {
-      if (isAdmin) {
-        await adminAPI.updateLead(lead.id, {
-          requested_date: date,
-        });
-      } else {
-        await adminAPI.updateUserLead(lead.id, {
-          requested_date: date,
-        });
-      }
-      onShowToast?.('Preferred date updated successfully', 'success');
-      // Don't call onLeadUpdate to prevent re-rendering
-    } catch (error) {
-      console.error('Failed to update requested date:', error);
-      onShowToast?.('Failed to update requested date', 'error');
     }
   };
 
@@ -1606,46 +1205,6 @@ export function LeadStepContent({
     }
   };
 
-  // Handle marking lead as lost
-  const handleMarkAsLost = async () => {
-    try {
-      if (isAdmin) {
-        await adminAPI.updateLead(lead.id, {
-          lead_status: 'lost',
-        });
-      } else {
-        await adminAPI.updateUserLead(lead.id, {
-          lead_status: 'lost',
-        });
-      }
-      onLeadUpdate?.();
-      onShowToast?.('Lead marked as lost', 'success');
-    } catch (error) {
-      console.error('Failed to mark lead as lost:', error);
-      onShowToast?.('Failed to mark lead as lost', 'error');
-    }
-  };
-
-  // Handle progressing lead to scheduling
-  const handleProgressToReadyToSchedule = async () => {
-    try {
-      if (isAdmin) {
-        await adminAPI.updateLead(lead.id, {
-          lead_status: 'scheduling',
-        });
-      } else {
-        await adminAPI.updateUserLead(lead.id, {
-          lead_status: 'scheduling',
-        });
-      }
-      onLeadUpdate?.();
-      onShowToast?.('Lead marked as Ready to Schedule!', 'success');
-    } catch (error) {
-      console.error('Failed to progress lead:', error);
-      onShowToast?.('Failed to update lead status', 'error');
-    }
-  };
-
   // Handle confirming service and finalizing sale
   const handleConfirmAndFinalize = async (
     confirmedDate: string,
@@ -1698,25 +1257,6 @@ export function LeadStepContent({
   // Handle emailing quote to customer - triggers parent modal
   const handleEmailQuote = () => {
     onEmailQuote?.();
-  };
-
-  const updateLeadRequestedTime = async (time: string) => {
-    try {
-      if (isAdmin) {
-        await adminAPI.updateLead(lead.id, {
-          requested_time: time,
-        });
-      } else {
-        await adminAPI.updateUserLead(lead.id, {
-          requested_time: time,
-        });
-      }
-      onShowToast?.('Preferred time updated successfully', 'success');
-      // Don't call onLeadUpdate to prevent re-rendering
-    } catch (error) {
-      console.error('Failed to update requested time:', error);
-      onShowToast?.('Failed to update requested time', 'error');
-    }
   };
 
   /**
@@ -1932,1749 +1472,6 @@ export function LeadStepContent({
     }
   };
 
-  const getButtonText = () => {
-    // Check if "Myself" is selected (current user)
-    const isMyself = selectedAssignee === user?.id;
-
-    if (ticketType === 'sales') {
-      return isMyself ? 'Manage Sales Lead' : 'Assign Sales Lead';
-    } else if (ticketType === 'support') {
-      return isMyself ? 'Manage Support Case' : 'Assign Support Case';
-    } else if (ticketType === 'junk') {
-      return 'Junk It';
-    }
-    return 'Assign Ticket';
-  };
-
-  const formatCallTimestamp = (timestamp?: string) => {
-    if (!timestamp) return 'Unknown';
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
-  };
-
-  const getCallMethod = () => {
-    // This would depend on your call record structure
-    // For now, assume inbound if we have a call record
-    return 'Inbound Call';
-  };
-
-  const getLeadSourceDisplay = (source: string) => {
-    const sourceMap: { [key: string]: string } = {
-      google_cpc: 'Paid Advertisement',
-      facebook_ads: 'Social Media Ads',
-      organic: 'Organic Search',
-      referral: 'Referral',
-      other: 'Other',
-    };
-    return sourceMap[source] || source;
-  };
-
-  const getAIQualification = (leadStatus: string) => {
-    return leadStatus === 'qualified' || leadStatus === 'in_process'
-      ? 'Sales Lead'
-      : 'Unqualified';
-  };
-
-  const capitalizeFirst = (str?: string) => {
-    if (!str) return 'Not specified';
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  };
-
-  const TeamAvatar = () => (
-    <div className={styles.teamAvatar}>
-      <Users size={16} color="white" />
-    </div>
-  );
-
-  const DefaultAvatar = ({ name }: { name: string }) => (
-    <div className={styles.defaultAvatar}>{name.charAt(0).toUpperCase()}</div>
-  );
-
-  const renderQuotedContent = () => {
-    const selectedPlan = serviceSelections[0]?.servicePlan;
-    const selectedService = selectedPlan?.plan_name || '';
-
-    const quotedTabs: TabItem[] = [
-      {
-        id: 'pest',
-        label: 'Pest Select',
-        content: (
-          <div className={styles.cardContent} style={{ position: 'relative' }}>
-            {loadingPlan && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10,
-                  borderRadius: '6px',
-                }}
-              >
-                <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
-                  Updating service plan...
-                </div>
-              </div>
-            )}
-            {loadingPestOptions ? (
-              <div className={cardStyles.lightText}>
-                Loading pest options...
-              </div>
-            ) : (
-              <>
-                {/* Primary Pest Section */}
-                <PestSelection
-                  selectedPestId={selectedPests[0] || null}
-                  pestOptions={pestOptions}
-                  onPestChange={async pestId => {
-                    if (pestId) {
-                      // Update primary pest
-                      setSelectedPests([pestId, ...additionalPests]);
-                      await updatePrimaryPest(pestId);
-                    } else {
-                      // Remove primary pest
-                      setSelectedPests(additionalPests);
-                      await updatePrimaryPest('');
-                    }
-                  }}
-                  loading={loadingPlan}
-                />
-
-                {/* Additional Pests Section - Only show if primary pest is selected */}
-                {selectedPests.length > 0 && selectedPests[0] && (
-                  <AdditionalPestsSelection
-                    selectedPestIds={additionalPests}
-                    pestOptions={pestOptions}
-                    primaryPestId={selectedPests[0]}
-                    onPestsChange={async pestIds => {
-                      setAdditionalPests(pestIds);
-                      setSelectedPests(
-                        [selectedPests[0], ...pestIds].filter(Boolean)
-                      );
-                      await updateAdditionalPests(pestIds);
-                    }}
-                    loading={loadingPlan}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        ),
-      },
-      {
-        id: 'service',
-        label: 'Service Selection',
-        content: (
-          <div className={styles.cardContent} style={{ position: 'relative' }}>
-            {(loadingPlan || isQuoteUpdating) && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10,
-                  borderRadius: '6px',
-                }}
-              >
-                <div style={{ color: 'var(--gray-500)', fontSize: '14px' }}>
-                  {loadingPlan ? 'Loading service plan...' : 'Updating...'}
-                </div>
-              </div>
-            )}
-            {loadingPlan && !selectedPlan ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'var(--gray-500)',
-                }}
-              >
-                Loading service plan...
-              </div>
-            ) : selectedPests.length === 0 ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'var(--gray-500)',
-                }}
-              >
-                Select a pest to view available service plans
-              </div>
-            ) : !selectedPlan ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'var(--gray-500)',
-                }}
-              >
-                No service plans available for selected pest
-              </div>
-            ) : (
-              <>
-                {/* Service Selection Form */}
-                {/* Row 1: Size of Home, Yard Size (2 columns) */}
-                <div className={`${styles.gridRow} ${styles.twoColumns}`}>
-                  <div className={styles.formField}>
-                    <div className={styles.fieldHeader}>
-                      <label className={styles.fieldLabel}>Size of Home</label>
-                    </div>
-                    <CustomDropdown
-                      options={homeSizeOptions}
-                      value={selectedHomeSizeOption}
-                      onChange={async rangeValue => {
-                        const oldValue = selectedHomeSizeOption;
-                        const oldHomeSize = homeSize;
-
-                        setSelectedHomeSizeOption(rangeValue);
-                        const option = homeSizeOptions.find(
-                          opt => opt.value === rangeValue
-                        );
-                        if (option) {
-                          setHomeSize(option.rangeStart);
-                        }
-
-                        // Update quote (which will also update service_address via API)
-                        if (quote && rangeValue) {
-                          try {
-                            const response = await fetch(
-                              `/api/quotes/${quote.id}`,
-                              {
-                                method: 'PUT',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                  home_size_range: rangeValue,
-                                }),
-                              }
-                            );
-
-                            if (!response.ok) {
-                              throw new Error(
-                                'Failed to update home size range'
-                              );
-                            }
-
-                            const data = await response.json();
-
-                            if (data.success && data.data) {
-                              await broadcastQuoteUpdate(data.data);
-                              onShowToast?.(
-                                'Home size updated successfully',
-                                'success'
-                              );
-
-                              // Provide undo handler
-                              if (onRequestUndo) {
-                                const undoHandler = async () => {
-                                  try {
-                                    // Revert UI state
-                                    setSelectedHomeSizeOption(oldValue);
-                                    setHomeSize(oldHomeSize);
-
-                                    // Revert in database
-                                    const revertResponse = await fetch(
-                                      `/api/quotes/${quote.id}`,
-                                      {
-                                        method: 'PUT',
-                                        headers: {
-                                          'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                          home_size_range: oldValue || null,
-                                        }),
-                                      }
-                                    );
-
-                                    if (!revertResponse.ok) {
-                                      throw new Error('Failed to undo change');
-                                    }
-
-                                    const revertData =
-                                      await revertResponse.json();
-                                    if (revertData.success && revertData.data) {
-                                      await broadcastQuoteUpdate(
-                                        revertData.data
-                                      );
-                                    }
-
-                                    onShowToast?.('Change undone', 'success');
-                                  } catch (error) {
-                                    console.error(
-                                      'Error undoing change:',
-                                      error
-                                    );
-                                    onShowToast?.(
-                                      'Failed to undo change',
-                                      'error'
-                                    );
-                                  }
-                                };
-
-                                onRequestUndo(undoHandler);
-                              }
-                            }
-                          } catch (error) {
-                            console.error(
-                              'Error updating home size range:',
-                              error
-                            );
-                            onShowToast?.(
-                              'Failed to update home size',
-                              'error'
-                            );
-                          }
-                        }
-                      }}
-                      placeholder="Select home size"
-                    />
-                  </div>
-                  <div className={styles.formField}>
-                    <div className={styles.fieldHeader}>
-                      <label className={styles.fieldLabel}>Yard Size</label>
-                    </div>
-                    <CustomDropdown
-                      options={yardSizeOptions}
-                      value={selectedYardSizeOption}
-                      onChange={async rangeValue => {
-                        const oldValue = selectedYardSizeOption;
-                        const oldYardSize = yardSize;
-
-                        setSelectedYardSizeOption(rangeValue);
-                        const option = yardSizeOptions.find(
-                          opt => opt.value === rangeValue
-                        );
-                        if (option) {
-                          setYardSize(option.rangeStart);
-                        }
-
-                        // Update quote (which will also update service_address via API)
-                        if (quote && rangeValue) {
-                          try {
-                            const response = await fetch(
-                              `/api/quotes/${quote.id}`,
-                              {
-                                method: 'PUT',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                  yard_size_range: rangeValue,
-                                }),
-                              }
-                            );
-
-                            if (!response.ok) {
-                              throw new Error(
-                                'Failed to update yard size range'
-                              );
-                            }
-
-                            const data = await response.json();
-
-                            if (data.success && data.data) {
-                              await broadcastQuoteUpdate(data.data);
-                              onShowToast?.(
-                                'Yard size updated successfully',
-                                'success'
-                              );
-
-                              // Provide undo handler
-                              if (onRequestUndo) {
-                                const undoHandler = async () => {
-                                  try {
-                                    // Revert UI state
-                                    setSelectedYardSizeOption(oldValue);
-                                    setYardSize(oldYardSize);
-
-                                    // Revert in database
-                                    const revertResponse = await fetch(
-                                      `/api/quotes/${quote.id}`,
-                                      {
-                                        method: 'PUT',
-                                        headers: {
-                                          'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                          yard_size_range: oldValue || null,
-                                        }),
-                                      }
-                                    );
-
-                                    if (!revertResponse.ok) {
-                                      throw new Error('Failed to undo change');
-                                    }
-
-                                    const revertData =
-                                      await revertResponse.json();
-                                    if (revertData.success && revertData.data) {
-                                      await broadcastQuoteUpdate(
-                                        revertData.data
-                                      );
-                                    }
-
-                                    onShowToast?.('Change undone', 'success');
-                                  } catch (error) {
-                                    console.error(
-                                      'Error undoing change:',
-                                      error
-                                    );
-                                    onShowToast?.(
-                                      'Failed to undo change',
-                                      'error'
-                                    );
-                                  }
-                                };
-
-                                onRequestUndo(undoHandler);
-                              }
-                            }
-                          } catch (error) {
-                            console.error(
-                              'Error updating yard size range:',
-                              error
-                            );
-                            onShowToast?.(
-                              'Failed to update yard size',
-                              'error'
-                            );
-                          }
-                        }
-                      }}
-                      placeholder="Select yard size"
-                    />
-                  </div>
-                </div>
-
-                {/* Render Service Selections Dynamically */}
-                {serviceSelections.map((selection, index) => (
-                  <div key={selection.id}>
-                    <div className={`${styles.gridRow} ${styles.threeColumns}`}>
-                      <div className={styles.formField}>
-                        <div className={styles.serviceHeaderRow}>
-                          <label className={styles.fieldLabel}>
-                            Select Service {index + 1}
-                          </label>
-                          {index > 0 && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removeServiceSelection(selection.displayOrder)
-                              }
-                              className={styles.removeServiceButton}
-                              aria-label="Remove service"
-                            >
-                              <X size={16} />
-                            </button>
-                          )}
-                        </div>
-                        <CustomDropdown
-                          options={
-                            loadingServicePlans
-                              ? [{ value: '', label: 'Loading plans...' }]
-                              : allServicePlans.length > 0
-                                ? allServicePlans.map(plan => ({
-                                    value: plan.plan_name,
-                                    label: plan.plan_name,
-                                  }))
-                                : [{ value: '', label: 'No plans available' }]
-                          }
-                          value={selection.servicePlan?.plan_name || ''}
-                          onChange={async planName => {
-                            const plan = allServicePlans.find(
-                              p => p.plan_name === planName
-                            );
-                            if (plan) {
-                              setServiceSelections(prev =>
-                                prev.map((sel, idx) =>
-                                  idx === index
-                                    ? { ...sel, servicePlan: plan }
-                                    : sel
-                                )
-                              );
-                              await createOrUpdateQuoteLineItem(
-                                plan,
-                                selection.displayOrder
-                              );
-                            }
-                          }}
-                          placeholder="Program or Service"
-                          disabled={loadingServicePlans}
-                        />
-                      </div>
-                      <div className={styles.formField}>
-                        <label className={styles.fieldLabel}>
-                          Service Frequency
-                        </label>
-                        <CustomDropdown
-                          options={[
-                            { value: 'monthly', label: 'Monthly' },
-                            { value: 'quarterly', label: 'Quarterly' },
-                            { value: 'semi-annually', label: 'Semi-Annually' },
-                            { value: 'annually', label: 'Annually' },
-                          ]}
-                          value={selection.frequency}
-                          onChange={async newFrequency => {
-                            setServiceSelections(prev =>
-                              prev.map((sel, idx) =>
-                                idx === index
-                                  ? { ...sel, frequency: newFrequency }
-                                  : sel
-                              )
-                            );
-
-                            if (selection.servicePlan && newFrequency) {
-                              await createOrUpdateQuoteLineItem(
-                                selection.servicePlan,
-                                selection.displayOrder,
-                                {
-                                  service_frequency: newFrequency,
-                                }
-                              );
-                            }
-                          }}
-                          placeholder="Select Frequency"
-                        />
-                      </div>
-                      {/* Discount selector - disabled when custom pricing is active */}
-                      <div className={styles.formField}>
-                        <label className={styles.fieldLabel}>Discount</label>
-                        <CustomDropdown
-                          options={
-                            loadingDiscounts
-                              ? [{ value: '', label: 'Loading discounts...' }]
-                              : [
-                                  { value: '', label: 'No Discount' },
-                                  ...(selection.servicePlan &&
-                                  availableDiscounts[selection.servicePlan.id]
-                                    ? availableDiscounts[
-                                        selection.servicePlan.id
-                                      ].map(discount => ({
-                                        value: discount.id,
-                                        label: discount.name,
-                                      }))
-                                    : []),
-                                ]
-                          }
-                          value={
-                            selection.isCustomPriced ? '' : selection.discount
-                          }
-                          onChange={async newDiscountId => {
-                            setServiceSelections(prev =>
-                              prev.map((sel, idx) =>
-                                idx === index
-                                  ? { ...sel, discount: newDiscountId }
-                                  : sel
-                              )
-                            );
-
-                            if (selection.servicePlan) {
-                              await createOrUpdateQuoteLineItem(
-                                selection.servicePlan,
-                                selection.displayOrder,
-                                {
-                                  discount_id:
-                                    newDiscountId === '' ? null : newDiscountId,
-                                }
-                              );
-                            }
-                          }}
-                          placeholder={
-                            loadingDiscounts
-                              ? 'Loading discounts...'
-                              : selection.isCustomPriced
-                                ? 'Disabled (Custom Pricing Active)'
-                                : 'Select Discount'
-                          }
-                          disabled={
-                            loadingDiscounts || selection.isCustomPriced
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    {/* Custom Pricing - Collapsible Section */}
-                    {selection.servicePlan?.allow_custom_pricing && (
-                      <div className={styles.customPricingSection}>
-                        <button
-                          type="button"
-                          className={styles.customPricingToggle}
-                          onClick={() => {
-                            const isExpanding =
-                              !customPricingExpanded[selection.displayOrder];
-
-                            setCustomPricingExpanded(prev => ({
-                              ...prev,
-                              [selection.displayOrder]: isExpanding,
-                            }));
-
-                            // Pre-fill with calculated prices when expanding for the first time
-                            if (
-                              isExpanding &&
-                              selection.customInitialPrice === undefined &&
-                              selection.customRecurringPrice === undefined
-                            ) {
-                              setServiceSelections(prev =>
-                                prev.map((sel, idx) =>
-                                  idx === index
-                                    ? {
-                                        ...sel,
-                                        customInitialPrice:
-                                          calculatedPrices[
-                                            selection.displayOrder
-                                          ]?.initial || 0,
-                                        customRecurringPrice:
-                                          calculatedPrices[
-                                            selection.displayOrder
-                                          ]?.recurring || 0,
-                                      }
-                                    : sel
-                                )
-                              );
-                            }
-                          }}
-                        >
-                          <span className={styles.toggleIcon}>
-                            {customPricingExpanded[selection.displayOrder]
-                              ? '▼'
-                              : '▶'}
-                          </span>
-                          Custom Pricing
-                        </button>
-
-                        {customPricingExpanded[selection.displayOrder] && (
-                          <div className={styles.customPricingFields}>
-                            <div className={styles.customPriceLabel}>
-                              Override calculated price
-                            </div>
-                            <div className={styles.priceInputRow}>
-                              <div className={styles.formField}>
-                                <label className={styles.fieldLabel}>
-                                  Initial Price ($)
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  className={styles.priceInput}
-                                  value={
-                                    selection.customInitialPrice ??
-                                    calculatedPrices[selection.displayOrder]
-                                      ?.initial ??
-                                    ''
-                                  }
-                                  onChange={e => {
-                                    const value =
-                                      parseFloat(e.target.value) || 0;
-                                    if (value < 0) return; // Prevent negative prices
-
-                                    // Update state only (don't save yet)
-                                    setServiceSelections(prev =>
-                                      prev.map((sel, idx) =>
-                                        idx === index
-                                          ? {
-                                              ...sel,
-                                              customInitialPrice: value,
-                                            }
-                                          : sel
-                                      )
-                                    );
-                                  }}
-                                  placeholder="Enter custom initial price"
-                                />
-                              </div>
-                              <div className={styles.formField}>
-                                <label className={styles.fieldLabel}>
-                                  Recurring Price ($)
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  className={styles.priceInput}
-                                  value={
-                                    selection.customRecurringPrice ??
-                                    calculatedPrices[selection.displayOrder]
-                                      ?.recurring ??
-                                    ''
-                                  }
-                                  onChange={e => {
-                                    const value =
-                                      parseFloat(e.target.value) || 0;
-                                    if (value < 0) return; // Prevent negative prices
-
-                                    // Update state only (don't save yet)
-                                    setServiceSelections(prev =>
-                                      prev.map((sel, idx) =>
-                                        idx === index
-                                          ? {
-                                              ...sel,
-                                              customRecurringPrice: value,
-                                            }
-                                          : sel
-                                      )
-                                    );
-                                  }}
-                                  placeholder="Enter custom recurring price"
-                                />
-                              </div>
-                            </div>
-                            <small className={styles.customPriceNote}>
-                              Calculated price: $
-                              {calculatedPrices[
-                                selection.displayOrder
-                              ]?.initial?.toFixed(2) || '0.00'}{' '}
-                              initial, $
-                              {calculatedPrices[
-                                selection.displayOrder
-                              ]?.recurring?.toFixed(2) || '0.00'}
-                              /mo recurring
-                            </small>
-
-                            {/* Action Buttons */}
-                            <div className={styles.customPricingActions}>
-                              <button
-                                type="button"
-                                className={styles.saveCustomPriceButton}
-                                onClick={async () => {
-                                  if (
-                                    selection.servicePlan &&
-                                    selection.customInitialPrice !==
-                                      undefined &&
-                                    selection.customRecurringPrice !== undefined
-                                  ) {
-                                    // Mark as custom priced and clear discount
-                                    setServiceSelections(prev =>
-                                      prev.map((sel, idx) =>
-                                        idx === index
-                                          ? {
-                                              ...sel,
-                                              isCustomPriced: true,
-                                              discount: '', // Clear discount when using custom pricing
-                                            }
-                                          : sel
-                                      )
-                                    );
-
-                                    // Save to backend
-                                    await createOrUpdateQuoteLineItem(
-                                      selection.servicePlan,
-                                      selection.displayOrder,
-                                      {
-                                        custom_initial_price:
-                                          selection.customInitialPrice,
-                                        custom_recurring_price:
-                                          selection.customRecurringPrice,
-                                        is_custom_priced: true,
-                                        discount_id: null, // Clear discount when using custom pricing
-                                      }
-                                    );
-                                  }
-                                }}
-                              >
-                                Save Custom Price
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.clearCustomPriceButton}
-                                onClick={async () => {
-                                  if (selection.servicePlan) {
-                                    // Clear custom pricing from state
-                                    setServiceSelections(prev =>
-                                      prev.map((sel, idx) =>
-                                        idx === index
-                                          ? {
-                                              ...sel,
-                                              customInitialPrice: undefined,
-                                              customRecurringPrice: undefined,
-                                              isCustomPriced: false,
-                                            }
-                                          : sel
-                                      )
-                                    );
-
-                                    // Clear from backend
-                                    await createOrUpdateQuoteLineItem(
-                                      selection.servicePlan,
-                                      selection.displayOrder,
-                                      {
-                                        custom_initial_price: undefined,
-                                        custom_recurring_price: undefined,
-                                        is_custom_priced: false,
-                                      }
-                                    );
-                                  }
-                                }}
-                              >
-                                Clear Custom Pricing
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Pest Concern Coverage Pills and Add Service Button Row */}
-                <div className={styles.pestCoverageRow}>
-                  <div className={styles.pestCoverageSection}>
-                    <label className={styles.fieldLabel}>
-                      Pest Concern Coverage
-                    </label>
-                    <div className={styles.pestContainer}>
-                      {pestOptions
-                        .filter(pest => selectedPests.includes(pest.id))
-                        .sort((a, b) => {
-                          // Sort by selectedPests order - primary pest (index 0) appears first
-                          const indexA = selectedPests.indexOf(a.id);
-                          const indexB = selectedPests.indexOf(b.id);
-                          return indexA - indexB;
-                        })
-                        .map(pest => {
-                          // Check if this pest is covered by ANY selected service plan
-                          const isCovered = serviceSelections.some(sel =>
-                            sel.servicePlan?.pest_coverage?.some(
-                              (coverage: any) => coverage.pest_id === pest.id
-                            )
-                          );
-
-                          return (
-                            <div
-                              key={pest.id}
-                              className={styles.pestBadge}
-                              style={
-                                !isCovered
-                                  ? {
-                                      background: '#FFE3E2',
-                                      border: '1px solid #FB2C36',
-                                      color: '#C10007',
-                                    }
-                                  : undefined
-                              }
-                            >
-                              {isCovered ? (
-                                <svg
-                                  width="8"
-                                  height="8"
-                                  viewBox="0 0 8 8"
-                                  fill="none"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    d="M6.5 2L3 5.5L1.5 4"
-                                    stroke="var(--green-600, #00A63E)"
-                                    strokeWidth="1.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              ) : (
-                                <CircleOff
-                                  size={8}
-                                  style={{ color: '#FB2C36' }}
-                                />
-                              )}
-                              {pest.custom_label}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-
-                  {/* Add Service Button */}
-                  {serviceSelections.length < 3 &&
-                    serviceSelections.some(sel => sel.servicePlan) && (
-                      <div className={styles.addServiceButtonContainer}>
-                        <button
-                          type="button"
-                          onClick={addServiceSelection}
-                          className={styles.addServiceButton}
-                        >
-                          <Plus size={20} />
-                          Add Service
-                        </button>
-                      </div>
-                    )}
-                </div>
-
-                {/* Add-On Services Section */}
-                {serviceSelections[0]?.servicePlan && (
-                  <div
-                    style={{
-                      marginTop: '32px',
-                      paddingTop: '24px',
-                      borderTop: '1px solid #e5e7eb',
-                    }}
-                  >
-                    <EligibleAddOnSelector
-                      companyId={lead.company_id}
-                      servicePlanId={serviceSelections[0].servicePlan.id}
-                      selectedAddonIds={selectedAddOns}
-                      onToggleAddon={handleToggleAddon}
-                    />
-                  </div>
-                )}
-
-                {/* Plan Pricing Section */}
-                {serviceSelections.some(sel => sel.servicePlan) && (
-                  <>
-                    <h4 className={cardStyles.defaultText}>Plan Pricing</h4>
-                    <div className={styles.planPricingContainer}>
-                      {serviceSelections.length === 1 ? (
-                        // Single Plan Pricing Display
-                        serviceSelections[0].servicePlan && (
-                          <div className={styles.singlePlanPricing}>
-                            <div className={styles.pricingGrid}>
-                              <div className={styles.pricingColumn}>
-                                <div className={styles.pricingLabel}>
-                                  Recurring Price
-                                </div>
-                                <div className={styles.recurringPrice}>
-                                  $
-                                  {quote?.line_items?.[0]
-                                    ?.final_recurring_price || 0}
-                                  <span className={styles.perMonth}>/mo</span>
-                                </div>
-                              </div>
-                              <div className={styles.pricingColumn}>
-                                <div className={styles.pricingLabel}>
-                                  Initial Price
-                                </div>
-                                <div className={styles.initialPrice}>
-                                  $
-                                  {Math.round(
-                                    quote?.line_items?.[0]
-                                      ?.final_initial_price || 0
-                                  )}
-                                </div>
-                                {quote?.line_items?.[0]?.discount_percentage ? (
-                                  <div className={styles.originalPrice}>
-                                    Originally $
-                                    {Math.round(
-                                      quote?.line_items?.[0]?.initial_price || 0
-                                    )}{' '}
-                                    (-
-                                    {
-                                      quote?.line_items?.[0]
-                                        ?.discount_percentage
-                                    }
-                                    %)
-                                  </div>
-                                ) : null}
-                              </div>
-                              <div className={styles.pricingColumn}>
-                                <div className={styles.pricingLabel}>
-                                  Treatment Frequency
-                                </div>
-                                <div className={styles.frequency}>
-                                  {serviceSelections[0].frequency
-                                    .charAt(0)
-                                    .toUpperCase() +
-                                    serviceSelections[0].frequency.slice(1)}
-                                </div>
-                                <div className={styles.inspection}>
-                                  Inspection Included
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Add-Ons for Single Plan */}
-                            {quote?.line_items &&
-                              quote.line_items.filter(
-                                item =>
-                                  item.addon_service_id != null &&
-                                  item.addon_service_id !== ''
-                              ).length > 0 && (
-                                <div className={styles.addOnsBreakdown}>
-                                  <div className={styles.addOnsHeader}>
-                                    Add-On Services:
-                                  </div>
-                                  {quote.line_items
-                                    .filter(
-                                      item =>
-                                        item.addon_service_id != null &&
-                                        item.addon_service_id !== ''
-                                    )
-                                    .map(addonItem => (
-                                      <div
-                                        key={addonItem.id}
-                                        className={styles.addonLineItem}
-                                      >
-                                        <div className={styles.addonName}>
-                                          {addonItem.plan_name}
-                                        </div>
-                                        <div className={styles.addonPrices}>
-                                          <span
-                                            className={styles.addonRecurring}
-                                          >
-                                            +${addonItem.final_recurring_price}
-                                            /mo
-                                          </span>
-                                          {addonItem.final_initial_price >
-                                            0 && (
-                                            <span
-                                              className={styles.addonInitial}
-                                            >
-                                              $
-                                              {Math.round(
-                                                addonItem.final_initial_price
-                                              )}{' '}
-                                              initial
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                </div>
-                              )}
-
-                            {/* Total with Add-Ons */}
-                            {quote?.line_items &&
-                              quote.line_items.filter(
-                                item =>
-                                  item.addon_service_id != null &&
-                                  item.addon_service_id !== ''
-                              ).length > 0 && (
-                                <div className={styles.singlePlanTotal}>
-                                  <div className={styles.totalRow}>
-                                    <span className={styles.totalLabel}>
-                                      Total Recurring:
-                                    </span>
-                                    <span className={styles.totalValue}>
-                                      $
-                                      {Math.round(
-                                        quote?.total_recurring_price || 0
-                                      )}
-                                      /mo
-                                    </span>
-                                  </div>
-                                  <div className={styles.totalRow}>
-                                    <span className={styles.totalLabel}>
-                                      Total Initial:
-                                    </span>
-                                    <span className={styles.totalValue}>
-                                      $
-                                      {Math.round(
-                                        quote?.total_initial_price || 0
-                                      )}
-                                    </span>
-                                  </div>
-                                </div>
-                              )}
-                          </div>
-                        )
-                      ) : (
-                        // Multiple Plans Pricing Display
-                        <div className={styles.multiplePlansPricing}>
-                          {serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .map((selection, index) => {
-                              const lineItem = quote?.line_items?.find(
-                                item =>
-                                  item.display_order === selection.displayOrder
-                              );
-                              return (
-                                <div
-                                  key={selection.id}
-                                  className={styles.planLineItem}
-                                >
-                                  <div className={styles.lineItemHeader}>
-                                    Service {index + 1}:{' '}
-                                    {selection.servicePlan?.plan_name}
-                                  </div>
-                                  <div className={styles.lineItemPricing}>
-                                    <div className={styles.lineItemColumn}>
-                                      <div className={styles.lineItemLabel}>
-                                        Recurring Price
-                                      </div>
-                                      <div
-                                        className={
-                                          styles.lineItemRecurringPrice
-                                        }
-                                      >
-                                        $
-                                        {Math.round(
-                                          lineItem?.final_recurring_price || 0
-                                        )}
-                                        <span
-                                          className={styles.lineItemPerMonth}
-                                        >
-                                          /mo
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <div className={styles.lineItemColumn}>
-                                      <div className={styles.lineItemLabel}>
-                                        Initial Price
-                                      </div>
-                                      <div
-                                        className={styles.lineItemInitialPrice}
-                                      >
-                                        $
-                                        {Math.round(
-                                          lineItem?.final_initial_price || 0
-                                        )}
-                                      </div>
-                                      {lineItem?.discount_percentage ? (
-                                        <div
-                                          className={
-                                            styles.lineItemOriginalPrice
-                                          }
-                                        >
-                                          Originally $
-                                          {Math.round(
-                                            lineItem?.initial_price || 0
-                                          )}{' '}
-                                          (-
-                                          {lineItem?.discount_percentage}%)
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    <div className={styles.lineItemColumn}>
-                                      <div className={styles.lineItemLabel}>
-                                        Treatment Frequency
-                                      </div>
-                                      <div className={styles.lineItemFrequency}>
-                                        {selection.frequency
-                                          .charAt(0)
-                                          .toUpperCase() +
-                                          selection.frequency.slice(1)}
-                                      </div>
-                                      <div
-                                        className={styles.lineItemInspection}
-                                      >
-                                        Inspection Included
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-
-                          {/* Add-Ons Section */}
-                          {quote?.line_items &&
-                            quote.line_items.filter(
-                              item =>
-                                item.addon_service_id != null &&
-                                item.addon_service_id !== ''
-                            ).length > 0 && (
-                              <div className={styles.addOnsSection}>
-                                <div className={styles.addOnsSectionHeader}>
-                                  Add-On Services
-                                </div>
-                                {quote.line_items
-                                  .filter(
-                                    item =>
-                                      item.addon_service_id != null &&
-                                      item.addon_service_id !== ''
-                                  )
-                                  .map(addonItem => (
-                                    <div
-                                      key={addonItem.id}
-                                      className={styles.planLineItem}
-                                    >
-                                      <div className={styles.lineItemHeader}>
-                                        {addonItem.plan_name}
-                                      </div>
-                                      <div className={styles.lineItemPricing}>
-                                        <div className={styles.lineItemColumn}>
-                                          <div className={styles.lineItemLabel}>
-                                            Recurring Price
-                                          </div>
-                                          <div
-                                            className={
-                                              styles.lineItemRecurringPrice
-                                            }
-                                          >
-                                            $
-                                            {Math.round(
-                                              addonItem.final_recurring_price ||
-                                                0
-                                            )}
-                                            <span
-                                              className={
-                                                styles.lineItemPerMonth
-                                              }
-                                            >
-                                              /mo
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <div className={styles.lineItemColumn}>
-                                          <div className={styles.lineItemLabel}>
-                                            Initial Price
-                                          </div>
-                                          <div
-                                            className={
-                                              styles.lineItemInitialPrice
-                                            }
-                                          >
-                                            $
-                                            {Math.round(
-                                              addonItem.final_initial_price || 0
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                              </div>
-                            )}
-
-                          {/* Total Cost Section */}
-                          <div className={styles.totalCostSection}>
-                            <div className={styles.totalCostHeader}>
-                              Total Cost:
-                            </div>
-                            <div className={styles.totalCostGrid}>
-                              <div className={styles.totalColumn}>
-                                <div className={styles.totalLabel}>
-                                  Total Recurring
-                                </div>
-                                <div className={styles.totalRecurringPrice}>
-                                  $
-                                  {Math.round(
-                                    quote?.total_recurring_price || 0
-                                  )}
-                                  <span className={styles.totalPerMonth}>
-                                    /mo
-                                  </span>
-                                </div>
-                              </div>
-                              <div className={styles.totalColumn}>
-                                <div className={styles.totalLabel}>
-                                  Total Initial
-                                </div>
-                                <div className={styles.totalInitialPrice}>
-                                  ${Math.round(quote?.total_initial_price || 0)}
-                                </div>
-                                {(() => {
-                                  const totalBaseInitial =
-                                    quote?.line_items?.reduce(
-                                      (sum, item) =>
-                                        sum + (item.initial_price || 0),
-                                      0
-                                    ) || 0;
-                                  const savings =
-                                    totalBaseInitial -
-                                    (quote?.total_initial_price || 0);
-                                  return savings > 0 ? (
-                                    <div className={styles.totalSavings}>
-                                      Savings: ${Math.round(savings)}
-                                    </div>
-                                  ) : null;
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {/* Plan Information Section */}
-                <h4 className={cardStyles.defaultText}>Plan Information</h4>
-                <div className={styles.planInfoContainer}>
-                  <div className={styles.tabContainer}>
-                    {[
-                      { id: 'overview', label: 'Plan Overview' },
-                      { id: 'pests', label: 'Covered Pests' },
-                      { id: 'expect', label: 'What to Expect' },
-                      { id: 'faqs', label: 'FAQs' },
-                    ].map((tab, index, array) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveServiceTab(tab.id)}
-                        className={`${styles.tabButton} ${
-                          activeServiceTab === tab.id
-                            ? styles.active
-                            : styles.inactive
-                        } ${index === 0 ? styles.firstTab : ''} ${
-                          index === array.length - 1 ? styles.lastTab : ''
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Tab Content */}
-                  <div className={styles.tabContent}>
-                    {activeServiceTab === 'overview' && (
-                      <div className={styles.tabContentInner}>
-                        <div className={styles.planOverviewScroll}>
-                          {serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .map((selection, index) => (
-                              <div
-                                key={selection.id}
-                                className={styles.planSection}
-                              >
-                                <h4 className={styles.planTitle}>
-                                  {selection.servicePlan.plan_name}
-                                  {serviceSelections.filter(
-                                    sel => sel.servicePlan
-                                  ).length > 1 && (
-                                    <span className={styles.planNumber}>
-                                      ({index + 1}/
-                                      {
-                                        serviceSelections.filter(
-                                          sel => sel.servicePlan
-                                        ).length
-                                      }
-                                      )
-                                    </span>
-                                  )}
-                                  {selection.servicePlan.highlight_badge && (
-                                    <span
-                                      style={{
-                                        marginLeft: '8px',
-                                        padding: '2px 8px',
-                                        backgroundColor: 'var(--action-500)',
-                                        color: 'white',
-                                        fontSize: '12px',
-                                        fontWeight: '500',
-                                        borderRadius: '12px',
-                                      }}
-                                    >
-                                      {selection.servicePlan.highlight_badge}
-                                    </span>
-                                  )}
-                                </h4>
-                                <p
-                                  style={{
-                                    margin: '0 0 16px 0',
-                                    color: 'var(--gray-600)',
-                                    fontSize: '14px',
-                                  }}
-                                >
-                                  {selection.servicePlan.plan_description}
-                                </p>
-
-                                <h5
-                                  style={{
-                                    margin: '0 0 12px 0',
-                                    fontSize: '14px',
-                                    fontWeight: '600',
-                                    color: 'var(--gray-900)',
-                                  }}
-                                >
-                                  Plan Features
-                                </h5>
-                                {selection.servicePlan.plan_features &&
-                                Array.isArray(
-                                  selection.servicePlan.plan_features
-                                ) ? (
-                                  <ul
-                                    style={{
-                                      margin: '0',
-                                      paddingLeft: '20px',
-                                      color: 'var(--gray-700)',
-                                    }}
-                                  >
-                                    {selection.servicePlan.plan_features.map(
-                                      (feature: string, idx: number) => (
-                                        <li key={idx}>{feature}</li>
-                                      )
-                                    )}
-                                  </ul>
-                                ) : (
-                                  <p
-                                    style={{
-                                      color: 'var(--gray-500)',
-                                      fontStyle: 'italic',
-                                    }}
-                                  >
-                                    No features listed
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {activeServiceTab === 'pests' && (
-                      <div className={styles.tabContentInner}>
-                        <h4
-                          style={{
-                            margin: '0 0 12px 0',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: 'var(--gray-900)',
-                          }}
-                        >
-                          Covered Pests
-                        </h4>
-                        {(() => {
-                          // Collect all unique pests from all selected plans
-                          const allPestCoverage = new Map<
-                            string,
-                            { pest: any; coverageLevel: string }
-                          >();
-
-                          serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .forEach(selection => {
-                              if (selection.servicePlan.pest_coverage) {
-                                selection.servicePlan.pest_coverage.forEach(
-                                  (coverage: any) => {
-                                    const pest = pestOptions.find(
-                                      p => p.id === coverage.pest_id
-                                    );
-                                    if (
-                                      pest &&
-                                      !allPestCoverage.has(coverage.pest_id)
-                                    ) {
-                                      allPestCoverage.set(coverage.pest_id, {
-                                        pest,
-                                        coverageLevel: coverage.coverage_level,
-                                      });
-                                    }
-                                  }
-                                );
-                              }
-                            });
-
-                          if (allPestCoverage.size === 0) {
-                            return (
-                              <p
-                                style={{
-                                  color: 'var(--gray-500)',
-                                  fontStyle: 'italic',
-                                }}
-                              >
-                                No pest coverage information available
-                              </p>
-                            );
-                          }
-
-                          return (
-                            <div
-                              style={{
-                                display: 'grid',
-                                gridTemplateColumns:
-                                  'repeat(auto-fill, minmax(150px, 1fr))',
-                                gap: '8px',
-                              }}
-                            >
-                              {Array.from(allPestCoverage.values()).map(
-                                ({ pest, coverageLevel }) => (
-                                  <div
-                                    key={pest.id}
-                                    style={{
-                                      padding: '8px 12px',
-                                      backgroundColor: 'var(--gray-50)',
-                                      borderRadius: '6px',
-                                      fontSize: '14px',
-                                      color: 'var(--gray-700)',
-                                      border:
-                                        coverageLevel !== 'full'
-                                          ? '1px dashed var(--gray-300)'
-                                          : '1px solid var(--gray-200)',
-                                    }}
-                                  >
-                                    {pest.custom_label || pest.name}
-                                    {coverageLevel !== 'full' && (
-                                      <span
-                                        style={{
-                                          display: 'block',
-                                          fontSize: '12px',
-                                          color: 'var(--gray-500)',
-                                          textTransform: 'capitalize',
-                                        }}
-                                      >
-                                        ({coverageLevel})
-                                      </span>
-                                    )}
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    {activeServiceTab === 'expect' && (
-                      <div className={styles.tabContentInner}>
-                        <div className={styles.planOverviewScroll}>
-                          {serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .map((selection, index) => (
-                              <div
-                                key={selection.id}
-                                className={styles.planSection}
-                              >
-                                <h4
-                                  style={{
-                                    margin: '0 0 12px 0',
-                                    fontSize: '16px',
-                                    fontWeight: '600',
-                                    color: 'var(--gray-900)',
-                                  }}
-                                >
-                                  {selection.servicePlan.plan_name} - What to
-                                  Expect
-                                  {serviceSelections.filter(
-                                    sel => sel.servicePlan
-                                  ).length > 1 && (
-                                    <span className={styles.planNumber}>
-                                      {' '}
-                                      ({index + 1}/
-                                      {
-                                        serviceSelections.filter(
-                                          sel => sel.servicePlan
-                                        ).length
-                                      }
-                                      )
-                                    </span>
-                                  )}
-                                </h4>
-                                <div
-                                  style={{
-                                    color: 'var(--gray-700)',
-                                    lineHeight: '1.6',
-                                  }}
-                                >
-                                  <p>
-                                    Treatment frequency:{' '}
-                                    <strong>
-                                      {
-                                        selection.servicePlan
-                                          .treatment_frequency
-                                      }
-                                    </strong>
-                                  </p>
-                                  <p>
-                                    Billing cycle:{' '}
-                                    <strong>
-                                      {selection.servicePlan.billing_frequency}
-                                    </strong>
-                                  </p>
-                                  {selection.servicePlan
-                                    .includes_inspection && (
-                                    <p>✓ Initial inspection included</p>
-                                  )}
-                                  <div
-                                    style={{
-                                      marginTop: '16px',
-                                      padding: '12px',
-                                      backgroundColor: 'var(--blue-50)',
-                                      borderRadius: '6px',
-                                      border: '1px solid var(--blue-200)',
-                                    }}
-                                  >
-                                    <p
-                                      style={{
-                                        margin: '0',
-                                        fontSize: '14px',
-                                        color: 'var(--blue-700)',
-                                      }}
-                                    >
-                                      Our{' '}
-                                      {selection.servicePlan.plan_name.toLowerCase()}{' '}
-                                      provides comprehensive protection with{' '}
-                                      {
-                                        selection.servicePlan
-                                          .treatment_frequency
-                                      }{' '}
-                                      treatments to keep your property pest-free
-                                      year-round.
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {activeServiceTab === 'faqs' && (
-                      <div className={styles.tabContentInner}>
-                        <div className={styles.planOverviewScroll}>
-                          {serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .map((selection, index) => (
-                              <div
-                                key={selection.id}
-                                className={styles.planSection}
-                              >
-                                <h4
-                                  style={{
-                                    margin: '0 0 12px 0',
-                                    fontSize: '16px',
-                                    fontWeight: '600',
-                                    color: 'var(--gray-900)',
-                                  }}
-                                >
-                                  {selection.servicePlan.plan_name} - Frequently
-                                  Asked Questions
-                                  {serviceSelections.filter(
-                                    sel => sel.servicePlan
-                                  ).length > 1 && (
-                                    <span className={styles.planNumber}>
-                                      {' '}
-                                      ({index + 1}/
-                                      {
-                                        serviceSelections.filter(
-                                          sel => sel.servicePlan
-                                        ).length
-                                      }
-                                      )
-                                    </span>
-                                  )}
-                                </h4>
-                                {selection.servicePlan.plan_faqs &&
-                                Array.isArray(
-                                  selection.servicePlan.plan_faqs
-                                ) ? (
-                                  <div style={{ display: 'grid', gap: '16px' }}>
-                                    {selection.servicePlan.plan_faqs.map(
-                                      (faq: any, idx: number) => (
-                                        <div
-                                          key={idx}
-                                          style={{
-                                            padding: '16px',
-                                            backgroundColor: 'var(--gray-50)',
-                                            borderRadius: '6px',
-                                          }}
-                                        >
-                                          <h5
-                                            style={{
-                                              margin: '0 0 8px 0',
-                                              fontSize: '14px',
-                                              fontWeight: '600',
-                                              color: 'var(--gray-900)',
-                                            }}
-                                          >
-                                            {faq.question}
-                                          </h5>
-                                          <p
-                                            style={{
-                                              margin: '0',
-                                              fontSize: '14px',
-                                              color: 'var(--gray-700)',
-                                              lineHeight: '1.5',
-                                            }}
-                                          >
-                                            {faq.answer}
-                                          </p>
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
-                                ) : (
-                                  <p
-                                    style={{
-                                      color: 'var(--gray-500)',
-                                      fontStyle: 'italic',
-                                    }}
-                                  >
-                                    No FAQs available for this plan
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Preferred Date and Time Inputs */}
-                <div className={`${styles.gridRow} ${styles.twoColumns}`}>
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>Preferred Date</label>
-                    <input
-                      type="date"
-                      className={styles.selectInput}
-                      value={preferredDate}
-                      onChange={e => {
-                        setPreferredDate(e.target.value);
-                        updateLeadRequestedDate(e.target.value);
-                      }}
-                      placeholder="Enter preferred date"
-                    />
-                  </div>
-                  <div className={styles.formField}>
-                    <label className={styles.fieldLabel}>Preferred Time</label>
-                    <CustomDropdown
-                      options={[
-                        { value: 'morning', label: 'Morning (8AM - 12PM)' },
-                        { value: 'afternoon', label: 'Afternoon (12PM - 5PM)' },
-                        { value: 'evening', label: 'Evening (5PM - 8PM)' },
-                        { value: 'anytime', label: 'Anytime' },
-                      ]}
-                      value={preferredTime}
-                      onChange={value => {
-                        setPreferredTime(value);
-                        updateLeadRequestedTime(value);
-                      }}
-                      placeholder="Enter preferred time"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        ),
-      },
-      {
-        id: 'quote',
-        label: 'Quote Summary',
-        content: (
-          <QuoteSummaryCard
-            quote={quote}
-            lead={lead}
-            isUpdating={isQuoteUpdating}
-            onEmailQuote={handleEmailQuote}
-            hideCard={true}
-          />
-        ),
-      },
-    ];
-
-    // Only check line items for default tab on initial render
-    if (!initialTabSetRef.current) {
-      initialTabSetRef.current = true;
-    }
-
-    const hasLineItems = quote?.line_items && quote.line_items.length > 0;
-    const defaultTab = hasLineItems ? 'service' : 'pest';
-
-    return (
-      <TabCard
-        key={`quoted-tabs-${quote?.id}`}
-        tabs={quotedTabs}
-        defaultTabId={defaultTab}
-      />
-    );
-  };
-
   // Render content based on lead status
   const renderContent = () => {
     // Show all sections simultaneously instead of conditionally based on status
@@ -3693,16 +1490,54 @@ export function LeadStepContent({
             activityNotes={activityNotes}
             isLoggingActivity={isLoggingActivity}
             selectedCadenceId={selectedCadenceId}
-            isStartingCadence={isStartingCadence}
             onActionTypeChange={setSelectedActionType}
             onActivityNotesChange={setActivityNotes}
             onLogActivity={handleLogActivityFromSection}
             onCadenceSelect={setSelectedCadenceId}
-            onStartCadence={handleStartCadence}
             onShowToast={onShowToast}
             onLeadUpdate={onLeadUpdate}
           />
-          {renderQuotedContent()}
+          <LeadQuoteSection
+            lead={lead}
+            quote={quote}
+            isQuoteUpdating={isQuoteUpdating}
+            pricingSettings={pricingSettings}
+            pestOptions={pestOptions}
+            allServicePlans={allServicePlans}
+            serviceSelections={serviceSelections}
+            selectedPests={selectedPests}
+            additionalPests={additionalPests}
+            selectedAddOns={selectedAddOns}
+            loadingPlan={loadingPlan}
+            loadingPestOptions={loadingPestOptions}
+            homeSize={homeSize}
+            yardSize={yardSize}
+            selectedHomeSizeOption={selectedHomeSizeOption}
+            selectedYardSizeOption={selectedYardSizeOption}
+            homeSizeOptions={homeSizeOptions}
+            yardSizeOptions={yardSizeOptions}
+            preferredDate={preferredDate}
+            preferredTime={preferredTime}
+            onPestsChange={handlePestsChange}
+            onHomeSizeChange={handleHomeSizeChange}
+            onYardSizeChange={handleYardSizeChange}
+            onServiceSelectionChange={setServiceSelections}
+            onAddOnToggle={handleToggleAddon}
+            onPreferredDateChange={setPreferredDate}
+            onPreferredTimeChange={setPreferredTime}
+            onEmailQuote={handleEmailQuote}
+            onShowToast={onShowToast}
+            onRequestUndo={onRequestUndo}
+            broadcastQuoteUpdate={broadcastQuoteUpdate}
+            setSelectedPests={setSelectedPests}
+            setAdditionalPests={setAdditionalPests}
+            setHomeSize={setHomeSize}
+            setYardSize={setYardSize}
+            setSelectedHomeSizeOption={setSelectedHomeSizeOption}
+            setSelectedYardSizeOption={setSelectedYardSizeOption}
+            setPreferredDate={setPreferredDate}
+            setPreferredTime={setPreferredTime}
+          />
           <LeadSchedulingSection
             lead={lead}
             quote={quote}
@@ -3732,29 +1567,9 @@ export function LeadStepContent({
     );
   };
 
-  const handleReturnToLeads = () => {
-    setShowAssignSuccessModal(false);
-    // Navigate to leads page
-    window.location.href = '/tickets/leads';
-  };
-
   return (
     <>
       {renderContent()}
-      <ManageLeadModal
-        isOpen={showManageLeadModal}
-        onClose={() => setShowManageLeadModal(false)}
-        onProceed={handleManageLeadProceed}
-        currentStage={lead.lead_status}
-      />
-      <AssignSuccessModal
-        isOpen={showAssignSuccessModal}
-        onClose={() => setShowAssignSuccessModal(false)}
-        onReturnToPage={handleReturnToLeads}
-        assigneeName={assignedUserInfo?.name || ''}
-        assigneeTitle={assignedUserInfo?.title || ''}
-        assigneeAvatar={assignedUserInfo?.avatar}
-      />
       <CompleteTaskModal
         isOpen={showCompleteTaskModal}
         task={

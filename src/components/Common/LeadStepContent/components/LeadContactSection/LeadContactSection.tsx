@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { TabCard, TabItem } from '@/components/Common/TabCard/TabCard';
+import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { SalesCadenceCard } from '@/components/Common/SalesCadenceCard/SalesCadenceCard';
-import { Phone, MessageSquareMore, Mail } from 'lucide-react';
+import { ActionTypeDropdown } from '@/components/Common/ActionTypeDropdown';
+import { Phone, MessageSquareMore, Mail, SquareUserRound } from 'lucide-react';
 import { LeadContactSectionProps } from '../../types/leadStepTypes';
 import styles from './LeadContactSection.module.scss';
 import cadenceStyles from '@/components/Common/SalesCadenceCard/SalesCadenceCard.module.scss';
@@ -18,12 +18,10 @@ export function LeadContactSection({
   activityNotes,
   isLoggingActivity,
   selectedCadenceId,
-  isStartingCadence,
   onActionTypeChange,
   onActivityNotesChange,
   onLogActivity,
   onCadenceSelect,
-  onStartCadence,
   onShowToast,
   onLeadUpdate,
 }: LeadContactSectionProps) {
@@ -40,18 +38,62 @@ export function LeadContactSection({
     );
   };
 
-  const contactingTabs: TabItem[] = [
-    {
-      id: 'contact',
-      label: 'Contact Log',
-      content: (
-        <div className={styles.cardContent}>
-          <div>
-            <h4 className={cardStyles.defaultText}>
-              Next Recommended Action:
+  return (
+    <InfoCard
+      title="Communication"
+      icon={<SquareUserRound size={20} />}
+      isCollapsible={true}
+      startExpanded={true}
+    >
+      <div className={styles.cardContent}>
+        {/* 2-Column Grid Layout */}
+        <div className={styles.twoColumnGrid}>
+          {/* Left Column - Dropdowns */}
+          <div className={styles.leftColumn}>
+            <div className={styles.formGroup}>
+              <label className={styles.fieldLabel}>Log Attempt:</label>
+              <ActionTypeDropdown
+                value={selectedActionType}
+                onChange={onActionTypeChange}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.fieldLabel}>Sales Cadence:</label>
+              <SalesCadenceCard
+                leadId={lead.id}
+                companyId={lead.company_id}
+                leadCreatedAt={lead.created_at}
+                onCadenceSelect={onCadenceSelect}
+                hideCard={true}
+              />
+            </div>
+          </div>
+
+          {/* Right Column - Comment & Buttons */}
+          <div className={styles.rightColumn}>
+            <div className={styles.commentSection}>
+              <label className={styles.fieldLabel}>
+                Comment <span className={styles.optionalLabel}>(optional)</span>
+              </label>
+              <textarea
+                value={activityNotes}
+                onChange={e => onActivityNotesChange(e.target.value)}
+                placeholder="Add a comment to ticket history"
+                className={styles.activityTextarea}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Next Recommended Action - Full Width Below */}
+        <div className={styles.fullWidthSection}>
+          <div className={styles.nextActionSection}>
+            <h4 className={styles.nextRecommendedHeader}>
+              Next recommended action:
             </h4>
             {loadingNextTask ? (
-              <div className={cardStyles.dataLabel}>Loading...</div>
+              <div className={styles.dataLabel}>Loading...</div>
             ) : hasActiveCadence ? (
               // Active cadence exists - show next task or completion message
               nextTask ? (
@@ -73,15 +115,15 @@ export function LeadContactSection({
                     <div className={cadenceStyles.stepHeader}>
                       <span className={cardStyles.inputText}>
                         Day {nextTask.day_number}:{' '}
-                        {nextTask.time_of_day === 'AM'
+                        {nextTask.time_of_day === 'morning'
                           ? 'Morning'
-                          : nextTask.time_of_day === 'PM'
+                          : nextTask.time_of_day === 'afternoon'
                             ? 'Afternoon'
                             : nextTask.time_of_day}{' '}
                         {nextTask.action_type === 'live_call'
                           ? 'Call'
                           : nextTask.action_type === 'outbound_call'
-                            ? 'Outbound Call'
+                            ? 'Call'
                             : nextTask.action_type === 'ai_call'
                               ? 'AI Call'
                               : nextTask.action_type === 'text_message'
@@ -90,28 +132,9 @@ export function LeadContactSection({
                                   ? 'Email'
                                   : nextTask.action_type}
                       </span>
-                      <div className={cadenceStyles.priorityIndicator}>
-                        <span className={cardStyles.inputText}>
-                          {nextTask.priority.charAt(0).toUpperCase() +
-                            nextTask.priority.slice(1)}
-                        </span>
-                        <div
-                          className={`${cadenceStyles.priorityDot} ${
-                            nextTask.priority === 'urgent'
-                              ? cadenceStyles.priorityDotUrgent
-                              : nextTask.priority === 'high'
-                                ? cadenceStyles.priorityDotHigh
-                                : nextTask.priority === 'low'
-                                  ? cadenceStyles.priorityDotLow
-                                  : cadenceStyles.priorityDotMedium
-                          }`}
-                        >
-                          <div className={cadenceStyles.priorityDotInner} />
-                        </div>
-                      </div>
                     </div>
                     {nextTask.due_date && nextTask.due_time ? (
-                      <div className={cardStyles.dataLabel}>
+                      <div className={styles.dataLabel}>
                         Target:{' '}
                         {new Date(
                           nextTask.due_date + 'T00:00:00'
@@ -130,7 +153,7 @@ export function LeadContactSection({
                         })}
                       </div>
                     ) : nextTask.due_date ? (
-                      <div className={cardStyles.dataLabel}>
+                      <div className={styles.dataLabel}>
                         Target:{' '}
                         {new Date(
                           nextTask.due_date + 'T00:00:00'
@@ -141,10 +164,29 @@ export function LeadContactSection({
                         })}
                       </div>
                     ) : null}
+                    <div className={cadenceStyles.priorityIndicator}>
+                      <span className={cardStyles.inputText}>
+                        {nextTask.priority.charAt(0).toUpperCase() +
+                          nextTask.priority.slice(1)}
+                      </span>
+                      <div
+                        className={`${cadenceStyles.priorityDot} ${
+                          nextTask.priority === 'urgent'
+                            ? cadenceStyles.priorityDotUrgent
+                            : nextTask.priority === 'high'
+                              ? cadenceStyles.priorityDotHigh
+                              : nextTask.priority === 'low'
+                                ? cadenceStyles.priorityDotLow
+                                : cadenceStyles.priorityDotMedium
+                        }`}
+                      >
+                        <div className={cadenceStyles.priorityDotInner} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className={cardStyles.dataLabel}>
+                <div className={styles.dataLabel}>
                   All cadence steps completed! 🎉
                 </div>
               )
@@ -178,87 +220,30 @@ export function LeadContactSection({
               </div>
             )}
           </div>
-
-          <div>
-            <h4 className={cardStyles.defaultText}>
-              Select activity to log:
-            </h4>
-            <div className={styles.tabContainer}>
-              {[
-                { id: 'outbound_call', label: 'Outbound Call' },
-                { id: 'text_message', label: 'Text Message' },
-                { id: 'ai_call', label: 'AI Call' },
-                { id: 'email', label: 'Email' },
-              ].map((tab, index, array) => (
-                <button
-                  key={tab.id}
-                  onClick={() => onActionTypeChange(tab.id)}
-                  className={`${styles.tabButton} ${
-                    selectedActionType === tab.id
-                      ? styles.active
-                      : styles.inactive
-                  } ${index === 0 ? styles.firstTab : ''} ${
-                    index === array.length - 1 ? styles.lastTab : ''
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className={styles.textareaLabel}>
-              Comment <span className={styles.optionalLabel}>(optional)</span>
-            </label>
-            <textarea
-              value={activityNotes}
-              onChange={e => onActivityNotesChange(e.target.value)}
-              placeholder={
-                selectedActionType === 'outbound_call'
-                  ? 'Add details about this call'
-                  : selectedActionType === 'text_message'
-                    ? 'Add details about this text message'
-                    : selectedActionType === 'ai_call'
-                      ? 'Add details about this AI call'
-                      : selectedActionType === 'email'
-                        ? 'Add details about this email'
-                        : 'Add a comment to ticket history'
-              }
-              className={styles.activityTextarea}
-            />
-          </div>
-
-          {selectedActionType && (
-            <div className={styles.activityActions}>
+          <div className={styles.buttonGroup}>
+            <button
+              type="button"
+              className={styles.viewHistoryButton}
+              onClick={() => {
+                // TODO: Implement view log history
+                console.log('View Log History clicked');
+              }}
+            >
+              View Log History
+            </button>
+            {selectedActionType && (
               <button
+                type="button"
                 onClick={handleLogActivityClick}
                 disabled={isLoggingActivity}
                 className={styles.logActivityButton}
               >
                 {isLoggingActivity ? 'Logging...' : 'Log Activity'}
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      ),
-    },
-    {
-      id: 'cadence',
-      label: 'Sales Cadence',
-      content: (
-        <SalesCadenceCard
-          leadId={lead.id}
-          companyId={lead.company_id}
-          leadCreatedAt={lead.created_at}
-          onCadenceSelect={onCadenceSelect}
-          onStartCadence={onStartCadence}
-          isStartingCadence={isStartingCadence}
-          hideCard={true}
-        />
-      ),
-    },
-  ];
-
-  return <TabCard tabs={contactingTabs} defaultTabId="contact" />;
+      </div>
+    </InfoCard>
+  );
 }

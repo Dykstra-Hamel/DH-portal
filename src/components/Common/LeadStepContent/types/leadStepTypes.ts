@@ -1,7 +1,10 @@
 import { Lead } from '@/types/lead';
 
 // Common callback types
-export type ShowToastCallback = (message: string, type: 'success' | 'error') => void;
+export type ShowToastCallback = (
+  message: string,
+  type: 'success' | 'error'
+) => void;
 export type RequestUndoCallback = (undoHandler: () => Promise<void>) => void;
 export type LeadUpdateCallback = (updatedLead?: Lead) => void;
 
@@ -76,7 +79,6 @@ export interface LeadContactSectionProps {
   activityNotes: string;
   isLoggingActivity: boolean;
   selectedCadenceId: string | null;
-  isStartingCadence: boolean;
   onActionTypeChange: (type: string) => void;
   onActivityNotesChange: (notes: string) => void;
   onLogActivity: (
@@ -85,7 +87,49 @@ export interface LeadContactSectionProps {
     matchesTask: boolean
   ) => Promise<void>;
   onCadenceSelect: (cadenceId: string | null) => void;
-  onStartCadence: () => Promise<void>;
   onShowToast?: ShowToastCallback;
   onLeadUpdate?: LeadUpdateCallback;
+}
+
+// Lead Quote Section Props
+export interface LeadQuoteSectionProps {
+  lead: Lead;
+  quote: any;
+  isQuoteUpdating: boolean;
+  pricingSettings: any;
+  pestOptions: any[];
+  allServicePlans: any[];
+  serviceSelections: ServiceSelection[];
+  selectedPests: string[];
+  additionalPests: string[];
+  selectedAddOns: string[];
+  loadingPlan: boolean;
+  loadingPestOptions: boolean;
+  homeSize: number | '';
+  yardSize: number | '';
+  selectedHomeSizeOption: string;
+  selectedYardSizeOption: string;
+  homeSizeOptions: any[];
+  yardSizeOptions: any[];
+  preferredDate: string;
+  preferredTime: string;
+  onPestsChange: (primary: string, additional: string[]) => Promise<void>;
+  onHomeSizeChange: (option: string) => Promise<void>;
+  onYardSizeChange: (option: string) => Promise<void>;
+  onServiceSelectionChange: (selections: ServiceSelection[]) => void;
+  onAddOnToggle: (addonId: string) => Promise<void>;
+  onPreferredDateChange: (date: string) => void;
+  onPreferredTimeChange: (time: string) => void;
+  onEmailQuote: () => void;
+  onShowToast?: ShowToastCallback;
+  onRequestUndo?: RequestUndoCallback;
+  broadcastQuoteUpdate: (quote: any) => Promise<void>;
+  setSelectedPests: (pests: string[]) => void;
+  setAdditionalPests: (pests: string[]) => void;
+  setHomeSize: (size: number | '') => void;
+  setYardSize: (size: number | '') => void;
+  setSelectedHomeSizeOption: (option: string) => void;
+  setSelectedYardSizeOption: (option: string) => void;
+  setPreferredDate: (date: string) => void;
+  setPreferredTime: (time: string) => void;
 }

@@ -423,6 +423,13 @@ export function LeadDetailsSidebar({
       : '';
   }, [serviceLocationData]);
 
+  // Handler to expand sidebar when any card is expanded
+  const handleCardExpand = () => {
+    if (!isSidebarExpanded) {
+      setIsSidebarExpanded(true);
+    }
+  };
+
   return (
     <div
       className={`${styles.sidebar} ${isSidebarExpanded ? styles.expanded : styles.collapsed}`}
@@ -431,20 +438,18 @@ export function LeadDetailsSidebar({
         <div className={styles.sidebarHeader}>
           <button
             title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+            onClick={
+              isSidebarExpanded
+                ? () => setIsSidebarExpanded(false)
+                : () => setIsSidebarExpanded(true)
+            }
             className={
               isSidebarExpanded
                 ? styles.sidebarCollapseButton
                 : styles.sidebarExpandButton
             }
           >
-            <ListCollapse
-              size={16}
-              onClick={
-                isSidebarExpanded
-                  ? () => setIsSidebarExpanded(false)
-                  : () => setIsSidebarExpanded(true)
-              }
-            />
+            <ListCollapse size={16} />
           </button>
           <h3>Details</h3>
         </div>
@@ -453,6 +458,9 @@ export function LeadDetailsSidebar({
             title="Contact Information"
             icon={<SquareUserRound size={20} />}
             startExpanded={false}
+            onExpand={handleCardExpand}
+            forceCollapse={!isSidebarExpanded}
+            isCompact={!isSidebarExpanded}
           >
             <CustomerInformation
               ticket={createTicketFromLead}
@@ -519,12 +527,18 @@ export function LeadDetailsSidebar({
             onServiceLocationChange={handleServiceLocationChange}
             hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
             currentFormattedAddress={currentFormattedAddress}
+            onExpand={handleCardExpand}
+            forceCollapse={!isSidebarExpanded}
+            isCompact={!isSidebarExpanded}
           />
 
           <InfoCard
             title="Activity"
             icon={<SquareActivity size={20} />}
             startExpanded={false}
+            onExpand={handleCardExpand}
+            forceCollapse={!isSidebarExpanded}
+            isCompact={!isSidebarExpanded}
           >
             <ActivityFeed
               entityType="lead"
@@ -537,6 +551,9 @@ export function LeadDetailsSidebar({
             title="Notes"
             icon={<NotebookPen size={20} />}
             startExpanded={false}
+            onExpand={handleCardExpand}
+            forceCollapse={!isSidebarExpanded}
+            isCompact={!isSidebarExpanded}
           >
             <NotesSection
               entityType="lead"
@@ -559,6 +576,9 @@ export function LeadDetailsSidebar({
               )
             }
             startExpanded={false}
+            onExpand={handleCardExpand}
+            forceCollapse={!isSidebarExpanded}
+            isCompact={!isSidebarExpanded}
           >
             <LeadCallFormInfo lead={lead} />
           </InfoCard>

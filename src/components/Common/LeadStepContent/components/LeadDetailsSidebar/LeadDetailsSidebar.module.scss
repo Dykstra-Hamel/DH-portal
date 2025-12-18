@@ -4,26 +4,24 @@
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  width: 110px;
+  transition: all 0.3s;
 
   // Collapsed state - show only icon buttons
   &.collapsed {
     .sidebarContent {
-      transition:
-        opacity 0.3s ease,
-        max-width 0.3s ease,
-        visibility 0s 0.3s;
+      transition: all 0.3s;
     }
   }
 
   // Expanded state - show full content
   &.expanded {
+    width: 490px;
+
     .sidebarContent {
       max-width: 100%;
       pointer-events: auto;
-      transition:
-        opacity 0.3s ease,
-        max-width 0.3s ease,
-        visibility 0s 0s;
+      transition: all 0.3s;
     }
   }
 }
@@ -133,5 +131,5 @@
   flex-direction: column;
   gap: 15px;
   position: relative;
-  padding: 18px;
+  padding: 18px 12px;
 }

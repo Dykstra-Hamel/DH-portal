@@ -36,6 +36,7 @@ interface LeadAssignmentControls {
   assignableUsers: AssignableUser[];
   currentUser: { id: string; name: string; email: string; avatar?: string };
   onLeadTypeChange: (type: string) => void;
+  onLeadTypeChangeWithModal?: (type: string) => void;
   onAssigneeChange: (id: string) => void;
   onSchedulerChange: (id: string) => void;
   onStatusChange: (status: string) => void;
@@ -52,8 +53,20 @@ interface GlobalLowerHeaderProps {
 }
 
 const PlusIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="19" viewBox="0 0 18 19" fill="none">
-    <path d="M8.14529 3.88458V15.516M13.961 9.70031H2.32956" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="19"
+    viewBox="0 0 18 19"
+    fill="none"
+  >
+    <path
+      d="M8.14529 3.88458V15.516M13.961 9.70031H2.32956"
+      stroke="white"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -87,13 +100,22 @@ export function GlobalLowerHeader({
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (leadTypeRef.current && !leadTypeRef.current.contains(event.target as Node)) {
+      if (
+        leadTypeRef.current &&
+        !leadTypeRef.current.contains(event.target as Node)
+      ) {
         setIsLeadTypeOpen(false);
       }
-      if (assignedToRef.current && !assignedToRef.current.contains(event.target as Node)) {
+      if (
+        assignedToRef.current &&
+        !assignedToRef.current.contains(event.target as Node)
+      ) {
         setIsAssignedToOpen(false);
       }
-      if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
+      if (
+        statusRef.current &&
+        !statusRef.current.contains(event.target as Node)
+      ) {
         setIsStatusOpen(false);
       }
     };
@@ -126,15 +148,25 @@ export function GlobalLowerHeader({
   };
 
   const getAssignedToDisplay = () => {
-    if (!leadAssignmentControls) return { name: 'Select', subtitle: '', avatar: null };
+    if (!leadAssignmentControls)
+      return { name: 'Select', subtitle: '', avatar: null };
 
-    const { leadStatus, assignedTo, assignedScheduler, assignedUser, schedulerUser, leadType } = leadAssignmentControls;
+    const {
+      leadStatus,
+      assignedTo,
+      assignedScheduler,
+      assignedUser,
+      schedulerUser,
+      leadType,
+    } = leadAssignmentControls;
 
     // Show scheduler for scheduling status and later
     if (leadStatus === 'scheduling' || leadStatus === 'won') {
       if (schedulerUser) {
         return {
-          name: `${schedulerUser.first_name || ''} ${schedulerUser.last_name || ''}`.trim() || 'Unknown',
+          name:
+            `${schedulerUser.first_name || ''} ${schedulerUser.last_name || ''}`.trim() ||
+            'Unknown',
           subtitle: schedulerUser.email || '',
           avatar: schedulerUser.avatar_url || null,
         };
@@ -151,7 +183,9 @@ export function GlobalLowerHeader({
     }
     if (assignedUser) {
       return {
-        name: `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim() || 'Unknown',
+        name:
+          `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim() ||
+          'Unknown',
         subtitle: assignedUser.email || '',
         avatar: assignedUser.avatar_url || null,
       };
@@ -169,7 +203,9 @@ export function GlobalLowerHeader({
     if (!leadAssignmentControls) return 0;
     const { assignableUsers, leadType } = leadAssignmentControls;
     return assignableUsers.filter(u =>
-      leadType === 'sales' ? u.departments.includes('sales') : u.departments.includes('support')
+      leadType === 'sales'
+        ? u.departments.includes('sales')
+        : u.departments.includes('support')
     ).length;
   };
 
@@ -193,15 +229,21 @@ export function GlobalLowerHeader({
                 className={styles.controlDropdown}
                 onClick={() => setIsLeadTypeOpen(!isLeadTypeOpen)}
               >
-                <span className={styles.controlValue}>{getLeadTypeDisplay()}</span>
-                <ChevronDown size={16} className={`${styles.chevron} ${isLeadTypeOpen ? styles.open : ''}`} />
+                <span className={styles.controlValue}>
+                  {getLeadTypeDisplay()}
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`${styles.chevron} ${isLeadTypeOpen ? styles.open : ''}`}
+                />
               </button>
               {isLeadTypeOpen && (
                 <div className={styles.dropdownMenu}>
                   <button
                     className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'sales' ? styles.selected : ''}`}
                     onClick={() => {
-                      leadAssignmentControls.onLeadTypeChange('sales');
+                      const handler = leadAssignmentControls.onLeadTypeChangeWithModal || leadAssignmentControls.onLeadTypeChange;
+                      handler('sales');
                       setIsLeadTypeOpen(false);
                     }}
                   >
@@ -210,7 +252,8 @@ export function GlobalLowerHeader({
                   <button
                     className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'support' ? styles.selected : ''}`}
                     onClick={() => {
-                      leadAssignmentControls.onLeadTypeChange('support');
+                      const handler = leadAssignmentControls.onLeadTypeChangeWithModal || leadAssignmentControls.onLeadTypeChange;
+                      handler('support');
                       setIsLeadTypeOpen(false);
                     }}
                   >
@@ -219,7 +262,8 @@ export function GlobalLowerHeader({
                   <button
                     className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'junk' ? styles.selected : ''}`}
                     onClick={() => {
-                      leadAssignmentControls.onLeadTypeChange('junk');
+                      const handler = leadAssignmentControls.onLeadTypeChangeWithModal || leadAssignmentControls.onLeadTypeChange;
+                      handler('junk');
                       setIsLeadTypeOpen(false);
                     }}
                   >
@@ -255,9 +299,14 @@ export function GlobalLowerHeader({
                     }
                     return <DefaultAvatar name={display.name} />;
                   })()}
-                  <span className={styles.controlValue}>{getAssignedToDisplay().name}</span>
+                  <span className={styles.controlValue}>
+                    {getAssignedToDisplay().name}
+                  </span>
                 </div>
-                <ChevronDown size={16} className={`${styles.chevron} ${isAssignedToOpen ? styles.open : ''}`} />
+                <ChevronDown
+                  size={16}
+                  className={`${styles.chevron} ${isAssignedToOpen ? styles.open : ''}`}
+                />
               </button>
               {isAssignedToOpen && (
                 <div className={styles.dropdownMenu}>
@@ -267,7 +316,9 @@ export function GlobalLowerHeader({
                       <button
                         className={`${styles.dropdownOption} ${leadAssignmentControls.assignedScheduler === leadAssignmentControls.currentUser.id ? styles.selected : ''}`}
                         onClick={() => {
-                          leadAssignmentControls.onSchedulerChange(leadAssignmentControls.currentUser.id);
+                          leadAssignmentControls.onSchedulerChange(
+                            leadAssignmentControls.currentUser.id
+                          );
                           setIsAssignedToOpen(false);
                         }}
                       >
@@ -281,16 +332,22 @@ export function GlobalLowerHeader({
                               className={styles.avatar}
                             />
                           ) : (
-                            <DefaultAvatar name={leadAssignmentControls.currentUser.name} />
+                            <DefaultAvatar
+                              name={leadAssignmentControls.currentUser.name}
+                            />
                           )}
                           <div className={styles.optionInfo}>
-                            <div className={styles.optionName}>{leadAssignmentControls.currentUser.name}</div>
+                            <div className={styles.optionName}>
+                              {leadAssignmentControls.currentUser.name}
+                            </div>
                             <div className={styles.optionSubtitle}>Myself</div>
                           </div>
                         </div>
                       </button>
                       {leadAssignmentControls.assignableUsers
-                        .filter(u => u.id !== leadAssignmentControls.currentUser.id)
+                        .filter(
+                          u => u.id !== leadAssignmentControls.currentUser.id
+                        )
                         .map(user => (
                           <button
                             key={user.id}
@@ -313,8 +370,12 @@ export function GlobalLowerHeader({
                                 <DefaultAvatar name={user.display_name} />
                               )}
                               <div className={styles.optionInfo}>
-                                <div className={styles.optionName}>{user.display_name}</div>
-                                <div className={styles.optionSubtitle}>{user.email}</div>
+                                <div className={styles.optionName}>
+                                  {user.display_name}
+                                </div>
+                                <div className={styles.optionSubtitle}>
+                                  {user.email}
+                                </div>
                               </div>
                             </div>
                           </button>
@@ -326,7 +387,9 @@ export function GlobalLowerHeader({
                       <button
                         className={`${styles.dropdownOption} ${leadAssignmentControls.assignedTo === leadAssignmentControls.currentUser.id ? styles.selected : ''}`}
                         onClick={() => {
-                          leadAssignmentControls.onAssigneeChange(leadAssignmentControls.currentUser.id);
+                          leadAssignmentControls.onAssigneeChange(
+                            leadAssignmentControls.currentUser.id
+                          );
                           setIsAssignedToOpen(false);
                         }}
                       >
@@ -340,10 +403,14 @@ export function GlobalLowerHeader({
                               className={styles.avatar}
                             />
                           ) : (
-                            <DefaultAvatar name={leadAssignmentControls.currentUser.name} />
+                            <DefaultAvatar
+                              name={leadAssignmentControls.currentUser.name}
+                            />
                           )}
                           <div className={styles.optionInfo}>
-                            <div className={styles.optionName}>{leadAssignmentControls.currentUser.name}</div>
+                            <div className={styles.optionName}>
+                              {leadAssignmentControls.currentUser.name}
+                            </div>
                             <div className={styles.optionSubtitle}>Myself</div>
                           </div>
                         </div>
@@ -354,15 +421,21 @@ export function GlobalLowerHeader({
                         <button
                           className={`${styles.dropdownOption} ${leadAssignmentControls.assignedTo === 'sales_team' ? styles.selected : ''}`}
                           onClick={() => {
-                            leadAssignmentControls.onAssigneeChange('sales_team');
+                            leadAssignmentControls.onAssigneeChange(
+                              'sales_team'
+                            );
                             setIsAssignedToOpen(false);
                           }}
                         >
                           <div className={styles.optionContent}>
                             <TeamAvatar />
                             <div className={styles.optionInfo}>
-                              <div className={styles.optionName}>Sales Team</div>
-                              <div className={styles.optionSubtitle}>{getTeamCount()} members</div>
+                              <div className={styles.optionName}>
+                                Sales Team
+                              </div>
+                              <div className={styles.optionSubtitle}>
+                                {getTeamCount()} members
+                              </div>
                             </div>
                           </div>
                         </button>
@@ -372,30 +445,41 @@ export function GlobalLowerHeader({
                         <button
                           className={`${styles.dropdownOption} ${leadAssignmentControls.assignedTo === 'support_team' ? styles.selected : ''}`}
                           onClick={() => {
-                            leadAssignmentControls.onAssigneeChange('support_team');
+                            leadAssignmentControls.onAssigneeChange(
+                              'support_team'
+                            );
                             setIsAssignedToOpen(false);
                           }}
                         >
                           <div className={styles.optionContent}>
                             <TeamAvatar />
                             <div className={styles.optionInfo}>
-                              <div className={styles.optionName}>Support Team</div>
-                              <div className={styles.optionSubtitle}>{getTeamCount()} members</div>
+                              <div className={styles.optionName}>
+                                Support Team
+                              </div>
+                              <div className={styles.optionSubtitle}>
+                                {getTeamCount()} members
+                              </div>
                             </div>
                           </div>
                         </button>
                       )}
 
                       {/* Team members */}
-                      {(leadAssignmentControls.leadType === 'sales' || leadAssignmentControls.leadType === 'support') &&
+                      {(leadAssignmentControls.leadType === 'sales' ||
+                        leadAssignmentControls.leadType === 'support') &&
                         leadAssignmentControls.assignableUsers
-                          .filter(u => u.id !== leadAssignmentControls.currentUser.id)
+                          .filter(
+                            u => u.id !== leadAssignmentControls.currentUser.id
+                          )
                           .map(user => (
                             <button
                               key={user.id}
                               className={`${styles.dropdownOption} ${leadAssignmentControls.assignedTo === user.id ? styles.selected : ''}`}
                               onClick={() => {
-                                leadAssignmentControls.onAssigneeChange(user.id);
+                                leadAssignmentControls.onAssigneeChange(
+                                  user.id
+                                );
                                 setIsAssignedToOpen(false);
                               }}
                             >
@@ -412,8 +496,12 @@ export function GlobalLowerHeader({
                                   <DefaultAvatar name={user.display_name} />
                                 )}
                                 <div className={styles.optionInfo}>
-                                  <div className={styles.optionName}>{user.display_name}</div>
-                                  <div className={styles.optionSubtitle}>{user.email}</div>
+                                  <div className={styles.optionName}>
+                                    {user.display_name}
+                                  </div>
+                                  <div className={styles.optionSubtitle}>
+                                    {user.email}
+                                  </div>
                                 </div>
                               </div>
                             </button>
@@ -431,8 +519,13 @@ export function GlobalLowerHeader({
                 className={styles.controlDropdown}
                 onClick={() => setIsStatusOpen(!isStatusOpen)}
               >
-                <span className={styles.controlValue}>{getStatusDisplay()}</span>
-                <ChevronDown size={16} className={`${styles.chevron} ${isStatusOpen ? styles.open : ''}`} />
+                <span className={styles.controlValue}>
+                  {getStatusDisplay()}
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`${styles.chevron} ${isStatusOpen ? styles.open : ''}`}
+                />
               </button>
               {isStatusOpen && (
                 <div className={styles.dropdownMenu}>
@@ -460,32 +553,33 @@ export function GlobalLowerHeader({
             </div>
           </div>
         )}
-
-        <div className={styles.rightSection}>
-          {actionButtons && actionButtons.length > 0 ? (
-            actionButtons.map((button, index) => (
+        {((actionButtons && actionButtons?.length > 0) || showAddButton) && (
+          <div className={styles.rightSection}>
+            {actionButtons && actionButtons.length > 0 ? (
+              actionButtons.map((button, index) => (
+                <button
+                  key={index}
+                  className={styles.addLeadButton}
+                  onClick={button.onClick}
+                  type="button"
+                >
+                  <PlusIcon />
+                  <span>{button.text}</span>
+                </button>
+              ))
+            ) : showAddButton ? (
               <button
-                key={index}
                 className={styles.addLeadButton}
-                onClick={button.onClick}
+                onClick={onAddClick}
+                disabled={!onAddClick}
                 type="button"
               >
                 <PlusIcon />
-                <span>{button.text}</span>
+                <span>{addButtonText}</span>
               </button>
-            ))
-          ) : showAddButton ? (
-            <button
-              className={styles.addLeadButton}
-              onClick={onAddClick}
-              disabled={!onAddClick}
-              type="button"
-            >
-              <PlusIcon />
-              <span>{addButtonText}</span>
-            </button>
-          ) : null}
-        </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

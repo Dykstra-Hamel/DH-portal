@@ -25,6 +25,7 @@
   padding: 20px;
   background: var(--slate-50);
   overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
 @media (max-width: 1024px) {

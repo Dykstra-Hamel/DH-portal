@@ -1,16 +1,11 @@
 'use client';
 
-import { TabCard } from '@/components/Common/TabCard/TabCard';
+import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { QuoteSummaryCard } from '@/components/Common/QuoteSummaryCard/QuoteSummaryCard';
 import { CalendarCheck } from 'lucide-react';
 import { LeadSchedulingSectionProps } from '../../types/leadStepTypes';
 import styles from './LeadSchedulingSection.module.scss';
-
-interface TabItem {
-  id: string;
-  label: string;
-  content: React.ReactNode;
-}
+import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
 export function LeadSchedulingSection({
   lead,
@@ -25,12 +20,17 @@ export function LeadSchedulingSection({
   onShowServiceConfirmationModal,
   onEmailQuote,
 }: LeadSchedulingSectionProps) {
-  const scheduleTabs: TabItem[] = [
-    {
-      id: 'quote_summary',
-      label: 'Quote Summary',
-      content: (
-        <div className={styles.cardContent}>
+  return (
+    <InfoCard
+      title="Scheduling"
+      icon={<CalendarCheck size={20} />}
+      isCollapsible={true}
+      startExpanded={true}
+    >
+      <div className={styles.cardContent}>
+        {/* Quote Summary Section */}
+        <div className={styles.section}>
+          <h4 className={cardStyles.defaultText}>Quote Summary</h4>
           <QuoteSummaryCard
             quote={quote}
             lead={lead}
@@ -39,14 +39,10 @@ export function LeadSchedulingSection({
             hideCard={true}
           />
         </div>
-      ),
-    },
-    {
-      id: 'service_confirmation',
-      label: 'Service Confirmation',
-      content: (
-        <div className={styles.cardContent}>
-          <h3 className={styles.scheduleTabHeading}>Service Confirmation</h3>
+
+        {/* Service Confirmation Section */}
+        <div className={styles.section}>
+          <h4 className={cardStyles.defaultText}>Service Confirmation</h4>
           <div className={styles.confirmationForm}>
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
@@ -90,9 +86,7 @@ export function LeadSchedulingSection({
             </div>
           </div>
         </div>
-      ),
-    },
-  ];
-
-  return <TabCard tabs={scheduleTabs} defaultTabId="quote_summary" />;
+      </div>
+    </InfoCard>
+  );
 }

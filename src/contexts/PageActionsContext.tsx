@@ -28,6 +28,7 @@ interface LeadAssignmentControls {
   assignableUsers: AssignableUser[];
   currentUser: { id: string; name: string; email: string; avatar?: string };
   onLeadTypeChange: (type: string) => void;
+  onLeadTypeChangeWithModal?: (type: string) => void;
   onAssigneeChange: (id: string) => void;
   onSchedulerChange: (id: string) => void;
   onStatusChange: (status: string) => void;

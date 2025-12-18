@@ -42,6 +42,9 @@ interface ServiceLocationCardProps {
   onServiceLocationChange?: (field: keyof ServiceAddressData, value: string) => void;
   hasCompleteUnchangedAddress?: boolean;
   currentFormattedAddress?: string;
+  onExpand?: () => void;
+  forceCollapse?: boolean;
+  isCompact?: boolean;
 }
 
 export function ServiceLocationCard({
@@ -61,6 +64,9 @@ export function ServiceLocationCard({
   onServiceLocationChange,
   hasCompleteUnchangedAddress = false,
   currentFormattedAddress = '',
+  onExpand,
+  forceCollapse = false,
+  isCompact = false,
 }: ServiceLocationCardProps) {
   const [selectedHomeSizeOption, setSelectedHomeSizeOption] = useState<string>('');
   const [selectedYardSizeOption, setSelectedYardSizeOption] = useState<string>('');
@@ -196,6 +202,9 @@ export function ServiceLocationCard({
         title="Service Location"
         icon={<MapPinned size={20} />}
         startExpanded={startExpanded}
+        onExpand={onExpand}
+        forceCollapse={forceCollapse}
+        isCompact={isCompact}
       >
         <div className={styles.cardContent}>
           {serviceAddress ? (
@@ -287,6 +296,9 @@ export function ServiceLocationCard({
       title="Service Location"
       icon={<MapPinned size={20} />}
       startExpanded={startExpanded}
+      onExpand={onExpand}
+      forceCollapse={forceCollapse}
+      isCompact={isCompact}
     >
       <div className={styles.cardContent}>
         <div className={styles.serviceLocationGrid}>

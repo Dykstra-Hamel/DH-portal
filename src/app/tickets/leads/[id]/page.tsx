@@ -26,6 +26,8 @@ import { QuickTaskModal } from '@/components/Common/QuickTaskModal/QuickTaskModa
 import { NotInterestedModal } from '@/components/Common/NotInterestedModal/NotInterestedModal';
 import { ReadyToScheduleModal } from '@/components/Common/ReadyToScheduleModal/ReadyToScheduleModal';
 import { EmailQuoteModal } from '@/components/Common/EmailQuoteModal/EmailQuoteModal';
+import { ConvertToSupportModal } from '@/components/Common/ConvertToSupportModal/ConvertToSupportModal';
+import { MarkAsJunkModal } from '@/components/Common/MarkAsJunkModal/MarkAsJunkModal';
 import { Toast } from '@/components/Common/Toast';
 import { GlobalLowerHeader } from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader';
 import { usePageActions } from '@/contexts/PageActionsContext';
@@ -68,6 +70,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const [showReadyToScheduleModal, setShowReadyToScheduleModal] =
     useState(false);
   const [showEmailQuoteModal, setShowEmailQuoteModal] = useState(false);
+  const [showConvertToSupportModal, setShowConvertToSupportModal] = useState(false);
+  const [showMarkAsJunkModal, setShowMarkAsJunkModal] = useState(false);
   const router = useRouter();
   const { setPageHeader } = usePageActions();
 
@@ -676,11 +680,107 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     setShowToast(true);
   }, []);
 
-  // Handle ticket type change
+  // Handle ticket type change (direct, no modal)
   const handleLeadTypeChange = useCallback((type: string) => {
     setTicketType(type);
     setSelectedAssignee(''); // Reset assignee when type changes
   }, []);
+
+  // Handle ticket type change with modal for support/junk conversions
+  const handleLeadTypeChangeWithModal = useCallback((type: string) => {
+    // If changing to sales, just update state directly
+    if (type === 'sales') {
+      setTicketType(type);
+      setSelectedAssignee('');
+      return;
+    }
+
+    // For support, show convert to support modal
+    if (type === 'support') {
+      setShowConvertToSupportModal(true);
+      return;
+    }
+
+    // For junk, show mark as junk modal
+    if (type === 'junk') {
+      setShowMarkAsJunkModal(true);
+      return;
+    }
+  }, []);
+
+  // Handle convert to support confirmation
+  const handleConvertToSupport = useCallback(async (notes: string) => {
+    if (!leadId || !lead || !currentUser) return;
+
+    try {
+      // Create support case
+      const supportCaseData = {
+        customer_id: lead.customer_id,
+        company_id: lead.company_id,
+        issue_type: 'general_inquiry',
+        summary: `Converted from sales lead${lead.customer ? ` - ${lead.customer.first_name} ${lead.customer.last_name}` : ''}`,
+        description: notes || lead.comments || 'Converted from sales lead',
+        status: 'new',
+        priority: 'medium',
+        assigned_to: currentUser.id,
+      };
+
+      await adminAPI.supportCases.create(supportCaseData);
+
+      // Archive the lead
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, { archived: true });
+      } else {
+        await adminAPI.updateUserLead(leadId, { archived: true });
+      }
+
+      handleShowToast('Support case created and lead archived', 'success');
+      // Navigate back to leads page
+      router.push('/tickets/leads');
+    } catch (error) {
+      console.error('Error converting to support case:', error);
+      handleShowToast(
+        error instanceof Error ? error.message : 'Failed to convert to support case',
+        'error'
+      );
+      throw error; // Re-throw so modal can handle loading state
+    } finally {
+      setShowConvertToSupportModal(false);
+    }
+  }, [leadId, lead, currentUser, isAdmin, handleShowToast, router]);
+
+  // Handle mark as junk confirmation
+  const handleMarkAsJunk = useCallback(async (reason: string) => {
+    if (!leadId || !lead) return;
+
+    try {
+      // Archive the lead as junk
+      const updateData: any = {
+        archived: true,
+        lead_status: 'lost',
+        lost_reason: reason || 'junk',
+      };
+
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, updateData);
+      } else {
+        await adminAPI.updateUserLead(leadId, updateData);
+      }
+
+      handleShowToast('Lead marked as junk and archived', 'success');
+      // Navigate back to leads page
+      router.push('/tickets/leads');
+    } catch (error) {
+      console.error('Error marking as junk:', error);
+      handleShowToast(
+        error instanceof Error ? error.message : 'Failed to mark lead as junk',
+        'error'
+      );
+      throw error; // Re-throw so modal can handle loading state
+    } finally {
+      setShowMarkAsJunkModal(false);
+    }
+  }, [leadId, lead, isAdmin, handleShowToast, router]);
 
   // Handle assignee change
   const handleAssigneeChange = useCallback(async (assigneeId: string) => {
@@ -793,6 +893,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           assignableUsers: stableAssignableUsers,
           currentUser: stableCurrentUser,
           onLeadTypeChange: handleLeadTypeChange,
+          onLeadTypeChangeWithModal: handleLeadTypeChangeWithModal,
           onAssigneeChange: handleAssigneeChange,
           onSchedulerChange: handleSchedulerChange,
           onStatusChange: handleStatusChange,
@@ -814,6 +915,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     stableAssignableUsers,
     // setPageHeader is intentionally omitted - it's a stable context setter
     handleLeadTypeChange,
+    handleLeadTypeChangeWithModal,
     handleAssigneeChange,
     handleSchedulerChange,
     handleStatusChange,
@@ -1142,6 +1244,28 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           }
           customerFirstName={lead.customer?.first_name}
           customerLastName={lead.customer?.last_name}
+        />
+
+        <ConvertToSupportModal
+          isOpen={showConvertToSupportModal}
+          onClose={() => setShowConvertToSupportModal(false)}
+          onConfirm={handleConvertToSupport}
+          customerName={
+            lead.customer
+              ? `${lead.customer.first_name} ${lead.customer.last_name}`
+              : 'this customer'
+          }
+        />
+
+        <MarkAsJunkModal
+          isOpen={showMarkAsJunkModal}
+          onClose={() => setShowMarkAsJunkModal(false)}
+          onConfirm={handleMarkAsJunk}
+          customerName={
+            lead.customer
+              ? `${lead.customer.first_name} ${lead.customer.last_name}`
+              : 'this lead'
+          }
         />
       </div>
     </>

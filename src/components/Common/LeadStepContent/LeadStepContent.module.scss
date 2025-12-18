@@ -1,9 +1,12 @@
 // Wrapper for the entire lead content (left + right columns)
 .leadContentWrapper {
-  display: grid;
-  grid-template-columns: 1fr 110px;
-  column-gap: 20px;
-  transition: grid-template-columns 0.3s ease;
+  display: flex;
+  gap: 20px;
+  transition: all 0.5s ease;
+
+  .contentLeft {
+    flex-grow: 1;
+  }
 
   &[data-sidebar-expanded='true'] {
     grid-template-columns: 60% 1fr;
