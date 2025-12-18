@@ -332,6 +332,29 @@ async function handleLeadCreationFromClick(
     return;
   }
 
+  // Fetch campaign details
+  const { data: campaign, error: campaignError } = await supabase
+    .from('campaigns')
+    .select('id, name, service_plan_id, discount_id, target_pest_id')
+    .eq('id', campaignId)
+    .single();
+
+  if (campaignError || !campaign) {
+    console.error('[LEAD_CREATION] Campaign not found:', campaignId, campaignError);
+    return; // Cannot create lead without campaign context
+  }
+
+  // Fetch target pest name if campaign has one
+  let targetPestName: string | null = null;
+  if (campaign.target_pest_id) {
+    const { data: pestType } = await supabase
+      .from('pest_types')
+      .select('name')
+      .eq('id', campaign.target_pest_id)
+      .single();
+    targetPestName = pestType?.name || null;
+  }
+
   // Check if lead already exists for this customer + campaign
   const { data: existingLead } = await supabase
     .from('leads')
@@ -364,6 +387,15 @@ async function handleLeadCreationFromClick(
 
   const serviceAddressId = customer?.customer_service_addresses?.[0]?.service_address?.id || null;
 
+  // Build lead comments
+  let leadComments = `Lead created from email click engagement. Link: ${click.link}`;
+  if (targetPestName) {
+    leadComments += `\nTarget Pest: ${targetPestName}`;
+  }
+  if (campaign.service_plan_id) {
+    leadComments += `\nCampaign Service Plan: ${campaign.name}`;
+  }
+
   // Create lead in 'quoted' stage
   const { data: newLead, error: leadError } = await supabase
     .from('leads')
@@ -374,7 +406,8 @@ async function handleLeadCreationFromClick(
       campaign_id: campaignId,
       lead_source: 'campaign',
       lead_status: 'quoted',
-      comments: `Lead created from email click engagement. Link: ${click.link}`,
+      pest_type: targetPestName,
+      comments: leadComments,
       ip_address: click.ipAddress || null,
       user_agent: click.userAgent || null,
     })
@@ -384,6 +417,181 @@ async function handleLeadCreationFromClick(
   if (leadError) {
     console.error('Error creating lead from click:', leadError);
     return;
+  }
+
+  // Create quote if campaign has service plan
+  if (campaign.service_plan_id && newLead) {
+    console.log('[LEAD_CREATION] Creating quote for campaign service plan...');
+
+    // Fetch service plan details
+    const { data: servicePlan } = await supabase
+      .from('service_plans')
+      .select('id, plan_name, plan_description, initial_price, recurring_price, billing_frequency')
+      .eq('id', campaign.service_plan_id)
+      .single();
+
+    if (servicePlan) {
+      // Fetch campaign discount
+      let campaignDiscount = null;
+      if (campaign.discount_id) {
+        const { data: discount, error: discountError } = await supabase
+          .from('company_discounts')
+          .select('*')
+          .eq('id', campaign.discount_id)
+          .single();
+
+        if (discountError) {
+          console.error('[LEAD_CREATION] Error fetching discount:', discountError);
+        } else if (!discount) {
+          console.warn('[LEAD_CREATION] Discount not found:', campaign.discount_id);
+        } else {
+          console.log('[LEAD_CREATION] Applying discount:', discount.discount_name, discount.discount_type, discount.discount_value);
+        }
+
+        campaignDiscount = discount;
+      }
+
+      // Calculate pricing with discount
+      let planInitialPrice = servicePlan.initial_price || 0;
+      let planRecurringPrice = servicePlan.recurring_price || 0;
+      let discountPercentage = 0;
+      let discountAmount = 0;
+
+      if (campaignDiscount && campaignDiscount.is_active) {
+        if (campaignDiscount.discount_type === 'percentage') {
+          discountPercentage = campaignDiscount.discount_value;
+          if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+            planInitialPrice = planInitialPrice * (1 - discountPercentage / 100);
+          }
+          if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
+            planRecurringPrice = planRecurringPrice * (1 - discountPercentage / 100);
+          }
+        } else if (campaignDiscount.discount_type === 'fixed_amount') {
+          discountAmount = campaignDiscount.discount_value;
+          if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+            planInitialPrice = Math.max(0, planInitialPrice - discountAmount);
+          }
+          if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
+            planRecurringPrice = Math.max(0, planRecurringPrice - discountAmount);
+          }
+        }
+      }
+
+      // Check if quote already exists for this lead
+      const { data: existingQuote } = await supabase
+        .from('quotes')
+        .select('id')
+        .eq('lead_id', newLead.id)
+        .single();
+
+      let quoteId: string;
+
+      if (existingQuote) {
+        // Update existing quote with new pricing
+        console.log('[LEAD_CREATION] Quote already exists for lead, updating pricing');
+        const { error: updateError } = await supabase
+          .from('quotes')
+          .update({
+            total_initial_price: planInitialPrice,
+            total_recurring_price: planRecurringPrice,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingQuote.id);
+
+        if (updateError) {
+          console.error('[LEAD_CREATION] Error updating quote:', updateError);
+          return;
+        }
+
+        quoteId = existingQuote.id;
+      } else {
+        // Create new quote
+        const { data: newQuote, error: quoteError } = await supabase
+          .from('quotes')
+          .insert({
+            lead_id: newLead.id,
+            company_id: companyId,
+            customer_id: customerId,
+            service_address_id: serviceAddressId,
+            total_initial_price: planInitialPrice,
+            total_recurring_price: planRecurringPrice,
+            quote_status: 'draft',
+          })
+          .select('id')
+          .single();
+
+        if (quoteError) {
+          console.error('[LEAD_CREATION] Error creating quote:', quoteError);
+          return; // Stop if quote creation fails
+        }
+
+        if (!newQuote) {
+          console.error('[LEAD_CREATION] Quote creation returned null');
+          return;
+        }
+
+        quoteId = newQuote.id;
+      }
+
+      // Check if line items already exist for this quote
+      const { data: existingLineItems } = await supabase
+        .from('quote_line_items')
+        .select('id')
+        .eq('quote_id', quoteId)
+        .eq('service_plan_id', servicePlan.id);
+
+      if (existingLineItems && existingLineItems.length > 0) {
+        // Update existing line item
+        console.log('[LEAD_CREATION] Updating existing quote line item');
+        const { error: updateLineItemError } = await supabase
+          .from('quote_line_items')
+          .update({
+            plan_name: servicePlan.plan_name,
+            plan_description: servicePlan.plan_description,
+            initial_price: servicePlan.initial_price || 0,
+            recurring_price: servicePlan.recurring_price || 0,
+            billing_frequency: servicePlan.billing_frequency || 'one-time',
+            discount_id: campaignDiscount?.id || null,
+            discount_percentage: discountPercentage,
+            discount_amount: discountAmount,
+            final_initial_price: planInitialPrice,
+            final_recurring_price: planRecurringPrice,
+          })
+          .eq('id', existingLineItems[0].id);
+
+        if (updateLineItemError) {
+          console.error('[LEAD_CREATION] Error updating quote line item:', updateLineItemError);
+        } else {
+          console.log('[LEAD_CREATION] Updated quote and line item for lead:', newLead.id);
+        }
+      } else {
+        // Create new line item
+        const { error: lineItemError } = await supabase
+          .from('quote_line_items')
+          .insert({
+            quote_id: quoteId,
+            service_plan_id: servicePlan.id,
+            addon_service_id: null,
+            plan_name: servicePlan.plan_name,
+            plan_description: servicePlan.plan_description,
+            initial_price: servicePlan.initial_price || 0,
+            recurring_price: servicePlan.recurring_price || 0,
+            billing_frequency: servicePlan.billing_frequency || 'one-time',
+            discount_id: campaignDiscount?.id || null,
+            discount_percentage: discountPercentage,
+            discount_amount: discountAmount,
+            final_initial_price: planInitialPrice,
+            final_recurring_price: planRecurringPrice,
+            display_order: 0,
+          });
+
+        if (lineItemError) {
+          console.error('[LEAD_CREATION] Error creating quote line item:', lineItemError);
+        } else {
+          console.log('[LEAD_CREATION] Created quote and line item for lead:', newLead.id);
+        }
+      }
+    }
   }
 
   // Update email log with lead reference

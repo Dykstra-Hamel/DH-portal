@@ -74,7 +74,10 @@ async function recalculateAllLineItemPrices(
     if (!servicePlan) continue;
 
     const baseInitialPrice = servicePlan.initial_price || 0;
-    const baseRecurringPrice = servicePlan.recurring_price || 0;
+    // For one-time plans, recurring_price should always be 0
+    const baseRecurringPrice = servicePlan.plan_category === 'one-time'
+      ? 0
+      : (servicePlan.recurring_price || 0);
 
     let homeInitialIncrease = 0;
     let homeRecurringIncrease = 0;
@@ -97,25 +100,68 @@ async function recalculateAllLineItemPrices(
       const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
 
       homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
-      homeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
+      // For one-time plans, never add recurring increases
+      homeRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
       yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
-      yardRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
+      // For one-time plans, never add recurring increases
+      yardRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
     }
 
     const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
     const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
 
-    // Apply existing discounts
+    // Apply existing discounts based on applies_to_price
     const discountAmount = lineItem.discount_amount || 0;
     const discountPercentage = lineItem.discount_percentage || 0;
 
-    let finalInitialPrice = initialPriceWithSize - discountAmount;
-    if (discountPercentage > 0) {
-      finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
+    // Fetch discount configuration if discount_id exists
+    let appliesToPrice = 'initial'; // default
+    let recurringDiscountAmount = 0;
+    let recurringDiscountPercentage = 0;
+
+    if (lineItem.discount_id) {
+      const { data: discountConfig } = await supabase
+        .from('company_discounts')
+        .select('applies_to_price, recurring_discount_type, recurring_discount_value')
+        .eq('id', lineItem.discount_id)
+        .single();
+
+      if (discountConfig) {
+        appliesToPrice = discountConfig.applies_to_price;
+
+        // For 'both' pricing, check if there are separate recurring discount settings
+        if (appliesToPrice === 'both' && discountConfig.recurring_discount_type && discountConfig.recurring_discount_value != null) {
+          if (discountConfig.recurring_discount_type === 'percentage') {
+            recurringDiscountPercentage = discountConfig.recurring_discount_value;
+          } else {
+            recurringDiscountAmount = discountConfig.recurring_discount_value;
+          }
+        } else {
+          // Use same discount for both
+          recurringDiscountAmount = discountAmount;
+          recurringDiscountPercentage = discountPercentage;
+        }
+      }
     }
 
-    // Discount only applies to initial price, not recurring
-    const finalRecurringPrice = recurringPriceWithSize;
+    let finalInitialPrice = initialPriceWithSize;
+    let finalRecurringPrice = recurringPriceWithSize;
+
+    // Apply discount to initial price if applicable
+    if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
+      finalInitialPrice = finalInitialPrice - discountAmount;
+      if (discountPercentage > 0) {
+        finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
+      }
+    }
+
+    // Apply discount to recurring price if applicable
+    if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
+      finalRecurringPrice = finalRecurringPrice - recurringDiscountAmount;
+      if (recurringDiscountPercentage > 0) {
+        finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
+      }
+    }
 
     // Update the line item
     await supabase
@@ -222,10 +268,10 @@ export async function PUT(
 
     const supabase = createAdminClient();
 
-    // Fetch existing quote to check if it's signed
+    // Fetch existing quote to check if it's signed and get current size ranges
     const { data: existingQuote, error: fetchError } = await supabase
       .from('quotes')
-      .select('signed_at, quote_status')
+      .select('signed_at, quote_status, home_size_range, yard_size_range')
       .eq('id', id)
       .single();
 
@@ -361,9 +407,15 @@ export async function PUT(
         }
       }
 
-      // Recalculate ALL line items' prices if size ranges changed
-      if ((body.home_size_range !== undefined || body.yard_size_range !== undefined)) {
-        await recalculateAllLineItemPrices(supabase, id, body.home_size_range, body.yard_size_range);
+      // Recalculate ALL line items' prices ONLY if size ranges actually changed
+      // Compare against the ORIGINAL values from existingQuote (before update)
+      if (body.home_size_range !== undefined || body.yard_size_range !== undefined) {
+        const homeSizeChanged = body.home_size_range !== undefined && body.home_size_range !== existingQuote.home_size_range;
+        const yardSizeChanged = body.yard_size_range !== undefined && body.yard_size_range !== existingQuote.yard_size_range;
+
+        if (homeSizeChanged || yardSizeChanged) {
+          await recalculateAllLineItemPrices(supabase, id, body.home_size_range, body.yard_size_range);
+        }
       }
     }
 
@@ -475,7 +527,10 @@ export async function PUT(
             } else {
               // Standard pricing flow
               const baseInitialPrice = servicePlan.initial_price || 0;
-              const baseRecurringPrice = servicePlan.recurring_price || 0;
+              // For one-time plans, recurring_price should always be 0
+              const baseRecurringPrice = servicePlan.plan_category === 'one-time'
+                ? 0
+                : (servicePlan.recurring_price || 0);
 
               // Calculate size-based price increases if pricing settings exist
               let homeInitialIncrease = 0;
@@ -499,9 +554,11 @@ export async function PUT(
                 const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
 
                 homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
-                homeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
+                // For one-time plans, never add recurring increases
+                homeRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
                 yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
-                yardRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
+                // For one-time plans, never add recurring increases
+                yardRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
               }
 
               initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
@@ -609,9 +666,11 @@ export async function PUT(
               service_plan_id: servicePlan.id,
               plan_name: servicePlan.plan_name,
               plan_description: servicePlan.plan_description,
+              // Note: plan_category is NOT stored in line items, it comes from service_plan join
               initial_price: initialPriceWithSize,
               recurring_price: recurringPriceWithSize,
-              billing_frequency: servicePlan.billing_frequency,
+              // For one-time plans, use 'one-time' as billing_frequency (quote_line_items doesn't allow null)
+              billing_frequency: servicePlan.plan_category === 'one-time' ? 'one-time' : servicePlan.billing_frequency,
               service_frequency: lineItem.service_frequency || servicePlan.treatment_frequency || null,
               discount_percentage: discountPercentage,
               discount_amount: discountAmount,
@@ -623,10 +682,18 @@ export async function PUT(
               final_recurring_price: finalRecurringPrice,
             };
 
-            await supabase
+            const { error: updateError } = await supabase
               .from('quote_line_items')
               .update(updateData)
               .eq('id', lineItem.id);
+
+            if (updateError) {
+              console.error('Error updating line item:', updateError);
+              return NextResponse.json(
+                { error: `Failed to update line item: ${updateError.message}` },
+                { status: 500 }
+              );
+            }
           }
         } else if (lineItem.id) {
           // Update existing line item (only discounts/display order, no service plan change)
@@ -756,7 +823,10 @@ export async function PUT(
             } else {
               // Standard pricing flow
               const baseInitialPrice = servicePlan.initial_price || 0;
-              const baseRecurringPrice = servicePlan.recurring_price || 0;
+              // For one-time plans, recurring_price should always be 0
+              const baseRecurringPrice = servicePlan.plan_category === 'one-time'
+                ? 0
+                : (servicePlan.recurring_price || 0);
 
               // Calculate size-based price increases if pricing settings exist
               let homeInitialIncrease = 0;
@@ -784,9 +854,11 @@ export async function PUT(
 
                 // Get price increases
                 homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
-                homeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
+                // For one-time plans, never add recurring increases
+                homeRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
                 yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
-                yardRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
+                // For one-time plans, never add recurring increases
+                yardRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
               }
 
               // Calculate prices with size increases

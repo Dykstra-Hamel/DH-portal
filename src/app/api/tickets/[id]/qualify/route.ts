@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 
 export async function POST(
   request: NextRequest,
@@ -434,6 +435,13 @@ export async function POST(
           // Don't fail the request - the lead was created successfully
         }
       }
+
+      // Send lead creation notification (non-blocking)
+      notifyLeadCreated(newLead.id, ticket.company_id, {
+        assignedUserId: assignedTo,
+      }).catch(error => {
+        console.error('Lead notification failed:', error);
+      });
 
       // Create assignment notification if lead was assigned to someone
       if (assignedTo) {

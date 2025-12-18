@@ -131,6 +131,8 @@ export async function PUT(
         description: body.description,
         discount_type: body.discount_type,
         discount_value: body.discount_value,
+        recurring_discount_type: body.recurring_discount_type,
+        recurring_discount_value: body.recurring_discount_value,
         applies_to_price: body.applies_to_price,
         applies_to_plans: body.applies_to_plans,
         eligible_plan_ids: body.eligible_plan_ids,

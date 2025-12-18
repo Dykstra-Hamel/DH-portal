@@ -97,29 +97,12 @@ export interface LeadQuoteSectionProps {
   quote: any;
   isQuoteUpdating: boolean;
   pricingSettings: any;
-  pestOptions: any[];
-  allServicePlans: any[];
-  serviceSelections: ServiceSelection[];
   selectedPests: string[];
   additionalPests: string[];
-  selectedAddOns: string[];
-  loadingPlan: boolean;
-  loadingPestOptions: boolean;
   homeSize: number | '';
   yardSize: number | '';
   selectedHomeSizeOption: string;
   selectedYardSizeOption: string;
-  homeSizeOptions: any[];
-  yardSizeOptions: any[];
-  preferredDate: string;
-  preferredTime: string;
-  onPestsChange: (primary: string, additional: string[]) => Promise<void>;
-  onHomeSizeChange: (option: string) => Promise<void>;
-  onYardSizeChange: (option: string) => Promise<void>;
-  onServiceSelectionChange: (selections: ServiceSelection[]) => void;
-  onAddOnToggle: (addonId: string) => Promise<void>;
-  onPreferredDateChange: (date: string) => void;
-  onPreferredTimeChange: (time: string) => void;
   onEmailQuote: () => void;
   onShowToast?: ShowToastCallback;
   onRequestUndo?: RequestUndoCallback;
@@ -130,6 +113,4 @@ export interface LeadQuoteSectionProps {
   setYardSize: (size: number | '') => void;
   setSelectedHomeSizeOption: (option: string) => void;
   setSelectedYardSizeOption: (option: string) => void;
-  setPreferredDate: (date: string) => void;
-  setPreferredTime: (time: string) => void;
 }

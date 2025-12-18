@@ -1,5 +1,6 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import type { NormalizedLeadData } from '@/lib/gemini/csv-parser';
 
 export const bulkLeadUploadHandler = inngest.createFunction(
@@ -147,7 +148,7 @@ export const bulkLeadUploadHandler = inngest.createFunction(
           }
 
           // Create lead
-          const { error: leadError } = await supabase.from('leads').insert([
+          const { data: newLead, error: leadError } = await supabase.from('leads').insert([
             {
               company_id: companyId,
               customer_id: customerId,
@@ -163,13 +164,23 @@ export const bulkLeadUploadHandler = inngest.createFunction(
               assigned_to: null,
               created_at: new Date().toISOString(),
             },
-          ]);
+          ])
+          .select('id')
+          .single();
 
-          if (leadError) {
+          if (leadError || !newLead) {
             console.error('Error creating lead:', leadError);
             failedCount++;
             continue;
           }
+
+          // Send lead creation notification (non-blocking)
+          notifyLeadCreated(newLead.id, companyId, {
+            assignedUserId: undefined, // Bulk uploads are unassigned
+          }).catch(error => {
+            console.error('Bulk lead notification failed:', error);
+            // Don't fail the upload if notification fails
+          });
 
           successCount++;
         } catch (error) {

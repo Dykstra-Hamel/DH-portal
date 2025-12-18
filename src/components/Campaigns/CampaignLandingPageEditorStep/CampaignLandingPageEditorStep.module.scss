@@ -382,6 +382,38 @@
   margin-top: 12px;
 }
 
+// Add-on limit information display
+.addonLimitInfo {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #f0f9ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1e40af;
+  }
+}
+
+// Disabled checkbox label styling
+.checkboxLabel.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+
+  input[type='checkbox'] {
+    cursor: not-allowed;
+  }
+
+  .addonName,
+  .addonDescription,
+  .addonPrice {
+    color: #9ca3af;
+  }
+}
+
 .addonName {
   font-weight: 600;
   color: #111827;
