@@ -66,6 +66,7 @@ interface ThankYouPageProps {
     phoneNumber: string | null;
     email: string | null;
     companyName: string;
+    accentColorPreference?: 'primary' | 'secondary';
     fontPrimaryName: string | null;
     fontPrimaryUrl: string | null;
   };
@@ -144,6 +145,15 @@ export default function ThankYouPage({
     ? replaceVariables(thankYou.content, customer, company)
     : null;
 
+  const accentColor =
+    branding.accentColorPreference === 'secondary'
+      ? branding.secondaryColor
+      : branding.primaryColor;
+  const faqColor =
+    branding.accentColorPreference === 'secondary'
+      ? branding.primaryColor
+      : branding.secondaryColor;
+
   // Determine CTA URL: use configured URL or fallback to company website
   const ctaUrl = thankYou.ctaUrl || (company.website && company.website[0]) || '#';
 
@@ -159,7 +169,9 @@ export default function ThankYouPage({
       style={{
         '--brand-primary': branding.primaryColor,
         '--brand-secondary': branding.secondaryColor,
-        '--accent-color': branding.primaryColor,
+        '--accent-color': accentColor,
+        '--faq-color': faqColor,
+        '--signature-color': faqColor,
         '--font-primary': branding.fontPrimaryName
           ? `"${branding.fontPrimaryName}", sans-serif`
           : '"Inter Tight", sans-serif',

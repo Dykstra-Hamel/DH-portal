@@ -62,6 +62,7 @@ export default function CampaignEditor({
   const [contactLists, setContactLists] = useState<any[]>([]);
   const [totalContacts, setTotalContacts] = useState(0);
   const [discounts, setDiscounts] = useState<any[]>([]);
+  const [pestTypes, setPestTypes] = useState<any[]>([]);
   const [campaignIdValidating, setCampaignIdValidating] = useState(false);
   const [campaignIdAvailable, setCampaignIdAvailable] = useState<
     boolean | null
@@ -77,6 +78,7 @@ export default function CampaignEditor({
   // Landing page state
   const [landingPageEnabled, setLandingPageEnabled] = useState(false);
   const [servicePlanId, setServicePlanId] = useState<string | null>(null);
+  const [targetPestId, setTargetPestId] = useState<string | null>(null);
   const [landingPageData, setLandingPageData] = useState<LandingPageFormData>({
     hero_title: 'Quarterly Pest Control starting at only $44/mo',
     hero_subtitle: 'Special Offer',
@@ -137,6 +139,7 @@ export default function CampaignEditor({
     if (companyId && isOpen) {
       fetchCompanyTimezone();
       fetchDiscounts();
+      fetchPestTypes();
     }
   }, [companyId, isOpen]);
 
@@ -168,6 +171,18 @@ export default function CampaignEditor({
       }
     } catch (error) {
       console.error('Error fetching discounts:', error);
+    }
+  };
+
+  const fetchPestTypes = async () => {
+    try {
+      const response = await fetch(`/api/pest-types?companyId=${companyId}`);
+      const result = await response.json();
+      if (result.success) {
+        setPestTypes(result.pestTypes || []);
+      }
+    } catch (error) {
+      console.error('Error fetching pest types:', error);
     }
   };
 
@@ -348,6 +363,7 @@ export default function CampaignEditor({
       setSelectedWorkflow(campaign.workflow);
       setEstimatedDays(campaign.estimated_days || null);
       setServicePlanId(campaign.service_plan_id || null);
+      setTargetPestId(campaign.target_pest_id || null);
       // Mark campaign ID and name as available if editing existing campaign
       if (campaign.campaign_id) {
         setCampaignIdAvailable(true);
@@ -502,6 +518,7 @@ export default function CampaignEditor({
         company_id: companyId,
         total_contacts: totalContacts,
         service_plan_id: servicePlanId,
+        target_pest_id: targetPestId,
       };
 
       const response = await fetch(url, {
@@ -707,6 +724,9 @@ export default function CampaignEditor({
 
     // Reset landing page state
     setLandingPageEnabled(false);
+    setServicePlanId(null);
+    setTargetPestId(null);
+    setPestTypes([]);
     setLandingPageData({
       hero_title: 'Quarterly Pest Control starting at only $44/mo',
       hero_subtitle: 'Special Offer',
@@ -909,6 +929,26 @@ export default function CampaignEditor({
                   Create New Discount
                 </button>
                 <small>Select a discount to apply to this campaign</small>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Target Pest (Optional)</label>
+                <select
+                  value={targetPestId || ''}
+                  onChange={e => setTargetPestId(e.target.value || null)}
+                >
+                  <option value="">No Specific Pest</option>
+                  {pestTypes
+                    .filter(p => p.is_active)
+                    .map(pest => (
+                      <option key={pest.id} value={pest.id}>
+                        {pest.name}
+                      </option>
+                    ))}
+                </select>
+                <small>
+                  When set, leads from this campaign will automatically target this pest
+                </small>
               </div>
 
               <div className={styles.formGroup}>

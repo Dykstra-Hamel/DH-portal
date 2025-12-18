@@ -226,9 +226,10 @@
     right: 12px;
   }
 
-  input {
-    padding-left: 28px;
-    padding-right: 28px;
+  input[type='number'],
+  input[type='text'] {
+    padding-left: 32px !important;
+    padding-right: 32px !important;
   }
 }
 

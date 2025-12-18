@@ -8,6 +8,7 @@ import {
   getSupabaseClient
 } from '@/lib/api-utils';
 import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
+import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 
 export async function GET(request: NextRequest) {
   try {
@@ -427,6 +428,13 @@ export async function POST(request: NextRequest) {
         // Don't fail the request if this fails
       }
     }
+
+    // Send lead creation notification (non-blocking)
+    notifyLeadCreated(newLead.id, companyId, {
+      assignedUserId: undefined, // Manual leads are unassigned
+    }).catch(error => {
+      console.error('Lead notification failed:', error);
+    });
 
     return NextResponse.json(
       { success: true, lead: newLead },

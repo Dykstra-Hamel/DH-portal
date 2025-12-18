@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
       exclude_weekends,
       total_contacts,
       service_plan_id,
+      target_pest_id,
     } = body;
 
     // Validate required fields
@@ -188,6 +189,7 @@ export async function POST(request: NextRequest) {
         campaign_id,
         discount_id: discount_id || null,
         service_plan_id: service_plan_id || null,
+        target_pest_id: target_pest_id || null,
         status: initialStatus,
         start_datetime,
         end_datetime: end_datetime && end_datetime.trim() !== '' ? end_datetime : null,

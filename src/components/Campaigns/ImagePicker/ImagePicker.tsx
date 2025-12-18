@@ -425,9 +425,10 @@ export default function ImagePicker({
                       <button
                         type="button"
                         onClick={() => handleLibraryImageSelect(image)}
-                        className={styles.selectButton}
+                        className={`${styles.selectButton} ${value === image.publicUrl ? styles.selectButtonSelected : ''}`}
+                        disabled={value === image.publicUrl}
                       >
-                        Select
+                        {value === image.publicUrl ? 'Selected' : 'Select'}
                       </button>
                     </div>
                   ))}

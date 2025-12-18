@@ -36,6 +36,11 @@ const DAY_NAMES: { [key: string]: string } = {
  * @returns Formatted time (e.g., "9am")
  */
 function formatTime(time: string): string {
+  // Guard against undefined, null, or empty string
+  if (!time || typeof time !== 'string') {
+    return 'N/A';
+  }
+
   const [hourStr, minuteStr] = time.split(':');
   let hour = parseInt(hourStr, 10);
   const minute = parseInt(minuteStr, 10);
@@ -136,7 +141,7 @@ export function formatBusinessHoursForDisplay(businessHours: BusinessHoursData):
     const dayData = businessHours[days[0]];
 
     const formattedDays = formatDayRange(days);
-    const formattedHours = dayData.closed
+    const formattedHours = dayData.closed || !dayData.start || !dayData.end
       ? 'Closed'
       : `${formatTime(dayData.start)}-${formatTime(dayData.end)}`;
 

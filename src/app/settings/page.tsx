@@ -20,6 +20,7 @@ import {
 import KnowledgeBase from '@/components/KnowledgeBase/KnowledgeBase';
 import AccountLinking from '@/components/AccountLinking/AccountLinking';
 import AutomationSettings from '@/components/Automation/AutomationSettings';
+import NotificationPreferences from '@/components/NotificationPreferences/NotificationPreferences';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -279,6 +280,13 @@ export default function SettingsPage() {
               <div className={styles.settingGroup}>
                 <AccountLinking user={user} />
               </div>
+
+              {/* Email Notification Preferences */}
+              {selectedCompany && (
+                <div className={styles.settingGroup}>
+                  <NotificationPreferences companyId={selectedCompany.id} />
+                </div>
+              )}
             </div>
           </div>
         )}

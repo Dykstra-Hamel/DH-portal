@@ -114,12 +114,14 @@ export function QuoteSummaryCard({
                         {(lineItem.discount_percentage || lineItem.discount_amount) ? ' (Discounted)' : ''}
                       </div>
                     </div>
-                    <div className={styles.gridItem}>
-                      <div className={styles.fieldLabel}>Recurring Price</div>
-                      <div className={styles.fieldValue}>
-                        {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                    {lineItem.billing_frequency && (
+                      <div className={styles.gridItem}>
+                        <div className={styles.fieldLabel}>Recurring Price</div>
+                        <div className={styles.fieldValue}>
+                          {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -145,12 +147,14 @@ export function QuoteSummaryCard({
                         {formatCurrency(lineItem.final_initial_price || lineItem.initial_price || 0)}
                       </div>
                     </div>
-                    <div className={styles.gridItem}>
-                      <div className={styles.fieldLabel}>Recurring Price</div>
-                      <div className={styles.fieldValue}>
-                        {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                    {lineItem.billing_frequency && (
+                      <div className={styles.gridItem}>
+                        <div className={styles.fieldLabel}>Recurring Price</div>
+                        <div className={styles.fieldValue}>
+                          {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               ))}

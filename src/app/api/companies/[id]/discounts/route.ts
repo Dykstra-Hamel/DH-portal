@@ -132,6 +132,8 @@ export async function POST(
         description: body.description || null,
         discount_type: body.discount_type,
         discount_value: body.discount_value,
+        recurring_discount_type: body.recurring_discount_type || null,
+        recurring_discount_value: body.recurring_discount_value || null,
         applies_to_price: body.applies_to_price || 'initial',
         applies_to_plans: body.applies_to_plans || 'all',
         eligible_plan_ids: body.eligible_plan_ids || [],

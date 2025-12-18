@@ -20,12 +20,22 @@ export interface CompanyPricingSettings {
 // Service plan-specific pricing per interval
 export interface ServicePlanPricing {
   home_size_pricing: {
+    pricing_mode?: 'linear' | 'custom'; // Default to 'linear' if not set (backwards compatible)
+    // Linear mode fields
     initial_cost_per_interval: number;
     recurring_cost_per_interval: number;
+    // Custom mode fields (array of exact prices per interval)
+    custom_initial_prices?: number[];
+    custom_recurring_prices?: number[];
   };
   yard_size_pricing: {
+    pricing_mode?: 'linear' | 'custom'; // Default to 'linear' if not set (backwards compatible)
+    // Linear mode fields
     initial_cost_per_interval: number;
     recurring_cost_per_interval: number;
+    // Custom mode fields (array of exact prices per interval)
+    custom_initial_prices?: number[];
+    custom_recurring_prices?: number[];
   };
 }
 

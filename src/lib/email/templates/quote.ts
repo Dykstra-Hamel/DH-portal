@@ -36,9 +36,11 @@ export function generateQuoteEmailTemplate(quoteData: QuoteEmailData): string {
   const singularPestType = getSingularPestType(pestType);
 
   // Use selectedPlan pricing if available, otherwise fallback to defaults
-  const recurringPrice = selectedPlan?.recurring_price
+  const recurringPrice = selectedPlan?.recurring_price && selectedPlan?.billing_frequency
     ? `$${selectedPlan.recurring_price} ${selectedPlan.billing_frequency.charAt(0).toUpperCase() + selectedPlan.billing_frequency.slice(1)}`
-    : '$49 Monthly';
+    : selectedPlan?.recurring_price === 0
+      ? 'N/A (One-time service)'
+      : '$49 Monthly';
   const initialPrice = selectedPlan?.initial_price
     ? `$${selectedPlan.initial_price}`
     : '$199';
