@@ -129,6 +129,9 @@ interface AddOn {
   recurring_price: number | null;
 }
 
+// Maximum number of add-ons that can be displayed on landing page
+const MAX_ADDONS = 6;
+
 export default function CampaignLandingPageEditorStep({
   campaignId,
   companyId,
@@ -138,6 +141,10 @@ export default function CampaignLandingPageEditorStep({
   onServicePlanChange,
 }: CampaignLandingPageEditorStepProps) {
   const supabase = createClient();
+  const [brandDefaults, setBrandDefaults] = useState<{
+    primaryColorHex: string | null;
+    secondaryColorHex: string | null;
+  }>({ primaryColorHex: null, secondaryColorHex: null });
   const [expandedSections, setExpandedSections] = useState<Set<SectionKey>>(
     new Set(['serviceplan', 'hero', 'pricing', 'redemption'])
   );
@@ -152,6 +159,30 @@ export default function CampaignLandingPageEditorStep({
   const [availableAddons, setAvailableAddons] = useState<AddOn[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(false);
   const selectionInitializedRef = useRef(false);
+
+  useEffect(() => {
+    const fetchBrandDefaults = async () => {
+      try {
+        const { data: brandData, error } = await supabase
+          .from('brands')
+          .select('primary_color_hex, secondary_color_hex')
+          .eq('company_id', companyId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        setBrandDefaults({
+          primaryColorHex: brandData?.primary_color_hex || null,
+          secondaryColorHex: brandData?.secondary_color_hex || null,
+        });
+      } catch (error) {
+        console.error('Error fetching brand defaults:', error);
+        setBrandDefaults({ primaryColorHex: null, secondaryColorHex: null });
+      }
+    };
+
+    fetchBrandDefaults();
+  }, [companyId, supabase]);
 
   // Fetch available service plans for this company
   useEffect(() => {
@@ -234,6 +265,15 @@ export default function CampaignLandingPageEditorStep({
     fetchAddons();
   }, [servicePlanId, companyId, supabase]);
 
+  const primaryColorFallback =
+    data.override_primary_color ||
+    brandDefaults.primaryColorHex ||
+    '#00529B';
+  const secondaryColorFallback =
+    data.override_secondary_color ||
+    brandDefaults.secondaryColorHex ||
+    '#00B142';
+
   // Ensure selected add-ons stay in sync with available options
   useEffect(() => {
     const availableIds = availableAddons.map((addon) => addon.id);
@@ -241,10 +281,19 @@ export default function CampaignLandingPageEditorStep({
 
     // Initialize selection when add-ons load or plan changes
     if (!selectionInitializedRef.current) {
-      const initialSelection =
+      let initialSelection =
         currentSelected.length > 0
           ? currentSelected.filter((id) => availableIds.includes(id))
           : availableIds;
+
+      // Enforce MAX_ADDONS limit on initialization
+      if (initialSelection.length > MAX_ADDONS) {
+        console.warn(
+          `Campaign has ${initialSelection.length} add-ons selected. ` +
+          `Limiting to first ${MAX_ADDONS} for display.`
+        );
+        initialSelection = initialSelection.slice(0, MAX_ADDONS);
+      }
 
       selectionInitializedRef.current = true;
 
@@ -254,10 +303,14 @@ export default function CampaignLandingPageEditorStep({
       return;
     }
 
-    // After initialization, only prune invalid selections
-    const filteredSelection = currentSelected.filter((id) =>
+    // After initialization, prune invalid selections AND enforce limit
+    let filteredSelection = currentSelected.filter((id) =>
       availableIds.includes(id)
     );
+
+    if (filteredSelection.length > MAX_ADDONS) {
+      filteredSelection = filteredSelection.slice(0, MAX_ADDONS);
+    }
 
     if (filteredSelection.length !== currentSelected.length) {
       updateField('selected_addon_ids', filteredSelection);
@@ -290,9 +343,21 @@ export default function CampaignLandingPageEditorStep({
 
   const toggleAddonSelection = (addonId: string) => {
     const current = data.selected_addon_ids || [];
-    const next = current.includes(addonId)
-      ? current.filter((id) => id !== addonId)
-      : [...current, addonId];
+
+    // If deselecting, always allow
+    if (current.includes(addonId)) {
+      const next = current.filter((id) => id !== addonId);
+      updateField('selected_addon_ids', next);
+      return;
+    }
+
+    // If selecting, check limit
+    if (current.length >= MAX_ADDONS) {
+      return; // Do nothing - checkbox will be disabled
+    }
+
+    // Add to selection
+    const next = [...current, addonId];
     updateField('selected_addon_ids', next);
   };
 
@@ -961,13 +1026,6 @@ export default function CampaignLandingPageEditorStep({
                   />
                 </div>
 
-                <ImageUploadField
-                  label="Letter Image (Optional)"
-                  value={data.letter_image_url || null}
-                  onChange={(url) => updateField('letter_image_url', url || '')}
-                  campaignId={campaignId}
-                  companyId={companyId}
-                />
               </>
             )}
           </>
@@ -1190,26 +1248,46 @@ export default function CampaignLandingPageEditorStep({
                     <p className={styles.helpText}>No eligible add-ons for this plan.</p>
                   )}
                   {availableAddons.length > 0 && (
-                    <div className={styles.checkboxGrid}>
-                      {availableAddons.map((addon) => (
-                        <label key={addon.id} className={styles.checkboxLabel}>
-                          <input
-                            type="checkbox"
-                            checked={data.selected_addon_ids?.includes(addon.id)}
-                            onChange={() => toggleAddonSelection(addon.id)}
-                          />
-                          <div>
-                            <div className={styles.addonName}>{addon.addon_name}</div>
-                            {addon.addon_description && (
-                              <div className={styles.addonDescription}>{addon.addon_description}</div>
-                            )}
-                            {addon.recurring_price !== null && (
-                              <div className={styles.addonPrice}>${addon.recurring_price}</div>
-                            )}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
+                    <>
+                      <div className={styles.addonLimitInfo}>
+                        <p className={styles.helpText}>
+                          {data.selected_addon_ids?.length || 0} of {MAX_ADDONS} add-ons selected
+                          {data.selected_addon_ids?.length >= MAX_ADDONS &&
+                            ` (maximum reached)`
+                          }
+                        </p>
+                      </div>
+                      <div className={styles.checkboxGrid}>
+                        {availableAddons.map((addon) => {
+                          const isSelected = data.selected_addon_ids?.includes(addon.id);
+                          const isAtLimit = (data.selected_addon_ids?.length || 0) >= MAX_ADDONS;
+                          const isDisabled = !isSelected && isAtLimit;
+
+                          return (
+                            <label
+                              key={addon.id}
+                              className={`${styles.checkboxLabel} ${isDisabled ? styles.disabled : ''}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleAddonSelection(addon.id)}
+                                disabled={isDisabled}
+                              />
+                              <div>
+                                <div className={styles.addonName}>{addon.addon_name}</div>
+                                {addon.addon_description && (
+                                  <div className={styles.addonDescription}>{addon.addon_description}</div>
+                                )}
+                                {addon.recurring_price !== null && (
+                                  <div className={styles.addonPrice}>${addon.recurring_price}</div>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -1467,25 +1545,6 @@ export default function CampaignLandingPageEditorStep({
               addButtonText="Add Link"
               emptyText="No footer links added yet."
             />
-          </>
-        )}
-
-        {/* Terms Section */}
-        {renderSection(
-          'terms',
-          'Terms & Conditions',
-          'Legal terms shown in the redemption modal',
-          <>
-            <div className={styles.field}>
-              <label className={styles.label}>Terms Content</label>
-              <textarea
-                value={data.terms_content}
-                onChange={(e) => updateField('terms_content', e.target.value)}
-                placeholder="Enter the terms and conditions text"
-                className={styles.textarea}
-                rows={8}
-              />
-            </div>
           </>
         )}
 
@@ -1776,7 +1835,7 @@ export default function CampaignLandingPageEditorStep({
               <div className={styles.colorInput}>
                 <input
                   type="color"
-                  value={data.override_primary_color || '#00529B'}
+                  value={primaryColorFallback}
                   onChange={(e) => updateField('override_primary_color', e.target.value)}
                   className={styles.colorPicker}
                 />
@@ -1784,7 +1843,7 @@ export default function CampaignLandingPageEditorStep({
                   type="text"
                   value={data.override_primary_color}
                   onChange={(e) => updateField('override_primary_color', e.target.value)}
-                  placeholder="#00529B"
+                  placeholder={brandDefaults.primaryColorHex || '#00529B'}
                   className={styles.input}
                 />
               </div>
@@ -1795,7 +1854,7 @@ export default function CampaignLandingPageEditorStep({
               <div className={styles.colorInput}>
                 <input
                   type="color"
-                  value={data.override_secondary_color || '#00B142'}
+                  value={secondaryColorFallback}
                   onChange={(e) => updateField('override_secondary_color', e.target.value)}
                   className={styles.colorPicker}
                 />
@@ -1803,7 +1862,7 @@ export default function CampaignLandingPageEditorStep({
                   type="text"
                   value={data.override_secondary_color}
                   onChange={(e) => updateField('override_secondary_color', e.target.value)}
-                  placeholder="#00B142"
+                  placeholder={brandDefaults.secondaryColorHex || '#00B142'}
                   className={styles.input}
                 />
               </div>

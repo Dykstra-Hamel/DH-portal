@@ -505,7 +505,7 @@
   display: grid;
   grid-template-columns: 1fr 400px;
   gap: 60px;
-  align-items: start;
+  align-items: center;
 
   // When only redemption card (no letter), center it
   &:has(.redemptionColumn:only-child) {

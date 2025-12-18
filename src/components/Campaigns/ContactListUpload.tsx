@@ -323,6 +323,12 @@ export default function ContactListUpload({
           // Remove from local state
           setSelectedLists(selectedLists.filter(l => l.id !== listId));
         }
+
+        // Clear preview state when list is removed
+        setShowPreview(false);
+        setPreviewData([]);
+        setPreviewListName('');
+        setPreviewTotalContacts(0);
       } catch (error) {
         console.error('Error removing contact list:', error);
       }

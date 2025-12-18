@@ -30,15 +30,24 @@ export function generateHomeSizeOptions(
 
     const isLastInterval = rangeEnd >= max_home_sq_ft;
 
-    // Calculate pricing increases based on interval index
-    const initialIncrease = servicePlanPricing
-      ? intervalIndex *
-        servicePlanPricing.home_size_pricing.initial_cost_per_interval
-      : 0;
-    const recurringIncrease = servicePlanPricing
-      ? intervalIndex *
-        servicePlanPricing.home_size_pricing.recurring_cost_per_interval
-      : 0;
+    // Calculate pricing increases based on interval index and mode
+    let initialIncrease = 0;
+    let recurringIncrease = 0;
+
+    if (servicePlanPricing?.home_size_pricing) {
+      const pricing = servicePlanPricing.home_size_pricing;
+      const mode = pricing.pricing_mode || 'linear'; // Default to linear for backwards compatibility
+
+      if (mode === 'custom') {
+        // Custom pricing: use array lookup
+        initialIncrease = pricing.custom_initial_prices?.[intervalIndex] ?? 0;
+        recurringIncrease = pricing.custom_recurring_prices?.[intervalIndex] ?? 0;
+      } else {
+        // Linear pricing (default/existing behavior)
+        initialIncrease = intervalIndex * (pricing.initial_cost_per_interval ?? 0);
+        recurringIncrease = intervalIndex * (pricing.recurring_cost_per_interval ?? 0);
+      }
+    }
 
     // Build label
     let label = '';
@@ -139,15 +148,24 @@ export function generateYardSizeOptions(
 
     const isLastInterval = rangeEnd >= max_yard_acres;
 
-    // Calculate pricing increases based on interval index
-    const initialIncrease = servicePlanPricing
-      ? intervalIndex *
-        servicePlanPricing.yard_size_pricing.initial_cost_per_interval
-      : 0;
-    const recurringIncrease = servicePlanPricing
-      ? intervalIndex *
-        servicePlanPricing.yard_size_pricing.recurring_cost_per_interval
-      : 0;
+    // Calculate pricing increases based on interval index and mode
+    let initialIncrease = 0;
+    let recurringIncrease = 0;
+
+    if (servicePlanPricing?.yard_size_pricing) {
+      const pricing = servicePlanPricing.yard_size_pricing;
+      const mode = pricing.pricing_mode || 'linear'; // Default to linear for backwards compatibility
+
+      if (mode === 'custom') {
+        // Custom pricing: use array lookup
+        initialIncrease = pricing.custom_initial_prices?.[intervalIndex] ?? 0;
+        recurringIncrease = pricing.custom_recurring_prices?.[intervalIndex] ?? 0;
+      } else {
+        // Linear pricing (default/existing behavior)
+        initialIncrease = intervalIndex * (pricing.initial_cost_per_interval ?? 0);
+        recurringIncrease = intervalIndex * (pricing.recurring_cost_per_interval ?? 0);
+      }
+    }
 
     // Build label with fractional values
     let label = '';
@@ -206,9 +224,12 @@ export function calculateTotalPricing(
   const yardSizeInitialIncrease = yardSizeOption?.initialIncrease || 0;
   const yardSizeRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
 
+  // Handle null/undefined baseRecurringPrice for one-time services
+  const safeBaseRecurringPrice = baseRecurringPrice || 0;
+
   return {
     baseInitialPrice,
-    baseRecurringPrice,
+    baseRecurringPrice: safeBaseRecurringPrice,
     homeSizeInitialIncrease,
     homeSizeRecurringIncrease,
     yardSizeInitialIncrease,
@@ -216,7 +237,7 @@ export function calculateTotalPricing(
     totalInitialPrice:
       baseInitialPrice + homeSizeInitialIncrease + yardSizeInitialIncrease,
     totalRecurringPrice:
-      baseRecurringPrice +
+      safeBaseRecurringPrice +
       homeSizeRecurringIncrease +
       yardSizeRecurringIncrease,
   };
@@ -237,4 +258,44 @@ export function findSizeOptionByValue(
     }
     return value >= option.rangeStart && value <= option.rangeEnd;
   });
+}
+
+/**
+ * Calculate how many intervals exist for a given dimension
+ * Used to determine array length for custom pricing mode
+ */
+export function calculateIntervalCount(
+  settings: CompanyPricingSettings,
+  dimension: 'home' | 'yard'
+): number {
+  if (dimension === 'home') {
+    const range = settings.max_home_sq_ft - settings.base_home_sq_ft;
+    const intervals = Math.ceil(range / settings.home_sq_ft_interval);
+    return intervals + 1; // +1 for the base interval (0)
+  } else {
+    const range = settings.max_yard_acres - settings.base_yard_acres;
+    const intervals = Math.ceil(range / settings.yard_acres_interval);
+    return intervals + 1;
+  }
+}
+
+/**
+ * Get human-readable label for an interval
+ * Used in custom pricing UI to show what each interval represents
+ */
+export function getIntervalLabel(
+  settings: CompanyPricingSettings | null | undefined,
+  dimension: 'home' | 'yard',
+  intervalIndex: number
+): string {
+  if (!settings) {
+    return `Interval ${intervalIndex}`;
+  }
+
+  // Generate all options and find the matching one
+  const options = dimension === 'home'
+    ? generateHomeSizeOptions(settings)
+    : generateYardSizeOptions(settings);
+
+  return options[intervalIndex]?.label || `Interval ${intervalIndex}`;
 }

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { captureDeviceData } from '@/lib/device-utils';
 import { inngest } from '@/lib/inngest/client';
+import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 
 interface RedeemRequest {
   customerId: string;
@@ -60,7 +61,7 @@ export async function POST(
     console.log('[REDEEM] Looking up campaign with campaign_id:', campaignId);
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
-      .select('id, campaign_id, name, company_id, discount_id, service_plan_id')
+      .select('id, campaign_id, name, company_id, discount_id, service_plan_id, target_pest_id')
       .eq('campaign_id', campaignId)
       .single();
 
@@ -72,6 +73,17 @@ export async function POST(
       );
     }
     console.log('[REDEEM] Campaign found:', campaign.name);
+
+    // Fetch target pest name if campaign has one
+    let targetPestName: string | null = null;
+    if (campaign.target_pest_id) {
+      const { data: pestType } = await supabase
+        .from('pest_types')
+        .select('name')
+        .eq('id', campaign.target_pest_id)
+        .single();
+      targetPestName = pestType?.name || null;
+    }
 
     // Fetch customer with service addresses
     console.log('[REDEEM] Looking up customer:', { customerId: body.customerId, companyId: campaign.company_id });
@@ -286,6 +298,11 @@ export async function POST(
       ? `Campaign: ${campaign.name}\nRedeemed with signature on ${new Date().toLocaleDateString()}`
       : `Campaign: ${campaign.name}\nRedeemed via inline form on ${new Date().toLocaleDateString()}`;
 
+    // Add pest targeting info if applicable
+    if (targetPestName) {
+      leadComments += `\n\nTarget Pest: ${targetPestName}`;
+    }
+
     // Add note if no service address provided
     if (!addressData) {
       leadComments += `\n\nNote: Customer did not have a service address on file. Please collect service address when scheduling.`;
@@ -315,7 +332,7 @@ export async function POST(
     // Check for existing lead first (may have been created from email click)
     const { data: existingLead } = await supabase
       .from('leads')
-      .select('id, lead_status, comments, service_address_id')
+      .select('id, lead_status, comments, service_address_id, assigned_to')
       .eq('customer_id', body.customerId)
       .eq('company_id', campaign.company_id)
       .eq('campaign_id', campaign.id)
@@ -366,6 +383,7 @@ export async function POST(
           campaign_id: campaign.id,
           lead_source: 'campaign',
           lead_status: 'scheduling',
+          pest_type: targetPestName,
           comments: leadComments,
           requested_date: body.requested_date || null,
           requested_time: body.requested_time || null,
@@ -721,6 +739,34 @@ export async function POST(
     if (activityError) {
       console.error('Error logging activity:', activityError);
       // Don't fail the request if activity logging fails
+    }
+
+    // Send lead creation notification (non-blocking)
+    notifyLeadCreated(lead.id, campaign.company_id, {
+      assignedUserId: undefined, // Campaign leads are unassigned
+    }).catch(error => {
+      console.error('Campaign lead notification failed:', error);
+    });
+
+    // If updating existing lead to scheduling status, trigger status-changed event
+    if (existingLead && existingLead.lead_status !== 'scheduling') {
+      try {
+        await inngest.send({
+          name: 'lead/status-changed',
+          data: {
+            leadId: existingLead.id,
+            companyId: campaign.company_id,
+            fromStatus: existingLead.lead_status,
+            toStatus: 'scheduling',
+            assignedUserId: existingLead.assigned_to,
+            userId: 'system',
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (error) {
+        console.error('Failed to trigger status-changed event:', error);
+        // Don't fail the redemption
+      }
     }
 
     // Return success

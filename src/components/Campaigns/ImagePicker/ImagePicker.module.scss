@@ -244,6 +244,18 @@
   &:hover {
     background-color: #0056b3;
   }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.selectButtonSelected {
+  background-color: #22c55e;
+
+  &:hover {
+    background-color: #22c55e;
+  }
 }
 
 .pagination {

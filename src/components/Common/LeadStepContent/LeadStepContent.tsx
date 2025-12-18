@@ -3521,28 +3521,36 @@ export function LeadStepContent({
               >
                 Loading service plan...
               </div>
-            ) : selectedPests.length === 0 ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'var(--gray-500)',
-                }}
-              >
-                Select a pest to view available service plans
-              </div>
-            ) : !selectedPlan ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'var(--gray-500)',
-                }}
-              >
-                No service plans available for selected pest
-              </div>
             ) : (
               <>
+                {selectedPests.length === 0 && (
+                  <div
+                    style={{
+                      padding: '12px 20px',
+                      marginBottom: '16px',
+                      backgroundColor: '#f3f4f6',
+                      borderRadius: '6px',
+                      color: '#6b7280',
+                      fontSize: '14px',
+                    }}
+                  >
+                    ℹ️ No pest selected. You can still configure service details below.
+                  </div>
+                )}
+                {selectedPests.length > 0 && !selectedPlan && (
+                  <div
+                    style={{
+                      padding: '12px 20px',
+                      marginBottom: '16px',
+                      backgroundColor: '#fef3c7',
+                      borderRadius: '6px',
+                      color: '#92400e',
+                      fontSize: '14px',
+                    }}
+                  >
+                    ⚠️ No service plans available for selected pest.
+                  </div>
+                )}
                 {/* Service Selection Form */}
                 {/* Row 1: Size of Home, Yard Size (2 columns) */}
                 <div className={`${styles.gridRow} ${styles.twoColumns}`}>
@@ -3799,16 +3807,24 @@ export function LeadStepContent({
                               p => p.plan_name === planName
                             );
                             if (plan) {
+                              // Auto-set frequency to 'one-time' for one-time plans
+                              const newFrequency = plan.plan_category === 'one-time'
+                                ? 'one-time'
+                                : selection.frequency;
+
                               setServiceSelections(prev =>
                                 prev.map((sel, idx) =>
                                   idx === index
-                                    ? { ...sel, servicePlan: plan }
+                                    ? { ...sel, servicePlan: plan, frequency: newFrequency }
                                     : sel
                                 )
                               );
                               await createOrUpdateQuoteLineItem(
                                 plan,
-                                selection.displayOrder
+                                selection.displayOrder,
+                                plan.plan_category === 'one-time'
+                                  ? { service_frequency: 'one-time' }
+                                  : {}
                               );
                             }
                           }}
@@ -3821,14 +3837,27 @@ export function LeadStepContent({
                           Service Frequency
                         </label>
                         <CustomDropdown
-                          options={[
-                            { value: 'monthly', label: 'Monthly' },
-                            { value: 'quarterly', label: 'Quarterly' },
-                            { value: 'semi-annually', label: 'Semi-Annually' },
-                            { value: 'annually', label: 'Annually' },
-                          ]}
-                          value={selection.frequency}
+                          options={
+                            selection.servicePlan?.plan_category === 'one-time'
+                              ? [{ value: 'one-time', label: 'One Time' }]
+                              : [
+                                  { value: 'monthly', label: 'Monthly' },
+                                  { value: 'quarterly', label: 'Quarterly' },
+                                  { value: 'semi-annually', label: 'Semi-Annually' },
+                                  { value: 'annually', label: 'Annually' },
+                                ]
+                          }
+                          value={
+                            selection.servicePlan?.plan_category === 'one-time'
+                              ? 'one-time'
+                              : selection.frequency
+                          }
                           onChange={async newFrequency => {
+                            // Don't allow changing frequency for one-time plans
+                            if (selection.servicePlan?.plan_category === 'one-time') {
+                              return;
+                            }
+
                             setServiceSelections(prev =>
                               prev.map((sel, idx) =>
                                 idx === index
@@ -3848,6 +3877,7 @@ export function LeadStepContent({
                             }
                           }}
                           placeholder="Select Frequency"
+                          disabled={selection.servicePlan?.plan_category === 'one-time'}
                         />
                       </div>
                       {/* Discount selector - disabled when custom pricing is active */}

@@ -85,7 +85,7 @@ interface ServicePlan {
   initial_price: number;
   initial_discount: number;
   recurring_price: number;
-  billing_frequency: string;
+  billing_frequency: string | null;
   treatment_frequency: string;
   includes_inspection: boolean;
   plan_features: string[];
