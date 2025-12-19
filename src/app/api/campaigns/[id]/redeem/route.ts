@@ -178,7 +178,7 @@ export async function POST(
         // (for tracking redemption in campaign_contact_list_members)
         const { data: campaignMember } = await supabase
           .from('campaign_contact_list_members')
-          .select('id')
+          .select('id, lead_id')
           .eq('customer_id', body.customerId)
           .eq('campaign_id', campaign.id)
           .maybeSingle();
@@ -202,7 +202,7 @@ export async function POST(
           // Fetch existing member record
           const { data: existingMember } = await supabase
             .from('campaign_contact_list_members')
-            .select('id, redeemed_at')
+            .select('id, redeemed_at, lead_id')
             .eq('id', campaignMember.id)
             .single();
 
@@ -229,7 +229,7 @@ export async function POST(
         // Find existing member record
         const { data: oldMember } = await supabase
           .from('campaign_contact_list_members')
-          .select('id, redeemed_at')
+          .select('id, redeemed_at, lead_id')
           .eq('contact_list_id', contactListId)
           .eq('customer_id', body.customerId)
           .maybeSingle();
@@ -330,13 +330,38 @@ export async function POST(
     }
 
     // Check for existing lead first (may have been created from email click)
-    const { data: existingLead } = await supabase
-      .from('leads')
-      .select('id, lead_status, comments, service_address_id, assigned_to')
-      .eq('customer_id', body.customerId)
-      .eq('company_id', campaign.company_id)
-      .eq('campaign_id', campaign.id)
-      .maybeSingle();
+    // Check for an existing lead tied to this member (only if it belongs to this campaign)
+    let existingLead: any = null;
+    if (updatedMember.lead_id) {
+      const { data: memberLead } = await supabase
+        .from('leads')
+        .select('id, lead_status, comments, service_address_id, assigned_to, campaign_id, company_id')
+        .eq('id', updatedMember.lead_id)
+        .maybeSingle();
+
+      if (
+        memberLead &&
+        memberLead.company_id === campaign.company_id &&
+        memberLead.campaign_id === campaign.id
+      ) {
+        existingLead = memberLead;
+      } else if (memberLead) {
+        console.log(
+          `[REDEEM] Member lead ${memberLead.id} belongs to different campaign (${memberLead.campaign_id}), ignoring`
+        );
+      }
+    }
+
+    if (!existingLead) {
+      const { data: leadByCustomer } = await supabase
+        .from('leads')
+        .select('id, lead_status, comments, service_address_id, assigned_to, campaign_id, company_id')
+        .eq('customer_id', body.customerId)
+        .eq('company_id', campaign.company_id)
+        .eq('campaign_id', campaign.id)
+        .maybeSingle();
+      existingLead = leadByCustomer || null;
+    }
 
     let lead;
     const signedAt = new Date().toLocaleDateString();
@@ -427,7 +452,7 @@ export async function POST(
       // 1. Fetch service plan details
       const { data: servicePlan, error: planError } = await supabase
         .from('service_plans')
-        .select('id, plan_name, plan_description, initial_price, recurring_price, billing_frequency')
+        .select('id, plan_name, plan_description, initial_price, recurring_price, billing_frequency, treatment_frequency')
         .eq('id', campaign.service_plan_id)
         .single();
 
@@ -453,22 +478,41 @@ export async function POST(
         let discountAmount = 0;
 
         if (campaignDiscount && campaignDiscount.is_active) {
-          if (campaignDiscount.discount_type === 'percentage') {
-            discountPercentage = campaignDiscount.discount_value;
-            if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+          // Initial discount: use primary fields
+          if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+            if (campaignDiscount.discount_type === 'percentage') {
+              discountPercentage = campaignDiscount.discount_value;
               planInitialPrice = planInitialPrice * (1 - discountPercentage / 100);
-            }
-            if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
-              planRecurringPrice = planRecurringPrice * (1 - discountPercentage / 100);
-            }
-          } else if (campaignDiscount.discount_type === 'fixed_amount') {
-            discountAmount = campaignDiscount.discount_value;
-            if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+            } else if (campaignDiscount.discount_type === 'fixed_amount') {
+              discountAmount = campaignDiscount.discount_value;
               planInitialPrice = Math.max(0, planInitialPrice - discountAmount);
             }
-            if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
-              planRecurringPrice = Math.max(0, planRecurringPrice - discountAmount);
+          }
+
+          // Recurring discount: use dedicated recurring fields if set, otherwise fall back to initial discount values
+          if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
+            let recurringDiscountPercentage = 0;
+            let recurringDiscountAmount = 0;
+
+            // Check for separate recurring discount configuration
+            if (campaignDiscount.recurring_discount_type && campaignDiscount.recurring_discount_value != null) {
+              if (campaignDiscount.recurring_discount_type === 'percentage') {
+                recurringDiscountPercentage = campaignDiscount.recurring_discount_value;
+              } else {
+                recurringDiscountAmount = campaignDiscount.recurring_discount_value;
+              }
+            } else {
+              // Fall back to initial discount values
+              recurringDiscountPercentage = discountPercentage;
+              recurringDiscountAmount = discountAmount;
             }
+
+            // Apply recurring discount
+            planRecurringPrice = planRecurringPrice - recurringDiscountAmount;
+            if (recurringDiscountPercentage > 0) {
+              planRecurringPrice = planRecurringPrice * (1 - recurringDiscountPercentage / 100);
+            }
+            planRecurringPrice = Math.max(0, planRecurringPrice);
           }
         }
 
@@ -585,6 +629,8 @@ export async function POST(
             initial_price: servicePlan.initial_price || 0,
             recurring_price: servicePlan.recurring_price,
             billing_frequency: servicePlan.billing_frequency,
+            service_frequency: (servicePlan as any).treatment_frequency || null,
+            discount_id: campaignDiscount?.id || null,
             discount_percentage: discountPercentage,
             discount_amount: discountAmount,
             final_initial_price: planInitialPrice,
@@ -603,6 +649,7 @@ export async function POST(
               initial_price: addon.initial_price || 0,
               recurring_price: addon.recurring_price,
               billing_frequency: addon.billing_frequency || servicePlan.billing_frequency,
+              discount_id: null,
               discount_percentage: 0,
               discount_amount: 0,
               final_initial_price: addon.initial_price || 0,

@@ -628,10 +628,41 @@ export async function PUT(
                     }
                     if (!(lineItem as any).discount_id && existingLineItem.discount_id) {
                       discountId = existingLineItem.discount_id;
+
+                      // If we retrieved a discount_id from existing line item, fetch and apply its configuration
+                      const { data: fetchedDiscount } = await supabase
+                        .from('company_discounts')
+                        .select('*')
+                        .eq('id', discountId)
+                        .single();
+
+                      if (fetchedDiscount) {
+                        appliesToPrice = fetchedDiscount.applies_to_price;
+
+                        // Apply discount configuration properly
+                        if (appliesToPrice === 'both' && fetchedDiscount.recurring_discount_type && fetchedDiscount.recurring_discount_value != null) {
+                          if (fetchedDiscount.recurring_discount_type === 'percentage') {
+                            recurringDiscountPercentage = fetchedDiscount.recurring_discount_value;
+                            recurringDiscountAmount = 0;
+                          } else {
+                            recurringDiscountAmount = fetchedDiscount.recurring_discount_value;
+                            recurringDiscountPercentage = 0;
+                          }
+                        } else {
+                          // For legacy line items without separate recurring fields, use same values
+                          recurringDiscountAmount = discountAmount;
+                          recurringDiscountPercentage = discountPercentage;
+                        }
+                      } else {
+                        // Discount not found, use legacy behavior
+                        recurringDiscountAmount = discountAmount;
+                        recurringDiscountPercentage = discountPercentage;
+                      }
+                    } else {
+                      // No discount_id, use legacy behavior
+                      recurringDiscountAmount = discountAmount;
+                      recurringDiscountPercentage = discountPercentage;
                     }
-                    // For legacy line items without discount_id, use same values for recurring
-                    recurringDiscountAmount = discountAmount;
-                    recurringDiscountPercentage = discountPercentage;
                   }
                 }
               }

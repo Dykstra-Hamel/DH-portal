@@ -11,8 +11,10 @@ import {
   ChevronDown,
   ChevronUp,
   List,
+  ChevronRight,
 } from 'lucide-react';
 import styles from './ContactListUpload.module.scss';
+import ContactListPreviewModal from './ContactListPreviewModal';
 
 interface ContactListUploadProps {
   companyId: string;
@@ -49,6 +51,10 @@ export default function ContactListUpload({
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [previewListName, setPreviewListName] = useState('');
   const [previewTotalContacts, setPreviewTotalContacts] = useState(0);
+  const [selectedListForPreview, setSelectedListForPreview] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,7 +91,11 @@ export default function ContactListUpload({
       const result = await response.json();
 
       if (result.success) {
-        setAvailableLists(result.lists || []);
+        // Filter out archived lists (API should already exclude them, but filter client-side too for safety)
+        const activeLists = (result.lists || []).filter(
+          (list: any) => !list.archived_at
+        );
+        setAvailableLists(activeLists);
       }
     } catch (error) {
       console.error('Error fetching available contact lists:', error);
@@ -435,9 +445,16 @@ export default function ContactListUpload({
                     <p className={styles.listDescription}>{list.description}</p>
                   )}
                   <div className={styles.listStats}>
-                    <div className={styles.statItem}>
+                    <div
+                      className={`${styles.statItem} ${styles.clickable}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedListForPreview({ id: list.id, name: list.name });
+                      }}
+                    >
                       <Users size={14} />
                       <span>{list.total_contacts} contacts</span>
+                      <ChevronRight size={14} />
                     </div>
                     {list.campaign_count > 0 && (
                       <div className={styles.statItem}>
@@ -733,9 +750,18 @@ export default function ContactListUpload({
                     <X size={16} />
                   </button>
                 </div>
-                <div className={styles.listInfo}>
+                <div
+                  className={`${styles.listInfo} ${styles.clickable}`}
+                  onClick={() => {
+                    setSelectedListForPreview({
+                      id: list.id,
+                      name: list.list_name || list.name
+                    });
+                  }}
+                >
                   <Users size={14} />
                   <span>{list.total_contacts} contacts</span>
+                  <ChevronRight size={14} />
                 </div>
               </div>
             ))}
@@ -751,6 +777,15 @@ export default function ContactListUpload({
             Select an existing list or upload a new CSV file to get started
           </span>
         </div>
+      )}
+
+      {/* Contact Preview Modal */}
+      {selectedListForPreview && (
+        <ContactListPreviewModal
+          listId={selectedListForPreview.id}
+          listName={selectedListForPreview.name}
+          onClose={() => setSelectedListForPreview(null)}
+        />
       )}
     </div>
   );

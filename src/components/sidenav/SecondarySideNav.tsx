@@ -352,7 +352,10 @@ export function SecondarySideNav({
       case 'campaigns':
         return [
           {
-            items: [{ text: 'Dashboard', href: '/campaigns' }],
+            items: [
+              { text: 'Dashboard', href: '/campaigns' },
+              { text: 'Contact Lists', href: '/campaigns/contact-lists' },
+            ],
           },
         ];
       case 'customers':

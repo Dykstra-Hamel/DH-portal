@@ -2,6 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { CreateQuoteRequest } from '@/types/quote';
 import { generateQuoteUrl, generateQuoteToken } from '@/lib/quote-utils';
+import {
+  generateHomeSizeOptions,
+  generateYardSizeOptions,
+  findSizeOptionByValue,
+} from '@/lib/pricing-calculations';
+
+/**
+ * Helper function to parse a size range string (e.g., "1500-2000" or "3000+")
+ * Returns the starting value for interval calculation
+ * Converts null/undefined to 0, matching the first interval
+ */
+function parseRangeValue(rangeString?: string): number {
+  if (!rangeString) return 0;
+
+  // Handle "3000+" format
+  if (rangeString.includes('+')) {
+    return parseFloat(rangeString.replace('+', ''));
+  }
+
+  // Handle "1500-2000" format - return the start value
+  const parts = rangeString.split('-');
+  return parseFloat(parts[0]);
+}
 
 /**
  * Ensures a quote exists for a lead. Creates one if missing.
@@ -265,6 +288,21 @@ export async function POST(
       }
     }
 
+    // Fetch company pricing settings for size-based pricing calculations
+    const { data: pricingSettings } = await supabase
+      .from('company_pricing_settings')
+      .select('*')
+      .eq('company_id', lead.company_id)
+      .single();
+
+    // Extract size ranges from service address (will be used for all line items)
+    const serviceAddress = Array.isArray(lead.primary_service_address)
+      ? lead.primary_service_address[0]
+      : lead.primary_service_address;
+
+    const homeSizeRange = serviceAddress?.home_size_range;
+    const yardSizeRange = serviceAddress?.yard_size_range;
+
     // Calculate total pricing and prepare line items
     let totalInitialPrice = 0;
     let totalRecurringPrice = 0;
@@ -275,15 +313,56 @@ export async function POST(
         throw new Error(`Service plan ${planRequest.service_plan_id} not found`);
       }
 
-      const initialPrice = plan.initial_price || 0;
-      const recurringPrice = plan.recurring_price || 0;
+      // --- SIZE-BASED PRICING CALCULATION ---
+      const baseInitialPrice = plan.initial_price || 0;
+      // For one-time plans, recurring_price should always be 0
+      const baseRecurringPrice = plan.plan_category === 'one-time'
+        ? 0
+        : (plan.recurring_price || 0);
 
-      // Apply discounts - support both discount_id (new) and manual discount amounts (legacy)
+      // Calculate size-based price increases if pricing settings exist
+      let homeInitialIncrease = 0;
+      let homeRecurringIncrease = 0;
+      let yardInitialIncrease = 0;
+      let yardRecurringIncrease = 0;
+
+      if (pricingSettings && plan.home_size_pricing && plan.yard_size_pricing) {
+        // Parse range values (null converts to 0, matching first interval)
+        const homeRangeValue = parseRangeValue(homeSizeRange);
+        const yardRangeValue = parseRangeValue(yardSizeRange);
+
+        const servicePlanPricing = {
+          home_size_pricing: plan.home_size_pricing,
+          yard_size_pricing: plan.yard_size_pricing,
+        };
+
+        // Generate options for both dimensions
+        const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
+        const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+
+        // Find matching size options
+        const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+        const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+
+        // Extract price increases from options
+        homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
+        // For one-time plans, never add recurring increases
+        homeRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
+        yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
+        // For one-time plans, never add recurring increases
+        yardRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
+      }
+
+      // Calculate prices WITH size increases (KEY FIX!)
+      const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
+      const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
+
+      // --- DISCOUNT CALCULATION (existing logic, applied to size-based prices) ---
       let discountAmount = planRequest.discount_amount || 0;
       let discountPercentage = planRequest.discount_percentage || 0;
       let recurringDiscountAmount = discountAmount;
       let recurringDiscountPercentage = discountPercentage;
-      let appliesToPrice = 'both'; // Default to applying to both prices
+      let appliesToPrice = 'both';
 
       // If discount_id is provided, use pre-fetched discount configuration
       if (planRequest.discount_id) {
@@ -317,13 +396,13 @@ export async function POST(
         }
       }
 
-      // Calculate final prices based on discount configuration
-      let finalInitialPrice = initialPrice;
-      let finalRecurringPrice = recurringPrice;
+      // Calculate final prices - apply discounts to size-based prices
+      let finalInitialPrice = initialPriceWithSize;
+      let finalRecurringPrice = recurringPriceWithSize;
 
       // Apply discount to initial price if configured
       if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
-        finalInitialPrice = initialPrice - discountAmount;
+        finalInitialPrice = initialPriceWithSize - discountAmount;
         if (discountPercentage > 0) {
           finalInitialPrice = finalInitialPrice * (1 - discountPercentage / 100);
         }
@@ -331,7 +410,7 @@ export async function POST(
 
       // Apply discount to recurring price if configured
       if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
-        finalRecurringPrice = recurringPrice - recurringDiscountAmount;
+        finalRecurringPrice = recurringPriceWithSize - recurringDiscountAmount;
         if (recurringDiscountPercentage > 0) {
           finalRecurringPrice = finalRecurringPrice * (1 - recurringDiscountPercentage / 100);
         }
@@ -348,8 +427,8 @@ export async function POST(
         service_plan_id: plan.id,
         plan_name: plan.plan_name,
         plan_description: plan.plan_description,
-        initial_price: initialPrice,
-        recurring_price: recurringPrice,
+        initial_price: initialPriceWithSize,
+        recurring_price: recurringPriceWithSize,
         billing_frequency: plan.billing_frequency,
         service_frequency: planRequest.service_frequency || plan.treatment_frequency || null,
         discount_percentage: discountPercentage,
@@ -369,11 +448,6 @@ export async function POST(
       .single();
 
     let quote;
-
-    // Extract service address from array
-    const serviceAddress = Array.isArray(lead.primary_service_address)
-      ? lead.primary_service_address[0]
-      : lead.primary_service_address;
 
     if (existingQuote) {
       // Update existing quote
