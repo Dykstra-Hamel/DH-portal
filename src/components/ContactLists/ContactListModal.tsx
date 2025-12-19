@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { X, Users, Trash2, Plus, FileDown, FileUp } from 'lucide-react';
 import styles from './ContactListModal.module.scss';
+import AddContactsToListModal from './AddContactsToListModal';
+import ImportCSVToListModal from './ImportCSVToListModal';
 
 interface ContactListModalProps {
   list: any | null; // null for creating new list
@@ -20,6 +22,8 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
   });
   const [members, setMembers] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [showAddContactsModal, setShowAddContactsModal] = useState(false);
+  const [showImportCSVModal, setShowImportCSVModal] = useState(false);
 
   const isEditing = !!list;
 
@@ -114,6 +118,43 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
     }
   };
 
+  const handleExport = () => {
+    if (members.length === 0) {
+      alert('No contacts to export');
+      return;
+    }
+
+    // Convert members to CSV format
+    const headers = ['First Name', 'Last Name', 'Email', 'Phone', 'Address', 'City', 'State', 'ZIP'];
+    const rows = members.map(member => [
+      member.customer?.first_name || '',
+      member.customer?.last_name || '',
+      member.customer?.email || '',
+      member.customer?.phone || '',
+      member.customer?.street_address || '',
+      member.customer?.city || '',
+      member.customer?.state || '',
+      member.customer?.zip || ''
+    ]);
+
+    // Create CSV string
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${list.name.replace(/[^a-z0-9]/gi, '_')}_contacts.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className={styles.modalOverlay} onClick={() => onClose(false)}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -166,15 +207,21 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
                     Contacts ({members.length})
                   </h3>
                   <div className={styles.sectionActions}>
-                    <button className={styles.secondaryButton} disabled>
+                    <button
+                      className={styles.secondaryButton}
+                      onClick={() => setShowImportCSVModal(true)}
+                    >
                       <FileUp size={16} />
                       Import CSV
                     </button>
-                    <button className={styles.secondaryButton} disabled>
+                    <button className={styles.secondaryButton} onClick={handleExport}>
                       <FileDown size={16} />
                       Export
                     </button>
-                    <button className={styles.secondaryButton} disabled>
+                    <button
+                      className={styles.secondaryButton}
+                      onClick={() => setShowAddContactsModal(true)}
+                    >
                       <Plus size={16} />
                       Add Contact
                     </button>
@@ -250,6 +297,32 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
           </button>
         </div>
       </div>
+
+      {/* Add Contacts Modal */}
+      {showAddContactsModal && (
+        <AddContactsToListModal
+          listId={list.id}
+          listName={list.name}
+          companyId={companyId}
+          onClose={(shouldRefresh) => {
+            setShowAddContactsModal(false);
+            if (shouldRefresh) fetchListDetails();
+          }}
+        />
+      )}
+
+      {/* Import CSV Modal */}
+      {showImportCSVModal && (
+        <ImportCSVToListModal
+          listId={list.id}
+          listName={list.name}
+          companyId={companyId}
+          onClose={(shouldRefresh) => {
+            setShowImportCSVModal(false);
+            if (shouldRefresh) fetchListDetails();
+          }}
+        />
+      )}
     </div>
   );
 }

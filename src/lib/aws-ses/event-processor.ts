@@ -456,25 +456,55 @@ async function handleLeadCreationFromClick(
       let planRecurringPrice = servicePlan.recurring_price || 0;
       let discountPercentage = 0;
       let discountAmount = 0;
+      let recurringDiscountPercentage = 0;
+      let recurringDiscountAmount = 0;
 
       if (campaignDiscount && campaignDiscount.is_active) {
+        const appliesToPrice = campaignDiscount.applies_to_price;
+
+        // Initial discount settings
         if (campaignDiscount.discount_type === 'percentage') {
           discountPercentage = campaignDiscount.discount_value;
-          if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+          discountAmount = 0;
+        } else {
+          discountAmount = campaignDiscount.discount_value;
+          discountPercentage = 0;
+        }
+
+        // Recurring discount settings (for 'both' - use separate values if set)
+        if (appliesToPrice === 'both' && campaignDiscount.recurring_discount_type && campaignDiscount.recurring_discount_value != null) {
+          if (campaignDiscount.recurring_discount_type === 'percentage') {
+            recurringDiscountPercentage = campaignDiscount.recurring_discount_value;
+            recurringDiscountAmount = 0;
+          } else {
+            recurringDiscountAmount = campaignDiscount.recurring_discount_value;
+            recurringDiscountPercentage = 0;
+          }
+        } else {
+          // Fallback: use same discount for both
+          recurringDiscountAmount = discountAmount;
+          recurringDiscountPercentage = discountPercentage;
+        }
+
+        // Apply discount to initial price
+        if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
+          planInitialPrice = planInitialPrice - discountAmount;
+          if (discountPercentage > 0) {
             planInitialPrice = planInitialPrice * (1 - discountPercentage / 100);
           }
-          if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
-            planRecurringPrice = planRecurringPrice * (1 - discountPercentage / 100);
-          }
-        } else if (campaignDiscount.discount_type === 'fixed_amount') {
-          discountAmount = campaignDiscount.discount_value;
-          if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
-            planInitialPrice = Math.max(0, planInitialPrice - discountAmount);
-          }
-          if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
-            planRecurringPrice = Math.max(0, planRecurringPrice - discountAmount);
+        }
+
+        // Apply discount to recurring price
+        if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
+          planRecurringPrice = planRecurringPrice - recurringDiscountAmount;
+          if (recurringDiscountPercentage > 0) {
+            planRecurringPrice = planRecurringPrice * (1 - recurringDiscountPercentage / 100);
           }
         }
+
+        // Ensure no negative prices
+        planInitialPrice = Math.max(0, planInitialPrice);
+        planRecurringPrice = Math.max(0, planRecurringPrice);
       }
 
       // Check if quote already exists for this lead

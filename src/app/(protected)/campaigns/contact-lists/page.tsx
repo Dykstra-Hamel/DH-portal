@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
-import { Plus, Search, Trash2, Copy, Edit2, Users, Calendar } from 'lucide-react';
+import { Plus, Search, Trash2, Copy, Edit2, Users, Calendar, FileUp, Archive, RotateCcw } from 'lucide-react';
 import styles from './page.module.scss';
 import ContactListModal from '@/components/ContactLists/ContactListModal';
+import ContactListUploadModal from '@/components/ContactLists/ContactListUploadModal';
 
 interface ContactList {
   id: string;
@@ -13,6 +14,8 @@ interface ContactList {
   notes: string | null;
   total_contacts: number;
   created_at: string;
+  archived_at: string | null;
+  archived_by: string | null;
   campaign_count: number;
   last_used_at: string | null;
   last_used_campaign: any;
@@ -26,12 +29,14 @@ export default function ContactListsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedList, setSelectedList] = useState<ContactList | null>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
 
   useEffect(() => {
     if (selectedCompany?.id) {
       fetchLists();
     }
-  }, [selectedCompany?.id]);
+  }, [selectedCompany?.id, activeTab]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -49,11 +54,22 @@ export default function ContactListsPage() {
   const fetchLists = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/contact-lists?company_id=${selectedCompany!.id}`);
+      const includeArchived = activeTab === 'archived' ? 'true' : 'false';
+      const response = await fetch(
+        `/api/contact-lists?company_id=${selectedCompany!.id}&include_archived=${includeArchived}`
+      );
       const result = await response.json();
 
       if (result.success) {
-        setLists(result.lists || []);
+        // Filter based on active tab
+        const filteredByTab = (result.lists || []).filter((list: ContactList) => {
+          if (activeTab === 'archived') {
+            return list.archived_at !== null;
+          } else {
+            return list.archived_at === null;
+          }
+        });
+        setLists(filteredByTab);
       }
     } catch (error) {
       console.error('Error fetching contact lists:', error);
@@ -116,6 +132,52 @@ export default function ContactListsPage() {
     }
   };
 
+  const handleArchive = async (list: ContactList) => {
+    if (!confirm(`Archive "${list.name}"? It will no longer be available for new campaigns but historical data will be preserved.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/contact-lists/${list.id}`, {
+        method: 'DELETE', // This now archives instead of deletes
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        fetchLists();
+      } else {
+        alert(result.error || 'Failed to archive list');
+      }
+    } catch (error) {
+      console.error('Error archiving list:', error);
+      alert('Failed to archive list');
+    }
+  };
+
+  const handleUnarchive = async (list: ContactList) => {
+    if (!confirm(`Restore "${list.name}"? It will be available for use in campaigns again.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/contact-lists/${list.id}/unarchive`, {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        fetchLists();
+      } else {
+        alert(result.error || 'Failed to restore list');
+      }
+    } catch (error) {
+      console.error('Error restoring list:', error);
+      alert('Failed to restore list');
+    }
+  };
+
   const handleModalClose = (shouldRefresh: boolean) => {
     setShowModal(false);
     setSelectedList(null);
@@ -140,9 +202,30 @@ export default function ContactListsPage() {
           <h1>Contact Lists</h1>
           <p>Manage reusable contact lists for your campaigns</p>
         </div>
-        <button onClick={handleCreate} className={styles.createButton}>
-          <Plus size={20} />
-          Create List
+        <div className={styles.headerButtons}>
+          <button onClick={() => setShowUploadModal(true)} className={styles.uploadButton}>
+            <FileUp size={20} />
+            Upload CSV
+          </button>
+          <button onClick={handleCreate} className={styles.createButton}>
+            <Plus size={20} />
+            Create List
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${activeTab === 'active' ? styles.active : ''}`}
+          onClick={() => setActiveTab('active')}
+        >
+          Active Lists
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'archived' ? styles.active : ''}`}
+          onClick={() => setActiveTab('archived')}
+        >
+          Archived
         </button>
       </div>
 
@@ -233,13 +316,23 @@ export default function ContactListsPage() {
                       >
                         <Copy size={16} />
                       </button>
-                      <button
-                        onClick={() => handleDelete(list)}
-                        className={styles.actionButton}
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {activeTab === 'active' ? (
+                        <button
+                          onClick={() => handleArchive(list)}
+                          className={styles.actionButton}
+                          title="Archive"
+                        >
+                          <Archive size={16} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleUnarchive(list)}
+                          className={styles.actionButton}
+                          title="Restore"
+                        >
+                          <RotateCcw size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -254,6 +347,16 @@ export default function ContactListsPage() {
           list={selectedList}
           companyId={selectedCompany!.id}
           onClose={handleModalClose}
+        />
+      )}
+
+      {showUploadModal && (
+        <ContactListUploadModal
+          companyId={selectedCompany!.id}
+          onClose={(shouldRefresh) => {
+            setShowUploadModal(false);
+            if (shouldRefresh) fetchLists();
+          }}
         />
       )}
     </div>

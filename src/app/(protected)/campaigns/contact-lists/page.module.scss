@@ -22,6 +22,31 @@
   }
 }
 
+.headerButtons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.uploadButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--gray-200);
+    border-color: var(--gray-400);
+  }
+}
+
 .createButton {
   display: flex;
   align-items: center;
@@ -38,6 +63,34 @@
 
   &:hover {
     background: #0056b3;
+  }
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 1.5rem;
+}
+
+.tab {
+  padding: 0.75rem 1.5rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  color: var(--gray-600);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    color: var(--action-600);
+  }
+
+  &.active {
+    color: var(--action-600);
+    border-bottom-color: var(--action-600);
   }
 }
 

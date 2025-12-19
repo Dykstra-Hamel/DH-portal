@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('company_id');
+    const includeArchived = searchParams.get('include_archived') === 'true';
 
     if (!companyId) {
       return NextResponse.json({ error: 'company_id is required' }, { status: 400 });
@@ -33,12 +34,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all contact lists for the company
-    const { data: lists, error } = await queryClient
+    // Get contact lists for the company
+    // Filter out archived lists by default unless include_archived=true
+    let query = queryClient
       .from('contact_lists')
       .select('*')
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false });
+      .eq('company_id', companyId);
+
+    // Filter out archived lists by default
+    if (!includeArchived) {
+      query = query.is('archived_at', null);
+    }
+
+    const { data: lists, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching contact lists:', error);
