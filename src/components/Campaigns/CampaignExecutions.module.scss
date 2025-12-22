@@ -164,6 +164,11 @@
   color: var(--success-700);
 }
 
+.statusCancelled {
+  background: var(--warning-100);
+  color: var(--warning-700);
+}
+
 .statusFailed {
   background: var(--error-100);
   color: var(--error-700);
@@ -310,6 +315,20 @@
   font-size: 0.8125rem;
   margin-left: auto;
   font-style: italic;
+}
+
+.cancellationMessage {
+  padding: 1rem;
+  background: var(--action-50);
+  border: 1px solid var(--action-200);
+  border-radius: var(--border-radius-md);
+  color: var(--action-700);
+  font-size: 0.875rem;
+  margin-top: 1rem;
+
+  strong {
+    font-weight: 600;
+  }
 }
 
 .errorMessage {

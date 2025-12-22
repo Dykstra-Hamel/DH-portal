@@ -219,6 +219,33 @@ export const workflowExecuteHandler = inngest.createFunction(
       );
 
       if (!statusCheck.shouldContinue) {
+        // Save completed steps to database before returning
+        await step.run('save-steps-before-cancellation', async () => {
+          const supabase = createAdminClient();
+
+          // Get current execution data to preserve existing fields
+          const { data: currentExecution } = await supabase
+            .from('automation_executions')
+            .select('execution_data')
+            .eq('id', executionId)
+            .single();
+
+          // Update with completed steps
+          await supabase
+            .from('automation_executions')
+            .update({
+              execution_data: {
+                ...currentExecution?.execution_data,
+                stepResults: stepResults,
+                completedSteps: stepResults.length,
+                cancelledAtStep: stepIndex,
+              },
+            })
+            .eq('id', executionId);
+
+          return { stepsSaved: stepResults.length };
+        });
+
         // Send workflow completion event for campaign tracking
         await inngest.send({
           name: 'workflow/completed',
@@ -238,6 +265,7 @@ export const workflowExecuteHandler = inngest.createFunction(
           cancelled: true,
           cancelledAt: stepIndex,
           totalSteps: workflowSteps.length,
+          completedSteps: stepResults.length,
           cancellationReason: statusCheck.cancellationReason,
           message: `Workflow execution stopped due to cancellation: ${statusCheck.cancellationReason}`,
         };
@@ -511,12 +539,41 @@ export const workflowExecuteHandler = inngest.createFunction(
         );
 
         if (!postSleepCheck.shouldContinue) {
+          // Save completed steps to database before returning
+          await step.run('save-steps-after-delay-cancellation', async () => {
+            const supabase = createAdminClient();
+
+            // Get current execution data to preserve existing fields
+            const { data: currentExecution } = await supabase
+              .from('automation_executions')
+              .select('execution_data')
+              .eq('id', executionId)
+              .single();
+
+            // Update with completed steps
+            await supabase
+              .from('automation_executions')
+              .update({
+                execution_data: {
+                  ...currentExecution?.execution_data,
+                  stepResults: stepResults,
+                  completedSteps: stepResults.length,
+                  cancelledAtStep: stepIndex,
+                  cancelledAfterDelay: true,
+                },
+              })
+              .eq('id', executionId);
+
+            return { stepsSaved: stepResults.length };
+          });
+
           return {
             success: true,
             cancelled: true,
             cancelledAt: stepIndex,
             cancelledAfter: 'delay',
             totalSteps: workflowSteps.length,
+            completedSteps: stepResults.length,
             message:
               'Workflow execution stopped due to cancellation after delay',
           };

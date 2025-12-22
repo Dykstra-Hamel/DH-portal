@@ -143,10 +143,17 @@ export default function CampaignReport({ campaign, metrics, onRefresh }: Campaig
 
   // View time-series data (last 30 days)
   const viewTimeSeriesData = metrics.viewsByDate
-    ? Object.entries(metrics.viewsByDate).map(([date, count]) => ({
-        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        views: count,
-      }))
+    ? Object.entries(metrics.viewsByDate).map(([date, count]) => {
+        // Parse YYYY-MM-DD without timezone conversion
+        const [year, month, day] = date.split('-');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const formattedDate = `${monthNames[parseInt(month) - 1]} ${parseInt(day)}`;
+
+        return {
+          date: formattedDate,
+          views: count,
+        };
+      })
     : [];
 
   return (
