@@ -31,6 +31,16 @@ export async function GET(
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
+    // Get company timezone setting
+    const { data: timezoneSetting } = await queryClient
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', campaign.company_id)
+      .eq('setting_key', 'company_timezone')
+      .single();
+
+    const companyTimezone = timezoneSetting?.setting_value || 'America/New_York';
+
     // Check user has access (skip for global admins)
     if (!isGlobalAdmin) {
       const { data: userCompany } = await supabase
@@ -198,7 +208,20 @@ export async function GET(
     // Group views by date for charting
     const viewsByDate: Record<string, number> = {};
     viewHistory?.forEach((view: any) => {
-      const date = new Date(view.viewed_at).toISOString().split('T')[0];
+      // Use Intl.DateTimeFormat to reliably extract date parts in company timezone
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: companyTimezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+
+      const parts = formatter.formatToParts(new Date(view.viewed_at));
+      const year = parts.find(p => p.type === 'year')?.value || '';
+      const month = parts.find(p => p.type === 'month')?.value || '';
+      const day = parts.find(p => p.type === 'day')?.value || '';
+
+      const date = `${year}-${month}-${day}`;
       viewsByDate[date] = (viewsByDate[date] || 0) + 1;
     });
 

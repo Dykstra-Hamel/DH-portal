@@ -35,6 +35,8 @@ interface Execution {
   workflow_run_id: string | null;
   customers: Customer;
   step_results: StepResult[];
+  cancellation_reason: string | null;
+  cancelled_at_step: string | number | null;
 }
 
 export default function CampaignExecutions({ campaignId, companyId, companyTimezone = 'America/New_York' }: CampaignExecutionsProps) {
@@ -172,6 +174,7 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
             <option value="pending">Pending</option>
             <option value="running">Running</option>
             <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
             <option value="failed">Failed</option>
           </select>
         </div>
@@ -249,6 +252,12 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {execution.status === 'cancelled' && execution.cancellation_reason && (
+                      <div className={styles.cancellationMessage}>
+                        <strong>Cancellation Reason:</strong> {execution.cancellation_reason}
                       </div>
                     )}
 

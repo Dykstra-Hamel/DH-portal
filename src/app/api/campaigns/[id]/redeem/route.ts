@@ -693,16 +693,24 @@ export async function POST(
     if (campaignExecution?.automation_execution_id) {
       console.log(`[REDEEM] Found active workflow execution ${campaignExecution.automation_execution_id}, cancelling...`);
 
-      // Update automation execution status to cancelled
+      // Fetch existing execution data to preserve completed steps
+      const { data: existingExecution } = await supabase
+        .from('automation_executions')
+        .select('execution_data')
+        .eq('id', campaignExecution.automation_execution_id)
+        .single();
+
+      // Update automation execution status to cancelled, preserving existing step results
       const { error: cancelError } = await supabase
         .from('automation_executions')
         .update({
           execution_status: 'cancelled',
           completed_at: new Date().toISOString(),
           execution_data: {
+            ...existingExecution?.execution_data,
             cancellationReason: 'Lead redeemed offer via landing page',
             cancellationProcessed: true,
-            cancelledAtStep: 'redemption',
+            cancelledAtStep: existingExecution?.execution_data?.stepIndex || 'redemption',
             cancelledBy: 'system',
             cancelledAt: new Date().toISOString(),
           },
