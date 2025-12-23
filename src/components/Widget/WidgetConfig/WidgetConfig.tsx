@@ -957,7 +957,15 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
   };
 
   const updateServicePlan = async (planData: Partial<ServicePlan>) => {
-    if (!companyDetails || !editingPlan) return;
+    if (!companyDetails) return;
+
+    // Get the plan ID from either editingPlan or the planData itself
+    const planId = editingPlan?.id || (planData as any).id;
+    if (!planId) {
+      console.error('Cannot update service plan: No plan ID found');
+      return;
+    }
+
     try {
       const response = await fetch(
         `/api/admin/service-plans/${companyDetails.id}`,
@@ -968,7 +976,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
           },
           body: JSON.stringify({
             ...planData,
-            id: editingPlan.id,
+            id: planId,
           }),
         }
       );
@@ -985,6 +993,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
       console.error('Error updating service plan:', error);
       setSaveStatus('error');
       setTimeout(() => setSaveStatus('idle'), 2000);
+    }
+  };
+
+  const saveServicePlan = async (planData: Partial<ServicePlan>) => {
+    // Determine if this is a create or update based on the plan data
+    const isUpdate = !!(planData as any).id || !!editingPlan?.id;
+
+    if (isUpdate) {
+      await updateServicePlan(planData);
+    } else {
+      await createServicePlan(planData);
     }
   };
 
@@ -2729,6 +2748,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               </button>
             </div>
           </CollapsibleSection>
+
           {/* Pest Options Section */}
           <CollapsibleSection
             sectionKey="pestOptions"
@@ -2754,38 +2774,39 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                     <div className={styles.pestOptionsList}>
                       {companyPestOptions.map(option => (
                         <div key={option.id} className={styles.pestOptionItem}>
-                          <div className={styles.pestOptionInfo}>
-                            <span
-                              className={styles.pestIcon}
-                              dangerouslySetInnerHTML={{
-                                __html: option.icon_svg,
-                              }}
-                            ></span>
-                            <div className={styles.pestDetails}>
-                              <div className={styles.pestName}>
-                                {option.custom_label || option.name}
-                                {debounceTimers.current[
-                                  `${option.id}-customLabel`
-                                ] && (
-                                  <span className={styles.savingIndicator}>
-                                    <Clock size={12} /> Saving...
-                                  </span>
-                                )}
-                              </div>
-                              <div className={styles.pestCategory}>
-                                Category: {option.category}
+                          <div className={styles.pestOptionHeader}>
+                            <div className={styles.pestOptionInfo}>
+                              <span
+                                className={styles.pestIcon}
+                                dangerouslySetInnerHTML={{
+                                  __html: option.icon_svg,
+                                }}
+                              ></span>
+                              <div className={styles.pestDetails}>
+                                <div className={styles.pestName}>
+                                  {option.custom_label || option.name}
+                                  {debounceTimers.current[
+                                    `${option.id}-customLabel`
+                                  ] && (
+                                    <span className={styles.savingIndicator}>
+                                      Saving...
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={styles.pestCategory}>
+                                  {option.category}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className={styles.pestOptionActions}>
+                            <div className={styles.pestOptionActions}>
                             <input
                               type="text"
-                              placeholder={option.name}
+                              className={styles.customLabelInput}
+                              placeholder={`Custom label for ${option.name}`}
                               value={
-                                localInputValues.customLabel[option.id] !==
-                                undefined
-                                  ? localInputValues.customLabel[option.id]
-                                  : option.custom_label || ''
+                                localInputValues.customLabel[option.id] ??
+                                option.custom_label ??
+                                ''
                               }
                               onChange={e =>
                                 updatePestOptionLabelDebounced(
@@ -2793,38 +2814,37 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                                   e.target.value
                                 )
                               }
-                              className={styles.customLabelInput}
                             />
                             <button
                               type="button"
                               onClick={() => removePestOption(option.id)}
                               className={styles.removeButton}
-                              title="Remove pest option"
                             >
-                              ✕
+                              Remove
                             </button>
+                            </div>
                           </div>
 
-                          {/* How We Do It Content Section */}
+                          {/* Expanded content for "How We Do It" text */}
                           <div className={styles.pestContentSection}>
                             <div className={styles.pestContentField}>
                               <label className={styles.fieldLabel}>
-                                How We Do It Description:
+                                How We Do It Text
                                 {debounceTimers.current[
                                   `${option.id}-howWeDoIt`
                                 ] && (
                                   <span className={styles.savingIndicator}>
-                                    <Clock size={12} /> Saving...
+                                    Saving...
                                   </span>
                                 )}
                               </label>
                               <textarea
-                                placeholder="Describe how you treat this pest..."
+                                className={styles.textarea}
+                                placeholder={`Describe how you treat ${option.name}...`}
                                 value={
-                                  localInputValues.howWeDoIt[option.id] !==
-                                  undefined
-                                    ? localInputValues.howWeDoIt[option.id]
-                                    : option.how_we_do_it_text || ''
+                                  localInputValues.howWeDoIt[option.id] ??
+                                  option.how_we_do_it_text ??
+                                  ''
                                 }
                                 onChange={e =>
                                   updatePestOptionHowWeDoIt(
@@ -2832,32 +2852,56 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                                     e.target.value
                                   )
                                 }
-                                className={styles.howWeDoItTextarea}
-                                rows={3}
                               />
                             </div>
 
                             <div className={styles.pestContentField}>
                               <label className={styles.fieldLabel}>
-                                Plan Comparison Header Text:
+                                Subspecies (comma-separated)
+                                {debounceTimers.current[
+                                  `${option.id}-subspecies`
+                                ] && (
+                                  <span className={styles.savingIndicator}>
+                                    Saving...
+                                  </span>
+                                )}
+                              </label>
+                              <input
+                                type="text"
+                                className={styles.pestContentInput}
+                                placeholder="e.g., German Cockroach, American Cockroach"
+                                value={
+                                  localInputValues.subspecies[option.id] ??
+                                  (option.subspecies || []).join(', ') ??
+                                  ''
+                                }
+                                onChange={e =>
+                                  updatePestOptionSubspecies(
+                                    option.id,
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </div>
+
+                            <div className={styles.pestContentField}>
+                              <label className={styles.fieldLabel}>
+                                Plan Comparison Header Text
                                 {debounceTimers.current[
                                   `${option.id}-planComparisonHeader`
                                 ] && (
                                   <span className={styles.savingIndicator}>
-                                    <Clock size={12} /> Saving...
+                                    Saving...
                                   </span>
                                 )}
                               </label>
                               <textarea
-                                placeholder="Leave blank to use default: Here's what we recommend for your home to get rid of those pesky [pest type] - and keep them out!"
+                                className={styles.textarea}
+                                placeholder="Text to show in plan comparison for this pest..."
                                 value={
                                   localInputValues.planComparisonHeader[
                                     option.id
-                                  ] !== undefined
-                                    ? localInputValues.planComparisonHeader[
-                                        option.id
-                                      ]
-                                    : option.plan_comparison_header_text || ''
+                                  ] ?? option.plan_comparison_header_text ?? ''
                                 }
                                 onChange={e =>
                                   updatePestOptionPlanComparisonHeader(
@@ -2865,38 +2909,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                                     e.target.value
                                   )
                                 }
-                                className={styles.howWeDoItTextarea}
-                                rows={3}
-                              />
-                            </div>
-
-                            <div className={styles.pestContentField}>
-                              <label className={styles.fieldLabel}>
-                                Subspecies (one per line):
-                                {debounceTimers.current[
-                                  `${option.id}-subspecies`
-                                ] && (
-                                  <span className={styles.savingIndicator}>
-                                    <Clock size={12} /> Saving...
-                                  </span>
-                                )}
-                              </label>
-                              <textarea
-                                placeholder="Enter subspecies, one per line..."
-                                value={
-                                  localInputValues.subspecies[option.id] !==
-                                  undefined
-                                    ? localInputValues.subspecies[option.id]
-                                    : option.subspecies.join('\n')
-                                }
-                                onChange={e => {
-                                  updatePestOptionSubspecies(
-                                    option.id,
-                                    e.target.value
-                                  );
-                                }}
-                                className={styles.subspeciesTextarea}
-                                rows={4}
                               />
                             </div>
                           </div>
@@ -2929,8 +2941,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             <div className={styles.pestDetails}>
                               <div className={styles.pestName}>{type.name}</div>
                               <div className={styles.pestCategory}>
-                                {type.pest_categories?.name ||
-                                  'Unknown Category'}
+                                {type.pest_categories?.name || type.category}
                               </div>
                             </div>
                           </div>
@@ -2938,7 +2949,6 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             type="button"
                             onClick={() => addPestOption(type)}
                             className={styles.addButton}
-                            title="Add to widget"
                           >
                             +
                           </button>
@@ -2959,109 +2969,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               </div>
             )}
           </CollapsibleSection>
-          {/* Service Plans Section */}
-          <CollapsibleSection
-            sectionKey="servicePlans"
-            title="Service Plans"
-            description="Manage service plans that customers can select based on their pest issues."
-            isExpanded={expandedSections.servicePlans}
-            onToggle={() => toggleSection('servicePlans')}
-            styles={styles}
-          >
-            {servicePlansLoading ? (
-              <div className={styles.loading}>Loading service plans...</div>
-            ) : (
-              <div className={styles.servicePlansManager}>
-                <div className={styles.servicePlansHeader}>
-                  <h4>Current Service Plans ({servicePlans.length})</h4>
-                  <button
-                    type="button"
-                    onClick={() => openPlanModal()}
-                    className={styles.createPlanButton}
-                  >
-                    + Create New Plan
-                  </button>
-                </div>
 
-                {servicePlans.length === 0 ? (
-                  <div className={styles.noPlans}>
-                    <p>No service plans configured yet.</p>
-                    <p>
-                      Create your first plan to enable dynamic plan suggestions
-                      in the widget.
-                    </p>
-                  </div>
-                ) : (
-                  <div className={styles.plansTable}>
-                    <div className={styles.plansTableHeader}>
-                      <div>Plan Name</div>
-                      <div>Category</div>
-                      <div>Price</div>
-                      <div>Coverage</div>
-                      <div>Status</div>
-                      <div>Actions</div>
-                    </div>
-                    {servicePlans.map(plan => (
-                      <div key={plan.id} className={styles.planRow}>
-                        <div className={styles.planName}>
-                          <strong>{plan.plan_name}</strong>
-                          {plan.highlight_badge && (
-                            <span className={styles.planBadge}>
-                              {plan.highlight_badge}
-                            </span>
-                          )}
-                          <div className={styles.planDescription}>
-                            {plan.plan_description}
-                          </div>
-                        </div>
-                        <div className={styles.planCategory}>
-                          {plan.plan_category || 'Standard'}
-                        </div>
-                        <div className={styles.planPrice}>
-                          <div>
-                            ${plan.recurring_price}/{plan.billing_frequency}
-                          </div>
-                          {plan.initial_price && (
-                            <div className={styles.initialPrice}>
-                              Setup: ${plan.initial_price}
-                            </div>
-                          )}
-                        </div>
-                        <div className={styles.planCoverage}>
-                          {plan.pest_coverage?.length || 0} pests
-                        </div>
-                        <div className={styles.planStatus}>
-                          <span
-                            className={`${styles.statusIndicator} ${plan.is_active ? styles.active : styles.inactive}`}
-                          >
-                            {plan.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                        <div className={styles.planActions}>
-                          <button
-                            type="button"
-                            onClick={() => openPlanModal(plan)}
-                            className={styles.editButton}
-                            title="Edit plan"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteServicePlan(plan.id)}
-                            className={styles.deleteButton}
-                            title="Delete plan"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </CollapsibleSection>
           {/* Service Areas Section */}
           <CollapsibleSection
             sectionKey="serviceAreas"
@@ -3133,7 +3041,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                       areas.
                     </p>
                     <p>
-                      Please add GOOGLE_PLACES_API_KEY to your environment
+                      Please add NEXT_PUBLIC_GOOGLE_PLACES_API_KEY to your environment
                       variables.
                     </p>
                   </div>
@@ -3412,8 +3320,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             plan={editingPlan}
             isOpen={showPlanModal}
             onClose={() => setShowPlanModal(false)}
-            onSave={editingPlan ? updateServicePlan : createServicePlan}
+            onSave={saveServicePlan}
             availablePestTypes={availablePestTypes}
+            companyId={companyId}
           />
         )}
       </div>

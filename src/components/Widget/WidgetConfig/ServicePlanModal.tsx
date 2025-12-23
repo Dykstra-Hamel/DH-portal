@@ -59,6 +59,7 @@ interface ServicePlanModalProps {
   onClose: () => void;
   onSave: (planData: Partial<ServicePlan>) => void;
   availablePestTypes: PestType[];
+  companyId: string;
 }
 
 // Custom Interval Pricing Input Component
@@ -79,12 +80,39 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
   const pricing = formData[pricingKey];
 
   // Fetch company pricing settings to know how many intervals exist
-  const { settings: pricingSettings } = usePricingSettings(companyId);
+  const { settings: pricingSettings, isLoading, error } = usePricingSettings(companyId);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className={styles.loadingState}>
+        <div className={styles.spinner}></div>
+        <p>Loading pricing intervals...</p>
+      </div>
+    );
+  }
+
+  // Show error state if pricing settings don't exist
+  if (error || !pricingSettings) {
+    return (
+      <div className={styles.errorState}>
+        <p style={{ color: '#dc3545', marginBottom: '8px' }}>
+          <strong>⚠️ Pricing intervals not configured</strong>
+        </p>
+        <p style={{ color: '#6c757d', fontSize: '14px', marginBottom: '12px' }}>
+          {dimension === 'home'
+            ? 'Home size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'
+            : 'Yard size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'}
+        </p>
+        <p style={{ color: '#6c757d', fontSize: '14px' }}>
+          Please go to <strong>Company Management → Pricing Settings</strong> to configure pricing intervals first.
+        </p>
+      </div>
+    );
+  }
 
   // Calculate number of intervals needed
-  const intervalCount = pricingSettings
-    ? calculateIntervalCount(pricingSettings, dimension)
-    : 5; // Default to 5 if settings not loaded
+  const intervalCount = calculateIntervalCount(pricingSettings, dimension);
 
   // Ensure arrays have correct length
   const ensureArrayLength = (arr: number[], length: number) => {
@@ -181,7 +209,7 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
 
       <div className={styles.pricingNote}>
         <strong>Note:</strong> These exact price increases will be applied for
-        each interval. The first interval (0) typically has $0 increase since
+        each interval. The first interval typically has $0 increase since
         it represents the base size.
       </div>
     </div>
@@ -194,6 +222,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   onClose,
   onSave,
   availablePestTypes,
+  companyId,
 }) => {
   const [formData, setFormData] = useState({
     plan_name: '',
@@ -1002,7 +1031,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     dimension="home"
                     formData={formData}
                     setFormData={setFormData}
-                    companyId={plan?.company_id || ''}
+                    companyId={companyId}
                   />
                 )}
               </div>
@@ -1109,7 +1138,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     dimension="yard"
                     formData={formData}
                     setFormData={setFormData}
-                    companyId={plan?.company_id || ''}
+                    companyId={companyId}
                   />
                 )}
               </div>

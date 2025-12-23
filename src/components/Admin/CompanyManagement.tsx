@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag } from 'lucide-react';
+import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag, FileText, Map, Bug } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
 import SalesConfigManager from './SalesConfigManager';
 import DiscountManager from './DiscountManager';
 import EmailDomainManager from './EmailDomainManager';
+import ServicePlansManager from './ServicePlansManager';
+import ServiceAreasManager from './ServiceAreasManager';
+import PestManager from './PestManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import styles from './CompanyManagement.module.scss';
 
@@ -49,7 +52,7 @@ interface CompanyManagementProps {
   user: User;
 }
 
-type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
+type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pest-management' | 'service-plans' | 'service-areas' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
@@ -423,6 +426,9 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'google-places', label: 'Google Places', icon: Settings },
     { id: 'login-page', label: 'Login Page', icon: Monitor },
+    { id: 'pest-management', label: 'Pest Management', icon: Bug },
+    { id: 'service-plans', label: 'Service Plans', icon: FileText },
+    { id: 'service-areas', label: 'Service Areas', icon: Map },
     { id: 'pricing-settings', label: 'Pricing Settings', icon: DollarSign },
     { id: 'sales-config', label: 'Sales Config', icon: Target },
     { id: 'discounts', label: 'Discounts', icon: Tag },
@@ -529,6 +535,15 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
               onSave={() => handleSave('login-page', {})}
               saving={saving}
             />
+          )}
+          {activeSection === 'pest-management' && (
+            <PestManager />
+          )}
+          {activeSection === 'service-plans' && (
+            <ServicePlansManager companyId={companyId} />
+          )}
+          {activeSection === 'service-areas' && (
+            <ServiceAreasManager companyId={companyId} />
           )}
           {activeSection === 'pricing-settings' && (
             <PricingSettingsManager companyId={companyId} />
