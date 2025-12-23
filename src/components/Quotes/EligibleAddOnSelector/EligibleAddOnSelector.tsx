@@ -138,6 +138,7 @@ export default function EligibleAddOnSelector({
             <div
               key={addon.addon_id}
               className={`${styles.addonRow} ${isSelected ? styles.selected : ''}`}
+              onClick={() => onToggleAddon(addon.addon_id)}
             >
               {isSelected && (
                 <svg
@@ -174,19 +175,11 @@ export default function EligibleAddOnSelector({
 
               <div className={styles.addonAction}>
                 {isSelected ? (
-                  <button
-                    type="button"
-                    className={styles.removeButton}
-                    onClick={() => onToggleAddon(addon.addon_id)}
-                  >
+                  <button type="button" className={styles.removeButton}>
                     Remove Add-On
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    className={styles.addButton}
-                    onClick={() => onToggleAddon(addon.addon_id)}
-                  >
+                  <button type="button" className={styles.addButton}>
                     Add Service
                   </button>
                 )}

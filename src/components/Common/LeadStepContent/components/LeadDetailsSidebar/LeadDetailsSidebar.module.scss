@@ -19,6 +19,7 @@
   &.expanded {
     width: 490px;
     flex-shrink: 0;
+    max-height: calc(100vh - 185px);
 
     .sidebarContent {
       max-width: 100%;
@@ -134,4 +135,16 @@
   gap: 15px;
   position: relative;
   padding: 18px 12px;
+  height: 100%;
+  overflow: auto;
+}
+
+.sidebar.active {
+  .sidebarContent {
+    box-shadow:
+      0 0 0 4px rgba(0, 105, 224, 0.16),
+      0 2px 5px 0 rgba(0, 105, 224, 0.08),
+      0 0 0 1px rgba(0, 105, 224, 0.64),
+      0 1px 1px 0 rgba(0, 105, 224, 0.12);
+  }
 }

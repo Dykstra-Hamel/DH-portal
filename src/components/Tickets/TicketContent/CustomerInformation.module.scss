@@ -1,6 +1,11 @@
 // Import and re-export shared section styles
 @use './shared';
 
+.section {
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+
 // Auto-save form specific styles
 .formGrid {
   display: flex;
