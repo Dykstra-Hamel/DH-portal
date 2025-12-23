@@ -10,6 +10,7 @@ import {
   removeCustomerChannel,
   subscribeToCustomerUpdates,
 } from '@/lib/realtime/customer-channel';
+import { ActiveSectionProvider } from '@/contexts/ActiveSectionContext';
 import styles from './LeadStepContent.module.scss';
 import { LeadDetailsSidebar } from './components/LeadDetailsSidebar/LeadDetailsSidebar';
 import { LeadSchedulingSection } from './components/LeadSchedulingSection';
@@ -524,7 +525,7 @@ export function LeadStepContent({
   };
 
   return (
-    <>
+    <ActiveSectionProvider>
       {renderContent()}
       <CompleteTaskModal
         isOpen={showCompleteTaskModal}
@@ -544,6 +545,6 @@ export function LeadStepContent({
         onSkip={handleCompleteTaskSkip}
         onCancel={handleCompleteTaskCancel}
       />
-    </>
+    </ActiveSectionProvider>
   );
 }
