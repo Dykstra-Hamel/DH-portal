@@ -298,7 +298,7 @@ export function useNotifications() {
       switch (notification.reference_type) {
         case 'ticket':
           router.push(
-            `/tickets/incoming?ticketId=${notification.reference_id}`
+            `/tickets/new?ticketId=${notification.reference_id}`
           );
           break;
         case 'lead':

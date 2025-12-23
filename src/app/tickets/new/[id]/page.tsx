@@ -154,7 +154,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
       }
 
       // Redirect to tickets page after successful deletion
-      router.push('/tickets/incoming');
+      router.push('/tickets/new');
     } catch (error) {
       console.error('Error deleting ticket:', error);
       alert('Failed to delete ticket. Please try again.');
