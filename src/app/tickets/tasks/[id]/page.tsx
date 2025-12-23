@@ -208,7 +208,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
           router.push(`/tickets/leads/${entityId}`);
           break;
         case 'support_cases':
-          router.push(`/tickets/incoming/${entityId}`);
+          router.push(`/tickets/customer-service/${entityId}`);
           break;
         case 'customers':
           router.push(`/customers/${entityId}`);
