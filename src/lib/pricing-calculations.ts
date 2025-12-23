@@ -268,15 +268,13 @@ export function calculateIntervalCount(
   settings: CompanyPricingSettings,
   dimension: 'home' | 'yard'
 ): number {
-  if (dimension === 'home') {
-    const range = settings.max_home_sq_ft - settings.base_home_sq_ft;
-    const intervals = Math.ceil(range / settings.home_sq_ft_interval);
-    return intervals + 1; // +1 for the base interval (0)
-  } else {
-    const range = settings.max_yard_acres - settings.base_yard_acres;
-    const intervals = Math.ceil(range / settings.yard_acres_interval);
-    return intervals + 1;
-  }
+  // Generate the actual options and return the length
+  // This ensures the count always matches what generateHomeSizeOptions/generateYardSizeOptions creates
+  const options = dimension === 'home'
+    ? generateHomeSizeOptions(settings)
+    : generateYardSizeOptions(settings);
+
+  return options.length;
 }
 
 /**
