@@ -114,7 +114,7 @@ export async function GET(
     if (lead.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .eq('id', lead.assigned_to)
         .single();
 
@@ -128,7 +128,7 @@ export async function GET(
     if (lead.assigned_scheduler) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .eq('id', lead.assigned_scheduler)
         .single();
 
@@ -161,11 +161,6 @@ export async function GET(
       primary_service_address: primaryServiceAddress,
     };
 
-    console.log('Returning enhanced lead with call record:', {
-      leadId: enhancedLead.id,
-      hasCallRecord: !!enhancedLead.call_record,
-      callRecordId: enhancedLead.call_record?.id
-    });
 
     return NextResponse.json(enhancedLead);
   } catch (error) {
@@ -215,7 +210,7 @@ export async function PUT(
     // First get the lead to check company access and capture current status and assignment
     const { data: existingLead, error: existingLeadError } = await supabase
       .from('leads')
-      .select('company_id, lead_status, assigned_to, furthest_completed_stage')
+      .select('company_id, lead_status, assigned_to, assigned_scheduler, furthest_completed_stage')
       .eq('id', id)
       .single();
 
@@ -530,7 +525,7 @@ export async function PUT(
     if (lead.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .eq('id', lead.assigned_to)
         .single();
 
@@ -544,7 +539,7 @@ export async function PUT(
     if (lead.assigned_scheduler) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .eq('id', lead.assigned_scheduler)
         .single();
 
@@ -577,11 +572,6 @@ export async function PUT(
       primary_service_address: primaryServiceAddress,
     };
 
-    console.log('Returning enhanced lead with call record:', {
-      leadId: enhancedLead.id,
-      hasCallRecord: !!enhancedLead.call_record,
-      callRecordId: enhancedLead.call_record?.id
-    });
 
     return NextResponse.json(enhancedLead);
   } catch (error) {
@@ -680,9 +670,9 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Lead deleted successfully' 
+    return NextResponse.json({
+      success: true,
+      message: 'Lead deleted successfully'
     });
   } catch (error) {
     console.error('Error in lead delete API:', error);

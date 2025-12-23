@@ -24,6 +24,8 @@ export function LeadContactSection({
   onCadenceSelect,
   onShowToast,
   onLeadUpdate,
+  onViewLogHistory,
+  isSidebarExpanded,
 }: LeadContactSectionProps) {
   const handleLogActivityClick = async () => {
     // Check if this activity matches the next recommended action
@@ -34,7 +36,7 @@ export function LeadContactSection({
     await onLogActivity(
       selectedActionType,
       activityNotes || '',
-      activityMatchesTask
+      !!activityMatchesTask
     );
   };
 
@@ -45,7 +47,10 @@ export function LeadContactSection({
       isCollapsible={true}
       startExpanded={true}
     >
-      <div className={styles.cardContent}>
+      <div
+        className={styles.cardContent}
+        data-sidebar-expanded={isSidebarExpanded}
+      >
         {/* 2-Column Grid Layout */}
         <div className={styles.twoColumnGrid}>
           {/* Left Column - Dropdowns */}
@@ -225,8 +230,9 @@ export function LeadContactSection({
               type="button"
               className={styles.viewHistoryButton}
               onClick={() => {
-                // TODO: Implement view log history
-                console.log('View Log History clicked');
+                if (onViewLogHistory) {
+                  onViewLogHistory();
+                }
               }}
             >
               View Log History

@@ -5,6 +5,10 @@
   border: 1px solid var(--gray-300);
   overflow: hidden;
 
+  &:has(.header.expanded) {
+    overflow: visible;
+  }
+
   // Compact mode - when sidebar is collapsed
   &.compact {
     .header {
@@ -46,6 +50,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
   transition: all 0.2s ease-in-out;
 
   &.collapsed {

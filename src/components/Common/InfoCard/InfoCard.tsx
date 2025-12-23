@@ -10,6 +10,7 @@ interface InfoCardProps {
   startExpanded?: boolean;
   onExpand?: () => void;
   forceCollapse?: boolean;
+  forceExpand?: boolean;
   isCompact?: boolean;
 }
 
@@ -22,6 +23,7 @@ export function InfoCard({
   startExpanded = false,
   onExpand,
   forceCollapse = false,
+  forceExpand = false,
   isCompact = false,
 }: InfoCardProps) {
   const [isExpanded, setIsExpanded] = useState(startExpanded);
@@ -32,6 +34,16 @@ export function InfoCard({
       setIsExpanded(false);
     }
   }, [forceCollapse]);
+
+  // Force expand when forceExpand prop becomes true
+  useEffect(() => {
+    if (forceExpand) {
+      setIsExpanded(true);
+      if (onExpand) {
+        onExpand();
+      }
+    }
+  }, [forceExpand, onExpand]);
 
   const toggleExpanded = () => {
     const newExpandedState = !isExpanded;

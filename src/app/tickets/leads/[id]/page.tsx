@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from 'react';
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  Suspense,
+} from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -70,7 +77,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const [showReadyToScheduleModal, setShowReadyToScheduleModal] =
     useState(false);
   const [showEmailQuoteModal, setShowEmailQuoteModal] = useState(false);
-  const [showConvertToSupportModal, setShowConvertToSupportModal] = useState(false);
+  const [showConvertToSupportModal, setShowConvertToSupportModal] =
+    useState(false);
   const [showMarkAsJunkModal, setShowMarkAsJunkModal] = useState(false);
   const router = useRouter();
   const { setPageHeader } = usePageActions();
@@ -81,7 +89,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   const [selectedScheduler, setSelectedScheduler] = useState('');
 
   // Hooks
-  const { user: currentUser } = useUser();
+  const { user: currentUser, profile: currentProfile } = useUser();
   const { users: assignableUsers } = useAssignableUsers({
     companyId: lead?.company_id,
     departmentType: ticketType === 'support' ? 'support' : 'sales',
@@ -90,22 +98,22 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
 
   // Create stable currentUser object to prevent infinite loops
   const stableCurrentUser = useMemo(() => {
-    if (!currentUser) return null;
+    if (!currentUser || !currentProfile) return null;
     return {
       id: currentUser.id,
-      name: `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.email,
-      email: currentUser.email,
-      avatar: currentUser.avatar_url || undefined,
-      first_name: currentUser.first_name,
-      last_name: currentUser.last_name,
-      avatar_url: currentUser.avatar_url,
+      name:
+        `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() ||
+        currentUser.email ||
+        'Unknown',
+      email: currentUser.email || '',
+      avatar: currentProfile.avatar_url || undefined,
     };
   }, [
     currentUser?.id,
     currentUser?.email,
-    currentUser?.first_name,
-    currentUser?.last_name,
-    currentUser?.avatar_url,
+    currentProfile?.first_name,
+    currentProfile?.last_name,
+    currentProfile?.avatar_url,
   ]);
 
   // Create stable assignableUsers array to prevent infinite loops
@@ -143,117 +151,6 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       status: 'disabled',
     },
   ];
-
-  // Update step statuses based on current lead status
-  const getUpdatedSteps = (): StepItem[] => {
-    if (!lead) return leadSteps;
-
-    const currentStatus = lead.lead_status;
-    const furthestStage = lead.furthest_completed_stage;
-
-    // Map lead status to step IDs
-    const statusToStep: { [key: string]: string } = {
-      new: 'qualify',
-      in_process: 'in_process',
-      quoted: 'quoted',
-      scheduling: 'scheduling',
-    };
-
-    const currentStepId = statusToStep[currentStatus];
-    const furthestStepId = furthestStage ? statusToStep[furthestStage] : null;
-    const stepOrder = ['qualify', 'in_process', 'quoted', 'scheduling'];
-    const currentIndex = stepOrder.indexOf(currentStepId);
-    const furthestIndex = furthestStepId
-      ? stepOrder.indexOf(furthestStepId)
-      : -1;
-
-    return leadSteps.map(step => {
-      const stepIndex = stepOrder.indexOf(step.id);
-
-      if (step.id === currentStepId) {
-        // Current step shows as editing if the furthest completed stage is AT or AFTER current
-        // (meaning we've been past this stage and came back to edit it)
-        // If furthestIndex is -1 (no furthest stage), then we're NOT editing
-        const isEditing = furthestIndex >= 0 && furthestIndex >= currentIndex;
-        return { ...step, status: 'current', isEditing };
-      }
-
-      // Steps before current index - these are "completed" (we've passed them)
-      if (stepIndex < currentIndex) {
-        return { ...step, status: 'completed', isEditing: false };
-      }
-
-      // Steps after current but at or before furthest completed - show as completed
-      if (stepIndex > currentIndex && stepIndex <= furthestIndex) {
-        return { ...step, status: 'completed', isEditing: false };
-      }
-
-      // Steps we haven't reached yet (including ready_to_schedule if not current)
-      return { ...step, status: 'upcoming', isEditing: false };
-    });
-  };
-
-  const handleStepClick = async (stepId: string) => {
-    if (!lead || !leadId) return;
-
-    // Don't allow clicking on scheduling step
-    if (stepId === 'scheduling') return;
-
-    // Map step IDs to lead statuses
-    const stepToStatus: { [key: string]: string } = {
-      qualify: 'new',
-      in_process: 'in_process',
-      quoted: 'quoted',
-    };
-
-    // Map step IDs to success messages
-    const stepToMessage: { [key: string]: string } = {
-      qualify: 'Lead moved to Qualify stage successfully!',
-      in_process: 'Lead moved to Contact stage successfully!',
-      quoted: 'Lead moved to Quote stage successfully!',
-    };
-
-    const newStatus = stepToStatus[stepId];
-    const successMessage = stepToMessage[stepId];
-    if (!newStatus) return;
-
-    try {
-      // Update the lead status via API
-      if (isAdmin) {
-        await adminAPI.updateLead(leadId, {
-          lead_status: newStatus,
-        });
-      } else {
-        await adminAPI.updateUserLead(leadId, {
-          lead_status: newStatus,
-        });
-      }
-
-      // If moving to quoted status, ensure quote exists
-      if (newStatus === 'quoted') {
-        try {
-          const response = await fetch(`/api/leads/${leadId}/quote`, {
-            method: 'GET',
-          });
-          const data = await response.json();
-
-          // If no quote exists, the ensureQuoteExists will be called on the Quote step load
-        } catch (error) {
-          console.error('Error checking quote:', error);
-        }
-      }
-
-      // Refresh the lead data to update the UI
-      await fetchLead();
-      handleShowToast(successMessage, 'success');
-    } catch (error) {
-      console.error('Error updating lead status:', error);
-      handleShowToast(
-        'Failed to update lead status. Please try again.',
-        'error'
-      );
-    }
-  };
 
   // Handle status progression button
   const handleProgressStatus = async () => {
@@ -674,11 +571,14 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     router.push('/tickets/leads');
   };
 
-  const handleShowToast = useCallback((message: string, type: 'success' | 'error') => {
-    setToastMessage(message);
-    setToastType(type);
-    setShowToast(true);
-  }, []);
+  const handleShowToast = useCallback(
+    (message: string, type: 'success' | 'error') => {
+      setToastMessage(message);
+      setToastType(type);
+      setShowToast(true);
+    },
+    []
+  );
 
   // Handle ticket type change (direct, no modal)
   const handleLeadTypeChange = useCallback((type: string) => {
@@ -709,164 +609,199 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   }, []);
 
   // Handle convert to support confirmation
-  const handleConvertToSupport = useCallback(async (notes: string) => {
-    if (!leadId || !lead || !currentUser) return;
+  const handleConvertToSupport = useCallback(
+    async (notes: string) => {
+      if (!leadId || !lead || !currentUser) return;
 
-    try {
-      // Create support case
-      const supportCaseData = {
-        customer_id: lead.customer_id,
-        company_id: lead.company_id,
-        issue_type: 'general_inquiry',
-        summary: `Converted from sales lead${lead.customer ? ` - ${lead.customer.first_name} ${lead.customer.last_name}` : ''}`,
-        description: notes || lead.comments || 'Converted from sales lead',
-        status: 'new',
-        priority: 'medium',
-        assigned_to: currentUser.id,
-      };
+      try {
+        // Create support case
+        const supportCaseData = {
+          customer_id: lead.customer_id,
+          company_id: lead.company_id,
+          issue_type: 'general_inquiry',
+          summary: `Converted from sales lead${lead.customer ? ` - ${lead.customer.first_name} ${lead.customer.last_name}` : ''}`,
+          description: notes || lead.comments || 'Converted from sales lead',
+          status: 'new',
+          priority: 'medium',
+          assigned_to: currentUser.id,
+        };
 
-      await adminAPI.supportCases.create(supportCaseData);
+        await adminAPI.supportCases.create(supportCaseData);
 
-      // Archive the lead
-      if (isAdmin) {
-        await adminAPI.updateLead(leadId, { archived: true });
-      } else {
-        await adminAPI.updateUserLead(leadId, { archived: true });
+        // Archive the lead
+        if (isAdmin) {
+          await adminAPI.updateLead(leadId, { archived: true });
+        } else {
+          await adminAPI.updateUserLead(leadId, { archived: true });
+        }
+
+        handleShowToast('Support case created and lead archived', 'success');
+        // Navigate back to leads page
+        router.push('/tickets/leads');
+      } catch (error) {
+        console.error('Error converting to support case:', error);
+        handleShowToast(
+          error instanceof Error
+            ? error.message
+            : 'Failed to convert to support case',
+          'error'
+        );
+        throw error; // Re-throw so modal can handle loading state
+      } finally {
+        setShowConvertToSupportModal(false);
       }
-
-      handleShowToast('Support case created and lead archived', 'success');
-      // Navigate back to leads page
-      router.push('/tickets/leads');
-    } catch (error) {
-      console.error('Error converting to support case:', error);
-      handleShowToast(
-        error instanceof Error ? error.message : 'Failed to convert to support case',
-        'error'
-      );
-      throw error; // Re-throw so modal can handle loading state
-    } finally {
-      setShowConvertToSupportModal(false);
-    }
-  }, [leadId, lead, currentUser, isAdmin, handleShowToast, router]);
+    },
+    [leadId, lead, currentUser, isAdmin, handleShowToast, router]
+  );
 
   // Handle mark as junk confirmation
-  const handleMarkAsJunk = useCallback(async (reason: string) => {
-    if (!leadId || !lead) return;
+  const handleMarkAsJunk = useCallback(
+    async (reason: string) => {
+      if (!leadId || !lead) return;
 
-    try {
-      // Archive the lead as junk
-      const updateData: any = {
-        archived: true,
-        lead_status: 'lost',
-        lost_reason: reason || 'junk',
-      };
+      try {
+        // Archive the lead as junk
+        const updateData: any = {
+          archived: true,
+          lead_status: 'lost',
+          lost_reason: reason || 'junk',
+        };
 
-      if (isAdmin) {
-        await adminAPI.updateLead(leadId, updateData);
-      } else {
-        await adminAPI.updateUserLead(leadId, updateData);
+        if (isAdmin) {
+          await adminAPI.updateLead(leadId, updateData);
+        } else {
+          await adminAPI.updateUserLead(leadId, updateData);
+        }
+
+        handleShowToast('Lead marked as junk and archived', 'success');
+        // Navigate back to leads page
+        router.push('/tickets/leads');
+      } catch (error) {
+        console.error('Error marking as junk:', error);
+        handleShowToast(
+          error instanceof Error
+            ? error.message
+            : 'Failed to mark lead as junk',
+          'error'
+        );
+        throw error; // Re-throw so modal can handle loading state
+      } finally {
+        setShowMarkAsJunkModal(false);
       }
-
-      handleShowToast('Lead marked as junk and archived', 'success');
-      // Navigate back to leads page
-      router.push('/tickets/leads');
-    } catch (error) {
-      console.error('Error marking as junk:', error);
-      handleShowToast(
-        error instanceof Error ? error.message : 'Failed to mark lead as junk',
-        'error'
-      );
-      throw error; // Re-throw so modal can handle loading state
-    } finally {
-      setShowMarkAsJunkModal(false);
-    }
-  }, [leadId, lead, isAdmin, handleShowToast, router]);
+    },
+    [leadId, lead, isAdmin, handleShowToast, router]
+  );
 
   // Handle assignee change
-  const handleAssigneeChange = useCallback(async (assigneeId: string) => {
-    if (!leadId) return;
+  const handleAssigneeChange = useCallback(
+    async (assigneeId: string) => {
+      if (!leadId) return;
 
-    setSelectedAssignee(assigneeId);
+      setSelectedAssignee(assigneeId);
 
-    try {
-      const updateData: any = {};
-      let successMessage = 'Lead assigned successfully!';
+      try {
+        const updateData: any = {};
+        let successMessage = 'Lead assigned successfully!';
 
-      if (ticketType === 'sales') {
-        if (assigneeId === 'sales_team') {
-          updateData.assigned_to = null;
-          successMessage = 'Lead assigned to sales team successfully!';
-        } else {
-          updateData.assigned_to = assigneeId;
-          successMessage = 'Lead assigned successfully!';
+        if (ticketType === 'sales') {
+          if (assigneeId === 'sales_team') {
+            updateData.assigned_to = null;
+            successMessage = 'Lead assigned to sales team successfully!';
+          } else {
+            updateData.assigned_to = assigneeId;
+            // Auto-progress status only if currently new
+            if (lead?.lead_status === 'new') {
+              updateData.lead_status = 'in_process';
+              successMessage = 'Lead assigned and status updated to in process!';
+            } else {
+              successMessage = 'Lead assigned successfully!';
+            }
+          }
+        } else if (ticketType === 'support') {
+          if (assigneeId === 'support_team') {
+            updateData.assigned_to = null;
+            successMessage = 'Case assigned to support team successfully!';
+          } else {
+            updateData.assigned_to = assigneeId;
+            successMessage = 'Case assigned successfully!';
+          }
+        } else if (ticketType === 'junk') {
+          updateData.lead_status = 'lost';
+          updateData.lost_reason = 'junk';
+          successMessage = 'Lead marked as junk successfully!';
         }
-      } else if (ticketType === 'support') {
-        if (assigneeId === 'support_team') {
-          updateData.assigned_to = null;
-          successMessage = 'Case assigned to support team successfully!';
+
+        if (isAdmin) {
+          await adminAPI.updateLead(leadId, updateData);
         } else {
-          updateData.assigned_to = assigneeId;
-          successMessage = 'Case assigned successfully!';
+          await adminAPI.updateUserLead(leadId, updateData);
         }
-      } else if (ticketType === 'junk') {
-        updateData.lead_status = 'lost';
-        updateData.lost_reason = 'junk';
-        successMessage = 'Lead marked as junk successfully!';
-      }
 
-      if (isAdmin) {
-        await adminAPI.updateLead(leadId, updateData);
-      } else {
-        await adminAPI.updateUserLead(leadId, updateData);
+        await fetchLead();
+        handleShowToast(successMessage, 'success');
+      } catch (error) {
+        console.error('Error assigning lead:', error);
+        handleShowToast('Failed to assign lead. Please try again.', 'error');
       }
-
-      await fetchLead();
-      handleShowToast(successMessage, 'success');
-    } catch (error) {
-      console.error('Error assigning lead:', error);
-      handleShowToast('Failed to assign lead. Please try again.', 'error');
-    }
-  }, [leadId, ticketType, isAdmin, fetchLead, handleShowToast]);
+    },
+    [leadId, lead, ticketType, isAdmin, fetchLead, handleShowToast]
+  );
 
   // Handle scheduler change
-  const handleSchedulerChange = useCallback(async (schedulerId: string) => {
-    if (!leadId) return;
+  const handleSchedulerChange = useCallback(
+    async (schedulerId: string) => {
+      if (!leadId) return;
 
-    setSelectedScheduler(schedulerId);
+      setSelectedScheduler(schedulerId);
 
-    try {
-      if (isAdmin) {
-        await adminAPI.updateLead(leadId, { assigned_scheduler: schedulerId });
-      } else {
-        await adminAPI.updateUserLead(leadId, { assigned_scheduler: schedulerId });
+      try {
+        if (isAdmin) {
+          await adminAPI.updateLead(leadId, {
+            assigned_scheduler: schedulerId,
+          });
+        } else {
+          await adminAPI.updateUserLead(leadId, {
+            assigned_scheduler: schedulerId,
+          });
+        }
+
+        await fetchLead();
+        handleShowToast('Scheduler assigned successfully!', 'success');
+      } catch (error) {
+        console.error('Error assigning scheduler:', error);
+        handleShowToast(
+          'Failed to assign scheduler. Please try again.',
+          'error'
+        );
       }
-
-      await fetchLead();
-      handleShowToast('Scheduler assigned successfully!', 'success');
-    } catch (error) {
-      console.error('Error assigning scheduler:', error);
-      handleShowToast('Failed to assign scheduler. Please try again.', 'error');
-    }
-  }, [leadId, isAdmin, fetchLead, handleShowToast]);
+    },
+    [leadId, isAdmin, fetchLead, handleShowToast]
+  );
 
   // Handle status change
-  const handleStatusChange = useCallback(async (status: string) => {
-    if (!leadId || !lead) return;
+  const handleStatusChange = useCallback(
+    async (status: string) => {
+      if (!leadId || !lead) return;
 
-    try {
-      if (isAdmin) {
-        await adminAPI.updateLead(leadId, { lead_status: status });
-      } else {
-        await adminAPI.updateUserLead(leadId, { lead_status: status });
+      try {
+        if (isAdmin) {
+          await adminAPI.updateLead(leadId, { lead_status: status });
+        } else {
+          await adminAPI.updateUserLead(leadId, { lead_status: status });
+        }
+
+        await fetchLead();
+        handleShowToast('Lead status updated successfully!', 'success');
+      } catch (error) {
+        console.error('Error updating lead status:', error);
+        handleShowToast(
+          'Failed to update lead status. Please try again.',
+          'error'
+        );
       }
-
-      await fetchLead();
-      handleShowToast('Lead status updated successfully!', 'success');
-    } catch (error) {
-      console.error('Error updating lead status:', error);
-      handleShowToast('Failed to update lead status. Please try again.', 'error');
-    }
-  }, [leadId, lead, isAdmin, fetchLead, handleShowToast]);
+    },
+    [leadId, lead, isAdmin, fetchLead, handleShowToast]
+  );
 
   // Update page header when lead data changes
   useEffect(() => {
@@ -1079,6 +1014,14 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         throw new Error(errorData.error || 'Failed to send quote email');
       }
 
+      // Update lead status to quoted
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, { lead_status: 'quoted' });
+      } else {
+        await adminAPI.updateUserLead(leadId, { lead_status: 'quoted' });
+      }
+      await fetchLead(); // Refresh lead data
+
       setShowEmailQuoteModal(false);
       handleShowToast('Quote emailed successfully!', 'success');
     } catch (error) {
@@ -1090,9 +1033,62 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     }
   };
 
+  // Check if current assigned user has scheduling permissions
+  const currentAssignedUserHasSchedulingPermissions = () => {
+    if (!lead?.assigned_to) {
+      // Not assigned to specific user, assigned to team
+      return false;
+    }
+
+    // Find the assigned user in assignableUsers
+    const assignedUser = assignableUsers.find(u => u.id === lead.assigned_to);
+    if (!assignedUser) {
+      return false;
+    }
+
+    // Check if user has scheduling permissions
+    return (
+      assignedUser.departments?.includes('scheduling') ||
+      assignedUser.roles?.includes('admin') ||
+      assignedUser.roles?.includes('manager')
+    );
+  };
+
+  // Handle Ready To Schedule button - direct assignment
+  const handleReadyToScheduleDirectly = async () => {
+    if (!lead || !leadId) return;
+
+    try {
+      const updateData: any = {
+        lead_status: 'scheduling',
+        assigned_scheduler: null, // Assign to scheduling team bucket
+      };
+
+      if (isAdmin) {
+        await adminAPI.updateLead(leadId, updateData);
+      } else {
+        await adminAPI.updateUserLead(leadId, updateData);
+      }
+
+      await fetchLead();
+      handleShowToast('Lead assigned to scheduling team!', 'success');
+      router.push('/tickets/leads');
+    } catch (error) {
+      console.error('Error updating lead to ready to schedule:', error);
+      handleShowToast('Failed to update lead status', 'error');
+    }
+  };
+
   // Handle Ready To Schedule button
   const handleReadyToSchedule = () => {
-    setShowReadyToScheduleModal(true);
+    // Check if current assigned user has scheduling permissions
+    if (currentAssignedUserHasSchedulingPermissions()) {
+      // Show modal to let them choose
+      setShowReadyToScheduleModal(true);
+    } else {
+      // Directly assign to scheduling bucket
+      handleReadyToScheduleDirectly();
+    }
   };
 
   // Handle Ready To Schedule modal submission
@@ -1107,9 +1103,12 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         lead_status: 'scheduling',
       };
 
-      if (option === 'someone_else' && assignedTo) {
+      if (option === 'now') {
+        // Assign scheduler to current assigned user (who has scheduling permissions)
+        updateData.assigned_scheduler = lead.assigned_to;
+      } else if (option === 'someone_else' && assignedTo) {
         // Handle team assignment (null) vs individual assignment (UUID)
-        updateData.assigned_to =
+        updateData.assigned_scheduler =
           assignedTo === 'scheduling_team' ? null : assignedTo;
       }
 
@@ -1174,6 +1173,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
             onFinalizeSale={trigger => {
               finalizeSaleModalTrigger.current = trigger;
             }}
+            onNotInterested={handleNotInterested}
+            onReadyToSchedule={handleReadyToSchedule}
           />
         </div>
 

@@ -3,36 +3,39 @@
 }
 
 .headerButton {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  background-color: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a1a;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
   cursor: pointer;
   transition: all 0.2s;
-  width: 100%;
   text-align: left;
   margin-bottom: 0;
 
-  &:hover:not(:disabled) {
-    background-color: #e9ecef;
-    border-color: #ced4da;
+  svg {
+    transition: all 0.2s;
   }
 
   &:disabled {
     cursor: not-allowed;
     opacity: 0.6;
   }
+
+  &[data-is-expanded='false'] {
+    svg {
+      transform: rotate(-90deg);
+    }
+  }
 }
 
 .toggleIcon {
   font-size: 12px;
-  color: #495057;
+  color: var(--gray-700);
   transition: transform 0.2s;
   display: inline-block;
   width: 12px;
@@ -48,7 +51,7 @@
 .heading {
   font-size: 16px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--gray-900);
   margin: 0 0 12px;
   display: flex;
   align-items: center;
@@ -58,7 +61,7 @@
 .count {
   font-size: 14px;
   font-weight: 500;
-  color: #666;
+  color: var(--gray-500);
 }
 
 .emptyState {
@@ -71,7 +74,7 @@
 
   p {
     font-size: 14px;
-    color: #666;
+    color: var(--gray-500);
     margin: 0;
   }
 }
@@ -87,7 +90,7 @@
 
   p {
     font-size: 14px;
-    color: #666;
+    color: var(--gray-500);
     margin: 0;
   }
 }
@@ -95,8 +98,8 @@
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #4caf50;
+  border: 3px solid var(--gray-100);
+  border-top: 3px solid var(--success-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -112,39 +115,49 @@
 
 .addonList {
   display: flex;
-  flex-direction: column;
+  flex-flow: row wrap;
   gap: 8px;
   margin-top: 12px;
 }
 
 .addonRow {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  position: relative;
+  flex-direction: column;
   padding: 10px 12px;
-  background: #fafafa;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  gap: 14px;
+  min-width: 155px;
   transition: all 0.2s ease;
 
-  &.selected {
-    background: #e8f5e9;
-    border-color: #4caf50;
+  &:hover {
+    box-shadow:
+      0 0 0 4px rgba(0, 105, 224, 0.16),
+      0 2px 5px 0 rgba(0, 105, 224, 0.08),
+      0 0 0 1px rgba(0, 105, 224, 0.64),
+      0 1px 1px 0 rgba(0, 105, 224, 0.12);
   }
 }
 
+.selectedAddonCheckmark {
+  display: block;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
 .addonInfo {
-  flex: 1;
-  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .addonName {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--gray-900);
 }
 
 .addonPricing {
@@ -154,53 +167,54 @@
 }
 
 .addonRecurring {
-  font-size: 13px;
-  font-weight: 600;
-  color: #4caf50;
+  font-size: 16px;
+  font-weight: 750;
 }
 
 .addonInitial {
   font-size: 12px;
   font-weight: 500;
-  color: #666;
+  color: var(--gray-500);
 }
 
 .addonAction {
   flex-shrink: 0;
-  margin-left: 16px;
 }
 
 .addButton {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  background: #4caf50;
+  padding: 4px 8px;
+  background: var(--action-500);
   color: #ffffff;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid var(--action-500);
+  border-radius: 6px;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: #43a047;
+    background: var(--action-600);
+  }
+
+  &:focus {
+    background: var(--action-700);
   }
 }
 
 .removeButton {
-  padding: 6px 12px;
-  background: #f44336;
+  padding: 4px 8px;
+  background: var(--error-500);
   color: #ffffff;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid var(--error-600);
+  border-radius: 6px;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: #d32f2f;
+    background: var(--error-600);
   }
 }

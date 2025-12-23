@@ -118,7 +118,7 @@ export function ServiceLocationCard({
           if (geocodeResponse.ok) {
             const geocodeData = await geocodeResponse.json();
             if (geocodeData.success && geocodeData.coordinates) {
-              // Update the service address with coordinates
+              // Update the service address with coordinates in the database
               await authenticatedFetch(`/api/service-addresses/${serviceAddress.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -128,6 +128,12 @@ export function ServiceLocationCard({
                   hasStreetView: geocodeData.coordinates.hasStreetView || false,
                 }),
               });
+
+              // Update local state so the street view image shows immediately
+              if (onServiceLocationChange) {
+                onServiceLocationChange('latitude', geocodeData.coordinates.lat.toString());
+                onServiceLocationChange('longitude', geocodeData.coordinates.lng.toString());
+              }
             }
           }
         } catch (error) {

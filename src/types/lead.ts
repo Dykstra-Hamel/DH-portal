@@ -74,6 +74,7 @@ export interface Lead {
   requested_time?: string;
   selected_plan_id?: string;
   recommended_plan_name?: string;
+  had_pest_control_before?: string | null;
   attribution_data?: {
     page_url?: string;
     utm_source?: string;

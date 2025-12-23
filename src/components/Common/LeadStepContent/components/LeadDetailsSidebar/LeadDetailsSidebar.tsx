@@ -35,6 +35,9 @@ interface LeadDetailsSidebarProps {
   customerChannelRef?: any;
   isSidebarExpanded: boolean;
   setIsSidebarExpanded: Dispatch<SetStateAction<boolean>>;
+  serviceLocationCardRef?: React.RefObject<HTMLDivElement | null>;
+  shouldExpandServiceLocation?: boolean;
+  shouldExpandActivity?: boolean;
 }
 
 export function LeadDetailsSidebar({
@@ -45,6 +48,9 @@ export function LeadDetailsSidebar({
   customerChannelRef,
   isSidebarExpanded,
   setIsSidebarExpanded,
+  serviceLocationCardRef,
+  shouldExpandServiceLocation,
+  shouldExpandActivity,
 }: LeadDetailsSidebarProps) {
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   // Service Location form state
@@ -129,6 +135,28 @@ export function LeadDetailsSidebar({
       }));
     }
   }, [lead.primary_service_address, lead.customer, originalServiceAddress]);
+
+  // Update service location data when lead's primary service address size ranges change
+  // This handles real-time updates from the quote section syncing to service_address
+  useEffect(() => {
+    if (lead.primary_service_address && originalServiceAddress !== null) {
+      // Only update size ranges, don't overwrite address fields during editing
+      if (lead.primary_service_address?.home_size_range &&
+          lead.primary_service_address.home_size_range !== serviceLocationData.home_size_range) {
+        setServiceLocationData(prev => ({
+          ...prev,
+          home_size_range: lead.primary_service_address?.home_size_range || '',
+        }));
+      }
+      if (lead.primary_service_address?.yard_size_range &&
+          lead.primary_service_address.yard_size_range !== serviceLocationData.yard_size_range) {
+        setServiceLocationData(prev => ({
+          ...prev,
+          yard_size_range: lead.primary_service_address?.yard_size_range || '',
+        }));
+      }
+    }
+  }, [lead.primary_service_address?.home_size_range, lead.primary_service_address?.yard_size_range]);
 
   // State name to abbreviation mapping
   const stateNameToAbbreviation: { [key: string]: string } = {
@@ -510,27 +538,29 @@ export function LeadDetailsSidebar({
             />
           </InfoCard>
 
-          <ServiceLocationCard
-            serviceAddress={lead.primary_service_address || null}
-            startExpanded={false}
-            showSizeInputs
-            pricingSettings={pricingSettings || undefined}
-            onShowToast={onShowToast}
-            onRequestUndo={onRequestUndo}
-            editable={true}
-            onAddressSelect={handleAddressSelect}
-            onSaveAddress={handleSaveAddress}
-            onCancelAddress={handleCancelAddressChanges}
-            hasAddressChanges={hasAddressChanges}
-            isSavingAddress={isSavingAddress}
-            serviceLocationData={serviceLocationData}
-            onServiceLocationChange={handleServiceLocationChange}
-            hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
-            currentFormattedAddress={currentFormattedAddress}
-            onExpand={handleCardExpand}
-            forceCollapse={!isSidebarExpanded}
-            isCompact={!isSidebarExpanded}
-          />
+          <div ref={serviceLocationCardRef}>
+            <ServiceLocationCard
+              serviceAddress={lead.primary_service_address || null}
+              startExpanded={shouldExpandServiceLocation || false}
+              showSizeInputs
+              pricingSettings={pricingSettings || undefined}
+              onShowToast={onShowToast}
+              onRequestUndo={onRequestUndo}
+              editable={true}
+              onAddressSelect={handleAddressSelect}
+              onSaveAddress={handleSaveAddress}
+              onCancelAddress={handleCancelAddressChanges}
+              hasAddressChanges={hasAddressChanges}
+              isSavingAddress={isSavingAddress}
+              serviceLocationData={serviceLocationData}
+              onServiceLocationChange={handleServiceLocationChange}
+              hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
+              currentFormattedAddress={currentFormattedAddress}
+              onExpand={handleCardExpand}
+              forceCollapse={!isSidebarExpanded}
+              isCompact={!isSidebarExpanded}
+            />
+          </div>
 
           <InfoCard
             title="Activity"
@@ -538,6 +568,7 @@ export function LeadDetailsSidebar({
             startExpanded={false}
             onExpand={handleCardExpand}
             forceCollapse={!isSidebarExpanded}
+            forceExpand={shouldExpandActivity}
             isCompact={!isSidebarExpanded}
           >
             <ActivityFeed

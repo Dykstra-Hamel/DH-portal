@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Lead } from '@/types/lead';
 import { CompleteTaskModal } from '@/components/Common/CompleteTaskModal/CompleteTaskModal';
-import { ServiceConfirmationModal } from '@/components/Common/ServiceConfirmationModal/ServiceConfirmationModal';
 import { useUser } from '@/hooks/useUser';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { useQuoteRealtime } from '@/hooks/useQuoteRealtime';
@@ -25,6 +24,8 @@ interface LeadStepContentProps {
   onRequestUndo?: (undoHandler: () => Promise<void>) => void;
   onEmailQuote?: () => void;
   onFinalizeSale?: (handler: () => void) => void;
+  onNotInterested?: () => void;
+  onReadyToSchedule?: () => void;
 }
 
 export function LeadStepContent({
@@ -35,18 +36,19 @@ export function LeadStepContent({
   onRequestUndo,
   onEmailQuote,
   onFinalizeSale,
+  onNotInterested,
+  onReadyToSchedule,
 }: LeadStepContentProps) {
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [shouldExpandActivity, setShouldExpandActivity] = useState(false);
   const [showCompleteTaskModal, setShowCompleteTaskModal] = useState(false);
   const [pendingActivity, setPendingActivity] = useState<{
     type: string;
     notes: string;
   } | null>(null);
 
-  // Service Confirmation state
-  const [showServiceConfirmationModal, setShowServiceConfirmationModal] =
-    useState(false);
+  // Scheduling state
   const [scheduledDate, setScheduledDate] = useState<string>(
     lead.scheduled_date || ''
   );
@@ -57,6 +59,7 @@ export function LeadStepContent({
 
   // Refs
   const customerChannelRef = useRef<any>(null);
+  const serviceLocationCardRef = useRef<HTMLDivElement | null>(null);
 
   const [homeSize, setHomeSize] = useState<number | ''>('');
   const [yardSize, setYardSize] = useState<number | ''>('');
@@ -84,6 +87,8 @@ export function LeadStepContent({
   const [selectedCadenceId, setSelectedCadenceId] = useState<string | null>(
     null
   );
+  const [shouldExpandServiceLocation, setShouldExpandServiceLocation] =
+    useState(false);
 
   const { user } = useUser();
   const { settings: pricingSettings } = usePricingSettings(lead.company_id);
@@ -98,6 +103,13 @@ export function LeadStepContent({
     leadId: lead.id,
     userId: user?.id,
     enabled: true,
+    onQuoteUpdate: (updatedQuote) => {
+      console.log('[LeadStepContent] Quote updated via realtime, refreshing lead data');
+      // When quote updates, refresh the lead to get updated service_address
+      if (onLeadUpdate) {
+        onLeadUpdate();
+      }
+    },
   });
 
   // Set default assignee to current user when component loads
@@ -146,50 +158,44 @@ export function LeadStepContent({
     }
   }, [lead.requested_date, lead.requested_time, preferredDate, preferredTime]);
 
-  // Load next recommended task from cadence and check if cadence exists
-  useEffect(() => {
-    const loadCadenceData = async () => {
-      try {
-        setLoadingNextTask(true);
+  // Function to load cadence data and next task - made reusable for refresh after completion
+  const loadCadenceData = useCallback(async () => {
+    try {
+      setLoadingNextTask(true);
 
-        // Check if lead has active cadence (authenticatedFetch returns JSON directly, not Response)
-        const cadenceResult = await authenticatedFetch(
-          `/api/leads/${lead.id}/cadence`
+      // Check if lead has active cadence (authenticatedFetch returns JSON directly, not Response)
+      const cadenceResult = await authenticatedFetch(
+        `/api/leads/${lead.id}/cadence`
+      );
+      const hasActiveCadence =
+        cadenceResult.data !== null &&
+        cadenceResult.data.completed_at === null;
+      setHasActiveCadence(hasActiveCadence);
+
+      // Only fetch next task if cadence exists
+      if (hasActiveCadence) {
+        const taskResult = await authenticatedFetch(
+          `/api/leads/${lead.id}/next-task`
         );
-        const hasActiveCadence =
-          cadenceResult.data !== null &&
-          cadenceResult.data.completed_at === null;
-        setHasActiveCadence(hasActiveCadence);
-
-        // Only fetch next task if cadence exists
-        if (hasActiveCadence) {
-          const taskResult = await authenticatedFetch(
-            `/api/leads/${lead.id}/next-task`
-          );
-          setNextTask(taskResult.data);
-        } else {
-          setNextTask(null);
-        }
-      } catch (error) {
-        console.error('Error loading cadence data:', error);
-        // If there's an error, assume no cadence
-        setHasActiveCadence(false);
+        setNextTask(taskResult.data);
+      } else {
         setNextTask(null);
-      } finally {
-        setLoadingNextTask(false);
       }
-    };
-
-    loadCadenceData();
+    } catch (error) {
+      console.error('Error loading cadence data:', error);
+      // If there's an error, assume no cadence
+      setHasActiveCadence(false);
+      setNextTask(null);
+    } finally {
+      setLoadingNextTask(false);
+    }
   }, [lead.id]);
 
-  // Expose finalize sale modal trigger to parent
+  // Load next recommended task from cadence and check if cadence exists
   useEffect(() => {
-    if (onFinalizeSale) {
-      // Pass a function to the parent that opens the modal
-      onFinalizeSale(() => setShowServiceConfirmationModal(true));
-    }
-  }, [onFinalizeSale]);
+    loadCadenceData();
+  }, [loadCadenceData]);
+
 
   const currentUser = user
     ? {
@@ -209,8 +215,8 @@ export function LeadStepContent({
     setShowCompleteTaskModal(false);
 
     try {
-      // Log the activity WITH task completion (the trigger will handle auto-progression)
-      const response = await fetch(`/api/leads/${lead.id}/activities`, {
+      // 1. Log the activity
+      const activityResponse = await fetch(`/api/leads/${lead.id}/activities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -219,15 +225,32 @@ export function LeadStepContent({
         }),
       });
 
-      if (!response.ok) {
+      if (!activityResponse.ok) {
         throw new Error('Failed to log activity');
+      }
+
+      // 2. Complete the task if it exists
+      if (nextTask?.task_id) {
+        const taskResponse = await fetch(`/api/tasks/${nextTask.task_id}/complete`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}), // Empty body - actual_hours is optional
+        });
+
+        if (!taskResponse.ok) {
+          console.error('Failed to complete task, but activity was logged');
+          // Don't throw - activity was logged successfully
+        }
       }
 
       onShowToast?.('Activity logged and task marked complete', 'success');
       setActivityNotes('');
       setSelectedActionType('');
       setPendingActivity(null);
+
+      // Refresh lead and next task data
       onLeadUpdate?.();
+      await loadCadenceData();
     } catch (error) {
       console.error('Error logging activity:', error);
       onShowToast?.('Failed to log activity', 'error');
@@ -366,9 +389,50 @@ export function LeadStepContent({
     }
   };
 
+  // Handle finalizing sale directly without modal
+  const handleFinalizeSale = () => {
+    handleConfirmAndFinalize(scheduledDate, scheduledTime, confirmationNote);
+  };
+
   // Handle emailing quote to customer - triggers parent modal
   const handleEmailQuote = () => {
     onEmailQuote?.();
+  };
+
+  // Handle edit address button click - expand sidebar and scroll to Service Location card
+  const handleEditAddress = () => {
+    // Expand sidebar if collapsed
+    setIsSidebarExpanded(true);
+
+    // Set flag to expand Service Location card
+    setShouldExpandServiceLocation(true);
+
+    // Scroll to Service Location card after a brief delay to allow sidebar expansion
+    setTimeout(() => {
+      serviceLocationCardRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+
+      // Reset the flag after expansion
+      setTimeout(() => {
+        setShouldExpandServiceLocation(false);
+      }, 500);
+    }, 300);
+  };
+
+  // Handle view log history button click - expand sidebar and open Activity section
+  const handleViewLogHistory = () => {
+    // Expand sidebar if collapsed
+    setIsSidebarExpanded(true);
+
+    // Set flag to expand Activity card
+    setShouldExpandActivity(true);
+
+    // Reset the flag after expansion
+    setTimeout(() => {
+      setShouldExpandActivity(false);
+    }, 500);
   };
 
   // Render content based on lead status
@@ -395,6 +459,8 @@ export function LeadStepContent({
             onCadenceSelect={setSelectedCadenceId}
             onShowToast={onShowToast}
             onLeadUpdate={onLeadUpdate}
+            onViewLogHistory={handleViewLogHistory}
+            isSidebarExpanded={isSidebarExpanded}
           />
           <LeadQuoteSection
             lead={lead}
@@ -407,7 +473,10 @@ export function LeadStepContent({
             yardSize={yardSize}
             selectedHomeSizeOption={selectedHomeSizeOption}
             selectedYardSizeOption={selectedYardSizeOption}
+            preferredDate={preferredDate}
+            preferredTime={preferredTime}
             onEmailQuote={handleEmailQuote}
+            onEditAddress={handleEditAddress}
             onShowToast={onShowToast}
             onRequestUndo={onRequestUndo}
             broadcastQuoteUpdate={broadcastQuoteUpdate}
@@ -417,6 +486,11 @@ export function LeadStepContent({
             setYardSize={setYardSize}
             setSelectedHomeSizeOption={setSelectedHomeSizeOption}
             setSelectedYardSizeOption={setSelectedYardSizeOption}
+            onPreferredDateChange={setPreferredDate}
+            onPreferredTimeChange={setPreferredTime}
+            onNotInterested={onNotInterested || (() => {})}
+            onReadyToSchedule={onReadyToSchedule || (() => {})}
+            isSidebarExpanded={isSidebarExpanded}
           />
           <LeadSchedulingSection
             lead={lead}
@@ -428,10 +502,9 @@ export function LeadStepContent({
             onScheduledDateChange={setScheduledDate}
             onScheduledTimeChange={setScheduledTime}
             onConfirmationNoteChange={setConfirmationNote}
-            onShowServiceConfirmationModal={() =>
-              setShowServiceConfirmationModal(true)
-            }
+            onFinalizeSale={handleFinalizeSale}
             onEmailQuote={handleEmailQuote}
+            isSidebarExpanded={isSidebarExpanded}
           />
         </div>
         <LeadDetailsSidebar
@@ -442,6 +515,9 @@ export function LeadStepContent({
           customerChannelRef={customerChannelRef}
           isSidebarExpanded={isSidebarExpanded}
           setIsSidebarExpanded={setIsSidebarExpanded}
+          serviceLocationCardRef={serviceLocationCardRef}
+          shouldExpandServiceLocation={shouldExpandServiceLocation}
+          shouldExpandActivity={shouldExpandActivity}
         />
       </div>
     );
@@ -467,17 +543,6 @@ export function LeadStepContent({
         onConfirm={handleCompleteTaskConfirm}
         onSkip={handleCompleteTaskSkip}
         onCancel={handleCompleteTaskCancel}
-      />
-      <ServiceConfirmationModal
-        isOpen={showServiceConfirmationModal}
-        onClose={() => setShowServiceConfirmationModal(false)}
-        onConfirm={handleConfirmAndFinalize}
-        scheduledDate={scheduledDate}
-        scheduledTime={scheduledTime}
-        confirmationNote={confirmationNote}
-        onScheduledDateChange={setScheduledDate}
-        onScheduledTimeChange={setScheduledTime}
-        onConfirmationNoteChange={setConfirmationNote}
       />
     </>
   );

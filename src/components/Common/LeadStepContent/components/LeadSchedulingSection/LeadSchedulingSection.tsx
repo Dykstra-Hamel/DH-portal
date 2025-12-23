@@ -17,9 +17,12 @@ export function LeadSchedulingSection({
   onScheduledDateChange,
   onScheduledTimeChange,
   onConfirmationNoteChange,
-  onShowServiceConfirmationModal,
+  onFinalizeSale,
   onEmailQuote,
+  isSidebarExpanded,
 }: LeadSchedulingSectionProps) {
+  // Disable finalize button if date or time is missing
+  const isFinalizeSaleDisabled = !scheduledDate || !scheduledTime;
   return (
     <InfoCard
       title="Scheduling"
@@ -27,19 +30,10 @@ export function LeadSchedulingSection({
       isCollapsible={true}
       startExpanded={true}
     >
-      <div className={styles.cardContent}>
-        {/* Quote Summary Section */}
-        <div className={styles.section}>
-          <h4 className={cardStyles.defaultText}>Quote Summary</h4>
-          <QuoteSummaryCard
-            quote={quote}
-            lead={lead}
-            isUpdating={isQuoteUpdating}
-            onEmailQuote={onEmailQuote}
-            hideCard={true}
-          />
-        </div>
-
+      <div
+        className={styles.cardContent}
+        data-sidebar-expanded={isSidebarExpanded}
+      >
         {/* Service Confirmation Section */}
         <div className={styles.section}>
           <h4 className={cardStyles.defaultText}>Service Confirmation</h4>
@@ -78,7 +72,8 @@ export function LeadSchedulingSection({
               <button
                 type="button"
                 className={styles.finalizeSaleButton}
-                onClick={onShowServiceConfirmationModal}
+                onClick={onFinalizeSale}
+                disabled={isFinalizeSaleDisabled}
               >
                 <CalendarCheck size={18} />
                 Finalize Sale

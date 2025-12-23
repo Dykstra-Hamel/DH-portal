@@ -65,8 +65,9 @@ export interface LeadSchedulingSectionProps {
   onScheduledDateChange: (date: string) => void;
   onScheduledTimeChange: (time: string) => void;
   onConfirmationNoteChange: (note: string) => void;
-  onShowServiceConfirmationModal: () => void;
+  onFinalizeSale: () => void;
   onEmailQuote: () => void;
+  isSidebarExpanded?: boolean;
 }
 
 // Lead Contact Section Props
@@ -89,6 +90,8 @@ export interface LeadContactSectionProps {
   onCadenceSelect: (cadenceId: string | null) => void;
   onShowToast?: ShowToastCallback;
   onLeadUpdate?: LeadUpdateCallback;
+  onViewLogHistory?: () => void;
+  isSidebarExpanded?: boolean;
 }
 
 // Lead Quote Section Props
@@ -103,7 +106,10 @@ export interface LeadQuoteSectionProps {
   yardSize: number | '';
   selectedHomeSizeOption: string;
   selectedYardSizeOption: string;
+  preferredDate: string;
+  preferredTime: string;
   onEmailQuote: () => void;
+  onEditAddress?: () => void;
   onShowToast?: ShowToastCallback;
   onRequestUndo?: RequestUndoCallback;
   broadcastQuoteUpdate: (quote: any) => Promise<void>;
@@ -113,4 +119,9 @@ export interface LeadQuoteSectionProps {
   setYardSize: (size: number | '') => void;
   setSelectedHomeSizeOption: (option: string) => void;
   setSelectedYardSizeOption: (option: string) => void;
+  onPreferredDateChange: (date: string) => void;
+  onPreferredTimeChange: (time: string) => void;
+  onNotInterested: () => void;
+  onReadyToSchedule: () => void;
+  isSidebarExpanded?: boolean;
 }
