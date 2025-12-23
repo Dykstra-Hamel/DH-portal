@@ -1,0 +1,1316 @@
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.loadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 6px;
+}
+
+.loadingText {
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+.emptyState {
+  padding: 20px;
+  text-align: center;
+  color: var(--gray-500);
+}
+
+.gridRow {
+  display: grid;
+  gap: 20px;
+
+  &.threeColumns {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  &.twoColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &.oneColumn {
+    grid-template-columns: 1fr;
+  }
+
+  @media (max-width: 768px) {
+    &.threeColumns,
+    &.twoColumns {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.fieldLabel {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.selectInput {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+}
+
+.serviceSelectionOptions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+
+  .formField {
+    flex-grow: 1;
+  }
+}
+
+.pestSelectRow {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 340px 1fr;
+}
+
+// Plan Information Tabs
+.planInfoContainer {
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--gray-300);
+  background: var(--gray-100);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+  .tabContainer {
+    background-color: none;
+    border: none;
+    padding: 0;
+  }
+}
+
+.tabContainer {
+  display: flex;
+  gap: 0px;
+  background-color: var(--gray-100);
+  border: 1px solid var(--gray-300);
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.tabButton {
+  display: flex;
+  padding: 8px 12px;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid var(--gray-300);
+  border-right: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 24px;
+  transition: all 0.2s ease;
+  flex: 1;
+
+  &.active {
+    background: var(--gray-500);
+    color: white;
+  }
+
+  &.inactive {
+    background: white;
+    color: var(--gray-900);
+  }
+
+  &.firstTab {
+    border-radius: 6px 0 0 6px;
+  }
+
+  &.lastTab {
+    border-radius: 0 6px 6px 0;
+    border-right: 1px solid var(--gray-300);
+  }
+}
+
+.tabContent {
+  min-height: 200px;
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  overflow: hidden;
+}
+
+.tabContentInner {
+  background: white;
+  padding: 12px;
+  min-height: 200px;
+}
+
+// Pest Badges
+.pestBadge {
+  border-radius: 6px;
+  border: 1px solid var(--success-500);
+  background: var(--success-100);
+  display: flex;
+  padding: 4px 8px;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--success-700);
+}
+
+.pestContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pestCoverageRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  margin: 16px 0;
+}
+
+.pestCoverageSection {
+  flex: 1;
+  max-width: 66.666%;
+}
+
+.addServiceButtonContainer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+.addServiceButton {
+  width: 131px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  padding: 7px 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--gray-50);
+  }
+}
+
+.serviceHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.serviceDropdownRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.removeServiceButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: none;
+  border: none;
+  color: var(--gray-500);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: var(--error-50);
+    color: var(--error-500);
+  }
+}
+
+// Dropdown with SVG
+.dropdownWithArrow {
+  position: relative;
+}
+
+.dropdownArrow {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%) rotate(180deg);
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+// Plan sections
+.planSection {
+  margin-bottom: 24px;
+}
+
+.planTitle {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 750;
+  color: var(--gray-900);
+}
+
+.planDescription {
+  margin: 0;
+  color: var(--gray-700);
+  line-height: 1.6;
+}
+
+.planGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.planItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--gray-50);
+  border-radius: 8px;
+}
+
+.planItemLabel {
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.planItemValue {
+  font-weight: 600;
+  color: var(--gray-900);
+  text-align: right;
+}
+
+// Service selection
+.serviceSection {
+  margin-bottom: 16px;
+}
+
+.pestCoverageList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pestCoverageItem {
+  padding: 8px 12px;
+  background: var(--gray-50);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+}
+
+.pestCoveragePartial {
+  border: 1px dashed var(--gray-300);
+}
+
+.pestCoverageNote {
+  display: block;
+  font-size: 12px;
+  color: var(--gray-500);
+  text-transform: capitalize;
+}
+
+// Multi-Pest Selection Styles
+.pestSection {
+  margin-bottom: 20px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.pestPillsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pestPill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-400);
+  }
+
+  &.primary {
+    cursor: default;
+    background: var(--gray-50);
+
+    &:hover {
+      background: var(--gray-50);
+      border-color: var(--gray-300);
+    }
+  }
+}
+
+.pestPillRemoveIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  height: 9px;
+  cursor: pointer;
+
+  svg {
+    width: 8px;
+    height: 9px;
+  }
+}
+
+.addPestButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+
+  &:active {
+    background: var(--gray-100);
+  }
+
+  svg {
+    transform: rotate(180deg);
+    transition: transform 0.2s ease;
+  }
+
+  &.open svg {
+    transform: rotate(0deg);
+  }
+}
+
+.pestDropdownContainer {
+  position: relative;
+}
+
+.pestDropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 10;
+  margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.pestDropdownOption {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  transition: background-color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--gray-50);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:first-child {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+  }
+
+  &:last-child {
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+  }
+}
+
+// Plan Pricing Styles
+.planPricingContainer {
+  border-radius: 8px;
+  background: white;
+}
+
+// Single Plan Pricing
+.singlePlanPricing {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: white;
+  padding: 20px;
+  margin-bottom: 20px;
+  .pricingGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+
+    .buttonColumn {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+    }
+  }
+
+  .pricingColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pricingLabel {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--gray-600);
+  }
+
+  .recurringPrice {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1;
+  }
+
+  .perMonth {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--gray-900);
+  }
+
+  .initialPrice {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .originalPrice {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--gray-500);
+  }
+
+  .frequency {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-900);
+  }
+
+  .inspection {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--gray-500);
+  }
+
+  // Add-Ons Breakdown (Single Plan)
+  .addOnsBreakdown {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--gray-200);
+  }
+
+  .addOnsHeader {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 12px;
+  }
+
+  .addonLineItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--gray-50);
+    border-radius: 6px;
+    margin-bottom: 8px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .addonName {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-900);
+  }
+
+  .addonPrices {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .addonRecurring {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--success-600);
+  }
+
+  .addonInitial {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-600);
+  }
+
+  // Single Plan Total
+  .singlePlanTotal {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 2px solid var(--gray-300);
+  }
+
+  .totalRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+
+    .totalLabel {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray-700);
+    }
+
+    .totalValue {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gray-900);
+    }
+  }
+}
+
+// Multiple Plans Pricing - Grid Container
+.multiplePlansPricingGrid {
+  display: grid;
+  grid-template-columns: 1fr 470px;
+  gap: 20px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Multiple Plans Pricing - Services List
+.multiplePlansPricing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  padding: 12px 20px 20px;
+}
+
+.planLineItem:last-of-type {
+  border-bottom: none;
+}
+
+.lineItemHeader {
+  font-size: 14px;
+  font-weight: 550a;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gray-300);
+}
+
+.lineItemPricing {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.lineItemColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lineItemLabel {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--gray-500);
+}
+
+.lineItemRecurringPrice {
+  font-size: 32px;
+  font-weight: 750;
+  color: var(--gray-900);
+  line-height: 1;
+}
+
+.lineItemPerMonth {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--gray-900);
+}
+
+.lineItemInitialPrice {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--gray-900);
+}
+
+.lineItemOriginalPrice {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gray-500);
+}
+
+.lineItemFrequency {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.lineItemInspection {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gray-500);
+}
+
+// Total Cost Section
+.totalCostSection {
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  overflow: hidden;
+}
+
+.totalCostHeader {
+  font-weight: 550;
+  padding: 12px 15px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-300);
+  color: var(--gray-900);
+  font-size: 14px;
+  line-height: 140%;
+}
+
+.totalCostContent {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.totalCostGrid {
+  display: flex;
+  gap: 40px;
+}
+
+.totalColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.totalLabel {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--gray-500);
+}
+
+.totalRecurringPrice {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  line-height: 1;
+}
+
+.totalPerMonth {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--gray-900);
+}
+
+.totalInitialPrice {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-900);
+  line-height: 1;
+}
+
+.totalSavings {
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--gray-500);
+}
+
+.emailQuoteButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  cursor: pointer;
+  margin-left: auto;
+  align-self: center;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.serviceAddressSection {
+  padding: 16px 20px;
+}
+
+.serviceAddressLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  border-bottom: 1px solid var(--gray-300);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}
+
+.serviceAddressContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.serviceAddressText {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900);
+  line-height: 1.4;
+  flex: 1;
+}
+
+.editAddressButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  color: var(--action-400);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+// Add-Ons Section (Multiple Plans)
+.addOnsSection {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 2px dashed var(--gray-300);
+}
+
+.addOnsSectionHeader {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+// Plan Information - Multiple Plans Support
+.multiplePlansIndicator {
+  background-color: var(--action-50);
+  border: 1px solid var(--action-200);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--action-700);
+  text-align: center;
+}
+
+.planOverviewScroll {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 8px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: 3px;
+
+    &:hover {
+      background: var(--gray-500);
+    }
+  }
+}
+
+.planNumber {
+  margin-left: 8px;
+}
+
+// Custom Pricing Styles
+.customPricingToggleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--action-500);
+  color: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--action-600);
+  }
+
+  &:active {
+    background: var(--action-700);
+  }
+}
+
+.customPricingSection {
+  margin-top: 16px;
+}
+
+.customPricingFields {
+  margin-top: 12px;
+  padding: 16px;
+  background-color: var(--gray-50);
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+}
+
+.customPriceLabel {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--gray-700);
+}
+
+.priceInputRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.priceInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 14px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--gray-400);
+  }
+
+  &::placeholder {
+    color: var(--gray-300);
+  }
+}
+
+.customPriceNote {
+  display: block;
+  font-size: 12px;
+  color: var(--gray-600);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.customPricingActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.saveCustomPriceButton {
+  padding: 8px 16px;
+  background: var(--success-600);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--success-700);
+  }
+
+  &:active {
+    background: var(--success-700);
+  }
+}
+
+.clearCustomPriceButton {
+  padding: 8px 16px;
+  background: var(--error-500);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--error-600);
+  }
+
+  &:active {
+    background: var(--error-600);
+  }
+}
+
+// Tab Content Styles
+.highlightBadge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  background-color: var(--action-500);
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 12px;
+}
+
+.planDescription {
+  margin: 0 0 16px 0;
+  color: var(--gray-600);
+  font-size: 14px;
+}
+
+.planFeaturesTitle {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.planFeaturesList {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--gray-700);
+}
+
+.emptyMessage {
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+.tabSectionTitle {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.pestCoverageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.pestCoverageItem {
+  padding: 8px 12px;
+  background-color: var(--gray-50);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+
+  &.partial {
+    border: 1px dashed var(--gray-300);
+  }
+}
+
+.pestCoverageNote {
+  display: block;
+  font-size: 12px;
+  color: var(--gray-500);
+  text-transform: capitalize;
+}
+
+.expectContent {
+  color: var(--gray-700);
+  line-height: 1.6;
+}
+
+.expectHighlight {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: var(--action-50);
+  border-radius: 6px;
+  border: 1px solid var(--action-200);
+}
+
+.expectHighlightText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--action-700);
+}
+
+.faqGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.faqItem {
+  padding: 16px;
+  background-color: var(--gray-50);
+  border-radius: 6px;
+}
+
+.faqQuestion {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.faqAnswer {
+  margin: 0;
+  font-size: 14px;
+  color: var(--gray-700);
+  line-height: 1.5;
+}
+
+// Preferred Scheduling Section
+.preferredSchedulingSection {
+  margin-top: 16px;
+}
+
+.preferredSchedulingGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: end;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.preferredDateTimeColumn {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.actionButtonsColumn {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.notInterestedButton {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  color: var(--gray-900);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--gray-100);
+  }
+
+  &:active {
+    background: var(--gray-200);
+  }
+}
+
+.readyToScheduleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--action-500);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--action-600);
+  }
+
+  &:active {
+    background: var(--action-700);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.cardContent[data-sidebar-expanded='true'] {
+  .threeColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+  .multiplePlansPricingGrid {
+    grid-template-columns: 1fr;
+  }
+  .addServiceButtonContainer {
+    grid-column-start: 2;
+  }
+
+  .singlePlanPricing {
+    .pricingGrid {
+      grid-template-columns: repeat(3, 1fr);
+      .buttonColumn {
+        grid-column: span 3;
+      }
+    }
+  }
+}

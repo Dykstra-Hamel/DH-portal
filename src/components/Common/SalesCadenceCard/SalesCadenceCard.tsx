@@ -36,8 +36,6 @@ interface SalesCadenceCardProps {
   companyId: string;
   leadCreatedAt: string;
   onCadenceSelect?: (cadenceId: string | null) => void;
-  onStartCadence?: () => void;
-  isStartingCadence?: boolean;
   hideCard?: boolean;
 }
 
@@ -56,8 +54,6 @@ export function SalesCadenceCard({
   companyId,
   leadCreatedAt,
   onCadenceSelect,
-  onStartCadence,
-  isStartingCadence = false,
   hideCard = false,
 }: SalesCadenceCardProps) {
   const [assignment, setAssignment] = useState<CadenceAssignment | null>(null);
@@ -166,14 +162,8 @@ export function SalesCadenceCard({
         handleCadenceChange(cadenceId);
       }
     } else {
-      // No active assignment - update preview
-      setSelectedPreviewCadenceId(cadenceId);
-      const selectedCadence = availableCadences.find(c => c.id === cadenceId);
-      if (selectedCadence) {
-        setPreviewSteps(selectedCadence.steps || []);
-      }
-      // Notify parent component
-      onCadenceSelect?.(cadenceId);
+      // No active assignment - immediately activate the selected cadence
+      handleCadenceChange(cadenceId);
       setIsDropdownOpen(false);
     }
   };
@@ -371,7 +361,6 @@ export function SalesCadenceCard({
         {availableCadences.length > 0 ? (
           <>
             <div className={styles.formGroup}>
-              <label className={cardStyles.inputLabels}>Active Cadence:</label>
               <div ref={dropdownRef} className={styles.dropdownWrapper}>
                 <button
                   type="button"
@@ -426,96 +415,50 @@ export function SalesCadenceCard({
                     {selectedCadence.steps
                       ?.sort((a, b) => a.display_order - b.display_order)
                       .map(step => (
-                      <div key={step.id} className={styles.stepItem}>
-                        <div className={styles.stepIcon}>
-                          {getActionIcon(step.action_type)}
-                        </div>
+                        <div key={step.id} className={styles.stepItem}>
+                          <div className={styles.stepIcon}>
+                            {getActionIcon(step.action_type)}
+                          </div>
 
-                        <div className={styles.stepContent}>
-                          <div className={styles.stepHeader}>
-                            <span className={cardStyles.inputText}>
-                              Day {step.day_number}:{' '}
-                              {step.time_of_day === 'morning'
-                                ? 'Morning'
-                                : 'Afternoon'}{' '}
-                              {step.action_type === 'live_call' ||
-                              step.action_type === 'outbound_call'
-                                ? 'Call'
-                                : step.action_type === 'ai_call'
-                                  ? 'AI Call'
-                                  : step.action_type === 'text_message'
-                                    ? 'Text'
-                                    : step.action_type === 'email'
-                                      ? 'Email'
-                                      : step.action_type}
-                            </span>
-                            <div className={styles.priorityIndicator}>
+                          <div className={styles.stepContent}>
+                            <div className={styles.stepHeader}>
                               <span className={cardStyles.inputText}>
-                                {PRIORITY_LABELS[step.priority]}
+                                Day {step.day_number}:{' '}
+                                {step.time_of_day === 'morning'
+                                  ? 'Morning'
+                                  : 'Afternoon'}{' '}
+                                {step.action_type === 'live_call' ||
+                                step.action_type === 'outbound_call'
+                                  ? 'Call'
+                                  : step.action_type === 'ai_call'
+                                    ? 'AI Call'
+                                    : step.action_type === 'text_message'
+                                      ? 'Text'
+                                      : step.action_type === 'email'
+                                        ? 'Email'
+                                        : step.action_type}
                               </span>
-                              <div
-                                className={`${styles.priorityDot} ${styles[`priorityDot${step.priority.charAt(0).toUpperCase() + step.priority.slice(1)}`]}`}
-                              >
-                                <div className={styles.priorityDotInner} />
+                              <div className={styles.priorityIndicator}>
+                                <span className={cardStyles.inputText}>
+                                  {PRIORITY_LABELS[step.priority]}
+                                </span>
+                                <div
+                                  className={`${styles.priorityDot} ${styles[`priorityDot${step.priority.charAt(0).toUpperCase() + step.priority.slice(1)}`]}`}
+                                >
+                                  <div className={styles.priorityDotInner} />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className={cardStyles.dataLabel}>
-                            Target:{' '}
-                            {calculateTargetDateTime(
-                              step,
-                              new Date().toISOString()
-                            )}
+                            <div className={cardStyles.dataLabel}>
+                              Target:{' '}
+                              {calculateTargetDateTime(
+                                step,
+                                new Date().toISOString()
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className={styles.actionButtonsContainer}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditMode(true);
-                      if (selectedCadence?.steps) {
-                        setEditingSteps([...selectedCadence.steps]);
-                      }
-                    }}
-                    className={styles.textButton}
-                  >
-                    <SquarePen size={18} />
-                    Edit Cadence
-                  </button>
-
-                  <div className={styles.actionButtonsRight}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedPreviewCadenceId(null);
-                        setIsEditMode(false);
-                        onCadenceSelect?.(null);
-                      }}
-                      className={styles.secondaryButton}
-                    >
-                      Cancel
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (onStartCadence) {
-                          await onStartCadence();
-                          await loadData();
-                        }
-                      }}
-                      disabled={isStartingCadence}
-                      className={styles.primaryButton}
-                    >
-                      <SquarePlay size={18} />
-                      {isStartingCadence ? 'Starting...' : 'Start Cadence'}
-                    </button>
+                      ))}
                   </div>
                 </div>
               </>
@@ -563,23 +506,6 @@ export function SalesCadenceCard({
                   }
                 }}
               />
-            )}
-
-            {!selectedPreviewCadenceId && (
-              <div className={styles.actionButtonsContainer}>
-                <button
-                  type="button"
-                  onClick={() => setShowCadenceModal(true)}
-                  className={styles.textButton}
-                >
-                  <Plus size={18} />
-                  Create New
-                </button>
-
-                <button type="button" disabled className={styles.primaryButton}>
-                  <SquarePlay size={18} /> Start Cadence
-                </button>
-              </div>
             )}
           </>
         ) : (
@@ -642,9 +568,15 @@ export function SalesCadenceCard({
                   if (a.day_number !== b.day_number) {
                     return a.day_number - b.day_number;
                   }
-                  if (a.time_of_day === 'morning' && b.time_of_day === 'afternoon')
+                  if (
+                    a.time_of_day === 'morning' &&
+                    b.time_of_day === 'afternoon'
+                  )
                     return -1;
-                  if (a.time_of_day === 'afternoon' && b.time_of_day === 'morning')
+                  if (
+                    a.time_of_day === 'afternoon' &&
+                    b.time_of_day === 'morning'
+                  )
                     return 1;
                   return 0;
                 });
@@ -695,9 +627,15 @@ export function SalesCadenceCard({
                   if (a.day_number !== b.day_number) {
                     return a.day_number - b.day_number;
                   }
-                  if (a.time_of_day === 'morning' && b.time_of_day === 'afternoon')
+                  if (
+                    a.time_of_day === 'morning' &&
+                    b.time_of_day === 'afternoon'
+                  )
                     return -1;
-                  if (a.time_of_day === 'afternoon' && b.time_of_day === 'morning')
+                  if (
+                    a.time_of_day === 'afternoon' &&
+                    b.time_of_day === 'morning'
+                  )
                     return 1;
                   return 0;
                 });
@@ -781,7 +719,6 @@ export function SalesCadenceCard({
 
       {/* Cadence Selector */}
       <div className={styles.formGroup}>
-        <label className={cardStyles.inputLabels}>Active Cadence:</label>
         <select
           className={styles.selectInput}
           value={assignment.cadence_id}
@@ -797,7 +734,7 @@ export function SalesCadenceCard({
       </div>
 
       {/* Cadence Steps */}
-      <div className={styles.stepsSection}>
+      {/* <div className={styles.stepsSection}>
         <h4 className={cardStyles.defaultText}>Steps:</h4>
         <div className={isPaused ? styles.stepsListPaused : styles.stepsList}>
           {assignment.cadence.steps.map((step, index) => {
@@ -864,10 +801,10 @@ export function SalesCadenceCard({
             );
           })}
         </div>
-      </div>
+      </div> */}
 
       {/* Action Buttons - Only show if cadence is not complete */}
-      {!allStepsComplete && (
+      {/* {!allStepsComplete && (
         <div className={styles.actionButtonsContainer}>
           <button
             onClick={handlePauseCadence}
@@ -891,7 +828,7 @@ export function SalesCadenceCard({
             {isEnding ? 'Ending...' : 'End Cadence'}
           </button>
         </div>
-      )}
+      )} */}
     </div>
   );
 

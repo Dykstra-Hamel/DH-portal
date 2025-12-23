@@ -318,7 +318,7 @@ export async function POST(
             const quoteUrl = quote.quote_url ? `${process.env.NEXT_PUBLIC_SITE_URL}${quote.quote_url}` : undefined;
 
             // Build lead URL
-            const leadUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/connections/leads/${leadData.id}`;
+            const leadUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/tickets/leads/${leadData.id}`;
 
             // Prepare email data
             const emailData: QuoteSignedEmailData = {

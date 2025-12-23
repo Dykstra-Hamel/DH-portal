@@ -1,5 +1,5 @@
 // Import and re-export shared section styles
-@forward './SharedSection.module.scss';
+@use './shared';
 
 // Auto-save form specific styles
 .formGrid {

@@ -56,9 +56,7 @@ export function simpleSubscriptionHandler(
   const name = channelName || 'channel';
 
   if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
-    if (isDevelopment) {
-      console.log(`✅ Subscribed: ${name}`);
-    }
+    // Successfully subscribed
   } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
     if (isDevelopment) {
       console.warn(`⚠️ Channel error: ${name}`);

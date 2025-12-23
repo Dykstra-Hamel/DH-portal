@@ -45,6 +45,7 @@ export interface Lead {
   lead_status: LeadStatus;
   comments?: string;
   assigned_to?: string;
+  assigned_scheduler?: string;
   last_contacted_at?: string;
   next_follow_up_at?: string;
   estimated_value?: number;
@@ -73,6 +74,7 @@ export interface Lead {
   requested_time?: string;
   selected_plan_id?: string;
   recommended_plan_name?: string;
+  had_pest_control_before?: string | null;
   attribution_data?: {
     page_url?: string;
     utm_source?: string;
@@ -112,6 +114,13 @@ export interface Lead {
     updated_at: string;
   };
   assigned_user?: {
+    id: string;
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    avatar_url?: string | null;
+  };
+  scheduler_user?: {
     id: string;
     email: string;
     first_name?: string;
@@ -170,6 +179,7 @@ export interface LeadFormData {
   lead_status: LeadStatus;
   comments?: string;
   assigned_to?: string;
+  assigned_scheduler?: string;
   last_contacted_at?: string;
   next_follow_up_at?: string;
   estimated_value?: number;

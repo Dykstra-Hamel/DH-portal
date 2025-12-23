@@ -1,33 +1,65 @@
 .infoCard {
   background: white;
-  border-radius: 6px;
+  border-radius: 8px;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--slate-300);
+  border: 1px solid var(--gray-300);
   overflow: hidden;
+
+  &:has(.header.expanded) {
+    overflow: visible;
+  }
+
+  // Compact mode - when sidebar is collapsed
+  &.compact {
+    .header {
+      justify-content: center;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .headerLeft {
+      gap: 0;
+      height: 20px;
+      h3 {
+        width: 0;
+        overflow: hidden;
+      }
+    }
+
+    .toggleButton {
+      display: none;
+    }
+    &:hover {
+      box-shadow:
+        0 0 0 4px rgba(102, 122, 153, 0.16),
+        0 2px 5px 0 rgba(102, 122, 153, 0.08),
+        0 0 0 1px rgba(102, 122, 153, 0.16),
+        0 1px 1px 0 rgba(102, 122, 153, 0.12);
+
+      .icon {
+        filter: blur(10px);
+      }
+      .compactTitle {
+        opacity: 1;
+      }
+    }
+  }
 }
 
 .header {
   padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: background-color 0.2s ease-in-out;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  transition: all 0.2s ease-in-out;
 
   &.collapsed {
     background: white;
-
-    &.clickable:hover {
-      background: #f9fafb;
-    }
   }
 
   &.expanded {
-    background: var(--slate-100);
-
-    &.clickable:hover {
-      background: #e8ebf4;
-    }
+    background: var(--gray-100);
   }
 
   &.clickable {
@@ -39,12 +71,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
 
   h3 {
     margin: 0;
     font-size: 1.125rem;
     font-weight: 600;
-    color: var(--slate-600);
+    color: var(--gray-800);
+    text-wrap-mode: nowrap;
+    transition: all 0.5s;
   }
 }
 
@@ -54,7 +89,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--slate-600);
+  color: var(--gray-800);
+  transition: all 0.3s;
 
   svg {
     width: 20px;
@@ -70,12 +106,12 @@
   align-items: center;
   border-radius: 6px;
   border: 1px solid var(--gray-300);
-  background: #e5e7eb;
+  background: var(--gray-100);
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 
   &:hover {
-    background: #d1d5db;
+    background: var(--gray-200);
   }
 
   svg {
@@ -130,4 +166,20 @@
   font-size: 14px;
   font-weight: 450;
   color: var(--gray-900);
+}
+
+.compactTitle {
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--gray-900);
+  font-size: 11px;
+  line-height: 120%;
+  font-weight: 650;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s;
 }

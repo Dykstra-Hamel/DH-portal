@@ -114,12 +114,26 @@ export async function GET(
     if (lead.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .eq('id', lead.assigned_to)
         .single();
 
       if (!profileError && profileData) {
         assignedUser = profileData;
+      }
+    }
+
+    // Get assigned scheduler profile if lead has one
+    let schedulerUser = null;
+    if (lead.assigned_scheduler) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', lead.assigned_scheduler)
+        .single();
+
+      if (!profileError && profileData) {
+        schedulerUser = profileData;
       }
     }
 
@@ -143,14 +157,10 @@ export async function GET(
       ...lead,
       call_record: callRecord || null,
       assigned_user: assignedUser,
+      scheduler_user: schedulerUser,
       primary_service_address: primaryServiceAddress,
     };
 
-    console.log('Returning enhanced lead with call record:', {
-      leadId: enhancedLead.id,
-      hasCallRecord: !!enhancedLead.call_record,
-      callRecordId: enhancedLead.call_record?.id
-    });
 
     return NextResponse.json(enhancedLead);
   } catch (error) {
@@ -200,7 +210,7 @@ export async function PUT(
     // First get the lead to check company access and capture current status and assignment
     const { data: existingLead, error: existingLeadError } = await supabase
       .from('leads')
-      .select('company_id, lead_status, assigned_to, furthest_completed_stage')
+      .select('company_id, lead_status, assigned_to, assigned_scheduler, furthest_completed_stage')
       .eq('id', id)
       .single();
 
@@ -453,6 +463,54 @@ export async function PUT(
       }
     }
 
+    // Check if scheduler assignment changed and trigger notifications
+    const oldAssignedScheduler = existingLead.assigned_scheduler;
+    const newAssignedScheduler = body.assigned_scheduler;
+
+    if (newAssignedScheduler !== oldAssignedScheduler) {
+      try {
+        const adminSupabase = createAdminClient();
+
+        if (newAssignedScheduler && !oldAssignedScheduler) {
+          // Scheduler became assigned (was unassigned, now assigned)
+          await adminSupabase.rpc('notify_assigned_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_assigned_user_id: newAssignedScheduler,
+            p_type: 'scheduler_assigned',
+            p_title: 'Lead Assigned to You for Scheduling',
+            p_message: `A lead has been assigned to you for scheduling${lead.customer?.first_name ? ` - ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        } else if (!newAssignedScheduler && oldAssignedScheduler) {
+          // Scheduler became unassigned (was assigned, now unassigned)
+          await adminSupabase.rpc('notify_department_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_department: 'scheduling',
+            p_type: 'scheduler_unassigned',
+            p_title: 'Lead Unassigned - Needs Scheduler',
+            p_message: `A lead has been unassigned from scheduling and needs a new scheduler${lead.customer?.first_name ? ` - ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        } else if (newAssignedScheduler && oldAssignedScheduler && newAssignedScheduler !== oldAssignedScheduler) {
+          // Scheduler assignment changed from one user to another
+          await adminSupabase.rpc('notify_assigned_and_managers', {
+            p_company_id: existingLead.company_id,
+            p_assigned_user_id: newAssignedScheduler,
+            p_type: 'scheduler_assigned',
+            p_title: 'Lead Reassigned to You for Scheduling',
+            p_message: `A lead has been reassigned to you for scheduling${lead.customer?.first_name ? ` - ${lead.customer.first_name} ${lead.customer.last_name || ''}`.trim() : ''}`,
+            p_reference_id: id,
+            p_reference_type: 'lead'
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error creating scheduler assignment notifications:', notificationError);
+        // Don't fail the API call if notification creation fails
+      }
+    }
+
     // Get call record separately using lead_id foreign key
     const { data: callRecord, error: callError } = await supabase
       .from('call_records')
@@ -467,12 +525,26 @@ export async function PUT(
     if (lead.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .eq('id', lead.assigned_to)
         .single();
 
       if (!profileError && profileData) {
         assignedUser = profileData;
+      }
+    }
+
+    // Get assigned scheduler profile if lead has one
+    let schedulerUser = null;
+    if (lead.assigned_scheduler) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', lead.assigned_scheduler)
+        .single();
+
+      if (!profileError && profileData) {
+        schedulerUser = profileData;
       }
     }
 
@@ -496,14 +568,10 @@ export async function PUT(
       ...lead,
       call_record: callRecord || null,
       assigned_user: assignedUser,
+      scheduler_user: schedulerUser,
       primary_service_address: primaryServiceAddress,
     };
 
-    console.log('Returning enhanced lead with call record:', {
-      leadId: enhancedLead.id,
-      hasCallRecord: !!enhancedLead.call_record,
-      callRecordId: enhancedLead.call_record?.id
-    });
 
     return NextResponse.json(enhancedLead);
   } catch (error) {
@@ -602,9 +670,9 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Lead deleted successfully' 
+    return NextResponse.json({
+      success: true,
+      message: 'Lead deleted successfully'
     });
   } catch (error) {
     console.error('Error in lead delete API:', error);

@@ -1,4 +1,28 @@
-.contentLeft,
+// Wrapper for the entire lead content (left + right columns)
+.leadContentWrapper {
+  display: flex;
+  gap: 20px;
+  transition: all 0.5s ease;
+
+  .contentLeft {
+    flex-grow: 1;
+  }
+
+  &[data-sidebar-expanded='true'] {
+    grid-template-columns: 60% 1fr;
+  }
+
+  &[data-sidebar-expanded='false'] {
+    grid-template-columns: 1fr 110px;
+  }
+}
+
+.contentLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .contentRight {
   display: flex;
   flex-direction: column;
@@ -1495,7 +1519,8 @@
   font-size: 14px;
   color: var(--gray-900);
   background-color: white;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   resize: vertical;
   min-height: 100px;
   transition: border-color 0.2s;

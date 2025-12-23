@@ -517,9 +517,9 @@ export default function TicketReviewModal({
       // Navigate to the new record page based on the response
       if (result && typeof result === 'object') {
         if (result.leadId) {
-          router.push(`/connections/leads/${result.leadId}`);
+          router.push(`/tickets/leads/${result.leadId}`);
         } else if (result.supportCaseId) {
-          router.push(`/connections/customer-service/${result.supportCaseId}`);
+          router.push(`/tickets/customer-service/${result.supportCaseId}`);
         }
       }
     } catch (error) {

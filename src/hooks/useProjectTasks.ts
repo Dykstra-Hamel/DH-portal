@@ -214,9 +214,6 @@ export function useProjectTasks(projectId?: string): UseProjectTasksResult {
         .subscribe((status) => {
           if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
             reconnectAttempts = 0;
-            if (isDevelopment) {
-              console.log(`✅ Subscribed: ${channelName}`);
-            }
           } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
             if (reconnectAttempts === 0 && isDevelopment) {
               console.warn(`⚠️ Channel error: ${channelName}`);

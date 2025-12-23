@@ -33,7 +33,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   const isCampaignLandingPage = pathname.match(/^\/campaign\/[^\/]+\/[^\/]+$/);
 
   // Pages that should have the full layout (header + sidebar)
-  const shouldShowLayout = !isPublicPage && !isHomePage && !isQuotePage && !isCampaignLandingPage;
+  const shouldShowLayout =
+    !isPublicPage && !isHomePage && !isQuotePage && !isCampaignLandingPage;
 
   const toggleSidebar = () => {
     setIsSidebarActive(!isSidebarActive);
@@ -85,8 +86,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           showAddButton: true,
           addButtonText: 'Add Lead',
         };
-      case '/connections/incoming':
-      case '/connections/calls-and-forms':
+      case '/tickets/incoming':
+      case '/tickets/calls-and-forms':
         return {
           title: 'Incoming',
           description:
@@ -132,49 +133,49 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'Manage system settings and user administration here.',
           showAddButton: false,
         };
-      case '/connections/leads':
+      case '/tickets/leads':
         return {
           title: 'Leads',
           description: 'View and manage all your sales leads here.',
           showAddButton: true,
           addButtonText: 'Add Lead',
         };
-      case '/connections/scheduling':
+      case '/tickets/scheduling':
         return {
           title: 'Scheduling',
           description:
             'Manage all your incoming calls and forms and assign them there.',
           showAddButton: false,
         };
-      case '/connections/my-sales-leads':
+      case '/tickets/my-sales-leads':
         return {
           title: 'Leads',
           description: 'View and manage all your sales leads here.',
           showAddButton: true,
           addButtonText: 'Add Lead',
         };
-      case '/connections/customer-service':
+      case '/tickets/customer-service':
         return {
           title: 'Customer Service',
           description: 'View and manage all your support cases here.',
           showAddButton: true,
           addButtonText: 'Add Case',
         };
-      case '/connections/my-support-cases':
+      case '/tickets/my-support-cases':
         return {
           title: 'Customer Service',
           description: 'View and manage all your support cases here.',
           showAddButton: true,
           addButtonText: 'Add Case',
         };
-      case '/connections/tasks':
+      case '/tickets/tasks':
         return {
           title: 'Tasks',
           description: 'View and manage all tasks here.',
           showAddButton: true,
           addButtonText: 'Create Task',
         };
-      case '/connections/my-tasks':
+      case '/tickets/my-tasks':
         return {
           title: 'My Tasks',
           description: 'View and manage your assigned tasks here.',
@@ -201,7 +202,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           addButtonText: 'Create Campaign',
         };
       case '/reports':
-      case '/connections/reports':
+      case '/tickets/reports':
         return {
           title: 'Reports',
           description: 'View detailed record reports here.',
@@ -221,17 +222,23 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           }
           return {
             title: 'Campaign Details',
-            description: 'View campaign performance, manage contacts and leads, and track execution metrics.',
+            description:
+              'View campaign performance, manage contacts and leads, and track execution metrics.',
             showAddButton: false,
           };
         }
         // Show lower header for lead detail pages
-        if (pathname.match(/^\/connections\/leads\/[^\/]+$/)) {
-          return {
-            title: 'Lead Details',
-            description: 'View and manage this lead information.',
-            showAddButton: false,
-          };
+        if (pathname.match(/^\/tickets\/leads\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise hide header
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              leadAssignmentControls: pageHeader.leadAssignmentControls,
+            };
+          }
+          return null;
         }
 
         // Show lower header for customer detail pages
@@ -255,7 +262,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
         if (
           pathname.includes('/customers/') ||
-          pathname.includes('/connections/incoming/')
+          pathname.includes('/tickets/incoming/')
         ) {
           return null; // Don't show lower header on individual record pages
         }
@@ -305,6 +312,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
                   : undefined
               }
               actionButtons={pageConfig.actionButtons}
+              leadAssignmentControls={pageConfig.leadAssignmentControls}
             />
           )}
           <main className={styles.mainContent}>

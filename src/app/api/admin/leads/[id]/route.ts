@@ -83,12 +83,26 @@ export async function GET(
     if (lead.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .eq('id', lead.assigned_to)
         .single();
 
       if (!profileError && profileData) {
         assignedUser = profileData;
+      }
+    }
+
+    // Get assigned scheduler profile if lead has one
+    let schedulerUser = null;
+    if (lead.assigned_scheduler) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', lead.assigned_scheduler)
+        .single();
+
+      if (!profileError && profileData) {
+        schedulerUser = profileData;
       }
     }
 
@@ -104,6 +118,7 @@ export async function GET(
       ...lead,
       call_record: callRecord || null,
       assigned_user: assignedUser,
+      scheduler_user: schedulerUser,
       primary_service_address: primaryServiceAddress,
     };
 
@@ -292,12 +307,26 @@ export async function PUT(
     if (lead.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, avatar_url')
         .eq('id', lead.assigned_to)
         .single();
 
       if (!profileError && profileData) {
         assignedUser = profileData;
+      }
+    }
+
+    // Get assigned scheduler profile if lead has one
+    let schedulerUser = null;
+    if (lead.assigned_scheduler) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', lead.assigned_scheduler)
+        .single();
+
+      if (!profileError && profileData) {
+        schedulerUser = profileData;
       }
     }
 
@@ -313,6 +342,7 @@ export async function PUT(
       ...lead,
       call_record: callRecord || null,
       assigned_user: assignedUser,
+      scheduler_user: schedulerUser,
       primary_service_address: primaryServiceAddress,
     };
 

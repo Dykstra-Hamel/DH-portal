@@ -11,7 +11,7 @@ import { usePathname } from 'next/navigation';
 
 export type PrimaryNavItem =
   | 'dashboard'
-  | 'connections'
+  | 'tickets'
   | 'campaigns'
   | 'customers'
   | 'tasks'
@@ -34,14 +34,14 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   // Update active nav based on current route
   useEffect(() => {
-    if (pathname.startsWith('/connections')) {
-      setActivePrimaryNav('connections');
+    if (pathname.startsWith('/tickets')) {
+      setActivePrimaryNav('tickets');
     } else if (pathname.startsWith('/conversations')) {
-      // Legacy /conversations route should activate connections
-      setActivePrimaryNav('connections');
+      // Legacy /conversations route should activate tickets
+      setActivePrimaryNav('tickets');
     } else if (pathname.startsWith('/leads')) {
-      // Legacy /leads route should also activate connections
-      setActivePrimaryNav('connections');
+      // Legacy /leads route should also activate tickets
+      setActivePrimaryNav('tickets');
     } else if (pathname.startsWith('/campaigns')) {
       setActivePrimaryNav('campaigns');
     } else if (pathname.startsWith('/customers')) {

@@ -81,8 +81,9 @@
 
   &:hover {
     box-shadow:
+      0 0 0 4px rgba(102, 122, 153, 0.16),
       0 2px 5px 0 rgba(102, 122, 153, 0.08),
-      0 0 0 1px rgba(102, 122, 153, 0.24),
+      0 0 0 1px rgba(102, 122, 153, 0.16),
       0 1px 1px 0 rgba(102, 122, 153, 0.12);
   }
 
@@ -117,9 +118,9 @@
 }
 
 .pestGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  display: flex;
+  flex-flow: row wrap;
+  gap: 16px;
   margin-bottom: 16px;
 
   @media (max-width: 768px) {

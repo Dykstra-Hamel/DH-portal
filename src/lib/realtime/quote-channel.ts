@@ -69,7 +69,6 @@ export function subscribeToQuoteUpdates(
 export async function removeQuoteChannel(channel: RealtimeChannel): Promise<void> {
   try {
     await channel.unsubscribe();
-    console.log(`Unsubscribed from channel: ${channel.topic}`);
   } catch (error) {
     console.error('Error removing quote channel:', error);
   }
