@@ -522,13 +522,13 @@ export function SecondarySideNav({
             items: [
               {
                 text: 'New',
-                href: '/tickets/incoming',
+                href: '/tickets/new',
                 count: counts.tickets,
                 countType: 'tickets',
                 showRedDot:
                   newItemIndicators.tickets &&
-                  pathname !== '/tickets/incoming' &&
-                  !pathname.startsWith('/tickets/incoming/') &&
+                  pathname !== '/tickets/new' &&
+                  !pathname.startsWith('/tickets/new/') &&
                   !pathname.startsWith('/tickets/calls-and-forms'),
               },
               {
@@ -659,8 +659,8 @@ export function SecondarySideNav({
                     pathname === item.href ||
                     (item.href === '/customers' &&
                       pathname.startsWith('/customers/')) ||
-                    (item.href === '/tickets/incoming' &&
-                      (pathname.startsWith('/tickets/incoming') ||
+                    (item.href === '/tickets/new' &&
+                      (pathname.startsWith('/tickets/new') ||
                         pathname.startsWith('/tickets/calls-and-forms'))) ||
                     (item.href.startsWith('/tickets/') &&
                       pathname.startsWith(item.href));

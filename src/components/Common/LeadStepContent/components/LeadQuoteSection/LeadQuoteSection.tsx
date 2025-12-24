@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
+import { useActiveSection } from '@/contexts/ActiveSectionContext';
 import { LeadQuoteSectionProps } from '../../types/leadStepTypes';
 import { adminAPI } from '@/lib/api-client';
 import {
@@ -57,6 +58,7 @@ export function LeadQuoteSection({
   onReadyToSchedule,
   isSidebarExpanded,
 }: LeadQuoteSectionProps) {
+  const { activeSection, setActiveSection } = useActiveSection();
   // Refs
   const pestDropdownRef = useRef<HTMLDivElement>(null);
   const additionalPestDropdownRef = useRef<HTMLDivElement>(null);
@@ -1115,12 +1117,16 @@ export function LeadQuoteSection({
   };
 
   return (
-    <InfoCard
-      title="Program Quoting"
-      icon={<ScrollText size={20} />}
-      isCollapsible={true}
-      startExpanded={true}
+    <div
+      className={`${styles.sectionWrapper} ${activeSection === 'quote' ? styles.active : ''}`}
+      onClick={() => setActiveSection('quote')}
     >
+      <InfoCard
+        title="Program Quoting"
+        icon={<ScrollText size={20} />}
+        isCollapsible={true}
+        startExpanded={true}
+      >
       <div
         className={styles.cardContent}
         data-sidebar-expanded={isSidebarExpanded}
@@ -2822,5 +2828,6 @@ export function LeadQuoteSection({
         </div>
       </div>
     </InfoCard>
+    </div>
   );
 }
