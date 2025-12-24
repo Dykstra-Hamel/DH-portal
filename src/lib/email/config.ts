@@ -8,12 +8,18 @@
 /**
  * Email sources that should NOT include unsubscribe links
  * These are transactional/system emails required for account functionality
+ * and internal staff notifications
  */
 export const SYSTEM_EMAIL_SOURCES: readonly string[] = [
   'password_reset',
   'email_verification',
   'security_alert',
   'system_notification',
+  // Internal staff notifications - no unsubscribe needed
+  'lead_created_notification',
+  'quote_signed_notification',
+  'project_created_notification',
+  'call_summary_notification',
 ] as const;
 
 /**

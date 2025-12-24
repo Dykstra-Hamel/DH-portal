@@ -260,7 +260,7 @@ export function LeadQuoteSection({
     lineItemCreationLockRef.current.clear();
   }, [lead.id]);
 
-  // Pre-fill service frequency and discount from quote line items
+  // Pre-fill service frequency and discount from quote line items (original logic for global state)
   useEffect(() => {
     const firstLineItem = quote?.line_items?.[0];
     if (firstLineItem) {
@@ -274,6 +274,52 @@ export function LeadQuoteSection({
       }
     }
   }, [quote?.line_items, serviceFrequency, discount]);
+
+  // Pre-fill frequency and discount in serviceSelections (independent of service plans loading)
+  useEffect(() => {
+    if (!quote?.line_items || quote.line_items.length === 0) return;
+
+    const servicePlanItems = quote.line_items.filter(
+      (item: any) => item.service_plan_id
+    );
+
+    if (servicePlanItems.length > 0) {
+      setServiceSelections(prev => {
+        // Only update if we have selections and they need updating
+        if (prev.length === 0) return prev;
+
+        return prev.map((selection, index) => {
+          const lineItem = servicePlanItems[index];
+          if (!lineItem) return selection;
+
+          // Check if we need to update (frequency or discount are empty and data is available)
+          const hasFrequencyData = lineItem.service_frequency || selection.servicePlan?.treatment_frequency;
+          const hasDiscountData = lineItem.discount_id || lineItem.discount_percentage;
+
+          const needsUpdate =
+            (!selection.frequency && hasFrequencyData) ||
+            (!selection.discount && hasDiscountData);
+
+          if (!needsUpdate) return selection;
+
+          return {
+            ...selection,
+            frequency:
+              selection.frequency ||
+              lineItem.service_frequency ||
+              selection.servicePlan?.treatment_frequency ||
+              lineItem.billing_frequency ||
+              '',
+            discount:
+              selection.discount ||
+              lineItem.discount_id ||
+              lineItem.discount_percentage?.toString() ||
+              '',
+          };
+        });
+      });
+    }
+  }, [quote?.line_items]);
 
   // Load pest options when component loads (for Quote step)
   useEffect(() => {
@@ -414,6 +460,11 @@ export function LeadQuoteSection({
     const loadServicePlan = async () => {
       const primaryPest = selectedPests[0];
 
+      // Skip if line items have already been initialized from existing quote data
+      if (initialLineItemCreatedRef.current) {
+        return;
+      }
+
       // Skip if there are already line items (user has made selections)
       if (quote?.line_items && quote.line_items.length > 0) {
         return;
@@ -435,6 +486,12 @@ export function LeadQuoteSection({
           lead.company_id,
           primaryPest
         );
+
+        // Check again after async call - line items might have been initialized while we were waiting
+        if (initialLineItemCreatedRef.current) {
+          return;
+        }
+
         if (response.success && response.cheapest_plan) {
           // Cross-reference with allServicePlans to get complete plan data with pest_coverage
           const fullPlan =
@@ -479,85 +536,96 @@ export function LeadQuoteSection({
 
   // Initialize serviceSelections from existing quote line items
   useEffect(() => {
-    if (
-      quote?.line_items &&
-      quote.line_items.length > 0 &&
-      allServicePlans.length > 0
-    ) {
-      // Separate line items by type
-      const servicePlanItems = quote.line_items.filter(
-        (item: any) => item.service_plan_id
-      );
-      const addonItems = quote.line_items.filter(
-        (item: any) => item.addon_service_id
-      );
-
-      // Map service plan line items to service selections
-      const selectionsFromLineItems = servicePlanItems
-        .sort((a: any, b: any) => a.display_order - b.display_order)
-        .map((lineItem: any, index: number) => {
-          // Find the full service plan data
-          const servicePlan = allServicePlans.find(
-            (p: any) => p.id === lineItem.service_plan_id
-          );
-
-          return {
-            id: (index + 1).toString(),
-            servicePlan: servicePlan || null,
-            displayOrder: lineItem.display_order,
-            frequency: lineItem.service_frequency || '',
-            discount:
-              (lineItem as any).discount_id ||
-              lineItem.discount_percentage?.toString() ||
-              '',
-          };
-        });
-
-      // Extract add-on IDs
-      const addonIds = addonItems
-        .map((item: any) => item.addon_service_id)
-        .filter(Boolean) as string[];
-
-      // Only update if selections are different (prevent infinite loop)
-      const currentPlanIds = serviceSelections
-        .map((s: any) => s.servicePlan?.id)
-        .join(',');
-      const newPlanIds = selectionsFromLineItems
-        .map((s: any) => s.servicePlan?.id)
-        .join(',');
-
-      if (currentPlanIds !== newPlanIds) {
-        setServiceSelections(selectionsFromLineItems);
-        setSelectedAddOns(addonIds); // Sync add-on selections
-        initialLineItemCreatedRef.current = true; // Mark as initialized from existing data
-
-        // Fetch discounts for all service plans
-        const fetchAllDiscounts = async () => {
-          const planIds = selectionsFromLineItems
-            .map((s: any) => s.servicePlan?.id)
-            .filter((id: any): id is string => !!id);
-
-          setLoadingDiscounts(true);
-          try {
-            for (const planId of planIds) {
-              const discounts = await fetchDiscountsForPlan(planId);
-              setAvailableDiscounts(prev => ({
-                ...prev,
-                [planId]: discounts,
-              }));
-              // Only mark as fetched if we have a profile (prevents marking empty fetches)
-              if (profile) {
-                discountsFetchedRef.current.add(planId);
-              }
-            }
-          } finally {
-            setLoadingDiscounts(false);
-          }
-        };
-
-        fetchAllDiscounts();
-      }
+    // Don't process if quote or line items don't exist
+    if (!quote?.line_items) {
+      return;
     }
+
+    // If we have a quote but no line items, it's likely empty - skip
+    if (quote.line_items.length === 0) {
+      return;
+    }
+
+    // Don't process if service plans haven't loaded yet
+    // (null/undefined means still loading, empty array means loaded but none available)
+    if (allServicePlans === null || allServicePlans === undefined) {
+      return;
+    }
+
+    // Separate line items by type
+    const servicePlanItems = quote.line_items.filter(
+      (item: any) => item.service_plan_id
+    );
+    const addonItems = quote.line_items.filter(
+      (item: any) => item.addon_service_id
+    );
+
+    if (servicePlanItems.length === 0) {
+      return;
+    }
+
+    // Map service plan line items to service selections
+    const selectionsFromLineItems = servicePlanItems
+      .sort((a: any, b: any) => a.display_order - b.display_order)
+      .map((lineItem: any, index: number) => {
+        // Find the full service plan data
+        const servicePlan = allServicePlans.find(
+          (p: any) => p.id === lineItem.service_plan_id
+        );
+
+        // Use service_frequency from line item, fall back to treatment_frequency from service plan
+        const frequency = lineItem.service_frequency || servicePlan?.treatment_frequency || '';
+
+        return {
+          id: (index + 1).toString(),
+          servicePlan: servicePlan || null,
+          displayOrder: lineItem.display_order,
+          frequency: frequency,
+          discount:
+            (lineItem as any).discount_id ||
+            lineItem.discount_percentage?.toString() ||
+            '',
+        };
+      });
+
+    // Extract add-on IDs
+    const addonIds = addonItems
+      .map((item: any) => item.addon_service_id)
+      .filter(Boolean) as string[];
+
+    // Always update selections when line items exist
+    // This ensures updates happen regardless of load order
+    setServiceSelections(selectionsFromLineItems);
+    setSelectedAddOns(addonIds); // Sync add-on selections
+    initialLineItemCreatedRef.current = true; // Mark as initialized from existing data
+
+    // Fetch discounts for all service plans
+    const fetchAllDiscounts = async () => {
+      const planIds = selectionsFromLineItems
+        .map((s: any) => s.servicePlan?.id)
+        .filter((id: any): id is string => !!id);
+
+      if (planIds.length === 0) return;
+
+      setLoadingDiscounts(true);
+      try {
+        for (const planId of planIds) {
+          const discounts = await fetchDiscountsForPlan(planId);
+          setAvailableDiscounts(prev => ({
+            ...prev,
+            [planId]: discounts,
+          }));
+          // Only mark as fetched if we have a profile (prevents marking empty fetches)
+          if (profile) {
+            discountsFetchedRef.current.add(planId);
+          }
+        }
+      } finally {
+        setLoadingDiscounts(false);
+      }
+    };
+
+    fetchAllDiscounts();
   }, [quote?.line_items, allServicePlans, profile, fetchDiscountsForPlan]);
 
   // Re-fetch discounts when profile loads if we have service selections but missing discounts
@@ -2709,17 +2777,11 @@ export function LeadQuoteSection({
                       <label className={styles.fieldLabel}>
                         Preferred Date
                       </label>
-                      <CustomDropdown
+                      <input
+                        type="date"
+                        className={styles.dateInput}
                         value={preferredDate}
-                        onChange={onPreferredDateChange}
-                        placeholder="Select date"
-                        options={[
-                          { value: '', label: 'Select date' },
-                          { value: 'asap', label: 'As soon as possible' },
-                          { value: 'this_week', label: 'This week' },
-                          { value: 'next_week', label: 'Next week' },
-                          { value: 'flexible', label: 'Flexible' },
-                        ]}
+                        onChange={(e) => onPreferredDateChange(e.target.value)}
                       />
                     </div>
                     <div className={styles.formField}>

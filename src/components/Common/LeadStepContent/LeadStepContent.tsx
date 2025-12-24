@@ -151,13 +151,16 @@ export function LeadStepContent({
 
   // Pre-fill preferred date and time from lead data
   useEffect(() => {
-    if (lead.requested_date && !preferredDate) {
+    // Update if lead has value AND it differs from current state
+    if (lead.requested_date && lead.requested_date !== preferredDate) {
       setPreferredDate(lead.requested_date);
     }
-    if (lead.requested_time && !preferredTime) {
+
+    if (lead.requested_time && lead.requested_time !== preferredTime) {
       setPreferredTime(lead.requested_time);
     }
-  }, [lead.requested_date, lead.requested_time, preferredDate, preferredTime]);
+  }, [lead.requested_date, lead.requested_time]);
+  // Removed preferredDate and preferredTime from dependencies to prevent re-run loops
 
   // Function to load cadence data and next task - made reusable for refresh after completion
   const loadCadenceData = useCallback(async () => {

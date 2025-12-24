@@ -1315,6 +1315,41 @@
   }
 }
 
+// Date input styled to match CustomDropdown
+.dateInput {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  // Style the placeholder
+  &::-webkit-datetime-edit {
+    color: var(--gray-900);
+  }
+
+  &::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    color: #6b7280;
+  }
+}
 .sectionWrapper {
   transition: all 0.2s ease;
   border-radius: 8px;
