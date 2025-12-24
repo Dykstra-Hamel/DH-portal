@@ -120,7 +120,7 @@ export async function notifyLeadCreated(
 
     // Generate lead URL
     const appUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const leadUrl = `${appUrl}/connections/leads/${leadId}`;
+    const leadUrl = `${appUrl}/tickets/leads/${leadId}`;
 
     // Build notification data
     const leadNotificationData: LeadNotificationData & { leadUrl?: string } = {
@@ -266,7 +266,7 @@ export async function notifyLeadStatusChangedToScheduling(
 
     // Generate lead URL
     const appUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const leadUrl = `${appUrl}/connections/leads/${leadId}`;
+    const leadUrl = `${appUrl}/tickets/leads/${leadId}`;
 
     // Build notification data with scheduling context
     const leadNotificationData: LeadNotificationData & {
