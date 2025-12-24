@@ -4,6 +4,7 @@ import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { SalesCadenceCard } from '@/components/Common/SalesCadenceCard/SalesCadenceCard';
 import { ActionTypeDropdown } from '@/components/Common/ActionTypeDropdown';
 import { Phone, MessageSquareMore, Mail, SquareUserRound } from 'lucide-react';
+import { useActiveSection } from '@/contexts/ActiveSectionContext';
 import { LeadContactSectionProps } from '../../types/leadStepTypes';
 import styles from './LeadContactSection.module.scss';
 import cadenceStyles from '@/components/Common/SalesCadenceCard/SalesCadenceCard.module.scss';
@@ -27,6 +28,8 @@ export function LeadContactSection({
   onViewLogHistory,
   isSidebarExpanded,
 }: LeadContactSectionProps) {
+  const { activeSection, setActiveSection } = useActiveSection();
+
   const handleLogActivityClick = async () => {
     // Check if this activity matches the next recommended action
     const activityMatchesTask =
@@ -41,12 +44,16 @@ export function LeadContactSection({
   };
 
   return (
-    <InfoCard
-      title="Communication"
-      icon={<SquareUserRound size={20} />}
-      isCollapsible={true}
-      startExpanded={true}
+    <div
+      className={`${styles.sectionWrapper} ${activeSection === 'contact' ? styles.active : ''}`}
+      onClick={() => setActiveSection('contact')}
     >
+      <InfoCard
+        title="Communication"
+        icon={<SquareUserRound size={20} />}
+        isCollapsible={true}
+        startExpanded={true}
+      >
       <div
         className={styles.cardContent}
         data-sidebar-expanded={isSidebarExpanded}
@@ -251,5 +258,6 @@ export function LeadContactSection({
         </div>
       </div>
     </InfoCard>
+    </div>
   );
 }

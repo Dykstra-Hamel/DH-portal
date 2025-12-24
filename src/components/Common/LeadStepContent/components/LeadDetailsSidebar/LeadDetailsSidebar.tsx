@@ -7,6 +7,7 @@ import { NotesSection } from '@/components/Common/NotesSection/NotesSection';
 import { LeadCallFormInfo } from '../LeadCallFormInfo';
 import { useUser } from '@/hooks/useUser';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
+import { useActiveSection } from '@/contexts/ActiveSectionContext';
 import { ServiceAddressData } from '@/lib/service-addresses';
 import { AddressComponents } from '@/components/Common/AddressAutocomplete/AddressAutocomplete';
 import { broadcastCustomerUpdate } from '@/lib/realtime/customer-channel';
@@ -52,6 +53,7 @@ export function LeadDetailsSidebar({
   shouldExpandServiceLocation,
   shouldExpandActivity,
 }: LeadDetailsSidebarProps) {
+  const { activeSection, setActiveSection } = useActiveSection();
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   // Service Location form state
   const [serviceLocationData, setServiceLocationData] =
@@ -460,7 +462,8 @@ export function LeadDetailsSidebar({
 
   return (
     <div
-      className={`${styles.sidebar} ${isSidebarExpanded ? styles.expanded : styles.collapsed}`}
+      className={`${styles.sidebar} ${isSidebarExpanded ? styles.expanded : styles.collapsed} ${activeSection === 'sidebar' ? styles.active : ''}`}
+      onClick={() => setActiveSection('sidebar')}
     >
       <div className={styles.sidebarContent}>
         <div className={styles.sidebarHeader}>

@@ -382,3 +382,18 @@
     color: #fff;
   }
 }
+
+[data-sidebar-expanded='true'] {
+  .stepIcon {
+    margin-top: -12px;
+  }
+  .stepContent {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+  }
+  .priorityIndicator {
+    grid-row-start: 1;
+    grid-column-start: 2;
+  }
+}

@@ -86,10 +86,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           showAddButton: true,
           addButtonText: 'Add Lead',
         };
-      case '/tickets/incoming':
+      case '/tickets/new':
       case '/tickets/calls-and-forms':
         return {
-          title: 'Incoming',
+          title: 'New Tickets',
           description:
             'Review, qualify, and assign all your incoming customer communications here.',
           showAddButton: true,
@@ -262,7 +262,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
         if (
           pathname.includes('/customers/') ||
-          pathname.includes('/tickets/incoming/')
+          pathname.includes('/tickets/new/')
         ) {
           return null; // Don't show lower header on individual record pages
         }

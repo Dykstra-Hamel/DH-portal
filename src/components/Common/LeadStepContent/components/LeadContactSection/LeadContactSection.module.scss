@@ -177,3 +177,28 @@
   display: inline-flex;
   align-items: center;
 }
+
+[data-sidebar-expanded='true'] {
+  .nextActionSection {
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  .dataLabel {
+    grid-column-start: 1;
+  }
+}
+
+.sectionWrapper {
+  transition: all 0.2s ease;
+  border-radius: 8px;
+
+  &.active {
+    box-shadow:
+      0 0 0 4px rgba(0, 105, 224, 0.16),
+      0 2px 5px 0 rgba(0, 105, 224, 0.08),
+      0 0 0 1px rgba(0, 105, 224, 0.64),
+      0 1px 1px 0 rgba(0, 105, 224, 0.12);
+  }
+}

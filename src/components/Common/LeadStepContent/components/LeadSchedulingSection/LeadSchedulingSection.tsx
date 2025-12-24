@@ -3,6 +3,7 @@
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { QuoteSummaryCard } from '@/components/Common/QuoteSummaryCard/QuoteSummaryCard';
 import { CalendarCheck } from 'lucide-react';
+import { useActiveSection } from '@/contexts/ActiveSectionContext';
 import { LeadSchedulingSectionProps } from '../../types/leadStepTypes';
 import styles from './LeadSchedulingSection.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
@@ -21,15 +22,20 @@ export function LeadSchedulingSection({
   onEmailQuote,
   isSidebarExpanded,
 }: LeadSchedulingSectionProps) {
+  const { activeSection, setActiveSection } = useActiveSection();
   // Disable finalize button if date or time is missing
   const isFinalizeSaleDisabled = !scheduledDate || !scheduledTime;
   return (
-    <InfoCard
-      title="Scheduling"
-      icon={<CalendarCheck size={20} />}
-      isCollapsible={true}
-      startExpanded={true}
+    <div
+      className={`${styles.sectionWrapper} ${activeSection === 'scheduling' ? styles.active : ''}`}
+      onClick={() => setActiveSection('scheduling')}
     >
+      <InfoCard
+        title="Scheduling"
+        icon={<CalendarCheck size={20} />}
+        isCollapsible={true}
+        startExpanded={true}
+      >
       <div
         className={styles.cardContent}
         data-sidebar-expanded={isSidebarExpanded}
@@ -83,5 +89,6 @@ export function LeadSchedulingSection({
         </div>
       </div>
     </InfoCard>
+    </div>
   );
 }
