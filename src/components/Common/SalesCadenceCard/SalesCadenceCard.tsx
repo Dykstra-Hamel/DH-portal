@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { InfoCard } from '../InfoCard/InfoCard';
 import {
   Phone,
@@ -28,7 +29,7 @@ import CadenceModal from '../CadenceModal/CadenceModal';
 import { CadenceEditMode } from './CadenceEditMode';
 import { SaveCadenceModal } from '../SaveCadenceModal/SaveCadenceModal';
 import { EndCadenceModal } from '../EndCadenceModal/EndCadenceModal';
-import { MarkAsJunkModal } from '../MarkAsJunkModal/MarkAsJunkModal';
+import { NotInterestedModal } from '../NotInterestedModal/NotInterestedModal';
 import styles from './SalesCadenceCard.module.scss';
 import cardStyles from '../InfoCard/InfoCard.module.scss';
 
@@ -57,6 +58,7 @@ export function SalesCadenceCard({
   onCadenceSelect,
   hideCard = false,
 }: SalesCadenceCardProps) {
+  const router = useRouter();
   const [assignment, setAssignment] = useState<CadenceAssignment | null>(null);
   const [availableCadences, setAvailableCadences] = useState<
     SalesCadenceWithSteps[]
@@ -84,7 +86,7 @@ export function SalesCadenceCard({
     []
   );
   const [showEndModal, setShowEndModal] = useState(false);
-  const [showMarkAsJunkModal, setShowMarkAsJunkModal] = useState(false);
+  const [showNotInterestedModal, setShowNotInterestedModal] = useState(false);
   const [companyTimezone, setCompanyTimezone] =
     useState<string>('America/New_York');
 
@@ -338,34 +340,39 @@ export function SalesCadenceCard({
 
   const handleMarkAsLost = () => {
     setShowEndModal(false);
-    setShowMarkAsJunkModal(true);
+    setShowNotInterestedModal(true);
   };
 
-  const handleMarkAsJunkConfirm = async (reason: string) => {
+  const handleNotInterestedSubmit = async (reason: string) => {
     try {
+      // First fetch the lead to get current status
+      const leadResponse = await fetch(`/api/leads/${leadId}`);
+      const leadData = await leadResponse.json();
+      const currentStatus = leadData.lead_status;
+
       // End the cadence first
       await fetch(`/api/leads/${leadId}/cadence`, {
         method: 'DELETE',
       });
 
-      // Mark lead as lost
+      // Mark lead as lost with lost_stage
       await fetch(`/api/leads/${leadId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lead_status: 'lost',
           lost_reason: reason,
+          lost_stage: currentStatus,
         }),
       });
 
-      setShowMarkAsJunkModal(false);
-      await loadData();
+      setShowNotInterestedModal(false);
 
-      // Optionally reload the page or redirect
-      window.location.reload();
+      // Redirect to leads page
+      router.push('/tickets/leads');
     } catch (error) {
-      console.error('Error marking lead as lost:', error);
-      alert('Failed to mark lead as lost');
+      console.error('Error marking lead as not interested:', error);
+      alert('Failed to mark lead as not interested');
       throw error;
     }
   };
@@ -893,11 +900,10 @@ export function SalesCadenceCard({
         onCancel={() => setShowEndModal(false)}
       />
 
-      <MarkAsJunkModal
-        isOpen={showMarkAsJunkModal}
-        onClose={() => setShowMarkAsJunkModal(false)}
-        onConfirm={handleMarkAsJunkConfirm}
-        customerName="this lead"
+      <NotInterestedModal
+        isOpen={showNotInterestedModal}
+        onClose={() => setShowNotInterestedModal(false)}
+        onSubmit={handleNotInterestedSubmit}
       />
 
       {hideCard ? (

@@ -220,6 +220,13 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'View detailed data about all calls.',
           showAddButton: false,
         };
+      case '/tickets/archived-leads':
+        return {
+          title: 'Archived Leads',
+          description:
+            'View leads that have been marked won, lost, or archived.',
+          showAddButton: false,
+        };
       // Handle individual record pages (hide lower header)
       default:
         // Show lower header for campaign detail pages
