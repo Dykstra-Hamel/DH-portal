@@ -54,7 +54,9 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
     return statusMap[status] || capitalizeFirst(status);
   };
 
-  const formatCallTimestamp = (timestamp: string | undefined | null): string => {
+  const formatCallTimestamp = (
+    timestamp: string | undefined | null
+  ): string => {
     if (!timestamp) return 'N/A';
     const date = new Date(timestamp);
     return date.toLocaleString('en-US', {
@@ -73,7 +75,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
         <>
           {/* Widget Details Section - only for widget submissions */}
           {lead.lead_source === 'widget_submission' && (
-            <div>
+            <div className={styles.cardContent}>
               <div className={styles.callInsightsSection}>
                 <h4 className={cardStyles.defaultText}>Widget Details:</h4>
               </div>
@@ -147,10 +149,14 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
           {lead.comments && (
             <div className={styles.transcriptSection}>
               <div className={styles.transcriptHeader}>
-                <h4 className={cardStyles.dataLabel}>Form Submission Details</h4>
+                <h4 className={cardStyles.dataLabel}>
+                  Form Submission Details
+                </h4>
               </div>
               <div className={styles.transcriptContent}>
-                <span className={cardStyles.transcriptText}>{lead.comments}</span>
+                <span className={cardStyles.transcriptText}>
+                  {lead.comments}
+                </span>
               </div>
             </div>
           )}
@@ -158,7 +164,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
       ) : lead.call_record ? (
         <>
           {/* Call Insights Section */}
-          <div>
+          <div className={styles.cardContent}>
             <div className={styles.callInsightsSection}>
               <h4 className={cardStyles.defaultText}>Call Insights:</h4>
             </div>
@@ -192,7 +198,9 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
                 </span>
               </div>
               <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>Preferred Service Time</span>
+                <span className={cardStyles.dataLabel}>
+                  Preferred Service Time
+                </span>
                 <span className={cardStyles.dataText}>
                   {capitalizeFirst(lead.call_record.preferred_service_time)}
                 </span>

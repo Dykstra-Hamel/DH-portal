@@ -208,6 +208,18 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'View detailed record reports here.',
           showAddButton: false,
         };
+      case '/tickets/form-submissions':
+        return {
+          title: 'Form Submissions',
+          description: 'View detailed data about your form submissions.',
+          showAddButton: false,
+        };
+      case '/tickets/call-records':
+        return {
+          title: 'Call Records',
+          description: 'View detailed data about all calls.',
+          showAddButton: false,
+        };
       // Handle individual record pages (hide lower header)
       default:
         // Show lower header for campaign detail pages

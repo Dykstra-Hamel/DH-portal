@@ -28,6 +28,10 @@ import {
 import styles from './LeadQuoteSection.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
+const formatRecurringPrice = (price: number): string => {
+  return price % 1 === 0 ? price.toString() : price.toFixed(2);
+};
+
 export function LeadQuoteSection({
   lead,
   quote,
@@ -2041,15 +2045,15 @@ export function LeadQuoteSection({
                                 </div>
                                 <div className={styles.recurringPrice}>
                                   $
-                                  {mainPlanLineItem?.final_recurring_price || 0}
+                                  {formatRecurringPrice(mainPlanLineItem?.final_recurring_price || 0)}
                                   <span className={styles.perMonth}>/mo</span>
                                 </div>
                                 {mainPlanLineItem?.is_custom_priced ? (
                                   <div className={styles.originalPrice}>
                                     Custom pricing (Originally: $
-                                    {calculatedPrices[
+                                    {formatRecurringPrice(calculatedPrices[
                                       serviceSelections[0].displayOrder
-                                    ]?.recurring || 0}
+                                    ]?.recurring || 0)}
                                     /mo)
                                   </div>
                                 ) : null}
@@ -2141,7 +2145,7 @@ export function LeadQuoteSection({
                                           <span
                                             className={styles.addonRecurring}
                                           >
-                                            +${addonItem.final_recurring_price}
+                                            +${formatRecurringPrice(addonItem.final_recurring_price)}
                                             /mo
                                           </span>
                                           {addonItem.final_initial_price >
@@ -2176,9 +2180,7 @@ export function LeadQuoteSection({
                                     </span>
                                     <span className={styles.totalValue}>
                                       $
-                                      {Math.round(
-                                        quote?.total_recurring_price || 0
-                                      )}
+                                      {formatRecurringPrice(quote?.total_recurring_price || 0)}
                                       /mo
                                     </span>
                                   </div>
@@ -2233,9 +2235,7 @@ export function LeadQuoteSection({
                                         }
                                       >
                                         $
-                                        {Math.round(
-                                          lineItem?.final_recurring_price || 0
-                                        )}
+                                        {formatRecurringPrice(lineItem?.final_recurring_price || 0)}
                                         <span
                                           className={styles.lineItemPerMonth}
                                         >
@@ -2354,10 +2354,8 @@ export function LeadQuoteSection({
                                             }
                                           >
                                             $
-                                            {Math.round(
-                                              addonItem.final_recurring_price ||
-                                                0
-                                            )}
+                                            {formatRecurringPrice(addonItem.final_recurring_price ||
+                                                0)}
                                             <span
                                               className={
                                                 styles.lineItemPerMonth
@@ -2402,9 +2400,7 @@ export function LeadQuoteSection({
                                 </div>
                                 <div className={styles.totalRecurringPrice}>
                                   $
-                                  {Math.round(
-                                    quote?.total_recurring_price || 0
-                                  )}
+                                  {formatRecurringPrice(quote?.total_recurring_price || 0)}
                                   <span className={styles.totalPerMonth}>
                                     /mo
                                   </span>

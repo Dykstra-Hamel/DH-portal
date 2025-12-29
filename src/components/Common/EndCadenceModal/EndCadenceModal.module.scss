@@ -179,8 +179,7 @@
   }
 }
 
-.proceedButton,
-.convertButton,
+.lostButton,
 .endButton {
   display: flex;
   align-items: center;
@@ -200,19 +199,11 @@
   }
 }
 
-.proceedButton {
-  background-color: #10b981;
+.lostButton {
+  background-color: #ef4444;
 
   &:hover:not(:disabled) {
-    background-color: #059669;
-  }
-}
-
-.convertButton {
-  background-color: #3b82f6;
-
-  &:hover:not(:disabled) {
-    background-color: #2563eb;
+    background-color: #dc2626;
   }
 }
 

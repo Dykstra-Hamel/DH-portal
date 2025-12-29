@@ -10,6 +10,11 @@ import {
   removeCustomerChannel,
   subscribeToCustomerUpdates,
 } from '@/lib/realtime/customer-channel';
+import {
+  createTaskChannel,
+  removeTaskChannel,
+  subscribeToTaskUpdates,
+} from '@/lib/realtime/task-channel';
 import { ActiveSectionProvider } from '@/contexts/ActiveSectionContext';
 import styles from './LeadStepContent.module.scss';
 import { LeadDetailsSidebar } from './components/LeadDetailsSidebar/LeadDetailsSidebar';
@@ -60,6 +65,7 @@ export function LeadStepContent({
 
   // Refs
   const customerChannelRef = useRef<any>(null);
+  const taskChannelRef = useRef<any>(null);
   const serviceLocationCardRef = useRef<HTMLDivElement | null>(null);
 
   const [homeSize, setHomeSize] = useState<number | ''>('');
@@ -120,48 +126,6 @@ export function LeadStepContent({
     }
   }, [user?.id, selectedAssignee]);
 
-  // Set up customer realtime channel for broadcasting updates
-  useEffect(() => {
-    if (!lead.customer?.id) {
-      // Clean up existing channel if no customer
-      if (customerChannelRef.current) {
-        removeCustomerChannel(customerChannelRef.current);
-        customerChannelRef.current = null;
-      }
-      return;
-    }
-
-    // Create customer channel for broadcasting
-    const channel = createCustomerChannel(lead.customer.id);
-    customerChannelRef.current = channel;
-
-    // Must subscribe to the channel before we can broadcast on it
-    subscribeToCustomerUpdates(channel, () => {
-      // Empty callback - channel subscription required for broadcasting
-    });
-
-    // Cleanup on unmount or when customer ID changes
-    return () => {
-      if (customerChannelRef.current) {
-        removeCustomerChannel(customerChannelRef.current);
-        customerChannelRef.current = null;
-      }
-    };
-  }, [lead.customer?.id]);
-
-  // Pre-fill preferred date and time from lead data
-  useEffect(() => {
-    // Update if lead has value AND it differs from current state
-    if (lead.requested_date && lead.requested_date !== preferredDate) {
-      setPreferredDate(lead.requested_date);
-    }
-
-    if (lead.requested_time && lead.requested_time !== preferredTime) {
-      setPreferredTime(lead.requested_time);
-    }
-  }, [lead.requested_date, lead.requested_time]);
-  // Removed preferredDate and preferredTime from dependencies to prevent re-run loops
-
   // Function to load cadence data and next task - made reusable for refresh after completion
   const loadCadenceData = useCallback(async () => {
     try {
@@ -199,6 +163,96 @@ export function LeadStepContent({
   useEffect(() => {
     loadCadenceData();
   }, [loadCadenceData]);
+
+  // Set up customer realtime channel for broadcasting updates
+  useEffect(() => {
+    if (!lead.customer?.id) {
+      // Clean up existing channel if no customer
+      if (customerChannelRef.current) {
+        removeCustomerChannel(customerChannelRef.current);
+        customerChannelRef.current = null;
+      }
+      return;
+    }
+
+    // Create customer channel for broadcasting
+    const channel = createCustomerChannel(lead.customer.id);
+    customerChannelRef.current = channel;
+
+    // Must subscribe to the channel before we can broadcast on it
+    subscribeToCustomerUpdates(channel, () => {
+      // Empty callback - channel subscription required for broadcasting
+    });
+
+    // Cleanup on unmount or when customer ID changes
+    return () => {
+      if (customerChannelRef.current) {
+        removeCustomerChannel(customerChannelRef.current);
+        customerChannelRef.current = null;
+      }
+    };
+  }, [lead.customer?.id]);
+
+  // Set up task realtime channel for next task updates
+  useEffect(() => {
+    if (!lead.company_id) {
+      // Clean up existing channel if no company
+      if (taskChannelRef.current) {
+        removeTaskChannel(taskChannelRef.current);
+        taskChannelRef.current = null;
+      }
+      return;
+    }
+
+    // Create task channel for this company
+    const channel = createTaskChannel(lead.company_id);
+    taskChannelRef.current = channel;
+
+    // Subscribe to task updates
+    subscribeToTaskUpdates(channel, async (payload) => {
+      // Check if this task is related to our lead by fetching task details
+      // This prevents unnecessary reloads for tasks unrelated to this lead
+      try {
+        // For DELETE operations, we can't fetch the task, so we reload cadence data
+        if (payload.action === 'DELETE') {
+          await loadCadenceData();
+          return;
+        }
+
+        // For INSERT/UPDATE, fetch the task to check if it's for this lead
+        const taskResponse = await authenticatedFetch(`/api/tasks/${payload.task_id}`);
+
+        if (taskResponse.data?.lead_id === lead.id) {
+          await loadCadenceData();
+        }
+      } catch (error) {
+        // If we can't fetch the task (it might be deleted), reload anyway to be safe
+        console.error('Error checking task:', error);
+        await loadCadenceData();
+      }
+    });
+
+    // Cleanup on unmount or when company ID changes
+    return () => {
+      if (taskChannelRef.current) {
+        removeTaskChannel(taskChannelRef.current);
+        taskChannelRef.current = null;
+      }
+    };
+  }, [lead.company_id, lead.id, loadCadenceData]);
+
+  // Pre-fill preferred date and time from lead data
+  useEffect(() => {
+    // Update if lead has value AND it differs from current state
+    if (lead.requested_date && lead.requested_date !== preferredDate) {
+      setPreferredDate(lead.requested_date);
+    }
+
+    if (lead.requested_time && lead.requested_time !== preferredTime) {
+      setPreferredTime(lead.requested_time);
+    }
+  }, [lead.requested_date, lead.requested_time]);
+  // Removed preferredDate and preferredTime from dependencies to prevent re-run loops
 
 
   const currentUser = user
@@ -460,7 +514,11 @@ export function LeadStepContent({
             onActionTypeChange={setSelectedActionType}
             onActivityNotesChange={setActivityNotes}
             onLogActivity={handleLogActivityFromSection}
-            onCadenceSelect={setSelectedCadenceId}
+            onCadenceSelect={(id) => {
+              setSelectedCadenceId(id);
+              // Immediately reload cadence data when cadence is selected/changed
+              loadCadenceData();
+            }}
             onShowToast={onShowToast}
             onLeadUpdate={onLeadUpdate}
             onViewLogHistory={handleViewLogHistory}
