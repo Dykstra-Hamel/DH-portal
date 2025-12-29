@@ -199,32 +199,25 @@ export default function CallRecordsPage() {
                   trend={metrics.totalCalls.trend}
                 />
                 <MetricsCard
-                  title={metrics.totalForms.title}
-                  value={metrics.totalForms.value}
-                  comparisonValue={metrics.totalForms.comparisonValue}
-                  comparisonPeriod={metrics.totalForms.comparisonPeriod}
-                  trend={metrics.totalForms.trend}
+                  title={metrics.avgCallDuration.title}
+                  value={metrics.avgCallDuration.value}
+                  comparisonValue={metrics.avgCallDuration.comparisonValue}
+                  comparisonPeriod={metrics.avgCallDuration.comparisonPeriod}
+                  trend={metrics.avgCallDuration.trend}
                 />
                 <MetricsCard
-                  title={metrics.avgTimeToAssign.title}
-                  value={metrics.avgTimeToAssign.value}
-                  comparisonValue={metrics.avgTimeToAssign.comparisonValue}
-                  comparisonPeriod={metrics.avgTimeToAssign.comparisonPeriod}
-                  trend={metrics.avgTimeToAssign.trend}
+                  title={metrics.positiveSentimentRate.title}
+                  value={metrics.positiveSentimentRate.value}
+                  comparisonValue={metrics.positiveSentimentRate.comparisonValue}
+                  comparisonPeriod={metrics.positiveSentimentRate.comparisonPeriod}
+                  trend={metrics.positiveSentimentRate.trend}
                 />
                 <MetricsCard
-                  title={metrics.hangupCalls.title}
-                  value={metrics.hangupCalls.value}
-                  comparisonValue={metrics.hangupCalls.comparisonValue}
-                  comparisonPeriod={metrics.hangupCalls.comparisonPeriod}
-                  trend={metrics.hangupCalls.trend}
-                />
-                <MetricsCard
-                  title={metrics.customerServiceCalls.title}
-                  value={metrics.customerServiceCalls.value}
-                  comparisonValue={metrics.customerServiceCalls.comparisonValue}
-                  comparisonPeriod={metrics.customerServiceCalls.comparisonPeriod}
-                  trend={metrics.customerServiceCalls.trend}
+                  title={metrics.salesCallsWon.title}
+                  value={metrics.salesCallsWon.value}
+                  comparisonValue={metrics.salesCallsWon.comparisonValue}
+                  comparisonPeriod={metrics.salesCallsWon.comparisonPeriod}
+                  trend={metrics.salesCallsWon.trend}
                 />
               </>
             ) : (
@@ -238,7 +231,7 @@ export default function CallRecordsPage() {
                   isLoading={true}
                 />
                 <MetricsCard
-                  title="Total Forms"
+                  title="Avg Call Duration"
                   value="--"
                   comparisonValue={0}
                   comparisonPeriod="previous period"
@@ -246,7 +239,7 @@ export default function CallRecordsPage() {
                   isLoading={true}
                 />
                 <MetricsCard
-                  title="Avg Time To Be Assigned"
+                  title="Positive Sentiment Rate"
                   value="--"
                   comparisonValue={0}
                   comparisonPeriod="previous period"
@@ -254,15 +247,7 @@ export default function CallRecordsPage() {
                   isLoading={true}
                 />
                 <MetricsCard
-                  title="Hang-up Calls"
-                  value="--"
-                  comparisonValue={0}
-                  comparisonPeriod="previous period"
-                  trend="good"
-                  isLoading={true}
-                />
-                <MetricsCard
-                  title="Customer Service Calls"
+                  title="Sales Calls Won"
                   value="--"
                   comparisonValue={0}
                   comparisonPeriod="previous period"
