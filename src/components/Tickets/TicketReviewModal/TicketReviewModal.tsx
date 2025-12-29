@@ -497,7 +497,7 @@ export default function TicketReviewModal({
 
       // Determine custom status based on qualification type
       const customStatus =
-        selectedQualification === 'sales' ? 'quoted' : 'in_progress';
+        selectedQualification === 'sales' ? 'in_process' : 'in_progress';
 
       // Map the qualification types to the expected types
       let qualificationType: 'sales' | 'customer_service';

@@ -105,12 +105,12 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (includeArchived) {
-      // If including archived, only show archived leads
-      query = query.eq('archived', true);
+      // If including archived, show leads that are archived OR have status lost/won
+      query = query.or('archived.eq.true,lead_status.eq.lost,lead_status.eq.won');
     } else {
-      // Default behavior: show active leads (exclude archived)
+      // Default behavior: show active leads (exclude archived and lost/won)
       query = query
-        .in('lead_status', ['new', 'in_process', 'quoted', 'scheduling', 'won', 'lost'])
+        .in('lead_status', ['new', 'in_process', 'quoted', 'scheduling'])
         .or('archived.is.null,archived.eq.false');
     }
 

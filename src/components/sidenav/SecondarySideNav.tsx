@@ -68,6 +68,24 @@ const CustomerLibraryIcon = () => (
   </svg>
 );
 
+const ArchivedIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 18 18"
+    fill="none"
+  >
+    <path
+      d="M14.25 6V14.25C14.25 14.6478 14.092 15.0294 13.8107 15.3107C13.5294 15.592 13.1478 15.75 12.75 15.75H5.25C4.85218 15.75 4.47064 15.592 4.18934 15.3107C3.90804 15.0294 3.75 14.6478 3.75 14.25V6M1.5 6H16.5M7.5 9V12.75M10.5 9V12.75M11.25 6V3C11.25 2.80109 11.171 2.61032 11.0303 2.46967C10.8897 2.32902 10.6989 2.25 10.5 2.25H7.5C7.30109 2.25 7.11032 2.32902 6.96967 2.46967C6.82902 2.61032 6.75 2.80109 6.75 3V6"
+      stroke="#6A7282"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 interface SidebarProps {
   collapsed?: boolean;
   isActive?: boolean;
@@ -618,6 +636,11 @@ export function SecondarySideNav({
                 text: 'Forms',
                 href: '/tickets/form-submissions',
                 icon: <CallsIcon />,
+              },
+              {
+                text: 'Archived Leads',
+                href: '/tickets/archived-leads',
+                icon: <ArchivedIcon />,
               },
               {
                 text: 'All Customers',
