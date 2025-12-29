@@ -108,6 +108,18 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'Review detailed call logs and recordings here.',
           showAddButton: false,
         };
+      case '/tickets/call-records':
+        return {
+          title: 'Call Records',
+          description: 'View and review all incoming and outgoing call activity and recordings.',
+          showAddButton: false,
+        };
+      case '/tickets/form-submissions':
+        return {
+          title: 'Form Submissions',
+          description: 'Review and manage all incoming form submissions from your website.',
+          showAddButton: false,
+        };
       case '/settings':
         return {
           title: 'Settings',
@@ -200,6 +212,13 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'Manage your outbound marketing campaigns',
           showAddButton: true,
           addButtonText: 'Create Campaign',
+        };
+      case '/campaigns/contact-lists':
+        return {
+          title: 'Contact Lists',
+          description: 'Manage your contact lists for campaigns',
+          showAddButton: true,
+          addButtonText: 'Create List',
         };
       case '/reports':
       case '/tickets/reports':

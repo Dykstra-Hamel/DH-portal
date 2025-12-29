@@ -2,6 +2,7 @@
 .topContent {
   display: flex;
   align-items: center;
+  flex-direction: row-reverse;
   justify-content: space-between;
   gap: 12px;
 }
@@ -39,16 +40,16 @@
 
 .searchContainer {
   position: absolute;
-  left: 0;
+  right: 0;
   bottom: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
   max-width: 0;
   width: 0;
   overflow: hidden;
   opacity: 0;
-  transform-origin: left center;
+  transform-origin: right center;
   transition:
     max-width 0.25s ease,
     width 0.25s ease,
@@ -67,7 +68,7 @@
   width: 100%;
   min-width: 240px;
   max-width: 320px;
-  padding: 8px 16px 8px 32px;
+  padding: 8px 16px 8px 16px;
   font-family: var(--font-satoshi);
   font-size: 14px;
   font-weight: 500;
@@ -150,7 +151,6 @@
 
 .contentArea {
   background: var(--white);
-  border-radius: var(--border-radius-md) 0 0 0;
   border: 1px solid var(--border-color);
   padding: 8px;
   min-width: 1240px;
