@@ -25,6 +25,12 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
   const [showAddContactsModal, setShowAddContactsModal] = useState(false);
   const [showImportCSVModal, setShowImportCSVModal] = useState(false);
 
+  // CSV upload state for new lists
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [parsedCsvData, setParsedCsvData] = useState<any | null>(null);
+  const [parsingCsv, setParsingCsv] = useState(false);
+  const [csvError, setCsvError] = useState<string | null>(null);
+
   const isEditing = !!list;
 
   useEffect(() => {
@@ -57,9 +63,59 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
     }
   };
 
+  const handleCsvFileSelection = async (selectedFile: File) => {
+    if (!selectedFile.name.endsWith('.csv')) {
+      setCsvError('Please upload a CSV file');
+      return;
+    }
+
+    setCsvFile(selectedFile);
+    setCsvError(null);
+    setParsedCsvData(null);
+
+    // Auto-parse the CSV
+    try {
+      setParsingCsv(true);
+      setCsvError(null);
+
+      const csvContent = await selectedFile.text();
+
+      // Call parse API
+      const response = await fetch('/api/leads/bulk/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          csvContent,
+          skipDatabaseDuplicateCheck: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to parse CSV');
+      }
+
+      setParsedCsvData(result);
+    } catch (err) {
+      console.error('Error parsing CSV:', err);
+      setCsvError(err instanceof Error ? err.message : 'Failed to parse CSV');
+      setParsedCsvData(null);
+    } finally {
+      setParsingCsv(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!formData.name.trim()) {
       alert('Name is required');
+      return;
+    }
+
+    // Require CSV upload for new lists
+    if (!isEditing && (!parsedCsvData || !parsedCsvData.leads || parsedCsvData.leads.length === 0)) {
+      alert('Please upload a CSV file with contacts');
       return;
     }
 
@@ -85,6 +141,26 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
       const result = await response.json();
 
       if (result.success) {
+        // If creating a new list with CSV data, import contacts
+        if (!isEditing && parsedCsvData && parsedCsvData.leads && parsedCsvData.leads.length > 0) {
+          const newListId = result.list.id;
+
+          // Import contacts to the newly created list
+          const importResponse = await fetch(`/api/contact-lists/${newListId}/members`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              members: parsedCsvData.leads,
+            }),
+          });
+
+          const importResult = await importResponse.json();
+
+          if (!importResult.success) {
+            alert('List created, but failed to import contacts. You can import them later.');
+          }
+        }
+
         onClose(true);
       } else {
         alert(result.error || 'Failed to save list');
@@ -193,10 +269,78 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="Optional notes about this list"
-                rows={3}
+                rows={2}
               />
             </div>
           </div>
+
+          {/* CSV Upload for new lists */}
+          {!isEditing && (
+            <div className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <h3>
+                  <FileUp size={16} />
+                  Upload Contacts *
+                </h3>
+              </div>
+
+              <div className={styles.csvUploadArea}>
+                <input
+                  id="csv-file-input-create"
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleCsvFileSelection(file);
+                  }}
+                  style={{ display: 'none' }}
+                />
+
+                <div
+                  className={styles.csvDropZone}
+                  onClick={() => document.getElementById('csv-file-input-create')?.click()}
+                >
+                  {parsingCsv ? (
+                    <div className={styles.csvParsing}>
+                      <div className={styles.spinner} />
+                      <p>Parsing CSV...</p>
+                    </div>
+                  ) : parsedCsvData ? (
+                    <div className={styles.csvSuccess}>
+                      <p className={styles.csvFileName}>{csvFile?.name}</p>
+                      <span className={styles.csvInfo}>
+                        {parsedCsvData.validRows || 0} valid contact{parsedCsvData.validRows !== 1 ? 's' : ''} ready to import
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.csvRemoveButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCsvFile(null);
+                          setParsedCsvData(null);
+                          setCsvError(null);
+                        }}
+                      >
+                        Remove file
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={styles.csvPrompt}>
+                      <FileUp size={28} />
+                      <p>Click to upload CSV file</p>
+                      <span className={styles.csvHint}>Upload a CSV file to add contacts to this list</span>
+                    </div>
+                  )}
+                </div>
+
+                {csvError && (
+                  <div className={styles.csvError}>
+                    {csvError}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {isEditing && (
             <>
@@ -293,7 +437,14 @@ export default function ContactListModal({ list, companyId, onClose }: ContactLi
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving} className={styles.saveButton}>
-            {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Create List'}
+            {saving
+              ? 'Saving...'
+              : isEditing
+                ? 'Save Changes'
+                : parsedCsvData && parsedCsvData.validRows > 0
+                  ? `Create List with ${parsedCsvData.validRows} Contact${parsedCsvData.validRows !== 1 ? 's' : ''}`
+                  : 'Create List'
+            }
           </button>
         </div>
       </div>
