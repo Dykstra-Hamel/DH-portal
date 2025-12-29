@@ -152,12 +152,15 @@
 .addonInfo {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 4px;
+  flex-grow: 1;
 }
 
 .addonName {
   font-size: 12px;
   font-weight: 550;
+  width: 125px;
   color: var(--gray-900);
 }
 

@@ -28,6 +28,7 @@ import CadenceModal from '../CadenceModal/CadenceModal';
 import { CadenceEditMode } from './CadenceEditMode';
 import { SaveCadenceModal } from '../SaveCadenceModal/SaveCadenceModal';
 import { EndCadenceModal } from '../EndCadenceModal/EndCadenceModal';
+import { MarkAsJunkModal } from '../MarkAsJunkModal/MarkAsJunkModal';
 import styles from './SalesCadenceCard.module.scss';
 import cardStyles from '../InfoCard/InfoCard.module.scss';
 
@@ -83,6 +84,7 @@ export function SalesCadenceCard({
     []
   );
   const [showEndModal, setShowEndModal] = useState(false);
+  const [showMarkAsJunkModal, setShowMarkAsJunkModal] = useState(false);
   const [companyTimezone, setCompanyTimezone] =
     useState<string>('America/New_York');
 
@@ -199,6 +201,9 @@ export function SalesCadenceCard({
 
       // Reload data
       await loadData();
+
+      // Notify parent component of cadence selection
+      onCadenceSelect?.(cadenceId);
     } catch (error) {
       console.error('Error changing cadence:', error);
       alert('Failed to update cadence');
@@ -328,6 +333,40 @@ export function SalesCadenceCard({
       alert('Failed to end cadence');
     } finally {
       setIsEnding(false);
+    }
+  };
+
+  const handleMarkAsLost = () => {
+    setShowEndModal(false);
+    setShowMarkAsJunkModal(true);
+  };
+
+  const handleMarkAsJunkConfirm = async (reason: string) => {
+    try {
+      // End the cadence first
+      await fetch(`/api/leads/${leadId}/cadence`, {
+        method: 'DELETE',
+      });
+
+      // Mark lead as lost
+      await fetch(`/api/leads/${leadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_status: 'lost',
+          lost_reason: reason,
+        }),
+      });
+
+      setShowMarkAsJunkModal(false);
+      await loadData();
+
+      // Optionally reload the page or redirect
+      window.location.reload();
+    } catch (error) {
+      console.error('Error marking lead as lost:', error);
+      alert('Failed to mark lead as lost');
+      throw error;
     }
   };
 
@@ -731,6 +770,13 @@ export function SalesCadenceCard({
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={handleEndCadence}
+          className={styles.removeCadenceLink}
+        >
+          Remove Cadence
+        </button>
       </div>
 
       {/* Cadence Steps */}
@@ -842,61 +888,16 @@ export function SalesCadenceCard({
 
       <EndCadenceModal
         isOpen={showEndModal}
-        onProceedToQuote={async () => {
-          try {
-            setIsEnding(true);
-
-            // 1. Get the next incomplete task
-            const nextTaskResponse = await fetch(
-              `/api/leads/${leadId}/next-task`
-            );
-            if (nextTaskResponse.ok) {
-              const { data: nextTask } = await nextTaskResponse.json();
-
-              // 2. If there's a task, mark it complete
-              if (nextTask?.task_id) {
-                await fetch(`/api/tasks/${nextTask.task_id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    status: 'completed',
-                    completed_at: new Date().toISOString(),
-                  }),
-                });
-              }
-            }
-
-            // 3. End the cadence (removes remaining tasks)
-            await fetch(`/api/leads/${leadId}/cadence`, {
-              method: 'DELETE',
-            });
-
-            // 4. Update lead status to quoted
-            await fetch(`/api/leads/${leadId}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lead_status: 'quoted',
-              }),
-            });
-
-            setShowEndModal(false);
-
-            // Reload the page to reflect the updated lead status
-            window.location.reload();
-          } catch (error) {
-            console.error('Error proceeding to quote:', error);
-            alert('Failed to proceed to quote');
-            setIsEnding(false);
-          }
-        }}
-        onConvertToAutomation={async () => {
-          // TODO: Implement automation conversion
-          // For now, just end the cadence
-          await endCadenceOnly();
-        }}
+        onMarkAsLost={handleMarkAsLost}
         onEndOnly={endCadenceOnly}
         onCancel={() => setShowEndModal(false)}
+      />
+
+      <MarkAsJunkModal
+        isOpen={showMarkAsJunkModal}
+        onClose={() => setShowMarkAsJunkModal(false)}
+        onConfirm={handleMarkAsJunkConfirm}
+        customerName="this lead"
       />
 
       {hideCard ? (

@@ -620,7 +620,7 @@ export function SecondarySideNav({
                 icon: <CallsIcon />,
               },
               {
-                text: 'Customer Library',
+                text: 'All Customers',
                 href: '/customers',
                 icon: <CustomerLibraryIcon />,
               },
