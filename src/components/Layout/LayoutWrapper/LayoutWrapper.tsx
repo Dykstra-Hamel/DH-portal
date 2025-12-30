@@ -116,13 +116,15 @@ function LayoutContent({ children }: LayoutWrapperProps) {
       case '/tickets/call-records':
         return {
           title: 'Call Records',
-          description: 'View and review all incoming and outgoing call activity and recordings.',
+          description:
+            'View and review all incoming and outgoing call activity and recordings.',
           showAddButton: false,
         };
       case '/tickets/form-submissions':
         return {
           title: 'Form Submissions',
-          description: 'Review and manage all incoming form submissions from your website.',
+          description:
+            'Review and manage all incoming form submissions from your website.',
           showAddButton: false,
         };
       case '/settings':
@@ -302,6 +304,21 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           return null;
         }
 
+        // Show lower header for support case detail pages
+        if (pathname.match(/^\/tickets\/customer-service\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise hide header
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              supportCaseAssignmentControls:
+                pageHeader.supportCaseAssignmentControls,
+            };
+          }
+          return null;
+        }
+
         // Show lower header for customer detail pages
         if (pathname.match(/^\/customers\/[^\/]+$/)) {
           // Use dynamic page header if set, otherwise use default
@@ -375,6 +392,9 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               }
               actionButtons={pageConfig.actionButtons}
               leadAssignmentControls={pageConfig.leadAssignmentControls}
+              supportCaseAssignmentControls={
+                pageConfig.supportCaseAssignmentControls
+              }
               customActions={pageConfig.customActions}
             />
           )}

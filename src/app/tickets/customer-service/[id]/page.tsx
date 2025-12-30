@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, Suspense, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
 import { SupportCase } from '@/types/support-case';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
-import { StepItem } from '@/components/Common/Step/Step';
-import { LeadStepWrapper } from '@/components/Common/LeadStepWrapper/LeadStepWrapper';
 import { SupportCaseStepContent } from '@/components/Common/SupportCaseStepContent/SupportCaseStepContent';
-import { ReassignModal } from '@/components/Common/ReassignModal/ReassignModal';
+import { SupportCaseDetailsSidebar } from '@/components/Common/SupportCaseStepContent/components/SupportCaseDetailsSidebar/SupportCaseDetailsSidebar';
 import { Toast } from '@/components/Common/Toast';
+import { ActiveSectionProvider } from '@/contexts/ActiveSectionContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import { formatHeaderDate } from '@/lib/date-utils';
+import { useUser } from '@/hooks/useUser';
+import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -38,311 +40,147 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
-  const [showReassignModal, setShowReassignModal] = useState(false);
   const router = useRouter();
+  const { setPageHeader } = usePageActions();
 
-  // Step configuration for support cases
-  const supportCaseSteps: StepItem[] = [
-    { id: 'unassigned', label: 'Unassigned', subLabel: '', status: 'upcoming' },
-    { id: 'in_progress', label: 'In Progress', subLabel: '', status: 'upcoming' },
-    { id: 'awaiting_response', label: 'Awaiting Response', subLabel: '', status: 'upcoming' },
-    { id: 'resolved', label: 'Resolved', subLabel: '', status: 'upcoming' },
-  ];
+  // Assignment state
+  const [selectedAssignee, setSelectedAssignee] = useState('');
 
-  // Update step statuses based on current support case status
-  const getUpdatedSteps = (): StepItem[] => {
-    if (!supportCase) return supportCaseSteps;
+  // Sidebar state
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
-    const currentStatus = supportCase.status;
+  // Hooks
+  const { user: currentUser, profile: currentProfile } = useUser();
+  const { users: assignableUsers } = useAssignableUsers({
+    companyId: supportCase?.company_id,
+    departmentType: 'support',
+    enabled: true,
+  });
 
-    // Map support case status to step IDs
-    const statusToStep: { [key: string]: string } = {
-      'unassigned': 'unassigned',
-      'in_progress': 'in_progress',
-      'awaiting_response': 'awaiting_response',
-      'resolved': 'resolved'
+  // Create stable currentUser object to prevent infinite loops
+  const stableCurrentUser = useMemo(() => {
+    if (!currentUser || !currentProfile) return null;
+    return {
+      id: currentUser.id,
+      name: `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || currentProfile.email || 'Unknown',
+      email: currentProfile.email || currentUser.email || '',
+      avatar: currentProfile.avatar_url || undefined,
     };
+  }, [currentUser, currentProfile]);
 
-    const currentStepId = statusToStep[currentStatus];
-    const stepOrder = ['unassigned', 'in_progress', 'awaiting_response', 'resolved'];
-    const currentIndex = stepOrder.indexOf(currentStepId);
+  // Create stable assignableUsers array
+  const stableAssignableUsers = useMemo(() => {
+    return assignableUsers.map(user => ({
+      id: user.id,
+      email: user.email,
+      display_name: user.display_name,
+      avatar_url: user.avatar_url,
+      departments: user.departments,
+    }));
+  }, [assignableUsers]);
 
-    return supportCaseSteps.map(step => {
-      const stepIndex = stepOrder.indexOf(step.id);
-
-      if (step.id === currentStepId) {
-        return { ...step, status: 'current' };
-      }
-
-      if (stepIndex < currentIndex) {
-        return { ...step, status: 'completed' };
-      }
-
-      return { ...step, status: 'upcoming' };
-    });
-  };
-
-  const handleStepClick = async (stepId: string) => {
-    if (!supportCase || !supportCaseId) return;
-
-    // Map step IDs to support case statuses
-    const stepToStatus: { [key: string]: string } = {
-      'unassigned': 'unassigned',
-      'in_progress': 'in_progress',
-      'awaiting_response': 'awaiting_response',
-      'resolved': 'resolved',
-    };
-
-    // Map step IDs to success messages
-    const stepToMessage: { [key: string]: string } = {
-      'unassigned': 'Support case moved to Unassigned stage successfully!',
-      'in_progress': 'Support case moved to In Progress stage successfully!',
-      'awaiting_response': 'Support case moved to Awaiting Response stage successfully!',
-      'resolved': 'Support case marked as Resolved successfully!',
-    };
-
-    const newStatus = stepToStatus[stepId];
-    const successMessage = stepToMessage[stepId];
-    if (!newStatus) return;
-
-    try {
-      // Update the support case status via API
-      if (isAdmin) {
-        await adminAPI.updateSupportCase(supportCaseId, {
-          status: newStatus
-        });
-      } else {
-        await adminAPI.updateUserSupportCase(supportCaseId, {
-          status: newStatus
-        });
-      }
-
-      // Refresh the support case data to update the UI
-      await fetchSupportCase();
-      handleShowToast(successMessage, 'success');
-    } catch (error) {
-      console.error('Error updating support case status:', error);
-      handleShowToast('Failed to update support case status. Please try again.', 'error');
+  // Sync selectedAssignee with supportCase.assigned_to
+  useEffect(() => {
+    if (supportCase?.assigned_to) {
+      setSelectedAssignee(supportCase.assigned_to);
+    } else if (supportCase?.status !== 'unassigned') {
+      // If assigned_to is null but status is not unassigned, it's assigned to support_team
+      setSelectedAssignee('support_team');
+    } else {
+      setSelectedAssignee('');
     }
-  };
+  }, [supportCase?.assigned_to, supportCase?.status]);
 
-  // Handle status progression button
-  const handleProgressStatus = async () => {
-    if (!supportCase || !supportCaseId) return;
-
-    let newStatus: string;
-    let successMessage: string;
-
-    switch (supportCase.status) {
-      case 'unassigned':
-        newStatus = 'in_progress';
-        successMessage = 'Support case moved to In Progress stage successfully!';
-        break;
-      case 'in_progress':
-        newStatus = 'awaiting_response';
-        successMessage = 'Support case moved to Awaiting Response stage successfully!';
-        break;
-      case 'awaiting_response':
-        newStatus = 'resolved';
-        successMessage = 'Support case marked as Resolved successfully!';
-        break;
-      default:
-        return; // No progression available
-    }
-
-    try {
-      if (isAdmin) {
-        await adminAPI.updateSupportCase(supportCaseId, {
-          status: newStatus
-        });
-      } else {
-        await adminAPI.updateUserSupportCase(supportCaseId, {
-          status: newStatus
-        });
-      }
-      await fetchSupportCase();
-      handleShowToast(successMessage, 'success');
-    } catch (error) {
-      console.error('Error updating support case status:', error);
-      handleShowToast('Failed to update support case status. Please try again.', 'error');
-    }
-  };
-
-  // Handle archive button
-  const handleArchive = async () => {
-    if (!supportCase || !supportCaseId) return;
-
-    try {
-      if (isAdmin) {
-        await adminAPI.archiveSupportCase(supportCaseId);
-      } else {
-        await adminAPI.archiveUserSupportCase(supportCaseId);
-      }
-      await fetchSupportCase();
-      handleShowToast('Support case archived successfully!', 'success');
-    } catch (error) {
-      console.error('Error archiving support case:', error);
-      handleShowToast('Failed to archive support case. Please try again.', 'error');
-    }
-  };
-
-  // Get dynamic button text based on current status
-  const getPrimaryButtonText = () => {
-    if (!supportCase) return 'Next Step';
-
-    switch (supportCase.status) {
-      case 'unassigned':
-        return 'Start Case';
-      case 'in_progress':
-        return 'Awaiting Response';
-      case 'awaiting_response':
-        return 'Mark as Resolved';
-      default:
-        return 'Next Step';
-    }
-  };
-
-  // Determine if primary button should be shown
-  const shouldShowPrimaryButton = () => {
-    if (!supportCase) return false;
-    return ['unassigned', 'in_progress', 'awaiting_response'].includes(supportCase.status);
-  };
-
-  // Determine if secondary button should be shown
-  const shouldShowSecondaryButton = () => {
-    if (!supportCase) return false;
-    return supportCase.status !== 'resolved' && !supportCase.archived;
-  };
-
-  // Handle reassign modal
-  const handleReassign = () => {
-    setShowReassignModal(true);
-  };
-
-  const handleReassignSubmit = async (assigneeId: string) => {
+  // Fetch support case data
+  const fetchSupportCase = useCallback(async () => {
     if (!supportCaseId) return;
 
     try {
-      const updateData: any = {};
-      let successMessage = 'Support case reassigned successfully!';
-
-      if (assigneeId === 'support_team') {
-        updateData.assigned_to = null;
-        // Keep current status when assigned to team
-        successMessage = 'Support case assigned to support team successfully!';
+      setSupportCaseLoading(true);
+      let supportCaseData;
+      if (isAdmin) {
+        supportCaseData = await adminAPI.getSupportCase(supportCaseId);
       } else {
-        updateData.assigned_to = assigneeId;
-        // Auto-progress status only if currently unassigned
-        if (supportCase?.status === 'unassigned') {
-          updateData.status = 'in_progress';
-          successMessage = 'Support case assigned and status updated to in progress!';
+        supportCaseData = await adminAPI.getUserSupportCase(supportCaseId);
+      }
+      setSupportCase(supportCaseData);
+    } catch (error) {
+      console.error('Error fetching support case:', error);
+      setSupportCase(null);
+    } finally {
+      setSupportCaseLoading(false);
+    }
+  }, [supportCaseId, isAdmin]);
+
+  // Handle assignee change from GlobalLowerHeader
+  const handleAssigneeChange = useCallback(
+    async (assigneeId: string) => {
+      if (!supportCaseId || !supportCase) return;
+
+      try {
+        const updateData: any = {};
+        let successMessage = 'Support case assigned successfully!';
+
+        // Handle team assignment (support_team becomes null in database)
+        if (assigneeId === 'support_team') {
+          updateData.assigned_to = null;
+          successMessage = 'Support case assigned to support team successfully!';
         } else {
-          successMessage = 'Support case reassigned successfully!';
+          updateData.assigned_to = assigneeId;
         }
+
+        // Auto-progress status if currently unassigned
+        if (supportCase.status === 'unassigned') {
+          updateData.status = 'in_progress';
+          successMessage = assigneeId === 'support_team'
+            ? 'Support case assigned to support team and moved to In Progress!'
+            : 'Support case assigned and moved to In Progress!';
+        }
+
+        if (isAdmin) {
+          await adminAPI.updateSupportCase(supportCaseId, updateData);
+        } else {
+          await adminAPI.updateUserSupportCase(supportCaseId, updateData);
+        }
+
+        await fetchSupportCase();
+        handleShowToast(successMessage, 'success');
+      } catch (error) {
+        console.error('Error assigning support case:', error);
+        handleShowToast('Failed to assign support case. Please try again.', 'error');
       }
+    },
+    [supportCaseId, supportCase, isAdmin, fetchSupportCase]
+  );
 
-      if (isAdmin) {
-        await adminAPI.updateSupportCase(supportCaseId, updateData);
-      } else {
-        await adminAPI.updateUserSupportCase(supportCaseId, updateData);
+  // Handle status change from GlobalLowerHeader
+  const handleStatusChange = useCallback(
+    async (status: string) => {
+      if (!supportCaseId || !supportCase) return;
+
+      const statusMessages: Record<string, string> = {
+        unassigned: 'Support case moved to Unassigned!',
+        in_progress: 'Support case moved to In Progress!',
+        awaiting_response: 'Support case moved to Awaiting Response!',
+        resolved: 'Support case marked as Resolved!',
+      };
+
+      try {
+        if (isAdmin) {
+          await adminAPI.updateSupportCase(supportCaseId, { status });
+        } else {
+          await adminAPI.updateUserSupportCase(supportCaseId, { status });
+        }
+
+        await fetchSupportCase();
+        handleShowToast(statusMessages[status] || 'Status updated successfully!', 'success');
+      } catch (error) {
+        console.error('Error updating support case status:', error);
+        handleShowToast('Failed to update status. Please try again.', 'error');
       }
-
-      await fetchSupportCase();
-      handleShowToast(successMessage, 'success');
-    } catch (error) {
-      console.error('Error reassigning support case:', error);
-      handleShowToast('Failed to reassign support case. Please try again.', 'error');
-      throw error;
-    }
-  };
-
-  // Handle move to previous step
-  const handleMoveToPrevious = async () => {
-    if (!supportCase || !supportCaseId) return;
-
-    let previousStatus: string;
-    let successMessage: string;
-
-    switch (supportCase.status) {
-      case 'resolved':
-        previousStatus = 'awaiting_response';
-        successMessage = 'Support case moved back to Awaiting Response stage successfully!';
-        break;
-      case 'awaiting_response':
-        previousStatus = 'in_progress';
-        successMessage = 'Support case moved back to In Progress stage successfully!';
-        break;
-      case 'in_progress':
-        previousStatus = 'unassigned';
-        successMessage = 'Support case moved back to Unassigned stage successfully!';
-        break;
-      default:
-        return; // No previous step available
-    }
-
-    try {
-      if (isAdmin) {
-        await adminAPI.updateSupportCase(supportCaseId, {
-          status: previousStatus
-        });
-      } else {
-        await adminAPI.updateUserSupportCase(supportCaseId, {
-          status: previousStatus
-        });
-      }
-      await fetchSupportCase();
-      handleShowToast(successMessage, 'success');
-    } catch (error) {
-      console.error('Error moving to previous step:', error);
-      handleShowToast('Failed to move to previous step. Please try again.', 'error');
-    }
-  };
-
-  // Check if previous step is available
-  const canMoveToPrevious = () => {
-    if (!supportCase) return false;
-    return ['resolved', 'awaiting_response', 'in_progress'].includes(supportCase.status);
-  };
-
-  // Create dropdown actions
-  const getDropdownActions = () => {
-    if (!supportCase) return [];
-
-    const actions = [];
-
-    // Primary action
-    if (shouldShowPrimaryButton()) {
-      actions.push({
-        label: getPrimaryButtonText(),
-        onClick: handleProgressStatus,
-        disabled: false
-      });
-    }
-
-    // Reassign action
-    actions.push({
-      label: 'Reassign Case',
-      onClick: handleReassign,
-      disabled: false
-    });
-
-    // Move to previous step
-    if (canMoveToPrevious()) {
-      const previousStepLabel =
-        supportCase.status === 'resolved' ? 'Move to Awaiting Response' :
-        supportCase.status === 'awaiting_response' ? 'Move to In Progress' :
-        supportCase.status === 'in_progress' ? 'Move to Unassigned' : '';
-      if (previousStepLabel) {
-        actions.push({
-          label: previousStepLabel,
-          onClick: handleMoveToPrevious,
-          disabled: false
-        });
-      }
-    }
-
-    return actions;
-  };
+    },
+    [supportCaseId, supportCase, isAdmin, fetchSupportCase]
+  );
 
   useEffect(() => {
     const resolveParams = async () => {
@@ -396,32 +234,54 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  const fetchSupportCase = useCallback(async () => {
-    if (!supportCaseId) return;
-
-    try {
-      setSupportCaseLoading(true);
-      let supportCaseData;
-      if (isAdmin) {
-        supportCaseData = await adminAPI.getSupportCase(supportCaseId);
-      } else {
-        supportCaseData = await adminAPI.getUserSupportCase(supportCaseId);
-      }
-      setSupportCase(supportCaseData);
-    } catch (error) {
-      console.error('Error fetching support case:', error);
-      setSupportCase(null);
-    } finally {
-      setSupportCaseLoading(false);
-    }
-  }, [supportCaseId, isAdmin]);
-
   // Fetch support case when supportCaseId is available
   useEffect(() => {
     if (supportCaseId && !loading) {
       fetchSupportCase();
     }
   }, [supportCaseId, loading, fetchSupportCase]);
+
+  // Update page header when support case data changes
+  useEffect(() => {
+    if (supportCase && stableCurrentUser) {
+      const customerName = supportCase.customer
+        ? `${supportCase.customer.first_name || ''} ${supportCase.customer.last_name || ''}`.trim() || 'Support Case'
+        : 'Support Case';
+
+      // Format timestamps with HTML formatting
+      const createdDate = formatHeaderDate(supportCase.created_at, true);
+      const updatedDate = formatHeaderDate(supportCase.updated_at, true);
+      const description = `Created: <span>${createdDate}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Last update: <span>${updatedDate}</span>`;
+
+      setPageHeader({
+        title: customerName,
+        description: description,
+        supportCaseAssignmentControls: {
+          caseStatus: supportCase.status,
+          assignedTo: selectedAssignee,
+          assignedUser: supportCase.assigned_user,
+          assignableUsers: stableAssignableUsers,
+          currentUser: stableCurrentUser,
+          onAssigneeChange: handleAssigneeChange,
+          onStatusChange: handleStatusChange,
+        },
+      });
+    }
+
+    // Cleanup: clear the header when component unmounts
+    return () => {
+      setPageHeader(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    supportCase,
+    stableCurrentUser,
+    selectedAssignee,
+    stableAssignableUsers,
+    // setPageHeader is intentionally omitted - it's a stable context setter
+    handleAssigneeChange,
+    handleStatusChange,
+  ]);
 
   const handleBack = () => {
     router.push('/tickets/customer-service');
@@ -446,73 +306,37 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
   }
 
   if (!supportCase) {
-    return (
-      <div className={styles.error}>
-        <h2>Support case not found</h2>
-        <button onClick={handleBack} className={styles.backButton}>
-          <ArrowLeft size={16} />
-          Back to Support Cases
-        </button>
-      </div>
-    );
+    return <div className={styles.error}>Support case not found</div>;
   }
 
   return (
-    <div className="container">
-      {/* Support Case Step Wrapper Component */}
-      <LeadStepWrapper
-        customerName={
-          supportCase.customer
-            ? `${supportCase.customer.first_name} ${supportCase.customer.last_name}`
-            : 'No Customer Assigned'
-        }
-        createdAt={supportCase.created_at}
-        updatedAt={supportCase.updated_at}
-        steps={getUpdatedSteps()}
-        currentStep={
-          supportCase.status === 'unassigned' ? 'unassigned' :
-          supportCase.status === 'in_progress' ? 'in_progress' :
-          supportCase.status === 'awaiting_response' ? 'awaiting_response' :
-          supportCase.status === 'resolved' ? 'resolved' :
-          'unassigned'
-        }
-        onStepClick={handleStepClick}
-        dropdownActions={getDropdownActions()}
-        showDropdown={true}
-      />
+    <ActiveSectionProvider>
+      <div className="container">
+        <div className={styles.pageLayout}>
+          <div className={styles.mainContent}>
+            <SupportCaseStepContent
+              supportCase={supportCase}
+              isAdmin={isAdmin}
+              onSupportCaseUpdate={fetchSupportCase}
+              onShowToast={handleShowToast}
+            />
+          </div>
+          <SupportCaseDetailsSidebar
+            supportCase={supportCase}
+            onShowToast={handleShowToast}
+            isSidebarExpanded={isSidebarExpanded}
+            setIsSidebarExpanded={setIsSidebarExpanded}
+          />
+        </div>
 
-      <div className={styles.content}>
-        <SupportCaseStepContent
-          supportCase={supportCase}
-          isAdmin={isAdmin}
-          onSupportCaseUpdate={fetchSupportCase}
-          onShowToast={handleShowToast}
+        <Toast
+          message={toastMessage}
+          isVisible={showToast}
+          onClose={handleToastClose}
+          type={toastType}
         />
       </div>
-
-      <Toast
-        message={toastMessage}
-        isVisible={showToast}
-        onClose={handleToastClose}
-        type={toastType}
-      />
-
-      <ReassignModal
-        isOpen={showReassignModal}
-        onClose={() => setShowReassignModal(false)}
-        onAssign={handleReassignSubmit}
-        customerName={
-          supportCase.customer
-            ? `${supportCase.customer.first_name} ${supportCase.customer.last_name}`
-            : 'No Customer Assigned'
-        }
-        customerEmail={supportCase.customer?.email}
-        customerPhone={supportCase.customer?.phone}
-        companyId={supportCase.company_id}
-        currentAssigneeId={supportCase.assigned_to}
-        type="support_case"
-      />
-    </div>
+    </ActiveSectionProvider>
   );
 }
 

@@ -1203,62 +1203,66 @@ export default function WorkflowEditor({
                 </div>
               )}
 
-              <div className={styles.formGroup}>
-                <label className={styles.checkbox}>
-                  <input
-                    type="checkbox"
-                    checked={formData.auto_cancel_on_status}
-                    onChange={e =>
-                      setFormData(prev => ({
-                        ...prev,
-                        auto_cancel_on_status: e.target.checked,
-                      }))
-                    }
-                  />
-                  Auto-cancel when lead reaches terminal status
-                </label>
-                <small className={styles.fieldHint}>
-                  Automatically cancel pending workflows when lead is won,
-                  converted, or closed
-                </small>
-              </div>
-
-              {formData.auto_cancel_on_status && (
-                <div className={styles.formGroup}>
-                  <label>Cancel on these statuses:</label>
-                  <div className={styles.statusCheckboxes}>
-                    {LEAD_STATUSES.map(status => (
-                      <label key={status.value} className={styles.checkbox}>
-                        <input
-                          type="checkbox"
-                          checked={formData.cancel_on_statuses.includes(
-                            status.value
-                          )}
-                          onChange={e => {
-                            if (e.target.checked) {
-                              setFormData(prev => ({
-                                ...prev,
-                                cancel_on_statuses: [
-                                  ...prev.cancel_on_statuses,
-                                  status.value,
-                                ],
-                              }));
-                            } else {
-                              setFormData(prev => ({
-                                ...prev,
-                                cancel_on_statuses:
-                                  prev.cancel_on_statuses.filter(
-                                    s => s !== status.value
-                                  ),
-                              }));
-                            }
-                          }}
-                        />
-                        {status.label}
-                      </label>
-                    ))}
+              {formData.trigger_type !== 'manual' && (
+                <>
+                  <div className={styles.formGroup}>
+                    <label className={styles.checkbox}>
+                      <input
+                        type="checkbox"
+                        checked={formData.auto_cancel_on_status}
+                        onChange={e =>
+                          setFormData(prev => ({
+                            ...prev,
+                            auto_cancel_on_status: e.target.checked,
+                          }))
+                        }
+                      />
+                      Auto-cancel when lead reaches terminal status
+                    </label>
+                    <small className={styles.fieldHint}>
+                      Automatically cancel pending workflows when lead is won,
+                      converted, or closed
+                    </small>
                   </div>
-                </div>
+
+                  {formData.auto_cancel_on_status && (
+                    <div className={styles.formGroup}>
+                      <label>Cancel on these statuses:</label>
+                      <div className={styles.statusCheckboxes}>
+                        {LEAD_STATUSES.map(status => (
+                          <label key={status.value} className={styles.checkbox}>
+                            <input
+                              type="checkbox"
+                              checked={formData.cancel_on_statuses.includes(
+                                status.value
+                              )}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    cancel_on_statuses: [
+                                      ...prev.cancel_on_statuses,
+                                      status.value,
+                                    ],
+                                  }));
+                                } else {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    cancel_on_statuses:
+                                      prev.cancel_on_statuses.filter(
+                                        s => s !== status.value
+                                      ),
+                                  }));
+                                }
+                              }}
+                            />
+                            {status.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

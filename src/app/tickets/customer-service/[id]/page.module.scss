@@ -134,6 +134,18 @@
   }
 }
 
+.pageLayout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.mainContent {
+  flex: 1;
+  min-width: 0; // Allow flex item to shrink below content size
+}
+
 .content {
   display: grid;
   grid-template-columns: 60% 1fr;
@@ -421,6 +433,10 @@
 
 // Mobile responsive
 @media (max-width: 1024px) {
+  .pageLayout {
+    flex-direction: column;
+  }
+
   .content {
     grid-template-columns: 1fr;
     gap: 16px;

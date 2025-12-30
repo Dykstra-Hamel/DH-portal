@@ -14,12 +14,14 @@
 .headerContent {
   width: 100%;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
 }
 
-.titleSection {
-  display: flex;
+.tab {
+  position: relative;
+  display: inline-flex;
   align-items: center;
   gap: 0.75rem;
 }
@@ -145,7 +147,7 @@
 
 .settingsSection {
   background: white;
-  border-radius: 0.75rem;
+  border-radius: 0 8px 8px 8px;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }

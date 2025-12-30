@@ -1,0 +1,150 @@
+// Unified Sidebar - single component that grows/shrinks
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  width: 110px;
+  transition: all 0.3s;
+
+  // Collapsed state - show only icon buttons
+  &.collapsed {
+    .sidebarContent {
+      transition: all 0.3s;
+    }
+  }
+
+  // Expanded state - show full content
+  &.expanded {
+    width: 490px;
+    flex-shrink: 0;
+    max-height: calc(100vh - 185px);
+
+    .sidebarContent {
+      max-width: 100%;
+      pointer-events: auto;
+      transition: all 0.3s;
+    }
+  }
+}
+
+.sidebarIconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--action-500);
+    color: var(--action-500);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.sidebarContent {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  overflow: hidden;
+}
+
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+    color: var(--gray-800);
+  }
+}
+
+.sidebarCollapseButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+    color: var(--gray-900);
+  }
+
+  svg {
+    transition: transform 0.2s ease;
+  }
+}
+
+.sidebarExpandButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+    color: var(--gray-900);
+  }
+
+  svg {
+    transform: rotate(-180deg);
+    transition: transform 0.2s ease;
+  }
+}
+
+.sidebarCardsWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  position: relative;
+  padding: 18px 12px;
+  height: 100%;
+  overflow: auto;
+}
+
+.sidebar.active {
+  .sidebarContent {
+    box-shadow:
+      0 0 0 4px rgba(0, 105, 224, 0.16),
+      0 2px 5px 0 rgba(0, 105, 224, 0.08),
+      0 0 0 1px rgba(0, 105, 224, 0.64),
+      0 1px 1px 0 rgba(0, 105, 224, 0.12);
+  }
+}

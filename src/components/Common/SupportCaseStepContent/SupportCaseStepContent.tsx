@@ -1,36 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import Image from 'next/image';
-import { SupportCase, supportCaseIssueTypeOptions, supportCasePriorityOptions } from '@/types/support-case';
+import {
+  SupportCase,
+  supportCaseIssueTypeOptions,
+  supportCasePriorityOptions,
+} from '@/types/support-case';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
-import { ContactInformationCard } from '@/components/Common/ContactInformationCard/ContactInformationCard';
-import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
-import { useUser } from '@/hooks/useUser';
-import { useAssignableUsers } from '@/hooks/useAssignableUsers';
-import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { adminAPI } from '@/lib/api-client';
-import {
-  AddressAutocomplete,
-  AddressComponents,
-} from '@/components/Common/AddressAutocomplete/AddressAutocomplete';
-import { StreetViewImage } from '@/components/Common/StreetViewImage/StreetViewImage';
-import {
-  ServiceAddressData,
-  createServiceAddressForLead,
-  updateExistingServiceAddress,
-} from '@/lib/service-addresses';
-import {
-  generateHomeSizeOptions,
-  generateYardSizeOptions,
-  findSizeOptionByValue,
-} from '@/lib/pricing-calculations';
-import { SizeOption } from '@/types/pricing';
-import {
-  SquareUserRound,
-  MapPinned,
-  AlertCircle,
-  Save,
-  Archive,
-} from 'lucide-react';
+import { AlertCircle, Save } from 'lucide-react';
 import styles from './SupportCaseStepContent.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
@@ -45,7 +21,7 @@ export function SupportCaseStepContent({
   supportCase,
   isAdmin,
   onSupportCaseUpdate,
-  onShowToast
+  onShowToast,
 }: SupportCaseStepContentProps) {
   // Form state for Customer Service Issue fields
   const [formData, setFormData] = useState({
@@ -54,238 +30,9 @@ export function SupportCaseStepContent({
     summary: supportCase.summary,
     description: supportCase.description || '',
     resolution_action: supportCase.resolution_action || '',
-    notes: supportCase.notes || ''
+    notes: supportCase.notes || '',
   });
-
   const [isSaving, setIsSaving] = useState(false);
-
-  // Service Location form state
-  const [serviceLocationData, setServiceLocationData] =
-    useState<ServiceAddressData>({
-      street_address: '',
-      city: '',
-      state: '',
-      zip_code: '',
-      latitude: undefined,
-      longitude: undefined,
-      address_type: 'residential',
-    });
-  const [originalServiceAddress, setOriginalServiceAddress] =
-    useState<ServiceAddressData | null>(null);
-  const [isSavingAddress, setIsSavingAddress] = useState(false);
-  const [homeSize, setHomeSize] = useState<number | ''>('');
-  const [yardSize, setYardSize] = useState<number | ''>('');
-  const [selectedHomeSizeOption, setSelectedHomeSizeOption] = useState<string>('');
-  const [selectedYardSizeOption, setSelectedYardSizeOption] = useState<string>('');
-
-  // Fetch pricing settings
-  const { settings: pricingSettings } = usePricingSettings(supportCase.company_id);
-
-  // Helper function to capitalize first letter
-  const capitalizeFirst = (str: string) => {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  };
-
-  // State name to abbreviation mapping
-  const stateNameToAbbreviation: { [key: string]: string } = {
-    Alabama: 'AL',
-    Alaska: 'AK',
-    Arizona: 'AZ',
-    Arkansas: 'AR',
-    California: 'CA',
-    Colorado: 'CO',
-    Connecticut: 'CT',
-    Delaware: 'DE',
-    Florida: 'FL',
-    Georgia: 'GA',
-    Hawaii: 'HI',
-    Idaho: 'ID',
-    Illinois: 'IL',
-    Indiana: 'IN',
-    Iowa: 'IA',
-    Kansas: 'KS',
-    Kentucky: 'KY',
-    Louisiana: 'LA',
-    Maine: 'ME',
-    Maryland: 'MD',
-    Massachusetts: 'MA',
-    Michigan: 'MI',
-    Minnesota: 'MN',
-    Mississippi: 'MS',
-    Missouri: 'MO',
-    Montana: 'MT',
-    Nebraska: 'NE',
-    Nevada: 'NV',
-    'New Hampshire': 'NH',
-    'New Jersey': 'NJ',
-    'New Mexico': 'NM',
-    'New York': 'NY',
-    'North Carolina': 'NC',
-    'North Dakota': 'ND',
-    Ohio: 'OH',
-    Oklahoma: 'OK',
-    Oregon: 'OR',
-    Pennsylvania: 'PA',
-    'Rhode Island': 'RI',
-    'South Carolina': 'SC',
-    'South Dakota': 'SD',
-    Tennessee: 'TN',
-    Texas: 'TX',
-    Utah: 'UT',
-    Vermont: 'VT',
-    Virginia: 'VA',
-    Washington: 'WA',
-    'West Virginia': 'WV',
-    Wisconsin: 'WI',
-    Wyoming: 'WY',
-  };
-
-  // Generate home size dropdown options (support cases don't have service plans, so no pricing shown)
-  const homeSizeOptions = useMemo(() => {
-    if (!pricingSettings) return [];
-    return generateHomeSizeOptions(pricingSettings);
-  }, [pricingSettings]);
-
-  // Generate yard size dropdown options (support cases don't have service plans, so no pricing shown)
-  const yardSizeOptions = useMemo(() => {
-    if (!pricingSettings) return [];
-    return generateYardSizeOptions(pricingSettings);
-  }, [pricingSettings]);
-
-  // Auto-select home size option when homeSize changes
-  useEffect(() => {
-    if (homeSize && homeSizeOptions.length > 0) {
-      const option = findSizeOptionByValue(Number(homeSize), homeSizeOptions);
-      if (option) {
-        setSelectedHomeSizeOption(option.value);
-      }
-    }
-  }, [homeSize, homeSizeOptions]);
-
-  // Auto-select yard size option when yardSize changes
-  useEffect(() => {
-    if (yardSize && yardSizeOptions.length > 0) {
-      const option = findSizeOptionByValue(Number(yardSize), yardSizeOptions);
-      if (option) {
-        setSelectedYardSizeOption(option.value);
-      }
-    }
-  }, [yardSize, yardSizeOptions]);
-
-  // Computed values for service location
-  const currentFormattedAddress = useMemo(() => {
-    const parts: string[] = [];
-    if (serviceLocationData.street_address?.trim()) {
-      parts.push(serviceLocationData.street_address);
-    }
-    if (serviceLocationData.city?.trim()) {
-      parts.push(serviceLocationData.city);
-    }
-    if (serviceLocationData.state?.trim() && serviceLocationData.zip_code?.trim()) {
-      parts.push(`${serviceLocationData.state} ${serviceLocationData.zip_code}`);
-    }
-
-    // Return formatted address if we have at least a street address or city
-    return parts.length >= 1 &&
-      (serviceLocationData.street_address?.trim() ||
-        serviceLocationData.city?.trim())
-      ? parts.join(', ')
-      : '';
-  }, [serviceLocationData]);
-
-  // Detect address changes by comparing current serviceLocationData with originalServiceAddress
-  const hasAddressChanges = useMemo(() => {
-    if (!originalServiceAddress) return false;
-
-    // Don't show buttons if the original address was empty (new address entry)
-    const hadExistingAddress = !!(
-      originalServiceAddress.street_address ||
-      originalServiceAddress.city ||
-      originalServiceAddress.state ||
-      originalServiceAddress.zip_code
-    );
-
-    if (!hadExistingAddress) return false;
-
-    return (
-      serviceLocationData.street_address !==
-        originalServiceAddress.street_address ||
-      serviceLocationData.city !== originalServiceAddress.city ||
-      serviceLocationData.state !== originalServiceAddress.state ||
-      serviceLocationData.zip_code !== originalServiceAddress.zip_code ||
-      serviceLocationData.apartment_unit !==
-        originalServiceAddress.apartment_unit ||
-      serviceLocationData.address_line_2 !== originalServiceAddress.address_line_2
-    );
-  }, [serviceLocationData, originalServiceAddress]);
-
-  const hasCompleteUnchangedAddress = useMemo(() => {
-    return Boolean(
-      serviceLocationData.street_address?.trim() &&
-      serviceLocationData.city?.trim() &&
-      serviceLocationData.state?.trim() &&
-      serviceLocationData.zip_code?.trim() &&
-      !hasAddressChanges
-    );
-  }, [serviceLocationData, hasAddressChanges]);
-
-  // Pre-fill service location with primary service address when component loads
-  useEffect(() => {
-    // Only pre-fill if we haven't already set the service location data
-    if (originalServiceAddress === null) {
-      if (supportCase.primary_service_address) {
-        const addressData: ServiceAddressData = {
-          street_address: supportCase.primary_service_address.street_address || '',
-          city: supportCase.primary_service_address.city || '',
-          state: supportCase.primary_service_address.state || '',
-          zip_code: supportCase.primary_service_address.zip_code || '',
-          apartment_unit: supportCase.primary_service_address.apartment_unit,
-          address_line_2: supportCase.primary_service_address.address_line_2,
-          latitude: supportCase.primary_service_address.latitude,
-          longitude: supportCase.primary_service_address.longitude,
-          address_type:
-            (supportCase.primary_service_address.address_type || 'residential') as 'residential' | 'commercial' | 'industrial' | 'mixed_use',
-          property_notes: supportCase.primary_service_address.property_notes,
-          hasStreetView: supportCase.primary_service_address.hasStreetView,
-        };
-
-        // Store original service address for change detection
-        setOriginalServiceAddress(addressData);
-
-        setServiceLocationData(prev => ({
-          ...prev,
-          ...addressData,
-        }));
-
-        // Set home and yard sizes if available
-        if (supportCase.primary_service_address.home_size && homeSize === '') {
-          setHomeSize(supportCase.primary_service_address.home_size);
-        }
-        if (supportCase.primary_service_address.yard_size && yardSize === '') {
-          setYardSize(supportCase.primary_service_address.yard_size);
-        }
-      } else if (supportCase.customer) {
-        // Fallback to customer address if no primary service address exists
-        const customerAddressData: ServiceAddressData = {
-          street_address: supportCase.customer.address || '',
-          city: supportCase.customer.city || '',
-          state: supportCase.customer.state || '',
-          zip_code: supportCase.customer.zip_code || '',
-          latitude: undefined,
-          longitude: undefined,
-          address_type: 'residential',
-        };
-
-        // Store original service address for change detection
-        setOriginalServiceAddress(customerAddressData);
-
-        setServiceLocationData(prev => ({
-          ...prev,
-          ...customerAddressData,
-        }));
-      }
-    }
-  }, [supportCase.primary_service_address, supportCase.customer, originalServiceAddress, homeSize, yardSize]);
 
   // Update form data when supportCase changes
   useEffect(() => {
@@ -295,7 +42,7 @@ export function SupportCaseStepContent({
       summary: supportCase.summary,
       description: supportCase.description || '',
       resolution_action: supportCase.resolution_action || '',
-      notes: supportCase.notes || ''
+      notes: supportCase.notes || '',
     });
   }, [supportCase]);
 
@@ -303,128 +50,8 @@ export function SupportCaseStepContent({
   const handleFormChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
-    }));
-  };
-
-  // Service Location handlers
-  const handleAddressSelect = (addressComponents: AddressComponents) => {
-    // Build street address from components instead of using full formatted address
-    let streetAddress = '';
-    if (addressComponents.street_number && addressComponents.route) {
-      streetAddress = `${addressComponents.street_number} ${addressComponents.route}`;
-    } else if (addressComponents.route) {
-      streetAddress = addressComponents.route;
-    } else {
-      // Fallback to formatted address if components not available
-      streetAddress = addressComponents.formatted_address || '';
-    }
-
-    // Convert state name to abbreviation
-    let stateAbbreviation = addressComponents.administrative_area_level_1 || '';
-    if (stateNameToAbbreviation[stateAbbreviation]) {
-      stateAbbreviation = stateNameToAbbreviation[stateAbbreviation];
-    }
-
-    const newLocationData = {
-      ...serviceLocationData,
-      street_address: streetAddress,
-      city: addressComponents.locality || '',
-      state: stateAbbreviation,
-      zip_code: addressComponents.postal_code || '',
-      latitude: addressComponents.latitude,
-      longitude: addressComponents.longitude,
-      hasStreetView: addressComponents.hasStreetView,
-    };
-
-    setServiceLocationData(newLocationData);
-  };
-
-  const handleServiceLocationChange = (
-    field: keyof ServiceAddressData,
-    value: string
-  ) => {
-    setServiceLocationData(prev => ({
-      ...prev,
       [field]: value,
     }));
-  };
-
-  const handleSaveAddress = async () => {
-    if (!supportCase.customer || !hasAddressChanges) return;
-
-    setIsSavingAddress(true);
-    try {
-      if (supportCase.primary_service_address?.id) {
-        // UPDATE existing service address
-        const { updateExistingServiceAddress } = await import('@/lib/service-addresses');
-        const updateResult = await updateExistingServiceAddress(
-          supportCase.primary_service_address.id,
-          serviceLocationData
-        );
-
-        if (!updateResult.success) {
-          throw new Error(
-            updateResult.error || 'Failed to update service address'
-          );
-        }
-
-        onShowToast?.('Service address updated successfully', 'success');
-      } else {
-        // CREATE new service address and link to customer
-        const { createOrFindServiceAddress, linkCustomerToServiceAddress } = await import('@/lib/service-addresses');
-        const isPrimary = !supportCase.primary_service_address; // Set as primary if no existing primary address
-
-        // First, create or find the service address
-        const serviceAddressResult = await createOrFindServiceAddress(
-          supportCase.company_id,
-          serviceLocationData
-        );
-
-        if (!serviceAddressResult.success) {
-          throw new Error(serviceAddressResult.error || 'Failed to create service address');
-        }
-
-        // Then link the customer to the service address
-        const linkResult = await linkCustomerToServiceAddress(
-          supportCase.customer.id,
-          serviceAddressResult.serviceAddressId!,
-          'owner',
-          isPrimary
-        );
-
-        if (!linkResult.success) {
-          throw new Error(linkResult.error || 'Failed to link customer to service address');
-        }
-
-        if (serviceAddressResult.isExisting) {
-          onShowToast?.('Service address linked successfully', 'success');
-        } else {
-          onShowToast?.('Service address created and linked successfully', 'success');
-        }
-      }
-
-      // Update the original service address to reflect the saved state
-      setOriginalServiceAddress({
-        ...serviceLocationData,
-      });
-
-      onSupportCaseUpdate?.(); // Refresh the support case data
-    } catch (error) {
-      console.error('Error saving address:', error);
-      onShowToast?.('Failed to save address. Please try again.', 'error');
-    } finally {
-      setIsSavingAddress(false);
-    }
-  };
-
-  const handleCancelAddressChanges = () => {
-    if (!originalServiceAddress) return;
-
-    // Revert service location back to original service address
-    setServiceLocationData({
-      ...originalServiceAddress,
-    });
   };
 
   // Handle Save & Close Issue
@@ -436,7 +63,7 @@ export function SupportCaseStepContent({
 
       const updateData = {
         ...formData,
-        status: 'resolved'
+        status: 'resolved',
       };
 
       if (isAdmin) {
@@ -496,7 +123,9 @@ export function SupportCaseStepContent({
                     <select
                       className={styles.selectInput}
                       value={formData.issue_type}
-                      onChange={e => handleFormChange('issue_type', e.target.value)}
+                      onChange={e =>
+                        handleFormChange('issue_type', e.target.value)
+                      }
                     >
                       {supportCaseIssueTypeOptions.map(option => (
                         <option key={option.value} value={option.value}>
@@ -523,12 +152,16 @@ export function SupportCaseStepContent({
                   </div>
                 </div>
                 <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>Priority Level</label>
+                  <label className={cardStyles.inputLabels}>
+                    Priority Level
+                  </label>
                   <div className={styles.dropdownWithArrow}>
                     <select
                       className={styles.selectInput}
                       value={formData.priority}
-                      onChange={e => handleFormChange('priority', e.target.value)}
+                      onChange={e =>
+                        handleFormChange('priority', e.target.value)
+                      }
                     >
                       {supportCasePriorityOptions.map(option => (
                         <option key={option.value} value={option.value}>
@@ -559,7 +192,9 @@ export function SupportCaseStepContent({
               {/* Row 2: Subject/Issue Summary */}
               <div className={`${styles.gridRow} ${styles.oneColumn}`}>
                 <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>Subject/Issue Summary</label>
+                  <label className={cardStyles.inputLabels}>
+                    Subject/Issue Summary
+                  </label>
                   <input
                     type="text"
                     className={styles.textInput}
@@ -573,11 +208,15 @@ export function SupportCaseStepContent({
               {/* Row 3: Detailed Description */}
               <div className={`${styles.gridRow} ${styles.oneColumn}`}>
                 <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>Detailed Description</label>
+                  <label className={cardStyles.inputLabels}>
+                    Detailed Description
+                  </label>
                   <textarea
                     className={styles.textareaInput}
                     value={formData.description}
-                    onChange={e => handleFormChange('description', e.target.value)}
+                    onChange={e =>
+                      handleFormChange('description', e.target.value)
+                    }
                     placeholder="Please provide detailed information about the customer issue, including any relevant background information, what they've tried, and what outcomes they are looking for"
                     rows={4}
                   />
@@ -587,11 +226,15 @@ export function SupportCaseStepContent({
               {/* Row 4: Resolution & Action Taken */}
               <div className={`${styles.gridRow} ${styles.oneColumn}`}>
                 <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>Resolution & Action Taken</label>
+                  <label className={cardStyles.inputLabels}>
+                    Resolution & Action Taken
+                  </label>
                   <textarea
                     className={styles.textareaInput}
                     value={formData.resolution_action}
-                    onChange={e => handleFormChange('resolution_action', e.target.value)}
+                    onChange={e =>
+                      handleFormChange('resolution_action', e.target.value)
+                    }
                     placeholder="Document the steps taken to resolve the issue, any solutions provided, follow-up actions required and final outcomes"
                     rows={4}
                   />
@@ -601,7 +244,9 @@ export function SupportCaseStepContent({
               {/* Row 5: Additional Notes */}
               <div className={`${styles.gridRow} ${styles.oneColumn}`}>
                 <div className={styles.formField}>
-                  <label className={cardStyles.inputLabels}>Additional Notes</label>
+                  <label className={cardStyles.inputLabels}>
+                    Additional Notes
+                  </label>
                   <textarea
                     className={styles.textareaInput}
                     value={formData.notes}
@@ -613,7 +258,7 @@ export function SupportCaseStepContent({
               </div>
 
               {/* Save Buttons */}
-              <div className={`${styles.gridRow} ${styles.twoColumns}`} style={{ marginTop: '20px' }}>
+              <div className={styles.actionButtons}>
                 <button
                   className={styles.saveCloseButton}
                   onClick={handleSaveAndClose}
@@ -634,27 +279,6 @@ export function SupportCaseStepContent({
             </div>
           </div>
         </InfoCard>
-      </div>
-
-      <div className={styles.contentRight}>
-        <ContactInformationCard customer={supportCase.customer || null} />
-
-        <ServiceLocationCard
-          serviceAddress={supportCase.primary_service_address || null}
-          showSizeInputs
-          pricingSettings={pricingSettings || undefined}
-          onShowToast={onShowToast}
-          editable={true}
-          onAddressSelect={handleAddressSelect}
-          onSaveAddress={handleSaveAddress}
-          onCancelAddress={handleCancelAddressChanges}
-          hasAddressChanges={hasAddressChanges}
-          isSavingAddress={isSavingAddress}
-          serviceLocationData={serviceLocationData}
-          onServiceLocationChange={handleServiceLocationChange}
-          hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
-          currentFormattedAddress={currentFormattedAddress}
-        />
       </div>
     </>
   );

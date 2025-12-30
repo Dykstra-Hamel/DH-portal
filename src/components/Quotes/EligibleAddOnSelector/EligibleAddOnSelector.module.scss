@@ -129,7 +129,7 @@
   border: 1px solid var(--gray-300);
   border-radius: 8px;
   gap: 14px;
-  min-width: 155px;
+  min-width: 171px;
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -220,5 +220,11 @@
 
   &:hover {
     background: var(--error-600);
+  }
+}
+
+[data-sidebar-expanded='true'] {
+  .addonRow {
+    min-width: 225px;
   }
 }
