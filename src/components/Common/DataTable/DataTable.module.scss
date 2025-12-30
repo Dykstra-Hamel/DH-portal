@@ -503,6 +503,11 @@
   --table-columns: 1fr 100px 90px 150px 150px 1fr;
 }
 
+.taskTable .headerRow,
+.taskTable .defaultRow {
+  column-gap: 16px;
+}
+
 .taskActions {
   display: flex;
   flex-flow: row;

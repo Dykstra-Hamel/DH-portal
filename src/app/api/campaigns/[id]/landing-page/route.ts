@@ -326,16 +326,19 @@ export async function GET(
       const listIds = contactListAssignments.map(a => a.contact_list_id);
 
       // Check if customer is a member of any contact list for this campaign
-      const { data: membership, error: membershipError } = await supabase
+      // Use limit(1) instead of maybeSingle() to handle customers in multiple contact lists
+      const { data: membershipResults, error: membershipError } = await supabase
         .from('contact_list_members')
         .select('id, contact_list_id')
         .eq('customer_id', customerId)
         .in('contact_list_id', listIds)
-        .maybeSingle();
+        .limit(1);
 
       if (membershipError) {
         console.error('Error checking membership:', membershipError);
       }
+
+      const membership = membershipResults?.[0] || null;
 
       if (!membership) {
         return NextResponse.json(

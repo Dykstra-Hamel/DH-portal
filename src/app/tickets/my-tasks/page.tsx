@@ -421,7 +421,7 @@ export default function MyTasksPage() {
         loading={loading}
         emptyStateMessage="No tasks assigned to you yet."
         onItemAction={handleTaskAction}
-        customColumnWidths="300px 100px 100px 150px 1fr"
+        customColumnWidths="minmax(340px, 2fr) 1fr 1fr 1.1fr 1.4fr"
       />
     </div>
   );

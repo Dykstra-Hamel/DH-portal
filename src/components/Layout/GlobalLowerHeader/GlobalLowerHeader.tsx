@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ReactNode } from 'react';
 import Image from 'next/image';
 import { ChevronDown, Users } from 'lucide-react';
 import styles from './GlobalLowerHeader.module.scss';
@@ -48,8 +48,10 @@ interface GlobalLowerHeaderProps {
   showAddButton?: boolean;
   addButtonText?: string;
   onAddClick?: () => void;
+  addButtonIcon?: ReactNode;
   actionButtons?: ActionButton[];
   leadAssignmentControls?: LeadAssignmentControls;
+  customActions?: ReactNode;
 }
 
 const PlusIcon = () => (
@@ -86,8 +88,10 @@ export function GlobalLowerHeader({
   showAddButton = false,
   addButtonText = 'Add Lead',
   onAddClick,
+  addButtonIcon,
   actionButtons,
   leadAssignmentControls,
+  customActions,
 }: GlobalLowerHeaderProps) {
   const [isLeadTypeOpen, setIsLeadTypeOpen] = useState(false);
   const [isAssignedToOpen, setIsAssignedToOpen] = useState(false);
@@ -553,9 +557,11 @@ export function GlobalLowerHeader({
             </div>
           </div>
         )}
-        {((actionButtons && actionButtons?.length > 0) || showAddButton) && (
+        {((actionButtons && actionButtons?.length > 0) || showAddButton || customActions) && (
           <div className={styles.rightSection}>
-            {actionButtons && actionButtons.length > 0 ? (
+            {customActions ? (
+              customActions
+            ) : actionButtons && actionButtons.length > 0 ? (
               actionButtons.map((button, index) => (
                 <button
                   key={index}
@@ -574,7 +580,7 @@ export function GlobalLowerHeader({
                 disabled={!onAddClick}
                 type="button"
               >
-                <PlusIcon />
+                {addButtonIcon || <PlusIcon />}
                 <span>{addButtonText}</span>
               </button>
             ) : null}

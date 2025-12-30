@@ -76,10 +76,6 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
 
     const demoContent = (
       <div className={styles.analyticsContainer}>
-        <div className={styles.analyticsHeader}>
-          <h2 className={styles.title}>Analytics Dashboard</h2>
-        </div>
-
         <div className={styles.metricsCards}>
           <div className={styles.metricCard}>
             <div className={styles.metricValue}>
@@ -192,10 +188,6 @@ export default function AnalyticsDashboard({ companyId, companyName, userRole }:
 
   return (
     <div className={styles.analyticsContainer}>
-      <div className={styles.analyticsHeader}>
-        <h2 className={styles.title}>Analytics Dashboard</h2>
-      </div>
-
       <div className={styles.metricsCards}>
         <div className={styles.metricCard}>
           <div className={styles.metricValue}>

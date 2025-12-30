@@ -187,6 +187,7 @@ export function Breadcrumbs() {
                 href: '/tickets/my-support-cases',
               },
               'my-tasks': { label: 'My Tasks', href: '/tickets/my-tasks' },
+              tasks: { label: 'Tasks', href: '/tickets/tasks' },
               'assigned-to-me': {
                 label: 'Assigned To Me',
                 href: '/tickets/assigned-to-me',
@@ -279,6 +280,19 @@ export function Breadcrumbs() {
                     // Fallback to call record if ticket fails
                     itemLabel = `Call`;
                   }
+                } else if (pathSegments[1] === 'tasks') {
+                  // Fetch task data to get the task title
+                  try {
+                    const response = await fetch(`/api/tasks/${params.id}`);
+                    if (response.ok) {
+                      const data = await response.json();
+                      itemLabel = data.task?.title || 'Task';
+                    } else {
+                      itemLabel = 'Task';
+                    }
+                  } catch {
+                    itemLabel = 'Task';
+                  }
                 } else {
                   itemLabel = pageConfig.label;
                 }
@@ -296,6 +310,8 @@ export function Breadcrumbs() {
                   crumbs.push({ label: 'Support Case' });
                 } else if (pathSegments[1] === 'customer-service') {
                   crumbs.push({ label: 'Support Case' });
+                } else if (pathSegments[1] === 'tasks') {
+                  crumbs.push({ label: 'Task' });
                 } else {
                   crumbs.push({ label: pageConfig.label });
                 }

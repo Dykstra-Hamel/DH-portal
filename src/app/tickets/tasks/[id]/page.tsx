@@ -5,13 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft,
   Edit,
-  Phone,
-  Mail,
   User as UserIcon,
-  Save,
-  X,
   CheckCircle,
   Trash2,
   Calendar,
@@ -20,17 +15,16 @@ import {
 } from 'lucide-react';
 import {
   Task,
-  TaskFormData,
   taskStatusOptions,
   taskPriorityOptions,
   isTaskOverdue,
   formatTaskDueDateTime,
 } from '@/types/task';
-import { CallHistory } from '@/components/Calls/CallHistory/CallHistory';
 import { UserSelector } from '@/components/Common/UserSelector';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
-import { formatDateForDisplay } from '@/lib/utils';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import { formatHeaderDate } from '@/lib/date-utils';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -56,7 +50,6 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [callHistoryRefresh, setCallHistoryRefresh] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -64,6 +57,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [actualHours, setActualHours] = useState<number | undefined>();
   const router = useRouter();
+  const { setPageHeader } = usePageActions();
 
   // Hook for fetching assignable users for tasks (all departments)
   const {
@@ -194,10 +188,6 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     }
   }, [task, isEditing, taskLoading, handleEdit, searchParams]);
 
-  const handleBack = () => {
-    router.push('/tickets/tasks');
-  };
-
   const handleBackToRelatedEntity = () => {
     if (task?.related_entity_type && task?.related_entity_id) {
       const entityType = task.related_entity_type;
@@ -298,9 +288,9 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     }
   };
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = useCallback(() => {
     setShowDeleteModal(true);
-  };
+  }, []);
 
   const handleDeleteConfirm = async () => {
     if (!taskId) return;
@@ -329,10 +319,10 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     setShowDeleteModal(false);
   };
 
-  const handleCompleteClick = () => {
+  const handleCompleteClick = useCallback(() => {
     setActualHours(task?.estimated_hours || undefined);
     setShowCompleteModal(true);
-  };
+  }, [task?.estimated_hours]);
 
   const handleCompleteConfirm = async () => {
     if (!taskId) return;
@@ -408,6 +398,99 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     return task.title || 'Untitled Task';
   };
 
+  // Update page header when task data changes
+  useEffect(() => {
+    if (task) {
+      const taskTitle = getTaskDisplayTitle(task);
+      const isCompleted = task.status === 'completed';
+
+      // Format timestamps with HTML formatting
+      const createdDate = formatHeaderDate(task.created_at, true);
+      const updatedDate = formatHeaderDate(task.updated_at, true);
+      const description = `Created: <span>${createdDate}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Last update: <span>${updatedDate}</span>`;
+
+      setPageHeader({
+        title: taskTitle,
+        description: description,
+        customActions: (
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {!isCompleted && (
+              <button
+                onClick={handleCompleteClick}
+                disabled={isEditing}
+                className={styles.completeButton}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isEditing ? 'not-allowed' : 'pointer',
+                  opacity: isEditing ? 0.5 : 1,
+                }}
+              >
+                <CheckCircle size={16} />
+                Mark Complete
+              </button>
+            )}
+            <button
+              onClick={handleEdit}
+              className={styles.editButton}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+            >
+              <Edit size={16} />
+              Edit Task
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              className={styles.deleteButton}
+              disabled={isEditing}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                backgroundColor: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: isEditing ? 'not-allowed' : 'pointer',
+                opacity: isEditing ? 0.5 : 1,
+              }}
+            >
+              <Trash2 size={16} />
+              Delete Task
+            </button>
+          </div>
+        ),
+      });
+    }
+
+    // Cleanup: clear the header when component unmounts
+    return () => {
+      setPageHeader(null);
+    };
+  }, [task, isEditing, setPageHeader, handleEdit, handleCompleteClick, handleDeleteClick]);
+
   if (loading || taskLoading) {
     return <div className={styles.loading}>Loading task...</div>;
   }
@@ -420,10 +503,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     return (
       <div className={styles.error}>
         <h2>Task not found</h2>
-        <button onClick={handleBack} className={styles.backButton}>
-          <ArrowLeft size={16} />
-          Back to Tasks
-        </button>
+        <p>The task you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.</p>
       </div>
     );
   }
@@ -433,328 +513,294 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
 
   return (
     <div className="container">
-      <div className={styles.header}>
-        <button onClick={handleBack} className={styles.backButton}>
-          <ArrowLeft size={16} />
-          Back to Tasks
-        </button>
-        <h1>{getTaskDisplayTitle(task)}</h1>
-        <div className={styles.headerButtons}>
-          {!isCompleted && (
-            <button
-              onClick={handleCompleteClick}
-              disabled={isEditing}
-              className={styles.completeButton}
-            >
-              <CheckCircle size={16} />
-              Mark Complete
-            </button>
-          )}
-          {isEditing ? (
-            <div className={styles.editActions}>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className={styles.saveButton}
-              >
-                <Save size={16} />
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-              <button
-                onClick={handleCancelEdit}
-                className={styles.cancelButton}
-              >
-                <X size={16} />
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <>
-              <button onClick={handleEdit} className={styles.editButton}>
-                <Edit size={16} />
-                Edit Task
-              </button>
-              <button
-                onClick={handleDeleteClick}
-                className={styles.deleteButton}
-                disabled={isEditing}
-              >
-                <Trash2 size={16} />
-                Delete Task
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
       <div className={styles.content}>
-        <div className={styles.leftColumn}>
-          {/* Task Description */}
-          {task.description && (
-            <div className={styles.infoCard}>
-              <h3>Description</h3>
-              <div className={styles.description}>{task.description}</div>
-            </div>
-          )}
-
-          {/* Related Entity Information */}
-          {task.related_entity && task.related_entity_type && (
-            <div className={styles.infoCard}>
-              <h3>
-                Related{' '}
-                {task.related_entity_type === 'support_cases'
-                  ? 'Support Case'
-                  : task.related_entity_type.replace('_', ' ')}
-              </h3>
-              <div className={styles.relatedEntity}>
-                <button
-                  onClick={handleBackToRelatedEntity}
-                  className={styles.entityLink}
-                >
-                  <UserIcon size={16} />
-                  {task.related_entity.name ||
-                    task.related_entity.title ||
-                    `${task.related_entity_type} #${task.related_entity.id.slice(-8)}`}
-                </button>
-                {task.related_entity.status && (
-                  <div className={styles.entityStatus}>
-                    Status: {task.related_entity.status}
-                  </div>
-                )}
-                {task.related_entity.type && (
-                  <div className={styles.entityType}>
-                    Type: {task.related_entity.type}
-                  </div>
-                )}
+        {isEditing && editFormData ? (
+            <div className={styles.detailCard}>
+              <div className={styles.cardHeader}>
+                <h3 className={styles.cardTitle}>Edit Task</h3>
               </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          {task.notes && (
-            <div className={styles.infoCard}>
-              <h3>Notes</h3>
-              <div className={styles.notes}>
-                {task.notes.split('\n').map((line, index) => (
-                  <div key={index}>{line}</div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className={styles.rightColumn}>
-          {isEditing && editFormData ? (
-            // Edit Form
-            <div className={styles.infoCard}>
-              <h3>Edit Task</h3>
               <div className={styles.editForm}>
+              <div className={styles.formField}>
+                <label>Title</label>
+                <input
+                  type="text"
+                  value={editFormData.title}
+                  onChange={e => handleInputChange('title', e.target.value)}
+                  className={styles.input}
+                />
+              </div>
+              <div className={styles.formField}>
+                <label>Description</label>
+                <textarea
+                  value={editFormData.description}
+                  onChange={e =>
+                    handleInputChange('description', e.target.value)
+                  }
+                  className={styles.textarea}
+                  rows={3}
+                />
+              </div>
+              <div className={styles.formRow}>
                 <div className={styles.formField}>
-                  <label>Title</label>
+                  <label>Status</label>
+                  <select
+                    value={editFormData.status}
+                    onChange={e => handleInputChange('status', e.target.value)}
+                    className={styles.select}
+                  >
+                    {taskStatusOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formField}>
+                  <label>Priority</label>
+                  <select
+                    value={editFormData.priority}
+                    onChange={e => handleInputChange('priority', e.target.value)}
+                    className={styles.select}
+                  >
+                    {taskPriorityOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className={styles.formRow}>
+                <div className={styles.formField}>
+                  <label>Due Date</label>
                   <input
-                    type="text"
-                    value={editFormData.title}
-                    onChange={e => handleInputChange('title', e.target.value)}
+                    type="date"
+                    value={editFormData.due_date}
+                    onChange={e => handleInputChange('due_date', e.target.value)}
                     className={styles.input}
                   />
                 </div>
                 <div className={styles.formField}>
-                  <label>Description</label>
-                  <textarea
-                    value={editFormData.description}
-                    onChange={e =>
-                      handleInputChange('description', e.target.value)
-                    }
-                    className={styles.textarea}
-                    rows={3}
-                  />
-                </div>
-                <div className={styles.formRow}>
-                  <div className={styles.formField}>
-                    <label>Status</label>
-                    <select
-                      value={editFormData.status}
-                      onChange={e =>
-                        handleInputChange('status', e.target.value)
-                      }
-                      className={styles.select}
-                    >
-                      {taskStatusOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className={styles.formField}>
-                    <label>Priority</label>
-                    <select
-                      value={editFormData.priority}
-                      onChange={e =>
-                        handleInputChange('priority', e.target.value)
-                      }
-                      className={styles.select}
-                    >
-                      {taskPriorityOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className={styles.formRow}>
-                  <div className={styles.formField}>
-                    <label>Due Date</label>
-                    <input
-                      type="date"
-                      value={editFormData.due_date}
-                      onChange={e =>
-                        handleInputChange('due_date', e.target.value)
-                      }
-                      className={styles.input}
-                    />
-                  </div>
-                  <div className={styles.formField}>
-                    <label>Due Time</label>
-                    <input
-                      type="time"
-                      value={editFormData.due_time}
-                      onChange={e =>
-                        handleInputChange('due_time', e.target.value)
-                      }
-                      className={styles.input}
-                    />
-                  </div>
-                </div>
-                <div className={styles.formField}>
-                  <label>Assigned To</label>
-                  <UserSelector
-                    users={assignableUsers}
-                    selectedUserId={editFormData.assigned_to}
-                    onSelect={userId =>
-                      handleInputChange('assigned_to', userId)
-                    }
-                    placeholder="Select user to assign..."
-                    loading={loadingUsers}
-                    disabled={loadingUsers}
-                    className={styles.userSelector}
-                  />
-                  {usersError && (
-                    <div className={styles.errorMessage}>
-                      Error loading users: {usersError}
-                    </div>
-                  )}
-                </div>
-                <div className={styles.formField}>
-                  <label>Notes</label>
-                  <textarea
-                    value={editFormData.notes}
-                    onChange={e => handleInputChange('notes', e.target.value)}
-                    className={styles.textarea}
-                    rows={4}
+                  <label>Due Time</label>
+                  <input
+                    type="time"
+                    value={editFormData.due_time}
+                    onChange={e => handleInputChange('due_time', e.target.value)}
+                    className={styles.input}
                   />
                 </div>
               </div>
+              <div className={styles.formField}>
+                <label>Assigned To</label>
+                <UserSelector
+                  users={assignableUsers}
+                  selectedUserId={editFormData.assigned_to}
+                  onSelect={userId => handleInputChange('assigned_to', userId)}
+                  placeholder="Select user to assign..."
+                  loading={loadingUsers}
+                  disabled={loadingUsers}
+                  className={styles.userSelector}
+                />
+                {usersError && (
+                  <div className={styles.errorMessage}>
+                    Error loading users: {usersError}
+                  </div>
+                )}
+              </div>
+              <div className={styles.formField}>
+                <label>Notes</label>
+                <textarea
+                  value={editFormData.notes}
+                  onChange={e => handleInputChange('notes', e.target.value)}
+                  className={styles.textarea}
+                  rows={4}
+                />
+              </div>
+              <div className={styles.editActions}>
+                <button
+                  className={styles.saveButton}
+                  onClick={handleSave}
+                  disabled={saving}
+                  type="button"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  className={styles.cancelButton}
+                  onClick={handleCancelEdit}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          ) : (
-            // Display Mode
-            <div className={styles.infoCard}>
-              <h3>Task Information</h3>
-              <div className={styles.taskDetails}>
-                <div className={styles.detailItem}>
-                  <label>Status</label>
-                  <span
-                    className={styles.statusBadge}
-                    style={{
-                      backgroundColor: getStatusColor(task.status),
-                    }}
-                  >
-                    {task.status.charAt(0).toUpperCase() +
-                      task.status.slice(1).replace('_', ' ')}
-                  </span>
-                </div>
-                <div className={styles.detailItem}>
-                  <label>Priority</label>
-                  <div className={styles.priorityContainer}>
-                    <span
-                      className={styles.priorityBadge}
-                      style={{
-                        backgroundColor: getPriorityColor(task.priority),
-                      }}
-                    >
-                      {task.priority.charAt(0).toUpperCase() +
-                        task.priority.slice(1)}
-                    </span>
+          </div>
+        ) : (
+          <div className={styles.detailCard}>
+              <div className={styles.cardHeader}>
+                <div className={styles.titleBlock}>
+                  <h3 className={styles.cardTitle}>{getTaskDisplayTitle(task)}</h3>
+                  <div className={styles.badgeRow}>
+                    <div className={styles.metaChip}>
+                      <span className={styles.chipLabel}>Status</span>
+                      <span
+                        className={styles.chipDot}
+                        style={{ backgroundColor: getStatusColor(task.status) }}
+                      />
+                      <span className={styles.chipValue}>
+                        {task.status.charAt(0).toUpperCase() +
+                          task.status.slice(1).replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className={styles.metaChip}>
+                      <span className={styles.chipLabel}>Priority</span>
+                      <span
+                        className={styles.chipDot}
+                        style={{ backgroundColor: getPriorityColor(task.priority) }}
+                      />
+                      <span
+                        className={styles.chipValue}
+                        style={{ color: getPriorityColor(task.priority) }}
+                      >
+                        {task.priority.charAt(0).toUpperCase() +
+                          task.priority.slice(1)}
+                      </span>
+                    </div>
                     {isOverdue && (
                       <span className={styles.overdueIndicator}>
                         <AlertCircle size={16} />
                         Overdue
                       </span>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.detailItem}>
-                  <label>Assigned To</label>
-                  {task.assigned_user ? (
-                    <div className={styles.userInfo}>
-                      <UserIcon size={16} />
-                      <span>
-                        {task.assigned_user.first_name}{' '}
-                        {task.assigned_user.last_name}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className={styles.unassigned}>Unassigned</span>
                   )}
                 </div>
-                {task.due_date && (
-                  <div className={styles.detailItem}>
-                    <label>Due Date</label>
-                    <div className={styles.dueDateInfo}>
-                      <Calendar size={16} />
-                      <span>
-                        {formatTaskDueDateTime(task.due_date, task.due_time)}
-                      </span>
-                    </div>
+              </div>
+              <div className={styles.assigneeRow}>
+                <label>Assigned To</label>
+                {task.assigned_user ? (
+                  <div className={styles.userInfo}>
+                    <UserIcon size={16} />
+                    <span>
+                      {task.assigned_user.first_name}{' '}
+                      {task.assigned_user.last_name}
+                    </span>
+                  </div>
+                ) : (
+                  <span className={styles.unassigned}>Unassigned</span>
+                )}
+            </div>
+          </div>
+
+            {(task.description || task.notes) && (
+              <div className={styles.sectionRow}>
+                {task.description && (
+                  <div className={styles.section}>
+                    <h4>Description</h4>
+                    <div className={styles.description}>{task.description}</div>
                   </div>
                 )}
-                {task.estimated_hours && (
-                  <div className={styles.detailItem}>
-                    <label>Estimated Hours</label>
-                    <div className={styles.hoursInfo}>
-                      <Clock size={16} />
-                      <span>{task.estimated_hours}h</span>
-                    </div>
-                  </div>
-                )}
-                {task.actual_hours && (
-                  <div className={styles.detailItem}>
-                    <label>Actual Hours</label>
-                    <div className={styles.hoursInfo}>
-                      <Clock size={16} />
-                      <span>{task.actual_hours}h</span>
-                    </div>
-                  </div>
-                )}
-                <div className={styles.detailItem}>
-                  <label>Created</label>
-                  <span>{formatDate(task.created_at)}</span>
-                </div>
-                <div className={styles.detailItem}>
-                  <label>Last Updated</label>
-                  <span>{formatDate(task.updated_at)}</span>
-                </div>
-                {task.completed_at && (
-                  <div className={styles.detailItem}>
-                    <label>Completed</label>
-                    <span>{formatDateTime(task.completed_at)}</span>
+                {task.notes && (
+                  <div className={styles.section}>
+                    <h4>Notes</h4>
+                    <div className={styles.notes}>{task.notes}</div>
                   </div>
                 )}
               </div>
+            )}
+
+            {task.related_entity && task.related_entity_type && (
+              <div className={styles.section}>
+                <h4>
+                  Related{' '}
+                  {task.related_entity_type === 'support_cases'
+                    ? 'Support Case'
+                    : task.related_entity_type.replace('_', ' ')}
+                </h4>
+                <div className={styles.relatedEntity}>
+                  <button
+                    onClick={handleBackToRelatedEntity}
+                    className={styles.entityLink}
+                  >
+                    <UserIcon size={16} />
+                    {task.related_entity.name ||
+                      task.related_entity.title ||
+                      `${task.related_entity_type} #${task.related_entity.id.slice(-8)}`}
+                  </button>
+                  <div className={styles.relatedMeta}>
+                    {task.related_entity.status && (
+                      <div className={styles.entityStatus}>
+                        Status: {task.related_entity.status}
+                      </div>
+                    )}
+                    {task.related_entity.type && (
+                      <div className={styles.entityType}>
+                        Type: {task.related_entity.type}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className={styles.metaGrid}>
+              {task.due_date && (
+                <div className={styles.detailItem}>
+                  <label>Due Date</label>
+                  <div className={styles.dueDateInfo}>
+                    <Calendar size={16} />
+                    <span>{formatTaskDueDateTime(task.due_date, task.due_time)}</span>
+                  </div>
+                </div>
+              )}
+              {task.estimated_hours && (
+                <div className={styles.detailItem}>
+                  <label>Estimated Hours</label>
+                  <div className={styles.hoursInfo}>
+                    <Clock size={16} />
+                    <span>{task.estimated_hours}h</span>
+                  </div>
+                </div>
+              )}
+              {task.actual_hours && (
+                <div className={styles.detailItem}>
+                  <label>Actual Hours</label>
+                  <div className={styles.hoursInfo}>
+                    <Clock size={16} />
+                    <span>{task.actual_hours}h</span>
+                  </div>
+                </div>
+              )}
+              <div className={styles.detailItem}>
+                <label>Assigned By</label>
+                {task.created_user ? (
+                  <div className={styles.userInfo}>
+                    <UserIcon size={16} />
+                    <span>
+                      {task.created_user.first_name} {task.created_user.last_name}
+                    </span>
+                  </div>
+                ) : (
+                  <span className={styles.unassigned}>
+                    {task.created_by ? `User ID: ${task.created_by}` : 'Unknown'}
+                  </span>
+                )}
+              </div>
+              <div className={styles.detailItem}>
+                <label>Created</label>
+                <span>{formatDate(task.created_at)}</span>
+              </div>
+              <div className={styles.detailItem}>
+                <label>Last Updated</label>
+                <span>{formatDate(task.updated_at)}</span>
+              </div>
+              {task.completed_at && (
+                <div className={styles.detailItem}>
+                  <label>Completed</label>
+                  <span>{formatDateTime(task.completed_at)}</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Complete Task Modal */}
