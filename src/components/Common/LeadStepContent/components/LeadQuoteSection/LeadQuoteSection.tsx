@@ -775,6 +775,15 @@ export function LeadQuoteSection({
     }
 
     try {
+      // Keep lead record in sync when primary pest is cleared
+      if (!pestId) {
+        try {
+          await adminAPI.updateLead(lead.id, { pest_type: null });
+        } catch (err) {
+          console.error('Failed to clear lead pest_type', err);
+        }
+      }
+
       // If removing primary pest and no additional pests, clear the quote
       if (!pestId && additionalPests.length === 0) {
         // Delete all line items

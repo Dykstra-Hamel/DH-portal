@@ -317,6 +317,7 @@ export default function ArchivedLeadsPage() {
         onItemAction={handleAction}
         emptyStateMessage="No archived leads found"
         tableType="leads"
+        customColumnWidths="160px 160px 220px 180px 1fr 140px"
       />
 
       <RecoverLeadModal

@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import { DataTable } from '@/components/Common/DataTable';
 import { getLeadColumns, getUserLeadTabs } from '@/components/Leads/LeadsList/LeadsListConfig';
 import { Lead } from '@/types/lead';
 import { createClient } from '@/lib/supabase/client';
+import { AddLeadModal } from '@/components/Leads/AddLeadModal/AddLeadModal';
 import {
   createLeadChannel,
   subscribeToLeadUpdates,
@@ -18,8 +20,10 @@ export default function MySalesLeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const { user } = useUser();
   const { selectedCompany } = useCompany();
+  const { registerPageAction, unregisterPageAction } = usePageActions();
   const router = useRouter();
 
   // Fetch leads assigned to current user
@@ -56,6 +60,17 @@ export default function MySalesLeadsPage() {
   useEffect(() => {
     fetchMyLeads();
   }, [user?.id, selectedCompany?.id]);
+
+  // Register the Add Lead button action
+  useEffect(() => {
+    if (selectedCompany) {
+      registerPageAction('add', () => setShowAddModal(true));
+    }
+
+    return () => {
+      unregisterPageAction('add');
+    };
+  }, [selectedCompany, registerPageAction, unregisterPageAction]);
 
   // Real-time subscription for lead updates
   useEffect(() => {
@@ -190,6 +205,16 @@ export default function MySalesLeadsPage() {
         tableType="leads"
         onItemAction={handleAction}
       />
+
+      {/* Add Lead Modal */}
+      {selectedCompany && (
+        <AddLeadModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          companyId={selectedCompany.id}
+          onSuccess={fetchMyLeads}
+        />
+      )}
     </div>
   );
 }

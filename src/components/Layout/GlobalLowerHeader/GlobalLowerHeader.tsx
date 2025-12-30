@@ -828,7 +828,6 @@ export function GlobalLowerHeader({
               <button
                 className={styles.addLeadButton}
                 onClick={onAddClick}
-                disabled={!onAddClick}
                 type="button"
               >
                 {addButtonIcon || <PlusIcon />}
