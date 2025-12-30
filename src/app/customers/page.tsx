@@ -6,10 +6,12 @@ import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import CustomersList from '@/components/Customers/CustomersList/CustomersList';
 import SearchByLetter from '@/components/Customers/SearchByLetter/SearchByLetter';
+import { AddCustomerModal } from '@/components/Customers/AddCustomerModal/AddCustomerModal';
 import { adminAPI } from '@/lib/api-client';
 import { Customer, CustomerStatus } from '@/types/customer';
 import { SortDirection } from '@/types/common';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -34,10 +36,14 @@ export default function CustomersPage() {
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [letterCounts, setLetterCounts] = useState<Record<string, number>>({});
   const [tabCounts, setTabCounts] = useState<{ all: number; active: number; inactive: number; archived: number }>({ all: 0, active: 0, inactive: 0, archived: 0 });
+  const [showAddModal, setShowAddModal] = useState(false);
   const router = useRouter();
 
   // Use global company context
   const { selectedCompany, isAdmin, isLoading: contextLoading } = useCompany();
+
+  // Use page actions for global header
+  const { registerPageAction, unregisterPageAction } = usePageActions();
 
   useEffect(() => {
     const supabase = createClient();
@@ -195,6 +201,18 @@ export default function CustomersPage() {
     }
   }, [contextLoading, selectedCompany, isAdmin, fetchLetterCounts]);
 
+  // Register the Add Customer button action
+  useEffect(() => {
+    if (selectedCompany) {
+      registerPageAction('add', () => setShowAddModal(true));
+    }
+
+    // Cleanup: remove the action when component unmounts or company changes
+    return () => {
+      unregisterPageAction('add');
+    };
+  }, [selectedCompany, registerPageAction, unregisterPageAction]);
+
   // Fetch customers when filters change
   useEffect(() => {
     if (!contextLoading && (selectedCompany || isAdmin)) {
@@ -214,6 +232,15 @@ export default function CustomersPage() {
 
   const handleCustomerClick = (customer: Customer) => {
     router.push(`/customers/${customer.id}`);
+  };
+
+  const handleCustomerCreated = () => {
+    // Refresh the customer list
+    setCurrentPage(1);
+    setCustomers([]);
+    setHasMore(true);
+    fetchCustomers(1);
+    fetchLetterCounts();
   };
 
   if (loading || contextLoading) {
@@ -278,6 +305,16 @@ export default function CustomersPage() {
           onCustomerClick={handleCustomerClick}
           showCompanyColumn={true}
           tabCounts={tabCounts}
+        />
+      )}
+
+      {/* Add Customer Modal */}
+      {selectedCompany && (
+        <AddCustomerModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          companyId={selectedCompany.id}
+          onSuccess={handleCustomerCreated}
         />
       )}
     </div>

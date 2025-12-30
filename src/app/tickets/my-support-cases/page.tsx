@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import { DataTable } from '@/components/Common/DataTable';
 import { getSupportCaseColumns, getUserSupportCaseTabs } from '@/components/SupportCases/SupportCasesList/SupportCasesListConfig';
 import { SupportCase } from '@/types/support-case';
 import { createClient } from '@/lib/supabase/client';
+import { AddSupportCaseModal } from '@/components/SupportCases/AddSupportCaseModal/AddSupportCaseModal';
 import {
   createSupportCaseChannel,
   subscribeToSupportCaseUpdates,
@@ -18,8 +20,10 @@ export default function MySupportCasesPage() {
   const [supportCases, setSupportCases] = useState<SupportCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const { user } = useUser();
   const { selectedCompany } = useCompany();
+  const { registerPageAction, unregisterPageAction } = usePageActions();
   const router = useRouter();
 
   // Fetch support cases assigned to current user
@@ -57,6 +61,17 @@ export default function MySupportCasesPage() {
   useEffect(() => {
     fetchMySupportCases();
   }, [user?.id, selectedCompany?.id]);
+
+  // Register the Add Case button action
+  useEffect(() => {
+    if (selectedCompany) {
+      registerPageAction('add', () => setShowAddModal(true));
+    }
+
+    return () => {
+      unregisterPageAction('add');
+    };
+  }, [selectedCompany, registerPageAction, unregisterPageAction]);
 
   // Real-time subscription for support case updates
   useEffect(() => {
@@ -213,6 +228,16 @@ export default function MySupportCasesPage() {
         tableType="supportCases"
         onItemAction={handleAction}
       />
+
+      {/* Add Support Case Modal */}
+      {selectedCompany && (
+        <AddSupportCaseModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          companyId={selectedCompany.id}
+          onSuccess={fetchMySupportCases}
+        />
+      )}
     </div>
   );
 }

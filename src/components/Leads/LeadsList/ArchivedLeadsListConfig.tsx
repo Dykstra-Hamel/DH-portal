@@ -135,16 +135,18 @@ export const getArchivedLeadColumns = (): ColumnDefinition<Lead>[] => [
       }
 
       return (
-        <button
-          className={styles.actionButton}
-          onClick={e => {
-            e.stopPropagation();
-            onAction?.('recover', lead);
-          }}
-        >
-          <RefreshCcw size={16} />
-          Recover Lead
-        </button>
+        <div className={styles.taskActions}>
+          <button
+            className={styles.actionButton}
+            onClick={e => {
+              e.stopPropagation();
+              onAction?.('recover', lead);
+            }}
+          >
+            <RefreshCcw size={16} />
+            Recover Lead
+          </button>
+        </div>
       );
     },
   },

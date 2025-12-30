@@ -6,6 +6,8 @@ import SupportCasesList from '@/components/SupportCases/SupportCasesList/Support
 import { SupportCase } from '@/types/support-case';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import { AddSupportCaseModal } from '@/components/SupportCases/AddSupportCaseModal/AddSupportCaseModal';
 import {
   createSupportCaseChannel,
   subscribeToSupportCaseUpdates,
@@ -15,9 +17,11 @@ import {
 export default function CustomerServicePage() {
   const [supportCases, setSupportCases] = useState<SupportCase[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Use global company context
   const { selectedCompany, isLoading: companyLoading } = useCompany();
+  const { registerPageAction, unregisterPageAction } = usePageActions();
 
   const fetchSupportCases = useCallback(async (companyId: string) => {
     if (!companyId) return;
@@ -42,6 +46,17 @@ export default function CustomerServicePage() {
       fetchSupportCases(selectedCompany.id);
     }
   }, [selectedCompany?.id, fetchSupportCases]);
+
+  // Register the Add Case button action
+  useEffect(() => {
+    if (selectedCompany) {
+      registerPageAction('add', () => setShowAddModal(true));
+    }
+
+    return () => {
+      unregisterPageAction('add');
+    };
+  }, [selectedCompany, registerPageAction, unregisterPageAction]);
 
   // Supabase Realtime broadcast subscription for live updates
   useEffect(() => {
@@ -228,6 +243,18 @@ export default function CustomerServicePage() {
         >
           Please select a company to view support cases.
         </div>
+      )}
+
+      {/* Add Support Case Modal */}
+      {selectedCompany && (
+        <AddSupportCaseModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          companyId={selectedCompany.id}
+          onSuccess={() => {
+            fetchSupportCases(selectedCompany.id);
+          }}
+        />
       )}
     </div>
   );
