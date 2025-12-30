@@ -88,7 +88,17 @@ export async function GET(
         .single();
 
       if (!profileError && profileData) {
-        assignedUser = profileData;
+        // Get user departments for this company
+        const { data: departments } = await supabase
+          .from('user_departments')
+          .select('department')
+          .eq('user_id', lead.assigned_to)
+          .eq('company_id', lead.company_id);
+
+        assignedUser = {
+          ...profileData,
+          departments: departments?.map(d => d.department) || [],
+        };
       }
     }
 
@@ -312,7 +322,17 @@ export async function PUT(
         .single();
 
       if (!profileError && profileData) {
-        assignedUser = profileData;
+        // Get user departments for this company
+        const { data: departments } = await supabase
+          .from('user_departments')
+          .select('department')
+          .eq('user_id', lead.assigned_to)
+          .eq('company_id', lead.company_id);
+
+        assignedUser = {
+          ...profileData,
+          departments: departments?.map(d => d.department) || [],
+        };
       }
     }
 

@@ -34,10 +34,21 @@ interface LeadAssignmentControls {
   onStatusChange: (status: string) => void;
 }
 
+interface SupportCaseAssignmentControls {
+  caseStatus: string;
+  assignedTo?: string;
+  assignedUser?: AssignedUser | null;
+  assignableUsers: AssignableUser[];
+  currentUser: { id: string; name: string; email: string; avatar?: string };
+  onAssigneeChange: (id: string) => void;
+  onStatusChange: (status: string) => void;
+}
+
 interface PageHeaderConfig {
   title: string;
   description: string;
   leadAssignmentControls?: LeadAssignmentControls;
+  supportCaseAssignmentControls?: SupportCaseAssignmentControls;
 }
 
 interface PageActionsContextType {

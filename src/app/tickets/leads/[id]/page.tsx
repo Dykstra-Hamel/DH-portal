@@ -614,6 +614,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       if (!leadId || !lead || !currentUser) return;
 
       try {
+        // Check if the currently assigned sales user also has support department access
+        const assignedSalesUser = lead.assigned_to ? lead.assigned_user : null;
+        const hasSupportAccess = assignedSalesUser?.departments?.includes('support') || false;
+
         // Create support case
         const supportCaseData = {
           customer_id: lead.customer_id,
@@ -621,9 +625,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           issue_type: 'general_inquiry',
           summary: `Converted from sales lead${lead.customer ? ` - ${lead.customer.first_name} ${lead.customer.last_name}` : ''}`,
           description: notes || lead.comments || 'Converted from sales lead',
-          status: 'new',
+          status: hasSupportAccess ? 'in_progress' : 'unassigned',
           priority: 'medium',
-          assigned_to: currentUser.id,
+          assigned_to: hasSupportAccess ? lead.assigned_to : null,
         };
 
         await adminAPI.supportCases.create(supportCaseData);
@@ -635,7 +639,10 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           await adminAPI.updateUserLead(leadId, { archived: true });
         }
 
-        handleShowToast('Support case created and lead archived', 'success');
+        const successMessage = hasSupportAccess
+          ? 'Support case created and assigned to sales rep (lead archived)'
+          : 'Support case created as unassigned (lead archived)';
+        handleShowToast(successMessage, 'success');
         // Navigate back to leads page
         router.push('/tickets/leads');
       } catch (error) {

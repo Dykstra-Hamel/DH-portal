@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, Dispatch, SetStateAction } from 'react';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
+import { DetailsCardsSidebar } from '@/components/Common/DetailsCardsSidebar/DetailsCardsSidebar';
 import { CustomerInformation } from '@/components/Tickets/TicketContent';
 import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
 import { ActivityFeed } from '@/components/Common/ActivityFeed/ActivityFeed';
@@ -13,7 +14,6 @@ import { AddressComponents } from '@/components/Common/AddressAutocomplete/Addre
 import { broadcastCustomerUpdate } from '@/lib/realtime/customer-channel';
 import { authenticatedFetch } from '@/lib/api-client';
 import {
-  ListCollapse,
   SquareUserRound,
   SquareActivity,
   NotebookPen,
@@ -26,7 +26,6 @@ import {
   RequestUndoCallback,
   LeadUpdateCallback,
 } from '../../types/leadStepTypes';
-import styles from './LeadDetailsSidebar.module.scss';
 
 interface LeadDetailsSidebarProps {
   lead: Lead;
@@ -461,30 +460,12 @@ export function LeadDetailsSidebar({
   };
 
   return (
-    <div
-      className={`${styles.sidebar} ${isSidebarExpanded ? styles.expanded : styles.collapsed} ${activeSection === 'sidebar' ? styles.active : ''}`}
-      onClick={() => setActiveSection('sidebar')}
+    <DetailsCardsSidebar
+      isSidebarExpanded={isSidebarExpanded}
+      setIsSidebarExpanded={setIsSidebarExpanded}
+      activeSection={activeSection || undefined}
+      onSectionClick={() => setActiveSection('sidebar')}
     >
-      <div className={styles.sidebarContent}>
-        <div className={styles.sidebarHeader}>
-          <button
-            title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-            onClick={
-              isSidebarExpanded
-                ? () => setIsSidebarExpanded(false)
-                : () => setIsSidebarExpanded(true)
-            }
-            className={
-              isSidebarExpanded
-                ? styles.sidebarCollapseButton
-                : styles.sidebarExpandButton
-            }
-          >
-            <ListCollapse size={16} />
-          </button>
-          <h3>Details</h3>
-        </div>
-        <div className={styles.sidebarCardsWrapper}>
           <InfoCard
             title="Contact Information"
             icon={<SquareUserRound size={20} />}
@@ -616,8 +597,6 @@ export function LeadDetailsSidebar({
           >
             <LeadCallFormInfo lead={lead} />
           </InfoCard>
-        </div>
-      </div>
-    </div>
+    </DetailsCardsSidebar>
   );
 }

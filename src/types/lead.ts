@@ -119,6 +119,7 @@ export interface Lead {
     first_name?: string;
     last_name?: string;
     avatar_url?: string | null;
+    departments?: string[];
   };
   scheduler_user?: {
     id: string;

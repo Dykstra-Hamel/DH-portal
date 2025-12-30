@@ -279,6 +279,20 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           return null;
         }
 
+        // Show lower header for support case detail pages
+        if (pathname.match(/^\/tickets\/customer-service\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise hide header
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              supportCaseAssignmentControls: pageHeader.supportCaseAssignmentControls,
+            };
+          }
+          return null;
+        }
+
         // Show lower header for customer detail pages
         if (pathname.match(/^\/customers\/[^\/]+$/)) {
           // Use dynamic page header if set, otherwise use default
@@ -351,6 +365,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               }
               actionButtons={pageConfig.actionButtons}
               leadAssignmentControls={pageConfig.leadAssignmentControls}
+              supportCaseAssignmentControls={pageConfig.supportCaseAssignmentControls}
             />
           )}
           <main className={styles.mainContent}>

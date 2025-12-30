@@ -131,7 +131,7 @@
   transition: border-color 0.2s ease;
   font-family: inherit;
   resize: vertical;
-  min-height: 100px;
+  min-height: 200px;
 
   &:focus {
     outline: none;
@@ -301,14 +301,12 @@
 
 .actionButtons {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: flex-end;
-  padding: 16px;
 
   @media (max-width: 640px) {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
   }
 }
 
