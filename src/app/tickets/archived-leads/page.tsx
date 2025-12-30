@@ -285,17 +285,11 @@ export default function ArchivedLeadsPage() {
         throw new Error('Failed to recover lead');
       }
 
-      // Close modal and refresh data
-      setShowRecoverModal(false);
-      setSelectedLead(null);
-      await fetchArchivedLeads();
-
-      // Show success message (you can add a toast notification here)
-      alert('Lead recovered successfully!');
+      // Redirect to the lead details page
+      router.push(`/tickets/leads/${selectedLead.id}`);
     } catch (error) {
       console.error('Error recovering lead:', error);
       alert('Failed to recover lead. Please try again.');
-    } finally {
       setIsRecovering(false);
     }
   };
