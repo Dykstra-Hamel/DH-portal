@@ -18,7 +18,7 @@ async function getMetricCounts(supabase: any, companyId: string, startDate: stri
   };
 
   // Fetch all call records with joins to leads and customers (same approach as /api/calls)
-  const { data: allCalls, error: callsError } = await supabase
+  const { data: allCalls } = await supabase
     .from('call_records')
     .select(`
       id,
@@ -40,15 +40,6 @@ async function getMetricCounts(supabase: any, companyId: string, startDate: stri
     .lte('created_at', endDate)
     .eq('archived', false);
 
-  console.log('[METRICS DEBUG] Date range:', { startDate, endDate });
-  console.log('[METRICS DEBUG] Company ID:', companyId);
-  console.log('[METRICS DEBUG] Total calls fetched:', allCalls?.length || 0);
-  console.log('[METRICS DEBUG] Calls error:', callsError);
-
-  if (allCalls && allCalls.length > 0) {
-    console.log('[METRICS DEBUG] Sample call:', JSON.stringify(allCalls[0], null, 2));
-  }
-
   // Filter calls to only include those belonging to the specified company
   const filteredCalls = (allCalls || []).filter((call: any) => {
     const leadCompanyId = call.leads?.company_id;
@@ -57,37 +48,30 @@ async function getMetricCounts(supabase: any, companyId: string, startDate: stri
     return matches;
   });
 
-  console.log('[METRICS DEBUG] Filtered calls for company:', filteredCalls.length);
-
   const allCallRecords = filteredCalls;
 
   // Calculate Average Call Duration
   let avgCallDuration = 0;
   const callsWithDuration = allCallRecords.filter((call: any) => call.duration_seconds && call.duration_seconds > 0);
-  console.log('[METRICS DEBUG] Calls with duration:', callsWithDuration.length);
   if (callsWithDuration.length > 0) {
     const totalDuration = callsWithDuration.reduce((sum: number, call: any) => sum + call.duration_seconds, 0);
     avgCallDuration = Math.round(totalDuration / callsWithDuration.length); // in seconds
-    console.log('[METRICS DEBUG] Avg duration:', avgCallDuration, 'seconds');
   }
 
   // Calculate Positive Sentiment Rate (includes both positive and neutral)
   let positiveSentimentRate = 0;
   const callsWithSentiment = allCallRecords.filter((call: any) => call.sentiment);
-  console.log('[METRICS DEBUG] Calls with sentiment:', callsWithSentiment.length);
   if (callsWithSentiment.length > 0) {
     const positiveCalls = callsWithSentiment.filter((call: any) =>
       call.sentiment === 'positive' || call.sentiment === 'neutral'
     ).length;
     positiveSentimentRate = Math.round((positiveCalls / callsWithSentiment.length) * 100); // percentage
-    console.log('[METRICS DEBUG] Positive/neutral calls:', positiveCalls, 'Rate:', positiveSentimentRate + '%');
   }
 
   // Calculate Sales Calls Won (calls where associated lead has lead_status = 'won')
   const salesCallsWon = allCallRecords.filter((call: any) =>
     call.leads && call.leads.lead_status === 'won'
   ).length;
-  console.log('[METRICS DEBUG] Sales calls won:', salesCallsWon);
 
   const result = {
     totalCalls: allCallRecords.length,
@@ -95,8 +79,6 @@ async function getMetricCounts(supabase: any, companyId: string, startDate: stri
     positiveSentimentRate,
     salesCallsWon
   };
-
-  console.log('[METRICS DEBUG] Returning metrics:', result);
 
   return result;
 }

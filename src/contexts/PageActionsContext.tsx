@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useCallback,
+} from 'react';
 
 interface AssignableUser {
   id: string;
@@ -49,6 +55,7 @@ interface PageHeaderConfig {
   description: string;
   leadAssignmentControls?: LeadAssignmentControls;
   supportCaseAssignmentControls?: SupportCaseAssignmentControls;
+  customActions?: ReactNode;
 }
 
 interface PageActionsContextType {
@@ -59,18 +66,25 @@ interface PageActionsContextType {
   pageHeader: PageHeaderConfig | null;
 }
 
-const PageActionsContext = createContext<PageActionsContextType | undefined>(undefined);
+const PageActionsContext = createContext<PageActionsContextType | undefined>(
+  undefined
+);
 
 export function PageActionsProvider({ children }: { children: ReactNode }) {
-  const [pageActions, setPageActions] = useState<{ [key: string]: () => void }>({});
+  const [pageActions, setPageActions] = useState<{ [key: string]: () => void }>(
+    {}
+  );
   const [pageHeader, setPageHeader] = useState<PageHeaderConfig | null>(null);
 
-  const registerPageAction = useCallback((actionType: string, handler: () => void) => {
-    setPageActions(prev => ({
-      ...prev,
-      [actionType]: handler,
-    }));
-  }, []);
+  const registerPageAction = useCallback(
+    (actionType: string, handler: () => void) => {
+      setPageActions(prev => ({
+        ...prev,
+        [actionType]: handler,
+      }));
+    },
+    []
+  );
 
   const unregisterPageAction = useCallback((actionType: string) => {
     setPageActions(prev => {
@@ -80,9 +94,12 @@ export function PageActionsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const getPageAction = useCallback((actionType: string) => {
-    return pageActions[actionType] || null;
-  }, [pageActions]);
+  const getPageAction = useCallback(
+    (actionType: string) => {
+      return pageActions[actionType] || null;
+    },
+    [pageActions]
+  );
 
   return (
     <PageActionsContext.Provider
@@ -91,7 +108,7 @@ export function PageActionsProvider({ children }: { children: ReactNode }) {
         unregisterPageAction,
         getPageAction,
         setPageHeader,
-        pageHeader
+        pageHeader,
       }}
     >
       {children}

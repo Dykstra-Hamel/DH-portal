@@ -73,7 +73,31 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 22px;
+  gap: 16px;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--gray-200);
+  background: var(--gray-50);
+  color: var(--gray-700);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--gray-100);
+    color: var(--gray-900);
+  }
+
+  &:active {
+    background: var(--gray-200);
+  }
 }
 
 @media (max-width: 768px) {

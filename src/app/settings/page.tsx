@@ -12,7 +12,6 @@ import {
   Save,
   AlertCircle,
   CheckCircle,
-  Settings as SettingsIcon,
   Copy,
   Check,
   RefreshCw,
@@ -226,16 +225,16 @@ export default function SettingsPage() {
     <div className={styles.container}>
       <main className={styles.main}>
         {/* Main Section Navigation */}
-        <div className={styles.tabs}>
+        <div className={styles.mainNavigation}>
           <button
-            className={`${styles.tab} ${activeSection === 'user' ? styles.active : ''}`}
+            className={`${styles.mainNavButton} ${activeSection === 'user' ? styles.active : ''}`}
             onClick={() => setActiveSection('user')}
           >
             User Settings
           </button>
           {showCompanySettings && (
             <button
-              className={`${styles.tab} ${activeSection === 'company' ? styles.active : ''}`}
+              className={`${styles.mainNavButton} ${activeSection === 'company' ? styles.active : ''}`}
               onClick={() => setActiveSection('company')}
             >
               Company Settings
@@ -246,6 +245,8 @@ export default function SettingsPage() {
         {/* User Settings Section */}
         {activeSection === 'user' && (
           <div className={styles.settingsSection}>
+            <h2 className={styles.sectionTitle}>User Settings</h2>
+
             <div className={styles.settingsForm}>
               {/* Profile Information */}
               <div className={styles.settingGroup}>
@@ -272,7 +273,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
-
               {/* Email Notification Preferences */}
               {selectedCompany && (
                 <div className={styles.settingGroup}>
@@ -292,6 +292,10 @@ export default function SettingsPage() {
           <>
             {selectedCompany ? (
               <div className={styles.settingsSection}>
+                <h2 className={styles.sectionTitle}>
+                  Settings for {selectedCompany.name}
+                </h2>
+
                 {message && (
                   <div className={`${styles.message} ${styles[message.type]}`}>
                     {message.type === 'success' ? (

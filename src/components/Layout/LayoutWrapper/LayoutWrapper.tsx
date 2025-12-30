@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { GlobalHeader } from '../GlobalHeader/GlobalHeader';
 import { Sidebar } from '@/components/sidenav/Sidebar';
 import { NavigationProvider } from '@/contexts/NavigationContext';
@@ -11,6 +12,7 @@ import {
   usePageActions,
 } from '@/contexts/PageActionsContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
+import { Settings, ArrowLeft } from 'lucide-react';
 import styles from './LayoutWrapper.module.scss';
 
 interface LayoutWrapperProps {
@@ -19,6 +21,7 @@ interface LayoutWrapperProps {
 
 function LayoutContent({ children }: LayoutWrapperProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarActive, setIsSidebarActive] = useState(false);
   const { getPageAction, pageHeader } = usePageActions();
 
@@ -84,7 +87,9 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           title: 'Dashboard',
           description: 'View your business analytics and metrics here.',
           showAddButton: true,
-          addButtonText: 'Add Lead',
+          addButtonText: 'Admin Settings',
+          addButtonIcon: <Settings size={18} strokeWidth={1.75} />,
+          onAddClick: () => router.push('/settings'),
         };
       case '/tickets/new':
       case '/tickets/calls-and-forms':
@@ -111,13 +116,15 @@ function LayoutContent({ children }: LayoutWrapperProps) {
       case '/tickets/call-records':
         return {
           title: 'Call Records',
-          description: 'View and review all incoming and outgoing call activity and recordings.',
+          description:
+            'View and review all incoming and outgoing call activity and recordings.',
           showAddButton: false,
         };
       case '/tickets/form-submissions':
         return {
           title: 'Form Submissions',
-          description: 'Review and manage all incoming form submissions from your website.',
+          description:
+            'Review and manage all incoming form submissions from your website.',
           showAddButton: false,
         };
       case '/settings':
@@ -125,7 +132,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           title: 'Settings',
           description:
             'Configure your account and application preferences here.',
-          showAddButton: false,
+          showAddButton: true,
+          addButtonText: 'Back to Dashboard',
+          addButtonIcon: <ArrowLeft size={18} strokeWidth={1.75} />,
+          onAddClick: () => router.push('/dashboard'),
         };
       case '/projects':
         return {
@@ -274,6 +284,21 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               description: pageHeader.description,
               showAddButton: false,
               leadAssignmentControls: pageHeader.leadAssignmentControls,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
+        // Show lower header for task detail pages
+        if (pathname.match(/^\/tickets\/tasks\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise hide header
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              customActions: pageHeader.customActions,
             };
           }
           return null;
@@ -287,7 +312,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               title: pageHeader.title,
               description: pageHeader.description,
               showAddButton: false,
-              supportCaseAssignmentControls: pageHeader.supportCaseAssignmentControls,
+              supportCaseAssignmentControls:
+                pageHeader.supportCaseAssignmentControls,
             };
           }
           return null;
@@ -358,14 +384,18 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               description={pageConfig.description}
               showAddButton={pageConfig.showAddButton}
               addButtonText={pageConfig.addButtonText}
+              addButtonIcon={pageConfig.addButtonIcon}
               onAddClick={
                 pageConfig.showAddButton
-                  ? getPageAction('add') || undefined
+                  ? pageConfig.onAddClick || getPageAction('add') || undefined
                   : undefined
               }
               actionButtons={pageConfig.actionButtons}
               leadAssignmentControls={pageConfig.leadAssignmentControls}
-              supportCaseAssignmentControls={pageConfig.supportCaseAssignmentControls}
+              supportCaseAssignmentControls={
+                pageConfig.supportCaseAssignmentControls
+              }
+              customActions={pageConfig.customActions}
             />
           )}
           <main className={styles.mainContent}>

@@ -458,86 +458,6 @@ export function LeadQuoteSection({
     [profile, lead.company_id]
   );
 
-  // Load service plan for first selection when primary pest is selected
-  // ONLY if there are no existing line items (auto-recommendation)
-  useEffect(() => {
-    const loadServicePlan = async () => {
-      const primaryPest = selectedPests[0];
-
-      // Skip if line items have already been initialized from existing quote data
-      if (initialLineItemCreatedRef.current) {
-        return;
-      }
-
-      // Skip if there are already line items (user has made selections)
-      if (quote?.line_items && quote.line_items.length > 0) {
-        return;
-      }
-
-      if (!primaryPest || !lead.company_id) {
-        // Clear first selection if no pest
-        setServiceSelections(prev =>
-          prev.map((sel, idx) =>
-            idx === 0 ? { ...sel, servicePlan: null } : sel
-          )
-        );
-        return;
-      }
-
-      try {
-        setLoadingPlan(true);
-        const response = await adminAPI.getServicePlansByPest(
-          lead.company_id,
-          primaryPest
-        );
-
-        // Check again after async call - line items might have been initialized while we were waiting
-        if (initialLineItemCreatedRef.current) {
-          return;
-        }
-
-        if (response.success && response.cheapest_plan) {
-          // Cross-reference with allServicePlans to get complete plan data with pest_coverage
-          const fullPlan =
-            allServicePlans.find(p => p.id === response.cheapest_plan.id) ||
-            response.cheapest_plan;
-
-          // Update first service selection with complete plan data
-          setServiceSelections(prev =>
-            prev.map((sel, idx) =>
-              idx === 0 ? { ...sel, servicePlan: fullPlan } : sel
-            )
-          );
-
-          // Automatically create quote line item if quote exists and no line items exist
-          if (quote && !initialLineItemCreatedRef.current) {
-            await createOrUpdateQuoteLineItem(fullPlan, 0);
-            initialLineItemCreatedRef.current = true;
-          }
-        } else {
-          setServiceSelections(prev =>
-            prev.map((sel, idx) =>
-              idx === 0 ? { ...sel, servicePlan: null } : sel
-            )
-          );
-        }
-      } catch (error) {
-        console.error('Error loading service plan:', error);
-        setServiceSelections(prev =>
-          prev.map((sel, idx) =>
-            idx === 0 ? { ...sel, servicePlan: null } : sel
-          )
-        );
-      } finally {
-        setLoadingPlan(false);
-      }
-    };
-
-    loadServicePlan();
-    // Only depend on PRIMARY pest (first element), not the entire selectedPests array
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPests[0], lead.company_id, allServicePlans, quote?.line_items]);
-
   // Initialize serviceSelections from existing quote line items
   useEffect(() => {
     // Don't process if quote or line items don't exist
@@ -585,10 +505,7 @@ export function LeadQuoteSection({
           servicePlan: servicePlan || null,
           displayOrder: lineItem.display_order,
           frequency: frequency,
-          discount:
-            (lineItem as any).discount_id ||
-            lineItem.discount_percentage?.toString() ||
-            '',
+          discount: lineItem.discount_id || '',
         };
       });
 
@@ -1155,6 +1072,39 @@ export function LeadQuoteSection({
                     // Update primary pest
                     setSelectedPests([pestId, ...additionalPests]);
                     await updatePrimaryPest(pestId);
+
+                    // Auto-select service plan ONLY if quote has no line items yet
+                    if (quote && (!quote.line_items || quote.line_items.length === 0)) {
+                      try {
+                        setLoadingPlan(true);
+                        const response = await adminAPI.getServicePlansByPest(
+                          lead.company_id,
+                          pestId
+                        );
+
+                        if (response.success && response.cheapest_plan) {
+                          // Cross-reference with allServicePlans to get complete plan data
+                          const fullPlan =
+                            allServicePlans.find(p => p.id === response.cheapest_plan.id) ||
+                            response.cheapest_plan;
+
+                          // Update first service selection with complete plan data
+                          setServiceSelections(prev =>
+                            prev.map((sel, idx) =>
+                              idx === 0 ? { ...sel, servicePlan: fullPlan } : sel
+                            )
+                          );
+
+                          // Create quote line item
+                          await createOrUpdateQuoteLineItem(fullPlan, 0);
+                          initialLineItemCreatedRef.current = true;
+                        }
+                      } catch (error) {
+                        console.error('Error loading service plan:', error);
+                      } finally {
+                        setLoadingPlan(false);
+                      }
+                    }
                   } else {
                     // Remove primary pest
                     setSelectedPests(additionalPests);
@@ -2056,6 +2006,20 @@ export function LeadQuoteSection({
                                     ]?.recurring || 0)}
                                     /mo)
                                   </div>
+                                ) : mainPlanLineItem?.discount_id ||
+                                   mainPlanLineItem?.discount_percentage > 0 ||
+                                   mainPlanLineItem?.discount_amount > 0 ||
+                                   (mainPlanLineItem?.recurring_price &&
+                                    mainPlanLineItem?.final_recurring_price < mainPlanLineItem?.recurring_price) ? (
+                                  <div className={styles.originalPrice}>
+                                    Originally ${mainPlanLineItem?.recurring_price || 0}/mo
+                                    {mainPlanLineItem?.discount_percentage > 0 && (
+                                      <span> (-{mainPlanLineItem.discount_percentage}%)</span>
+                                    )}
+                                    {mainPlanLineItem?.discount_amount > 0 && !mainPlanLineItem?.discount_percentage && (
+                                      <span> (-${mainPlanLineItem.discount_amount})</span>
+                                    )}
+                                  </div>
                                 ) : null}
                               </div>
                               <div className={styles.pricingColumn}>
@@ -2078,15 +2042,22 @@ export function LeadQuoteSection({
                                     )}
                                     )
                                   </div>
-                                ) : mainPlanLineItem?.discount_percentage ? (
+                                ) : mainPlanLineItem?.discount_id ||
+                                   mainPlanLineItem?.discount_percentage > 0 ||
+                                   mainPlanLineItem?.discount_amount > 0 ||
+                                   (mainPlanLineItem?.initial_price &&
+                                    mainPlanLineItem?.final_initial_price < mainPlanLineItem?.initial_price) ? (
                                   <div className={styles.originalPrice}>
                                     Originally $
                                     {Math.round(
                                       mainPlanLineItem?.initial_price || 0
-                                    )}{' '}
-                                    (-
-                                    {mainPlanLineItem?.discount_percentage}
-                                    %)
+                                    )}
+                                    {mainPlanLineItem?.discount_percentage > 0 && (
+                                      <span> (-{mainPlanLineItem.discount_percentage}%)</span>
+                                    )}
+                                    {mainPlanLineItem?.discount_amount > 0 && !mainPlanLineItem?.discount_percentage && (
+                                      <span> (-${mainPlanLineItem.discount_amount})</span>
+                                    )}
                                   </div>
                                 ) : null}
                               </div>
@@ -2254,6 +2225,24 @@ export function LeadQuoteSection({
                                           ]?.recurring || 0}
                                           /mo)
                                         </div>
+                                      ) : lineItem?.discount_id ||
+                                         lineItem?.discount_percentage > 0 ||
+                                         lineItem?.discount_amount > 0 ||
+                                         (lineItem?.recurring_price &&
+                                          lineItem?.final_recurring_price < lineItem?.recurring_price) ? (
+                                        <div
+                                          className={
+                                            styles.lineItemOriginalPrice
+                                          }
+                                        >
+                                          Originally ${lineItem?.recurring_price || 0}/mo
+                                          {lineItem?.discount_percentage > 0 && (
+                                            <span> (-{lineItem.discount_percentage}%)</span>
+                                          )}
+                                          {lineItem?.discount_amount > 0 && !lineItem?.discount_percentage && (
+                                            <span> (-${lineItem.discount_amount})</span>
+                                          )}
+                                        </div>
                                       ) : null}
                                     </div>
                                     <div className={styles.lineItemColumn}>
@@ -2282,7 +2271,11 @@ export function LeadQuoteSection({
                                           )}
                                           )
                                         </div>
-                                      ) : lineItem?.discount_percentage ? (
+                                      ) : lineItem?.discount_id ||
+                                         lineItem?.discount_percentage > 0 ||
+                                         lineItem?.discount_amount > 0 ||
+                                         (lineItem?.initial_price &&
+                                          lineItem?.final_initial_price < lineItem?.initial_price) ? (
                                         <div
                                           className={
                                             styles.lineItemOriginalPrice
@@ -2291,9 +2284,13 @@ export function LeadQuoteSection({
                                           Originally $
                                           {Math.round(
                                             lineItem?.initial_price || 0
-                                          )}{' '}
-                                          (-
-                                          {lineItem?.discount_percentage}%)
+                                          )}
+                                          {lineItem?.discount_percentage > 0 && (
+                                            <span> (-{lineItem.discount_percentage}%)</span>
+                                          )}
+                                          {lineItem?.discount_amount > 0 && !lineItem?.discount_percentage && (
+                                            <span> (-${lineItem.discount_amount})</span>
+                                          )}
                                         </div>
                                       ) : null}
                                     </div>

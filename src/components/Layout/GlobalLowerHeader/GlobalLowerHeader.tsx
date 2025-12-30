@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ReactNode } from 'react';
 import Image from 'next/image';
 import { ChevronDown, Users } from 'lucide-react';
 import styles from './GlobalLowerHeader.module.scss';
@@ -58,9 +58,11 @@ interface GlobalLowerHeaderProps {
   showAddButton?: boolean;
   addButtonText?: string;
   onAddClick?: () => void;
+  addButtonIcon?: ReactNode;
   actionButtons?: ActionButton[];
   leadAssignmentControls?: LeadAssignmentControls;
   supportCaseAssignmentControls?: SupportCaseAssignmentControls;
+  customActions?: ReactNode;
 }
 
 const PlusIcon = () => (
@@ -97,9 +99,11 @@ export function GlobalLowerHeader({
   showAddButton = false,
   addButtonText = 'Add Lead',
   onAddClick,
+  addButtonIcon,
   actionButtons,
   leadAssignmentControls,
   supportCaseAssignmentControls,
+  customActions,
 }: GlobalLowerHeaderProps) {
   const [isLeadTypeOpen, setIsLeadTypeOpen] = useState(false);
   const [isAssignedToOpen, setIsAssignedToOpen] = useState(false);
@@ -273,7 +277,8 @@ export function GlobalLowerHeader({
   const getSupportTeamCount = () => {
     if (!supportCaseAssignmentControls) return 0;
     const { assignableUsers } = supportCaseAssignmentControls;
-    return assignableUsers.filter(u => u.departments.includes('support')).length;
+    return assignableUsers.filter(u => u.departments.includes('support'))
+      .length;
   };
 
   return (
@@ -309,7 +314,9 @@ export function GlobalLowerHeader({
                   <button
                     className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'sales' ? styles.selected : ''}`}
                     onClick={() => {
-                      const handler = leadAssignmentControls.onLeadTypeChangeWithModal || leadAssignmentControls.onLeadTypeChange;
+                      const handler =
+                        leadAssignmentControls.onLeadTypeChangeWithModal ||
+                        leadAssignmentControls.onLeadTypeChange;
                       handler('sales');
                       setIsLeadTypeOpen(false);
                     }}
@@ -319,7 +326,9 @@ export function GlobalLowerHeader({
                   <button
                     className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'support' ? styles.selected : ''}`}
                     onClick={() => {
-                      const handler = leadAssignmentControls.onLeadTypeChangeWithModal || leadAssignmentControls.onLeadTypeChange;
+                      const handler =
+                        leadAssignmentControls.onLeadTypeChangeWithModal ||
+                        leadAssignmentControls.onLeadTypeChange;
                       handler('support');
                       setIsLeadTypeOpen(false);
                     }}
@@ -329,7 +338,9 @@ export function GlobalLowerHeader({
                   <button
                     className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'junk' ? styles.selected : ''}`}
                     onClick={() => {
-                      const handler = leadAssignmentControls.onLeadTypeChangeWithModal || leadAssignmentControls.onLeadTypeChange;
+                      const handler =
+                        leadAssignmentControls.onLeadTypeChangeWithModal ||
+                        leadAssignmentControls.onLeadTypeChange;
                       handler('junk');
                       setIsLeadTypeOpen(false);
                     }}
@@ -696,16 +707,16 @@ export function GlobalLowerHeader({
                   <button
                     className={`${styles.dropdownOption} ${supportCaseAssignmentControls.assignedTo === 'support_team' ? styles.selected : ''}`}
                     onClick={() => {
-                      supportCaseAssignmentControls.onAssigneeChange('support_team');
+                      supportCaseAssignmentControls.onAssigneeChange(
+                        'support_team'
+                      );
                       setIsAssignedToOpen(false);
                     }}
                   >
                     <div className={styles.optionContent}>
                       <TeamAvatar />
                       <div className={styles.optionInfo}>
-                        <div className={styles.optionName}>
-                          Support Team
-                        </div>
+                        <div className={styles.optionName}>Support Team</div>
                         <div className={styles.optionSubtitle}>
                           {getSupportTeamCount()} members
                         </div>
@@ -715,13 +726,17 @@ export function GlobalLowerHeader({
 
                   {/* Team members */}
                   {supportCaseAssignmentControls.assignableUsers
-                    .filter(u => u.id !== supportCaseAssignmentControls.currentUser.id)
+                    .filter(
+                      u => u.id !== supportCaseAssignmentControls.currentUser.id
+                    )
                     .map(user => (
                       <button
                         key={user.id}
                         className={`${styles.dropdownOption} ${supportCaseAssignmentControls.assignedTo === user.id ? styles.selected : ''}`}
                         onClick={() => {
-                          supportCaseAssignmentControls.onAssigneeChange(user.id);
+                          supportCaseAssignmentControls.onAssigneeChange(
+                            user.id
+                          );
                           setIsAssignedToOpen(false);
                         }}
                       >
@@ -791,9 +806,13 @@ export function GlobalLowerHeader({
             </div>
           </div>
         )}
-        {((actionButtons && actionButtons?.length > 0) || showAddButton) && (
+        {((actionButtons && actionButtons?.length > 0) ||
+          showAddButton ||
+          customActions) && (
           <div className={styles.rightSection}>
-            {actionButtons && actionButtons.length > 0 ? (
+            {customActions ? (
+              customActions
+            ) : actionButtons && actionButtons.length > 0 ? (
               actionButtons.map((button, index) => (
                 <button
                   key={index}
@@ -812,7 +831,7 @@ export function GlobalLowerHeader({
                 disabled={!onAddClick}
                 type="button"
               >
-                <PlusIcon />
+                {addButtonIcon || <PlusIcon />}
                 <span>{addButtonText}</span>
               </button>
             ) : null}

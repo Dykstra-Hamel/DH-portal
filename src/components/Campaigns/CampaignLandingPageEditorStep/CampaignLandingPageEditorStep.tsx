@@ -680,9 +680,11 @@ export default function CampaignLandingPageEditorStep({
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{company_name}')}>
                   {'{company_name}'}
                 </button>
-                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{service_name}')}>
-                  {'{service_name}'}
-                </button>
+                {servicePlanId && (
+                  <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{service_name}')}>
+                    {'{service_name}'}
+                  </button>
+                )}
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{company_phone}')}>
                   {'{company_phone}'}
                 </button>
@@ -760,9 +762,11 @@ export default function CampaignLandingPageEditorStep({
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{company_name}')}>
                   {'{company_name}'}
                 </button>
-                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{service_name}')}>
-                  {'{service_name}'}
-                </button>
+                {servicePlanId && (
+                  <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{service_name}')}>
+                    {'{service_name}'}
+                  </button>
+                )}
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{company_phone}')}>
                   {'{company_phone}'}
                 </button>
@@ -915,9 +919,11 @@ export default function CampaignLandingPageEditorStep({
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{company_name}')}>
                   {'{company_name}'}
                 </button>
-                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{service_name}')}>
-                  {'{service_name}'}
-                </button>
+                {servicePlanId && (
+                  <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{service_name}')}>
+                    {'{service_name}'}
+                  </button>
+                )}
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{company_phone}')}>
                   {'{company_phone}'}
                 </button>
@@ -1000,9 +1006,11 @@ export default function CampaignLandingPageEditorStep({
                     <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{company_name}')}>
                       {'{company_name}'}
                     </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{service_name}')}>
-                      {'{service_name}'}
-                    </button>
+                    {servicePlanId && (
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{service_name}')}>
+                        {'{service_name}'}
+                      </button>
+                    )}
                     <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{company_phone}')}>
                       {'{company_phone}'}
                     </button>
@@ -1094,9 +1102,11 @@ export default function CampaignLandingPageEditorStep({
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_name}')}>
                   {'{company_name}'}
                 </button>
-                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{service_name}')}>
-                  {'{service_name}'}
-                </button>
+                {servicePlanId && (
+                  <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{service_name}')}>
+                    {'{service_name}'}
+                  </button>
+                )}
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_phone}')}>
                   {'{company_phone}'}
                 </button>
@@ -1225,9 +1235,11 @@ export default function CampaignLandingPageEditorStep({
                     <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{company_name}')}>
                       {'{company_name}'}
                     </button>
-                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{service_name}')}>
-                      {'{service_name}'}
-                    </button>
+                    {servicePlanId && (
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{service_name}')}>
+                        {'{service_name}'}
+                      </button>
+                    )}
                     <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{company_phone}')}>
                       {'{company_phone}'}
                     </button>
@@ -1407,9 +1419,11 @@ export default function CampaignLandingPageEditorStep({
                         <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{company_name}')}>
                           {'{company_name}'}
                         </button>
-                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{service_name}')}>
-                          {'{service_name}'}
-                        </button>
+                        {servicePlanId && (
+                          <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{service_name}')}>
+                            {'{service_name}'}
+                          </button>
+                        )}
                         <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{company_phone}')}>
                           {'{company_phone}'}
                         </button>
@@ -1528,9 +1542,11 @@ export default function CampaignLandingPageEditorStep({
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{company_name}')}>
                   {'{company_name}'}
                 </button>
-                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{service_name}')}>
-                  {'{service_name}'}
-                </button>
+                {servicePlanId && (
+                  <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{service_name}')}>
+                    {'{service_name}'}
+                  </button>
+                )}
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('footer-tagline-input', 'footer_company_tagline', '{company_phone}')}>
                   {'{company_phone}'}
                 </button>

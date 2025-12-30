@@ -76,9 +76,6 @@ export default function DashboardPage() {
   }
 
   return (
-    <Dashboard
-      user={user}
-      profile={profile}
-    />
+    <Dashboard profile={profile} />
   );
 }
