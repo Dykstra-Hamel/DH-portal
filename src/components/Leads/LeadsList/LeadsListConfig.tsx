@@ -317,6 +317,20 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
 // User-specific tabs - excludes "unassigned" tab for "My Sales Leads" view
 export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
   {
+    key: 'all',
+    label: 'All My Leads',
+    filter: (leads: Lead[]) =>
+      leads.filter(
+        lead =>
+          !lead.archived && ['in_process', 'quoted', 'scheduling'].includes(lead.lead_status)
+      ),
+    getCount: (leads: Lead[]) =>
+      leads.filter(
+        lead =>
+          !lead.archived && ['in_process', 'quoted', 'scheduling'].includes(lead.lead_status)
+      ).length,
+  },
+  {
     key: 'contacting',
     label: 'Contacting',
     filter: (leads: Lead[]) =>
@@ -335,34 +349,12 @@ export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
         .length,
   },
   {
-    key: 'won',
-    label: 'Won',
+    key: 'scheduling',
+    label: 'Ready To Schedule',
     filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'won'),
+      leads.filter(lead => !lead.archived && lead.lead_status === 'scheduling'),
     getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'won').length,
-  },
-  {
-    key: 'lost',
-    label: 'Lost',
-    filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'lost'),
-    getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'lost')
+      leads.filter(lead => !lead.archived && lead.lead_status === 'scheduling')
         .length,
-  },
-  {
-    key: 'all',
-    label: 'All My Leads',
-    filter: (leads: Lead[]) =>
-      leads.filter(
-        lead =>
-          !lead.archived && ['in_process', 'quoted'].includes(lead.lead_status)
-      ),
-    getCount: (leads: Lead[]) =>
-      leads.filter(
-        lead =>
-          !lead.archived && ['in_process', 'quoted'].includes(lead.lead_status)
-      ).length,
   },
 ];

@@ -682,11 +682,33 @@ export async function POST(
         issueType = 'service_quality';
       }
 
-      // Generate summary from ticket data
-      const summary =
-        ticket.description ||
-        `${ticket.type} inquiry from ${ticket.source}` ||
-        'Support request';
+      // Generate summary - use call summary from call record if available
+      let summary = 'Support request';
+
+      // Try to get call summary from linked call record
+      if (ticket.call_record_id) {
+        try {
+          const { data: callRecord } = await supabase
+            .from('call_records')
+            .select('call_summary')
+            .eq('id', ticket.call_record_id)
+            .single();
+
+          if (callRecord?.call_summary) {
+            summary = callRecord.call_summary;
+          }
+        } catch (error) {
+          // Silently fall back to ticket description
+        }
+      }
+
+      // Fall back to ticket description or generic text if no call summary
+      if (summary === 'Support request') {
+        summary =
+          ticket.description ||
+          `${ticket.type} inquiry from ${ticket.source}` ||
+          'Support request';
+      }
 
       // Create a new support case from the ticket
       const supportCaseInsertData = {

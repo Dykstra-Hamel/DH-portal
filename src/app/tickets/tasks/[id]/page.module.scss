@@ -159,67 +159,146 @@
 }
 
 .content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-
-.leftColumn,
-.rightColumn {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
-.infoCard {
+.detailCard {
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.04),
+    0 1px 3px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
-.infoCard h3 {
-  background: #f9fafb;
-  padding: 16px 20px;
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1f2937;
-  border-bottom: 1px solid #e5e7eb;
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.taskDetails,
-.relatedEntity,
-.description,
-.notes {
-  padding: 20px;
+.cardTitle {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.titleBlock {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.metaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.chipLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.chipValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.chipDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.assigneeRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 220px;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    letter-spacing: 0.04em;
+  }
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 12px 20px 16px;
+}
+
+.section {
+  border-top: 1px solid #f1f5f9;
+  padding: 16px 20px;
+
+  h4 {
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+}
+
+.sectionRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
+  border-top: 1px solid #f1f5f9;
+  padding: 0 20px 12px;
+
+  .section {
+    border-top: none;
+    padding: 16px 0 12px;
+  }
 }
 
 .description {
   font-size: 14px;
   color: #374151;
   line-height: 1.6;
-  padding: 20px;
-  white-space: pre-wrap;
+  white-space: pre-line;
 }
 
 .notes {
   font-size: 14px;
   color: #374151;
   line-height: 1.6;
-  padding: 20px;
-  
-  div {
-    margin-bottom: 8px;
-    
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
+  white-space: pre-line;
+}
+
+.relatedEntity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .detailItem {
@@ -244,14 +323,16 @@
 
 .statusBadge,
 .priorityBadge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
   font-size: 12px;
-  font-weight: 500;
-  color: white;
-  white-space: nowrap;
-  width: fit-content;
+  font-weight: 700;
+  color: #0f172a;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
 }
 
 .priorityContainer {
@@ -322,6 +403,14 @@
     color: #2563eb;
     text-decoration: underline;
   }
+}
+
+.relatedMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .entityStatus,

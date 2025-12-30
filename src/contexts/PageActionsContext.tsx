@@ -38,6 +38,7 @@ interface PageHeaderConfig {
   title: string;
   description: string;
   leadAssignmentControls?: LeadAssignmentControls;
+  customActions?: ReactNode;
 }
 
 interface PageActionsContextType {

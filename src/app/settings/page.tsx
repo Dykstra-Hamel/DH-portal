@@ -12,7 +12,6 @@ import {
   Save,
   AlertCircle,
   CheckCircle,
-  Settings as SettingsIcon,
   Copy,
   Check,
   RefreshCw,
@@ -210,21 +209,6 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <div className={styles.titleSection}>
-            <SettingsIcon size={24} className={styles.titleIcon} />
-            <h1 className={styles.title}>Settings</h1>
-          </div>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className={styles.backButton}
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </header>
-
       <main className={styles.main}>
         {/* Main Section Navigation */}
         <div className={styles.mainNavigation}>
@@ -299,9 +283,6 @@ export default function SettingsPage() {
                 <h2 className={styles.sectionTitle}>
                   Settings for {selectedCompany.name}
                 </h2>
-                <p className={styles.sectionDescription}>
-                  Use the company dropdown in the header to switch between companies.
-                </p>
 
                 {message && (
                   <div className={`${styles.message} ${styles[message.type]}`}>

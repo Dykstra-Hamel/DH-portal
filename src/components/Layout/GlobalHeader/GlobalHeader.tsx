@@ -1,6 +1,7 @@
 'use client';
 
 import { Menu } from 'lucide-react';
+import { ReactNode } from 'react';
 import { Breadcrumbs } from '../Breadcrumbs/Breadcrumbs';
 import { SearchBar } from '../SearchBar/SearchBar';
 import { NotificationIcon } from '../NotificationIcon/NotificationIcon';
@@ -10,9 +11,10 @@ import styles from './GlobalHeader.module.scss';
 
 interface GlobalHeaderProps {
   onMenuToggle?: () => void;
+  rightActions?: ReactNode;
 }
 
-export function GlobalHeader({ onMenuToggle }: GlobalHeaderProps) {
+export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) {
   return (
     <header className={styles.globalHeader}>
       <div className={styles.headerContent}>
@@ -31,6 +33,7 @@ export function GlobalHeader({ onMenuToggle }: GlobalHeaderProps) {
         <div className={styles.centerSection}>
         </div>
         <div className={styles.rightSection}>
+          {rightActions}
           <SearchBar />
           <GlobalCompanyDropdown />
           <NotificationIcon />

@@ -233,6 +233,12 @@ export const getSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
 // User-specific tabs - excludes "unassigned" tab for "My Support Cases" view
 export const getUserSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
   {
+    key: 'all',
+    label: 'All My Cases',
+    filter: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived),
+    getCount: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived).length,
+  },
+  {
     key: 'in_progress',
     label: 'In Progress',
     filter: (supportCases: SupportCase[]) =>
@@ -255,11 +261,5 @@ export const getUserSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
       supportCases.filter(sc => !sc.archived && sc.status === 'resolved'),
     getCount: (supportCases: SupportCase[]) =>
       supportCases.filter(sc => !sc.archived && sc.status === 'resolved').length,
-  },
-  {
-    key: 'all',
-    label: 'All My Cases',
-    filter: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived),
-    getCount: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived).length,
   },
 ];
