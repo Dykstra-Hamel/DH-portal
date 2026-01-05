@@ -73,18 +73,16 @@ export default function ContactListUploadModal({
       setParsing(true);
       setError(null);
 
-      // Read file content
-      const csvContent = await csvFile.text();
+      // Use FormData to avoid JSON escaping issues with large CSVs
+      const formData = new FormData();
+      formData.append('csvFile', csvFile);
+      formData.append('companyId', companyId);
+      formData.append('skipDatabaseDuplicateCheck', 'true');
 
       // Call parse API
       const response = await fetch('/api/leads/bulk/parse', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          csvContent,
-          skipDatabaseDuplicateCheck: true,
-        }),
+        body: formData,
       });
 
       const result = await response.json();

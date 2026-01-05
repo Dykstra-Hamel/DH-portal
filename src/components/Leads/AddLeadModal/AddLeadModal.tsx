@@ -262,21 +262,14 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
     setError(null);
 
     try {
-      const csvContent = await csvFile.text();
-
-      console.log('Sending parse request:', {
-        companyId,
-        csvContentLength: csvContent.length,
-        csvPreview: csvContent.substring(0, 100)
-      });
+      // Use FormData to avoid JSON escaping issues with large CSVs
+      const formData = new FormData();
+      formData.append('csvFile', csvFile);
+      formData.append('companyId', companyId);
 
       const response = await fetch('/api/leads/bulk/parse', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          csvContent,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
