@@ -539,7 +539,7 @@ export function SecondarySideNav({
           {
             items: [
               {
-                text: 'New',
+                text: 'New Tickets',
                 href: '/tickets/new',
                 count: counts.tickets,
                 countType: 'tickets',

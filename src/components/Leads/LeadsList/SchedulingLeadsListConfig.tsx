@@ -11,21 +11,9 @@ export const getSchedulingLeadTabs = (): TabDefinition<Lead>[] => [
     key: 'ready_to_schedule',
     label: 'Ready To Schedule',
     filter: (leads: Lead[]) =>
-      leads.filter(
-        lead => !lead.archived && lead.lead_status === 'scheduling'
-      ),
+      leads.filter(lead => !lead.archived && lead.lead_status === 'scheduling'),
     getCount: (leads: Lead[]) =>
-      leads.filter(
-        lead => !lead.archived && lead.lead_status === 'scheduling'
-      ).length,
-  },
-  {
-    key: 'scheduled',
-    label: 'Scheduled',
-    filter: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'won'),
-    getCount: (leads: Lead[]) =>
-      leads.filter(lead => !lead.archived && lead.lead_status === 'won')
+      leads.filter(lead => !lead.archived && lead.lead_status === 'scheduling')
         .length,
   },
 ];

@@ -166,14 +166,25 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
       };
 
       try {
+        const updateData: any = { status };
+
+        // If changing to "unassigned" status, clear assigned user
+        if (status === 'unassigned') {
+          updateData.assigned_to = null;
+        }
+
         if (isAdmin) {
-          await adminAPI.updateSupportCase(supportCaseId, { status });
+          await adminAPI.updateSupportCase(supportCaseId, updateData);
         } else {
-          await adminAPI.updateUserSupportCase(supportCaseId, { status });
+          await adminAPI.updateUserSupportCase(supportCaseId, updateData);
         }
 
         await fetchSupportCase();
-        handleShowToast(statusMessages[status] || 'Status updated successfully!', 'success');
+
+        const message = status === 'unassigned' && supportCase.assigned_to
+          ? 'Support case moved to Unassigned and user unassigned!'
+          : statusMessages[status] || 'Status updated successfully!';
+        handleShowToast(message, 'success');
       } catch (error) {
         console.error('Error updating support case status:', error);
         handleShowToast('Failed to update status. Please try again.', 'error');

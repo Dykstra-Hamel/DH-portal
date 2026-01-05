@@ -13,6 +13,7 @@ import {
   subscribeToLeadUpdates,
   LeadUpdatePayload,
 } from '@/lib/realtime/lead-channel';
+import styles from './page.module.scss';
 
 interface Profile {
   id: string;
@@ -155,7 +156,7 @@ export default function SchedulingPage() {
   }
 
   return (
-    <div style={{ width: '100%' }}>
+    <div className={styles.pageContainer}>
       {selectedCompany && (
         <div>
           <LeadsList
@@ -173,52 +174,18 @@ export default function SchedulingPage() {
       )}
 
       {companyLoading && (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '800px',
-              margin: '0 auto',
-              animation: 'pulse 1.5s ease-in-out infinite',
-            }}
-          >
-            <div
-              style={{
-                height: '60px',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '8px',
-                marginBottom: '16px',
-              }}
-            />
-            <div
-              style={{
-                height: '40px',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '8px',
-                marginBottom: '12px',
-              }}
-            />
-            <div
-              style={{
-                height: '40px',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '8px',
-                marginBottom: '12px',
-              }}
-            />
-            <div
-              style={{
-                height: '40px',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '8px',
-              }}
-            />
+        <div className={styles.loadingContainer}>
+          <div className={styles.loadingSkeleton}>
+            <div className={styles.skeletonItem} />
+            <div className={styles.skeletonItem} />
+            <div className={styles.skeletonItem} />
+            <div className={styles.skeletonItem} />
           </div>
         </div>
       )}
 
       {!selectedCompany && !companyLoading && (
-        <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
+        <div className={styles.emptyState}>
           Please select a company to view scheduling.
         </div>
       )}

@@ -109,8 +109,9 @@ export function SupportCaseStepContent({
     <>
       <div className={styles.contentLeft}>
         <InfoCard
-          title="Customer Service Issue"
+          title="Customer Support Case"
           icon={<AlertCircle size={20} />}
+          isCollapsible={false}
           startExpanded={true}
         >
           <div className={styles.cardContent}>
