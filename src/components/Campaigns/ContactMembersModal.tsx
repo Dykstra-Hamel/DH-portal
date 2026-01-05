@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, ReactElement } from 'react';
-import { X, User, Mail, Phone, CheckCircle, XCircle, Clock, Loader } from 'lucide-react';
+import { X, User, Mail, Phone, CheckCircle, XCircle, Clock, Loader, Eye } from 'lucide-react';
 import styles from './ContactMembersModal.module.scss';
 
 interface ContactMember {
@@ -10,6 +10,10 @@ interface ContactMember {
   added_at: string;
   processed_at: string | null;
   error_message: string | null;
+  first_viewed_at: string | null;
+  last_viewed_at: string | null;
+  view_count: number;
+  redeemed_at: string | null;
   customer: {
     id: string;
     first_name: string;
@@ -56,6 +60,7 @@ export default function ContactMembersModal({ campaignId, listId, listName, onCl
       processing: { icon: <Loader size={14} />, label: 'Processing', className: styles.statusProcessing },
       processed: { icon: <CheckCircle size={14} />, label: 'Processed', className: styles.statusProcessed },
       failed: { icon: <XCircle size={14} />, label: 'Failed', className: styles.statusFailed },
+      excluded: { icon: <XCircle size={14} />, label: 'Excluded', className: styles.statusExcluded },
     };
 
     const config = statusConfig[status] || statusConfig.pending;
@@ -64,6 +69,36 @@ export default function ContactMembersModal({ campaignId, listId, listName, onCl
       <span className={`${styles.statusBadge} ${config.className}`}>
         {config.icon}
         {config.label}
+      </span>
+    );
+  };
+
+  const formatLastViewed = (lastViewedAt: string | null) => {
+    if (!lastViewedAt) {
+      return <span className={styles.noData}>Never</span>;
+    }
+
+    const viewDate = new Date(lastViewedAt);
+    const now = new Date();
+    const diffMs = now.getTime() - viewDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+    let timeAgo = '';
+    if (diffDays > 0) {
+      timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else if (diffHours > 0) {
+      timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else if (diffMinutes > 0) {
+      timeAgo = `${diffMinutes} min${diffMinutes > 1 ? 's' : ''} ago`;
+    } else {
+      timeAgo = 'Just now';
+    }
+
+    return (
+      <span className={styles.viewedDate} title={viewDate.toLocaleString()}>
+        {timeAgo}
       </span>
     );
   };
@@ -103,6 +138,9 @@ export default function ContactMembersModal({ campaignId, listId, listName, onCl
                     <th>Email</th>
                     <th>Phone</th>
                     <th>Status</th>
+                    <th>Views</th>
+                    <th>Last Viewed</th>
+                    <th>Redeemed</th>
                     <th>Added</th>
                   </tr>
                 </thead>
@@ -135,7 +173,39 @@ export default function ContactMembersModal({ campaignId, listId, listName, onCl
                           )}
                         </div>
                       </td>
-                      <td>{getStatusBadge(member.status)}</td>
+                      <td>
+                        <div>
+                          {getStatusBadge(member.status)}
+                          {member.error_message && (
+                            <div className={styles.errorMessage} title={member.error_message}>
+                              {member.error_message}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.viewCountCell}>
+                          {member.view_count > 0 ? (
+                            <>
+                              <Eye size={14} />
+                              <span>{member.view_count}</span>
+                            </>
+                          ) : (
+                            <span className={styles.noData}>0</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>{formatLastViewed(member.last_viewed_at)}</td>
+                      <td>
+                        {member.redeemed_at ? (
+                          <span className={`${styles.statusBadge} ${styles.statusRedeemed}`}>
+                            <CheckCircle size={14} />
+                            Redeemed
+                          </span>
+                        ) : (
+                          <span className={styles.noData}>-</span>
+                        )}
+                      </td>
                       <td>
                         <span className={styles.dateCell}>
                           {new Date(member.added_at).toLocaleDateString('en-US', {

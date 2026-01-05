@@ -62,10 +62,10 @@ export function Breadcrumbs() {
         switch (activePrimaryNav) {
           case 'dashboard':
             return { label: 'Dashboard', href: '/dashboard' };
-          case 'connections':
-            return { label: 'Connections', href: '/connections' };
+          case 'tickets':
+            return { label: 'Tickets', href: '/tickets' };
           case 'tasks':
-            return { label: 'Tasks', href: '/connections' };
+            return { label: 'Tasks', href: '/tickets' };
           case 'brand':
             return { label: 'Brand', href: '/brand' };
           default:
@@ -88,9 +88,9 @@ export function Breadcrumbs() {
 
         case 'leads':
           // Start with primary nav root only if not already there
-          if (activePrimaryNav === 'connections') {
-            // For /leads route under connections
-            crumbs.push({ label: 'Sales Leads', href: '/connections/leads' });
+          if (activePrimaryNav === 'tickets') {
+            // For /leads route under tickets
+            crumbs.push({ label: 'Sales Leads', href: '/tickets/leads' });
           } else {
             crumbs.push({ label: 'Leads', href: '/leads' });
           }
@@ -117,33 +117,6 @@ export function Breadcrumbs() {
               console.error('Error fetching lead for breadcrumb:', error);
               crumbs.push({ label: `Lead` });
               setCustomerId(null);
-            } finally {
-              setLoading(false);
-            }
-          }
-          break;
-
-        case 'tickets':
-          // Don't add root again if we're in tasks nav
-          if (activePrimaryNav !== 'tasks') {
-            crumbs.push({ label: 'Incoming', href: '/connections/incoming' });
-          }
-
-          // If viewing specific ticket
-          if (pathSegments[1] && params?.id) {
-            try {
-              setLoading(true);
-              const ticket = await adminAPI.getTicket(params.id as string);
-              if (ticket?.customer) {
-                const customerName =
-                  `${ticket.customer.first_name} ${ticket.customer.last_name}`.trim();
-                crumbs.push({ label: customerName });
-              } else {
-                crumbs.push({ label: `Ticket` });
-              }
-            } catch (error) {
-              console.error('Error fetching ticket for breadcrumb:', error);
-              crumbs.push({ label: `Ticket` });
             } finally {
               setLoading(false);
             }
@@ -177,10 +150,10 @@ export function Breadcrumbs() {
           }
           break;
 
-        case 'connections':
-          // Don't add Conversations again if it's already the primary nav root
-          if (activePrimaryNav !== 'connections') {
-            crumbs.push({ label: 'Connections', href: '/connections' });
+        case 'tickets':
+          // Don't add Tickets again if it's already the primary nav root
+          if (activePrimaryNav !== 'tickets') {
+            crumbs.push({ label: 'Tickets', href: '/tickets' });
           }
 
           // Handle conversation sub-pages
@@ -190,38 +163,39 @@ export function Breadcrumbs() {
             } = {
               'calls-and-forms': {
                 label: 'Tickets',
-                href: '/connections/calls-and-forms',
+                href: '/tickets/calls-and-forms',
               },
-              leads: { label: 'Sales Leads', href: '/connections/leads' },
+              leads: { label: 'Sales Leads', href: '/tickets/leads' },
               scheduling: {
                 label: 'Scheduling',
-                href: '/connections/scheduling',
+                href: '/tickets/scheduling',
               },
               'customer-service': {
                 label: 'Customer Service',
-                href: '/connections/customer-service',
+                href: '/tickets/customer-service',
               },
               'support-cases': {
                 label: 'Support Cases',
-                href: '/connections/customer-service',
+                href: '/tickets/customer-service',
               },
               'my-sales-leads': {
                 label: 'My Sales Leads',
-                href: '/connections/my-sales-leads',
+                href: '/tickets/my-sales-leads',
               },
               'my-support-cases': {
                 label: 'My Support Cases',
-                href: '/connections/my-support-cases',
+                href: '/tickets/my-support-cases',
               },
-              'my-tasks': { label: 'My Tasks', href: '/connections/my-tasks' },
+              'my-tasks': { label: 'My Tasks', href: '/tickets/my-tasks' },
+              tasks: { label: 'Tasks', href: '/tickets/tasks' },
               'assigned-to-me': {
                 label: 'Assigned To Me',
-                href: '/connections/assigned-to-me',
+                href: '/tickets/assigned-to-me',
               },
-              reports: { label: 'Reports', href: '/connections/reports' },
+              reports: { label: 'Reports', href: '/tickets/reports' },
               'archived-calls': {
                 label: 'Archived Calls',
-                href: '/connections/archived-calls',
+                href: '/tickets/archived-calls',
               },
             };
 
@@ -230,7 +204,7 @@ export function Breadcrumbs() {
                 .split('-')
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                 .join(' '),
-              href: `/connections/${pathSegments[1]}`,
+              href: `/tickets/${pathSegments[1]}`,
             };
 
             crumbs.push({
@@ -306,6 +280,19 @@ export function Breadcrumbs() {
                     // Fallback to call record if ticket fails
                     itemLabel = `Call`;
                   }
+                } else if (pathSegments[1] === 'tasks') {
+                  // Fetch task data to get the task title
+                  try {
+                    const response = await fetch(`/api/tasks/${params.id}`);
+                    if (response.ok) {
+                      const data = await response.json();
+                      itemLabel = data.task?.title || 'Task';
+                    } else {
+                      itemLabel = 'Task';
+                    }
+                  } catch {
+                    itemLabel = 'Task';
+                  }
                 } else {
                   itemLabel = pageConfig.label;
                 }
@@ -323,6 +310,8 @@ export function Breadcrumbs() {
                   crumbs.push({ label: 'Support Case' });
                 } else if (pathSegments[1] === 'customer-service') {
                   crumbs.push({ label: 'Support Case' });
+                } else if (pathSegments[1] === 'tasks') {
+                  crumbs.push({ label: 'Task' });
                 } else {
                   crumbs.push({ label: pageConfig.label });
                 }

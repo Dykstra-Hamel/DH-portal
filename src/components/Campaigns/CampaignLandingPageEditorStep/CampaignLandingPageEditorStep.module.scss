@@ -334,3 +334,120 @@
     line-height: 1.5;
   }
 }
+
+.variableButtons {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.buttonGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+
+  &:not(:last-child) {
+    margin-bottom: 8px;
+  }
+}
+
+.variableButton {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #374151;
+
+  &:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+.checkboxGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+// Add-on limit information display
+.addonLimitInfo {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #f0f9ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1e40af;
+  }
+}
+
+// Disabled checkbox label styling
+.checkboxLabel.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+
+  input[type='checkbox'] {
+    cursor: not-allowed;
+  }
+
+  .addonName,
+  .addonDescription,
+  .addonPrice {
+    color: #9ca3af;
+  }
+}
+
+.addonName {
+  font-weight: 600;
+  color: #111827;
+}
+
+.addonDescription {
+  font-size: 13px;
+  color: #4b5563;
+  margin-top: 2px;
+}
+
+.addonPrice {
+  font-size: 13px;
+  color: #111827;
+  margin-top: 4px;
+}
+
+.expectColumnEditor {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+
+  &:first-of-type {
+    margin-top: 16px;
+  }
+}
+
+.columnTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2b2b2b;
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb;
+}

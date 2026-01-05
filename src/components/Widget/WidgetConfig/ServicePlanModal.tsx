@@ -3,6 +3,8 @@ import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import RichTextEditor from '@/components/UI/RichTextEditor/RichTextEditor';
 import styles from './WidgetConfig.module.scss';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
+import { calculateIntervalCount, getIntervalLabel } from '@/lib/pricing-calculations';
 
 interface ServicePlan {
   id: string;
@@ -13,7 +15,7 @@ interface ServicePlan {
   initial_price: number;
   initial_discount: number;
   recurring_price: number;
-  billing_frequency: string;
+  billing_frequency: string | null;
   treatment_frequency: string;
   includes_inspection: boolean;
   plan_features: string[];
@@ -57,7 +59,162 @@ interface ServicePlanModalProps {
   onClose: () => void;
   onSave: (planData: Partial<ServicePlan>) => void;
   availablePestTypes: PestType[];
+  companyId: string;
 }
+
+// Custom Interval Pricing Input Component
+interface CustomIntervalPricingInputProps {
+  dimension: 'home' | 'yard';
+  formData: any;
+  setFormData: (data: any) => void;
+  companyId: string;
+}
+
+const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
+  dimension,
+  formData,
+  setFormData,
+  companyId,
+}) => {
+  const pricingKey = dimension === 'home' ? 'home_size_pricing' : 'yard_size_pricing';
+  const pricing = formData[pricingKey];
+
+  // Fetch company pricing settings to know how many intervals exist
+  const { settings: pricingSettings, isLoading, error } = usePricingSettings(companyId);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className={styles.loadingState}>
+        <div className={styles.spinner}></div>
+        <p>Loading pricing intervals...</p>
+      </div>
+    );
+  }
+
+  // Show error state if pricing settings don't exist
+  if (error || !pricingSettings) {
+    return (
+      <div className={styles.errorState}>
+        <p style={{ color: '#dc3545', marginBottom: '8px' }}>
+          <strong>⚠️ Pricing intervals not configured</strong>
+        </p>
+        <p style={{ color: '#6c757d', fontSize: '14px', marginBottom: '12px' }}>
+          {dimension === 'home'
+            ? 'Home size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'
+            : 'Yard size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'}
+        </p>
+        <p style={{ color: '#6c757d', fontSize: '14px' }}>
+          Please go to <strong>Company Management → Pricing Settings</strong> to configure pricing intervals first.
+        </p>
+      </div>
+    );
+  }
+
+  // Calculate number of intervals needed
+  const intervalCount = calculateIntervalCount(pricingSettings, dimension);
+
+  // Ensure arrays have correct length
+  const ensureArrayLength = (arr: number[], length: number) => {
+    const result = [...arr];
+    while (result.length < length) result.push(0);
+    return result.slice(0, length);
+  };
+
+  const initialPrices = ensureArrayLength(
+    pricing.custom_initial_prices || [],
+    intervalCount
+  );
+  const recurringPrices = ensureArrayLength(
+    pricing.custom_recurring_prices || [],
+    intervalCount
+  );
+
+  const handlePriceChange = (
+    type: 'initial' | 'recurring',
+    index: number,
+    value: number
+  ) => {
+    const arrayKey = type === 'initial'
+      ? 'custom_initial_prices'
+      : 'custom_recurring_prices';
+
+    const newPrices = [...(pricing[arrayKey] || [])];
+    newPrices[index] = value;
+
+    setFormData({
+      ...formData,
+      [pricingKey]: {
+        ...pricing,
+        [arrayKey]: newPrices
+      }
+    });
+  };
+
+  return (
+    <div className={styles.customPricingGrid}>
+      <div className={styles.headerRow}>
+        <span>Interval</span>
+        <span>Initial Price Increase</span>
+        {formData.plan_category !== 'one-time' && (
+          <span>Recurring Price Increase</span>
+        )}
+      </div>
+
+      {initialPrices.map((initialPrice, index) => {
+        const intervalLabel = getIntervalLabel(pricingSettings, dimension, index);
+
+        return (
+          <div key={index} className={styles.intervalRow}>
+            <div className={styles.intervalLabel}>
+              <strong>{intervalLabel}</strong>
+            </div>
+
+            <div className={styles.priceInput}>
+              <span>+$</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={initialPrice}
+                onChange={(e) => handlePriceChange(
+                  'initial',
+                  index,
+                  parseFloat(e.target.value) || 0
+                )}
+                placeholder="0.00"
+              />
+            </div>
+
+            {formData.plan_category !== 'one-time' && (
+              <div className={styles.priceInput}>
+                <span>+$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={recurringPrices[index]}
+                  onChange={(e) => handlePriceChange(
+                    'recurring',
+                    index,
+                    parseFloat(e.target.value) || 0
+                  )}
+                  placeholder="0.00"
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div className={styles.pricingNote}>
+        <strong>Note:</strong> These exact price increases will be applied for
+        each interval. The first interval typically has $0 increase since
+        it represents the base size.
+      </div>
+    </div>
+  );
+};
 
 const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   plan,
@@ -65,6 +222,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   onClose,
   onSave,
   availablePestTypes,
+  companyId,
 }) => {
   const [formData, setFormData] = useState({
     plan_name: '',
@@ -73,7 +231,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     initial_price: 0,
     initial_discount: 0,
     recurring_price: 0,
-    billing_frequency: 'monthly',
+    billing_frequency: 'monthly' as string | null,
     treatment_frequency: 'monthly',
     includes_inspection: true,
     plan_features: [''],
@@ -84,14 +242,21 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_image_url: '',
     plan_disclaimer: '',
     is_active: true,
+    allow_custom_pricing: false,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
     home_size_pricing: {
+      pricing_mode: 'linear' as 'linear' | 'custom',
       initial_cost_per_interval: 20.00,
       recurring_cost_per_interval: 10.00,
+      custom_initial_prices: [0],
+      custom_recurring_prices: [0],
     },
     yard_size_pricing: {
+      pricing_mode: 'linear' as 'linear' | 'custom',
       initial_cost_per_interval: 25.00,
       recurring_cost_per_interval: 15.00,
+      custom_initial_prices: [0],
+      custom_recurring_prices: [0],
     },
   });
 
@@ -107,7 +272,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         initial_price: plan.initial_price || 0,
         initial_discount: plan.initial_discount || 0,
         recurring_price: plan.recurring_price,
-        billing_frequency: plan.billing_frequency,
+        billing_frequency: plan.plan_category === 'one-time' ? null : (plan.billing_frequency || 'monthly'),
         treatment_frequency: plan.treatment_frequency || 'monthly',
         includes_inspection: plan.includes_inspection,
         plan_features: plan.plan_features.length > 0 ? plan.plan_features : [''],
@@ -118,17 +283,24 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_image_url: plan.plan_image_url || '',
         plan_disclaimer: plan.plan_disclaimer || '',
         is_active: plan.is_active,
+        allow_custom_pricing: (plan as any).allow_custom_pricing || false,
         pest_coverage: plan.pest_coverage?.map(pc => ({
           pest_id: pc.pest_id,
           coverage_level: pc.coverage_level,
         })) || [],
-        home_size_pricing: (plan as any).home_size_pricing || {
-          initial_cost_per_interval: 20.00,
-          recurring_cost_per_interval: 10.00,
+        home_size_pricing: {
+          pricing_mode: (plan as any).home_size_pricing?.pricing_mode || 'linear',
+          initial_cost_per_interval: (plan as any).home_size_pricing?.initial_cost_per_interval || 20.00,
+          recurring_cost_per_interval: (plan as any).home_size_pricing?.recurring_cost_per_interval || 10.00,
+          custom_initial_prices: (plan as any).home_size_pricing?.custom_initial_prices || [0],
+          custom_recurring_prices: (plan as any).home_size_pricing?.custom_recurring_prices || [0],
         },
-        yard_size_pricing: (plan as any).yard_size_pricing || {
-          initial_cost_per_interval: 25.00,
-          recurring_cost_per_interval: 15.00,
+        yard_size_pricing: {
+          pricing_mode: (plan as any).yard_size_pricing?.pricing_mode || 'linear',
+          initial_cost_per_interval: (plan as any).yard_size_pricing?.initial_cost_per_interval || 25.00,
+          recurring_cost_per_interval: (plan as any).yard_size_pricing?.recurring_cost_per_interval || 15.00,
+          custom_initial_prices: (plan as any).yard_size_pricing?.custom_initial_prices || [0],
+          custom_recurring_prices: (plan as any).yard_size_pricing?.custom_recurring_prices || [0],
         },
       });
     } else {
@@ -140,7 +312,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         initial_price: 0,
         initial_discount: 0,
         recurring_price: 0,
-        billing_frequency: 'monthly',
+        billing_frequency: 'monthly' as string | null,
         treatment_frequency: 'monthly',
         includes_inspection: true,
         plan_features: [''],
@@ -151,14 +323,21 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_image_url: '',
         plan_disclaimer: '',
         is_active: true,
+        allow_custom_pricing: false,
         pest_coverage: [],
         home_size_pricing: {
+          pricing_mode: 'linear' as 'linear' | 'custom',
           initial_cost_per_interval: 20.00,
           recurring_cost_per_interval: 10.00,
+          custom_initial_prices: [0],
+          custom_recurring_prices: [0],
         },
         yard_size_pricing: {
+          pricing_mode: 'linear' as 'linear' | 'custom',
           initial_cost_per_interval: 25.00,
           recurring_cost_per_interval: 15.00,
+          custom_initial_prices: [0],
+          custom_recurring_prices: [0],
         },
       });
     }
@@ -313,11 +492,40 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate required fields
-    if (!formData.plan_name || !formData.recurring_price) {
-      alert('Plan name and recurring price are required');
+    if (!formData.plan_name) {
+      alert('Plan name is required');
       return;
+    }
+
+    if (!formData.initial_price || formData.initial_price <= 0) {
+      alert('Initial price is required and must be greater than 0');
+      return;
+    }
+
+    // Validate one-time plans
+    if (formData.plan_category === 'one-time') {
+      if (formData.recurring_price !== 0) {
+        alert('One-time service plans must have a recurring price of $0');
+        return;
+      }
+      if (formData.billing_frequency !== null) {
+        alert('One-time service plans should not have a billing frequency');
+        return;
+      }
+    }
+
+    // Validate subscription plans
+    if (formData.plan_category !== 'one-time') {
+      if (!formData.recurring_price || formData.recurring_price <= 0) {
+        alert('Recurring price is required for subscription plans and must be greater than 0');
+        return;
+      }
+      if (!formData.billing_frequency) {
+        alert('Billing frequency is required for subscription plans');
+        return;
+      }
     }
 
     // Enrich pest_coverage with additional pest info and filter out empty features and FAQs
@@ -414,11 +622,33 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   <label>Category</label>
                   <select
                     value={formData.plan_category}
-                    onChange={(e) => handleInputChange('plan_category', e.target.value)}
+                    onChange={(e) => {
+                      const newCategory = e.target.value as 'basic' | 'standard' | 'premium' | 'one-time';
+
+                      setFormData({
+                        ...formData,
+                        plan_category: newCategory,
+                        // Force recurring fields to appropriate values based on category
+                        recurring_price: newCategory === 'one-time' ? 0 : formData.recurring_price,
+                        billing_frequency: newCategory === 'one-time' ? null : (formData.billing_frequency || 'monthly'),
+                        // Clear interval recurring pricing for one-time plans
+                        home_size_pricing: {
+                          ...formData.home_size_pricing,
+                          recurring_cost_per_interval: newCategory === 'one-time' ? 0 : formData.home_size_pricing.recurring_cost_per_interval,
+                          custom_recurring_prices: newCategory === 'one-time' ? [] : formData.home_size_pricing.custom_recurring_prices,
+                        },
+                        yard_size_pricing: {
+                          ...formData.yard_size_pricing,
+                          recurring_cost_per_interval: newCategory === 'one-time' ? 0 : formData.yard_size_pricing.recurring_cost_per_interval,
+                          custom_recurring_prices: newCategory === 'one-time' ? [] : formData.yard_size_pricing.custom_recurring_prices,
+                        },
+                      });
+                    }}
                   >
                     <option value="basic">Basic</option>
                     <option value="standard">Standard</option>
                     <option value="premium">Premium</option>
+                    <option value="one-time">One-Time Service</option>
                   </select>
                 </div>
                 <div className={styles.formGroup}>
@@ -459,48 +689,53 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                 </div>
               </div>
 
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <label>Recurring Price ($) *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.recurring_price}
-                    onChange={(e) => handleInputChange('recurring_price', parseFloat(e.target.value) || 0)}
-                    required
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  {/* Empty div to maintain grid layout */}
-                </div>
-              </div>
+              {/* Only show recurring price and billing frequency for non-one-time services */}
+              {formData.plan_category !== 'one-time' && (
+                <>
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>Recurring Price ($) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.recurring_price}
+                        onChange={(e) => handleInputChange('recurring_price', parseFloat(e.target.value) || 0)}
+                        required
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      {/* Empty div to maintain grid layout */}
+                    </div>
+                  </div>
 
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <label>Billing Frequency</label>
-                  <select
-                    value={formData.billing_frequency}
-                    onChange={(e) => handleInputChange('billing_frequency', e.target.value)}
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="semi-annually">Semi-Annually</option>
-                    <option value="annually">Annually</option>
-                  </select>
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Treatment Frequency</label>
-                  <select
-                    value={formData.treatment_frequency}
-                    onChange={(e) => handleInputChange('treatment_frequency', e.target.value)}
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="bi-monthly">Bi-Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                  </select>
-                </div>
-              </div>
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>Billing Frequency</label>
+                      <select
+                        value={formData.billing_frequency || ''}
+                        onChange={(e) => handleInputChange('billing_frequency', e.target.value)}
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="semi-annually">Semi-Annually</option>
+                        <option value="annually">Annually</option>
+                      </select>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Treatment Frequency</label>
+                      <select
+                        value={formData.treatment_frequency}
+                        onChange={(e) => handleInputChange('treatment_frequency', e.target.value)}
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="bi-monthly">Bi-Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className={styles.formGroup}>
                 <label>Highlight Badge</label>
@@ -697,94 +932,241 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
 
               <div className={styles.pricingSection}>
                 <h5>Home Size Pricing</h5>
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label>Initial Cost Per Interval ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.home_size_pricing.initial_cost_per_interval}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        home_size_pricing: {
-                          ...formData.home_size_pricing,
-                          initial_cost_per_interval: parseFloat(e.target.value) || 0,
-                        },
-                      })}
-                      placeholder="20.00"
-                    />
-                    <small>Added to initial price for each interval above base</small>
-                  </div>
 
-                  <div className={styles.formGroup}>
-                    <label>Recurring Cost Per Interval ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.home_size_pricing.recurring_cost_per_interval}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        home_size_pricing: {
-                          ...formData.home_size_pricing,
-                          recurring_cost_per_interval: parseFloat(e.target.value) || 0,
-                        },
-                      })}
-                      placeholder="10.00"
-                    />
-                    <small>Added to recurring price for each interval above base</small>
-                  </div>
+                {/* Pricing Mode Toggle */}
+                <div className={styles.formGroup}>
+                  <label>Pricing Mode</label>
+                  <select
+                    value={formData.home_size_pricing.pricing_mode || 'linear'}
+                    onChange={(e) => {
+                      const newMode = e.target.value as 'linear' | 'custom';
+
+                      // Auto-populate custom arrays when switching to custom mode
+                      if (newMode === 'custom' && formData.home_size_pricing.pricing_mode !== 'custom') {
+                        const intervalCount = 5; // Default for now
+                        const customInitialPrices = Array.from({ length: intervalCount }, (_, i) =>
+                          i * formData.home_size_pricing.initial_cost_per_interval
+                        );
+                        const customRecurringPrices = Array.from({ length: intervalCount }, (_, i) =>
+                          i * formData.home_size_pricing.recurring_cost_per_interval
+                        );
+
+                        setFormData({
+                          ...formData,
+                          home_size_pricing: {
+                            ...formData.home_size_pricing,
+                            pricing_mode: newMode,
+                            custom_initial_prices: customInitialPrices,
+                            custom_recurring_prices: customRecurringPrices
+                          }
+                        });
+                      } else {
+                        setFormData({
+                          ...formData,
+                          home_size_pricing: {
+                            ...formData.home_size_pricing,
+                            pricing_mode: newMode
+                          }
+                        });
+                      }
+                    }}
+                  >
+                    <option value="linear">Linear (Same increase per interval)</option>
+                    <option value="custom">Custom (Set price for each interval)</option>
+                  </select>
+                  <small>
+                    Linear: Each interval adds the same amount (e.g., +$20, +$40, +$60)
+                    <br />
+                    Custom: Set exact prices for each interval (e.g., +$15, +$35, +$80)
+                    <br />
+                    <em>Switching to Custom will pre-fill values based on your linear pricing</em>
+                  </small>
                 </div>
+
+                {/* Conditional rendering based on mode */}
+                {(formData.home_size_pricing.pricing_mode || 'linear') === 'linear' ? (
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>Initial Cost Per Interval ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.home_size_pricing.initial_cost_per_interval}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          home_size_pricing: {
+                            ...formData.home_size_pricing,
+                            initial_cost_per_interval: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="20.00"
+                      />
+                      <small>Added to initial price for each interval above base</small>
+                    </div>
+
+                    {formData.plan_category !== 'one-time' && (
+                      <div className={styles.formGroup}>
+                        <label>Recurring Cost Per Interval ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.home_size_pricing.recurring_cost_per_interval}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            home_size_pricing: {
+                              ...formData.home_size_pricing,
+                              recurring_cost_per_interval: parseFloat(e.target.value) || 0,
+                            },
+                          })}
+                          placeholder="10.00"
+                        />
+                        <small>Added to recurring price for each interval above base</small>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <CustomIntervalPricingInput
+                    dimension="home"
+                    formData={formData}
+                    setFormData={setFormData}
+                    companyId={companyId}
+                  />
+                )}
               </div>
 
               <div className={styles.pricingSection}>
                 <h5>Yard Size Pricing</h5>
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label>Initial Cost Per Interval ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.yard_size_pricing.initial_cost_per_interval}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        yard_size_pricing: {
-                          ...formData.yard_size_pricing,
-                          initial_cost_per_interval: parseFloat(e.target.value) || 0,
-                        },
-                      })}
-                      placeholder="25.00"
-                    />
-                    <small>Added to initial price for each interval above base</small>
-                  </div>
 
-                  <div className={styles.formGroup}>
-                    <label>Recurring Cost Per Interval ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.yard_size_pricing.recurring_cost_per_interval}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        yard_size_pricing: {
-                          ...formData.yard_size_pricing,
-                          recurring_cost_per_interval: parseFloat(e.target.value) || 0,
-                        },
-                      })}
-                      placeholder="15.00"
-                    />
-                    <small>Added to recurring price for each interval above base</small>
-                  </div>
+                {/* Pricing Mode Toggle */}
+                <div className={styles.formGroup}>
+                  <label>Pricing Mode</label>
+                  <select
+                    value={formData.yard_size_pricing.pricing_mode || 'linear'}
+                    onChange={(e) => {
+                      const newMode = e.target.value as 'linear' | 'custom';
+
+                      // Auto-populate custom arrays when switching to custom mode
+                      if (newMode === 'custom' && formData.yard_size_pricing.pricing_mode !== 'custom') {
+                        // Default to 5 intervals if pricing settings not available
+                        const intervalCount = 5;
+                        const customInitialPrices = Array.from({ length: intervalCount }, (_, i) =>
+                          i * formData.yard_size_pricing.initial_cost_per_interval
+                        );
+                        const customRecurringPrices = Array.from({ length: intervalCount }, (_, i) =>
+                          i * formData.yard_size_pricing.recurring_cost_per_interval
+                        );
+
+                        setFormData({
+                          ...formData,
+                          yard_size_pricing: {
+                            ...formData.yard_size_pricing,
+                            pricing_mode: newMode,
+                            custom_initial_prices: customInitialPrices,
+                            custom_recurring_prices: customRecurringPrices,
+                          },
+                        });
+                      } else {
+                        setFormData({
+                          ...formData,
+                          yard_size_pricing: {
+                            ...formData.yard_size_pricing,
+                            pricing_mode: newMode,
+                          },
+                        });
+                      }
+                    }}
+                  >
+                    <option value="linear">Linear (Same increase per interval)</option>
+                    <option value="custom">Custom (Set price for each interval)</option>
+                  </select>
+                  <small>
+                    Linear: Each interval adds the same amount (e.g., +$25, +$50, +$75)
+                    <br />
+                    Custom: Set exact prices for each interval (e.g., +$20, +$45, +$85)
+                    <br />
+                    <em>Switching to Custom will pre-fill values based on your linear pricing</em>
+                  </small>
                 </div>
+
+                {/* Conditional rendering based on mode */}
+                {(formData.yard_size_pricing.pricing_mode || 'linear') === 'linear' ? (
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>Initial Cost Per Interval ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.yard_size_pricing.initial_cost_per_interval}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          yard_size_pricing: {
+                            ...formData.yard_size_pricing,
+                            initial_cost_per_interval: parseFloat(e.target.value) || 0,
+                          },
+                        })}
+                        placeholder="25.00"
+                      />
+                      <small>Added to initial price for each interval above base</small>
+                    </div>
+
+                    {formData.plan_category !== 'one-time' && (
+                      <div className={styles.formGroup}>
+                        <label>Recurring Cost Per Interval ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.yard_size_pricing.recurring_cost_per_interval}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            yard_size_pricing: {
+                              ...formData.yard_size_pricing,
+                              recurring_cost_per_interval: parseFloat(e.target.value) || 0,
+                            },
+                          })}
+                          placeholder="15.00"
+                        />
+                        <small>Added to recurring price for each interval above base</small>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <CustomIntervalPricingInput
+                    dimension="yard"
+                    formData={formData}
+                    setFormData={setFormData}
+                    companyId={companyId}
+                  />
+                )}
               </div>
 
               <div className={styles.pricingNote}>
                 <strong>Note:</strong> These prices are applied for each interval step above the base size.
                 For example, if a home is in the second interval (1501-2000 sq ft), the initial cost increase
                 would be 1 × Initial Cost Per Interval.
+              </div>
+
+              <hr style={{ margin: '24px 0', border: 'none', borderTop: '1px solid #e9ecef' }} />
+
+              <h4>Custom Pricing Options</h4>
+              <div className={styles.checkboxGroup}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.allow_custom_pricing}
+                    onChange={(e) => handleInputChange('allow_custom_pricing', e.target.checked)}
+                    style={{ marginTop: '3px' }}
+                  />
+                  <div>
+                    <div>Allow custom pricing for this plan</div>
+                    <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                      When enabled, sales representatives can set custom prices when adding this plan to quotes instead of using calculated prices.
+                    </small>
+                  </div>
+                </label>
               </div>
             </div>
           )}

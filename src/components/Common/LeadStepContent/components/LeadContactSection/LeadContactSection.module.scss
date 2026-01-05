@@ -1,0 +1,211 @@
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 18px;
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+.twoColumnGrid {
+  display: grid;
+  grid-template-columns: 215px 1fr;
+  gap: 20px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leftColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.commentSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.fullWidthSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.nextActionSection {
+  flex-grow: 1;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.infoBanner {
+  padding: 8px 12px;
+  background-color: var(--warning-50);
+  border: 1px solid var(--warning-600);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.infoBannerIcon {
+  circle,
+  path {
+    stroke: var(--warning-800);
+  }
+}
+
+.infoBannerText {
+  color: var(--warning-800);
+  font-size: 14px;
+}
+
+.textareaLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+
+.optionalLabel {
+  font-size: 14px;
+  color: var(--gray-500);
+  font-weight: 400;
+}
+
+.activityTextarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  background-color: white;
+  flex-grow: 1;
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.viewHistoryButton {
+  padding: 8px 16px;
+  border: none;
+  background-color: white;
+  color: var(--gray-700);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logActivityButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--action-600);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background-color: var(--action-700);
+  }
+
+  &:active:not(:disabled) {
+    background-color: var(--action-800);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.nextRecommendedHeader {
+  color: var(--UI-Gray-900);
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 170%;
+}
+
+.dataLabel {
+  font-size: 12px;
+  line-height: 14px;
+  font-weight: 500;
+  color: var(--gray-500);
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-sidebar-expanded='true'] {
+  .nextActionSection {
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  .dataLabel {
+    grid-column-start: 1;
+  }
+}
+
+.sectionWrapper {
+  transition: all 0.2s ease;
+  border-radius: 8px;
+
+  &.active {
+    box-shadow:
+      0 0 0 4px rgba(0, 105, 224, 0.16),
+      0 2px 5px 0 rgba(0, 105, 224, 0.08),
+      0 0 0 1px rgba(0, 105, 224, 0.64),
+      0 1px 1px 0 rgba(0, 105, 224, 0.12);
+  }
+}

@@ -5,12 +5,16 @@ import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag } from 'lucide-react';
+import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag, FileText, Map, Bug } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
 import SalesConfigManager from './SalesConfigManager';
 import DiscountManager from './DiscountManager';
 import EmailDomainManager from './EmailDomainManager';
+import ServicePlansManager from './ServicePlansManager';
+import ServiceAreasManager from './ServiceAreasManager';
+import PestManager from './PestManager';
+import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -48,7 +52,7 @@ interface CompanyManagementProps {
   user: User;
 }
 
-type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
+type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pest-management' | 'service-plans' | 'service-areas' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
@@ -422,6 +426,9 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'google-places', label: 'Google Places', icon: Settings },
     { id: 'login-page', label: 'Login Page', icon: Monitor },
+    { id: 'pest-management', label: 'Pest Management', icon: Bug },
+    { id: 'service-plans', label: 'Service Plans', icon: FileText },
+    { id: 'service-areas', label: 'Service Areas', icon: Map },
     { id: 'pricing-settings', label: 'Pricing Settings', icon: DollarSign },
     { id: 'sales-config', label: 'Sales Config', icon: Target },
     { id: 'discounts', label: 'Discounts', icon: Tag },
@@ -528,6 +535,15 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
               onSave={() => handleSave('login-page', {})}
               saving={saving}
             />
+          )}
+          {activeSection === 'pest-management' && (
+            <PestManager />
+          )}
+          {activeSection === 'service-plans' && (
+            <ServicePlansManager companyId={companyId} />
+          )}
+          {activeSection === 'service-areas' && (
+            <ServiceAreasManager companyId={companyId} />
           )}
           {activeSection === 'pricing-settings' && (
             <PricingSettingsManager companyId={companyId} />
@@ -752,23 +768,43 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     size: company.size || '',
   });
   const [timezone, setTimezone] = useState<string>('America/New_York');
+  const [businessHours, setBusinessHours] = useState<BusinessHoursData>({
+    monday: { start: '09:00', end: '17:00', closed: false },
+    tuesday: { start: '09:00', end: '17:00', closed: false },
+    wednesday: { start: '09:00', end: '17:00', closed: false },
+    thursday: { start: '09:00', end: '17:00', closed: false },
+    friday: { start: '09:00', end: '17:00', closed: false },
+    saturday: { start: '09:00', end: '17:00', closed: true },
+    sunday: { start: '09:00', end: '17:00', closed: true },
+  });
+  const [termsUrl, setTermsUrl] = useState<string>('');
+  const [privacyUrl, setPrivacyUrl] = useState<string>('');
   const [loadingTimezone, setLoadingTimezone] = useState(true);
 
   useEffect(() => {
-    const loadTimezone = async () => {
+    const loadSettings = async () => {
       try {
         const response = await fetch(`/api/companies/${company.id}/settings`);
         if (response.ok) {
           const { settings } = await response.json();
           setTimezone(settings.company_timezone?.value || 'America/New_York');
+
+          // Load business hours if they exist
+          if (settings.business_hours?.value) {
+            setBusinessHours(settings.business_hours.value);
+          }
+
+          // Load Terms & Privacy URLs
+          setTermsUrl(settings.terms_conditions_url?.value || '');
+          setPrivacyUrl(settings.privacy_policy_url?.value || '');
         }
       } catch (error) {
-        console.error('Error loading timezone:', error);
+        console.error('Error loading settings:', error);
       } finally {
         setLoadingTimezone(false);
       }
     };
-    loadTimezone();
+    loadSettings();
   }, [company.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -777,7 +813,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     // Save business info
     await onSave(formData);
 
-    // Save timezone setting separately
+    // Save timezone, business hours, and URLs settings separately
     try {
       await fetch(`/api/companies/${company.id}/settings`, {
         method: 'PUT',
@@ -787,12 +823,24 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
             company_timezone: {
               value: timezone,
               type: 'string'
+            },
+            business_hours: {
+              value: businessHours,
+              type: 'json'
+            },
+            terms_conditions_url: {
+              value: termsUrl,
+              type: 'string'
+            },
+            privacy_policy_url: {
+              value: privacyUrl,
+              type: 'string'
             }
           }
         }),
       });
     } catch (error) {
-      console.error('Error saving timezone:', error);
+      console.error('Error saving settings:', error);
     }
   };
 
@@ -850,6 +898,35 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
             </optgroup>
           </select>
           <small>This timezone will be used for scheduling tasks and business hours</small>
+        </div>
+
+        <div className={styles.formGroup}>
+          <BusinessHoursEditor
+            businessHours={businessHours}
+            onChange={setBusinessHours}
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Terms & Conditions URL:</label>
+          <input
+            type="url"
+            value={termsUrl}
+            onChange={(e) => setTermsUrl(e.target.value)}
+            placeholder="https://example.com/terms"
+          />
+          <small>Link to your company&apos;s Terms & Conditions page</small>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Privacy Policy URL:</label>
+          <input
+            type="url"
+            value={privacyUrl}
+            onChange={(e) => setPrivacyUrl(e.target.value)}
+            placeholder="https://example.com/privacy"
+          />
+          <small>Link to your company&apos;s Privacy Policy page</small>
         </div>
 
         <button type="submit" disabled={saving} className={styles.saveButton}>

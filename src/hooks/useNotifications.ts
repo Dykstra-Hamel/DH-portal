@@ -298,14 +298,14 @@ export function useNotifications() {
       switch (notification.reference_type) {
         case 'ticket':
           router.push(
-            `/connections/incoming?ticketId=${notification.reference_id}`
+            `/tickets/new?ticketId=${notification.reference_id}`
           );
           break;
         case 'lead':
-          router.push(`/connections/leads/${notification.reference_id}`);
+          router.push(`/tickets/leads/${notification.reference_id}`);
           break;
         case 'support_case':
-          router.push('/connections/customer-service');
+          router.push('/tickets/customer-service');
           break;
         case 'project':
           router.push(`/projects?highlight=${notification.reference_id}`);

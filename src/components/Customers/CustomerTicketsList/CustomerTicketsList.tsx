@@ -23,7 +23,7 @@ export function CustomerTicketsList({
   // Handle item actions (mainly navigation to ticket detail)
   const handleItemAction = (action: string, ticket: Ticket) => {
     if (action === 'navigate' || !action) {
-      router.push(`/connections/incoming?ticketId=${ticket.id}`);
+      router.push(`/tickets/new?ticketId=${ticket.id}`);
     }
   };
 

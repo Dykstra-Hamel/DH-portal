@@ -15,7 +15,7 @@ interface PageAccessGuardProps {
 export function PageAccessGuard({
   pageType,
   children,
-  redirectTo = '/connections',
+  redirectTo = '/tickets',
   showErrorPage = true
 }: PageAccessGuardProps) {
   const { hasAccess, isLoading, error, accessReason } = useCurrentUserPageAccess(pageType);
@@ -113,10 +113,10 @@ function AccessDeniedPage({ pageType }: AccessDeniedPageProps) {
 
         <div className={styles.actions}>
           <button
-            onClick={() => router.push('/connections')}
+            onClick={() => router.push('/tickets')}
             className={styles.backButton}
           >
-            Back to Connections
+            Back to Tickets
           </button>
           <button
             onClick={() => router.push('/settings')}

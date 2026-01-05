@@ -86,7 +86,10 @@ export default function TabbedFAQSection({
   return (
     <section id="faq-section" className={styles.faqSection}>
       <div className={styles.faqContainer}>
-        <h2 className={styles.faqHeading}>{processedHeading}</h2>
+        <h2
+          className={styles.faqHeading}
+          dangerouslySetInnerHTML={{ __html: processedHeading }}
+        />
 
         {/* Mobile Dropdown (visible on mobile only) */}
         <div className={styles.faqDropdownContainer}>

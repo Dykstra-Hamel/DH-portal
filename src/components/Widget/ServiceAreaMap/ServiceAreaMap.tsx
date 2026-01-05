@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   APIProvider,
   Map,
@@ -70,6 +70,7 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
   const newAreaNameRef = useRef('');
   const newAreaPriorityRef = useRef(0);
   const prevExistingAreasRef = useRef<ServiceArea[]>([]);
+  const hasInitiallycenteredRef = useRef(false);
 
   // Save state tracking
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -94,7 +95,27 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
     lng: -74.006, // New York City
   };
 
-  const initialCenter = defaultCenter || fallbackCenter;
+  // Memoize the initial center so onLoad/useEffect dependencies stay stable across renders
+  const initialCenter = useMemo(
+    () => defaultCenter || fallbackCenter,
+    [defaultCenter?.lat, defaultCenter?.lng]
+  );
+
+  // Re-center once when a default center becomes available (but allow user panning afterwards)
+  useEffect(() => {
+    if (map && defaultCenter && !hasInitiallycenteredRef.current) {
+      const current = map.getCenter();
+      const needsUpdate =
+        !current ||
+        Math.abs(current.lat() - defaultCenter.lat) > 1e-6 ||
+        Math.abs(current.lng() - defaultCenter.lng) > 1e-6;
+
+      if (needsUpdate) {
+        map.setCenter(defaultCenter);
+      }
+      hasInitiallycenteredRef.current = true;
+    }
+  }, [map, defaultCenter?.lat, defaultCenter?.lng]);
 
   // Map options
   const mapOptions = {

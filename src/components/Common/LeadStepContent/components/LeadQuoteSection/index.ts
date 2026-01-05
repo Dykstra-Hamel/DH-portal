@@ -1,0 +1,1 @@
+export { LeadQuoteSection } from './LeadQuoteSection';

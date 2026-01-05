@@ -1,13 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, Clock, Loader, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { CheckCircle, XCircle, Clock, Loader, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import {
+  createCampaignExecutionChannel,
+  subscribeToCampaignExecutionUpdates,
+  CampaignExecutionUpdatePayload,
+  removeCampaignExecutionChannel
+} from '@/lib/realtime/campaign-execution-channel';
 import styles from './CampaignExecutions.module.scss';
 
 interface CampaignExecutionsProps {
   campaignId: string;
   companyId: string;
   companyTimezone?: string;
+  onExecutionCountChange?: (count: number) => void;
 }
 
 interface Customer {
@@ -35,9 +43,11 @@ interface Execution {
   workflow_run_id: string | null;
   customers: Customer;
   step_results: StepResult[];
+  cancellation_reason: string | null;
+  cancelled_at_step: string | number | null;
 }
 
-export default function CampaignExecutions({ campaignId, companyId, companyTimezone = 'America/New_York' }: CampaignExecutionsProps) {
+export default function CampaignExecutions({ campaignId, companyId, companyTimezone = 'America/New_York', onExecutionCountChange }: CampaignExecutionsProps) {
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -49,9 +59,140 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
     hasMore: false,
   });
 
+  // Track execution IDs we've seen to prevent duplicate counting
+  const seenExecutionIds = useRef<Set<string>>(new Set());
+
   useEffect(() => {
+    // Clear seen IDs when campaign changes
+    seenExecutionIds.current.clear();
     fetchExecutions();
   }, [campaignId, filterStatus]);
+
+  // Notify parent when execution count changes
+  useEffect(() => {
+    if (onExecutionCountChange) {
+      onExecutionCountChange(pagination.total);
+    }
+  }, [pagination.total, onExecutionCountChange]);
+
+  // Realtime subscription for execution updates
+  useEffect(() => {
+    if (!campaignId) return;
+
+    const channel = createCampaignExecutionChannel(campaignId);
+
+    subscribeToCampaignExecutionUpdates(channel, async (payload: CampaignExecutionUpdatePayload) => {
+      const { campaign_id, action, execution_id } = payload;
+
+      // Verify this update is for the current campaign
+      if (campaign_id !== campaignId) return;
+
+      if (action === 'INSERT' || action === 'UPDATE') {
+        // Fetch just the updated execution instead of all executions
+        try {
+          const supabase = createClient();
+          const { data: execution, error } = await supabase
+            .from('campaign_executions')
+            .select(`
+              id,
+              customer_id,
+              lead_id,
+              execution_status,
+              started_at,
+              completed_at,
+              automation_execution_id,
+              customers(
+                id,
+                first_name,
+                last_name,
+                email,
+                phone
+              ),
+              automation_execution:automation_executions(execution_data, error_message)
+            `)
+            .eq('id', execution_id)
+            .single();
+
+          if (error) {
+            console.error('Error fetching updated execution:', error);
+            return;
+          }
+
+          if (execution) {
+            // Supabase returns foreign keys as arrays, extract first element
+            const automationExec = Array.isArray(execution.automation_execution)
+              ? execution.automation_execution[0]
+              : execution.automation_execution;
+
+            const customer = Array.isArray(execution.customers)
+              ? execution.customers[0]
+              : execution.customers;
+
+            // Map execution_status to status for frontend compatibility (matches API mapping)
+            const mappedExecution: Execution = {
+              ...execution,
+              customers: customer,
+              status: execution.execution_status,
+              workflow_run_id: execution.automation_execution_id,
+              error_message: automationExec?.error_message || null,
+              step_results: automationExec?.execution_data?.stepResults || [],
+              cancellation_reason: automationExec?.execution_data?.cancellationReason || null,
+              cancelled_at_step: automationExec?.execution_data?.cancelledAtStep || null,
+            };
+
+            setExecutions(prev => {
+              const exists = prev.some(exec => exec.id === mappedExecution.id);
+
+              let newExecutions;
+              if (exists) {
+                // Update existing execution
+                newExecutions = prev.map(exec =>
+                  exec.id === mappedExecution.id ? mappedExecution : exec
+                );
+              } else {
+                // Add new execution to beginning of list
+                newExecutions = [mappedExecution, ...prev];
+
+                // Only increment count if this is truly a new execution we haven't seen before
+                if (!seenExecutionIds.current.has(mappedExecution.id)) {
+                  seenExecutionIds.current.add(mappedExecution.id);
+                  setPagination(prevPag => ({
+                    ...prevPag,
+                    total: prevPag.total + 1,
+                  }));
+                }
+              }
+
+              return newExecutions;
+            });
+          }
+        } catch (error) {
+          console.error('Error handling execution update:', error);
+        }
+      } else if (action === 'DELETE') {
+        // Remove execution from list and decrement total count
+        setExecutions(prev => {
+          const prevLength = prev.length;
+          const filtered = prev.filter(exec => exec.id !== execution_id);
+
+          // Only update count if array length actually changed
+          if (filtered.length < prevLength && seenExecutionIds.current.has(execution_id)) {
+            seenExecutionIds.current.delete(execution_id);
+            setPagination(prevPag => ({
+              ...prevPag,
+              total: Math.max(0, prevPag.total - 1),
+            }));
+          }
+
+          return filtered;
+        });
+      }
+    });
+
+    return () => {
+      removeCampaignExecutionChannel(channel);
+    };
+  }, [campaignId]);
 
   const fetchExecutions = async (offset = 0) => {
     try {
@@ -74,10 +215,16 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
       });
 
       if (result.success) {
+        const newExecutions = result.executions || [];
+
         if (offset === 0) {
-          setExecutions(result.executions || []);
+          setExecutions(newExecutions);
+          // Reset seen IDs when fetching fresh data
+          seenExecutionIds.current = new Set(newExecutions.map((e: Execution) => e.id));
         } else {
-          setExecutions(prev => [...prev, ...(result.executions || [])]);
+          setExecutions(prev => [...prev, ...newExecutions]);
+          // Add new IDs to seen set
+          newExecutions.forEach((e: Execution) => seenExecutionIds.current.add(e.id));
         }
         setPagination(result.pagination);
       } else {
@@ -106,6 +253,8 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
   };
 
   const getStatusIcon = (status: string) => {
+    if (!status) return <Clock size={20} className={styles.iconPending} />;
+
     switch (status) {
       case 'completed':
         return <CheckCircle size={20} className={styles.iconCompleted} />;
@@ -119,6 +268,7 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
   };
 
   const getStatusLabel = (status: string) => {
+    if (!status) return 'Pending';
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
@@ -172,8 +322,17 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
             <option value="pending">Pending</option>
             <option value="running">Running</option>
             <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
             <option value="failed">Failed</option>
           </select>
+          <button
+            onClick={() => fetchExecutions(0)}
+            disabled={loading}
+            className={styles.refreshButton}
+            title="Refresh executions"
+          >
+            <RefreshCw size={16} className={loading ? styles.spinning : ''} />
+          </button>
         </div>
       </div>
 
@@ -249,6 +408,12 @@ export default function CampaignExecutions({ campaignId, companyId, companyTimez
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {execution.status === 'cancelled' && execution.cancellation_reason && (
+                      <div className={styles.cancellationMessage}>
+                        <strong>Cancellation Reason:</strong> {execution.cancellation_reason}
                       </div>
                     )}
 

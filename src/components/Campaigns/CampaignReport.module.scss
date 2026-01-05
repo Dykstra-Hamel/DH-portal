@@ -104,12 +104,12 @@
 // KPI Cards Grid
 .kpiGrid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   margin-bottom: 2rem;
 
   @media (max-width: 1200px) {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   @media (max-width: 768px) {
@@ -165,6 +165,11 @@
   &.error {
     background: rgba(231, 0, 11, 0.1);
     color: #e7000b;
+  }
+
+  &.purple {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
   }
 }
 

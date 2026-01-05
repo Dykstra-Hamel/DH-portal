@@ -1,23 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { X, CircleCheck, RefreshCcwDot, CircleSlash } from 'lucide-react';
+import { X, Trash2, CircleSlash } from 'lucide-react';
 import styles from './EndCadenceModal.module.scss';
 
 interface EndCadenceModalProps {
   isOpen: boolean;
-  onProceedToQuote: () => Promise<void>;
-  onConvertToAutomation: () => Promise<void>;
+  onMarkAsLost: () => void;
   onEndOnly: () => Promise<void>;
   onCancel: () => void;
 }
 
-type EndOption = 'quote' | 'automation' | 'end' | null;
+type EndOption = 'lost' | 'end' | null;
 
 export function EndCadenceModal({
   isOpen,
-  onProceedToQuote,
-  onConvertToAutomation,
+  onMarkAsLost,
   onEndOnly,
   onCancel,
 }: EndCadenceModalProps) {
@@ -32,11 +30,8 @@ export function EndCadenceModal({
     setIsProcessing(true);
     try {
       switch (selectedOption) {
-        case 'quote':
-          await onProceedToQuote();
-          break;
-        case 'automation':
-          await onConvertToAutomation();
+        case 'lost':
+          onMarkAsLost();
           break;
         case 'end':
           await onEndOnly();
@@ -51,10 +46,8 @@ export function EndCadenceModal({
     if (isProcessing) return 'Processing...';
 
     switch (selectedOption) {
-      case 'quote':
-        return 'Proceed to Quote!';
-      case 'automation':
-        return 'Convert to Automation';
+      case 'lost':
+        return 'Mark as Lost';
       case 'end':
         return 'End Cadence';
       default:
@@ -64,10 +57,8 @@ export function EndCadenceModal({
 
   const getButtonClass = () => {
     switch (selectedOption) {
-      case 'quote':
-        return styles.proceedButton;
-      case 'automation':
-        return styles.convertButton;
+      case 'lost':
+        return styles.lostButton;
       case 'end':
         return styles.endButton;
       default:
@@ -95,45 +86,6 @@ export function EndCadenceModal({
               <input
                 type="radio"
                 name="endOption"
-                value="quote"
-                checked={selectedOption === 'quote'}
-                onChange={() => setSelectedOption('quote')}
-                disabled={isProcessing}
-                className={styles.radioInput}
-              />
-              <span className={styles.radioCustom}></span>
-              <div className={styles.optionContent}>
-                <strong>I&apos;m ready to quote this lead.</strong>
-                <span className={styles.optionDescription}>
-                  Complete current stage and task. Proceed to the next stage!
-                </span>
-              </div>
-            </label>
-
-            <label className={styles.radioOption}>
-              <input
-                type="radio"
-                name="endOption"
-                value="automation"
-                checked={selectedOption === 'automation'}
-                onChange={() => setSelectedOption('automation')}
-                disabled={isProcessing}
-                className={styles.radioInput}
-              />
-              <span className={styles.radioCustom}></span>
-              <div className={styles.optionContent}>
-                <strong>This lead is not interested.</strong>
-                <span className={styles.optionDescription}>
-                  Complete current stage and task. Go to automation (coming
-                  soon).
-                </span>
-              </div>
-            </label>
-
-            <label className={styles.radioOption}>
-              <input
-                type="radio"
-                name="endOption"
                 value="end"
                 checked={selectedOption === 'end'}
                 onChange={() => setSelectedOption('end')}
@@ -145,6 +97,25 @@ export function EndCadenceModal({
                 <strong>I want to try something else.</strong>
                 <span className={styles.optionDescription}>
                   End cadence and remove remaining tasks.
+                </span>
+              </div>
+            </label>
+
+            <label className={styles.radioOption}>
+              <input
+                type="radio"
+                name="endOption"
+                value="lost"
+                checked={selectedOption === 'lost'}
+                onChange={() => setSelectedOption('lost')}
+                disabled={isProcessing}
+                className={styles.radioInput}
+              />
+              <span className={styles.radioCustom}></span>
+              <div className={styles.optionContent}>
+                <strong>This lead is not interested.</strong>
+                <span className={styles.optionDescription}>
+                  Mark lead as lost and end the cadence.
                 </span>
               </div>
             </label>
@@ -166,8 +137,7 @@ export function EndCadenceModal({
             className={getButtonClass()}
             disabled={!selectedOption || isProcessing}
           >
-            {selectedOption === 'quote' && <CircleCheck size={18} />}
-            {selectedOption === 'automation' && <RefreshCcwDot size={18} />}
+            {selectedOption === 'lost' && <Trash2 size={18} />}
             {selectedOption === 'end' && <CircleSlash size={18} />}
             {getButtonText()}
           </button>

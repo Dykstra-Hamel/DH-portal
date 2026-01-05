@@ -1,0 +1,123 @@
+// Call Information Card Styles
+.cardContent {
+  padding: 20px 16px;
+}
+
+.callInsightsSection {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-300);
+  margin-bottom: 16px;
+}
+
+.callInsightsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.callDetailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.callDetailsSection {
+  margin-top: 24px;
+}
+
+.callDetailsHeader {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-300);
+  margin-bottom: 16px;
+}
+
+.attributionSection {
+  margin-top: 24px;
+}
+
+// Recording Section
+.recordingSection {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-300);
+}
+
+// Transcript Section
+.transcriptSection {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-300);
+}
+
+.transcriptHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.transcriptContent {
+  background: var(--gray-50);
+  padding: 16px;
+  border-radius: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.toggleContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background-color: var(--gray-300);
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &.active {
+    background-color: var(--action-600);
+  }
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.toggleCircle {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+
+  .active & {
+    transform: translateX(20px);
+  }
+}
+
+.toggleLabel {
+  font-size: 14px;
+  color: var(--gray-700);
+}
+
+.noCallData {
+  padding: 32px;
+  text-align: center;
+  color: var(--gray-500);
+}
+
+@media (max-width: 768px) {
+  .callInsightsGrid {
+    grid-template-columns: 1fr;
+  }
+}

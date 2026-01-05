@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { ChevronDown, Users, CircleCheck } from 'lucide-react';
@@ -221,9 +222,11 @@ export function ReadyToScheduleModal({
                   {selectedDisplay.isTeam ? (
                     <TeamAvatar />
                   ) : selectedDisplay.avatar ? (
-                    <img
+                    <Image
                       src={selectedDisplay.avatar}
                       alt={selectedDisplay.name}
+                      width={32}
+                      height={32}
                       className={styles.avatar}
                     />
                   ) : (
@@ -259,9 +262,11 @@ export function ReadyToScheduleModal({
                       }}
                     >
                       {currentUser.avatar ? (
-                        <img
+                        <Image
                           src={currentUser.avatar}
                           alt={currentUser.name}
+                          width={32}
+                          height={32}
                           className={styles.avatar}
                         />
                       ) : (
@@ -310,9 +315,11 @@ export function ReadyToScheduleModal({
                         }}
                       >
                         {schedulingUser.avatar_url ? (
-                          <img
+                          <Image
                             src={schedulingUser.avatar_url}
                             alt={schedulingUser.display_name}
+                            width={32}
+                            height={32}
                             className={styles.avatar}
                           />
                         ) : (

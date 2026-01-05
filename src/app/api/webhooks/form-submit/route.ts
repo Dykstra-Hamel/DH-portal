@@ -18,6 +18,7 @@ import {
   createCorsErrorResponse,
   validateOrigin,
 } from '@/lib/cors';
+import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { parseFormSubmission } from '@/lib/gemini/form-parser';
 import type { FormSubmissionResponse } from '@/types/form-submission';
 import {
@@ -453,7 +454,7 @@ export async function POST(request: NextRequest) {
         lead_source: 'campaign',
         lead_type: 'web_form',
         service_type: geminiResult.ticket.service_type || 'Pest Control',
-        lead_status: 'unassigned',
+        lead_status: 'new',
         comments: geminiResult.ticket.description || 'Campaign form submission',
         priority: geminiResult.ticket.priority || 'medium',
         utm_campaign: campaignId, // Also store in UTM for tracking purposes
@@ -479,6 +480,13 @@ export async function POST(request: NextRequest) {
       }
 
       leadId = lead.id;
+
+      // Send lead creation notification (non-blocking)
+      notifyLeadCreated(lead.id, companyId, {
+        assignedUserId: undefined,
+      }).catch(error => {
+        console.error('Lead notification failed:', error);
+      });
     } else {
       // Non-campaign submission: Create a ticket (existing behavior)
       const ticketData: any = {

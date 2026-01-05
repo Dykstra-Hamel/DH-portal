@@ -68,6 +68,24 @@ const CustomerLibraryIcon = () => (
   </svg>
 );
 
+const ArchivedIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 18 18"
+    fill="none"
+  >
+    <path
+      d="M14.25 6V14.25C14.25 14.6478 14.092 15.0294 13.8107 15.3107C13.5294 15.592 13.1478 15.75 12.75 15.75H5.25C4.85218 15.75 4.47064 15.592 4.18934 15.3107C3.90804 15.0294 3.75 14.6478 3.75 14.25V6M1.5 6H16.5M7.5 9V12.75M10.5 9V12.75M11.25 6V3C11.25 2.80109 11.171 2.61032 11.0303 2.46967C10.8897 2.32902 10.6989 2.25 10.5 2.25H7.5C7.30109 2.25 7.11032 2.32902 6.96967 2.46967C6.82902 2.61032 6.75 2.80109 6.75 3V6"
+      stroke="#6A7282"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 interface SidebarProps {
   collapsed?: boolean;
   isActive?: boolean;
@@ -180,7 +198,7 @@ export function SecondarySideNav({
             />
           </svg>
         );
-      case 'connections':
+      case 'tickets':
         return (
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -352,7 +370,10 @@ export function SecondarySideNav({
       case 'campaigns':
         return [
           {
-            items: [{ text: 'Dashboard', href: '/campaigns' }],
+            items: [
+              { text: 'Dashboard', href: '/campaigns' },
+              { text: 'Contact Lists', href: '/campaigns/contact-lists' },
+            ],
           },
         ];
       case 'customers':
@@ -512,42 +533,42 @@ export function SecondarySideNav({
             ],
           },
         ];
-      case 'connections':
+      case 'tickets':
       default:
         return [
           {
             items: [
               {
-                text: 'New',
-                href: '/connections/incoming',
+                text: 'New Tickets',
+                href: '/tickets/new',
                 count: counts.tickets,
                 countType: 'tickets',
                 showRedDot:
                   newItemIndicators.tickets &&
-                  pathname !== '/connections/incoming' &&
-                  !pathname.startsWith('/connections/incoming/') &&
-                  !pathname.startsWith('/connections/calls-and-forms'),
+                  pathname !== '/tickets/new' &&
+                  !pathname.startsWith('/tickets/new/') &&
+                  !pathname.startsWith('/tickets/calls-and-forms'),
               },
               {
                 text: 'Sales Leads',
-                href: '/connections/leads',
+                href: '/tickets/leads',
                 count: counts.leads,
                 countType: 'leads',
                 showRedDot: counts.unassigned_leads > 0,
               },
               {
                 text: 'Scheduling',
-                href: '/connections/scheduling',
+                href: '/tickets/scheduling',
                 count: counts.scheduling,
                 countType: 'scheduling',
                 showRedDot:
                   newItemIndicators.scheduling &&
-                  pathname !== '/connections/scheduling' &&
-                  !pathname.startsWith('/connections/scheduling/'),
+                  pathname !== '/tickets/scheduling' &&
+                  !pathname.startsWith('/tickets/scheduling/'),
               },
               {
                 text: 'Customer Service',
-                href: '/connections/customer-service',
+                href: '/tickets/customer-service',
                 count: counts.cases,
                 countType: 'cases',
                 showRedDot: counts.unassigned_cases > 0,
@@ -561,13 +582,13 @@ export function SecondarySideNav({
                 ? [
                     {
                       text: 'My Sales Leads',
-                      href: '/connections/my-sales-leads',
+                      href: '/tickets/my-sales-leads',
                       count: counts.my_leads,
                       countType: 'my_leads',
                       hasNewItems:
                         newItemIndicators.my_leads &&
-                        pathname !== '/connections/my-sales-leads' &&
-                        !pathname.startsWith('/connections/my-sales-leads/'),
+                        pathname !== '/tickets/my-sales-leads' &&
+                        !pathname.startsWith('/tickets/my-sales-leads/'),
                     },
                   ]
                 : []),
@@ -575,25 +596,25 @@ export function SecondarySideNav({
                 ? [
                     {
                       text: 'My Support Cases',
-                      href: '/connections/my-support-cases',
+                      href: '/tickets/my-support-cases',
                       count: counts.my_cases,
                       countType: 'my_cases',
                       hasNewItems:
                         newItemIndicators.my_cases &&
-                        pathname !== '/connections/my-support-cases' &&
-                        !pathname.startsWith('/connections/my-support-cases/'),
+                        pathname !== '/tickets/my-support-cases' &&
+                        !pathname.startsWith('/tickets/my-support-cases/'),
                     },
                   ]
                 : []),
               {
                 text: 'My Tasks',
-                href: '/connections/my-tasks',
+                href: '/tickets/my-tasks',
                 count: counts.my_tasks,
                 countType: 'my_tasks',
                 hasNewItems:
                   newItemIndicators.my_tasks &&
-                  pathname !== '/connections/my-tasks' &&
-                  !pathname.startsWith('/connections/my-tasks/'),
+                  pathname !== '/tickets/my-tasks' &&
+                  !pathname.startsWith('/tickets/my-tasks/'),
               },
             ],
           },
@@ -602,22 +623,27 @@ export function SecondarySideNav({
             items: [
               {
                 text: 'Reports',
-                href: '/connections/reports',
+                href: '/tickets/reports',
                 disabled: false,
                 icon: <ReportsIcon />,
               },
               {
                 text: 'Calls',
-                href: '/connections/call-records',
+                href: '/tickets/call-records',
                 icon: <CallsIcon />,
               },
               {
                 text: 'Forms',
-                href: '/connections/form-submissions',
+                href: '/tickets/form-submissions',
                 icon: <CallsIcon />,
               },
               {
-                text: 'Customer Library',
+                text: 'Archived Leads',
+                href: '/tickets/archived-leads',
+                icon: <ArchivedIcon />,
+              },
+              {
+                text: 'All Customers',
                 href: '/customers',
                 icon: <CustomerLibraryIcon />,
               },
@@ -656,10 +682,10 @@ export function SecondarySideNav({
                     pathname === item.href ||
                     (item.href === '/customers' &&
                       pathname.startsWith('/customers/')) ||
-                    (item.href === '/connections/incoming' &&
-                      (pathname.startsWith('/connections/incoming') ||
-                        pathname.startsWith('/connections/calls-and-forms'))) ||
-                    (item.href.startsWith('/connections/') &&
+                    (item.href === '/tickets/new' &&
+                      (pathname.startsWith('/tickets/new') ||
+                        pathname.startsWith('/tickets/calls-and-forms'))) ||
+                    (item.href.startsWith('/tickets/') &&
                       pathname.startsWith(item.href));
 
                   return (

@@ -16,11 +16,9 @@ import CallSettingsManager from './CallSettingsManager';
 import PartialLeadsManager from './PartialLeadsManager';
 import AttributionAnalytics from './AttributionAnalytics';
 import FormAnalytics from './FormAnalytics';
-import PestManager from './PestManager';
 import TemplateLibraryManager from './TemplateLibraryManager';
 import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
-import AddOnServicesManager from './AddOnServicesManager';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -35,7 +33,7 @@ type AdminCategory =
   | 'system';
 
 type UserSubsection = 'users' | 'relationships';
-type CompanySubsection = 'companies' | 'projects' | 'brands' | 'add-ons';
+type CompanySubsection = 'companies' | 'projects' | 'brands';
 type AnalyticsSubsection =
   | 'attribution'
   | 'forms'
@@ -63,7 +61,6 @@ type AdminSection =
   | 'relationships'
   | 'brands'
   | 'projects'
-  | 'add-ons'
   | 'widgets'
   | 'call-records'
   | 'call-settings'
@@ -117,7 +114,6 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
       { id: 'companies', label: 'Companies', legacySection: 'companies' },
       { id: 'projects', label: 'Projects', legacySection: 'projects' },
       { id: 'brands', label: 'Brand Management', legacySection: 'brands' },
-      { id: 'add-ons', label: 'Add-On Services', legacySection: 'add-ons' },
     ],
   },
   {
@@ -171,11 +167,6 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
     icon: Settings,
     subsections: [
       { id: 'widgets', label: 'Widget Config', legacySection: 'widgets' },
-      {
-        id: 'pest-management',
-        label: 'Pest Management',
-        legacySection: 'pest-management',
-      },
       { id: 'calling', label: 'Calling', legacySection: 'call-settings' },
       { id: 'sms-testing', label: 'SMS Testing', legacySection: 'sms-testing' },
     ],
@@ -189,20 +180,6 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
 
-  // Helper function to get legacy section for renderSection compatibility
-  const getCurrentLegacySection = (): AdminSection => {
-    for (const category of ADMIN_CATEGORIES) {
-      const subsection = category.subsections.find(
-        sub => sub.id === activeSubsection
-      );
-      if (subsection?.legacySection) {
-        return subsection.legacySection;
-      }
-    }
-    return 'users'; // fallback
-  };
-
-  // Helper function to handle category changes
   const handleCategoryChange = (categoryId: AdminCategory) => {
     setActiveCategory(categoryId);
     // Set to first subsection of the category
@@ -241,8 +218,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   }, [selectedCompanyId]);
 
   const renderSection = () => {
-    const currentSection = getCurrentLegacySection();
-    switch (currentSection) {
+    switch (activeSubsection) {
       case 'users':
         return <UsersManager />;
       case 'companies':
@@ -253,32 +229,21 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <BrandManager />;
       case 'projects':
         return <ProjectsManager user={user} />;
-      case 'add-ons':
-        if (!selectedCompanyId) {
-          return (
-            <div className={styles.emptyState}>
-              <p>Please select a company to manage add-on services</p>
-            </div>
-          );
-        }
-        return <AddOnServicesManager companyId={selectedCompanyId} />;
       case 'widgets':
         return <WidgetManager />;
       case 'call-records':
         return <CallRecordsManager />;
-      case 'call-settings':
+      case 'calling':
         return <CallSettingsManager />;
       case 'partial-leads':
         return <PartialLeadsManager />;
-      case 'attribution-analytics':
+      case 'attribution':
         return <AttributionAnalytics />;
-      case 'form-analytics':
+      case 'forms':
         return <FormAnalytics />;
-      case 'pest-management':
-        return <PestManager />;
-      case 'template-library':
+      case 'templates':
         return <TemplateLibraryManager />;
-      case 'workflow-executions':
+      case 'executions':
         return selectedCompanyId ? (
           <ExecutionManager companyId={selectedCompanyId} />
         ) : (
@@ -286,10 +251,19 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         );
       case 'sms-testing':
         return <SMSTestManager />;
-      case 'admin-pest-pressure':
+      case 'pest-pressure':
         return (
           <div>
-            <p>Navigate to <Link href="/admin/pest-pressure" style={{ color: 'var(--primary-color)' }}>/admin/pest-pressure</Link> to view the cross-company pest pressure dashboard.</p>
+            <p>
+              Navigate to{' '}
+              <Link
+                href="/admin/pest-pressure"
+                style={{ color: 'var(--action-500)' }}
+              >
+                /admin/pest-pressure
+              </Link>{' '}
+              to view the cross-company pest pressure dashboard.
+            </p>
           </div>
         );
       default:
@@ -343,24 +317,24 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         );
       })()}
 
-      {/* Company Selection for Workflow Executions and Add-Ons */}
-      {(activeSubsection === 'executions' || activeSubsection === 'add-ons') && companies.length > 0 && (
+      {/* Company Selection for Workflow Executions */}
+      {activeSubsection === 'executions' && companies.length > 0 && (
         <div className={styles.companySelector}>
           <label htmlFor="company-select">Select Company:</label>
           <select
             id="company-select"
             value={selectedCompanyId}
-            onChange={e => setSelectedCompanyId(e.target.value)}
-            className={styles.companySelect}
-          >
-            {companies.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+              onChange={e => setSelectedCompanyId(e.target.value)}
+              className={styles.companySelect}
+            >
+              {companies.map(company => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
       <main className={styles.content}>{renderSection()}</main>
     </div>

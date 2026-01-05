@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from 'react';
+import Image from 'next/image';
 import styles from '../CampaignLandingPage.module.scss';
 import PriceCard from '../components/PriceCard';
 import { processTextWithVariables } from '@/lib/campaign-text-processing';
@@ -94,7 +95,13 @@ export default function LetterSection({
 
           {letter.imageUrl && (
             <div className={styles.letterImage}>
-              <img src={letter.imageUrl} alt="Letter visual" />
+              <Image
+                src={letter.imageUrl}
+                alt="Letter visual"
+                width={400}
+                height={300}
+                style={{ objectFit: 'contain' }}
+              />
             </div>
           )}
         </div>

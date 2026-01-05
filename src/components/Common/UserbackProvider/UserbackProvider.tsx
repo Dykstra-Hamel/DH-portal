@@ -7,6 +7,7 @@ import {
   useState,
   ReactNode,
 } from 'react';
+import { usePathname } from 'next/navigation';
 import Userback from '@userback/widget';
 import { useUser } from '@/hooks/useUser';
 
@@ -23,8 +24,31 @@ interface UserbackProviderProps {
 export function UserbackProvider({ children }: UserbackProviderProps) {
   const [userback, setUserback] = useState<any>(null);
   const { user, profile, loading } = useUser();
+  const pathname = usePathname();
+
+  // Check if current route is a public route
+  const isPublicRoute = () => {
+    if (!pathname) return false;
+
+    // Public routes where Userback should not show
+    const publicRoutes = [
+      /^\/campaign\//, // Campaign landing pages
+      /^\/[^/]+\/quote\//, // Quote landing pages (e.g., /company-slug/quote/id)
+      /^\/unsubscribe/, // Unsubscribe page
+      /^\/login/, // Login page
+      /^\/sign-up/, // Sign up page
+      /^\/auth\//, // Auth callback pages
+    ];
+
+    return publicRoutes.some(route => route.test(pathname));
+  };
 
   useEffect(() => {
+    // Don't initialize Userback on public routes
+    if (isPublicRoute()) {
+      return;
+    }
+
     const token = process.env.NEXT_PUBLIC_USERBACK_TOKEN;
 
     if (!token) {
@@ -65,7 +89,7 @@ export function UserbackProvider({ children }: UserbackProviderProps) {
     if (!loading) {
       initUserback();
     }
-  }, [user, profile, loading]);
+  }, [user, profile, loading, pathname]);
 
   return (
     <UserbackContext.Provider value={{ userback }}>

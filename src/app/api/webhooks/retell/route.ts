@@ -184,7 +184,7 @@ async function handleCallStarted(supabase: any, callData: any) {
         customer_id: customerId,
         lead_source: 'cold_call',
         lead_type: 'phone_call',
-        lead_status: 'unassigned', // Will be updated based on AI qualification later
+        lead_status: 'new', // Will be updated based on AI qualification later
         priority: 'medium',
         comments: `📞 Inbound call started at ${new Date().toISOString()}`,
         created_at: new Date().toISOString(),
@@ -565,7 +565,7 @@ async function handleCallEnded(supabase: any, callData: any) {
             },
             leadData: {
               id: leadWithCompany.id,
-              lead_status: leadWithCompany.lead_status || 'unassigned',
+              lead_status: leadWithCompany.lead_status || 'new',
               lead_source: leadWithCompany.lead_source || 'cold_call',
               comments: leadWithCompany.comments,
               pest_type: leadWithCompany.pest_type
@@ -675,7 +675,7 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
     // Update lead status based on AI qualification decision
     if (isQualified === 'true' || isQualified === true) {
       // AI determined this is a qualified lead - keep as 'new' for follow-up
-      updateData.lead_status = 'unassigned';
+      updateData.lead_status = 'new';
       updateData.comments = `${updateData.comments}\n\n✅ AI Qualification: QUALIFIED - Ready for follow-up`.trim();
     } else if (isQualified === 'false' || isQualified === false) {
       // AI determined this is not a qualified lead
@@ -684,7 +684,7 @@ async function handleCallAnalyzed(supabase: any, callData: any) {
     } else {
       // No qualification decision provided - fallback to old logic for backward compatibility
       if (call_analysis?.call_successful === true) {
-        updateData.lead_status = 'unassigned';
+        updateData.lead_status = 'new';
         updateData.comments = `${updateData.comments}\n\n📞 Call completed successfully - No AI qualification provided`.trim();
       } else if (!isFollowUp) {
         updateData.lead_status = 'contacted';

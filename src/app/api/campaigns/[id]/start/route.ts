@@ -28,7 +28,10 @@ export async function POST(
       .single();
 
     if (fetchError || !campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Campaign not found' },
+        { status: 404 }
+      );
     }
 
     // Check user has permission (skip for global admins)
@@ -40,31 +43,48 @@ export async function POST(
         .eq('company_id', campaign.company_id)
         .single();
 
-      if (!userCompany || !['admin', 'manager', 'owner'].includes(userCompany.role)) {
+      if (
+        !userCompany ||
+        !['admin', 'manager', 'owner'].includes(userCompany.role)
+      ) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
       }
     }
 
     // Validate campaign can be started
     if (campaign.status === 'running') {
-      return NextResponse.json({ error: 'Campaign is already running' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Campaign is already running' },
+        { status: 400 }
+      );
     }
 
     if (campaign.status === 'completed') {
-      return NextResponse.json({ error: 'Cannot restart a completed campaign' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Cannot restart a completed campaign' },
+        { status: 400 }
+      );
     }
 
     if (!campaign.workflow_id) {
-      return NextResponse.json({ error: 'Campaign must have a workflow assigned' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Campaign must have a workflow assigned' },
+        { status: 400 }
+      );
     }
 
-    // Check if campaign has contact lists
-    const { data: contactLists, error: listsError } = await queryClient
-      .from('campaign_contact_lists')
-      .select('id')
-      .eq('campaign_id', id);
+    // Check if campaign has contact lists (using new reusable contact list system)
+    const { data: contactListAssignments, error: listsError } =
+      await queryClient
+        .from('campaign_contact_list_assignments')
+        .select('contact_list_id')
+        .eq('campaign_id', id);
 
-    if (listsError || !contactLists || contactLists.length === 0) {
+    if (
+      listsError ||
+      !contactListAssignments ||
+      contactListAssignments.length === 0
+    ) {
       return NextResponse.json(
         { error: 'Campaign must have at least one contact list' },
         { status: 400 }
@@ -76,7 +96,7 @@ export async function POST(
       .from('campaigns')
       .update({
         status: 'scheduled',
-        start_datetime: new Date().toISOString() // Start immediately
+        start_datetime: new Date().toISOString(), // Start immediately
       })
       .eq('id', id)
       .select()
@@ -84,17 +104,22 @@ export async function POST(
 
     if (updateError) {
       console.error('Error starting campaign:', updateError);
-      return NextResponse.json({ error: 'Failed to start campaign' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to start campaign' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
       message: 'Campaign scheduled to start',
-      campaign: updatedCampaign
+      campaign: updatedCampaign,
     });
-
   } catch (error) {
     console.error('Error in campaign start:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

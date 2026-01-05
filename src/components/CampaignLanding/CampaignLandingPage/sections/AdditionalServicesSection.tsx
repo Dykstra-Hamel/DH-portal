@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from 'react';
+import Image from 'next/image';
 import styles from '../CampaignLandingPage.module.scss';
 import { processTextWithVariables, type VariableContext } from '@/lib/campaign-text-processing';
 
@@ -24,6 +25,7 @@ interface AdditionalServicesSectionProps {
   company: VariableContext['company'];
   branding?: VariableContext['branding'];
   serviceName?: string;
+  buttonText: string;
   onCtaClick: () => void;
 }
 
@@ -35,6 +37,7 @@ export default function AdditionalServicesSection({
   company,
   branding,
   serviceName,
+  buttonText,
   onCtaClick,
 }: AdditionalServicesSectionProps) {
   // Create variable context for text processing
@@ -62,16 +65,17 @@ export default function AdditionalServicesSection({
   };
 
   return (
-    <section className={styles.additionalServicesSection}>
+    <section id="additional-services-section" className={styles.additionalServicesSection}>
       <div className={styles.additionalServicesContainer}>
         {/* Left column - Content */}
         <div className={styles.additionalServicesContent}>
-          <h2 className={styles.additionalServicesHeading}>
-            {processedHeading}
-          </h2>
+          <h2
+            className={styles.additionalServicesHeading}
+            dangerouslySetInnerHTML={{ __html: processedHeading }}
+          />
 
           <ul className={styles.servicesList}>
-            {addons.map((addon) => (
+            {addons.slice(0, 6).map((addon) => (
               <li key={addon.id} className={styles.serviceItem}>
                 <svg
                   className={styles.checkIcon}
@@ -113,7 +117,7 @@ export default function AdditionalServicesSection({
 
           <div className={styles.additionalServicesActions}>
             <button className={styles.additionalServicesCta} onClick={onCtaClick}>
-              Upgrade Today!
+              {buttonText}
             </button>
             <button className={styles.additionalServicesLink} onClick={scrollToFaq}>
               View Add-On FAQ&apos;s
@@ -124,7 +128,13 @@ export default function AdditionalServicesSection({
         {/* Right column - Image */}
         <div className={styles.additionalServicesImage}>
           {additionalServices.imageUrl ? (
-            <img src={additionalServices.imageUrl} alt="Additional Services" />
+            <Image
+              src={additionalServices.imageUrl}
+              alt="Additional Services"
+              width={1516}
+              height={1134}
+              quality={80}
+            />
           ) : (
             <div className={styles.imagePlaceholder} />
           )}

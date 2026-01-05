@@ -103,13 +103,11 @@ export function ActivityFeed({
     if (fieldName === 'lead_status') {
       const statusMap: Record<string, string> = {
         'new': 'New',
-        'unassigned': 'Assign',
-        'contacting': 'Communication',
+        'in_process': 'Communication',
         'quoted': 'Quote',
-        'ready_to_schedule': 'Schedule',
-        'scheduled': 'Scheduled',
-        'completed': 'Completed',
+        'scheduling': 'Schedule',
         'won': 'Won',
+        'completed': 'Completed',
         'lost': 'Lost',
       };
       return statusMap[value.toLowerCase()] || value;

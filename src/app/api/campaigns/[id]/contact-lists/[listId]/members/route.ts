@@ -66,6 +66,10 @@ export async function GET(
         added_at,
         processed_at,
         error_message,
+        first_viewed_at,
+        last_viewed_at,
+        view_count,
+        redeemed_at,
         customer:customers(
           id,
           first_name,

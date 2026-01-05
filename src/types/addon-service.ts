@@ -83,7 +83,9 @@ export interface AddOnEligibility {
   addon_id: string;
   addon_name: string;
   addon_description: string | null;
+  initial_price: number | null;
   recurring_price: number;
+  billing_frequency: 'monthly' | 'quarterly' | 'semi-annually' | 'annually';
   eligibility_mode: 'all' | 'specific';
   is_eligible: boolean; // True if this add-on can be added to the service plan
 }

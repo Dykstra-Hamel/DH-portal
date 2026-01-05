@@ -15,7 +15,7 @@
 .modalContent {
   background: white;
   border-radius: 8px;
-  max-width: 900px;
+  max-width: 1200px;
   width: 100%;
   max-height: 80vh;
   display: flex;
@@ -218,6 +218,47 @@
   color: #991b1b;
 }
 
+.statusExcluded {
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #fcd34d;
+}
+
+.errorMessage {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #78350f;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dateCell {
   color: #6b7280;
+}
+
+.viewCountCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  svg {
+    color: #3b82f6;
+    flex-shrink: 0;
+  }
+
+  span {
+    font-weight: 500;
+  }
+}
+
+.viewedDate {
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.statusRedeemed {
+  background: #dcfce7;
+  color: #14532d;
 }

@@ -3,6 +3,7 @@ import { Outfit } from 'next/font/google';
 import localFont from 'next/font/local';
 import { LayoutWrapper } from '@/components/Layout/LayoutWrapper/LayoutWrapper';
 import { UserbackProvider } from '@/components/Common/UserbackProvider';
+import ScrollToTop from '@/components/Common/ScrollToTop';
 import '@/styles/main.scss';
 
 const outfit = Outfit({
@@ -31,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.className} ${veganDays.variable}`}>
       <body>
+        <ScrollToTop />
         <UserbackProvider>
           <LayoutWrapper>{children}</LayoutWrapper>
         </UserbackProvider>

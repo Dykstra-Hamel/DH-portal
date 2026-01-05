@@ -8,8 +8,7 @@ export interface MetricData {
 
 export interface MetricsResponse {
   totalCalls: MetricData;
-  totalForms: MetricData;
-  avgTimeToAssign: MetricData;
-  hangupCalls: MetricData;
-  customerServiceCalls: MetricData;
+  avgCallDuration: MetricData;
+  positiveSentimentRate: MetricData;
+  salesCallsWon: MetricData;
 }

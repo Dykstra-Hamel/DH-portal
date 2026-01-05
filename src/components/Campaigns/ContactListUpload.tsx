@@ -11,8 +11,10 @@ import {
   ChevronDown,
   ChevronUp,
   List,
+  ChevronRight,
 } from 'lucide-react';
 import styles from './ContactListUpload.module.scss';
+import ContactListPreviewModal from './ContactListPreviewModal';
 
 interface ContactListUploadProps {
   companyId: string;
@@ -45,6 +47,14 @@ export default function ContactListUpload({
     file: null,
     parsedData: null,
   });
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [previewListName, setPreviewListName] = useState('');
+  const [previewTotalContacts, setPreviewTotalContacts] = useState(0);
+  const [selectedListForPreview, setSelectedListForPreview] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +91,11 @@ export default function ContactListUpload({
       const result = await response.json();
 
       if (result.success) {
-        setAvailableLists(result.lists || []);
+        // Filter out archived lists (API should already exclude them, but filter client-side too for safety)
+        const activeLists = (result.lists || []).filter(
+          (list: any) => !list.archived_at
+        );
+        setAvailableLists(activeLists);
       }
     } catch (error) {
       console.error('Error fetching available contact lists:', error);
@@ -114,6 +128,10 @@ export default function ContactListUpload({
       return;
     }
 
+    // Clear previous preview
+    setShowPreview(false);
+    setPreviewData([]);
+
     setCurrentUpload({
       ...currentUpload,
       file,
@@ -129,18 +147,16 @@ export default function ContactListUpload({
       setParsing(true);
       setError(null);
 
-      // Read file content
-      const csvContent = await file.text();
+      // Use FormData to send the file (avoids JSON escaping issues with large CSVs)
+      const formData = new FormData();
+      formData.append('csvFile', file);
+      formData.append('companyId', companyId);
+      formData.append('skipDatabaseDuplicateCheck', 'true'); // For campaigns, only check for within-CSV duplicates
 
       // Call existing parse API
       const response = await fetch('/api/leads/bulk/parse', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          csvContent,
-          skipDatabaseDuplicateCheck: true, // For campaigns, only check for within-CSV duplicates
-        }),
+        body: formData,
       });
 
       const result = await response.json();
@@ -154,6 +170,14 @@ export default function ContactListUpload({
         file,
         parsedData: result,
       });
+
+      // Show preview of first 5 contacts
+      if (result.leads && result.leads.length > 0) {
+        setPreviewData(result.leads.slice(0, 5));
+        setPreviewListName(currentUpload.listName || file.name.replace('.csv', ''));
+        setPreviewTotalContacts(result.validRows || result.leads.length);
+        setShowPreview(true);
+      }
     } catch (err) {
       console.error('Error parsing CSV:', err);
       setError(err instanceof Error ? err.message : 'Failed to parse CSV');
@@ -197,12 +221,14 @@ export default function ContactListUpload({
       // Refresh available lists
       await fetchAvailableLists();
 
-      // Reset upload form
+      // Reset upload form and preview
       setCurrentUpload({
         listName: '',
         file: null,
         parsedData: null,
       });
+      setShowPreview(false);
+      setPreviewData([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -227,6 +253,26 @@ export default function ContactListUpload({
     }
 
     try {
+      // Fetch list details to show preview
+      const detailsResponse = await fetch(`/api/contact-lists/${listId}`);
+      const detailsResult = await detailsResponse.json();
+
+      if (detailsResult.success && detailsResult.list?.members) {
+        // Show preview of first 5 members
+        const members = detailsResult.list.members.slice(0, 5).map((member: any) => ({
+          first_name: member.customer?.first_name || '',
+          last_name: member.customer?.last_name || '',
+          email: member.customer?.email || '',
+          phone_number: member.customer?.phone || '',
+          street_address: '', // Not included in member data
+        }));
+
+        setPreviewData(members);
+        setPreviewListName(list.name || list.list_name);
+        setPreviewTotalContacts(list.total_contacts || 0);
+        setShowPreview(true);
+      }
+
       // If we have a campaignId, assign it via API
       if (campaignId) {
         const response = await fetch(
@@ -285,6 +331,12 @@ export default function ContactListUpload({
           // Remove from local state
           setSelectedLists(selectedLists.filter(l => l.id !== listId));
         }
+
+        // Clear preview state when list is removed
+        setShowPreview(false);
+        setPreviewData([]);
+        setPreviewListName('');
+        setPreviewTotalContacts(0);
       } catch (error) {
         console.error('Error removing contact list:', error);
       }
@@ -391,9 +443,16 @@ export default function ContactListUpload({
                     <p className={styles.listDescription}>{list.description}</p>
                   )}
                   <div className={styles.listStats}>
-                    <div className={styles.statItem}>
+                    <div
+                      className={`${styles.statItem} ${styles.clickable}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedListForPreview({ id: list.id, name: list.name });
+                      }}
+                    >
                       <Users size={14} />
                       <span>{list.total_contacts} contacts</span>
+                      <ChevronRight size={14} />
                     </div>
                     {list.campaign_count > 0 && (
                       <div className={styles.statItem}>
@@ -414,6 +473,40 @@ export default function ContactListUpload({
               <span>
                 Upload a new CSV to create your first reusable contact list
               </span>
+            </div>
+          )}
+
+          {/* Preview Section for Selected List */}
+          {showPreview && previewData.length > 0 && (
+            <div className={styles.preview}>
+              <h4>Preview: {previewListName}</h4>
+              <div className={styles.previewTable}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.map((contact, index) => (
+                      <tr key={index}>
+                        <td>{contact.first_name} {contact.last_name}</td>
+                        <td>{contact.email || '-'}</td>
+                        <td>{contact.phone_number || '-'}</td>
+                        <td>{contact.street_address || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {previewTotalContacts > 5 && (
+                  <p className={styles.tableFooter}>
+                    ...and {previewTotalContacts - 5} more contacts
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -471,6 +564,40 @@ export default function ContactListUpload({
               </div>
             )}
           </div>
+
+          {/* Preview Section */}
+          {showPreview && previewData.length > 0 && (
+            <div className={styles.preview}>
+              <h4>Preview: {previewListName}</h4>
+              <div className={styles.previewTable}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.map((contact, index) => (
+                      <tr key={index}>
+                        <td>{contact.first_name} {contact.last_name}</td>
+                        <td>{contact.email || '-'}</td>
+                        <td>{contact.phone_number || '-'}</td>
+                        <td>{contact.street_address || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {previewTotalContacts > 5 && (
+                  <p className={styles.tableFooter}>
+                    ...and {previewTotalContacts - 5} more contacts
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {currentUpload.parsedData && (
             <>
@@ -621,9 +748,18 @@ export default function ContactListUpload({
                     <X size={16} />
                   </button>
                 </div>
-                <div className={styles.listInfo}>
+                <div
+                  className={`${styles.listInfo} ${styles.clickable}`}
+                  onClick={() => {
+                    setSelectedListForPreview({
+                      id: list.id,
+                      name: list.list_name || list.name
+                    });
+                  }}
+                >
                   <Users size={14} />
                   <span>{list.total_contacts} contacts</span>
+                  <ChevronRight size={14} />
                 </div>
               </div>
             ))}
@@ -639,6 +775,15 @@ export default function ContactListUpload({
             Select an existing list or upload a new CSV file to get started
           </span>
         </div>
+      )}
+
+      {/* Contact Preview Modal */}
+      {selectedListForPreview && (
+        <ContactListPreviewModal
+          listId={selectedListForPreview.id}
+          listName={selectedListForPreview.name}
+          onClose={() => setSelectedListForPreview(null)}
+        />
       )}
     </div>
   );

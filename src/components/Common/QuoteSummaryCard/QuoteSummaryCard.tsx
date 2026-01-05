@@ -36,6 +36,22 @@ export function QuoteSummaryCard({
     }).format(amount);
   };
 
+  const formatFrequency = (frequency: string | null | undefined): string => {
+    if (!frequency) return 'N/A';
+
+    const formattedFrequencies: Record<string, string> = {
+      'monthly': 'Monthly',
+      'bi-monthly': 'Bi-Monthly',
+      'quarterly': 'Quarterly',
+      'semi-annually': 'Semi-Annually',
+      'annually': 'Annually',
+      'annual': 'Annually',
+      'one-time': 'One Time',
+    };
+
+    return formattedFrequencies[frequency.toLowerCase()] || frequency;
+  };
+
   // Format yard size range from decimal to fractional display
   const formatYardSizeRange = (range: string): string => {
     // Parse range like "0.26-0.50" or "2.00+"
@@ -96,15 +112,9 @@ export function QuoteSummaryCard({
                       <div className={styles.fieldValue}>{lineItem.plan_name}</div>
                     </div>
                     <div className={styles.gridItem}>
-                      <div className={styles.fieldLabel}>Frequency</div>
+                      <div className={styles.fieldLabel}>Service Frequency</div>
                       <div className={styles.fieldValue}>
-                        {lineItem.billing_frequency === 'quarterly'
-                          ? 'Quarterly'
-                          : lineItem.billing_frequency === 'monthly'
-                            ? 'Monthly'
-                            : lineItem.billing_frequency === 'annual'
-                              ? 'Annual'
-                              : lineItem.billing_frequency}
+                        {formatFrequency(lineItem.service_frequency || lineItem.billing_frequency)}
                       </div>
                     </div>
                     <div className={styles.gridItem}>
@@ -114,12 +124,14 @@ export function QuoteSummaryCard({
                         {(lineItem.discount_percentage || lineItem.discount_amount) ? ' (Discounted)' : ''}
                       </div>
                     </div>
-                    <div className={styles.gridItem}>
-                      <div className={styles.fieldLabel}>Recurring Price</div>
-                      <div className={styles.fieldValue}>
-                        {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                    {lineItem.billing_frequency && (
+                      <div className={styles.gridItem}>
+                        <div className={styles.fieldLabel}>Recurring Price</div>
+                        <div className={styles.fieldValue}>
+                          {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -145,12 +157,14 @@ export function QuoteSummaryCard({
                         {formatCurrency(lineItem.final_initial_price || lineItem.initial_price || 0)}
                       </div>
                     </div>
-                    <div className={styles.gridItem}>
-                      <div className={styles.fieldLabel}>Recurring Price</div>
-                      <div className={styles.fieldValue}>
-                        {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                    {lineItem.billing_frequency && (
+                      <div className={styles.gridItem}>
+                        <div className={styles.fieldLabel}>Recurring Price</div>
+                        <div className={styles.fieldValue}>
+                          {formatCurrency(lineItem.final_recurring_price || lineItem.recurring_price || 0)}/mo
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               ))}

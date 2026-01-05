@@ -110,7 +110,8 @@ export async function generateUnsubscribeToken(
     console.error('Error generating unsubscribe token:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to generate token',
+      error:
+        error instanceof Error ? error.message : 'Failed to generate token',
     };
   }
 }
@@ -186,7 +187,8 @@ export async function validateUnsubscribeToken(
     console.error('Error validating unsubscribe token:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to validate token',
+      error:
+        error instanceof Error ? error.message : 'Failed to validate token',
     };
   }
 }
@@ -220,7 +222,8 @@ export async function markTokenAsUsed(
     console.error('Error marking token as used:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to mark token as used',
+      error:
+        error instanceof Error ? error.message : 'Failed to mark token as used',
     };
   }
 }
@@ -233,7 +236,8 @@ export async function markTokenAsUsed(
  * @returns Full unsubscribe URL
  */
 export function getUnsubscribeUrl(token: string, baseUrl?: string): string {
-  const base = baseUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const base =
+    baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
   return `${base}/unsubscribe?token=${token}`;
 }
 
@@ -260,7 +264,12 @@ export async function getCompanyTokens(
 }> {
   try {
     const supabase = createAdminClient();
-    const { includeUsed = false, includeExpired = false, limit = 100, offset = 0 } = options || {};
+    const {
+      includeUsed = false,
+      includeExpired = false,
+      limit = 100,
+      offset = 0,
+    } = options || {};
 
     let query = supabase
       .from('unsubscribe_tokens')
@@ -286,7 +295,7 @@ export async function getCompanyTokens(
       throw error;
     }
 
-    const tokens: UnsubscribeToken[] = (data || []).map((row) => ({
+    const tokens: UnsubscribeToken[] = (data || []).map(row => ({
       id: row.id,
       token: row.token,
       companyId: row.company_id,
@@ -309,7 +318,8 @@ export async function getCompanyTokens(
     console.error('Error getting company tokens:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get company tokens',
+      error:
+        error instanceof Error ? error.message : 'Failed to get company tokens',
     };
   }
 }
@@ -320,9 +330,7 @@ export async function getCompanyTokens(
  * @param companyId - UUID of the company
  * @returns Token statistics or error
  */
-export async function getTokenStats(
-  companyId: string
-): Promise<{
+export async function getTokenStats(companyId: string): Promise<{
   success: boolean;
   data?: {
     total: number;
@@ -348,9 +356,11 @@ export async function getTokenStats(
     const now = new Date();
     const stats = {
       total: data.length,
-      used: data.filter((t) => t.used_at).length,
-      expired: data.filter((t) => new Date(t.expires_at) < now && !t.used_at).length,
-      active: data.filter((t) => !t.used_at && new Date(t.expires_at) >= now).length,
+      used: data.filter(t => t.used_at).length,
+      expired: data.filter(t => new Date(t.expires_at) < now && !t.used_at)
+        .length,
+      active: data.filter(t => !t.used_at && new Date(t.expires_at) >= now)
+        .length,
       bySource: {} as Record<string, number>,
     };
 
@@ -367,7 +377,8 @@ export async function getTokenStats(
     console.error('Error getting token stats:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get token stats',
+      error:
+        error instanceof Error ? error.message : 'Failed to get token stats',
     };
   }
 }
@@ -407,7 +418,10 @@ export async function cleanupExpiredTokens(): Promise<{
     console.error('Error cleaning up expired tokens:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to cleanup expired tokens',
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to cleanup expired tokens',
     };
   }
 }

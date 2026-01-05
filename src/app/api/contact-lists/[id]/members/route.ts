@@ -18,11 +18,28 @@ export async function POST(
     const queryClient = getSupabaseClient(isGlobalAdmin, supabase);
 
     const body = await request.json();
-    const { customer_ids, notes } = body;
+    const { customer_ids, members, notes } = body;
 
-    if (!customer_ids || !Array.isArray(customer_ids) || customer_ids.length === 0) {
+    // Support two modes:
+    // 1. customer_ids: Add existing customers to list
+    // 2. members: Create new customers from CSV data and add to list
+    if (!customer_ids && !members) {
       return NextResponse.json(
-        { error: 'customer_ids array is required' },
+        { error: 'Either customer_ids or members array is required' },
+        { status: 400 }
+      );
+    }
+
+    if (customer_ids && (!Array.isArray(customer_ids) || customer_ids.length === 0)) {
+      return NextResponse.json(
+        { error: 'customer_ids must be a non-empty array' },
+        { status: 400 }
+      );
+    }
+
+    if (members && (!Array.isArray(members) || members.length === 0)) {
+      return NextResponse.json(
+        { error: 'members must be a non-empty array' },
         { status: 400 }
       );
     }
@@ -52,27 +69,66 @@ export async function POST(
       }
     }
 
-    // Verify all customers belong to the company
-    const { data: customers, error: customersError } = await queryClient
-      .from('customers')
-      .select('id')
-      .eq('company_id', list.company_id)
-      .in('id', customer_ids);
+    let finalCustomerIds: string[] = [];
 
-    if (customersError) {
-      console.error('Error verifying customers:', customersError);
-      return NextResponse.json({ error: 'Failed to verify customers' }, { status: 500 });
+    // Handle two modes: existing customer IDs or create new customers from members data
+    if (customer_ids) {
+      // Mode 1: Verify all customers belong to the company
+      const { data: customers, error: customersError } = await queryClient
+        .from('customers')
+        .select('id')
+        .eq('company_id', list.company_id)
+        .in('id', customer_ids);
+
+      if (customersError) {
+        console.error('Error verifying customers:', customersError);
+        return NextResponse.json({ error: 'Failed to verify customers' }, { status: 500 });
+      }
+
+      if (!customers || customers.length !== customer_ids.length) {
+        return NextResponse.json(
+          { error: 'One or more customer IDs are invalid or do not belong to this company' },
+          { status: 400 }
+        );
+      }
+
+      finalCustomerIds = customer_ids;
+    } else if (members) {
+      // Mode 2: Create customers from CSV/member data
+      const customersToCreate = members.map((member: any) => ({
+        company_id: list.company_id,
+        first_name: member.first_name || '',
+        last_name: member.last_name || '',
+        email: member.email || null,
+        phone: member.phone_number || member.phone || null,
+        address: member.street_address || member.address || null,
+        city: member.city || null,
+        state: member.state || null,
+        zip_code: member.zip || member.zip_code || null,
+        customer_status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { data: createdCustomers, error: createError } = await queryClient
+        .from('customers')
+        .insert(customersToCreate)
+        .select('id');
+
+      if (createError) {
+        console.error('Error creating customers:', createError);
+        return NextResponse.json({ error: 'Failed to create customers' }, { status: 500 });
+      }
+
+      if (!createdCustomers || createdCustomers.length === 0) {
+        return NextResponse.json({ error: 'Failed to create customers' }, { status: 500 });
+      }
+
+      finalCustomerIds = createdCustomers.map((c: { id: string }) => c.id);
     }
 
-    if (!customers || customers.length !== customer_ids.length) {
-      return NextResponse.json(
-        { error: 'One or more customer IDs are invalid or do not belong to this company' },
-        { status: 400 }
-      );
-    }
-
-    // Add members
-    const members = customer_ids.map((customerId) => ({
+    // Add members to contact list
+    const listMembers = finalCustomerIds.map((customerId) => ({
       contact_list_id: listId,
       customer_id: customerId,
       notes: notes || null,
@@ -81,7 +137,7 @@ export async function POST(
 
     const { data: addedMembers, error: addError } = await queryClient
       .from('contact_list_members')
-      .insert(members)
+      .insert(listMembers)
       .select();
 
     if (addError) {

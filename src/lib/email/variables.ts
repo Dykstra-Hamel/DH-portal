@@ -24,6 +24,7 @@ export interface EmailVariables {
   companyPhone: string;
   companyWebsite: string;
   companyLogo: string;
+  companySignature: string;
 
   // Google Reviews variables
   googleRating: string;
@@ -107,7 +108,7 @@ export function createSampleVariables(
     phone?: string;
     website?: string;
   } | null,
-  brandData?: { logo_url?: string } | null,
+  brandData?: { logo_url?: string; signature_url?: string } | null,
   reviewsData?: { rating?: number; reviewCount?: number } | null
 ): EmailVariables {
   return {
@@ -124,6 +125,7 @@ export function createSampleVariables(
     companyPhone: companyData?.phone || '(555) 000-0000',
     companyWebsite: companyData?.website || 'https://yourcompany.com',
     companyLogo: brandData?.logo_url || '/pcocentral-logo.png',
+    companySignature: brandData?.signature_url || 'https://via.placeholder.com/200x80?text=Signature',
 
     // Google Reviews (use real data when available)
     googleRating: reviewsData?.rating ? reviewsData.rating.toString() : '4.8',
@@ -249,18 +251,21 @@ export function extractVariables(content: string): string[] {
  * @param campaignId - Campaign identifier (e.g., "PEST26")
  * @param customerId - Customer UUID
  * @param leadId - Optional existing lead UUID (if updating)
+ * @param companyId - Optional company UUID (used as a fallback if email log lacks company_id)
  * @returns SES tags attribute string in format: ses:tags="key:value;key:value;"
  */
 export function generateLeadTrackingTags(
   campaignId: string | null,
   customerId: string | null,
-  leadId?: string | null
+  leadId?: string | null,
+  companyId?: string | null
 ): string {
   const tags: string[] = ['generateLead:true'];
 
   if (campaignId) tags.push(`campaignId:${campaignId}`);
   if (customerId) tags.push(`customerId:${customerId}`);
   if (leadId) tags.push(`leadId:${leadId}`);
+   if (companyId) tags.push(`companyId:${companyId}`);
 
   return `ses:tags="${tags.join(';')};"`;
 }

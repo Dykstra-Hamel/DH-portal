@@ -218,39 +218,28 @@ export async function DELETE(
       }
     }
 
-    // Check if used in any active or scheduled campaigns
-    const { data: activeCampaigns } = await queryClient
-      .from('campaign_contact_list_assignments')
-      .select('campaign:campaigns(id, name, status)')
-      .eq('contact_list_id', listId)
-      .in('campaigns.status', ['scheduled', 'running']);
-
-    if (activeCampaigns && activeCampaigns.length > 0) {
-      const campaignNames = activeCampaigns
-        .map((ac: any) => ac.campaign?.name)
-        .filter(Boolean)
-        .join(', ');
-
-      return NextResponse.json(
-        {
-          error: `Cannot delete list. It is currently used in active/scheduled campaigns: ${campaignNames}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Delete the list (members and assignments will cascade)
-    const { error: deleteError } = await queryClient
+    // Soft delete: Update archived_at instead of deleting
+    // This preserves historical campaign data, landing pages, and execution tracking
+    const { data: archivedList, error: archiveError } = await queryClient
       .from('contact_lists')
-      .delete()
-      .eq('id', listId);
+      .update({
+        archived_at: new Date().toISOString(),
+        archived_by: user.id
+      })
+      .eq('id', listId)
+      .select()
+      .single();
 
-    if (deleteError) {
-      console.error('Error deleting contact list:', deleteError);
-      return NextResponse.json({ error: 'Failed to delete contact list' }, { status: 500 });
+    if (archiveError) {
+      console.error('Error archiving contact list:', archiveError);
+      return NextResponse.json({ error: 'Failed to archive contact list' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: 'Contact list archived successfully',
+      list: archivedList
+    });
   } catch (error) {
     console.error('Error in contact list DELETE:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

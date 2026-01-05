@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, Upload, CheckCircle, XCircle, Clock, Loader, ChevronRight } from 'lucide-react';
+import { Users, Upload, CheckCircle, XCircle, Clock, Loader, ChevronRight, Ban } from 'lucide-react';
 import ContactListUpload from './ContactListUpload';
 import ContactMembersModal from './ContactMembersModal';
 import styles from './CampaignContacts.module.scss';
@@ -21,6 +21,7 @@ interface ContactList {
   processing_count: number;
   processed_count: number;
   failed_count: number;
+  excluded_count: number;
   created_at: string;
 }
 
@@ -153,6 +154,16 @@ export default function CampaignContacts({ campaignId, companyId, campaignStatus
                     <p className={styles.statLabel}>Failed</p>
                   </div>
                 </div>
+
+                {list.excluded_count > 0 && (
+                  <div className={styles.stat}>
+                    <Ban size={16} className={styles.iconExcluded} />
+                    <div>
+                      <p className={styles.statValue}>{list.excluded_count}</p>
+                      <p className={styles.statLabel}>Excluded</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {list.total_members > 0 && (

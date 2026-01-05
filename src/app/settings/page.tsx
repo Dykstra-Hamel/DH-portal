@@ -12,7 +12,6 @@ import {
   Save,
   AlertCircle,
   CheckCircle,
-  Settings as SettingsIcon,
   Copy,
   Check,
   RefreshCw,
@@ -20,6 +19,7 @@ import {
 import KnowledgeBase from '@/components/KnowledgeBase/KnowledgeBase';
 import AccountLinking from '@/components/AccountLinking/AccountLinking';
 import AutomationSettings from '@/components/Automation/AutomationSettings';
+import NotificationPreferences from '@/components/NotificationPreferences/NotificationPreferences';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -65,8 +65,12 @@ export default function SettingsPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'widget' | 'knowledge-base' | 'automation'>('widget');
-  const [activeSection, setActiveSection] = useState<'user' | 'company'>('user');
+  const [activeTab, setActiveTab] = useState<'knowledge-base' | 'automation'>(
+    'automation'
+  );
+  const [activeSection, setActiveSection] = useState<'user' | 'company'>(
+    'user'
+  );
   const router = useRouter();
 
   // Use global company context
@@ -150,10 +154,20 @@ export default function SettingsPage() {
 
   // Fetch settings when company is selected or changes
   useEffect(() => {
-    if (!contextLoading && selectedCompany && (isCompanyAdmin || isGlobalAdmin)) {
+    if (
+      !contextLoading &&
+      selectedCompany &&
+      (isCompanyAdmin || isGlobalAdmin)
+    ) {
       fetchSettings();
     }
-  }, [contextLoading, selectedCompany, isCompanyAdmin, isGlobalAdmin, fetchSettings]);
+  }, [
+    contextLoading,
+    selectedCompany,
+    isCompanyAdmin,
+    isGlobalAdmin,
+    fetchSettings,
+  ]);
 
   const handleSettingChange = (key: string, value: any) => {
     setSettings(prev => ({
@@ -209,21 +223,6 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <div className={styles.titleSection}>
-            <SettingsIcon size={24} className={styles.titleIcon} />
-            <h1 className={styles.title}>Settings</h1>
-          </div>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className={styles.backButton}
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </header>
-
       <main className={styles.main}>
         {/* Main Section Navigation */}
         <div className={styles.mainNavigation}>
@@ -247,7 +246,7 @@ export default function SettingsPage() {
         {activeSection === 'user' && (
           <div className={styles.settingsSection}>
             <h2 className={styles.sectionTitle}>User Settings</h2>
-            
+
             <div className={styles.settingsForm}>
               {/* Profile Information */}
               <div className={styles.settingGroup}>
@@ -255,7 +254,7 @@ export default function SettingsPage() {
                 <p className={styles.groupDescription}>
                   Your personal account information.
                 </p>
-                
+
                 <div className={styles.setting}>
                   <div className={styles.settingInfo}>
                     <label className={styles.settingLabel}>Name</label>
@@ -274,7 +273,12 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
-
+              {/* Email Notification Preferences */}
+              {selectedCompany && (
+                <div className={styles.settingGroup}>
+                  <NotificationPreferences companyId={selectedCompany.id} />
+                </div>
+              )}
               {/* Linked Accounts */}
               <div className={styles.settingGroup}>
                 <AccountLinking user={user} />
@@ -291,9 +295,6 @@ export default function SettingsPage() {
                 <h2 className={styles.sectionTitle}>
                   Settings for {selectedCompany.name}
                 </h2>
-                <p className={styles.sectionDescription}>
-                  Use the company dropdown in the header to switch between companies.
-                </p>
 
                 {message && (
                   <div className={`${styles.message} ${styles[message.type]}`}>
@@ -309,12 +310,6 @@ export default function SettingsPage() {
                 {/* Tab Navigation */}
                 <div className={styles.tabNavigation}>
                   <button
-                    className={`${styles.tabButton} ${activeTab === 'widget' ? styles.active : ''}`}
-                    onClick={() => setActiveTab('widget')}
-                  >
-                    Widget Settings
-                  </button>
-                  <button
                     className={`${styles.tabButton} ${activeTab === 'automation' ? styles.active : ''}`}
                     onClick={() => setActiveTab('automation')}
                   >
@@ -329,43 +324,11 @@ export default function SettingsPage() {
                 </div>
 
                 {settingsLoading ? (
-                  <div className={styles.settingsLoading}>Loading settings...</div>
+                  <div className={styles.settingsLoading}>
+                    Loading settings...
+                  </div>
                 ) : (
                   <div className={styles.settingsForm}>
-                    {/* Widget Settings Tab */}
-                    {activeTab === 'widget' && (
-                      <>
-                        <div className={styles.settingGroup}>
-                          <h3 className={styles.groupTitle}>Widget Form Settings</h3>
-                          <p className={styles.groupDescription}>
-                            Configure the lead capture widget for your website.
-                          </p>
-                          
-                          <div className={styles.setting}>
-                            <div className={styles.settingInfo}>
-                              <label htmlFor="widget-enabled" className={styles.settingLabel}>
-                                Enable Widget
-                              </label>
-                              <p className={styles.settingDescription}>
-                                Enable or disable the lead capture widget.
-                              </p>
-                            </div>
-                            <div className={styles.settingControl}>
-                              <label className={styles.toggle}>
-                                <input
-                                  id="widget-enabled"
-                                  type="checkbox"
-                                  checked={settings.widget_enabled?.value === true}
-                                  onChange={e => handleSettingChange('widget_enabled', e.target.checked)}
-                                />
-                                <span className={styles.toggleSlider}></span>
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    )}
-
                     {/* Automation Tab */}
                     {activeTab === 'automation' && (
                       <div className={styles.automationSection}>
@@ -379,20 +342,6 @@ export default function SettingsPage() {
                         <KnowledgeBase companyId={selectedCompany.id} />
                       </div>
                     )}
-
-                    {/* Save Button - only show for widget tab */}
-                    {activeTab === 'widget' && (
-                      <div className={styles.actions}>
-                        <button
-                          onClick={handleSave}
-                          disabled={saving || (!isCompanyAdmin && !isGlobalAdmin)}
-                          className={styles.saveButton}
-                        >
-                          <Save size={16} />
-                          {saving ? 'Saving...' : 'Save Settings'}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -400,7 +349,8 @@ export default function SettingsPage() {
               <div className={styles.settingsSection}>
                 <div className={styles.message}>
                   <AlertCircle size={16} />
-                  Please select a company from the header dropdown to view settings.
+                  Please select a company from the header dropdown to view
+                  settings.
                 </div>
               </div>
             )}

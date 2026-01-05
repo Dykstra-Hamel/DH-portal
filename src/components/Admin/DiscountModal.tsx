@@ -68,7 +68,8 @@ export default function DiscountModal({
         discount_type: discount.discount_type,
         discount_value: discount.discount_value.toString(),
         recurring_discount_type: discount.recurring_discount_type || '',
-        recurring_discount_value: discount.recurring_discount_value?.toString() || '',
+        recurring_discount_value:
+          discount.recurring_discount_value?.toString() || '',
         applies_to_price: discount.applies_to_price,
         applies_to_plans: discount.applies_to_plans,
         eligible_plan_ids: discount.eligible_plan_ids || [],
@@ -152,7 +153,9 @@ export default function DiscountModal({
       }
       if (formData.time_restriction_type === 'limited_time') {
         if (!formData.limited_time_start || !formData.limited_time_end) {
-          throw new Error('Both start and end dates are required for limited time discounts');
+          throw new Error(
+            'Both start and end dates are required for limited time discounts'
+          );
         }
       }
 
@@ -165,11 +168,13 @@ export default function DiscountModal({
         discount_value: Number(formData.discount_value),
         // Recurring discount fields (only used when applies_to_price = 'both')
         recurring_discount_type:
-          formData.applies_to_price === 'both' && formData.recurring_discount_type
+          formData.applies_to_price === 'both' &&
+          formData.recurring_discount_type
             ? formData.recurring_discount_type
             : null,
         recurring_discount_value:
-          formData.applies_to_price === 'both' && formData.recurring_discount_value
+          formData.applies_to_price === 'both' &&
+          formData.recurring_discount_value
             ? Number(formData.recurring_discount_value)
             : null,
         applies_to_price: formData.applies_to_price,
@@ -234,10 +239,10 @@ export default function DiscountModal({
   };
 
   const handlePlanToggle = (planId: string) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       eligible_plan_ids: prev.eligible_plan_ids.includes(planId)
-        ? prev.eligible_plan_ids.filter((id) => id !== planId)
+        ? prev.eligible_plan_ids.filter(id => id !== planId)
         : [...prev.eligible_plan_ids, planId],
     }));
   };
@@ -246,7 +251,7 @@ export default function DiscountModal({
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2>{discount ? 'Edit Discount' : 'Create Discount'}</h2>
           <button
@@ -274,7 +279,7 @@ export default function DiscountModal({
                 type="text"
                 id="discount_name"
                 value={formData.discount_name}
-                onChange={(e) =>
+                onChange={e =>
                   setFormData({ ...formData, discount_name: e.target.value })
                 }
                 placeholder="e.g., Summer Special - 15% Off"
@@ -287,7 +292,7 @@ export default function DiscountModal({
               <textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) =>
+                onChange={e =>
                   setFormData({ ...formData, description: e.target.value })
                 }
                 placeholder="Internal notes about this discount..."
@@ -300,7 +305,7 @@ export default function DiscountModal({
                 <input
                   type="checkbox"
                   checked={formData.is_active}
-                  onChange={(e) =>
+                  onChange={e =>
                     setFormData({ ...formData, is_active: e.target.checked })
                   }
                 />
@@ -322,7 +327,7 @@ export default function DiscountModal({
                     name="applies_to_price"
                     value="initial"
                     checked={formData.applies_to_price === 'initial'}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         applies_to_price: e.target.value as 'initial',
@@ -337,7 +342,7 @@ export default function DiscountModal({
                     name="applies_to_price"
                     value="recurring"
                     checked={formData.applies_to_price === 'recurring'}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         applies_to_price: e.target.value as 'recurring',
@@ -352,7 +357,7 @@ export default function DiscountModal({
                     name="applies_to_price"
                     value="both"
                     checked={formData.applies_to_price === 'both'}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         applies_to_price: e.target.value as 'both',
@@ -376,7 +381,7 @@ export default function DiscountModal({
                         name="discount_type"
                         value="percentage"
                         checked={formData.discount_type === 'percentage'}
-                        onChange={(e) =>
+                        onChange={e =>
                           setFormData({
                             ...formData,
                             discount_type: e.target.value as 'percentage',
@@ -391,7 +396,7 @@ export default function DiscountModal({
                         name="discount_type"
                         value="fixed_amount"
                         checked={formData.discount_type === 'fixed_amount'}
-                        onChange={(e) =>
+                        onChange={e =>
                           setFormData({
                             ...formData,
                             discount_type: e.target.value as 'fixed_amount',
@@ -415,15 +420,26 @@ export default function DiscountModal({
                       type="number"
                       id="discount_value"
                       value={formData.discount_value}
-                      onChange={(e) =>
-                        setFormData({ ...formData, discount_value: e.target.value })
+                      onChange={e =>
+                        setFormData({
+                          ...formData,
+                          discount_value: e.target.value,
+                        })
                       }
                       placeholder={
                         formData.discount_type === 'percentage' ? '15' : '100'
                       }
                       min="0"
-                      step={formData.discount_type === 'percentage' ? '0.01' : '1'}
-                      max={formData.discount_type === 'percentage' ? '100' : undefined}
+                      step={
+                        formData.discount_type === 'fixed_amount'
+                          ? '0.01'
+                          : '0.10'
+                      }
+                      max={
+                        formData.discount_type === 'percentage'
+                          ? '100'
+                          : undefined
+                      }
                       required
                     />
                     {formData.discount_type === 'percentage' && (
@@ -444,10 +460,12 @@ export default function DiscountModal({
                     <label>Type</label>
                     <select
                       value={formData.discount_type}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({
                           ...formData,
-                          discount_type: e.target.value as 'percentage' | 'fixed_amount',
+                          discount_type: e.target.value as
+                            | 'percentage'
+                            | 'fixed_amount',
                         })
                       }
                     >
@@ -467,13 +485,26 @@ export default function DiscountModal({
                         type="number"
                         id="discount_value"
                         value={formData.discount_value}
-                        onChange={(e) =>
-                          setFormData({ ...formData, discount_value: e.target.value })
+                        onChange={e =>
+                          setFormData({
+                            ...formData,
+                            discount_value: e.target.value,
+                          })
                         }
-                        placeholder={formData.discount_type === 'percentage' ? '15' : '100'}
+                        placeholder={
+                          formData.discount_type === 'percentage' ? '15' : '100'
+                        }
                         min="0"
-                        step={formData.discount_type === 'percentage' ? '0.01' : '1'}
-                        max={formData.discount_type === 'percentage' ? '100' : undefined}
+                        step={
+                          formData.discount_type === 'fixed_amount'
+                            ? '0.01'
+                            : '0.10'
+                        }
+                        max={
+                          formData.discount_type === 'percentage'
+                            ? '100'
+                            : undefined
+                        }
                         required
                       />
                       {formData.discount_type === 'percentage' && (
@@ -490,10 +521,13 @@ export default function DiscountModal({
                     <label>Type</label>
                     <select
                       value={formData.recurring_discount_type}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({
                           ...formData,
-                          recurring_discount_type: e.target.value as 'percentage' | 'fixed_amount' | '',
+                          recurring_discount_type: e.target.value as
+                            | 'percentage'
+                            | 'fixed_amount'
+                            | '',
                         })
                       }
                     >
@@ -504,37 +538,60 @@ export default function DiscountModal({
                   </div>
                   <div className={styles.formGroup}>
                     <label htmlFor="recurring_discount_value">
-                      Value {formData.recurring_discount_type && <span className={styles.required}>*</span>}
+                      Value{' '}
+                      {formData.recurring_discount_type && (
+                        <span className={styles.required}>*</span>
+                      )}
                     </label>
                     <div className={styles.inputWithPrefix}>
                       {(formData.recurring_discount_type === 'fixed_amount' ||
-                        (!formData.recurring_discount_type && formData.discount_type === 'fixed_amount')) && (
+                        (!formData.recurring_discount_type &&
+                          formData.discount_type === 'fixed_amount')) && (
                         <span className={styles.prefix}>$</span>
                       )}
                       <input
                         type="number"
                         id="recurring_discount_value"
                         value={formData.recurring_discount_value}
-                        onChange={(e) =>
-                          setFormData({ ...formData, recurring_discount_value: e.target.value })
+                        onChange={e =>
+                          setFormData({
+                            ...formData,
+                            recurring_discount_value: e.target.value,
+                          })
                         }
                         placeholder={
                           formData.recurring_discount_type
-                            ? formData.recurring_discount_type === 'percentage' ? '10' : '50'
+                            ? formData.recurring_discount_type === 'percentage'
+                              ? '10'
+                              : '50'
                             : 'Same as initial'
                         }
                         min="0"
-                        step={(formData.recurring_discount_type || formData.discount_type) === 'percentage' ? '0.01' : '1'}
-                        max={(formData.recurring_discount_type || formData.discount_type) === 'percentage' ? '100' : undefined}
+                        step={
+                          (formData.recurring_discount_type ||
+                            formData.discount_type) === 'fixed_amount'
+                            ? '0.01'
+                            : '0.10'
+                        }
+                        max={
+                          (formData.recurring_discount_type ||
+                            formData.discount_type) === 'percentage'
+                            ? '100'
+                            : undefined
+                        }
                         disabled={!formData.recurring_discount_type}
                       />
                       {(formData.recurring_discount_type === 'percentage' ||
-                        (!formData.recurring_discount_type && formData.discount_type === 'percentage')) && (
+                        (!formData.recurring_discount_type &&
+                          formData.discount_type === 'percentage')) && (
                         <span className={styles.suffix}>%</span>
                       )}
                     </div>
                     {!formData.recurring_discount_type && (
-                      <small>Select a different type above to set a separate recurring discount</small>
+                      <small>
+                        Select a different type above to set a separate
+                        recurring discount
+                      </small>
                     )}
                   </div>
                 </div>
@@ -555,7 +612,7 @@ export default function DiscountModal({
                     name="applies_to_plans"
                     value="all"
                     checked={formData.applies_to_plans === 'all'}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         applies_to_plans: e.target.value as 'all',
@@ -570,7 +627,7 @@ export default function DiscountModal({
                     name="applies_to_plans"
                     value="specific"
                     checked={formData.applies_to_plans === 'specific'}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         applies_to_plans: e.target.value as 'specific',
@@ -591,7 +648,7 @@ export default function DiscountModal({
                       No service plans found. Create plans first.
                     </p>
                   ) : (
-                    servicePlans.map((plan) => (
+                    servicePlans.map(plan => (
                       <label key={plan.id} className={styles.checkboxLabel}>
                         <input
                           type="checkbox"
@@ -616,8 +673,11 @@ export default function DiscountModal({
                 <input
                   type="checkbox"
                   checked={formData.requires_manager}
-                  onChange={(e) =>
-                    setFormData({ ...formData, requires_manager: e.target.checked })
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      requires_manager: e.target.checked,
+                    })
                   }
                 />
                 <span>Manager Only (requires admin/manager role to apply)</span>
@@ -638,7 +698,7 @@ export default function DiscountModal({
                     name="time_restriction_type"
                     value="none"
                     checked={formData.time_restriction_type === 'none'}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         time_restriction_type: e.target.value as 'none',
@@ -653,7 +713,7 @@ export default function DiscountModal({
                     name="time_restriction_type"
                     value="seasonal"
                     checked={formData.time_restriction_type === 'seasonal'}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         time_restriction_type: e.target.value as 'seasonal',
@@ -668,7 +728,7 @@ export default function DiscountModal({
                     name="time_restriction_type"
                     value="limited_time"
                     checked={formData.time_restriction_type === 'limited_time'}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         time_restriction_type: e.target.value as 'limited_time',
@@ -687,7 +747,7 @@ export default function DiscountModal({
                   <div className={styles.dateInputs}>
                     <select
                       value={formData.seasonal_start_month}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({
                           ...formData,
                           seasonal_start_month: e.target.value,
@@ -696,7 +756,7 @@ export default function DiscountModal({
                       required
                     >
                       <option value="">Month</option>
-                      {MONTH_OPTIONS.map((month) => (
+                      {MONTH_OPTIONS.map(month => (
                         <option key={month.value} value={month.value}>
                           {month.label}
                         </option>
@@ -704,7 +764,7 @@ export default function DiscountModal({
                     </select>
                     <select
                       value={formData.seasonal_start_day}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({
                           ...formData,
                           seasonal_start_day: e.target.value,
@@ -713,7 +773,7 @@ export default function DiscountModal({
                       required
                     >
                       <option value="">Day</option>
-                      {DAY_OPTIONS.map((day) => (
+                      {DAY_OPTIONS.map(day => (
                         <option key={day.value} value={day.value}>
                           {day.label}
                         </option>
@@ -726,7 +786,7 @@ export default function DiscountModal({
                   <div className={styles.dateInputs}>
                     <select
                       value={formData.seasonal_end_month}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({
                           ...formData,
                           seasonal_end_month: e.target.value,
@@ -735,7 +795,7 @@ export default function DiscountModal({
                       required
                     >
                       <option value="">Month</option>
-                      {MONTH_OPTIONS.map((month) => (
+                      {MONTH_OPTIONS.map(month => (
                         <option key={month.value} value={month.value}>
                           {month.label}
                         </option>
@@ -743,7 +803,7 @@ export default function DiscountModal({
                     </select>
                     <select
                       value={formData.seasonal_end_day}
-                      onChange={(e) =>
+                      onChange={e =>
                         setFormData({
                           ...formData,
                           seasonal_end_day: e.target.value,
@@ -752,7 +812,7 @@ export default function DiscountModal({
                       required
                     >
                       <option value="">Day</option>
-                      {DAY_OPTIONS.map((day) => (
+                      {DAY_OPTIONS.map(day => (
                         <option key={day.value} value={day.value}>
                           {day.label}
                         </option>
@@ -771,7 +831,7 @@ export default function DiscountModal({
                     type="datetime-local"
                     id="limited_time_start"
                     value={formData.limited_time_start}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         limited_time_start: e.target.value,
@@ -786,7 +846,7 @@ export default function DiscountModal({
                     type="datetime-local"
                     id="limited_time_end"
                     value={formData.limited_time_end}
-                    onChange={(e) =>
+                    onChange={e =>
                       setFormData({
                         ...formData,
                         limited_time_end: e.target.value,
@@ -809,7 +869,7 @@ export default function DiscountModal({
                 type="number"
                 id="sort_order"
                 value={formData.sort_order}
-                onChange={(e) =>
+                onChange={e =>
                   setFormData({ ...formData, sort_order: e.target.value })
                 }
                 min="0"
@@ -832,7 +892,11 @@ export default function DiscountModal({
               className={styles.saveButton}
               disabled={loading}
             >
-              {loading ? 'Saving...' : discount ? 'Update Discount' : 'Create Discount'}
+              {loading
+                ? 'Saving...'
+                : discount
+                  ? 'Update Discount'
+                  : 'Create Discount'}
             </button>
           </div>
         </form>

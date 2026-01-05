@@ -1,3 +1,7 @@
+.container {
+  width: 100%;
+}
+
 .header {
   background: white;
   border-bottom: 1px solid #e2e8f0;
@@ -8,15 +12,16 @@
 }
 
 .headerContent {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
 }
 
-.titleSection {
-  display: flex;
+.tab {
+  position: relative;
+  display: inline-flex;
   align-items: center;
   gap: 0.75rem;
 }
@@ -32,66 +37,44 @@
   margin: 0;
 }
 
-.backButton {
-  background: #f1f5f9;
-  color: #64748b;
-  border: 1px solid #cbd5e1;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-
-  &:hover {
-    background: #e2e8f0;
-    color: #475569;
-  }
-}
-
 .main {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .mainNavigation {
   display: flex;
-  gap: 0;
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
-  overflow: hidden;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  width: fit-content;
+  margin: 0 0 1.5rem 0;
+  margin-left: auto;
 }
 
 .mainNavButton {
-  flex: 1;
-  padding: 1rem 1.5rem;
-  background: none;
+  padding: 0.45rem 0.95rem;
+  background: transparent;
   border: none;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #6b7280;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
   cursor: pointer;
-  transition: all 0.2s;
-  border-right: 1px solid #e5e7eb;
-
-  &:last-child {
-    border-right: none;
-  }
+  transition: all 0.2s ease;
 
   &:hover {
-    background: #f9fafb;
-    color: #374151;
+    color: #0f172a;
+    background: #f8fafc;
   }
 
   &.active {
-    background: #3b82f6;
-    color: white;
-
-    &:hover {
-      background: #2563eb;
-    }
+    background: var(--action-600, #0284c7);
+    color: #ffffff;
   }
 }
 
@@ -164,7 +147,7 @@
 
 .settingsSection {
   background: white;
-  border-radius: 0.75rem;
+  border-radius: 0 8px 8px 8px;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
@@ -616,6 +599,15 @@
 @media (max-width: 768px) {
   .main {
     padding: 1rem;
+  }
+
+  .mainNavigation {
+    margin: 0 auto 1.25rem;
+  }
+
+  .mainNavButton {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.85rem;
   }
 
   .header {

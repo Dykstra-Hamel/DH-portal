@@ -92,6 +92,7 @@ export default function EmailTemplateEditor({
   } | null>(null);
   const [brandData, setBrandData] = useState<{
     logo_url: string;
+    signature_url: string;
   } | null>(null);
   const [reviewsData, setReviewsData] = useState<{
     rating: number;
@@ -157,7 +158,7 @@ export default function EmailTemplateEditor({
           // Fetch brand data
           const { data: brand } = await supabase
             .from('brands')
-            .select('logo_url')
+            .select('logo_url, signature_url')
             .eq('company_id', companyId)
             .single();
 

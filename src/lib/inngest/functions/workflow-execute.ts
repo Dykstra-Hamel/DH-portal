@@ -12,10 +12,6 @@ import {
   formatDiscount,
 } from '@/lib/campaign-utils';
 import { isPhoneSuppressed } from '@/lib/suppression';
-import {
-  generateUnsubscribeToken,
-  getUnsubscribeUrl,
-} from '@/lib/suppression/tokens';
 
 interface StepResult {
   stepIndex: number;
@@ -223,11 +219,53 @@ export const workflowExecuteHandler = inngest.createFunction(
       );
 
       if (!statusCheck.shouldContinue) {
+        // Save completed steps to database before returning
+        await step.run('save-steps-before-cancellation', async () => {
+          const supabase = createAdminClient();
+
+          // Get current execution data to preserve existing fields
+          const { data: currentExecution } = await supabase
+            .from('automation_executions')
+            .select('execution_data')
+            .eq('id', executionId)
+            .single();
+
+          // Update with completed steps
+          await supabase
+            .from('automation_executions')
+            .update({
+              execution_data: {
+                ...currentExecution?.execution_data,
+                stepResults: stepResults,
+                completedSteps: stepResults.length,
+                cancelledAtStep: stepIndex,
+              },
+            })
+            .eq('id', executionId);
+
+          return { stepsSaved: stepResults.length };
+        });
+
+        // Send workflow completion event for campaign tracking
+        await inngest.send({
+          name: 'workflow/completed',
+          data: {
+            executionId,
+            workflowId,
+            companyId,
+            triggerType,
+            success: false,
+            cancelled: true,
+            cancellationReason: statusCheck.cancellationReason,
+          },
+        });
+
         return {
           success: true,
           cancelled: true,
           cancelledAt: stepIndex,
           totalSteps: workflowSteps.length,
+          completedSteps: stepResults.length,
           cancellationReason: statusCheck.cancellationReason,
           message: `Workflow execution stopped due to cancellation: ${statusCheck.cancellationReason}`,
         };
@@ -363,6 +401,20 @@ export const workflowExecuteHandler = inngest.createFunction(
                 .eq('automation_execution_id', executionId);
             }
 
+            // Send workflow completion event for campaign tracking
+            await inngest.send({
+              name: 'workflow/completed',
+              data: {
+                executionId,
+                workflowId,
+                companyId,
+                triggerType,
+                success: false,
+                failed: true,
+                error: errorMessage,
+              },
+            });
+
             throw error;
           }
         }
@@ -487,12 +539,41 @@ export const workflowExecuteHandler = inngest.createFunction(
         );
 
         if (!postSleepCheck.shouldContinue) {
+          // Save completed steps to database before returning
+          await step.run('save-steps-after-delay-cancellation', async () => {
+            const supabase = createAdminClient();
+
+            // Get current execution data to preserve existing fields
+            const { data: currentExecution } = await supabase
+              .from('automation_executions')
+              .select('execution_data')
+              .eq('id', executionId)
+              .single();
+
+            // Update with completed steps
+            await supabase
+              .from('automation_executions')
+              .update({
+                execution_data: {
+                  ...currentExecution?.execution_data,
+                  stepResults: stepResults,
+                  completedSteps: stepResults.length,
+                  cancelledAtStep: stepIndex,
+                  cancelledAfterDelay: true,
+                },
+              })
+              .eq('id', executionId);
+
+            return { stepsSaved: stepResults.length };
+          });
+
           return {
             success: true,
             cancelled: true,
             cancelledAt: stepIndex,
             cancelledAfter: 'delay',
             totalSteps: workflowSteps.length,
+            completedSteps: stepResults.length,
             message:
               'Workflow execution stopped due to cancellation after delay',
           };
@@ -666,7 +747,7 @@ async function executeEmailStep(
   // Get brand data for company logo and colors
   const { data: brandData } = await supabase
     .from('brands')
-    .select('logo_url, primary_color_hex, secondary_color_hex')
+    .select('logo_url, primary_color_hex, secondary_color_hex, signature_url')
     .eq('company_id', companyId)
     .single();
 
@@ -827,38 +908,12 @@ async function executeEmailStep(
     return `<div class="faq-section">${faqItems}</div>`;
   };
 
-  // Generate unsubscribe token for this email
-  let unsubscribeUrl = '';
-  let unsubscribeLink = '';
-
-  try {
-    const tokenResult = await generateUnsubscribeToken({
-      companyId,
-      customerId: customerId || undefined,
-      email: customerEmail,
-      phoneNumber:
-        leadData.customerPhone ||
-        leadData.phone ||
-        fullLeadData?.customer?.phone ||
-        undefined,
-      source: campaignId ? 'email_campaign' : 'automation_workflow',
-      metadata: {
-        campaignId,
-        executionId,
-        workflowId,
-        leadId,
-        templateId: template.id,
-      },
-    });
-
-    if (tokenResult.success && tokenResult.data) {
-      unsubscribeUrl = getUnsubscribeUrl(tokenResult.data.token);
-      unsubscribeLink = `<a href="${unsubscribeUrl}">Unsubscribe</a>`;
-    }
-  } catch (error) {
-    console.error('Error generating unsubscribe token:', error);
-    // Continue with empty unsubscribe links rather than failing the entire email
-  }
+  // NOTE: Unsubscribe footer is now automatically injected by the sendEmail() function
+  // These variables are kept for backward compatibility with older templates that may
+  // manually reference {{unsubscribeUrl}} or {{unsubscribeLink}} in their content.
+  // New emails will have the footer automatically appended regardless of these variables.
+  const unsubscribeUrl = '';
+  const unsubscribeLink = '';
 
   // Extract plan data with fallbacks for partial leads
   const planData = fullLeadData?.service_plans || leadData.selectedPlan;
@@ -906,6 +961,7 @@ async function executeEmailStep(
     companyPhone: company?.phone || '',
     companyWebsite: company?.website || '',
     companyLogo: logoUrl,
+    companySignature: brandData?.signature_url || '',
 
     // Brand colors
     brandPrimaryColor: brandData?.primary_color_hex || '',
@@ -1066,7 +1122,7 @@ async function executeEmailStep(
     campaignHeroImage: campaignLandingPage?.hero_image_url || '',
     createLeadLink:
       campaignId && customerId
-        ? generateLeadTrackingTags(campaignId, customerId)
+        ? generateLeadTrackingTags(campaignId, customerId, undefined, companyId)
         : '',
     // Unsubscribe variables
     unsubscribeUrl,

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import { ArrowLeft } from 'lucide-react';
 import styles from './page.module.scss';
 import CampaignDetailHeader from '@/components/Campaigns/CampaignDetailHeader';
@@ -26,6 +27,7 @@ export default function CampaignDetailPage({
 }: CampaignDetailPageProps) {
   const router = useRouter();
   const { selectedCompany } = useCompany();
+  const { setPageHeader } = usePageActions();
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<any>(null);
   const [metrics, setMetrics] = useState<any>(null);
@@ -37,6 +39,7 @@ export default function CampaignDetailPage({
     useState<string>('America/New_York');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLandingPageModal, setShowLandingPageModal] = useState(false);
+  const [isClonedCampaign, setIsClonedCampaign] = useState(false);
 
   useEffect(() => {
     params.then(p => setCampaignId(p.id));
@@ -46,7 +49,6 @@ export default function CampaignDetailPage({
     if (campaignId && selectedCompany?.id) {
       fetchCampaignData();
       fetchCompanyTimezone();
-      setupRealtimeSubscription();
     }
   }, [campaignId, selectedCompany?.id]);
 
@@ -64,6 +66,12 @@ export default function CampaignDetailPage({
       }
 
       setCampaign(campaignResult.campaign);
+
+      // Update page header with campaign name
+      setPageHeader({
+        title: campaignResult.campaign.name,
+        description: 'View campaign performance, manage contacts and leads, and track execution metrics.',
+      });
 
       // Fetch metrics
       const metricsResponse = await fetch(
@@ -116,53 +124,47 @@ export default function CampaignDetailPage({
     }
   };
 
-  const setupRealtimeSubscription = () => {
-    const supabase = createClient();
-
-    // Subscribe to campaign changes
-    const campaignChannel = supabase
-      .channel(`campaign-${campaignId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaigns',
-          filter: `id=eq.${campaignId}`,
-        },
-        payload => {
-          console.log('Campaign updated:', payload);
-          fetchCampaignData();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to execution changes
-    const executionsChannel = supabase
-      .channel(`campaign-executions-${campaignId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaign_executions',
-          filter: `campaign_id=eq.${campaignId}`,
-        },
-        payload => {
-          console.log('Execution updated:', payload);
-          fetchCampaignData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(campaignChannel);
-      supabase.removeChannel(executionsChannel);
-    };
-  };
-
   const handleCampaignUpdate = () => {
     fetchCampaignData();
+  };
+
+  const handleExecutionCountChange = useCallback((totalExecutions: number) => {
+    setMetrics((prev: any) => ({
+      ...prev,
+      totalExecutions,
+    }));
+  }, []);
+
+  const handleDuplicateCampaign = async () => {
+    if (!campaign) return;
+
+    const confirmed = confirm(`Duplicate campaign "${campaign.name}"?`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/campaigns/${campaign.id}/clone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          // Let backend auto-increment the name (Copy, Copy 2, Copy 3, etc.)
+          copy_contact_lists: false, // Don't copy contact lists
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Open edit modal with cloned campaign
+        setCampaign(result.campaign);
+        setIsClonedCampaign(true);
+        setShowEditModal(true);
+      } else {
+        alert(result.error || 'Failed to duplicate campaign');
+      }
+    } catch (error) {
+      console.error('Error duplicating campaign:', error);
+      alert('Failed to duplicate campaign');
+    }
   };
 
   if (loading) {
@@ -207,6 +209,7 @@ export default function CampaignDetailPage({
         onUpdate={handleCampaignUpdate}
         onEdit={() => setShowEditModal(true)}
         onEditLandingPage={() => setShowLandingPageModal(true)}
+        onDuplicate={handleDuplicateCampaign}
         companyTimezone={companyTimezone}
       />
 
@@ -270,6 +273,7 @@ export default function CampaignDetailPage({
             campaignId={campaign.id}
             companyId={selectedCompany?.id || ''}
             companyTimezone={companyTimezone}
+            onExecutionCountChange={handleExecutionCountChange}
           />
         )}
 
@@ -285,12 +289,17 @@ export default function CampaignDetailPage({
       {/* Edit Campaign Modal */}
       <CampaignEditor
         isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
+        onClose={() => {
+          setShowEditModal(false);
+          setIsClonedCampaign(false);
+        }}
         companyId={campaign.company_id}
         campaign={campaign}
+        isCloned={isClonedCampaign}
         onSuccess={() => {
           fetchCampaignData();
           setShowEditModal(false);
+          setIsClonedCampaign(false);
         }}
       />
 

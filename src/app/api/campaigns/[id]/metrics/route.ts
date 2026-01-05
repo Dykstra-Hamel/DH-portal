@@ -31,6 +31,16 @@ export async function GET(
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
+    // Get company timezone setting
+    const { data: timezoneSetting } = await queryClient
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', campaign.company_id)
+      .eq('setting_key', 'company_timezone')
+      .single();
+
+    const companyTimezone = timezoneSetting?.setting_value || 'America/New_York';
+
     // Check user has access (skip for global admins)
     if (!isGlobalAdmin) {
       const { data: userCompany } = await supabase
@@ -155,7 +165,7 @@ export async function GET(
 
     const { data: members } = await queryClient
       .from('campaign_contact_list_members')
-      .select('status')
+      .select('status, redeemed_at, first_viewed_at, last_viewed_at, view_count')
       .eq('campaign_id', campaignId);
 
     if (members) {
@@ -169,6 +179,51 @@ export async function GET(
         excluded: members.filter((m: any) => m.status === 'excluded').length,
       };
     }
+
+    // Calculate view tracking metrics
+    const viewMetrics = {
+      total_views: members?.reduce((sum: number, m: any) => sum + (m.view_count || 0), 0) || 0,
+      unique_viewers: members?.filter((m: any) => m.view_count > 0).length || 0,
+      total_redeemed: members?.filter((m: any) => m.redeemed_at !== null).length || 0,
+      viewed_not_redeemed: members?.filter((m: any) =>
+        m.view_count > 0 && m.redeemed_at === null
+      ).length || 0,
+      view_to_redemption_rate: 0,
+    };
+
+    // Calculate conversion rate (views -> redemptions)
+    if (viewMetrics.unique_viewers > 0) {
+      viewMetrics.view_to_redemption_rate =
+        Math.round((viewMetrics.total_redeemed / viewMetrics.unique_viewers) * 100);
+    }
+
+    // Get time-series view data (last 30 days)
+    const { data: viewHistory } = await queryClient
+      .from('campaign_landing_page_views')
+      .select('viewed_at')
+      .eq('campaign_id', campaignId)
+      .gte('viewed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .order('viewed_at', { ascending: true });
+
+    // Group views by date for charting
+    const viewsByDate: Record<string, number> = {};
+    viewHistory?.forEach((view: any) => {
+      // Use Intl.DateTimeFormat to reliably extract date parts in company timezone
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: companyTimezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+
+      const parts = formatter.formatToParts(new Date(view.viewed_at));
+      const year = parts.find(p => p.type === 'year')?.value || '';
+      const month = parts.find(p => p.type === 'month')?.value || '';
+      const day = parts.find(p => p.type === 'day')?.value || '';
+
+      const date = `${year}-${month}-${day}`;
+      viewsByDate[date] = (viewsByDate[date] || 0) + 1;
+    });
 
     // Calculate progress percentage
     const progressPercentage = campaign.total_contacts > 0
@@ -191,6 +246,8 @@ export async function GET(
       },
       email: emailMetrics,
       workflow: workflowMetrics,
+      views: viewMetrics,
+      viewsByDate,
       memberStatus: memberStatusCounts,
       contactLists: contactLists || [],
       totalExecutions: executions?.length || 0,

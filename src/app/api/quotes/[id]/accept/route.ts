@@ -4,6 +4,7 @@ import { captureDeviceData } from '@/lib/device-utils';
 import { sendQuoteSignedNotification } from '@/lib/email/quote-notifications';
 import { QuoteSignedEmailData } from '@/lib/email/types';
 import { logActivity } from '@/lib/activity-logger';
+import { inngest } from '@/lib/inngest/client';
 
 interface AcceptQuoteRequest {
   signature_data: string;
@@ -182,16 +183,44 @@ export async function POST(
 
     // Update the associated lead status
     if (quote.lead_id) {
+      // Get previous lead status before updating
+      const { data: previousLead } = await supabase
+        .from('leads')
+        .select('lead_status, assigned_to')
+        .eq('id', quote.lead_id)
+        .single();
+
       const { error: updateLeadError } = await supabase
         .from('leads')
         .update({
-          lead_status: 'ready_to_schedule',
+          lead_status: 'scheduling',
         })
         .eq('id', quote.lead_id);
 
       if (updateLeadError) {
         console.error('Error updating lead status:', updateLeadError);
         // Don't fail the request if lead update fails - quote is already accepted
+      }
+
+      // Trigger status-changed event for scheduling notifications
+      if (previousLead && previousLead.lead_status !== 'scheduling') {
+        try {
+          await inngest.send({
+            name: 'lead/status-changed',
+            data: {
+              leadId: quote.lead_id,
+              companyId: quote.company_id,
+              fromStatus: previousLead.lead_status,
+              toStatus: 'scheduling',
+              assignedUserId: previousLead.assigned_to,
+              userId: 'system',
+              timestamp: new Date().toISOString(),
+            },
+          });
+        } catch (error) {
+          console.error('Failed to trigger status-changed event:', error);
+          // Don't fail quote acceptance
+        }
       }
 
       // Store preferred date/time in lead comments if provided
@@ -289,7 +318,7 @@ export async function POST(
             const quoteUrl = quote.quote_url ? `${process.env.NEXT_PUBLIC_SITE_URL}${quote.quote_url}` : undefined;
 
             // Build lead URL
-            const leadUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/connections/leads/${leadData.id}`;
+            const leadUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/tickets/leads/${leadData.id}`;
 
             // Prepare email data
             const emailData: QuoteSignedEmailData = {

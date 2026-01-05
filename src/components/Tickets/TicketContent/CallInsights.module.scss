@@ -1,5 +1,5 @@
 // Import shared section styles
-@import './SharedSection.module.scss';
+@use './shared';
 
 // Simple container styles for headerless layout
 .simpleContainer {

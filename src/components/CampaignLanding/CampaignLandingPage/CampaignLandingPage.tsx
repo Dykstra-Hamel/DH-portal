@@ -6,7 +6,7 @@
  * Main landing page with customizable sections based on campaign configuration
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from './CampaignLandingPage.module.scss';
 import ThankYouPage from '../ThankYouPage/ThankYouPage';
 import InlineRedemptionCard from '../InlineRedemptionCard/InlineRedemptionCard';
@@ -49,6 +49,7 @@ interface CampaignLandingPageProps {
     id: string;
     name: string;
     slug: string;
+    website: string[];
   };
   redemption: {
     isRedeemed: boolean;
@@ -56,6 +57,13 @@ interface CampaignLandingPageProps {
     requestedDate: string | null;
     requestedTime: string | null;
   };
+  businessHours?: {
+    [day: string]: {
+      start: string;
+      end: string;
+      closed: boolean;
+    };
+  } | null;
   landingPage: {
     hero: {
       title: string;
@@ -63,6 +71,7 @@ interface CampaignLandingPageProps {
       description: string | null;
       buttonText: string;
       imageUrl: string | null; // Changed from imageUrls array to single image
+      buttonIconUrl: string | null;
     };
     pricing: {
       displayPrice: string;
@@ -112,9 +121,15 @@ interface CampaignLandingPageProps {
     footer: {
       tagline: string;
       links: Array<{ label: string; url: string }>;
+      termsUrl?: string | null;
+      privacyUrl?: string | null;
     };
     terms: {
       content: string | null;
+    };
+    redemptionCard: {
+      heading: string | null;
+      disclaimer: string | null;
     };
     branding: {
       logoUrl: string | null;
@@ -127,6 +142,19 @@ interface CampaignLandingPageProps {
       fontPrimaryName: string | null;
       fontPrimaryUrl: string | null;
     };
+    thankYou: {
+      greeting: string;
+      content: string | null;
+      showExpect: boolean;
+      expectHeading: string;
+      expectColumns: Array<{
+        imageUrl: string | null;
+        heading: string | null;
+        content: string | null;
+      }>;
+      ctaText: string;
+      ctaUrl: string | null;
+    };
   };
 }
 
@@ -135,23 +163,50 @@ export default function CampaignLandingPage({
   customer,
   company,
   redemption,
+  businessHours,
   landingPage,
 }: CampaignLandingPageProps) {
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const redemptionCardRef = useRef<HTMLDivElement | null>(null);
 
   // Load brand primary font dynamically
   useEffect(() => {
     if (landingPage.branding.fontPrimaryUrl) {
+      // Remove any existing campaign font link to prevent duplicates
+      const existingLink = document.getElementById('campaign-custom-font');
+      if (existingLink) {
+        existingLink.remove();
+      }
+
+      // Add new font link with ID for tracking
       const link = document.createElement('link');
+      link.id = 'campaign-custom-font';
       link.rel = 'stylesheet';
       link.href = landingPage.branding.fontPrimaryUrl;
       document.head.appendChild(link);
 
+      // Cleanup on unmount
       return () => {
-        document.head.removeChild(link);
+        const linkToRemove = document.getElementById('campaign-custom-font');
+        if (linkToRemove) {
+          linkToRemove.remove();
+        }
       };
     }
   }, [landingPage.branding.fontPrimaryUrl]);
+
+  // Scroll to redemption card callback - must be defined before any conditional returns
+  const scrollToRedemptionCard = useCallback(() => {
+    if (!redemptionCardRef.current) return;
+
+    const offset = 70;
+    const targetY =
+      redemptionCardRef.current.getBoundingClientRect().top +
+      window.scrollY -
+      offset;
+
+    window.scrollTo({ top: Math.max(targetY, 0), behavior: 'smooth' });
+  }, []);
 
   // If already redeemed, show full-page thank you
   if (redemption.isRedeemed) {
@@ -161,7 +216,11 @@ export default function CampaignLandingPage({
         customer={customer}
         company={company}
         redemption={redemption}
+        thankYou={landingPage.thankYou}
         branding={landingPage.branding}
+        header={landingPage.header}
+        footer={landingPage.footer}
+        businessHours={businessHours || null}
       />
     );
   }
@@ -213,6 +272,10 @@ export default function CampaignLandingPage({
     }
   };
 
+  const secondaryButtonText = landingPage.branding.phoneNumber
+    ? `Call ${landingPage.branding.phoneNumber}`
+    : landingPage.header.secondaryButtonText || 'Call';
+
   return (
     <div
       className={styles.landingPage}
@@ -223,6 +286,9 @@ export default function CampaignLandingPage({
           ? landingPage.branding.primaryColor
           : landingPage.branding.secondaryColor,
         '--faq-color': landingPage.branding.accentColorPreference === 'primary'
+          ? landingPage.branding.secondaryColor
+          : landingPage.branding.primaryColor,
+        '--signature-color': landingPage.branding.accentColorPreference === 'primary'
           ? landingPage.branding.secondaryColor
           : landingPage.branding.primaryColor,
         '--font-primary': landingPage.branding.fontPrimaryName
@@ -236,9 +302,9 @@ export default function CampaignLandingPage({
           logo={landingPage.branding.logoUrl}
           companyName={landingPage.branding.companyName}
           primaryButtonText={landingPage.header.primaryButtonText}
-          secondaryButtonText={landingPage.header.secondaryButtonText}
+          secondaryButtonText={secondaryButtonText}
           phoneNumber={landingPage.branding.phoneNumber}
-          onPrimaryClick={() => handleImmediateRedeem()}
+          onPrimaryClick={scrollToRedemptionCard}
         />
       )}
 
@@ -250,26 +316,32 @@ export default function CampaignLandingPage({
         company={company}
         branding={landingPage.branding}
         serviceName={landingPage.faq.serviceName}
-        onCtaClick={() => handleImmediateRedeem()}
+        onCtaClick={scrollToRedemptionCard}
       />
 
       {/* Letter Section with Redemption Card (2-column layout) */}
-      {landingPage.letter.show && landingPage.letter.content && (
+      {landingPage.letter.show && (
         <section className={styles.letterAndRedemptionSection}>
           <div className={styles.letterAndRedemptionContainer}>
-            <div className={styles.letterColumn}>
-              <LetterSection
-                letter={landingPage.letter}
-                pricing={landingPage.pricing}
-                customer={customer}
-                campaign={campaign}
-                company={company}
-                branding={landingPage.branding}
-                serviceName={landingPage.faq.serviceName}
-                onCtaClick={() => handleImmediateRedeem()}
-              />
-            </div>
-            <div className={styles.redemptionColumn}>
+            {landingPage.letter.content && (
+              <div className={styles.letterColumn}>
+                <LetterSection
+                  letter={landingPage.letter}
+                  pricing={landingPage.pricing}
+                  customer={customer}
+                  campaign={campaign}
+                  company={company}
+                  branding={landingPage.branding}
+                  serviceName={landingPage.faq.serviceName}
+                  onCtaClick={scrollToRedemptionCard}
+                />
+              </div>
+            )}
+            <div
+              className={styles.redemptionColumn}
+              id="inline-redemption-card"
+              ref={redemptionCardRef}
+            >
               <InlineRedemptionCard
                 customer={customer}
                 campaign={campaign}
@@ -279,6 +351,12 @@ export default function CampaignLandingPage({
                   priceFrequency: landingPage.pricing.displayPrice.split('/')[1] || 'mo',
                 }}
                 addons={landingPage.addons}
+                landingPage={{
+                  redemptionCard: {
+                    heading: landingPage.redemptionCard.heading || undefined,
+                    disclaimer: landingPage.redemptionCard.disclaimer || undefined,
+                  },
+                }}
                 company={company}
                 branding={landingPage.branding}
                 serviceName={landingPage.faq.serviceName}
@@ -298,7 +376,8 @@ export default function CampaignLandingPage({
           company={company}
           branding={landingPage.branding}
           serviceName={landingPage.faq.serviceName}
-          onCtaClick={() => handleImmediateRedeem()}
+          buttonText={landingPage.hero.buttonText}
+          onCtaClick={scrollToRedemptionCard}
         />
       )}
 
@@ -313,7 +392,8 @@ export default function CampaignLandingPage({
             company={company}
             branding={landingPage.branding}
             serviceName={landingPage.faq.serviceName}
-            onCtaClick={() => handleImmediateRedeem()}
+            buttonText={landingPage.hero.buttonText}
+            onCtaClick={scrollToRedemptionCard}
           />
         )}
 
@@ -333,6 +413,7 @@ export default function CampaignLandingPage({
       <FooterSection
         footer={landingPage.footer}
         branding={landingPage.branding}
+        serviceName={landingPage.faq.serviceName}
       />
     </div>
   );

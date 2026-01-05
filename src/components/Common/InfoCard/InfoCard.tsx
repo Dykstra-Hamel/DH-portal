@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import styles from './InfoCard.module.scss';
 
 interface InfoCardProps {
@@ -8,6 +8,10 @@ interface InfoCardProps {
   icon?: ReactNode;
   isCollapsible?: boolean;
   startExpanded?: boolean;
+  onExpand?: () => void;
+  forceCollapse?: boolean;
+  forceExpand?: boolean;
+  isCompact?: boolean;
 }
 
 export function InfoCard({
@@ -16,16 +20,45 @@ export function InfoCard({
   className = '',
   icon,
   isCollapsible = true,
-  startExpanded = false
+  startExpanded = false,
+  onExpand,
+  forceCollapse = false,
+  forceExpand = false,
+  isCompact = false,
 }: InfoCardProps) {
   const [isExpanded, setIsExpanded] = useState(startExpanded);
 
+  // Force collapse when forceCollapse prop becomes true
+  useEffect(() => {
+    if (forceCollapse) {
+      setIsExpanded(false);
+    }
+  }, [forceCollapse]);
+
+  // Force expand when forceExpand prop becomes true
+  useEffect(() => {
+    if (forceExpand) {
+      setIsExpanded(true);
+      if (onExpand) {
+        onExpand();
+      }
+    }
+  }, [forceExpand, onExpand]);
+
   const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
+    const newExpandedState = !isExpanded;
+    setIsExpanded(newExpandedState);
+
+    // Call onExpand callback when expanding (going from collapsed to expanded)
+    if (newExpandedState && onExpand) {
+      onExpand();
+    }
   };
 
   return (
-    <div className={`${styles.infoCard} ${className}`}>
+    <div
+      className={`${styles.infoCard} ${isCompact ? styles.compact : ''} ${className}`}
+    >
       <div
         className={`${styles.header} ${isCollapsible ? styles.clickable : ''} ${!isExpanded ? styles.collapsed : styles.expanded}`}
         onClick={isCollapsible ? toggleExpanded : undefined}
@@ -33,11 +66,12 @@ export function InfoCard({
         <div className={styles.headerLeft}>
           {icon && <div className={styles.icon}>{icon}</div>}
           <h3>{title}</h3>
+          <p className={styles.compactTitle}>{title}</p>
         </div>
         {isCollapsible && (
           <button
             className={styles.toggleButton}
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation(); // Prevent double-trigger from header click
               toggleExpanded();
             }}
@@ -62,11 +96,7 @@ export function InfoCard({
           </button>
         )}
       </div>
-      {isExpanded && (
-        <div className={styles.body}>
-          {children}
-        </div>
-      )}
+      {isExpanded && <div className={styles.body}>{children}</div>}
     </div>
   );
 }

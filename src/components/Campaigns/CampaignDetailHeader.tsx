@@ -9,10 +9,11 @@ interface CampaignDetailHeaderProps {
   onUpdate: () => void;
   onEdit: () => void;
   onEditLandingPage: () => void;
+  onDuplicate: () => void;
   companyTimezone?: string;
 }
 
-export default function CampaignDetailHeader({ campaign, onUpdate, onEdit, onEditLandingPage, companyTimezone = 'America/New_York' }: CampaignDetailHeaderProps) {
+export default function CampaignDetailHeader({ campaign, onUpdate, onEdit, onEditLandingPage, onDuplicate, companyTimezone = 'America/New_York' }: CampaignDetailHeaderProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const handleStartCampaign = async () => {
@@ -169,6 +170,16 @@ export default function CampaignDetailHeader({ campaign, onUpdate, onEdit, onEdi
         >
           <FileText size={16} />
           Edit Landing Page
+        </button>
+
+        {/* Duplicate button - available for all campaign statuses */}
+        <button
+          className={`${styles.actionButton} ${styles.secondary}`}
+          onClick={onDuplicate}
+          title="Duplicate Campaign"
+        >
+          <Copy size={16} />
+          Duplicate
         </button>
 
         {campaign.status !== 'cancelled' && campaign.status !== 'completed' && (

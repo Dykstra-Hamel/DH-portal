@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { GlobalHeader } from '../GlobalHeader/GlobalHeader';
 import { Sidebar } from '@/components/sidenav/Sidebar';
 import { NavigationProvider } from '@/contexts/NavigationContext';
@@ -11,6 +12,7 @@ import {
   usePageActions,
 } from '@/contexts/PageActionsContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
+import { Settings, ArrowLeft } from 'lucide-react';
 import styles from './LayoutWrapper.module.scss';
 
 interface LayoutWrapperProps {
@@ -19,6 +21,7 @@ interface LayoutWrapperProps {
 
 function LayoutContent({ children }: LayoutWrapperProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarActive, setIsSidebarActive] = useState(false);
   const { getPageAction, pageHeader } = usePageActions();
 
@@ -33,7 +36,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   const isCampaignLandingPage = pathname.match(/^\/campaign\/[^\/]+\/[^\/]+$/);
 
   // Pages that should have the full layout (header + sidebar)
-  const shouldShowLayout = !isPublicPage && !isHomePage && !isQuotePage && !isCampaignLandingPage;
+  const shouldShowLayout =
+    !isPublicPage && !isHomePage && !isQuotePage && !isCampaignLandingPage;
 
   const toggleSidebar = () => {
     setIsSidebarActive(!isSidebarActive);
@@ -83,12 +87,14 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           title: 'Dashboard',
           description: 'View your business analytics and metrics here.',
           showAddButton: true,
-          addButtonText: 'Add Lead',
+          addButtonText: 'Admin Settings',
+          addButtonIcon: <Settings size={18} strokeWidth={1.75} />,
+          onAddClick: () => router.push('/settings'),
         };
-      case '/connections/incoming':
-      case '/connections/calls-and-forms':
+      case '/tickets/new':
+      case '/tickets/calls-and-forms':
         return {
-          title: 'Incoming',
+          title: 'New Tickets',
           description:
             'Review, qualify, and assign all your incoming customer communications here.',
           showAddButton: true,
@@ -107,12 +113,29 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'Review detailed call logs and recordings here.',
           showAddButton: false,
         };
+      case '/tickets/call-records':
+        return {
+          title: 'Call Records',
+          description:
+            'View and review all incoming and outgoing call activity and recordings.',
+          showAddButton: false,
+        };
+      case '/tickets/form-submissions':
+        return {
+          title: 'Form Submissions',
+          description:
+            'Review and manage all incoming form submissions from your website.',
+          showAddButton: false,
+        };
       case '/settings':
         return {
           title: 'Settings',
           description:
             'Configure your account and application preferences here.',
-          showAddButton: false,
+          showAddButton: true,
+          addButtonText: 'Back to Dashboard',
+          addButtonIcon: <ArrowLeft size={18} strokeWidth={1.75} />,
+          onAddClick: () => router.push('/dashboard'),
         };
       case '/projects':
         return {
@@ -132,49 +155,49 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'Manage system settings and user administration here.',
           showAddButton: false,
         };
-      case '/connections/leads':
+      case '/tickets/leads':
         return {
           title: 'Leads',
           description: 'View and manage all your sales leads here.',
           showAddButton: true,
           addButtonText: 'Add Lead',
         };
-      case '/connections/scheduling':
+      case '/tickets/scheduling':
         return {
           title: 'Scheduling',
           description:
             'Manage all your incoming calls and forms and assign them there.',
           showAddButton: false,
         };
-      case '/connections/my-sales-leads':
+      case '/tickets/my-sales-leads':
         return {
           title: 'Leads',
           description: 'View and manage all your sales leads here.',
           showAddButton: true,
           addButtonText: 'Add Lead',
         };
-      case '/connections/customer-service':
+      case '/tickets/customer-service':
         return {
           title: 'Customer Service',
           description: 'View and manage all your support cases here.',
           showAddButton: true,
           addButtonText: 'Add Case',
         };
-      case '/connections/my-support-cases':
+      case '/tickets/my-support-cases':
         return {
           title: 'Customer Service',
           description: 'View and manage all your support cases here.',
           showAddButton: true,
           addButtonText: 'Add Case',
         };
-      case '/connections/tasks':
+      case '/tickets/tasks':
         return {
           title: 'Tasks',
           description: 'View and manage all tasks here.',
           showAddButton: true,
           addButtonText: 'Create Task',
         };
-      case '/connections/my-tasks':
+      case '/tickets/my-tasks':
         return {
           title: 'My Tasks',
           description: 'View and manage your assigned tasks here.',
@@ -200,22 +223,100 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           showAddButton: true,
           addButtonText: 'Create Campaign',
         };
+      case '/campaigns/contact-lists':
+        return {
+          title: 'Contact Lists',
+          description: 'Manage your contact lists for campaigns',
+          showAddButton: true,
+          addButtonText: 'Create List',
+        };
       case '/reports':
-      case '/connections/reports':
+      case '/tickets/reports':
         return {
           title: 'Reports',
           description: 'View detailed record reports here.',
           showAddButton: false,
         };
+      case '/tickets/form-submissions':
+        return {
+          title: 'Form Submissions',
+          description: 'View detailed data about your form submissions.',
+          showAddButton: false,
+        };
+      case '/tickets/call-records':
+        return {
+          title: 'Call Records',
+          description: 'View detailed data about all calls.',
+          showAddButton: false,
+        };
+      case '/tickets/archived-leads':
+        return {
+          title: 'Archived Leads',
+          description:
+            'View leads that have been marked won, lost, or archived.',
+          showAddButton: false,
+        };
       // Handle individual record pages (hide lower header)
       default:
-        // Show lower header for lead detail pages
-        if (pathname.match(/^\/connections\/leads\/[^\/]+$/)) {
+        // Show lower header for campaign detail pages
+        if (pathname.match(/^\/campaigns\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise use default
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+            };
+          }
           return {
-            title: 'Lead Details',
-            description: 'View and manage this lead information.',
+            title: 'Campaign Details',
+            description:
+              'View campaign performance, manage contacts and leads, and track execution metrics.',
             showAddButton: false,
           };
+        }
+        // Show lower header for lead detail pages
+        if (pathname.match(/^\/tickets\/leads\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise hide header
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              leadAssignmentControls: pageHeader.leadAssignmentControls,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
+        // Show lower header for task detail pages
+        if (pathname.match(/^\/tickets\/tasks\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise hide header
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
+        // Show lower header for support case detail pages
+        if (pathname.match(/^\/tickets\/customer-service\/[^\/]+$/)) {
+          // Use dynamic page header if set, otherwise hide header
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              supportCaseAssignmentControls:
+                pageHeader.supportCaseAssignmentControls,
+            };
+          }
+          return null;
         }
 
         // Show lower header for customer detail pages
@@ -239,7 +340,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
         if (
           pathname.includes('/customers/') ||
-          pathname.includes('/connections/incoming/')
+          pathname.includes('/tickets/new/')
         ) {
           return null; // Don't show lower header on individual record pages
         }
@@ -283,12 +384,18 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               description={pageConfig.description}
               showAddButton={pageConfig.showAddButton}
               addButtonText={pageConfig.addButtonText}
+              addButtonIcon={pageConfig.addButtonIcon}
               onAddClick={
                 pageConfig.showAddButton
-                  ? getPageAction('add') || undefined
+                  ? pageConfig.onAddClick || getPageAction('add') || undefined
                   : undefined
               }
               actionButtons={pageConfig.actionButtons}
+              leadAssignmentControls={pageConfig.leadAssignmentControls}
+              supportCaseAssignmentControls={
+                pageConfig.supportCaseAssignmentControls
+              }
+              customActions={pageConfig.customActions}
             />
           )}
           <main className={styles.mainContent}>

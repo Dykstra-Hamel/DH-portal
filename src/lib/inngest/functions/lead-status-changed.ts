@@ -1,5 +1,6 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { notifyLeadStatusChangedToScheduling } from '@/lib/notifications/lead-notifications';
 
 export const leadStatusChangedHandler = inngest.createFunction(
   {
@@ -122,10 +123,30 @@ export const leadStatusChangedHandler = inngest.createFunction(
       };
     });
 
-    // Step 2: Find workflows triggered by lead status changes
+    // Step 2: Send scheduling notification if status changed to scheduling
+    if (toStatus === 'scheduling') {
+      await step.run('send-scheduling-notification', async () => {
+        try {
+          console.log(`Sending scheduling notification for lead ${leadId} to assigned user: ${event.data.assignedUserId || 'none (will use scheduling department)'}`);
+          const result = await notifyLeadStatusChangedToScheduling(
+            leadId,
+            companyId,
+            event.data.assignedUserId
+          );
+          console.log(`Scheduling notification result:`, result);
+          return { success: true, result };
+        } catch (error) {
+          console.error('Failed to send scheduling notification:', error);
+          // Don't fail the workflow if notification fails
+          return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
+      });
+    }
+
+    // Step 3: Find workflows triggered by lead status changes
     const matchingWorkflows = await step.run('find-matching-workflows', async () => {
       const supabase = createAdminClient();
-      
+
       const { data: workflows, error } = await supabase
         .from('automation_workflows')
         .select('*')
@@ -141,17 +162,17 @@ export const leadStatusChangedHandler = inngest.createFunction(
       // Filter workflows based on status conditions
       return workflows.filter(workflow => {
         const conditions = workflow.trigger_conditions || {};
-        
+
         // Check "to_status" condition (required)
         if (conditions.to_status && conditions.to_status !== toStatus) {
           return false;
         }
-        
+
         // Check "from_status" condition (optional)
         if (conditions.from_status && conditions.from_status !== fromStatus) {
           return false;
         }
-        
+
         return true;
       });
     });

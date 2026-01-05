@@ -18,6 +18,7 @@ export function generateLeadCreatedEmailTemplate(
     priority,
     autoCallEnabled,
     submittedAt,
+    leadUrl,
   } = leadData;
 
   const priorityColors = {
@@ -157,6 +158,19 @@ export function generateLeadCreatedEmailTemplate(
               }
             </div>
           </div>
+
+          ${
+            leadUrl
+              ? `
+          <!-- Call to Action -->
+          <div style="text-align: center; margin-bottom: 24px;">
+            <a href="${leadUrl}" style="display: inline-block; background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);">
+              View Lead Details →
+            </a>
+          </div>
+          `
+              : ''
+          }
 
           <!-- Lead Metrics -->
 

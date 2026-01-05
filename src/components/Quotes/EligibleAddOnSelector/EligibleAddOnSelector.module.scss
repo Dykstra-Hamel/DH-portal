@@ -1,16 +1,58 @@
 .container {
   width: 100%;
-  padding: 20px;
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
+}
+
+.headerButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-900);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  margin-bottom: 0;
+
+  svg {
+    transition: all 0.2s;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  &[data-is-expanded='false'] {
+    svg {
+      transform: rotate(-90deg);
+    }
+  }
+}
+
+.toggleIcon {
+  font-size: 12px;
+  color: var(--gray-700);
+  transition: transform 0.2s;
+  display: inline-block;
+  width: 12px;
+}
+
+.headerText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
 }
 
 .heading {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0 0 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -19,7 +61,7 @@
 .count {
   font-size: 14px;
   font-weight: 500;
-  color: #666;
+  color: var(--gray-500);
 }
 
 .emptyState {
@@ -28,10 +70,11 @@
   justify-content: center;
   padding: 40px 20px;
   text-align: center;
+  margin-top: 12px;
 
   p {
     font-size: 14px;
-    color: #666;
+    color: var(--gray-500);
     margin: 0;
   }
 }
@@ -43,10 +86,11 @@
   justify-content: center;
   padding: 40px 20px;
   gap: 12px;
+  margin-top: 12px;
 
   p {
     font-size: 14px;
-    color: #666;
+    color: var(--gray-500);
     margin: 0;
   }
 }
@@ -54,8 +98,8 @@
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #4caf50;
+  border: 3px solid var(--gray-100);
+  border-top: 3px solid var(--success-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -71,106 +115,116 @@
 
 .addonList {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-flow: row wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 
-.addonCard {
+.addonRow {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: #fafafa;
-  border: 2px solid #e0e0e0;
+  position: relative;
+  flex-direction: column;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--gray-300);
   border-radius: 8px;
+  gap: 14px;
+  min-width: 171px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: #4caf50;
-    background: #f5f5f5;
+    box-shadow:
+      0 0 0 4px rgba(0, 105, 224, 0.16),
+      0 2px 5px 0 rgba(0, 105, 224, 0.08),
+      0 0 0 1px rgba(0, 105, 224, 0.64),
+      0 1px 1px 0 rgba(0, 105, 224, 0.12);
   }
+}
 
-  &.selected {
-    background: #e8f5e9;
-    border-color: #4caf50;
-
-    &:hover {
-      background: #e0f2e1;
-    }
-  }
+.selectedAddonCheckmark {
+  display: block;
+  position: absolute;
+  top: 10px;
+  right: 10px;
 }
 
 .addonInfo {
-  flex: 1;
-  min-width: 0;
-
-  h4 {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin: 0 0 6px;
-  }
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  flex-grow: 1;
 }
 
-.description {
-  font-size: 13px;
-  color: #666;
-  margin: 0 0 8px;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.addonName {
+  font-size: 12px;
+  font-weight: 550;
+  width: 125px;
+  color: var(--gray-900);
 }
 
-.price {
-  display: inline-block;
-  font-size: 14px;
-  font-weight: 700;
-  color: #4caf50;
-  padding: 4px 10px;
-  background: #ffffff;
-  border-radius: 4px;
+.addonPricing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.addonRecurring {
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.addonInitial {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-500);
 }
 
 .addonAction {
   flex-shrink: 0;
-  margin-left: 16px;
 }
 
 .addButton {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: #4caf50;
+  padding: 4px 8px;
+  background: var(--action-500);
   color: #ffffff;
-  border: none;
+  border: 1px solid var(--action-500);
   border-radius: 6px;
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 500;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: #43a047;
-    transform: translateY(-1px);
+    background: var(--action-600);
   }
 
-  &:active {
-    transform: translateY(0);
+  &:focus {
+    background: var(--action-700);
   }
 }
 
-.selectedBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: #4caf50;
+.removeButton {
+  padding: 4px 8px;
+  background: var(--error-500);
   color: #ffffff;
+  border: 1px solid var(--error-600);
   border-radius: 6px;
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--error-600);
+  }
+}
+
+[data-sidebar-expanded='true'] {
+  .addonRow {
+    min-width: 225px;
+  }
 }

@@ -35,6 +35,7 @@ export interface LeadNotificationData {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   autoCallEnabled: boolean;
   submittedAt: string;
+  leadUrl?: string;
 }
 
 export interface EmailNotificationConfig {

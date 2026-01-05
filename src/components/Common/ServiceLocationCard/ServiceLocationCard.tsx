@@ -42,6 +42,9 @@ interface ServiceLocationCardProps {
   onServiceLocationChange?: (field: keyof ServiceAddressData, value: string) => void;
   hasCompleteUnchangedAddress?: boolean;
   currentFormattedAddress?: string;
+  onExpand?: () => void;
+  forceCollapse?: boolean;
+  isCompact?: boolean;
 }
 
 export function ServiceLocationCard({
@@ -61,6 +64,9 @@ export function ServiceLocationCard({
   onServiceLocationChange,
   hasCompleteUnchangedAddress = false,
   currentFormattedAddress = '',
+  onExpand,
+  forceCollapse = false,
+  isCompact = false,
 }: ServiceLocationCardProps) {
   const [selectedHomeSizeOption, setSelectedHomeSizeOption] = useState<string>('');
   const [selectedYardSizeOption, setSelectedYardSizeOption] = useState<string>('');
@@ -112,7 +118,7 @@ export function ServiceLocationCard({
           if (geocodeResponse.ok) {
             const geocodeData = await geocodeResponse.json();
             if (geocodeData.success && geocodeData.coordinates) {
-              // Update the service address with coordinates
+              // Update the service address with coordinates in the database
               await authenticatedFetch(`/api/service-addresses/${serviceAddress.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -122,6 +128,12 @@ export function ServiceLocationCard({
                   hasStreetView: geocodeData.coordinates.hasStreetView || false,
                 }),
               });
+
+              // Update local state so the street view image shows immediately
+              if (onServiceLocationChange) {
+                onServiceLocationChange('latitude', geocodeData.coordinates.lat.toString());
+                onServiceLocationChange('longitude', geocodeData.coordinates.lng.toString());
+              }
             }
           }
         } catch (error) {
@@ -196,6 +208,9 @@ export function ServiceLocationCard({
         title="Service Location"
         icon={<MapPinned size={20} />}
         startExpanded={startExpanded}
+        onExpand={onExpand}
+        forceCollapse={forceCollapse}
+        isCompact={isCompact}
       >
         <div className={styles.cardContent}>
           {serviceAddress ? (
@@ -287,6 +302,9 @@ export function ServiceLocationCard({
       title="Service Location"
       icon={<MapPinned size={20} />}
       startExpanded={startExpanded}
+      onExpand={onExpand}
+      forceCollapse={forceCollapse}
+      isCompact={isCompact}
     >
       <div className={styles.cardContent}>
         <div className={styles.serviceLocationGrid}>

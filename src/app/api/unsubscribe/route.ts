@@ -14,19 +14,12 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { token, preferences } = body;
+    const { token } = body;
 
     // Validate required fields
     if (!token) {
       return NextResponse.json(
         { error: 'Token is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!preferences || typeof preferences !== 'object') {
-      return NextResponse.json(
-        { error: 'Preferences are required' },
         { status: 400 }
       );
     }
@@ -45,8 +38,7 @@ export async function POST(request: NextRequest) {
     const { companyId, customerId, email, phoneNumber } = tokenData;
 
     // Log token data for debugging
-    console.log('Unsubscribe request:', {
-      preferences,
+    console.log('Unsubscribe request (marketing):', {
       tokenData: {
         companyId,
         customerId,
@@ -55,91 +47,40 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Process unsubscribe preferences
+    // Add to suppression list with 'marketing' communication type
     const results = {
       email: false,
       phone: false,
-      sms: false,
-      all: false,
     };
 
-    // Unsubscribe from email communications
-    if (preferences.email && email) {
-      const result = await addToSuppressionList(
+    if (email) {
+      const emailResult = await addToSuppressionList(
         email,
         companyId,
         'manual',
         'unsubscribe',
         null,
-        'Unsubscribed via unsubscribe link',
-        'email'
+        'Unsubscribed from marketing communications via unsubscribe link',
+        'marketing'
       );
-      results.email = result.success;
-      console.log('Created email suppression:', result.success);
+      results.email = emailResult.success;
+      console.log('Created email marketing suppression:', emailResult.success);
     }
 
-    // Unsubscribe from phone calls
-    if (preferences.phone && phoneNumber) {
-      const result = await addPhoneToSuppressionList(
+    if (phoneNumber) {
+      const phoneResult = await addPhoneToSuppressionList(
         phoneNumber,
         companyId,
-        'phone',
+        'marketing',
         'manual',
         'unsubscribe',
-        'Unsubscribed via unsubscribe link'
+        'Unsubscribed from marketing communications via unsubscribe link'
       );
-      results.phone = result.success;
+      results.phone = phoneResult.success;
+      console.log('Created phone marketing suppression:', phoneResult.success);
     }
 
-    // Unsubscribe from SMS
-    if (preferences.sms && phoneNumber) {
-      const result = await addPhoneToSuppressionList(
-        phoneNumber,
-        companyId,
-        'sms',
-        'manual',
-        'unsubscribe',
-        'Unsubscribed via unsubscribe link'
-      );
-      results.sms = result.success;
-    }
-
-    // Unsubscribe from all communications
-    if (preferences.all) {
-      if (email) {
-        const emailResult = await addToSuppressionList(
-          email,
-          companyId,
-          'manual',
-          'unsubscribe',
-          null,
-          'Unsubscribed from all communications via unsubscribe link',
-          'all'
-        );
-        results.email = emailResult.success;
-        console.log('Created email suppression (all):', emailResult.success);
-      }
-
-      if (phoneNumber) {
-        const phoneResult = await addPhoneToSuppressionList(
-          phoneNumber,
-          companyId,
-          'all',
-          'manual',
-          'unsubscribe',
-          'Unsubscribed from all communications via unsubscribe link'
-        );
-        results.phone = phoneResult.success;
-        results.sms = phoneResult.success;
-        console.log('Created phone suppression (all):', phoneResult.success);
-      } else {
-        console.log('No phone number in token - skipping phone suppression');
-      }
-
-      results.all = true;
-    }
-
-    console.log('Suppression results:', results);
+    console.log('Marketing suppression results:', results);
 
     // Mark token as used
     await markTokenAsUsed(token);

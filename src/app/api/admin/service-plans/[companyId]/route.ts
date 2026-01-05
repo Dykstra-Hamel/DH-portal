@@ -9,8 +9,8 @@ interface ServicePlan {
   plan_category: string;
   initial_price: number;
   initial_discount: number;
-  recurring_price: number;
-  billing_frequency: string;
+  recurring_price: number | null;  // Nullable for one-time plans
+  billing_frequency: string | null; // Nullable for one-time plans
   treatment_frequency: string;
   includes_inspection: boolean;
   plan_features: string[];
@@ -40,8 +40,8 @@ interface CreateServicePlanRequest {
   plan_category?: string;
   initial_price?: number;
   initial_discount?: number;
-  recurring_price: number;
-  billing_frequency: string;
+  recurring_price?: number | null;  // Optional and nullable for one-time plans
+  billing_frequency?: string | null; // Optional and nullable for one-time plans
   treatment_frequency?: string;
   includes_inspection?: boolean;
   plan_features?: string[];
@@ -160,11 +160,38 @@ export async function POST(
       );
     }
 
-    if (!planData.plan_name || !planData.recurring_price || !planData.billing_frequency) {
+    // Validate plan data based on category
+    if (!planData.plan_name) {
       return NextResponse.json(
-        { error: 'Plan name, recurring price, and billing frequency are required' },
+        { error: 'Plan name is required' },
         { status: 400 }
       );
+    }
+
+    if (planData.plan_category === 'one-time') {
+      // One-time service validation
+      if (planData.recurring_price !== 0) {
+        return NextResponse.json(
+          { error: 'One-time service plans must have recurring_price = 0' },
+          { status: 400 }
+        );
+      }
+      // Force billing_frequency to null for one-time plans
+      planData.billing_frequency = null;
+    } else {
+      // Subscription plan validation
+      if (!planData.recurring_price || planData.recurring_price <= 0) {
+        return NextResponse.json(
+          { error: 'Recurring price is required for subscription plans and must be greater than 0' },
+          { status: 400 }
+        );
+      }
+      if (!planData.billing_frequency) {
+        return NextResponse.json(
+          { error: 'Billing frequency is required for subscription plans' },
+          { status: 400 }
+        );
+      }
     }
 
     const supabase = createAdminClient();
@@ -238,6 +265,21 @@ export async function PUT(
         { error: 'Company ID and plan ID are required' },
         { status: 400 }
       );
+    }
+
+    // Validate and enforce recurring field rules based on plan_category
+    if (planData.plan_category === 'one-time') {
+      // Force recurring fields to correct values for one-time plans
+      planData.recurring_price = 0;
+      planData.billing_frequency = null;
+    } else if (planData.plan_category && planData.plan_category !== 'one-time') {
+      // Validate subscription plans have required fields
+      if (planData.recurring_price !== undefined && (planData.recurring_price === null || planData.recurring_price <= 0)) {
+        return NextResponse.json(
+          { error: 'Subscription plans must have recurring_price > 0' },
+          { status: 400 }
+        );
+      }
     }
 
     const supabase = createAdminClient();

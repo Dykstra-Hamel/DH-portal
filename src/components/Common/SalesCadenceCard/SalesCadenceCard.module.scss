@@ -1,5 +1,4 @@
 .cardContent {
-  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -35,6 +34,25 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.removeCadenceLink {
+  background: none;
+  border: none;
+  color: var(--gray-600);
+  font-size: 12px;
+  font-weight: 450;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 4px;
+  text-align: left;
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: var(--gray-900);
+    text-decoration: underline;
+  }
 }
 
 .selectInput {
@@ -83,9 +101,6 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 12px;
-  border: 1px solid var(--gray-300);
-  border-radius: 6px;
   background: white;
   transition: all 0.2s ease;
 }
@@ -126,8 +141,8 @@
 .stepContent {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 20px;
+  align-items: baseline;
   min-width: 0;
 }
 
@@ -384,5 +399,20 @@
     opacity: 0.6;
     background-color: var(--gray-400);
     color: #fff;
+  }
+}
+
+[data-sidebar-expanded='true'] {
+  .stepIcon {
+    margin-top: -12px;
+  }
+  .stepContent {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+  }
+  .priorityIndicator {
+    grid-row-start: 1;
+    grid-column-start: 2;
   }
 }

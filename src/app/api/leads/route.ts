@@ -8,6 +8,7 @@ import {
   getSupabaseClient
 } from '@/lib/api-utils';
 import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
+import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +26,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
     const assignedTo = searchParams.get('assignedTo');
+    const assignedScheduler = searchParams.get('assignedScheduler');
     const unassigned = searchParams.get('unassigned') === 'true';
+    const unassignedScheduler = searchParams.get('unassignedScheduler') === 'true';
     const includeArchived = searchParams.get('includeArchived') === 'true';
 
     if (!companyId) {
@@ -76,6 +79,7 @@ export async function GET(request: NextRequest) {
         lead_status,
         comments,
         assigned_to,
+        assigned_scheduler,
         last_contacted_at,
         next_follow_up_at,
         estimated_value,
@@ -101,18 +105,18 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (includeArchived) {
-      // If including archived, only show archived leads
-      query = query.eq('archived', true);
+      // If including archived, show leads that are archived OR have status lost/won
+      query = query.or('archived.eq.true,lead_status.eq.lost,lead_status.eq.won');
     } else {
-      // Default behavior: show active leads (exclude archived)
+      // Default behavior: show active leads (exclude archived and lost/won)
       query = query
-        .in('lead_status', ['unassigned', 'contacting', 'quoted', 'ready_to_schedule', 'scheduled', 'won', 'lost'])
+        .in('lead_status', ['new', 'in_process', 'quoted', 'scheduling'])
         .or('archived.is.null,archived.eq.false');
     }
 
     // Apply additional filters
     if (status) {
-      // Handle comma-separated status values (e.g., "unassigned,contacting,quoted")
+      // Handle comma-separated status values (e.g., "new,in_process,quoted")
       const statusArray = status.split(',').map(s => s.trim());
       if (statusArray.length === 1) {
         query = query.eq('lead_status', statusArray[0]);
@@ -126,9 +130,16 @@ export async function GET(request: NextRequest) {
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo);
     }
+    if (assignedScheduler) {
+      query = query.eq('assigned_scheduler', assignedScheduler);
+    }
     if (unassigned) {
       // Filter for leads assigned to sales team (assigned_to IS NULL)
       query = query.is('assigned_to', null);
+    }
+    if (unassignedScheduler) {
+      // Filter for leads without a scheduler assigned (assigned_scheduler IS NULL)
+      query = query.is('assigned_scheduler', null);
     }
 
     const { data: leads, error } = await query;
@@ -145,11 +156,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Get all unique user IDs from leads (assigned_to field)
+    // Get all unique user IDs from leads (assigned_to and assigned_scheduler fields)
     const userIds = new Set<string>();
     leads.forEach((lead: Lead) => {
       if (lead.assigned_to) {
         userIds.add(lead.assigned_to);
+      }
+      if (lead.assigned_scheduler) {
+        userIds.add(lead.assigned_scheduler);
       }
     });
 
@@ -183,6 +197,9 @@ export async function GET(request: NextRequest) {
       ...lead,
       assigned_user: lead.assigned_to
         ? profileMap.get(lead.assigned_to) || null
+        : null,
+      scheduler_user: lead.assigned_scheduler
+        ? profileMap.get(lead.assigned_scheduler) || null
         : null,
     }));
 
@@ -378,7 +395,7 @@ export async function POST(request: NextRequest) {
           service_address_id: serviceAddressId,
           lead_type: 'web_form',
           lead_source: leadSource || 'other',
-          lead_status: 'unassigned',
+          lead_status: 'new',
           priority: priority || 'medium',
           pest_type: pestType,
           comments,
@@ -427,6 +444,13 @@ export async function POST(request: NextRequest) {
         // Don't fail the request if this fails
       }
     }
+
+    // Send lead creation notification (non-blocking)
+    notifyLeadCreated(newLead.id, companyId, {
+      assignedUserId: undefined, // Manual leads are unassigned
+    }).catch(error => {
+      console.error('Lead notification failed:', error);
+    });
 
     return NextResponse.json(
       { success: true, lead: newLead },

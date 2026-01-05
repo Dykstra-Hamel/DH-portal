@@ -41,11 +41,7 @@ interface ServicePlan {
   created_at: string;
   updated_at: string;
 }
-import {
-  sendLeadCreatedNotifications,
-  validateEmails,
-  LeadNotificationData,
-} from '@/lib/email';
+import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { sendEvent } from '@/lib/inngest/client';
 import { createOrFindServiceAddress, linkCustomerToServiceAddress, extractAddressData } from '@/lib/service-addresses';
 
@@ -837,62 +833,13 @@ export async function POST(request: NextRequest) {
       // Don't fail the lead creation due to automation trigger issues
     }
 
-    // Trigger email notifications via Inngest (non-blocking)
-    try {
-      const widgetConfig = company?.widget_config || {};
-      const notificationEmails = widgetConfig.notifications?.emails || [];
-
-      if (notificationEmails.length > 0) {
-        // Validate email addresses
-        const { valid: validEmails, invalid: invalidEmails } =
-          validateEmails(notificationEmails);
-
-        if (invalidEmails.length > 0) {
-          console.warn(
-            `Invalid notification emails found for company ${submission.companyId}:`,
-            invalidEmails
-          );
-        }
-
-        if (validEmails.length > 0) {
-          const leadNotificationData = {
-            leadId: lead.id,
-            companyName: company?.name || 'Unknown Company',
-            customerName: submission.contactInfo.name,
-            customerEmail: submission.contactInfo.email,
-            customerPhone: submission.contactInfo.phone,
-            pestType: submission.pestType,
-            selectedPlan: submission.selectedPlan?.plan_name,
-            recommendedPlan: submission.recommendedPlan?.plan_name,
-            address: submission.address,
-            homeSize: submission.homeSize,
-            estimatedPrice: submission.estimatedPrice,
-            priority: priority as 'medium' | 'low' | 'high' | 'urgent',
-            autoCallEnabled,
-            submittedAt: new Date().toISOString(),
-          };
-
-          // Get email notification configuration
-          const emailConfig = company?.widget_config?.emailNotifications || {
-            enabled: true,
-            subjectLine: 'New Service Request: {customerName} - {companyName}',
-          };
-
-          // Send email notification (non-blocking - fire and forget)
-          sendLeadCreatedNotifications(
-            validEmails,
-            leadNotificationData,
-            emailConfig.enabled ? { subjectLine: emailConfig.subjectLine } : undefined,
-            submission.companyId
-          ).catch(error => {
-            console.error('Error sending email notifications:', error);
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error setting up email notifications:', error);
-      // Don't fail the lead creation due to email setup issues
-    }
+    // Send universal lead creation notification (non-blocking)
+    notifyLeadCreated(lead.id, submission.companyId, {
+      assignedUserId: undefined, // Widget leads are unassigned
+    }).catch(error => {
+      console.error('Lead notification failed:', error);
+      // Don't fail the lead creation due to notification issues
+    });
 
     // SMS functionality disabled for now - will be implemented with different system later
 

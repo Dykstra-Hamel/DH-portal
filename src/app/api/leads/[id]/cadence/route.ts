@@ -253,6 +253,95 @@ export async function PUT(
       );
     }
 
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Get the lead to check if it needs assignment or status update
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('id, company_id, assigned_to, lead_status')
+      .eq('id', leadId)
+      .single();
+
+    if (leadError || !lead) {
+      return NextResponse.json(
+        { error: 'Lead not found' },
+        { status: 404 }
+      );
+    }
+
+    // If lead is unassigned or has status 'new', assign to current user and update status
+    if (!lead.assigned_to || lead.lead_status === 'new') {
+      const leadUpdateData: any = {};
+
+      // Assign to current user if unassigned
+      if (!lead.assigned_to) {
+        leadUpdateData.assigned_to = user.id;
+      }
+
+      // Update status to in_process if currently new
+      if (lead.lead_status === 'new') {
+        leadUpdateData.lead_status = 'in_process';
+      }
+
+      // Update the lead
+      const { error: updateError } = await supabase
+        .from('leads')
+        .update(leadUpdateData)
+        .eq('id', leadId);
+
+      if (updateError) {
+        console.error('Error updating lead:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to update lead' },
+          { status: 500 }
+        );
+      }
+
+      // Log assignment activity if lead was assigned
+      if (!lead.assigned_to) {
+        try {
+          await logActivity({
+            company_id: lead.company_id,
+            entity_type: 'lead',
+            entity_id: leadId,
+            activity_type: 'assignment_changed',
+            user_id: user.id,
+            field_name: 'assigned_to',
+            old_value: null,
+            new_value: user.id,
+          });
+        } catch (activityError) {
+          console.error('Error logging lead assignment activity:', activityError);
+        }
+      }
+
+      // Log status change activity if status was updated
+      if (lead.lead_status === 'new') {
+        try {
+          await logActivity({
+            company_id: lead.company_id,
+            entity_type: 'lead',
+            entity_id: leadId,
+            activity_type: 'status_change',
+            user_id: user.id,
+            field_name: 'lead_status',
+            old_value: 'new',
+            new_value: 'in_process',
+          });
+        } catch (activityError) {
+          console.error('Error logging status change activity:', activityError);
+        }
+      }
+    }
+
     // Delete old cadence tasks (keep completed tasks for history)
     await supabase
       .from('tasks')

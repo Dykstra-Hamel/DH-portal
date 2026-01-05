@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { captureDeviceData } from '@/lib/device-utils';
+import { inngest } from '@/lib/inngest/client';
+import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 
 interface RedeemRequest {
   customerId: string;
@@ -59,7 +61,7 @@ export async function POST(
     console.log('[REDEEM] Looking up campaign with campaign_id:', campaignId);
     const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
-      .select('id, campaign_id, name, company_id, discount_id, service_plan_id')
+      .select('id, campaign_id, name, company_id, discount_id, service_plan_id, target_pest_id')
       .eq('campaign_id', campaignId)
       .single();
 
@@ -71,6 +73,17 @@ export async function POST(
       );
     }
     console.log('[REDEEM] Campaign found:', campaign.name);
+
+    // Fetch target pest name if campaign has one
+    let targetPestName: string | null = null;
+    if (campaign.target_pest_id) {
+      const { data: pestType } = await supabase
+        .from('pest_types')
+        .select('name')
+        .eq('id', campaign.target_pest_id)
+        .single();
+      targetPestName = pestType?.name || null;
+    }
 
     // Fetch customer with service addresses
     console.log('[REDEEM] Looking up customer:', { customerId: body.customerId, companyId: campaign.company_id });
@@ -165,7 +178,7 @@ export async function POST(
         // (for tracking redemption in campaign_contact_list_members)
         const { data: campaignMember } = await supabase
           .from('campaign_contact_list_members')
-          .select('id')
+          .select('id, lead_id')
           .eq('customer_id', body.customerId)
           .eq('campaign_id', campaign.id)
           .maybeSingle();
@@ -189,7 +202,7 @@ export async function POST(
           // Fetch existing member record
           const { data: existingMember } = await supabase
             .from('campaign_contact_list_members')
-            .select('id, redeemed_at')
+            .select('id, redeemed_at, lead_id')
             .eq('id', campaignMember.id)
             .single();
 
@@ -216,7 +229,7 @@ export async function POST(
         // Find existing member record
         const { data: oldMember } = await supabase
           .from('campaign_contact_list_members')
-          .select('id, redeemed_at')
+          .select('id, redeemed_at, lead_id')
           .eq('contact_list_id', contactListId)
           .eq('customer_id', body.customerId)
           .maybeSingle();
@@ -285,6 +298,11 @@ export async function POST(
       ? `Campaign: ${campaign.name}\nRedeemed with signature on ${new Date().toLocaleDateString()}`
       : `Campaign: ${campaign.name}\nRedeemed via inline form on ${new Date().toLocaleDateString()}`;
 
+    // Add pest targeting info if applicable
+    if (targetPestName) {
+      leadComments += `\n\nTarget Pest: ${targetPestName}`;
+    }
+
     // Add note if no service address provided
     if (!addressData) {
       leadComments += `\n\nNote: Customer did not have a service address on file. Please collect service address when scheduling.`;
@@ -312,13 +330,38 @@ export async function POST(
     }
 
     // Check for existing lead first (may have been created from email click)
-    const { data: existingLead } = await supabase
-      .from('leads')
-      .select('id, lead_status, comments, service_address_id')
-      .eq('customer_id', body.customerId)
-      .eq('company_id', campaign.company_id)
-      .eq('campaign_id', campaign.id)
-      .maybeSingle();
+    // Check for an existing lead tied to this member (only if it belongs to this campaign)
+    let existingLead: any = null;
+    if (updatedMember.lead_id) {
+      const { data: memberLead } = await supabase
+        .from('leads')
+        .select('id, lead_status, comments, service_address_id, assigned_to, campaign_id, company_id')
+        .eq('id', updatedMember.lead_id)
+        .maybeSingle();
+
+      if (
+        memberLead &&
+        memberLead.company_id === campaign.company_id &&
+        memberLead.campaign_id === campaign.id
+      ) {
+        existingLead = memberLead;
+      } else if (memberLead) {
+        console.log(
+          `[REDEEM] Member lead ${memberLead.id} belongs to different campaign (${memberLead.campaign_id}), ignoring`
+        );
+      }
+    }
+
+    if (!existingLead) {
+      const { data: leadByCustomer } = await supabase
+        .from('leads')
+        .select('id, lead_status, comments, service_address_id, assigned_to, campaign_id, company_id')
+        .eq('customer_id', body.customerId)
+        .eq('company_id', campaign.company_id)
+        .eq('campaign_id', campaign.id)
+        .maybeSingle();
+      existingLead = leadByCustomer || null;
+    }
 
     let lead;
     const signedAt = new Date().toLocaleDateString();
@@ -333,9 +376,10 @@ export async function POST(
       const { data: updatedLead, error: updateError } = await supabase
         .from('leads')
         .update({
-          lead_status: 'ready_to_schedule',
+          lead_status: 'scheduling',
           service_address_id: addressData?.id || existingLead.service_address_id,
           requested_date: body.requested_date || null,
+          requested_time: body.requested_time || null,
           comments: updatedComments,
           updated_at: new Date().toISOString(),
         })
@@ -352,9 +396,9 @@ export async function POST(
       }
 
       lead = updatedLead;
-      console.log(`Updated existing lead ${lead.id} from '${existingLead.lead_status}' to 'ready_to_schedule'`);
+      console.log(`Updated existing lead ${lead.id} from '${existingLead.lead_status}' to 'scheduling'`);
     } else {
-      // Create new lead in 'ready_to_schedule' stage (no prior email engagement)
+      // Create new lead in 'scheduling' stage (no prior email engagement)
       const { data: newLead, error: createError } = await supabase
         .from('leads')
         .insert({
@@ -363,9 +407,11 @@ export async function POST(
           service_address_id: addressData?.id || null,
           campaign_id: campaign.id,
           lead_source: 'campaign',
-          lead_status: 'ready_to_schedule',
+          lead_status: 'scheduling',
+          pest_type: targetPestName,
           comments: leadComments,
           requested_date: body.requested_date || null,
+          requested_time: body.requested_time || null,
         })
         .select()
         .single();
@@ -379,7 +425,7 @@ export async function POST(
       }
 
       lead = newLead;
-      console.log(`Created new lead ${lead.id} in 'ready_to_schedule' stage`);
+      console.log(`Created new lead ${lead.id} in 'scheduling' stage`);
     }
 
     // UPDATE CUSTOMER PHONE NUMBER: If phone number provided and different from existing
@@ -406,7 +452,7 @@ export async function POST(
       // 1. Fetch service plan details
       const { data: servicePlan, error: planError } = await supabase
         .from('service_plans')
-        .select('id, plan_name, plan_description, initial_price, recurring_price, billing_frequency')
+        .select('id, plan_name, plan_description, initial_price, recurring_price, billing_frequency, treatment_frequency')
         .eq('id', campaign.service_plan_id)
         .single();
 
@@ -432,22 +478,41 @@ export async function POST(
         let discountAmount = 0;
 
         if (campaignDiscount && campaignDiscount.is_active) {
-          if (campaignDiscount.discount_type === 'percentage') {
-            discountPercentage = campaignDiscount.discount_value;
-            if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+          // Initial discount: use primary fields
+          if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+            if (campaignDiscount.discount_type === 'percentage') {
+              discountPercentage = campaignDiscount.discount_value;
               planInitialPrice = planInitialPrice * (1 - discountPercentage / 100);
-            }
-            if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
-              planRecurringPrice = planRecurringPrice * (1 - discountPercentage / 100);
-            }
-          } else if (campaignDiscount.discount_type === 'fixed_amount') {
-            discountAmount = campaignDiscount.discount_value;
-            if (campaignDiscount.applies_to_price === 'initial' || campaignDiscount.applies_to_price === 'both') {
+            } else if (campaignDiscount.discount_type === 'fixed_amount') {
+              discountAmount = campaignDiscount.discount_value;
               planInitialPrice = Math.max(0, planInitialPrice - discountAmount);
             }
-            if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
-              planRecurringPrice = Math.max(0, planRecurringPrice - discountAmount);
+          }
+
+          // Recurring discount: use dedicated recurring fields if set, otherwise fall back to initial discount values
+          if (campaignDiscount.applies_to_price === 'recurring' || campaignDiscount.applies_to_price === 'both') {
+            let recurringDiscountPercentage = 0;
+            let recurringDiscountAmount = 0;
+
+            // Check for separate recurring discount configuration
+            if (campaignDiscount.recurring_discount_type && campaignDiscount.recurring_discount_value != null) {
+              if (campaignDiscount.recurring_discount_type === 'percentage') {
+                recurringDiscountPercentage = campaignDiscount.recurring_discount_value;
+              } else {
+                recurringDiscountAmount = campaignDiscount.recurring_discount_value;
+              }
+            } else {
+              // Fall back to initial discount values
+              recurringDiscountPercentage = discountPercentage;
+              recurringDiscountAmount = discountAmount;
             }
+
+            // Apply recurring discount
+            planRecurringPrice = planRecurringPrice - recurringDiscountAmount;
+            if (recurringDiscountPercentage > 0) {
+              planRecurringPrice = planRecurringPrice * (1 - recurringDiscountPercentage / 100);
+            }
+            planRecurringPrice = Math.max(0, planRecurringPrice);
           }
         }
 
@@ -564,6 +629,8 @@ export async function POST(
             initial_price: servicePlan.initial_price || 0,
             recurring_price: servicePlan.recurring_price,
             billing_frequency: servicePlan.billing_frequency,
+            service_frequency: (servicePlan as any).treatment_frequency || null,
+            discount_id: campaignDiscount?.id || null,
             discount_percentage: discountPercentage,
             discount_amount: discountAmount,
             final_initial_price: planInitialPrice,
@@ -582,6 +649,7 @@ export async function POST(
               initial_price: addon.initial_price || 0,
               recurring_price: addon.recurring_price,
               billing_frequency: addon.billing_frequency || servicePlan.billing_frequency,
+              discount_id: null,
               discount_percentage: 0,
               discount_amount: 0,
               final_initial_price: addon.initial_price || 0,
@@ -611,6 +679,93 @@ export async function POST(
       .update({ lead_id: lead.id })
       .eq('id', updatedMember.id);
 
+    // CANCEL WORKFLOW: If a workflow execution is running for this customer + campaign, cancel it
+    // This prevents unnecessary follow-up steps (like AI calls) after the customer has already redeemed
+    console.log('[REDEEM] Checking for active workflow executions to cancel...');
+    const { data: campaignExecution } = await supabase
+      .from('campaign_executions')
+      .select('automation_execution_id, execution_status')
+      .eq('campaign_id', campaign.id)
+      .eq('customer_id', body.customerId)
+      .in('execution_status', ['pending', 'running'])
+      .maybeSingle();
+
+    if (campaignExecution?.automation_execution_id) {
+      console.log(`[REDEEM] Found active workflow execution ${campaignExecution.automation_execution_id}, cancelling...`);
+
+      // Fetch existing execution data to preserve completed steps
+      const { data: existingExecution } = await supabase
+        .from('automation_executions')
+        .select('execution_data')
+        .eq('id', campaignExecution.automation_execution_id)
+        .single();
+
+      // Update automation execution status to cancelled, preserving existing step results
+      const { error: cancelError } = await supabase
+        .from('automation_executions')
+        .update({
+          execution_status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          execution_data: {
+            ...existingExecution?.execution_data,
+            cancellationReason: 'Lead redeemed offer via landing page',
+            cancellationProcessed: true,
+            cancelledAtStep: existingExecution?.execution_data?.stepIndex || 'redemption',
+            cancelledBy: 'system',
+            cancelledAt: new Date().toISOString(),
+          },
+        })
+        .eq('id', campaignExecution.automation_execution_id)
+        .in('execution_status', ['pending', 'running']); // Only cancel if still active
+
+      if (cancelError) {
+        console.error('[REDEEM] Error cancelling workflow execution:', cancelError);
+        // Don't fail redemption if cancellation fails - log and continue
+      } else {
+        // Also update campaign execution status
+        await supabase
+          .from('campaign_executions')
+          .update({
+            execution_status: 'cancelled',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('automation_execution_id', campaignExecution.automation_execution_id);
+
+        // Update member status to 'processed' since customer completed the workflow by redeeming
+        await supabase
+          .from('campaign_contact_list_members')
+          .update({
+            status: 'processed',
+            processed_at: new Date().toISOString(),
+          })
+          .eq('execution_id', campaignExecution.automation_execution_id);
+
+        // Send workflow completion event for campaign tracking
+        // This ensures campaign completion logic runs even if workflow doesn't send it
+        try {
+          await inngest.send({
+            name: 'workflow/completed',
+            data: {
+              executionId: campaignExecution.automation_execution_id,
+              workflowId: null,
+              companyId: campaign.company_id,
+              triggerType: 'campaign',
+              success: false,
+              cancelled: true,
+              cancellationReason: 'Lead redeemed offer via landing page',
+            },
+          });
+        } catch (eventError) {
+          console.error('[REDEEM] Failed to send workflow completion event:', eventError);
+          // Don't fail redemption if event sending fails
+        }
+
+        console.log(`[REDEEM] Successfully cancelled workflow execution ${campaignExecution.automation_execution_id}`);
+      }
+    } else {
+      console.log('[REDEEM] No active workflow execution found for this customer + campaign');
+    }
+
     // Log activity
     const { error: activityError } = await supabase
       .from('activities')
@@ -629,14 +784,44 @@ export async function POST(
           requested_time: body.requested_time,
           device_data: completeDeviceData,
           previous_lead_status: existingLead?.lead_status || null,
-          new_lead_status: 'ready_to_schedule',
+          new_lead_status: 'scheduling',
           selected_addon_ids: body.selected_addon_ids || [],
+          workflow_cancelled: !!campaignExecution?.automation_execution_id,
+          cancelled_execution_id: campaignExecution?.automation_execution_id || null,
         },
       });
 
     if (activityError) {
       console.error('Error logging activity:', activityError);
       // Don't fail the request if activity logging fails
+    }
+
+    // Send lead creation notification (non-blocking)
+    notifyLeadCreated(lead.id, campaign.company_id, {
+      assignedUserId: undefined, // Campaign leads are unassigned
+    }).catch(error => {
+      console.error('Campaign lead notification failed:', error);
+    });
+
+    // If updating existing lead to scheduling status, trigger status-changed event
+    if (existingLead && existingLead.lead_status !== 'scheduling') {
+      try {
+        await inngest.send({
+          name: 'lead/status-changed',
+          data: {
+            leadId: existingLead.id,
+            companyId: campaign.company_id,
+            fromStatus: existingLead.lead_status,
+            toStatus: 'scheduling',
+            assignedUserId: existingLead.assigned_to,
+            userId: 'system',
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (error) {
+        console.error('Failed to trigger status-changed event:', error);
+        // Don't fail the redemption
+      }
     }
 
     // Return success

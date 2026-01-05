@@ -7,6 +7,7 @@ export interface ModalProps {
   onClose: () => void
   children: ReactNode
   className?: string
+  size?: 'small' | 'medium' | 'large'
 }
 
 export interface ModalTopProps {
@@ -31,7 +32,7 @@ export interface ModalBottomProps {
   className?: string
 }
 
-export function Modal({ isOpen, onClose, children, className }: ModalProps) {
+export function Modal({ isOpen, onClose, children, className, size }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -68,9 +69,16 @@ export function Modal({ isOpen, onClose, children, className }: ModalProps) {
     }
   }
 
+  const sizeMaxWidths: Record<NonNullable<ModalProps['size']>, string> = {
+    small: '560px',
+    medium: '720px',
+    large: '900px',
+  }
+  const modalStyle = size ? { maxWidth: sizeMaxWidths[size] } : undefined
+
   return (
     <div className={styles.overlay} onClick={handleOverlayClick}>
-      <div className={`${styles.modal} ${className || ''}`}>
+      <div className={`${styles.modal} ${className || ''}`} style={modalStyle}>
         {children}
       </div>
     </div>

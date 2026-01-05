@@ -26,6 +26,7 @@ interface CampaignEditorProps {
   onClose: () => void;
   companyId: string;
   campaign?: any; // For editing existing campaigns
+  isCloned?: boolean; // True when campaign was just cloned
   onSuccess: () => void;
 }
 
@@ -36,6 +37,7 @@ export default function CampaignEditor({
   onClose,
   companyId,
   campaign,
+  isCloned = false,
   onSuccess,
 }: CampaignEditorProps) {
   const [currentStep, setCurrentStep] = useState<Step>('basic');
@@ -60,6 +62,7 @@ export default function CampaignEditor({
   const [contactLists, setContactLists] = useState<any[]>([]);
   const [totalContacts, setTotalContacts] = useState(0);
   const [discounts, setDiscounts] = useState<any[]>([]);
+  const [pestTypes, setPestTypes] = useState<any[]>([]);
   const [campaignIdValidating, setCampaignIdValidating] = useState(false);
   const [campaignIdAvailable, setCampaignIdAvailable] = useState<
     boolean | null
@@ -75,11 +78,13 @@ export default function CampaignEditor({
   // Landing page state
   const [landingPageEnabled, setLandingPageEnabled] = useState(false);
   const [servicePlanId, setServicePlanId] = useState<string | null>(null);
+  const [targetPestId, setTargetPestId] = useState<string | null>(null);
   const [landingPageData, setLandingPageData] = useState<LandingPageFormData>({
     hero_title: 'Quarterly Pest Control starting at only $44/mo',
     hero_subtitle: 'Special Offer',
     hero_description: '',
     hero_button_text: 'Upgrade Today!',
+    hero_button_icon_url: '',
     hero_image_url: '',
     display_price: '$44/mo',
     display_original_price: '',
@@ -96,6 +101,7 @@ export default function CampaignEditor({
       'And thats not all, we offer additional add-on programs as well including:',
     additional_services: [],
     additional_services_image_url: '',
+    selected_addon_ids: [],
     show_faq: true,
     faq_heading: 'Frequently Asked Questions',
     faq_items: [],
@@ -105,11 +111,27 @@ export default function CampaignEditor({
     footer_company_tagline: 'Personal. Urgent. Reliable.',
     footer_links: [],
     terms_content: '',
+    redemption_card_heading: '',
     override_logo_url: '',
     override_primary_color: '',
     override_secondary_color: '',
     override_phone: '',
     accent_color_preference: 'primary',
+    thankyou_greeting: 'Thanks {first_name}!',
+    thankyou_content: '',
+    thankyou_show_expect: true,
+    thankyou_expect_heading: 'What To Expect',
+    thankyou_expect_col1_image: '',
+    thankyou_expect_col1_heading: '',
+    thankyou_expect_col1_content: '',
+    thankyou_expect_col2_image: '',
+    thankyou_expect_col2_heading: '',
+    thankyou_expect_col2_content: '',
+    thankyou_expect_col3_image: '',
+    thankyou_expect_col3_heading: '',
+    thankyou_expect_col3_content: '',
+    thankyou_cta_text: 'Go Back To Homepage',
+    thankyou_cta_url: '',
   });
 
   // Fetch company data on mount
@@ -117,6 +139,7 @@ export default function CampaignEditor({
     if (companyId && isOpen) {
       fetchCompanyTimezone();
       fetchDiscounts();
+      fetchPestTypes();
     }
   }, [companyId, isOpen]);
 
@@ -148,6 +171,18 @@ export default function CampaignEditor({
       }
     } catch (error) {
       console.error('Error fetching discounts:', error);
+    }
+  };
+
+  const fetchPestTypes = async () => {
+    try {
+      const response = await fetch(`/api/pest-types?companyId=${companyId}`);
+      const result = await response.json();
+      if (result.success) {
+        setPestTypes(result.pestTypes || []);
+      }
+    } catch (error) {
+      console.error('Error fetching pest types:', error);
     }
   };
 
@@ -220,15 +255,15 @@ export default function CampaignEditor({
       const response = await fetch(`/api/campaigns/${campaignId}/landing-page`);
       const result = await response.json();
 
-      if (result.success && result.landingPage) {
-        const lp = result.landingPage;
+      if (result.success && result.data?.landingPage) {
+        const lp = result.data.landingPage;
 
         // Enable landing page if data exists
         setLandingPageEnabled(true);
 
         // Set service plan ID
-        if (result.campaign?.service_plan_id) {
-          setServicePlanId(result.campaign.service_plan_id);
+        if (result.data.campaign?.service_plan_id) {
+          setServicePlanId(result.data.campaign.service_plan_id);
         }
 
         // Map API response to form data
@@ -238,6 +273,7 @@ export default function CampaignEditor({
           hero_subtitle: lp.hero.subtitle || 'Special Offer',
           hero_description: lp.hero.description || '',
           hero_button_text: lp.hero.buttonText || 'Upgrade Today!',
+          hero_button_icon_url: lp.hero.buttonIconUrl || '',
           hero_image_url: lp.hero.imageUrl || '',
           display_price: lp.pricing.displayPrice || '$44/mo',
           display_original_price: lp.pricing.originalPrice || '',
@@ -256,6 +292,10 @@ export default function CampaignEditor({
             'And thats not all, we offer additional add-on programs as well including:',
           additional_services: lp.additionalServices.services || [],
           additional_services_image_url: lp.additionalServices.imageUrl || '',
+          selected_addon_ids:
+            lp.selectedAddonIds && lp.selectedAddonIds.length > 0
+              ? lp.selectedAddonIds
+              : (lp.addons || []).map((addon: any) => addon.id),
           show_faq: lp.faq.show,
           faq_heading: lp.faq.heading || 'Frequently Asked Questions',
           faq_items: lp.faq.items || [],
@@ -268,12 +308,38 @@ export default function CampaignEditor({
             lp.footer.tagline || 'Personal. Urgent. Reliable.',
           footer_links: lp.footer.links || [],
           terms_content: lp.terms.content || '',
+          redemption_card_heading: lp.redemptionCard?.heading || '',
           override_logo_url: lp.branding.logoUrl || '',
           override_primary_color: lp.branding.primaryColor || '',
           override_secondary_color: lp.branding.secondaryColor || '',
           override_phone: lp.branding.phoneNumber || '',
           accent_color_preference:
             lp.branding.accentColorPreference || 'primary',
+          thankyou_greeting: lp.thankYou?.greeting || 'Thanks {first_name}!',
+          thankyou_content: lp.thankYou?.content || '',
+          thankyou_show_expect: lp.thankYou?.showExpect ?? true,
+          thankyou_expect_heading:
+            lp.thankYou?.expectHeading || 'What To Expect',
+          thankyou_expect_col1_image:
+            lp.thankYou?.expectColumns?.[0]?.imageUrl || '',
+          thankyou_expect_col1_heading:
+            lp.thankYou?.expectColumns?.[0]?.heading || '',
+          thankyou_expect_col1_content:
+            lp.thankYou?.expectColumns?.[0]?.content || '',
+          thankyou_expect_col2_image:
+            lp.thankYou?.expectColumns?.[1]?.imageUrl || '',
+          thankyou_expect_col2_heading:
+            lp.thankYou?.expectColumns?.[1]?.heading || '',
+          thankyou_expect_col2_content:
+            lp.thankYou?.expectColumns?.[1]?.content || '',
+          thankyou_expect_col3_image:
+            lp.thankYou?.expectColumns?.[2]?.imageUrl || '',
+          thankyou_expect_col3_heading:
+            lp.thankYou?.expectColumns?.[2]?.heading || '',
+          thankyou_expect_col3_content:
+            lp.thankYou?.expectColumns?.[2]?.content || '',
+          thankyou_cta_text: lp.thankYou?.ctaText || 'Go Back To Homepage',
+          thankyou_cta_url: lp.thankYou?.ctaUrl || '',
         });
       }
     } catch (error) {
@@ -297,6 +363,7 @@ export default function CampaignEditor({
       setSelectedWorkflow(campaign.workflow);
       setEstimatedDays(campaign.estimated_days || null);
       setServicePlanId(campaign.service_plan_id || null);
+      setTargetPestId(campaign.target_pest_id || null);
       // Mark campaign ID and name as available if editing existing campaign
       if (campaign.campaign_id) {
         setCampaignIdAvailable(true);
@@ -355,14 +422,8 @@ export default function CampaignEditor({
     { key: 'basic', label: 'Basic Info', number: 1 },
     { key: 'workflow', label: 'Select Workflow', number: 2 },
     { key: 'contacts', label: 'Add Contacts', number: 3 },
-    ...(landingPageEnabled
-      ? [{ key: 'landing-page' as Step, label: 'Landing Page', number: 4 }]
-      : []),
-    {
-      key: 'review',
-      label: 'Review & Launch',
-      number: landingPageEnabled ? 5 : 4,
-    },
+    { key: 'landing-page', label: 'Landing Page', number: 4 },
+    { key: 'review', label: 'Review & Launch', number: 5 },
   ];
 
   const currentStepIndex = steps.findIndex(s => s.key === currentStep);
@@ -381,11 +442,15 @@ export default function CampaignEditor({
       case 'contacts':
         return contactLists.length > 0 && totalContacts > 0;
       case 'landing-page':
-        // Require hero_title and display_price if landing page is enabled
-        return (
-          landingPageData.hero_title.trim() !== '' &&
-          landingPageData.display_price.trim() !== ''
-        );
+        // Can always proceed from landing page step
+        // If enabled, require hero_title and display_price
+        if (landingPageEnabled) {
+          return (
+            landingPageData.hero_title.trim() !== '' &&
+            landingPageData.display_price.trim() !== ''
+          );
+        }
+        return true; // Can skip if not enabled
       case 'review':
         return true;
       default:
@@ -453,6 +518,7 @@ export default function CampaignEditor({
         company_id: companyId,
         total_contacts: totalContacts,
         service_plan_id: servicePlanId,
+        target_pest_id: targetPestId,
       };
 
       const response = await fetch(url, {
@@ -467,12 +533,70 @@ export default function CampaignEditor({
         throw new Error(result.error || 'Failed to save campaign');
       }
 
+      // Store campaign ID for later use
+      const savedCampaignId = campaign ? campaign.id : result.campaign?.id;
+
+      if (savedCampaignId) {
+        try {
+          // Fetch current campaign status and contact lists
+          const [statusCheckResponse, contactListsResponse] = await Promise.all(
+            [
+              fetch(`/api/campaigns/${savedCampaignId}`),
+              fetch(`/api/campaigns/${savedCampaignId}/contact-lists`),
+            ]
+          );
+
+          const statusCheckResult = await statusCheckResponse.json();
+          const contactListsResult = await contactListsResponse.json();
+
+          if (
+            statusCheckResult.success &&
+            statusCheckResult.campaign?.status === 'draft'
+          ) {
+            // Calculate actual total contacts from assigned contact lists
+            const actualTotalContacts =
+              contactListsResult.success && contactListsResult.contactLists
+                ? contactListsResult.contactLists.reduce(
+                    (sum: number, list: any) =>
+                      sum + (list.total_contacts || 0),
+                    0
+                  )
+                : 0;
+
+            // Check if all requirements for scheduling are met
+            const hasWorkflow = !!formData.workflow_id;
+            const hasStartTime = !!formData.start_datetime;
+            const hasContacts = actualTotalContacts > 0;
+
+            if (hasWorkflow && hasStartTime && hasContacts) {
+              const startDate = new Date(formData.start_datetime);
+              const now = new Date();
+
+              // Only schedule if start time is in the future
+              if (startDate > now) {
+                // Use PATCH endpoint to transition status
+                await fetch(`/api/campaigns/${savedCampaignId}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'scheduled' }),
+                });
+              }
+            }
+          }
+        } catch (statusErr) {
+          // Don't throw - campaign is already saved, status transition is optional
+          console.error('Error checking/updating campaign status:', statusErr);
+        }
+      }
+
       // Determine campaign_id for landing page operations
-      const campaignIdForLandingPage = campaign
-        ? campaign.campaign_id // Use existing campaign_id when editing
-        : formData.campaign_id; // Use new campaign_id when creating
+      const campaignIdForLandingPage =
+        campaign && !isCloned
+          ? campaign.campaign_id // Use existing campaign_id when editing (not cloned)
+          : formData.campaign_id; // Use new/updated campaign_id when creating or cloning
 
       // If creating a new campaign, assign ALL contact lists
+      // Note: For cloned/existing campaigns, ContactListUpload handles assignment immediately when user selects lists
       if (!campaign && result.campaign?.id) {
         const newCampaignId = result.campaign.id;
 
@@ -543,6 +667,7 @@ export default function CampaignEditor({
         }
       }
 
+      // Campaign saved as draft - user will manually start it when ready
       // Show success message based on start time
       const startDate = new Date(formData.start_datetime);
       const now = new Date();
@@ -599,12 +724,16 @@ export default function CampaignEditor({
 
     // Reset landing page state
     setLandingPageEnabled(false);
+    setServicePlanId(null);
+    setTargetPestId(null);
+    setPestTypes([]);
     setLandingPageData({
       hero_title: 'Quarterly Pest Control starting at only $44/mo',
       hero_subtitle: 'Special Offer',
       hero_description: '',
       hero_button_text: 'Upgrade Today!',
       hero_image_url: '',
+      hero_button_icon_url: '',
       display_price: '$44/mo',
       display_original_price: '',
       display_savings: '',
@@ -620,6 +749,7 @@ export default function CampaignEditor({
         'And thats not all, we offer additional add-on programs as well including:',
       additional_services: [],
       additional_services_image_url: '',
+      selected_addon_ids: [],
       show_faq: true,
       faq_heading: 'Frequently Asked Questions',
       faq_items: [],
@@ -629,11 +759,27 @@ export default function CampaignEditor({
       footer_company_tagline: 'Personal. Urgent. Reliable.',
       footer_links: [],
       terms_content: '',
+      redemption_card_heading: '',
       override_logo_url: '',
       override_primary_color: '',
       override_secondary_color: '',
       override_phone: '',
       accent_color_preference: 'primary',
+      thankyou_greeting: 'Thanks {first_name}!',
+      thankyou_content: '',
+      thankyou_show_expect: true,
+      thankyou_expect_heading: 'What To Expect',
+      thankyou_expect_col1_image: '',
+      thankyou_expect_col1_heading: '',
+      thankyou_expect_col1_content: '',
+      thankyou_expect_col2_image: '',
+      thankyou_expect_col2_heading: '',
+      thankyou_expect_col2_content: '',
+      thankyou_expect_col3_image: '',
+      thankyou_expect_col3_heading: '',
+      thankyou_expect_col3_content: '',
+      thankyou_cta_text: 'Go Back To Homepage',
+      thankyou_cta_url: '',
     });
 
     // Close the modal
@@ -734,7 +880,7 @@ export default function CampaignEditor({
                   }}
                   placeholder="e.g., PEST26"
                   maxLength={50}
-                  disabled={!!campaign}
+                  disabled={!!campaign && !isCloned}
                 />
                 {campaignIdValidating && (
                   <small style={{ color: '#666' }}>
@@ -783,6 +929,26 @@ export default function CampaignEditor({
                   Create New Discount
                 </button>
                 <small>Select a discount to apply to this campaign</small>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Target Pest (Optional)</label>
+                <select
+                  value={targetPestId || ''}
+                  onChange={e => setTargetPestId(e.target.value || null)}
+                >
+                  <option value="">No Specific Pest</option>
+                  {pestTypes
+                    .filter(p => p.is_active)
+                    .map(pest => (
+                      <option key={pest.id} value={pest.id}>
+                        {pest.name}
+                      </option>
+                    ))}
+                </select>
+                <small>
+                  When set, leads from this campaign will automatically target this pest
+                </small>
               </div>
 
               <div className={styles.formGroup}>
@@ -908,40 +1074,39 @@ export default function CampaignEditor({
                     )}
                   </div>
                 )}
-
-                {/* Landing Page Option */}
-                <div className={styles.landingPageOption}>
-                  <h3>Landing Page (Optional)</h3>
-                  <div className={styles.formGroup}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={landingPageEnabled}
-                        onChange={e => setLandingPageEnabled(e.target.checked)}
-                        style={{ width: 'auto', marginRight: '8px' }}
-                      />
-                      Create custom landing page for this campaign
-                    </label>
-                    <small>
-                      Add a customized landing page with images, text, and
-                      branding specific to this campaign
-                    </small>
-                  </div>
-                </div>
               </div>
             </div>
           )}
 
           {currentStep === 'landing-page' && (
             <div className={styles.landingPageStep}>
-              <CampaignLandingPageEditorStep
-                campaignId={formData.campaign_id}
-                companyId={companyId}
-                data={landingPageData}
-                onChange={setLandingPageData}
-                servicePlanId={servicePlanId}
-                onServicePlanChange={setServicePlanId}
-              />
+              <h3>Landing Page</h3>
+              <div className={styles.formGroup}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={landingPageEnabled}
+                    onChange={e => setLandingPageEnabled(e.target.checked)}
+                    style={{ width: 'auto', marginRight: '8px' }}
+                  />
+                  Create custom landing page for this campaign
+                </label>
+                <small>
+                  Add a customized landing page with images, text, and branding
+                  specific to this campaign
+                </small>
+              </div>
+
+              {landingPageEnabled && (
+                <CampaignLandingPageEditorStep
+                  campaignId={formData.campaign_id}
+                  companyId={companyId}
+                  data={landingPageData}
+                  onChange={setLandingPageData}
+                  servicePlanId={servicePlanId}
+                  onServicePlanChange={setServicePlanId}
+                />
+              )}
             </div>
           )}
 

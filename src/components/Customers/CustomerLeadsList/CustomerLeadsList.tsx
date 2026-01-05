@@ -23,7 +23,7 @@ export function CustomerLeadsList({
   // Handle item actions (mainly navigation to lead detail)
   const handleItemAction = (action: string, lead: Lead) => {
     if (action === 'navigate' || !action) {
-      router.push(`/connections/leads/${lead.id}`);
+      router.push(`/tickets/leads/${lead.id}`);
     }
   };
 

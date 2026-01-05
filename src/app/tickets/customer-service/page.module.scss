@@ -1,0 +1,55 @@
+// Customer Service Page Styles
+.container {
+  width: 100%;
+}
+
+.metricsSection {
+  margin-bottom: 24px;
+}
+
+.loadingContainer {
+  text-align: center;
+  padding: 40px;
+}
+
+.loadingSkeleton {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonItem {
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  margin-bottom: 16px;
+
+  &:first-child {
+    height: 60px;
+  }
+
+  &:not(:first-child) {
+    height: 40px;
+    margin-bottom: 12px;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.emptyState {
+  text-align: center;
+  color: #6b7280;
+  margin-top: 40px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

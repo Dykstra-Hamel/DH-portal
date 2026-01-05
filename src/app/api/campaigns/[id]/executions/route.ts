@@ -104,6 +104,8 @@ export async function GET(
       workflow_run_id: execution.automation_execution_id,
       error_message: execution.automation_execution?.error_message || null,
       step_results: execution.automation_execution?.execution_data?.stepResults || [],
+      cancellation_reason: execution.automation_execution?.execution_data?.cancellationReason || null,
+      cancelled_at_step: execution.automation_execution?.execution_data?.cancelledAtStep || null,
     }));
 
     return NextResponse.json({

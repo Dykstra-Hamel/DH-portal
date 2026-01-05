@@ -12,21 +12,37 @@ export async function POST(request: NextRequest) {
 
     const { user, isGlobalAdmin, supabase } = authResult;
 
-    // Parse request body
-    const body = await request.json();
-    const { companyId, csvContent, skipDatabaseDuplicateCheck } = body;
+    // Parse request body - support both FormData and JSON for backwards compatibility
+    const contentType = request.headers.get('content-type') || '';
+    let companyId: string;
+    let csvContent: string;
+    let skipDatabaseDuplicateCheck: boolean = false;
 
-    console.log('Bulk parse request:', {
-      companyId,
-      csvContentLength: csvContent?.length,
-      hasCompanyId: !!companyId,
-      hasCsvContent: !!csvContent,
-      skipDatabaseDuplicateCheck
-    });
+    if (contentType.includes('multipart/form-data')) {
+      // New FormData approach (handles large files better)
+      const formData = await request.formData();
+      companyId = formData.get('companyId') as string;
+      const csvFile = formData.get('csvFile') as File;
+      skipDatabaseDuplicateCheck = formData.get('skipDatabaseDuplicateCheck') === 'true';
+
+      if (!csvFile) {
+        return NextResponse.json(
+          { error: 'CSV file is required' },
+          { status: 400 }
+        );
+      }
+
+      csvContent = await csvFile.text();
+    } else {
+      // Legacy JSON approach (kept for backwards compatibility)
+      const body = await request.json();
+      companyId = body.companyId;
+      csvContent = body.csvContent;
+      skipDatabaseDuplicateCheck = body.skipDatabaseDuplicateCheck;
+    }
 
     // Validate required fields
     if (!companyId || !csvContent) {
-      console.error('Missing required fields:', { companyId: !!companyId, csvContent: !!csvContent });
       return NextResponse.json(
         { error: 'Company ID and CSV content are required' },
         { status: 400 }

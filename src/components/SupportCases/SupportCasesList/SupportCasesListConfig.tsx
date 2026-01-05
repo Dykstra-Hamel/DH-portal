@@ -41,12 +41,13 @@ const formatPhone = (phone?: string): string => {
 const formatIssueType = (issueType: string): string => {
   const typeMap: { [key: string]: string } = {
     billing: 'Billing',
-    technical: 'Technical',
-    service_issue: 'Service',
+    scheduling: 'Scheduling',
     complaint: 'Complaint',
-    general_inquiry: 'General',
-    account: 'Account',
-    other: 'Other',
+    service_quality: 'Service Quality',
+    treatment_request: 'Treatment Request',
+    re_service: 'Re-service',
+    general_inquiry: 'General Inquiry',
+    warranty_claim: 'Warranty Claim',
   };
   return typeMap[issueType] || issueType;
 };
@@ -123,7 +124,7 @@ export const getSupportCaseColumns = (): ColumnDefinition<SupportCase>[] => [
   {
     key: 'issue_type',
     title: 'Issue Type',
-    width: '120px',
+    width: '150px',
     sortable: true,
     sortKey: 'issue_type',
     render: (supportCase: SupportCase) => (
@@ -166,7 +167,11 @@ export const getSupportCaseColumns = (): ColumnDefinition<SupportCase>[] => [
               />
             )}
             <span className={styles.statusBadge}>
-              {supportCaseStatusOptions.find(s => s.value === supportCase.status)?.label}
+              {
+                supportCaseStatusOptions.find(
+                  s => s.value === supportCase.status
+                )?.label
+              }
             </span>
           </div>
         )}
@@ -201,16 +206,10 @@ export const getSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
   {
     key: 'all',
     label: 'All Cases',
-    filter: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived),
-    getCount: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived).length,
-  },
-  {
-    key: 'unassigned',
-    label: 'Unassigned',
     filter: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && !sc.assigned_to),
+      supportCases.filter(sc => !sc.archived),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && !sc.assigned_to).length,
+      supportCases.filter(sc => !sc.archived).length,
   },
   {
     key: 'in_progress',
@@ -218,15 +217,20 @@ export const getSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
     filter: (supportCases: SupportCase[]) =>
       supportCases.filter(sc => !sc.archived && sc.status === 'in_progress'),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && sc.status === 'in_progress').length,
+      supportCases.filter(sc => !sc.archived && sc.status === 'in_progress')
+        .length,
   },
   {
     key: 'awaiting_response',
     label: 'Awaiting Response',
     filter: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && sc.status === 'awaiting_response'),
+      supportCases.filter(
+        sc => !sc.archived && sc.status === 'awaiting_response'
+      ),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && sc.status === 'awaiting_response').length,
+      supportCases.filter(
+        sc => !sc.archived && sc.status === 'awaiting_response'
+      ).length,
   },
   {
     key: 'resolved',
@@ -234,27 +238,41 @@ export const getSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
     filter: (supportCases: SupportCase[]) =>
       supportCases.filter(sc => !sc.archived && sc.status === 'resolved'),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && sc.status === 'resolved').length,
+      supportCases.filter(sc => !sc.archived && sc.status === 'resolved')
+        .length,
   },
 ];
 
 // User-specific tabs - excludes "unassigned" tab for "My Support Cases" view
 export const getUserSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
   {
+    key: 'all',
+    label: 'All My Cases',
+    filter: (supportCases: SupportCase[]) =>
+      supportCases.filter(sc => !sc.archived),
+    getCount: (supportCases: SupportCase[]) =>
+      supportCases.filter(sc => !sc.archived).length,
+  },
+  {
     key: 'in_progress',
     label: 'In Progress',
     filter: (supportCases: SupportCase[]) =>
       supportCases.filter(sc => !sc.archived && sc.status === 'in_progress'),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && sc.status === 'in_progress').length,
+      supportCases.filter(sc => !sc.archived && sc.status === 'in_progress')
+        .length,
   },
   {
     key: 'awaiting_response',
     label: 'Awaiting Response',
     filter: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && sc.status === 'awaiting_response'),
+      supportCases.filter(
+        sc => !sc.archived && sc.status === 'awaiting_response'
+      ),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && sc.status === 'awaiting_response').length,
+      supportCases.filter(
+        sc => !sc.archived && sc.status === 'awaiting_response'
+      ).length,
   },
   {
     key: 'resolved',
@@ -262,12 +280,7 @@ export const getUserSupportCaseTabs = (): TabDefinition<SupportCase>[] => [
     filter: (supportCases: SupportCase[]) =>
       supportCases.filter(sc => !sc.archived && sc.status === 'resolved'),
     getCount: (supportCases: SupportCase[]) =>
-      supportCases.filter(sc => !sc.archived && sc.status === 'resolved').length,
-  },
-  {
-    key: 'all',
-    label: 'All My Cases',
-    filter: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived),
-    getCount: (supportCases: SupportCase[]) => supportCases.filter(sc => !sc.archived).length,
+      supportCases.filter(sc => !sc.archived && sc.status === 'resolved')
+        .length,
   },
 ];

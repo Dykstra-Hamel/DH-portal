@@ -807,6 +807,7 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
       recording_url,
       transcript,
       call_analysis,
+      call_summary: extractedData.summary, // Save call summary for easy access
       retell_variables: retell_llm_dynamic_variables,
       opt_out_sensitive_data_storage: opt_out_sensitive_data_storage === true,
       sentiment: extractedData.sentiment,

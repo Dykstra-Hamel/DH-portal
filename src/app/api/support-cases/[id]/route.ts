@@ -55,6 +55,20 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch support case' }, { status: 500 });
     }
 
+    // Fetch assigned user profile if assigned_to exists
+    let assignedUser = null;
+    if (supportCase.assigned_to) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', supportCase.assigned_to)
+        .single();
+
+      if (!profileError && profileData) {
+        assignedUser = profileData;
+      }
+    }
+
     // Get customer's primary service address if support case has a customer
     let primaryServiceAddress = null;
     if (supportCase.customer_id) {
@@ -70,10 +84,11 @@ export async function GET(
       }
     }
 
-    // Add primary service address to response
+    // Add primary service address and assigned user to response
     const enhancedSupportCase = {
       ...supportCase,
       primary_service_address: primaryServiceAddress,
+      assigned_user: assignedUser,
     };
 
     return NextResponse.json(enhancedSupportCase);
@@ -139,6 +154,20 @@ export async function PUT(
       return NextResponse.json({ error: 'Failed to update support case' }, { status: 500 });
     }
 
+    // Fetch assigned user profile if assigned_to exists
+    let updatedAssignedUser = null;
+    if (updatedSupportCase.assigned_to) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', updatedSupportCase.assigned_to)
+        .single();
+
+      if (!profileError && profileData) {
+        updatedAssignedUser = profileData;
+      }
+    }
+
     // Get customer's primary service address if support case has a customer
     let primaryServiceAddress = null;
     if (updatedSupportCase.customer_id) {
@@ -154,10 +183,11 @@ export async function PUT(
       }
     }
 
-    // Add primary service address to response
+    // Add primary service address and assigned user to response
     const enhancedUpdatedSupportCase = {
       ...updatedSupportCase,
       primary_service_address: primaryServiceAddress,
+      assigned_user: updatedAssignedUser,
     };
 
     return NextResponse.json(enhancedUpdatedSupportCase);
