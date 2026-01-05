@@ -147,18 +147,16 @@ export default function ContactListUpload({
       setParsing(true);
       setError(null);
 
-      // Read file content
-      const csvContent = await file.text();
+      // Use FormData to send the file (avoids JSON escaping issues with large CSVs)
+      const formData = new FormData();
+      formData.append('csvFile', file);
+      formData.append('companyId', companyId);
+      formData.append('skipDatabaseDuplicateCheck', 'true'); // For campaigns, only check for within-CSV duplicates
 
       // Call existing parse API
       const response = await fetch('/api/leads/bulk/parse', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          csvContent,
-          skipDatabaseDuplicateCheck: true, // For campaigns, only check for within-CSV duplicates
-        }),
+        body: formData,
       });
 
       const result = await response.json();
