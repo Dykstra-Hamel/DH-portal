@@ -330,6 +330,9 @@ export function SalesCadenceCard({
 
       setShowEndModal(false);
       await loadData();
+
+      // Notify parent that cadence was removed
+      onCadenceSelect?.(null);
     } catch (error) {
       console.error('Error ending cadence:', error);
       alert('Failed to end cadence');
