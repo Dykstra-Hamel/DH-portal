@@ -419,7 +419,8 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
           setAvailableCompanies([]);
           setIsAdmin(false);
           setIsLoading(false);
-          localStorage.removeItem(SELECTED_COMPANY_STORAGE_KEY);
+          // Don't remove selected company from localStorage on logout
+          // This allows users to return to the same company when they log back in
         }
       }
     );

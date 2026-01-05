@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useRef, useEffect } from 'react';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import SearchableDropdown from '@/components/Common/SearchableDropdown/SearchableDropdown';
+import { useUser } from '@/hooks/useUser';
+import { useAssignableUsers } from '@/hooks/useAssignableUsers';
+import Image from 'next/image';
+import { Users, ChevronDown } from 'lucide-react';
 import styles from './AddSupportCaseModal.module.scss';
 
 interface AddSupportCaseModalProps {
@@ -21,6 +25,22 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+
+  // Assignment state
+  const [selectedAssignee, setSelectedAssignee] = useState<string>('');
+  const [isAssignmentDropdownOpen, setIsAssignmentDropdownOpen] = useState(false);
+  const assignmentDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch current user and assignable users
+  const { user } = useUser();
+  const {
+    users: assignableUsers,
+    loading: loadingUsers
+  } = useAssignableUsers({
+    companyId,
+    departmentType: 'support',
+    enabled: isOpen,
+  });
 
   // Support case form state
   const [formData, setFormData] = useState({
@@ -79,6 +99,28 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
     setSelectedCustomer(customer);
   };
 
+  // Default to current user when modal opens
+  useEffect(() => {
+    if (isOpen && user?.id && !selectedAssignee) {
+      setSelectedAssignee(user.id);
+    }
+  }, [isOpen, user?.id, selectedAssignee]);
+
+  // Close assignment dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        assignmentDropdownRef.current &&
+        !assignmentDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsAssignmentDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleClose = () => {
     // Reset all state
     setIsLoading(false);
@@ -86,6 +128,8 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
     setShowNewCustomer(false);
     setSelectedCustomer(null);
     setCustomers([]);
+    setSelectedAssignee('');
+    setIsAssignmentDropdownOpen(false);
     setFormData({
       firstName: '',
       lastName: '',
@@ -155,7 +199,8 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
           summary: formData.summary,
           description: formData.description || null,
           priority: formData.priority,
-          status: 'unassigned',
+          assigned_to: isTeamAssignment() ? undefined : (selectedAssignee || undefined),
+          status: selectedAssignee ? 'in_progress' : 'unassigned',
         }),
       });
 
@@ -172,6 +217,66 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
       setIsLoading(false);
     }
   };
+
+  // Helper to check if assignment is to a team
+  const isTeamAssignment = () => selectedAssignee === 'support_team';
+
+  // Get display data for selected assignee
+  const getSelectedAssigneeData = () => {
+    if (!selectedAssignee) {
+      return { name: 'Select', avatar: null, subtitle: '' };
+    }
+
+    if (selectedAssignee === 'support_team') {
+      const memberCount = assignableUsers.filter(u =>
+        u.departments.includes('support')
+      ).length;
+      return {
+        name: 'Support Team',
+        avatar: 'team',
+        subtitle: `${memberCount} members`
+      };
+    }
+
+    if (selectedAssignee === user?.id) {
+      return {
+        name: user.user_metadata?.first_name && user.user_metadata?.last_name
+          ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
+          : user.email || 'Current User',
+        avatar: user.user_metadata?.avatar_url || null,
+        subtitle: 'Myself',
+      };
+    }
+
+    const assignedUser = assignableUsers.find(u => u.id === selectedAssignee);
+    if (assignedUser) {
+      return {
+        name: assignedUser.display_name,
+        avatar: assignedUser.avatar_url,
+        subtitle: assignedUser.email,
+      };
+    }
+
+    return { name: 'Select', avatar: null, subtitle: '' };
+  };
+
+  // Get support team member count
+  const getSupportTeamCount = () => {
+    return assignableUsers.filter(u => u.departments.includes('support')).length;
+  };
+
+  // Avatar components
+  const TeamAvatar = () => (
+    <div className={styles.teamAvatar}>
+      <Users size={20} />
+    </div>
+  );
+
+  const DefaultAvatar = ({ name }: { name: string }) => (
+    <div className={styles.defaultAvatar}>
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} className={styles.addSupportCaseModal}>
@@ -314,6 +419,151 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Assignment Dropdown */}
+          <div className={styles.assignmentSection}>
+            <label className={styles.sectionLabel}>Assign To</label>
+            <div className={styles.customDropdown} ref={assignmentDropdownRef}>
+              <button
+                type="button"
+                className={styles.dropdownButton}
+                onClick={() => setIsAssignmentDropdownOpen(!isAssignmentDropdownOpen)}
+                disabled={loadingUsers}
+              >
+                <div className={styles.selectedOption}>
+                  {(() => {
+                    const display = getSelectedAssigneeData();
+                    if (display.avatar === 'team') {
+                      return <TeamAvatar />;
+                    }
+                    if (display.avatar) {
+                      return (
+                        <Image
+                          src={display.avatar}
+                          alt={display.name}
+                          width={32}
+                          height={32}
+                          className={styles.avatar}
+                        />
+                      );
+                    }
+                    return <DefaultAvatar name={display.name} />;
+                  })()}
+                  <div className={styles.userInfo}>
+                    <div className={styles.userName}>{getSelectedAssigneeData().name}</div>
+                    {getSelectedAssigneeData().subtitle && (
+                      <div className={styles.userSubtitle}>
+                        {getSelectedAssigneeData().subtitle}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`${styles.chevron} ${isAssignmentDropdownOpen ? styles.open : ''}`}
+                />
+              </button>
+
+              {isAssignmentDropdownOpen && (
+                <div className={styles.dropdownMenu}>
+                  {/* Current User First */}
+                  {user && (
+                    <button
+                      type="button"
+                      className={`${styles.dropdownOption} ${
+                        selectedAssignee === user.id ? styles.selected : ''
+                      }`}
+                      onClick={() => {
+                        setSelectedAssignee(user.id);
+                        setIsAssignmentDropdownOpen(false);
+                      }}
+                    >
+                      <div className={styles.optionContent}>
+                        {user.user_metadata?.avatar_url ? (
+                          <Image
+                            src={user.user_metadata.avatar_url}
+                            alt="Current user"
+                            width={32}
+                            height={32}
+                            className={styles.avatar}
+                          />
+                        ) : (
+                          <DefaultAvatar
+                            name={user.email || 'User'}
+                          />
+                        )}
+                        <div className={styles.optionInfo}>
+                          <div className={styles.optionName}>
+                            {user.user_metadata?.first_name && user.user_metadata?.last_name
+                              ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
+                              : user.email}
+                          </div>
+                          <div className={styles.myselfLabel}>Myself</div>
+                        </div>
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Support Team Option */}
+                  <button
+                    type="button"
+                    className={`${styles.dropdownOption} ${
+                      selectedAssignee === 'support_team' ? styles.selected : ''
+                    }`}
+                    onClick={() => {
+                      setSelectedAssignee('support_team');
+                      setIsAssignmentDropdownOpen(false);
+                    }}
+                  >
+                    <div className={styles.optionContent}>
+                      <TeamAvatar />
+                      <div className={styles.optionInfo}>
+                        <div className={styles.optionName}>Support Team</div>
+                        <div className={styles.optionSubtitle}>
+                          {getSupportTeamCount()} members
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Other Team Members */}
+                  {assignableUsers
+                    .filter(u => u.id !== user?.id && u.departments.includes('support'))
+                    .map(assignee => (
+                      <button
+                        key={assignee.id}
+                        type="button"
+                        className={`${styles.dropdownOption} ${
+                          selectedAssignee === assignee.id ? styles.selected : ''
+                        }`}
+                        onClick={() => {
+                          setSelectedAssignee(assignee.id);
+                          setIsAssignmentDropdownOpen(false);
+                        }}
+                      >
+                        <div className={styles.optionContent}>
+                          {assignee.avatar_url ? (
+                            <Image
+                              src={assignee.avatar_url}
+                              alt={assignee.display_name}
+                              width={32}
+                              height={32}
+                              className={styles.avatar}
+                            />
+                          ) : (
+                            <DefaultAvatar name={assignee.display_name} />
+                          )}
+                          <div className={styles.optionInfo}>
+                            <div className={styles.optionName}>{assignee.display_name}</div>
+                            <div className={styles.optionSubtitle}>{assignee.email}</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Support Case Fields */}

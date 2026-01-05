@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -49,7 +49,6 @@ export default function CampaignDetailPage({
     if (campaignId && selectedCompany?.id) {
       fetchCampaignData();
       fetchCompanyTimezone();
-      setupRealtimeSubscription();
     }
   }, [campaignId, selectedCompany?.id]);
 
@@ -125,54 +124,16 @@ export default function CampaignDetailPage({
     }
   };
 
-  const setupRealtimeSubscription = () => {
-    const supabase = createClient();
-
-    // Subscribe to campaign changes
-    const campaignChannel = supabase
-      .channel(`campaign-${campaignId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaigns',
-          filter: `id=eq.${campaignId}`,
-        },
-        payload => {
-          console.log('Campaign updated:', payload);
-          fetchCampaignData();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to execution changes
-    const executionsChannel = supabase
-      .channel(`campaign-executions-${campaignId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'campaign_executions',
-          filter: `campaign_id=eq.${campaignId}`,
-        },
-        payload => {
-          console.log('Execution updated:', payload);
-          fetchCampaignData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(campaignChannel);
-      supabase.removeChannel(executionsChannel);
-    };
-  };
-
   const handleCampaignUpdate = () => {
     fetchCampaignData();
   };
+
+  const handleExecutionCountChange = useCallback((totalExecutions: number) => {
+    setMetrics((prev: any) => ({
+      ...prev,
+      totalExecutions,
+    }));
+  }, []);
 
   const handleDuplicateCampaign = async () => {
     if (!campaign) return;
@@ -312,6 +273,7 @@ export default function CampaignDetailPage({
             campaignId={campaign.id}
             companyId={selectedCompany?.id || ''}
             companyTimezone={companyTimezone}
+            onExecutionCountChange={handleExecutionCountChange}
           />
         )}
 
