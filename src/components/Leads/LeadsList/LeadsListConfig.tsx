@@ -295,8 +295,26 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
       ).length,
   },
   {
-    key: 'contacting',
-    label: 'Contacting',
+    key: 'unassigned',
+    label: 'Unassigned',
+    filter: (leads: Lead[]) =>
+      leads.filter(
+        lead =>
+          !lead.archived &&
+          lead.lead_status === 'new' &&
+          !lead.assigned_to
+      ),
+    getCount: (leads: Lead[]) =>
+      leads.filter(
+        lead =>
+          !lead.archived &&
+          lead.lead_status === 'new' &&
+          !lead.assigned_to
+      ).length,
+  },
+  {
+    key: 'in_process',
+    label: 'In Process',
     filter: (leads: Lead[]) =>
       leads.filter(lead => !lead.archived && lead.lead_status === 'in_process'),
     getCount: (leads: Lead[]) =>
@@ -331,8 +349,8 @@ export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
       ).length,
   },
   {
-    key: 'contacting',
-    label: 'Contacting',
+    key: 'in_process',
+    label: 'In Process',
     filter: (leads: Lead[]) =>
       leads.filter(lead => !lead.archived && lead.lead_status === 'in_process'),
     getCount: (leads: Lead[]) =>

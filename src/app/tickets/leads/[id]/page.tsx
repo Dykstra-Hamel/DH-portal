@@ -791,14 +791,26 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       if (!leadId || !lead) return;
 
       try {
+        const updateData: any = { lead_status: status };
+
+        // If changing to "new" status, unassign users to set it back to unassigned state
+        if (status === 'new') {
+          updateData.assigned_to = null;
+          updateData.assigned_scheduler = null;
+        }
+
         if (isAdmin) {
-          await adminAPI.updateLead(leadId, { lead_status: status });
+          await adminAPI.updateLead(leadId, updateData);
         } else {
-          await adminAPI.updateUserLead(leadId, { lead_status: status });
+          await adminAPI.updateUserLead(leadId, updateData);
         }
 
         await fetchLead();
-        handleShowToast('Lead status updated successfully!', 'success');
+
+        const message = status === 'new'
+          ? 'Lead status updated and users unassigned successfully!'
+          : 'Lead status updated successfully!';
+        handleShowToast(message, 'success');
       } catch (error) {
         console.error('Error updating lead status:', error);
         handleShowToast(
