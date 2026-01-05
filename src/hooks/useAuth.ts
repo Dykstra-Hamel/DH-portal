@@ -45,9 +45,9 @@ export function useAuth() {
 
       // Avatar sync is handled in useUser.ts hook
 
-      // Redirect to dashboard if user is authenticated
+      // Redirect to tickets/new if user is authenticated
       if (session?.user) {
-        router.push('/dashboard');
+        router.push('/tickets/new');
       }
     });
 
@@ -65,7 +65,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${redirectOrigin}/auth/callback?next=/dashboard`,
+        redirectTo: `${redirectOrigin}/auth/callback?next=/tickets/new`,
       },
     });
     if (error) console.error('Error signing in:', error);
@@ -82,7 +82,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
-        redirectTo: `${redirectOrigin}/auth/callback?next=/dashboard`,
+        redirectTo: `${redirectOrigin}/auth/callback?next=/tickets/new`,
       },
     });
     if (error) console.error('Error signing in:', error);
@@ -102,7 +102,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${redirectOrigin}/auth/callback?next=/dashboard`,
+        emailRedirectTo: `${redirectOrigin}/auth/callback?next=/tickets/new`,
       },
     });
 
