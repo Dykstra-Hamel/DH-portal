@@ -14,6 +14,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
+// Batch processing configuration
+const BATCH_SIZE = 100; // Process 100 rows at a time to stay within AI model limits
+
 /**
  * Normalized lead data from CSV
  */
@@ -166,46 +169,20 @@ function parseCSV(csvText: string): Record<string, string>[] {
 }
 
 /**
- * Parse CSV data using Gemini AI to normalize lead records
- *
- * @param csvContent - Raw CSV content as string
- * @param existingLeads - Array of existing leads (email/phone) for duplicate detection
- * @returns Normalized lead data with duplicate warnings
+ * Process a batch of rows through Gemini AI
  */
-export async function parseCSVLeads(
-  csvContent: string,
-  existingLeads: Array<{ email?: string; phone_number?: string }> = []
-): Promise<CSVParseResult> {
-  try {
-    // Parse CSV into rows
-    const rows = parseCSV(csvContent);
+async function processBatch(
+  rows: Record<string, string>[],
+  batchNumber: number,
+  totalBatches: number
+): Promise<{ leads: NormalizedLeadData[]; confidence: number }> {
+  console.log(`🔄 Processing batch ${batchNumber}/${totalBatches} (${rows.length} rows)`);
 
-    console.log('📊 Parsed CSV rows:', {
-      totalRows: rows.length,
-      headers: rows.length > 0 ? Object.keys(rows[0]) : [],
-      firstRow: rows[0]
-    });
+  const model = genAI.getGenerativeModel({
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite'
+  });
 
-    if (rows.length === 0) {
-      return {
-        success: false,
-        leads: [],
-        confidence: 0,
-        totalRows: 0,
-        validRows: 0,
-        invalidRows: 0,
-        duplicates: [],
-        invalidRowDetails: [],
-        error: 'No valid data found in CSV',
-      };
-    }
-
-    // Use Gemini model from environment variable with fallback
-    const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite'
-    });
-
-    const prompt = `You are a data extraction AI for a pest control CRM system. Parse CSV data into standardized lead records.
+  const prompt = `You are a data extraction AI for a pest control CRM system. Parse CSV data into standardized lead records.
 
 INPUT DATA (CSV rows as JSON):
 ${JSON.stringify(rows, null, 2)}
@@ -284,26 +261,91 @@ IMPORTANT:
 - Email: convert to lowercase
 - Each row in the input should produce one lead in the output`;
 
-    // Retry Gemini API call with exponential backoff
-    const result = await retryWithBackoff(async () => {
-      return await model.generateContent(prompt);
+  // Retry Gemini API call with exponential backoff
+  const result = await retryWithBackoff(async () => {
+    return await model.generateContent(prompt);
+  });
+
+  const responseText = result.response.text();
+
+  // Clean the response
+  const cleanedText = responseText
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
+
+  // Parse JSON response
+  const parsed = JSON.parse(cleanedText);
+
+  console.log(`✅ Batch ${batchNumber}/${totalBatches} complete:`, {
+    totalLeads: parsed.leads?.length || 0,
+    confidence: parsed.confidence
+  });
+
+  return {
+    leads: parsed.leads || [],
+    confidence: parsed.confidence || 0.5
+  };
+}
+
+/**
+ * Parse CSV data using Gemini AI to normalize lead records
+ *
+ * @param csvContent - Raw CSV content as string
+ * @param existingLeads - Array of existing leads (email/phone) for duplicate detection
+ * @returns Normalized lead data with duplicate warnings
+ */
+export async function parseCSVLeads(
+  csvContent: string,
+  existingLeads: Array<{ email?: string; phone_number?: string }> = []
+): Promise<CSVParseResult> {
+  try {
+    // Parse CSV into rows
+    const rows = parseCSV(csvContent);
+
+    console.log('📊 Parsed CSV rows:', {
+      totalRows: rows.length,
+      headers: rows.length > 0 ? Object.keys(rows[0]) : [],
+      firstRow: rows[0]
     });
 
-    const responseText = result.response.text();
+    if (rows.length === 0) {
+      return {
+        success: false,
+        leads: [],
+        confidence: 0,
+        totalRows: 0,
+        validRows: 0,
+        invalidRows: 0,
+        duplicates: [],
+        invalidRowDetails: [],
+        error: 'No valid data found in CSV',
+      };
+    }
 
-    // Clean the response
-    const cleanedText = responseText
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
+    // Split rows into batches to stay within AI model limits
+    const batches: Record<string, string>[][] = [];
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      batches.push(rows.slice(i, i + BATCH_SIZE));
+    }
 
-    // Parse JSON response
-    const parsed = JSON.parse(cleanedText);
+    console.log(`🔢 Processing ${rows.length} rows in ${batches.length} batches of up to ${BATCH_SIZE} rows each`);
 
-    console.log('🤖 Gemini AI response:', {
-      totalLeads: parsed.leads?.length || 0,
-      confidence: parsed.confidence,
-      firstLead: parsed.leads?.[0]
+    // Process all batches
+    const batchResults = await Promise.all(
+      batches.map((batch, index) =>
+        processBatch(batch, index + 1, batches.length)
+      )
+    );
+
+    // Combine all leads from batches
+    const normalizedLeads = batchResults.flatMap(result => result.leads);
+    const avgConfidence = batchResults.reduce((sum, r) => sum + r.confidence, 0) / batchResults.length;
+
+    console.log('🎯 All batches processed:', {
+      totalBatches: batches.length,
+      totalLeads: normalizedLeads.length,
+      averageConfidence: avgConfidence
     });
 
     // Detect duplicates and invalid rows
@@ -319,8 +361,6 @@ IMPORTANT:
       data: NormalizedLeadData;
       reason: string;
     }> = [];
-
-    const normalizedLeads = parsed.leads || [];
 
     normalizedLeads.forEach((lead: NormalizedLeadData, index: number) => {
       const email = lead.email?.toLowerCase();
@@ -393,7 +433,7 @@ IMPORTANT:
     return {
       success: true,
       leads: validLeads,
-      confidence: parsed.confidence || 0.5,
+      confidence: avgConfidence,
       totalRows: rows.length,
       validRows: validLeads.length,
       invalidRows: invalidRowDetails.length,
