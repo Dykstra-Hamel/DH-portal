@@ -24,6 +24,12 @@ import {
 import { adminAPI } from '@/lib/api-client';
 import { Lead } from '@/types/lead';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
+import {
+  createLeadChannel,
+  subscribeToLeadUpdates,
+  removeLeadChannel,
+  LeadUpdatePayload,
+} from '@/lib/realtime/lead-channel';
 import { StepItem } from '@/components/Common/Step/Step';
 import { LeadStepWrapper } from '@/components/Common/LeadStepWrapper/LeadStepWrapper';
 import { LeadStepContent } from '@/components/Common/LeadStepContent/LeadStepContent';
@@ -567,6 +573,106 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     }
   }, [leadId, loading, fetchLead]);
 
+  // Set up realtime subscription for lead updates
+  useEffect(() => {
+    if (!lead?.company_id || !leadId) return;
+
+    const channel = createLeadChannel(lead.company_id);
+    const companyId = lead.company_id; // Capture for closure
+
+    subscribeToLeadUpdates(channel, async (payload: LeadUpdatePayload) => {
+      const { company_id, action, lead_id } = payload;
+
+      // Verify this is for our company and our lead
+      if (company_id !== companyId || lead_id !== leadId) {
+        return;
+      }
+
+      // Handle updates by fetching only the assignment/status fields
+      if (action === 'UPDATE') {
+        try {
+          const supabase = createClient();
+          const { data: updatedLead, error } = await supabase
+            .from('leads')
+            .select('id, assigned_to, assigned_scheduler, lead_status')
+            .eq('id', leadId)
+            .single();
+
+          if (!error && updatedLead) {
+            // Update the lead state with new assignment fields
+            setLead(prev => {
+              if (!prev) return prev;
+
+              // Check if values actually changed
+              const changed =
+                updatedLead.assigned_to !== prev.assigned_to ||
+                updatedLead.assigned_scheduler !== prev.assigned_scheduler ||
+                updatedLead.lead_status !== prev.lead_status;
+
+              if (!changed) return prev;
+
+              // Fetch the user profiles separately if assignment changed
+              if (updatedLead.assigned_to !== prev.assigned_to ||
+                  updatedLead.assigned_scheduler !== prev.assigned_scheduler) {
+                // Fetch profiles for the new assignees
+                (async () => {
+                  const userIds = [
+                    updatedLead.assigned_to,
+                    updatedLead.assigned_scheduler
+                  ].filter(Boolean) as string[];
+
+                  if (userIds.length > 0) {
+                    const { data: profiles } = await supabase
+                      .from('profiles')
+                      .select('id, email, first_name, last_name, avatar_url')
+                      .in('id', userIds);
+
+                    if (profiles) {
+                      const profileMap = new Map(profiles.map(p => [p.id, p]));
+                      setLead(current => current ? {
+                        ...current,
+                        assigned_user: updatedLead.assigned_to
+                          ? profileMap.get(updatedLead.assigned_to)
+                          : undefined,
+                        scheduler_user: updatedLead.assigned_scheduler
+                          ? profileMap.get(updatedLead.assigned_scheduler)
+                          : undefined,
+                      } : current);
+                    }
+                  } else {
+                    // No assignees, clear the user objects
+                    setLead(current => current ? {
+                      ...current,
+                      assigned_user: undefined,
+                      scheduler_user: undefined,
+                    } : current);
+                  }
+                })();
+              }
+
+              // Return new object with updated fields
+              return {
+                ...prev,
+                assigned_to: updatedLead.assigned_to,
+                assigned_scheduler: updatedLead.assigned_scheduler,
+                lead_status: updatedLead.lead_status,
+              };
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching updated lead fields:', error);
+        }
+      } else if (action === 'DELETE') {
+        // Lead was deleted, redirect to leads list
+        router.push('/tickets/leads');
+      }
+    });
+
+    return () => {
+      removeLeadChannel(channel);
+    };
+  }, [lead?.company_id, leadId, router]);
+
   const handleBack = () => {
     router.push('/tickets/leads');
   };
@@ -840,8 +946,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         leadAssignmentControls: {
           leadType: ticketType,
           leadStatus: lead.lead_status,
-          assignedTo: selectedAssignee,
-          assignedScheduler: selectedScheduler,
+          assignedTo: lead.assigned_to || '',
+          assignedScheduler: lead.assigned_scheduler || '',
           assignedUser: lead.assigned_user,
           schedulerUser: lead.scheduler_user,
           assignableUsers: stableAssignableUsers,
@@ -862,10 +968,13 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     lead,
+    lead?.assigned_to,
+    lead?.assigned_scheduler,
+    lead?.lead_status,
+    lead?.assigned_user,
+    lead?.scheduler_user,
     stableCurrentUser,
     ticketType,
-    selectedAssignee,
-    selectedScheduler,
     stableAssignableUsers,
     // setPageHeader is intentionally omitted - it's a stable context setter
     handleLeadTypeChange,
@@ -940,9 +1049,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           });
           const data = await response.json();
 
-          if (!data.data) {
-            console.log('Quote will be created when Quote step loads');
-          }
+          // Quote will be created when Quote step loads if it doesn't exist
         } catch (error) {
           console.error('Error checking quote:', error);
         }
