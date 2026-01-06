@@ -18,12 +18,32 @@ export function generateLeadSchedulingEmailTemplate(
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Lead Ready to Schedule</title>
+        <style>
+          @media only screen and (max-width: 768px) {
+            .section-outer {
+              padding: 0 14px 14px 14px !important;
+            }
+            .section-inner {
+              padding: 18px !important;
+            }
+            .section-table {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            .greeting-section {
+              padding: 30px 14px 20px 14px !important;
+            }
+            .footer-section {
+              padding: 18px !important;
+            }
+          }
+        </style>
       </head>
       <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; background-color: #f5f5f5;">
         <!-- Email Container -->
         <table role="presentation" style="width: 100%;">
           <tr>
-            <td align="center" style="padding: 20px 0;">
+            <td align="center" style="padding: 0;">
               <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
 
                 <!-- Header -->
@@ -36,14 +56,14 @@ export function generateLeadSchedulingEmailTemplate(
 
                 <!-- Greeting -->
                 <tr>
-                  <td style="padding: 30px 30px 20px 30px;">
+                  <td class="greeting-section" style="padding: 30px 30px 20px 30px;">
                     <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">Hi ${recipientName},</p>
                   </td>
                 </tr>
 
                 <!-- Alert Message -->
                 <tr>
-                  <td style="padding: 0 30px 30px 30px;">
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
                     <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
                       <strong>This lead is ready to be scheduled.</strong> Please review the customer&apos;s preferences and schedule their service appointment.
                     </p>
@@ -52,10 +72,10 @@ export function generateLeadSchedulingEmailTemplate(
 
                 <!-- Scheduling Section -->
                 <tr>
-                  <td style="padding: 0 30px 30px 30px;">
-                    <table role="presentation" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: 6px;">
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: 6px;">
                       <tr>
-                        <td style="text-align: center; padding: 20px;">
+                        <td class="section-inner" style="text-align: center; padding: 20px;">
                           <img src="${baseUrl}/images/email/phone-icon.png" alt="Phone" style="width: 26px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
                           <h2 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Manual Follow-Up Required</h2>
                           <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
@@ -78,10 +98,10 @@ export function generateLeadSchedulingEmailTemplate(
 
                 <!-- Customer Information Section -->
                 <tr>
-                  <td style="padding: 0 30px 30px 30px;">
-                    <table role="presentation" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
                       <tr>
-                        <td style="padding: 20px;">
+                        <td class="section-inner" style="padding: 20px;">
                           <!-- Section Header with Icon (table-based for compatibility) -->
                           <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
                             <tr>
@@ -124,10 +144,10 @@ export function generateLeadSchedulingEmailTemplate(
                 ${leadData.pestType ? `
                 <!-- Service Request Section (conditional) -->
                 <tr>
-                  <td style="padding: 0 30px 30px 30px;">
-                    <table role="presentation" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
                       <tr>
-                        <td style="padding: 20px;">
+                        <td class="section-inner" style="padding: 20px;">
                           <!-- Section Header with Icon (table-based for compatibility) -->
                           <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
                             <tr>
@@ -151,7 +171,7 @@ export function generateLeadSchedulingEmailTemplate(
 
                 <!-- Footer -->
                 <tr>
-                  <td style="padding: 30px; text-align: center;">
+                  <td class="footer-section" style="padding: 30px; text-align: center;">
                     <img src="${baseUrl}/images/email/footer-logo.png" alt="PMP CENTRAL" style="width: 179px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;" />
                     <p style="margin: 0; font-size: 12px; color: #9ca3af;">
                       This notification was generated automatically by PMPCENTRAL - A Dykstra | Hamel Company
