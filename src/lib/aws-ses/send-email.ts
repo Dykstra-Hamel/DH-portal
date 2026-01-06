@@ -358,7 +358,7 @@ export async function sendEmailWithFallback(
     tenantName: fallbackTenant,
     configurationSetName: fallbackConfigSet,
     from: fallbackFrom,
-    fromName: 'DH Portal',
+    fromName: 'PMPCENTRAL',
   });
 
   if (fallbackResult.success) {

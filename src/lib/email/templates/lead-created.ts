@@ -23,7 +23,7 @@ export function generateLeadCreatedEmailTemplate(
 
                 <!-- Header -->
                 <tr>
-                  <td style="background-color: #020618; padding: 40px 20px; text-align: center;">
+                  <td style="background-color: #020618; padding: 50px 20px 30px 20px; text-align: center; border-radius: 6px;">
                     <h1 style="margin: 0 0 20px 0; font-size: 30px; font-weight: 700; line-height: 30px; color: #ffffff;">New Customer Lead</h1>
                     <img src="${baseUrl}/images/email/header-logo.png" alt="PMP CENTRAL" style="width: 110px; height: auto; opacity: 0.56;" />
                   </td>
@@ -50,7 +50,7 @@ export function generateLeadCreatedEmailTemplate(
                   <td style="padding: 0 30px 30px 30px;">
                     <table role="presentation" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: 6px;">
                       <tr>
-                        <td style="text-align: center; padding: 30px;">
+                        <td style="text-align: center; padding: 20px;">
                           <img src="${baseUrl}/images/email/phone-icon.png" alt="Phone" style="width: 26px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
                           <h2 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Manual Follow-Up Required</h2>
                           <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
