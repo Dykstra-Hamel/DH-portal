@@ -21,7 +21,7 @@ const formatCustomerName = (lead: Lead): string => {
 const getLeadActionButtonText = (status: string): string => {
   switch (status) {
     case 'new':
-      return 'Assign Lead';
+      return 'Manage Lead';
     case 'in_process':
       return 'Manage Lead';
     case 'quoted':
@@ -63,7 +63,9 @@ const getLeadSourceLabel = (leadType: string | null): string => {
       return 'Bulk Add';
     default:
       // Capitalize first letter for other types
-      return leadType.charAt(0).toUpperCase() + leadType.slice(1).replace(/_/g, ' ');
+      return (
+        leadType.charAt(0).toUpperCase() + leadType.slice(1).replace(/_/g, ' ')
+      );
   }
 };
 
@@ -300,16 +302,12 @@ export const getLeadTabs = (): TabDefinition<Lead>[] => [
     filter: (leads: Lead[]) =>
       leads.filter(
         lead =>
-          !lead.archived &&
-          lead.lead_status === 'new' &&
-          !lead.assigned_to
+          !lead.archived && lead.lead_status === 'new' && !lead.assigned_to
       ),
     getCount: (leads: Lead[]) =>
       leads.filter(
         lead =>
-          !lead.archived &&
-          lead.lead_status === 'new' &&
-          !lead.assigned_to
+          !lead.archived && lead.lead_status === 'new' && !lead.assigned_to
       ).length,
   },
   {
@@ -340,12 +338,14 @@ export const getUserLeadTabs = (): TabDefinition<Lead>[] => [
     filter: (leads: Lead[]) =>
       leads.filter(
         lead =>
-          !lead.archived && ['in_process', 'quoted', 'scheduling'].includes(lead.lead_status)
+          !lead.archived &&
+          ['in_process', 'quoted', 'scheduling'].includes(lead.lead_status)
       ),
     getCount: (leads: Lead[]) =>
       leads.filter(
         lead =>
-          !lead.archived && ['in_process', 'quoted', 'scheduling'].includes(lead.lead_status)
+          !lead.archived &&
+          ['in_process', 'quoted', 'scheduling'].includes(lead.lead_status)
       ).length,
   },
   {

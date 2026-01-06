@@ -48,6 +48,7 @@ export function Breadcrumbs() {
   const [loading, setLoading] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const customerChannelRef = useRef<RealtimeChannel | null>(null);
+  const subscriptionActiveRef = useRef<boolean>(false);
 
   // Check if user is admin
   const isAdmin = profile ? isAuthorizedAdminSync(profile) : false;
@@ -56,6 +57,9 @@ export function Breadcrumbs() {
     const generateBreadcrumbs = async () => {
       const pathSegments = pathname.split('/').filter(Boolean);
       const crumbs: BreadcrumbItem[] = [];
+
+      // Deactivate subscription synchronously to prevent race conditions
+      subscriptionActiveRef.current = false;
 
       // Clear customer ID by default - will be re-set if viewing a customer-specific page
       setCustomerId(null);
@@ -369,6 +373,7 @@ export function Breadcrumbs() {
   useEffect(() => {
     if (!customerId) {
       // Clean up existing channel if customer ID is cleared
+      subscriptionActiveRef.current = false;
       if (customerChannelRef.current) {
         removeCustomerChannel(customerChannelRef.current);
         customerChannelRef.current = null;
@@ -376,11 +381,19 @@ export function Breadcrumbs() {
       return;
     }
 
+    // Mark subscription as active
+    subscriptionActiveRef.current = true;
+
     // Create and subscribe to customer channel
     const channel = createCustomerChannel(customerId);
     customerChannelRef.current = channel;
 
     subscribeToCustomerUpdates(channel, (payload: CustomerUpdatePayload) => {
+      // Only update breadcrumbs if subscription is still active
+      if (!subscriptionActiveRef.current) {
+        return;
+      }
+
       // Update breadcrumb with new customer name
       setBreadcrumbs(prev => {
         const updated = [...prev];
@@ -399,6 +412,7 @@ export function Breadcrumbs() {
 
     // Cleanup on unmount or when customer ID changes
     return () => {
+      subscriptionActiveRef.current = false;
       if (customerChannelRef.current) {
         removeCustomerChannel(customerChannelRef.current);
         customerChannelRef.current = null;
