@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import { createClient } from '@/lib/supabase/server';
 import { logActivity } from '@/lib/activity-logger';
 import { generateQuoteUrl, generateQuoteToken, getFullQuoteUrl } from '@/lib/quote-utils';
+import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/pricing-calculations';
 
 export async function POST(
   request: NextRequest,
@@ -218,8 +219,12 @@ export async function POST(
       quoteTotalRecurringPrice: formatCurrency(quote.total_recurring_price || 0),
       quoteLineItems: quoteLineItems,
       quotePestConcerns: pestConcerns.join(', ') || 'Not specified',
-      quoteHomeSize: quote.home_size_range || 'Not specified',
-      quoteYardSize: quote.yard_size_range || 'Not specified',
+      quoteHomeSize: quote.home_size_range
+        ? formatHomeSizeRange(quote.home_size_range)
+        : 'Not specified',
+      quoteYardSize: quote.yard_size_range
+        ? formatYardSizeRange(quote.yard_size_range)
+        : 'Not specified',
 
       // Service address variables
       address: lead.primary_service_address
