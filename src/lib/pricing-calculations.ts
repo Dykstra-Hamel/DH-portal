@@ -121,6 +121,70 @@ export function formatAcresFractional(acres: number): string {
 }
 
 /**
+ * Format home size range string into human-readable display
+ * Examples: "0-1500" → "Up to 1,500 Sq Ft", "1501-2000" → "1,501-2,000 Sq Ft", "3000+" → "3,000+ Sq Ft"
+ */
+export function formatHomeSizeRange(range: string): string {
+  if (!range) return 'Not specified';
+
+  // Handle "3000+" format (open-ended)
+  if (range.includes('+')) {
+    const startValue = parseInt(range.replace('+', ''));
+    return `${startValue.toLocaleString()}+ Sq Ft`;
+  }
+
+  // Handle "0-1500" or "1501-2000" format
+  if (range.includes('-')) {
+    const [start, end] = range.split('-').map(Number);
+
+    // Special case: first interval starts at 0
+    if (start === 0) {
+      return `Up to ${end.toLocaleString()} Sq Ft`;
+    }
+
+    // Standard interval
+    return `${start.toLocaleString()}-${end.toLocaleString()} Sq Ft`;
+  }
+
+  // Fallback: return original value
+  return range;
+}
+
+/**
+ * Format yard size range string into human-readable display with fractions
+ * Examples: "0.00-0.25" → "Up to 1/4 Acre", "0.26-0.50" → "1/4 to 1/2 Acre", "2.00+" → "2+ Acres"
+ */
+export function formatYardSizeRange(range: string): string {
+  if (!range) return 'Not specified';
+
+  // Handle "2.00+" format (open-ended)
+  if (range.includes('+')) {
+    const startValue = parseFloat(range.replace('+', ''));
+    const formatted = formatAcresFractional(startValue);
+    return `${formatted}+ Acres`;
+  }
+
+  // Handle "0.00-0.25" or "0.26-0.50" format
+  if (range.includes('-')) {
+    const [start, end] = range.split('-').map(parseFloat);
+    const startFormatted = formatAcresFractional(start);
+    const endFormatted = formatAcresFractional(end);
+    const acreWord = end > 1 ? 'Acres' : 'Acre';
+
+    // Special case: first interval starts at 0
+    if (start === 0) {
+      return `Up to ${endFormatted} ${acreWord}`;
+    }
+
+    // Standard interval
+    return `${startFormatted} to ${endFormatted} ${acreWord}`;
+  }
+
+  // Fallback: return original value
+  return range;
+}
+
+/**
  * Generate yard size dropdown options based on company intervals
  * Example output: "Up to 1/4 Acre", "1/4 to 1/2 Acre", "1 to 1 1/4 Acres", "2+ Acres"
  */

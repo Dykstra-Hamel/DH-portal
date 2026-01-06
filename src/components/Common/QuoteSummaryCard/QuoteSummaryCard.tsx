@@ -2,7 +2,7 @@ import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { Quote } from '@/types/quote';
 import styles from './QuoteSummaryCard.module.scss';
 import { FileText, Mail, ExternalLink } from 'lucide-react';
-import { formatAcresFractional } from '@/lib/pricing-calculations';
+import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/pricing-calculations';
 import { getFullQuoteUrl } from '@/lib/quote-utils';
 
 interface QuoteSummaryCardProps {
@@ -50,22 +50,6 @@ export function QuoteSummaryCard({
     };
 
     return formattedFrequencies[frequency.toLowerCase()] || frequency;
-  };
-
-  // Format yard size range from decimal to fractional display
-  const formatYardSizeRange = (range: string): string => {
-    // Parse range like "0.26-0.50" or "2.00+"
-    if (range.includes('+')) {
-      const startValue = parseFloat(range.replace('+', ''));
-      return `${formatAcresFractional(startValue)}+ acre`;
-    } else if (range.includes('-')) {
-      const [start, end] = range.split('-').map(parseFloat);
-      const startFormatted = formatAcresFractional(start);
-      const endFormatted = formatAcresFractional(end);
-      const acreWord = end > 1 ? 'acres' : 'acre';
-      return `${startFormatted}-${endFormatted} ${acreWord}`;
-    }
-    return range;
   };
 
   // Format pest concerns from quote (single source of truth)
@@ -240,7 +224,7 @@ export function QuoteSummaryCard({
             <div className={styles.gridItem}>
               <div className={styles.fieldLabel}>Home Size</div>
               <div className={styles.fieldValue}>
-                {quote.home_size_range} sq ft
+                {formatHomeSizeRange(quote.home_size_range)}
               </div>
             </div>
           )}
