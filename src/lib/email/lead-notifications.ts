@@ -18,7 +18,7 @@ export async function sendLeadCreatedNotifications(
   try {
     // Get company's from email (custom domain if verified, otherwise fallback)
     const fromEmail = companyId ? await getCompanyFromEmail(companyId) : await getCompanyFromEmail('');
-    const fromName = companyId ? await getCompanyName(companyId) : 'DH Portal';
+    const fromName = companyId ? await getCompanyName(companyId) : 'PMPCENTRAL';
     const tenantName = companyId ? await getCompanyTenantName(companyId) : '';
 
     const results = [];

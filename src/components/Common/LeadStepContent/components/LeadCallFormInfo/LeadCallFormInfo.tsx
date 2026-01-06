@@ -125,7 +125,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
           )}
 
           {/* Attribution Details Section */}
-          <div className={styles.attributionSection}>
+          <div className={styles.cardContent}>
             <div className={styles.callInsightsSection}>
               <h4 className={cardStyles.defaultText}>Attribution Details:</h4>
             </div>

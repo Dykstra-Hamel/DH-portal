@@ -4,205 +4,176 @@ export function generateLeadCreatedEmailTemplate(
   recipientName: string,
   leadData: LeadNotificationData
 ): string {
-  const {
-    companyName,
-    customerName,
-    customerEmail,
-    customerPhone,
-    pestType,
-    selectedPlan,
-    recommendedPlan,
-    address,
-    homeSize,
-    estimatedPrice,
-    priority,
-    autoCallEnabled,
-    submittedAt,
-    leadUrl,
-  } = leadData;
-
-  const priorityColors = {
-    urgent: '#dc2626',
-    high: '#ea580c',
-    medium: '#d97706',
-    low: '#65a30d',
-  };
-
-  const priorityColor = priorityColors[priority];
-  const submittedDate = new Date(submittedAt).toLocaleString();
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   return `
     <!DOCTYPE html>
     <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>New Lead Notification</title>
-    </head>
-    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; color: #334155;">
-      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-        
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); padding: 24px; text-align: center;">
-          <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-            🎯 New Lead Alert
-          </h1>
-          <p style="margin: 8px 0 0 0; color: #e2e8f0; font-size: 16px;">
-            ${companyName}
-          </p>
-        </div>
-
-        <!-- Main Content -->
-        <div style="padding: 32px;">
-          <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.5;">
-            Hi ${recipientName},
-          </p>
-
-          <div style="background-color: #f1f5f9; border-left: 4px solid ${priorityColor}; padding: 16px; margin-bottom: 24px; border-radius: 0 4px 4px 0;">
-            <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #1e293b;">
-              ${autoCallEnabled ? '🤖 AI Agent is Calling Now' : '📞 Manual Follow-up Required'}
-            </h2>
-            <p style="margin: 0; font-size: 14px; color: #64748b;">
-              ${
-                autoCallEnabled
-                  ? 'Our automated AI agent is currently calling the customer. The lead will be updated automatically with call notes.'
-                  : 'This is a new lead that requires manual follow-up. Please contact the customer as soon as possible.'
-              }
-            </p>
-          </div>
-
-          <!-- Customer Information -->
-          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
-            <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-              👤 Customer Information
-            </h3>
-            
-            <div style="display: grid; gap: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                <span style="font-weight: 500; color: #64748b;">Name: </span>
-                <span style="color: #1e293b;">${customerName}</span>
-              </div>
-              
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                <span style="font-weight: 500; color: #64748b;">Email: </span>
-                <a href="mailto:${customerEmail}" style="color: #007bff; text-decoration: none;">${customerEmail}</a>
-              </div>
-              
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                <span style="font-weight: 500; color: #64748b;">Phone: </span>
-                <a href="tel:${customerPhone}" style="color: #007bff; text-decoration: none;">${customerPhone}</a>
-              </div>
-              
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; gap: 5px;">
-                <span style="font-weight: 500; color: #64748b;">Address: </span>
-                <span style="color: #1e293b; text-align: right; max-width: 300px;">${address}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Service Details -->
-          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
-            <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-              🐛 Service Request
-            </h3>
-            
-            <div style="display: grid; gap: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                <span style="font-weight: 500; color: #64748b;">Pest Type: </span>
-                <span style="color: #1e293b;">${pestType}</span>
-              </div>
-              
-              
-              ${
-                selectedPlan
-                  ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                  <span style="font-weight: 500; color: #64748b;">Selected Plan:</span>
-                  <span style="color: #1e293b;">${selectedPlan}</span>
-                </div>
-              `
-                  : ''
-              }
-              
-              ${
-                recommendedPlan
-                  ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                  <span style="font-weight: 500; color: #64748b;">Recommended Plan:</span>
-                  <span style="color: #1e293b;">${recommendedPlan}</span>
-                </div>
-              `
-                  : ''
-              }
-              
-              ${
-                homeSize
-                  ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                  <span style="font-weight: 500; color: #64748b;">Home Size:</span>
-                  <span style="color: #1e293b;">${homeSize.toLocaleString()} sq ft</span>
-                </div>
-              `
-                  : ''
-              }
-              
-              ${
-                estimatedPrice
-                  ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                  <span style="font-weight: 500; color: #64748b;">Estimated Price:</span>
-                  <span style="color: #1e293b;">$${estimatedPrice.min} - $${estimatedPrice.max} (${estimatedPrice.service_type})</span>
-                </div>
-              `
-                  : ''
-              }
-            </div>
-          </div>
-
-          ${
-            leadUrl
-              ? `
-          <!-- Call to Action -->
-          <div style="text-align: center; margin-bottom: 24px;">
-            <a href="${leadUrl}" style="display: inline-block; background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);">
-              View Lead Details →
-            </a>
-          </div>
-          `
-              : ''
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Customer Lead</title>
+        <style>
+          @media only screen and (max-width: 768px) {
+            .section-outer {
+              padding: 0 14px 14px 14px !important;
+            }
+            .section-inner {
+              padding: 18px !important;
+            }
+            .section-table {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            .greeting-section {
+              padding: 30px 14px 20px 14px !important;
+            }
+            .footer-section {
+              padding: 18px !important;
+            }
           }
+        </style>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; background-color: #f5f5f5;">
+        <!-- Email Container -->
+        <table role="presentation" style="width: 100%;">
+          <tr>
+            <td align="center" style="padding: 0;">
+              <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
 
-          <!-- Lead Metrics -->
+                <!-- Header -->
+                <tr>
+                  <td style="background-color: #020618; padding: 50px 20px 30px 20px; text-align: center; border-radius: 6px;">
+                    <h1 style="margin: 0 0 20px 0; font-size: 30px; font-weight: 700; line-height: 30px; color: #ffffff;">New Customer Lead</h1>
+                    <img src="${baseUrl}/images/email/header-logo.png" alt="PMP CENTRAL" style="width: 110px; height: auto; opacity: 0.56;" />
+                  </td>
+                </tr>
 
-          <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
-            <p style="margin: 0; font-size: 14px; color: #64748b; text-align: center;">
-              <strong>Submitted:</strong> ${submittedDate}
-            </p>
-          </div>
+                <!-- Greeting -->
+                <tr>
+                  <td class="greeting-section" style="padding: 30px 30px 20px 30px;">
+                    <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">Hi ${recipientName},</p>
+                  </td>
+                </tr>
 
-          ${
-            !autoCallEnabled
-              ? `
-            <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 16px; text-align: center;">
-              <p style="margin: 0; font-size: 14px; color: #92400e;">
-                ⚡ <strong>Action Required:</strong> This lead needs immediate follow-up. Please contact the customer promptly to maximize conversion potential.
-              </p>
-            </div>
-          `
-              : ''
-          }
-        </div>
+                <!-- Alert Message -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
+                      <strong>This lead needs immediate follow-up.</strong> Please contact the customer promptly to maximize conversion potential.
+                    </p>
+                  </td>
+                </tr>
 
-        <!-- Footer -->
-        <div style="background-color: #f1f5f9; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
-          <p style="margin: 0; font-size: 12px; color: #64748b;">
-            This notification was generated automatically by your widget system.
-            <br>
-            ${companyName} • Lead Management System
-          </p>
-        </div>
-      </div>
-    </body>
+                <!-- Manual Follow-Up Section -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: 6px;">
+                      <tr>
+                        <td class="section-inner" style="text-align: center; padding: 20px;">
+                          <img src="${baseUrl}/images/email/phone-icon.png" alt="Phone" style="width: 26px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
+                          <h2 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Manual Follow-Up Required</h2>
+                          <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
+                            This is a new lead that requires manual follow-up. Please contact the customer as soon as possible.
+                          </p>
+                          <a href="${leadData.leadUrl || '#'}" style="display: inline-block; padding: 12px 30px; background-color: #0080F0; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; line-height: 18px;">Open Lead Ticket</a>
+                          <p style="margin: 20px 0 0 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
+                            <strong>Submitted:</strong> ${new Date(leadData.submittedAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Customer Information Section -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                      <tr>
+                        <td class="section-inner" style="padding: 20px;">
+                          <!-- Section Header with Icon (table-based for compatibility) -->
+                          <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
+                            <tr>
+                              <td style="width: 15px; vertical-align: middle; padding: 0 10px 0 0;">
+                                <img src="${baseUrl}/images/email/customer-icon.png" alt="Customer" style="width: 15px; height: auto; display: block;" />
+                              </td>
+                              <td style="vertical-align: middle; padding: 0;">
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Customer Information</h3>
+                              </td>
+                            </tr>
+                          </table>
+                          <table role="presentation" style="width: 100%;">
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Name:</strong> <span style="color: #020618;">${leadData.customerName}</span></p>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Email:</strong> <a href="mailto:${leadData.customerEmail}" style="color: #020618; text-decoration: underline;">${leadData.customerEmail}</a></p>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Phone:</strong> <a href="tel:${leadData.customerPhone}" style="color: #020618; text-decoration: underline;">${leadData.customerPhone}</a></p>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Address:</strong> <span style="color: #020618;">${leadData.address}</span></p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                ${leadData.pestType ? `
+                <!-- Service Request Section (conditional) -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                      <tr>
+                        <td class="section-inner" style="padding: 20px;">
+                          <!-- Section Header with Icon (table-based for compatibility) -->
+                          <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
+                            <tr>
+                              <td style="width: 19px; vertical-align: middle; padding: 0 10px 0 0;">
+                                <img src="${baseUrl}/images/email/service-request-icon.png" alt="Service" style="width: 19px; height: auto; display: block;" />
+                              </td>
+                              <td style="vertical-align: middle; padding: 0;">
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Service Request</h3>
+                              </td>
+                            </tr>
+                          </table>
+                          <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;">
+                            <strong style="color: #4A5565;">Pest Type:</strong> <span style="color: #020618;">${leadData.pestType}</span>
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                ` : ''}
+
+                <!-- Footer -->
+                <tr>
+                  <td class="footer-section" style="padding: 30px; text-align: center;">
+                    <img src="${baseUrl}/images/email/footer-logo.png" alt="PMP CENTRAL" style="width: 179px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;" />
+                    <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                      This notification was generated automatically by PMPCENTRAL - A Dykstra | Hamel Company
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
     </html>
   `;
 }

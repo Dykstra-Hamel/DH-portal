@@ -57,6 +57,9 @@ export function Breadcrumbs() {
       const pathSegments = pathname.split('/').filter(Boolean);
       const crumbs: BreadcrumbItem[] = [];
 
+      // Clear customer ID by default - will be re-set if viewing a customer-specific page
+      setCustomerId(null);
+
       // Get the primary nav root based on current active nav
       const getPrimaryNavRoot = () => {
         switch (activePrimaryNav) {
@@ -165,6 +168,7 @@ export function Breadcrumbs() {
                 label: 'Tickets',
                 href: '/tickets/calls-and-forms',
               },
+              new: { label: 'New Tickets', href: '/tickets/new' },
               leads: { label: 'Sales Leads', href: '/tickets/leads' },
               scheduling: {
                 label: 'Scheduling',

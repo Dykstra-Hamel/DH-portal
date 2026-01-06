@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useCompany } from '@/contexts/CompanyContext';
 import styles from './GlobalCompanyDropdown.module.scss';
 
@@ -32,6 +33,7 @@ export function GlobalCompanyDropdown() {
     setSelectedCompany,
   } = useCompany();
 
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -78,6 +80,7 @@ export function GlobalCompanyDropdown() {
     setSelectedCompany(company);
     setIsOpen(false);
     setSearchQuery(''); // Clear search when selecting
+    router.push('/tickets/new');
   };
 
   const handleClearSearch = () => {
