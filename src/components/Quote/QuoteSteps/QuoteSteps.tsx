@@ -236,8 +236,8 @@ export default function QuoteSteps({
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -412,10 +412,11 @@ export default function QuoteSteps({
                           </span>
                           <div className={styles.dhPlanHeaderPricing}>
                             <span className={styles.dhPlanHeaderRecurring}>
-                              $
-                              {item.final_recurring_price ||
+                              {formatCurrency(
+                                item.final_recurring_price ||
                                 item.recurring_price ||
-                                0}
+                                0
+                              )}
                               /
                               {abbreviateFrequency(
                                 item.billing_frequency || 'monthly'
@@ -425,10 +426,11 @@ export default function QuoteSteps({
                               |
                             </span>
                             <span className={styles.dhPlanHeaderInitial}>
-                              Initial: $
-                              {item.final_initial_price ||
+                              Initial: {formatCurrency(
+                                item.final_initial_price ||
                                 item.initial_price ||
-                                0}
+                                0
+                              )}
                             </span>
                           </div>
                           <span className={styles.dhPlanHeaderIcon}>
@@ -545,12 +547,11 @@ export default function QuoteSteps({
                               {/* Left: Recurring Price */}
                               <div className={styles.dhPlanPriceLeft}>
                                 <div className={styles.dhPlanPriceRecurring}>
-                                  <span className={styles.dhPriceDollar}>
-                                    $
-                                  </span>
-                                  {item.final_recurring_price ||
+                                  {formatCurrency(
+                                    item.final_recurring_price ||
                                     item.recurring_price ||
-                                    0}
+                                    0
+                                  )}
                                   <div className={styles.dhPriceSuffix}>
                                     <span className={styles.dhPriceAsterisk}>
                                       *
@@ -569,23 +570,19 @@ export default function QuoteSteps({
                               <div className={styles.dhPlanPriceRight}>
                                 <div className={styles.dhPlanPriceInitial}>
                                   Initial Only{' '}
-                                  <span className={styles.dhPriceDollar}>
-                                    $
-                                  </span>
                                   <span className={styles.dhPriceNumber}>
-                                    {item.final_initial_price ||
+                                    {formatCurrency(
+                                      item.final_initial_price ||
                                       item.initial_price ||
-                                      0}
+                                      0
+                                    )}
                                   </span>
                                 </div>
                                 {hasDiscount && (
                                   <div className={styles.dhPlanPriceNormally}>
                                     Normally{' '}
-                                    <span className={styles.dhPriceDollar}>
-                                      $
-                                    </span>
                                     <span className={styles.dhPlanPriceCrossed}>
-                                      {item.initial_price || 0}
+                                      {formatCurrency(item.initial_price || 0)}
                                     </span>
                                   </div>
                                 )}
@@ -1093,10 +1090,11 @@ export default function QuoteSteps({
                           </span>
                           <div className={styles.dhPlanHeaderPricing}>
                             <span className={styles.dhPlanHeaderRecurring}>
-                              $
-                              {item.final_recurring_price ||
+                              {formatCurrency(
+                                item.final_recurring_price ||
                                 item.recurring_price ||
-                                0}
+                                0
+                              )}
                               /
                               {abbreviateFrequency(
                                 item.billing_frequency || 'monthly'
@@ -1106,10 +1104,11 @@ export default function QuoteSteps({
                               |
                             </span>
                             <span className={styles.dhPlanHeaderInitial}>
-                              Initial: $
-                              {item.final_initial_price ||
+                              Initial: {formatCurrency(
+                                item.final_initial_price ||
                                 item.initial_price ||
-                                0}
+                                0
+                              )}
                             </span>
                           </div>
                           <span className={styles.dhPlanHeaderIcon}>
@@ -1226,12 +1225,11 @@ export default function QuoteSteps({
                               {/* Left: Recurring Price */}
                               <div className={styles.dhPlanPriceLeft}>
                                 <div className={styles.dhPlanPriceRecurring}>
-                                  <span className={styles.dhPriceDollar}>
-                                    $
-                                  </span>
-                                  {item.final_recurring_price ||
+                                  {formatCurrency(
+                                    item.final_recurring_price ||
                                     item.recurring_price ||
-                                    0}
+                                    0
+                                  )}
                                   <div className={styles.dhPriceSuffix}>
                                     <span className={styles.dhPriceAsterisk}>
                                       *
@@ -1250,23 +1248,19 @@ export default function QuoteSteps({
                               <div className={styles.dhPlanPriceRight}>
                                 <div className={styles.dhPlanPriceInitial}>
                                   Initial Only{' '}
-                                  <span className={styles.dhPriceDollar}>
-                                    $
-                                  </span>
                                   <span className={styles.dhPriceNumber}>
-                                    {item.final_initial_price ||
+                                    {formatCurrency(
+                                      item.final_initial_price ||
                                       item.initial_price ||
-                                      0}
+                                      0
+                                    )}
                                   </span>
                                 </div>
                                 {hasDiscount && (
                                   <div className={styles.dhPlanPriceNormally}>
                                     Normally{' '}
-                                    <span className={styles.dhPriceDollar}>
-                                      $
-                                    </span>
                                     <span className={styles.dhPlanPriceCrossed}>
-                                      {item.initial_price || 0}
+                                      {formatCurrency(item.initial_price || 0)}
                                     </span>
                                   </div>
                                 )}

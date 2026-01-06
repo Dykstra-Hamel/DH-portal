@@ -18,6 +18,7 @@ interface FieldState {
   value: string;
   isLoading: boolean;
   hasError: boolean;
+  errorMessage?: string;
   showSuccess: boolean;
 }
 
@@ -35,30 +36,35 @@ export default function CustomerInformation({
       value: ticket.customer?.first_name || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     last_name: {
       value: ticket.customer?.last_name || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     email: {
       value: ticket.customer?.email || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     phone: {
       value: ticket.customer?.phone || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     alternate_phone: {
       value: ticket.customer?.alternate_phone || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
   });
@@ -233,18 +239,28 @@ export default function CustomerInformation({
 
           onRequestUndo(undoHandler);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error updating ${fieldName}:`, error);
+
+        // Extract error message from response
+        let errorMessage = 'Failed to update field';
+        if (error?.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+
         updateFieldState(fieldName, {
           isLoading: false,
           hasError: true,
+          errorMessage,
           showSuccess: false,
         });
 
-        // Clear error after 3 seconds
-        setTimeout(() => {
-          updateFieldState(fieldName, { hasError: false });
-        }, 3000);
+        // Show error toast
+        if (onShowToast) {
+          onShowToast(errorMessage, 'error');
+        }
       }
     },
     [ticket.customer?.id, ticket.company_id, onUpdate, onShowToast, onRequestUndo, activityEntityType, activityEntityId]
@@ -263,10 +279,12 @@ export default function CustomerInformation({
     }
 
     // Update local state immediately for responsive UI
+    // Clear error state when user starts typing again
     updateFieldState(fieldName, {
       value: formattedValue,
       showSuccess: false,
       hasError: false,
+      errorMessage: undefined,
     });
 
     // Clear existing timeout
@@ -347,6 +365,9 @@ export default function CustomerInformation({
               />
               <FieldStatusIndicator fieldName="first_name" />
             </div>
+            {fields.first_name.hasError && fields.first_name.errorMessage && (
+              <span className={styles.errorMessage}>{fields.first_name.errorMessage}</span>
+            )}
           </div>
           <div className={styles.formField}>
             <label>Last Name</label>
@@ -360,6 +381,9 @@ export default function CustomerInformation({
               />
               <FieldStatusIndicator fieldName="last_name" />
             </div>
+            {fields.last_name.hasError && fields.last_name.errorMessage && (
+              <span className={styles.errorMessage}>{fields.last_name.errorMessage}</span>
+            )}
           </div>
         </div>
         <div className={styles.formRow}>
@@ -375,6 +399,9 @@ export default function CustomerInformation({
               />
               <FieldStatusIndicator fieldName="phone" />
             </div>
+            {fields.phone.hasError && fields.phone.errorMessage && (
+              <span className={styles.errorMessage}>{fields.phone.errorMessage}</span>
+            )}
           </div>
           <div className={styles.formField}>
             <label>Alternate Phone</label>
@@ -388,6 +415,9 @@ export default function CustomerInformation({
               />
               <FieldStatusIndicator fieldName="alternate_phone" />
             </div>
+            {fields.alternate_phone.hasError && fields.alternate_phone.errorMessage && (
+              <span className={styles.errorMessage}>{fields.alternate_phone.errorMessage}</span>
+            )}
           </div>
         </div>
         <div className={styles.formField}>
@@ -402,6 +432,9 @@ export default function CustomerInformation({
             />
             <FieldStatusIndicator fieldName="email" />
           </div>
+          {fields.email.hasError && fields.email.errorMessage && (
+            <span className={styles.errorMessage}>{fields.email.errorMessage}</span>
+          )}
         </div>
       </div>
     </div>
