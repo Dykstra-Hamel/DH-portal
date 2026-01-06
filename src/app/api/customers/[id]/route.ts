@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { normalizePhoneNumber } from '@/lib/utils';
+import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 
 export async function GET(
   request: NextRequest,
@@ -222,19 +223,24 @@ export async function PUT(
       );
     }
 
-    // Verify user has access to this customer's company
-    const { data: userCompany, error: userCompanyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', existingCustomer.company_id)
-      .single();
+    // Check if user is global admin
+    const isAdmin = await isAuthorizedAdmin(user);
 
-    if (userCompanyError || !userCompany) {
-      return NextResponse.json(
-        { error: 'Access denied to this customer' },
-        { status: 403 }
-      );
+    // Verify user has access to this customer's company (skip for global admins)
+    if (!isAdmin) {
+      const { data: userCompany, error: userCompanyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', existingCustomer.company_id)
+        .single();
+
+      if (userCompanyError || !userCompany) {
+        return NextResponse.json(
+          { error: 'Access denied to this customer' },
+          { status: 403 }
+        );
+      }
     }
 
     // Clean and validate the data before updating
@@ -301,12 +307,45 @@ export async function PUT(
 
     if (error) {
       console.error('Error updating customer:', error);
+
+      // Handle not found
       if (error.code === 'PGRST116') {
         return NextResponse.json(
           { error: 'Customer not found' },
           { status: 404 }
         );
       }
+
+      // Handle unique constraint violations (duplicate data)
+      if (error.code === '23505') {
+        // Check which field caused the duplicate
+        if (error.message?.includes('email') || error.details?.includes('email')) {
+          return NextResponse.json(
+            { error: 'This email address is already in use by another customer' },
+            { status: 409 }
+          );
+        }
+        if (error.message?.includes('phone') || error.details?.includes('phone')) {
+          return NextResponse.json(
+            { error: 'This phone number is already in use by another customer' },
+            { status: 409 }
+          );
+        }
+        return NextResponse.json(
+          { error: 'This value is already in use' },
+          { status: 409 }
+        );
+      }
+
+      // Handle not-null constraint violations
+      if (error.code === '23502') {
+        return NextResponse.json(
+          { error: 'Required field is missing' },
+          { status: 400 }
+        );
+      }
+
+      // Generic error
       return NextResponse.json(
         { error: 'Failed to update customer' },
         { status: 500 }

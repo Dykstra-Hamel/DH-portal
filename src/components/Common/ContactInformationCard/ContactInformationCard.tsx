@@ -29,6 +29,7 @@ interface FieldState {
   value: string;
   isLoading: boolean;
   hasError: boolean;
+  errorMessage?: string;
   showSuccess: boolean;
 }
 
@@ -50,36 +51,42 @@ export function ContactInformationCard({
       value: customer?.first_name || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     last_name: {
       value: customer?.last_name || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     email: {
       value: customer?.email || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     phone: {
       value: customer?.phone || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     alternate_phone: {
       value: customer?.alternate_phone || '',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
     customer_status: {
       value: customer?.customer_status || 'active',
       isLoading: false,
       hasError: false,
+      errorMessage: undefined,
       showSuccess: false,
     },
   });
@@ -248,23 +255,28 @@ export function ContactInformationCard({
 
           onRequestUndo(undoHandler);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error updating ${fieldName}:`, error);
+
+        // Extract error message from response
+        let errorMessage = 'Failed to update field';
+        if (error?.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+
         updateFieldState(fieldName, {
           isLoading: false,
           hasError: true,
+          errorMessage,
           showSuccess: false,
         });
 
         // Show error toast
         if (onShowToast) {
-          onShowToast('Failed to update field', 'error');
+          onShowToast(errorMessage, 'error');
         }
-
-        // Clear error after 3 seconds
-        setTimeout(() => {
-          updateFieldState(fieldName, { hasError: false });
-        }, 3000);
       }
     },
     [customer?.id, companyId, onShowToast, onRequestUndo]
@@ -283,10 +295,12 @@ export function ContactInformationCard({
     }
 
     // Update local state immediately for responsive UI
+    // Clear error state when user starts typing again
     updateFieldState(fieldName, {
       value: formattedValue,
       showSuccess: false,
       hasError: false,
+      errorMessage: undefined,
     });
 
     // Clear existing timeout
@@ -363,16 +377,21 @@ export function ContactInformationCard({
             <div className={styles.callDetailItem}>
               <span className={cardStyles.dataLabel}>First Name</span>
               {editable ? (
-                <div className={styles.inputWrapper}>
-                  <input
-                    type="text"
-                    value={fields.first_name.value}
-                    onChange={(e) => handleFieldChange('first_name', e.target.value)}
-                    className={styles.editableInput}
-                    placeholder="First name"
-                  />
-                  {renderFieldIndicator('first_name')}
-                </div>
+                <>
+                  <div className={styles.inputWrapper}>
+                    <input
+                      type="text"
+                      value={fields.first_name.value}
+                      onChange={(e) => handleFieldChange('first_name', e.target.value)}
+                      className={`${styles.editableInput} ${fields.first_name.hasError ? styles.inputError : ''}`}
+                      placeholder="First name"
+                    />
+                    {renderFieldIndicator('first_name')}
+                  </div>
+                  {fields.first_name.hasError && fields.first_name.errorMessage && (
+                    <span className={styles.errorMessage}>{fields.first_name.errorMessage}</span>
+                  )}
+                </>
               ) : (
                 <span className={cardStyles.dataText}>
                   {customer.first_name || 'Not provided'}
@@ -384,16 +403,21 @@ export function ContactInformationCard({
             <div className={styles.callDetailItem}>
               <span className={cardStyles.dataLabel}>Last Name</span>
               {editable ? (
-                <div className={styles.inputWrapper}>
-                  <input
-                    type="text"
-                    value={fields.last_name.value}
-                    onChange={(e) => handleFieldChange('last_name', e.target.value)}
-                    className={styles.editableInput}
-                    placeholder="Last name"
-                  />
-                  {renderFieldIndicator('last_name')}
-                </div>
+                <>
+                  <div className={styles.inputWrapper}>
+                    <input
+                      type="text"
+                      value={fields.last_name.value}
+                      onChange={(e) => handleFieldChange('last_name', e.target.value)}
+                      className={`${styles.editableInput} ${fields.last_name.hasError ? styles.inputError : ''}`}
+                      placeholder="Last name"
+                    />
+                    {renderFieldIndicator('last_name')}
+                  </div>
+                  {fields.last_name.hasError && fields.last_name.errorMessage && (
+                    <span className={styles.errorMessage}>{fields.last_name.errorMessage}</span>
+                  )}
+                </>
               ) : (
                 <span className={cardStyles.dataText}>
                   {customer.last_name || 'Not provided'}
@@ -405,16 +429,21 @@ export function ContactInformationCard({
             <div className={styles.callDetailItem}>
               <span className={cardStyles.dataLabel}>Phone Number</span>
               {editable ? (
-                <div className={styles.inputWrapper}>
-                  <input
-                    type="tel"
-                    value={fields.phone.value}
-                    onChange={(e) => handleFieldChange('phone', e.target.value)}
-                    className={styles.editableInput}
-                    placeholder="(XXX) XXX-XXXX"
-                  />
-                  {renderFieldIndicator('phone')}
-                </div>
+                <>
+                  <div className={styles.inputWrapper}>
+                    <input
+                      type="tel"
+                      value={fields.phone.value}
+                      onChange={(e) => handleFieldChange('phone', e.target.value)}
+                      className={`${styles.editableInput} ${fields.phone.hasError ? styles.inputError : ''}`}
+                      placeholder="(XXX) XXX-XXXX"
+                    />
+                    {renderFieldIndicator('phone')}
+                  </div>
+                  {fields.phone.hasError && fields.phone.errorMessage && (
+                    <span className={styles.errorMessage}>{fields.phone.errorMessage}</span>
+                  )}
+                </>
               ) : (
                 <span className={cardStyles.dataText}>
                   {getPhoneDisplay(customer.phone)}
@@ -426,16 +455,21 @@ export function ContactInformationCard({
             <div className={styles.callDetailItem}>
               <span className={cardStyles.dataLabel}>Alternate Phone</span>
               {editable ? (
-                <div className={styles.inputWrapper}>
-                  <input
-                    type="tel"
-                    value={fields.alternate_phone.value}
-                    onChange={(e) => handleFieldChange('alternate_phone', e.target.value)}
-                    className={styles.editableInput}
-                    placeholder="(XXX) XXX-XXXX"
-                  />
-                  {renderFieldIndicator('alternate_phone')}
-                </div>
+                <>
+                  <div className={styles.inputWrapper}>
+                    <input
+                      type="tel"
+                      value={fields.alternate_phone.value}
+                      onChange={(e) => handleFieldChange('alternate_phone', e.target.value)}
+                      className={`${styles.editableInput} ${fields.alternate_phone.hasError ? styles.inputError : ''}`}
+                      placeholder="(XXX) XXX-XXXX"
+                    />
+                    {renderFieldIndicator('alternate_phone')}
+                  </div>
+                  {fields.alternate_phone.hasError && fields.alternate_phone.errorMessage && (
+                    <span className={styles.errorMessage}>{fields.alternate_phone.errorMessage}</span>
+                  )}
+                </>
               ) : (
                 <span className={cardStyles.dataText}>
                   {getPhoneDisplay(customer.alternate_phone)}
@@ -447,16 +481,21 @@ export function ContactInformationCard({
             <div className={styles.callDetailItem}>
               <span className={cardStyles.dataLabel}>Email</span>
               {editable ? (
-                <div className={styles.inputWrapper}>
-                  <input
-                    type="email"
-                    value={fields.email.value}
-                    onChange={(e) => handleFieldChange('email', e.target.value)}
-                    className={styles.editableInput}
-                    placeholder="email@example.com"
-                  />
-                  {renderFieldIndicator('email')}
-                </div>
+                <>
+                  <div className={styles.inputWrapper}>
+                    <input
+                      type="email"
+                      value={fields.email.value}
+                      onChange={(e) => handleFieldChange('email', e.target.value)}
+                      className={`${styles.editableInput} ${fields.email.hasError ? styles.inputError : ''}`}
+                      placeholder="email@example.com"
+                    />
+                    {renderFieldIndicator('email')}
+                  </div>
+                  {fields.email.hasError && fields.email.errorMessage && (
+                    <span className={styles.errorMessage}>{fields.email.errorMessage}</span>
+                  )}
+                </>
               ) : (
                 <span className={cardStyles.dataText}>
                   {customer.email || 'Not provided'}

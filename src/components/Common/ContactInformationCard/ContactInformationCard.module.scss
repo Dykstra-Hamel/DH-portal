@@ -42,6 +42,15 @@
   &::placeholder {
     color: #9ca3af;
   }
+
+  &.inputError {
+    border-color: #ef4444;
+
+    &:focus {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+  }
 }
 
 .editableSelect {
@@ -71,4 +80,12 @@
 .errorIcon {
   color: #ef4444;
   flex-shrink: 0;
+}
+
+.errorMessage {
+  display: block;
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 4px;
+  line-height: 1.4;
 }
