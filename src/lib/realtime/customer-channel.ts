@@ -77,23 +77,13 @@ export function subscribeToCustomerUpdates(
 }
 
 /**
- * Removes a customer channel subscription and cleans up the channel
+ * Removes a customer channel subscription
+ * Note: This doesn't actually unsubscribe since multiple components may be using the channel
+ * The channel will be cleaned up when the page unmounts
  */
 export async function removeCustomerChannel(
   channel: RealtimeChannel
 ): Promise<void> {
-  try {
-    // Unsubscribe from the channel
-    await channel.unsubscribe();
-
-    // Remove from registry by finding the channel key
-    for (const [key, registeredChannel] of channelRegistry.entries()) {
-      if (registeredChannel === channel) {
-        channelRegistry.delete(key);
-        break;
-      }
-    }
-  } catch (error) {
-    console.error('Error removing customer channel:', error);
-  }
+  // Don't actually unsubscribe - keep the channel alive for other components
+  // The channel will be automatically cleaned up when the page unmounts
 }
