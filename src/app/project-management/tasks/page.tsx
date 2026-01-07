@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useUser } from '@/hooks/useUser';
+import { useCompany } from '@/contexts/CompanyContext';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { CalendarView } from '@/components/TaskManagement/CalendarView/CalendarView';
 import { ArchiveView } from '@/components/TaskManagement/ArchiveView/ArchiveView';
@@ -18,6 +19,7 @@ type ViewType = 'list' | 'calendar' | 'archive';
 export default function TasksPage() {
   const { registerPageAction } = usePageActions();
   const { user } = useUser();
+  const { selectedCompany } = useCompany();
   const [currentView, setCurrentView] = useState<ViewType>('list');
   const [showMyTasksOnly, setShowMyTasksOnly] = useState(true);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -46,6 +48,58 @@ export default function TasksPage() {
       // Cleanup function not needed as PageActionsProvider handles cleanup
     };
   }, [registerPageAction]);
+
+  // Fetch tasks and projects from API
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!selectedCompany?.id) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch tasks
+        const tasksResponse = await fetch(`/api/tasks?companyId=${selectedCompany.id}`);
+        if (tasksResponse.ok) {
+          const tasksData = await tasksResponse.json();
+          // Ensure tasksData is an array before setting
+          if (Array.isArray(tasksData)) {
+            setTasks(tasksData);
+          } else {
+            console.error('Tasks API returned non-array data:', tasksData);
+            setTasks([]);
+          }
+        } else {
+          console.error('Error fetching tasks:', await tasksResponse.text());
+          setTasks([]);
+        }
+
+        // Fetch projects - use regular projects endpoint with companyId parameter
+        const projectsResponse = await fetch(`/api/projects?companyId=${selectedCompany.id}`);
+        if (projectsResponse.ok) {
+          const projectsData = await projectsResponse.json();
+          // Ensure projectsData is an array before setting
+          if (Array.isArray(projectsData)) {
+            setProjects(projectsData);
+          } else {
+            console.error('Projects API returned non-array data:', projectsData);
+            setProjects([]);
+          }
+        } else {
+          console.error('Error fetching projects:', await projectsResponse.text());
+          setProjects([]);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setTasks([]);
+        setProjects([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selectedCompany?.id]);
 
   const handleSaveTask = useCallback((taskData: Partial<Task>) => {
     if (taskData.id) {

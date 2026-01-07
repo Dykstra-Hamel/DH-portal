@@ -23,9 +23,9 @@ export function generateUnsubscribeFooter(
 
   return `
 <!-- Unsubscribe Footer -->
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 40px; border-top: 1px solid #dddddd;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 18px;">
   <tr>
-    <td style="padding: 20px; background-color: #f4f4f4; text-align: center;">
+    <td style="padding-bottom: 20px; text-align: center;">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td style="padding: 0 0 10px 0;">

@@ -61,21 +61,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the webhook is from Retell using signature verification
-    const retellWebhookSecret = process.env.RETELL_WEBHOOK_SECRET;
+    // SIGNATURE VALIDATION - Company-Specific
     const signature = request.headers.get('x-retell-signature');
-
-    if (!retellWebhookSecret || !signature) {
-      console.error(`❌ [${requestId}] Webhook authentication not configured`);
-    }
-
-    if (!retellWebhookSecret) {
-      console.error(`❌ [${requestId}] RETELL_WEBHOOK_SECRET not configured`);
-      return NextResponse.json(
-        { error: 'Webhook authentication not configured' },
-        { status: 500 }
-      );
-    }
 
     if (!signature) {
       console.error(`❌ [${requestId}] Missing signature header`);
@@ -85,28 +72,80 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const payload = await request.json();
+    // Parse payload to identify company (needed before we can validate signature)
+    const bodyText = await request.text();
+    let payload;
+    try {
+      payload = JSON.parse(bodyText);
+    } catch (error) {
+      console.error(`❌ [${requestId}] Invalid JSON payload`);
+      return NextResponse.json(
+        { error: 'Invalid JSON payload' },
+        { status: 400 }
+      );
+    }
 
-    // Verify webhook signature using Retell SDK
+    // Extract agent ID to identify company
+    const callData = payload.call || payload;
+    const agentIdValue = callData.agent_id || callData.retell_llm_id || callData.llm_id || payload.agent_id;
+
+    if (!agentIdValue) {
+      console.error(`❌ [${requestId}] No agent_id in payload`);
+      return NextResponse.json(
+        { error: 'agent_id required in payload' },
+        { status: 400 }
+      );
+    }
+
+    // Look up company from agent ID
+    const { company_id: companyId } = await findCompanyAndDirectionByAgentId(agentIdValue);
+
+    if (!companyId) {
+      console.error(`❌ [${requestId}] Company not found for agent: ${agentIdValue}`);
+      return NextResponse.json(
+        { error: 'Company not found for agent ID' },
+        { status: 404 }
+      );
+    }
+
+    // Get company's Retell API key (which is also the webhook secret)
+    const supabase = createAdminClient();
+    const { data: apiKeySetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'retell_api_key')
+      .single();
+
+    if (!apiKeySetting?.setting_value) {
+      console.error(`❌ [${requestId}] Retell API key not configured for company: ${companyId}`);
+      return NextResponse.json(
+        { error: 'Retell API key not configured for company' },
+        { status: 500 }
+      );
+    }
+
+    // Verify signature using company-specific API key (which serves as webhook secret)
     const isValidSignature = Retell.verify(
-      JSON.stringify(payload),
-      retellWebhookSecret,
+      bodyText, // Use original body text, not re-stringified
+      apiKeySetting.setting_value,
       signature
     );
 
     if (!isValidSignature) {
-      console.error(`❌ [${requestId}] Invalid webhook signature`);
+      console.error(`❌ [${requestId}] Invalid webhook signature for company: ${companyId}`);
       return NextResponse.json(
         { error: 'Invalid webhook signature' },
         { status: 401 }
       );
     }
 
+    console.log(`✅ [${requestId}] Signature validated for company: ${companyId}`);
+
     // Get event type - Retell sends this as 'event' at top level
     const eventType = payload.event;
 
-    // Extract data from the nested call object
-    const callData = payload.call || payload;
+    // Extract call_id (callData already extracted during signature validation)
     const { call_id } = callData;
 
     if (!call_id) {
@@ -116,8 +155,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const supabase = createAdminClient();
 
     // Add request ID to context for downstream functions
     callData._requestId = requestId;
