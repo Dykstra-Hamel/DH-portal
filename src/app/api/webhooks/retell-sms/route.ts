@@ -27,18 +27,10 @@ interface RetellSMSWebhookPayload {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify the webhook is from Retell with proper authentication
+    // AUTHENTICATION - Company-Specific (Bearer token method)
     const authHeader = request.headers.get('authorization');
-    const retellWebhookSecret = process.env.RETELL_WEBHOOK_SECRET;
-    
-    if (!retellWebhookSecret) {
-      return NextResponse.json(
-        { error: 'Webhook secret not configured' },
-        { status: 500 }
-      );
-    }
-    
-    // Validate authorization header
+
+    // Validate authorization header format
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('Retell SMS Webhook: Missing or invalid authorization header');
       return NextResponse.json(
@@ -46,34 +38,82 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-    
+
     const token = authHeader.replace('Bearer ', '');
-    
-    // Use constant-time comparison to prevent timing attacks
-    const expectedToken = Buffer.from(retellWebhookSecret, 'utf8');
-    const providedToken = Buffer.from(token, 'utf8');
-    
-    // Ensure buffers are the same length to prevent length-based timing attacks
-    if (expectedToken.length !== providedToken.length) {
-      console.error('Retell SMS Webhook: Invalid webhook secret');
+
+    // Parse payload to identify company (needed before we can validate token)
+    const payload: RetellSMSWebhookPayload = await request.json();
+
+    // Extract agent ID to identify company
+    const agentId = payload.agent_id;
+
+    if (!agentId) {
+      console.error('Retell SMS Webhook: No agent_id in payload');
       return NextResponse.json(
-        { error: 'Unauthorized - invalid token' },
-        { status: 401 }
+        { error: 'agent_id required in payload' },
+        { status: 400 }
       );
     }
-    
-    // Use crypto.timingSafeEqual for constant-time comparison
-    const { timingSafeEqual } = await import('crypto');
-    if (!timingSafeEqual(expectedToken, providedToken)) {
-      console.error('Retell SMS Webhook: Invalid webhook secret');
+
+    // Look up company from agent ID
+    const supabase = createAdminClient();
+    const { data: agent } = await supabase
+      .from('agents')
+      .select('company_id')
+      .eq('agent_id', agentId)
+      .eq('is_active', true)
+      .single();
+
+    if (!agent?.company_id) {
+      console.error(`Retell SMS Webhook: Company not found for agent: ${agentId}`);
+      return NextResponse.json(
+        { error: 'Company not found for agent ID' },
+        { status: 404 }
+      );
+    }
+
+    const companyId = agent.company_id;
+
+    // Get company's Retell API key (which is also the webhook secret)
+    const { data: apiKeySetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'retell_api_key')
+      .single();
+
+    if (!apiKeySetting?.setting_value) {
+      console.error(`Retell SMS Webhook: Retell API key not configured for company: ${companyId}`);
+      return NextResponse.json(
+        { error: 'Retell API key not configured for company' },
+        { status: 500 }
+      );
+    }
+
+    // Validate token using constant-time comparison to prevent timing attacks
+    const expectedToken = Buffer.from(apiKeySetting.setting_value, 'utf8');
+    const providedToken = Buffer.from(token, 'utf8');
+
+    // Ensure buffers are the same length to prevent length-based timing attacks
+    if (expectedToken.length !== providedToken.length) {
+      console.error(`Retell SMS Webhook: Invalid token for company: ${companyId}`);
       return NextResponse.json(
         { error: 'Unauthorized - invalid token' },
         { status: 401 }
       );
     }
 
-    const payload: RetellSMSWebhookPayload = await request.json();
-    const supabase = createAdminClient();
+    // Use crypto.timingSafeEqual for constant-time comparison
+    const { timingSafeEqual } = await import('crypto');
+    if (!timingSafeEqual(expectedToken, providedToken)) {
+      console.error(`Retell SMS Webhook: Invalid token for company: ${companyId}`);
+      return NextResponse.json(
+        { error: 'Unauthorized - invalid token' },
+        { status: 401 }
+      );
+    }
+
+    console.log(`✅ Retell SMS Webhook: Token validated for company: ${companyId}`);
     
     console.log('Received Retell SMS webhook:', payload.event, payload.chat_id);
 
