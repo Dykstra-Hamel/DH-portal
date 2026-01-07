@@ -11,19 +11,10 @@ function calculateBillableDuration(durationSeconds: number | null): number | nul
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify the webhook is from Retell with proper authentication
+    // AUTHENTICATION - Company-Specific (Bearer token method)
     const authHeader = request.headers.get('authorization');
-    const retellWebhookSecret = process.env.RETELL_WEBHOOK_SECRET;
-    
-    if (!retellWebhookSecret) {
-      console.error('Retell Outbound Webhook: RETELL_WEBHOOK_SECRET not configured');
-      return NextResponse.json(
-        { error: 'Webhook secret not configured' },
-        { status: 500 }
-      );
-    }
-    
-    // Validate authorization header
+
+    // Validate authorization header format
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('Retell Outbound Webhook: Missing or invalid authorization header');
       return NextResponse.json(
@@ -31,39 +22,81 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-    
+
     const token = authHeader.replace('Bearer ', '');
-    
-    // Use constant-time comparison to prevent timing attacks
-    const expectedToken = Buffer.from(retellWebhookSecret, 'utf8');
-    const providedToken = Buffer.from(token, 'utf8');
-    
-    // Ensure buffers are the same length to prevent length-based timing attacks
-    if (expectedToken.length !== providedToken.length) {
-      console.error('Retell Outbound Webhook: Invalid webhook secret');
+
+    // Parse payload to identify company (needed before we can validate token)
+    const payload = await request.json();
+
+    // Extract agent ID to identify company
+    const callData = payload.call || payload;
+    const agentIdValue = callData.agent_id || callData.retell_llm_id || callData.llm_id || payload.agent_id;
+
+    if (!agentIdValue) {
+      console.error('Retell Outbound Webhook: No agent_id in payload');
       return NextResponse.json(
-        { error: 'Unauthorized - invalid token' },
-        { status: 401 }
+        { error: 'agent_id required in payload' },
+        { status: 400 }
       );
     }
-    
-    // Use crypto.timingSafeEqual for constant-time comparison
-    const { timingSafeEqual } = await import('crypto');
-    if (!timingSafeEqual(expectedToken, providedToken)) {
-      console.error('Retell Outbound Webhook: Invalid webhook secret');
+
+    // Look up company from agent ID
+    const companyId = await findCompanyByAgentId(agentIdValue);
+
+    if (!companyId) {
+      console.error(`Retell Outbound Webhook: Company not found for agent: ${agentIdValue}`);
+      return NextResponse.json(
+        { error: 'Company not found for agent ID' },
+        { status: 404 }
+      );
+    }
+
+    // Get company's Retell API key (which is also the webhook secret)
+    const supabase = createAdminClient();
+    const { data: apiKeySetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'retell_api_key')
+      .single();
+
+    if (!apiKeySetting?.setting_value) {
+      console.error(`Retell Outbound Webhook: Retell API key not configured for company: ${companyId}`);
+      return NextResponse.json(
+        { error: 'Retell API key not configured for company' },
+        { status: 500 }
+      );
+    }
+
+    // Validate token using constant-time comparison to prevent timing attacks
+    const expectedToken = Buffer.from(apiKeySetting.setting_value, 'utf8');
+    const providedToken = Buffer.from(token, 'utf8');
+
+    // Ensure buffers are the same length to prevent length-based timing attacks
+    if (expectedToken.length !== providedToken.length) {
+      console.error(`Retell Outbound Webhook: Invalid token for company: ${companyId}`);
       return NextResponse.json(
         { error: 'Unauthorized - invalid token' },
         { status: 401 }
       );
     }
 
-    const payload = await request.json();
+    // Use crypto.timingSafeEqual for constant-time comparison
+    const { timingSafeEqual } = await import('crypto');
+    if (!timingSafeEqual(expectedToken, providedToken)) {
+      console.error(`Retell Outbound Webhook: Invalid token for company: ${companyId}`);
+      return NextResponse.json(
+        { error: 'Unauthorized - invalid token' },
+        { status: 401 }
+      );
+    }
+
+    console.log(`✅ Retell Outbound Webhook: Token validated for company: ${companyId}`);
 
     // Get event type - Retell sends this as 'event' at top level
     const eventType = payload.event;
 
-    // Extract data from the nested call object
-    const callData = payload.call || payload;
+    // Extract call_id (callData already extracted during authentication)
     const { call_id } = callData;
 
     if (!call_id) {
@@ -73,8 +106,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const supabase = createAdminClient();
 
     // Handle different event types for outbound calls
     switch (eventType) {
