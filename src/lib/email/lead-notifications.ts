@@ -119,7 +119,7 @@ function generateSubjectLine(
 ): string {
   // Default templates based on notification type
   const defaultTemplates = {
-    lead_created: 'New Service Request: {customerName} - {companyName}',
+    lead_created: 'New Lead: {customerName}',
     lead_status_changed_scheduling: 'Ready to Schedule: {customerName} - {companyName}',
   };
 
