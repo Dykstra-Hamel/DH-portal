@@ -73,7 +73,10 @@ export class SMSService {
 
         if (existingConversation) {
           // Check the actual status on Retell's end
-          const retellStatus = await this.getRetellChatStatus(existingConversation.sms_id);
+          const retellStatus = await this.getRetellChatStatus(
+            options.companyId,
+            existingConversation.sms_id
+          );
           
           if (retellStatus.success) {
             if (retellStatus.status === 'ongoing') {
@@ -145,17 +148,20 @@ export class SMSService {
       }
 
       // Create conversation via Retell API
-      const retellResult = await this.callRetellSMSAPI({
-        from_number: retellNumber,
-        to_number: options.customerNumber,
-        override_agent_id: finalAgentId,
-        metadata: {
-          ...options.metadata,
-          company_id: options.companyId,
-          source: 'dh_portal',
-        },
-        retell_llm_dynamic_variables: options.dynamicVariables || {},
-      });
+      const retellResult = await this.callRetellSMSAPI(
+        options.companyId,
+        {
+          from_number: retellNumber,
+          to_number: options.customerNumber,
+          override_agent_id: finalAgentId,
+          metadata: {
+            ...options.metadata,
+            company_id: options.companyId,
+            source: 'dh_portal',
+          },
+          retell_llm_dynamic_variables: options.dynamicVariables || {},
+        }
+      );
 
       if (!retellResult.success) {
         return retellResult;
@@ -314,10 +320,10 @@ export class SMSService {
     error?: string;
   }> {
     try {
-      // Get the conversation to find the SMS ID
+      // Get the conversation to find the SMS ID and company ID
       const { data: conversation, error } = await this.supabase
         .from('sms_conversations')
-        .select('sms_id, status')
+        .select('sms_id, status, company_id')
         .eq('id', conversationId)
         .single();
 
@@ -336,7 +342,10 @@ export class SMSService {
       }
 
       // End the conversation on Retell
-      const retellResult = await this.endRetellChat(conversation.sms_id);
+      const retellResult = await this.endRetellChat(
+        conversation.company_id,
+        conversation.sms_id
+      );
       
       if (!retellResult.success) {
         console.warn(`Failed to end conversation on Retell: ${retellResult.error}`);
@@ -450,16 +459,31 @@ export class SMSService {
   /**
    * Check the actual status of a chat conversation on Retell
    */
-  private async getRetellChatStatus(chatId: string): Promise<{
+  private async getRetellChatStatus(
+    companyId: string,
+    chatId: string
+  ): Promise<{
     success: boolean;
     status?: 'ongoing' | 'ended' | string;
     error?: string;
   }> {
     try {
-      const retellApiKey = process.env.RETELL_API_KEY;
-      if (!retellApiKey) {
-        return { success: false, error: 'Retell API key not configured' };
+      // Get company's Retell API key from database
+      const { data: apiKeySetting } = await this.supabase
+        .from('company_settings')
+        .select('setting_value')
+        .eq('company_id', companyId)
+        .eq('setting_key', 'retell_api_key')
+        .single();
+
+      if (!apiKeySetting?.setting_value) {
+        return {
+          success: false,
+          error: 'Retell API key not configured for company'
+        };
       }
+
+      const retellApiKey = apiKeySetting.setting_value;
 
       const response = await fetch(`https://api.retellai.com/get-chat/${chatId}`, {
         method: 'GET',
@@ -500,15 +524,30 @@ export class SMSService {
   /**
    * End a chat conversation on Retell
    */
-  private async endRetellChat(chatId: string): Promise<{
+  private async endRetellChat(
+    companyId: string,
+    chatId: string
+  ): Promise<{
     success: boolean;
     error?: string;
   }> {
     try {
-      const retellApiKey = process.env.RETELL_API_KEY;
-      if (!retellApiKey) {
-        return { success: false, error: 'Retell API key not configured' };
+      // Get company's Retell API key from database
+      const { data: apiKeySetting } = await this.supabase
+        .from('company_settings')
+        .select('setting_value')
+        .eq('company_id', companyId)
+        .eq('setting_key', 'retell_api_key')
+        .single();
+
+      if (!apiKeySetting?.setting_value) {
+        return {
+          success: false,
+          error: 'Retell API key not configured for company'
+        };
       }
+
+      const retellApiKey = apiKeySetting.setting_value;
 
       const response = await fetch('https://api.retellai.com/end-chat', {
         method: 'POST',
@@ -547,22 +586,37 @@ export class SMSService {
     }
   }
 
-  private async callRetellSMSAPI(payload: {
-    from_number: string;
-    to_number: string;
-    override_agent_id: string;
-    metadata?: Record<string, any>;
-    retell_llm_dynamic_variables?: Record<string, any>;
-  }): Promise<{
+  private async callRetellSMSAPI(
+    companyId: string,
+    payload: {
+      from_number: string;
+      to_number: string;
+      override_agent_id: string;
+      metadata?: Record<string, any>;
+      retell_llm_dynamic_variables?: Record<string, any>;
+    }
+  ): Promise<{
     success: boolean;
     smsId?: string;
     error?: string;
   }> {
     try {
-      const retellApiKey = process.env.RETELL_API_KEY;
-      if (!retellApiKey) {
-        return { success: false, error: 'Retell API key not configured' };
+      // Get company's Retell API key from database
+      const { data: apiKeySetting } = await this.supabase
+        .from('company_settings')
+        .select('setting_value')
+        .eq('company_id', companyId)
+        .eq('setting_key', 'retell_api_key')
+        .single();
+
+      if (!apiKeySetting?.setting_value) {
+        return {
+          success: false,
+          error: 'Retell API key not configured for company'
+        };
       }
+
+      const retellApiKey = apiKeySetting.setting_value;
 
       const response = await fetch('https://api.retellai.com/create-sms-chat', {
         method: 'POST',
