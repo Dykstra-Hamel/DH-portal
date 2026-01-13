@@ -89,6 +89,15 @@ export default function PlanDetails({
   onContinue,
   sortedLineItems,
 }: PlanDetailsProps) {
+  // State for FAQ tabs
+  const [activeFaqTab, setActiveFaqTab] = useState(0);
+
+  // Get plans with FAQs
+  const plansWithFaqs = sortedLineItems.filter(
+    (item: any) =>
+      item.service_plan?.plan_faqs && item.service_plan.plan_faqs.length > 0
+  );
+
   return (
     <>
       {/* Plans Container */}
@@ -380,25 +389,72 @@ export default function PlanDetails({
         </button>
       </div>
 
-      {/* Consolidated Plan FAQs */}
-      {sortedLineItems.some(
-        (item: any) =>
-          item.service_plan?.plan_faqs && item.service_plan.plan_faqs.length > 0
-      ) && (
+      {/* Plan FAQs - Single or Tabbed Layout */}
+      {plansWithFaqs.length > 0 && (
         <div className={styles.faqsSection}>
-          <h2 className={styles.faqsTitle}>Frequently Asked Questions</h2>
-          <div className={styles.faqsContainer}>
-            {sortedLineItems.map((item: any, itemIndex: number) =>
-              item.service_plan?.plan_faqs &&
-              item.service_plan.plan_faqs.length > 0
-                ? item.service_plan.plan_faqs.map(
-                    (faq: any, faqIndex: number) => (
-                      <FaqItem key={`${itemIndex}-${faqIndex}`} faq={faq} />
-                    )
+          {plansWithFaqs.length === 1 ? (
+            /* Single plan: Show all FAQs aggregated */
+            <>
+              <h2 className={styles.faqsTitle}>Frequently Asked Questions</h2>
+              <div className={styles.faqsContainer}>
+                {plansWithFaqs[0].service_plan.plan_faqs.map(
+                  (faq: any, faqIndex: number) => (
+                    <FaqItem key={faqIndex} faq={faq} />
                   )
-                : null
-            )}
-          </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* Multiple plans: Show sidebar with buttons */
+            <>
+              <h2 className={styles.faqsTitle}>Frequently Asked Questions</h2>
+
+              {/* Mobile Dropdown (visible on mobile only) */}
+              <div className={styles.faqDropdownContainer}>
+                <label htmlFor="faq-plan-select" className={styles.faqDropdownLabel}>
+                  Choose A Plan To View FAQs:
+                </label>
+                <select
+                  id="faq-plan-select"
+                  className={styles.faqDropdown}
+                  value={activeFaqTab}
+                  onChange={(e) => setActiveFaqTab(Number(e.target.value))}
+                >
+                  {plansWithFaqs.map((item: any, tabIndex: number) => (
+                    <option key={tabIndex} value={tabIndex}>
+                      {item.plan_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.faqsLayoutGrid}>
+                {/* Left: Plan Buttons (hidden on mobile) */}
+                <div className={styles.faqsSidebar}>
+                  {plansWithFaqs.map((item: any, tabIndex: number) => (
+                    <button
+                      key={tabIndex}
+                      className={`${styles.faqTabButton} ${
+                        activeFaqTab === tabIndex ? styles.faqTabButtonActive : ''
+                      }`}
+                      onClick={() => setActiveFaqTab(tabIndex)}
+                    >
+                      {item.plan_name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Right: FAQ Content */}
+                <div className={styles.faqsContainer}>
+                  {plansWithFaqs[activeFaqTab]?.service_plan?.plan_faqs?.map(
+                    (faq: any, faqIndex: number) => (
+                      <FaqItem key={faqIndex} faq={faq} />
+                    )
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </>
