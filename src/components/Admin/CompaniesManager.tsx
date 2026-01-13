@@ -44,6 +44,7 @@ export default function CompaniesManager() {
   const [googlePlacesListings, setGooglePlacesListings] = useState<GooglePlaceListing[]>([]);
   const [websites, setWebsites] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -279,6 +280,21 @@ export default function CompaniesManager() {
     }
   };
 
+  // Filter and sort companies
+  const filteredAndSortedCompanies = companies
+    .filter(company => {
+      if (!searchQuery) return true;
+
+      const query = searchQuery.toLowerCase();
+      const nameMatch = company.name.toLowerCase().includes(query);
+      const websiteMatch = company.website?.some(w => w.toLowerCase().includes(query));
+      const emailMatch = company.email?.toLowerCase().includes(query);
+      const industryMatch = company.industry?.toLowerCase().includes(query);
+
+      return nameMatch || websiteMatch || emailMatch || industryMatch;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   if (loading) {
     return <div>Loading companies...</div>;
   }
@@ -474,6 +490,22 @@ export default function CompaniesManager() {
         </div>
       )}
 
+      <div className={styles.formGroup} style={{ marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="Search companies by name, website, email, or industry..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            fontSize: '14px',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            outline: 'none',
+          }}
+        />
+      </div>
 
       <div className={styles.table}>
         <table>
@@ -490,7 +522,7 @@ export default function CompaniesManager() {
             </tr>
           </thead>
           <tbody>
-            {companies.map(company => (
+            {filteredAndSortedCompanies.map(company => (
               <tr key={company.id}>
                 <td>{company.name}</td>
                 <td>

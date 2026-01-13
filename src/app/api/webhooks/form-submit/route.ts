@@ -450,6 +450,7 @@ export async function POST(request: NextRequest) {
       const leadData: any = {
         company_id: companyId,
         customer_id: customerId,
+        service_address_id: serviceAddressId,
         campaign_id: campaign.id, // Store campaign UUID for proper FK relationship
         lead_source: 'campaign',
         lead_type: 'web_form',

@@ -37,13 +37,19 @@ export async function GET(
     // Fetch the quote with all related data
     const { data: quote, error } = await supabase
       .from('quotes')
-      .select(`
+      .select(
+        `
         *,
         line_items:quote_line_items(
           *,
           service_plan:service_plans(
             plan_features,
-            plan_faqs
+            plan_faqs,
+            plan_image_url,
+            plan_disclaimer
+          ),
+          addon_service:add_on_services(
+            addon_description
           )
         ),
         customer:customers(
@@ -82,16 +88,14 @@ export async function GET(
           phone,
           website
         )
-      `)
+      `
+      )
       .eq('id', id)
       .single();
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Quote not found' },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
       }
 
       console.error('Error fetching public quote:', error);

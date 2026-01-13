@@ -15,6 +15,7 @@ import {
   Mail,
   PenLine,
   ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useActiveSection } from '@/contexts/ActiveSectionContext';
@@ -297,8 +298,11 @@ export function LeadQuoteSection({
           if (!lineItem) return selection;
 
           // Check if we need to update (frequency or discount are empty and data is available)
-          const hasFrequencyData = lineItem.service_frequency || selection.servicePlan?.treatment_frequency;
-          const hasDiscountData = lineItem.discount_id || lineItem.discount_percentage;
+          const hasFrequencyData =
+            lineItem.service_frequency ||
+            selection.servicePlan?.treatment_frequency;
+          const hasDiscountData =
+            lineItem.discount_id || lineItem.discount_percentage;
 
           const needsUpdate =
             (!selection.frequency && hasFrequencyData) ||
@@ -498,7 +502,8 @@ export function LeadQuoteSection({
         );
 
         // Use service_frequency from line item, fall back to treatment_frequency from service plan
-        const frequency = lineItem.service_frequency || servicePlan?.treatment_frequency || '';
+        const frequency =
+          lineItem.service_frequency || servicePlan?.treatment_frequency || '';
 
         return {
           id: (index + 1).toString(),
@@ -1057,1055 +1062,1403 @@ export function LeadQuoteSection({
         isCollapsible={true}
         startExpanded={true}
       >
-      <div
-        className={styles.cardContent}
-        data-sidebar-expanded={isSidebarExpanded}
-      >
-        {/* Pest Selection Section */}
-        <div className={styles.section}>
-          {loadingPlan && (
-            <div className={styles.loadingOverlay}>
-              <div className={styles.loadingText}>Updating service plan...</div>
-            </div>
-          )}
-          {loadingPestOptions ? (
-            <div className={cardStyles.lightText}>Loading pest options...</div>
-          ) : (
-            <div className={styles.pestSelectRow}>
-              {/* Primary Pest Section */}
-              <PestSelection
-                selectedPestId={selectedPests[0] || null}
-                pestOptions={pestOptions}
-                onPestChange={async pestId => {
-                  if (pestId) {
-                    // Update primary pest
-                    setSelectedPests([pestId, ...additionalPests]);
-                    await updatePrimaryPest(pestId);
+        <div
+          className={styles.cardContent}
+          data-sidebar-expanded={isSidebarExpanded}
+        >
+          {/* Pest Selection Section */}
+          <div className={styles.section}>
+            {loadingPlan && (
+              <div className={styles.loadingOverlay}>
+                <div className={styles.loadingText}>
+                  Updating service plan...
+                </div>
+              </div>
+            )}
+            {loadingPestOptions ? (
+              <div className={cardStyles.lightText}>
+                Loading pest options...
+              </div>
+            ) : (
+              <div className={styles.pestSelectRow}>
+                {/* Primary Pest Section */}
+                <PestSelection
+                  selectedPestId={selectedPests[0] || null}
+                  pestOptions={pestOptions}
+                  onPestChange={async pestId => {
+                    if (pestId) {
+                      // Update primary pest
+                      setSelectedPests([pestId, ...additionalPests]);
+                      await updatePrimaryPest(pestId);
 
-                    // Auto-select service plan ONLY if quote has no line items yet
-                    if (quote && (!quote.line_items || quote.line_items.length === 0)) {
-                      try {
-                        setLoadingPlan(true);
-                        const response = await adminAPI.getServicePlansByPest(
-                          lead.company_id,
-                          pestId
-                        );
-
-                        if (response.success && response.cheapest_plan) {
-                          // Cross-reference with allServicePlans to get complete plan data
-                          const fullPlan =
-                            allServicePlans.find(p => p.id === response.cheapest_plan.id) ||
-                            response.cheapest_plan;
-
-                          // Update first service selection with complete plan data
-                          setServiceSelections(prev =>
-                            prev.map((sel, idx) =>
-                              idx === 0 ? { ...sel, servicePlan: fullPlan } : sel
-                            )
+                      // Auto-select service plan ONLY if quote has no line items yet
+                      if (
+                        quote &&
+                        (!quote.line_items || quote.line_items.length === 0)
+                      ) {
+                        try {
+                          setLoadingPlan(true);
+                          const response = await adminAPI.getServicePlansByPest(
+                            lead.company_id,
+                            pestId
                           );
 
-                          // Create quote line item
-                          await createOrUpdateQuoteLineItem(fullPlan, 0);
-                          initialLineItemCreatedRef.current = true;
-                        }
-                      } catch (error) {
-                        console.error('Error loading service plan:', error);
-                      } finally {
-                        setLoadingPlan(false);
-                      }
-                    }
-                  } else {
-                    // Remove primary pest
-                    setSelectedPests(additionalPests);
-                    await updatePrimaryPest('');
-                  }
-                }}
-                loading={loadingPlan}
-              />
+                          if (response.success && response.cheapest_plan) {
+                            // Cross-reference with allServicePlans to get complete plan data
+                            const fullPlan =
+                              allServicePlans.find(
+                                p => p.id === response.cheapest_plan.id
+                              ) || response.cheapest_plan;
 
-              {/* Additional Pests Section - Only show if primary pest is selected */}
-              {selectedPests.length > 0 && selectedPests[0] && (
-                <AdditionalPestsSelection
-                  selectedPestIds={additionalPests}
-                  pestOptions={pestOptions}
-                  primaryPestId={selectedPests[0]}
-                  onPestsChange={async pestIds => {
-                    setAdditionalPests(pestIds);
-                    setSelectedPests(
-                      [selectedPests[0], ...pestIds].filter(Boolean)
-                    );
-                    await updateAdditionalPests(pestIds);
+                            // Update first service selection with complete plan data
+                            setServiceSelections(prev =>
+                              prev.map((sel, idx) =>
+                                idx === 0
+                                  ? { ...sel, servicePlan: fullPlan }
+                                  : sel
+                              )
+                            );
+
+                            // Create quote line item
+                            await createOrUpdateQuoteLineItem(fullPlan, 0);
+                            initialLineItemCreatedRef.current = true;
+                          }
+                        } catch (error) {
+                          console.error('Error loading service plan:', error);
+                        } finally {
+                          setLoadingPlan(false);
+                        }
+                      }
+                    } else {
+                      // Remove primary pest
+                      setSelectedPests(additionalPests);
+                      await updatePrimaryPest('');
+                    }
                   }}
                   loading={loadingPlan}
                 />
-              )}
-            </div>
-          )}
-        </div>
 
-        {/* Service Selection Section */}
-        <div className={styles.section}>
-          {(loadingPlan || isQuoteUpdating) && (
-            <div className={styles.loadingOverlay}>
-              <div className={styles.loadingText}>
-                {loadingPlan ? 'Loading service plan...' : 'Updating...'}
+                {/* Additional Pests Section - Only show if primary pest is selected */}
+                {selectedPests.length > 0 && selectedPests[0] && (
+                  <AdditionalPestsSelection
+                    selectedPestIds={additionalPests}
+                    pestOptions={pestOptions}
+                    primaryPestId={selectedPests[0]}
+                    onPestsChange={async pestIds => {
+                      setAdditionalPests(pestIds);
+                      setSelectedPests(
+                        [selectedPests[0], ...pestIds].filter(Boolean)
+                      );
+                      await updateAdditionalPests(pestIds);
+                    }}
+                    loading={loadingPlan}
+                  />
+                )}
               </div>
-            </div>
-          )}
-          {loadingPlan && !selectedPlan ? (
-            <div className={styles.emptyState}>Loading service plan...</div>
-          ) : (
-            <>
-              {selectedPests.length === 0 && (
-                <div className={styles.emptyState}>
-                  No pest selected. You can still configure service details
-                  below.
+            )}
+          </div>
+
+          {/* Service Selection Section */}
+          <div className={styles.section}>
+            {(loadingPlan || isQuoteUpdating) && (
+              <div className={styles.loadingOverlay}>
+                <div className={styles.loadingText}>
+                  {loadingPlan ? 'Loading service plan...' : 'Updating...'}
                 </div>
-              )}
-              {selectedPests.length > 0 && !selectedPlan && (
-                <div className={styles.emptyState}>
-                  No service plans available for selected pest.
-                </div>
-              )}
-              {/* Service Selection Form */}
-              {/* Row 1: Size of Home, Yard Size, Had Pest Control Before (3 columns) */}
-              <div className={`${styles.gridRow} ${styles.threeColumns}`}>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>Size of Home</label>
+              </div>
+            )}
+            {loadingPlan && !selectedPlan ? (
+              <div className={styles.emptyState}>Loading service plan...</div>
+            ) : (
+              <>
+                {selectedPests.length === 0 && (
+                  <div className={styles.emptyState}>
+                    No pest selected. You can still configure service details
+                    below.
                   </div>
-                  <CustomDropdown
-                    options={homeSizeOptions}
-                    value={selectedHomeSizeOption}
-                    onChange={async rangeValue => {
-                      const oldValue = selectedHomeSizeOption;
-                      const oldHomeSize = homeSize;
+                )}
+                {selectedPests.length > 0 && !selectedPlan && (
+                  <div className={styles.emptyState}>
+                    No service plans available for selected pest.
+                  </div>
+                )}
+                {/* Service Selection Form */}
+                {/* Row 1: Size of Home, Yard Size, Had Pest Control Before (3 columns) */}
+                <div className={`${styles.gridRow} ${styles.threeColumns}`}>
+                  <div className={styles.formField}>
+                    <div className={styles.fieldHeader}>
+                      <label className={styles.fieldLabel}>Size of Home</label>
+                    </div>
+                    <CustomDropdown
+                      options={homeSizeOptions}
+                      value={selectedHomeSizeOption}
+                      onChange={async rangeValue => {
+                        const oldValue = selectedHomeSizeOption;
+                        const oldHomeSize = homeSize;
 
-                      setSelectedHomeSizeOption(rangeValue);
-                      const option = homeSizeOptions.find(
-                        opt => opt.value === rangeValue
-                      );
-                      if (option) {
-                        setHomeSize(option.rangeStart);
-                      }
-
-                      // Update quote (which will also update service_address via API)
-                      if (quote && rangeValue) {
-                        try {
-                          const response = await fetch(
-                            `/api/quotes/${quote.id}`,
-                            {
-                              method: 'PUT',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                home_size_range: rangeValue,
-                              }),
-                            }
-                          );
-
-                          if (!response.ok) {
-                            throw new Error('Failed to update home size range');
-                          }
-
-                          const data = await response.json();
-
-                          if (data.success && data.data) {
-                            console.log(
-                              'Home size update response:',
-                              data.data
-                            );
-                            await broadcastQuoteUpdate(data.data);
-                            onShowToast?.(
-                              'Home size updated successfully',
-                              'success'
-                            );
-
-                            // Provide undo handler
-                            if (onRequestUndo) {
-                              const undoHandler = async () => {
-                                try {
-                                  // Revert UI state
-                                  setSelectedHomeSizeOption(oldValue);
-                                  setHomeSize(oldHomeSize);
-
-                                  // Revert in database
-                                  const revertResponse = await fetch(
-                                    `/api/quotes/${quote.id}`,
-                                    {
-                                      method: 'PUT',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                      },
-                                      body: JSON.stringify({
-                                        home_size_range: oldValue || null,
-                                      }),
-                                    }
-                                  );
-
-                                  if (!revertResponse.ok) {
-                                    throw new Error('Failed to undo change');
-                                  }
-
-                                  const revertData =
-                                    await revertResponse.json();
-                                  if (revertData.success && revertData.data) {
-                                    await broadcastQuoteUpdate(revertData.data);
-                                  }
-
-                                  onShowToast?.('Change undone', 'success');
-                                } catch (error) {
-                                  console.error('Error undoing change:', error);
-                                  onShowToast?.(
-                                    'Failed to undo change',
-                                    'error'
-                                  );
-                                }
-                              };
-
-                              onRequestUndo(undoHandler);
-                            }
-                          }
-                        } catch (error) {
-                          console.error(
-                            'Error updating home size range:',
-                            error
-                          );
-                          onShowToast?.('Failed to update home size', 'error');
+                        setSelectedHomeSizeOption(rangeValue);
+                        const option = homeSizeOptions.find(
+                          opt => opt.value === rangeValue
+                        );
+                        if (option) {
+                          setHomeSize(option.rangeStart);
                         }
-                      }
-                    }}
-                    placeholder="Select home size"
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>Yard Size</label>
-                  </div>
-                  <CustomDropdown
-                    options={yardSizeOptions}
-                    value={selectedYardSizeOption}
-                    onChange={async rangeValue => {
-                      const oldValue = selectedYardSizeOption;
-                      const oldYardSize = yardSize;
 
-                      setSelectedYardSizeOption(rangeValue);
-                      const option = yardSizeOptions.find(
-                        opt => opt.value === rangeValue
-                      );
-                      if (option) {
-                        setYardSize(option.rangeStart);
-                      }
-
-                      // Update quote (which will also update service_address via API)
-                      if (quote && rangeValue) {
-                        try {
-                          const response = await fetch(
-                            `/api/quotes/${quote.id}`,
-                            {
-                              method: 'PUT',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                yard_size_range: rangeValue,
-                              }),
-                            }
-                          );
-
-                          if (!response.ok) {
-                            throw new Error('Failed to update yard size range');
-                          }
-
-                          const data = await response.json();
-
-                          if (data.success && data.data) {
-                            console.log(
-                              'Yard size update response:',
-                              data.data
-                            );
-                            await broadcastQuoteUpdate(data.data);
-                            onShowToast?.(
-                              'Yard size updated successfully',
-                              'success'
-                            );
-
-                            // Provide undo handler
-                            if (onRequestUndo) {
-                              const undoHandler = async () => {
-                                try {
-                                  // Revert UI state
-                                  setSelectedYardSizeOption(oldValue);
-                                  setYardSize(oldYardSize);
-
-                                  // Revert in database
-                                  const revertResponse = await fetch(
-                                    `/api/quotes/${quote.id}`,
-                                    {
-                                      method: 'PUT',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                      },
-                                      body: JSON.stringify({
-                                        yard_size_range: oldValue || null,
-                                      }),
-                                    }
-                                  );
-
-                                  if (!revertResponse.ok) {
-                                    throw new Error('Failed to undo change');
-                                  }
-
-                                  const revertData =
-                                    await revertResponse.json();
-                                  if (revertData.success && revertData.data) {
-                                    await broadcastQuoteUpdate(revertData.data);
-                                  }
-
-                                  onShowToast?.('Change undone', 'success');
-                                } catch (error) {
-                                  console.error('Error undoing change:', error);
-                                  onShowToast?.(
-                                    'Failed to undo change',
-                                    'error'
-                                  );
-                                }
-                              };
-
-                              onRequestUndo(undoHandler);
-                            }
-                          }
-                        } catch (error) {
-                          console.error(
-                            'Error updating yard size range:',
-                            error
-                          );
-                          onShowToast?.('Failed to update yard size', 'error');
-                        }
-                      }
-                    }}
-                    placeholder="Select yard size"
-                  />
-                </div>
-                <div className={styles.formField}>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.fieldLabel}>
-                      Have You Had Pest Control Before?
-                    </label>
-                  </div>
-                  <CustomDropdown
-                    options={[
-                      { label: 'Yes', value: 'yes' },
-                      { label: 'No', value: 'no' },
-                      { label: 'Not Sure', value: 'not_sure' },
-                    ]}
-                    value={hadPestControlBefore}
-                    onChange={async value => {
-                      const oldValue = hadPestControlBefore;
-
-                      setHadPestControlBefore(value);
-
-                      // Update lead in database
-                      if (lead.id) {
-                        try {
-                          const response = await fetch(
-                            `/api/leads/${lead.id}`,
-                            {
-                              method: 'PUT',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                had_pest_control_before: value,
-                              }),
-                            }
-                          );
-
-                          if (!response.ok) {
-                            throw new Error(
-                              'Failed to update pest control history'
-                            );
-                          }
-
-                          onShowToast?.(
-                            'Pest control history updated successfully',
-                            'success'
-                          );
-
-                          // Provide undo handler
-                          if (onRequestUndo) {
-                            const undoHandler = async () => {
-                              try {
-                                // Revert UI state
-                                setHadPestControlBefore(oldValue);
-
-                                // Revert in database
-                                const revertResponse = await fetch(
-                                  `/api/leads/${lead.id}`,
-                                  {
-                                    method: 'PUT',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({
-                                      had_pest_control_before: oldValue || null,
-                                    }),
-                                  }
-                                );
-
-                                if (!revertResponse.ok) {
-                                  throw new Error('Failed to undo change');
-                                }
-
-                                onShowToast?.('Change undone', 'success');
-                              } catch (error) {
-                                console.error('Error undoing change:', error);
-                                onShowToast?.('Failed to undo change', 'error');
+                        // Update quote (which will also update service_address via API)
+                        if (quote && rangeValue) {
+                          try {
+                            const response = await fetch(
+                              `/api/quotes/${quote.id}`,
+                              {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  home_size_range: rangeValue,
+                                }),
                               }
-                            };
-
-                            onRequestUndo(undoHandler);
-                          }
-                        } catch (error) {
-                          console.error(
-                            'Error updating pest control history:',
-                            error
-                          );
-                          onShowToast?.(
-                            'Failed to update pest control history',
-                            'error'
-                          );
-                        }
-                      }
-                    }}
-                    placeholder="Select option"
-                  />
-                </div>
-              </div>
-
-              {/* Render Service Selections Dynamically */}
-              {serviceSelections.map((selection, index) => (
-                <div key={selection.id}>
-                  <div className={`${styles.gridRow} ${styles.threeColumns}`}>
-                    <div className={styles.formField}>
-                      <div className={styles.serviceHeaderRow}>
-                        <label className={styles.fieldLabel}>
-                          Select Service {index + 1}
-                        </label>
-                        {index > 0 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeServiceSelection(selection.displayOrder)
-                            }
-                            className={styles.removeServiceButton}
-                            aria-label="Remove service"
-                          >
-                            <X size={16} />
-                          </button>
-                        )}
-                      </div>
-                      <div className={styles.serviceDropdownRow}>
-                        <CustomDropdown
-                          options={
-                            loadingServicePlans
-                              ? [{ value: '', label: 'Loading plans...' }]
-                              : allServicePlans.length > 0
-                                ? allServicePlans.map(plan => ({
-                                    value: plan.plan_name,
-                                    label: plan.plan_name,
-                                  }))
-                                : [{ value: '', label: 'No plans available' }]
-                          }
-                          value={selection.servicePlan?.plan_name || ''}
-                          onChange={async planName => {
-                            const plan = allServicePlans.find(
-                              p => p.plan_name === planName
                             );
-                            if (plan) {
-                              // Auto-set frequency to 'one-time' for one-time plans
-                              const newFrequency =
-                                plan.plan_category === 'one-time'
-                                  ? 'one-time'
-                                  : selection.frequency;
 
-                              setServiceSelections(prev =>
-                                prev.map((sel, idx) =>
-                                  idx === index
-                                    ? {
-                                        ...sel,
-                                        servicePlan: plan,
-                                        frequency: newFrequency,
-                                      }
-                                    : sel
-                                )
-                              );
-                              await createOrUpdateQuoteLineItem(
-                                plan,
-                                selection.displayOrder,
-                                plan.plan_category === 'one-time'
-                                  ? { service_frequency: 'one-time' }
-                                  : {}
+                            if (!response.ok) {
+                              throw new Error(
+                                'Failed to update home size range'
                               );
                             }
-                          }}
-                          placeholder="Program or Service"
-                          disabled={loadingServicePlans}
-                        />
-                        {selection.servicePlan?.allow_custom_pricing && (
-                          <button
-                            type="button"
-                            className={styles.customPricingToggleButton}
-                            onClick={() => {
-                              const isExpanding =
-                                !customPricingExpanded[selection.displayOrder];
 
-                              setCustomPricingExpanded(prev => ({
-                                ...prev,
-                                [selection.displayOrder]: isExpanding,
-                              }));
+                            const data = await response.json();
 
-                              // Pre-fill with calculated prices when expanding for the first time
-                              if (
-                                isExpanding &&
-                                selection.customInitialPrice === undefined &&
-                                selection.customRecurringPrice === undefined
-                              ) {
+                            if (data.success && data.data) {
+                              console.log(
+                                'Home size update response:',
+                                data.data
+                              );
+                              await broadcastQuoteUpdate(data.data);
+                              onShowToast?.(
+                                'Home size updated successfully',
+                                'success'
+                              );
+
+                              // Provide undo handler
+                              if (onRequestUndo) {
+                                const undoHandler = async () => {
+                                  try {
+                                    // Revert UI state
+                                    setSelectedHomeSizeOption(oldValue);
+                                    setHomeSize(oldHomeSize);
+
+                                    // Revert in database
+                                    const revertResponse = await fetch(
+                                      `/api/quotes/${quote.id}`,
+                                      {
+                                        method: 'PUT',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                          home_size_range: oldValue || null,
+                                        }),
+                                      }
+                                    );
+
+                                    if (!revertResponse.ok) {
+                                      throw new Error('Failed to undo change');
+                                    }
+
+                                    const revertData =
+                                      await revertResponse.json();
+                                    if (revertData.success && revertData.data) {
+                                      await broadcastQuoteUpdate(
+                                        revertData.data
+                                      );
+                                    }
+
+                                    onShowToast?.('Change undone', 'success');
+                                  } catch (error) {
+                                    console.error(
+                                      'Error undoing change:',
+                                      error
+                                    );
+                                    onShowToast?.(
+                                      'Failed to undo change',
+                                      'error'
+                                    );
+                                  }
+                                };
+
+                                onRequestUndo(undoHandler);
+                              }
+                            }
+                          } catch (error) {
+                            console.error(
+                              'Error updating home size range:',
+                              error
+                            );
+                            onShowToast?.(
+                              'Failed to update home size',
+                              'error'
+                            );
+                          }
+                        }
+                      }}
+                      placeholder="Select home size"
+                    />
+                  </div>
+                  <div className={styles.formField}>
+                    <div className={styles.fieldHeader}>
+                      <label className={styles.fieldLabel}>Yard Size</label>
+                    </div>
+                    <CustomDropdown
+                      options={yardSizeOptions}
+                      value={selectedYardSizeOption}
+                      onChange={async rangeValue => {
+                        const oldValue = selectedYardSizeOption;
+                        const oldYardSize = yardSize;
+
+                        setSelectedYardSizeOption(rangeValue);
+                        const option = yardSizeOptions.find(
+                          opt => opt.value === rangeValue
+                        );
+                        if (option) {
+                          setYardSize(option.rangeStart);
+                        }
+
+                        // Update quote (which will also update service_address via API)
+                        if (quote && rangeValue) {
+                          try {
+                            const response = await fetch(
+                              `/api/quotes/${quote.id}`,
+                              {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  yard_size_range: rangeValue,
+                                }),
+                              }
+                            );
+
+                            if (!response.ok) {
+                              throw new Error(
+                                'Failed to update yard size range'
+                              );
+                            }
+
+                            const data = await response.json();
+
+                            if (data.success && data.data) {
+                              console.log(
+                                'Yard size update response:',
+                                data.data
+                              );
+                              await broadcastQuoteUpdate(data.data);
+                              onShowToast?.(
+                                'Yard size updated successfully',
+                                'success'
+                              );
+
+                              // Provide undo handler
+                              if (onRequestUndo) {
+                                const undoHandler = async () => {
+                                  try {
+                                    // Revert UI state
+                                    setSelectedYardSizeOption(oldValue);
+                                    setYardSize(oldYardSize);
+
+                                    // Revert in database
+                                    const revertResponse = await fetch(
+                                      `/api/quotes/${quote.id}`,
+                                      {
+                                        method: 'PUT',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                          yard_size_range: oldValue || null,
+                                        }),
+                                      }
+                                    );
+
+                                    if (!revertResponse.ok) {
+                                      throw new Error('Failed to undo change');
+                                    }
+
+                                    const revertData =
+                                      await revertResponse.json();
+                                    if (revertData.success && revertData.data) {
+                                      await broadcastQuoteUpdate(
+                                        revertData.data
+                                      );
+                                    }
+
+                                    onShowToast?.('Change undone', 'success');
+                                  } catch (error) {
+                                    console.error(
+                                      'Error undoing change:',
+                                      error
+                                    );
+                                    onShowToast?.(
+                                      'Failed to undo change',
+                                      'error'
+                                    );
+                                  }
+                                };
+
+                                onRequestUndo(undoHandler);
+                              }
+                            }
+                          } catch (error) {
+                            console.error(
+                              'Error updating yard size range:',
+                              error
+                            );
+                            onShowToast?.(
+                              'Failed to update yard size',
+                              'error'
+                            );
+                          }
+                        }
+                      }}
+                      placeholder="Select yard size"
+                    />
+                  </div>
+                  <div className={styles.formField}>
+                    <div className={styles.fieldHeader}>
+                      <label className={styles.fieldLabel}>
+                        Have You Had Pest Control Before?
+                      </label>
+                    </div>
+                    <CustomDropdown
+                      options={[
+                        { label: 'Yes', value: 'yes' },
+                        { label: 'No', value: 'no' },
+                        { label: 'Not Sure', value: 'not_sure' },
+                      ]}
+                      value={hadPestControlBefore}
+                      onChange={async value => {
+                        const oldValue = hadPestControlBefore;
+
+                        setHadPestControlBefore(value);
+
+                        // Update lead in database
+                        if (lead.id) {
+                          try {
+                            const response = await fetch(
+                              `/api/leads/${lead.id}`,
+                              {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  had_pest_control_before: value,
+                                }),
+                              }
+                            );
+
+                            if (!response.ok) {
+                              throw new Error(
+                                'Failed to update pest control history'
+                              );
+                            }
+
+                            onShowToast?.(
+                              'Pest control history updated successfully',
+                              'success'
+                            );
+
+                            // Provide undo handler
+                            if (onRequestUndo) {
+                              const undoHandler = async () => {
+                                try {
+                                  // Revert UI state
+                                  setHadPestControlBefore(oldValue);
+
+                                  // Revert in database
+                                  const revertResponse = await fetch(
+                                    `/api/leads/${lead.id}`,
+                                    {
+                                      method: 'PUT',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({
+                                        had_pest_control_before:
+                                          oldValue || null,
+                                      }),
+                                    }
+                                  );
+
+                                  if (!revertResponse.ok) {
+                                    throw new Error('Failed to undo change');
+                                  }
+
+                                  onShowToast?.('Change undone', 'success');
+                                } catch (error) {
+                                  console.error('Error undoing change:', error);
+                                  onShowToast?.(
+                                    'Failed to undo change',
+                                    'error'
+                                  );
+                                }
+                              };
+
+                              onRequestUndo(undoHandler);
+                            }
+                          } catch (error) {
+                            console.error(
+                              'Error updating pest control history:',
+                              error
+                            );
+                            onShowToast?.(
+                              'Failed to update pest control history',
+                              'error'
+                            );
+                          }
+                        }
+                      }}
+                      placeholder="Select option"
+                    />
+                  </div>
+                </div>
+
+                {/* Render Service Selections Dynamically */}
+                {serviceSelections.map((selection, index) => (
+                  <div key={selection.id}>
+                    <div className={`${styles.gridRow} ${styles.threeColumns}`}>
+                      <div className={styles.formField}>
+                        <div className={styles.serviceHeaderRow}>
+                          <label className={styles.fieldLabel}>
+                            Select Service {index + 1}
+                          </label>
+                          {index > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeServiceSelection(selection.displayOrder)
+                              }
+                              className={styles.removeServiceButton}
+                              aria-label="Remove service"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                        </div>
+                        <div className={styles.serviceDropdownRow}>
+                          <CustomDropdown
+                            options={
+                              loadingServicePlans
+                                ? [{ value: '', label: 'Loading plans...' }]
+                                : allServicePlans.length > 0
+                                  ? allServicePlans.map(plan => ({
+                                      value: plan.plan_name,
+                                      label: plan.plan_name,
+                                    }))
+                                  : [{ value: '', label: 'No plans available' }]
+                            }
+                            value={selection.servicePlan?.plan_name || ''}
+                            onChange={async planName => {
+                              const plan = allServicePlans.find(
+                                p => p.plan_name === planName
+                              );
+                              if (plan) {
+                                // Auto-set frequency to 'one-time' for one-time plans
+                                const newFrequency =
+                                  plan.plan_category === 'one-time'
+                                    ? 'one-time'
+                                    : selection.frequency;
+
                                 setServiceSelections(prev =>
                                   prev.map((sel, idx) =>
                                     idx === index
                                       ? {
                                           ...sel,
-                                          customInitialPrice:
-                                            calculatedPrices[
-                                              selection.displayOrder
-                                            ]?.initial || 0,
-                                          customRecurringPrice:
-                                            calculatedPrices[
-                                              selection.displayOrder
-                                            ]?.recurring || 0,
+                                          servicePlan: plan,
+                                          frequency: newFrequency,
                                         }
                                       : sel
                                   )
                                 );
+                                await createOrUpdateQuoteLineItem(
+                                  plan,
+                                  selection.displayOrder,
+                                  plan.plan_category === 'one-time'
+                                    ? { service_frequency: 'one-time' }
+                                    : {}
+                                );
                               }
                             }}
-                          >
-                            Cust. Price
-                          </button>
-                        )}
+                            placeholder="Program or Service"
+                            disabled={loadingServicePlans}
+                          />
+                          {selection.servicePlan?.allow_custom_pricing && (
+                            <button
+                              type="button"
+                              className={styles.customPricingToggleButton}
+                              onClick={() => {
+                                const isExpanding =
+                                  !customPricingExpanded[
+                                    selection.displayOrder
+                                  ];
+
+                                setCustomPricingExpanded(prev => ({
+                                  ...prev,
+                                  [selection.displayOrder]: isExpanding,
+                                }));
+
+                                // Pre-fill with calculated prices when expanding for the first time
+                                if (
+                                  isExpanding &&
+                                  selection.customInitialPrice === undefined &&
+                                  selection.customRecurringPrice === undefined
+                                ) {
+                                  setServiceSelections(prev =>
+                                    prev.map((sel, idx) =>
+                                      idx === index
+                                        ? {
+                                            ...sel,
+                                            customInitialPrice:
+                                              calculatedPrices[
+                                                selection.displayOrder
+                                              ]?.initial || 0,
+                                            customRecurringPrice:
+                                              calculatedPrices[
+                                                selection.displayOrder
+                                              ]?.recurring || 0,
+                                          }
+                                        : sel
+                                    )
+                                  );
+                                }
+                              }}
+                            >
+                              Cust. Price
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className={styles.serviceSelectionOptions}>
-                      <div className={styles.formField}>
-                        <label className={styles.fieldLabel}>
-                          Service Frequency
-                        </label>
-                        <CustomDropdown
-                          options={
-                            selection.servicePlan?.plan_category === 'one-time'
-                              ? [{ value: 'one-time', label: 'One Time' }]
-                              : [
-                                  { value: 'monthly', label: 'Monthly' },
-                                  { value: 'quarterly', label: 'Quarterly' },
-                                  {
-                                    value: 'semi-annually',
-                                    label: 'Semi-Annually',
-                                  },
-                                  { value: 'annually', label: 'Annually' },
-                                ]
-                          }
-                          value={
-                            selection.servicePlan?.plan_category === 'one-time'
-                              ? 'one-time'
-                              : selection.frequency
-                          }
-                          onChange={async newFrequency => {
-                            // Don't allow changing frequency for one-time plans
-                            if (
+                      <div className={styles.serviceSelectionOptions}>
+                        <div className={styles.formField}>
+                          <label className={styles.fieldLabel}>
+                            Service Frequency
+                          </label>
+                          <CustomDropdown
+                            options={
                               selection.servicePlan?.plan_category ===
                               'one-time'
-                            ) {
-                              return;
+                                ? [{ value: 'one-time', label: 'One Time' }]
+                                : [
+                                    { value: 'monthly', label: 'Monthly' },
+                                    { value: 'quarterly', label: 'Quarterly' },
+                                    {
+                                      value: 'semi-annually',
+                                      label: 'Semi-Annually',
+                                    },
+                                    { value: 'annually', label: 'Annually' },
+                                  ]
                             }
+                            value={
+                              selection.servicePlan?.plan_category ===
+                              'one-time'
+                                ? 'one-time'
+                                : selection.frequency
+                            }
+                            onChange={async newFrequency => {
+                              // Don't allow changing frequency for one-time plans
+                              if (
+                                selection.servicePlan?.plan_category ===
+                                'one-time'
+                              ) {
+                                return;
+                              }
 
-                            setServiceSelections(prev =>
-                              prev.map((sel, idx) =>
-                                idx === index
-                                  ? { ...sel, frequency: newFrequency }
-                                  : sel
-                              )
-                            );
-
-                            if (selection.servicePlan && newFrequency) {
-                              await createOrUpdateQuoteLineItem(
-                                selection.servicePlan,
-                                selection.displayOrder,
-                                {
-                                  service_frequency: newFrequency,
-                                }
+                              setServiceSelections(prev =>
+                                prev.map((sel, idx) =>
+                                  idx === index
+                                    ? { ...sel, frequency: newFrequency }
+                                    : sel
+                                )
                               );
-                            }
-                          }}
-                          placeholder="Frequency"
-                          disabled={
-                            selection.servicePlan?.plan_category === 'one-time'
-                          }
-                        />
-                      </div>
-                      {/* Discount selector - disabled when custom pricing is active */}
-                      <div className={styles.formField}>
-                        <label className={styles.fieldLabel}>Discount</label>
-                        <CustomDropdown
-                          options={
-                            loadingDiscounts
-                              ? [{ value: '', label: 'Loading...' }]
-                              : [
-                                  { value: '', label: 'No Discount' },
-                                  ...(selection.servicePlan &&
-                                  availableDiscounts[selection.servicePlan.id]
-                                    ? availableDiscounts[
-                                        selection.servicePlan.id
-                                      ].map(discount => ({
-                                        value: discount.id,
-                                        label: discount.name,
-                                      }))
-                                    : []),
-                                ]
-                          }
-                          value={
-                            selection.isCustomPriced ? '' : selection.discount
-                          }
-                          onChange={async newDiscountId => {
-                            setServiceSelections(prev =>
-                              prev.map((sel, idx) =>
-                                idx === index
-                                  ? { ...sel, discount: newDiscountId }
-                                  : sel
-                              )
-                            );
 
-                            if (selection.servicePlan) {
-                              await createOrUpdateQuoteLineItem(
-                                selection.servicePlan,
-                                selection.displayOrder,
-                                {
-                                  discount_id:
-                                    newDiscountId === '' ? null : newDiscountId,
-                                }
-                              );
+                              if (selection.servicePlan && newFrequency) {
+                                await createOrUpdateQuoteLineItem(
+                                  selection.servicePlan,
+                                  selection.displayOrder,
+                                  {
+                                    service_frequency: newFrequency,
+                                  }
+                                );
+                              }
+                            }}
+                            placeholder="Frequency"
+                            disabled={
+                              selection.servicePlan?.plan_category ===
+                              'one-time'
                             }
-                          }}
-                          placeholder={
-                            loadingDiscounts
-                              ? 'Loading discounts...'
-                              : selection.isCustomPriced
-                                ? 'Disabled (Custom Pricing Active)'
-                                : 'Select Discount'
-                          }
-                          disabled={
-                            loadingDiscounts || selection.isCustomPriced
-                          }
-                        />
+                          />
+                        </div>
+                        {/* Discount selector - disabled when custom pricing is active */}
+                        <div className={styles.formField}>
+                          <label className={styles.fieldLabel}>Discount</label>
+                          <CustomDropdown
+                            options={
+                              loadingDiscounts
+                                ? [{ value: '', label: 'Loading...' }]
+                                : [
+                                    { value: '', label: 'No Discount' },
+                                    ...(selection.servicePlan &&
+                                    availableDiscounts[selection.servicePlan.id]
+                                      ? availableDiscounts[
+                                          selection.servicePlan.id
+                                        ].map(discount => ({
+                                          value: discount.id,
+                                          label: discount.name,
+                                        }))
+                                      : []),
+                                  ]
+                            }
+                            value={
+                              selection.isCustomPriced ? '' : selection.discount
+                            }
+                            onChange={async newDiscountId => {
+                              setServiceSelections(prev =>
+                                prev.map((sel, idx) =>
+                                  idx === index
+                                    ? { ...sel, discount: newDiscountId }
+                                    : sel
+                                )
+                              );
+
+                              if (selection.servicePlan) {
+                                await createOrUpdateQuoteLineItem(
+                                  selection.servicePlan,
+                                  selection.displayOrder,
+                                  {
+                                    discount_id:
+                                      newDiscountId === ''
+                                        ? null
+                                        : newDiscountId,
+                                  }
+                                );
+                              }
+                            }}
+                            placeholder={
+                              loadingDiscounts
+                                ? 'Loading discounts...'
+                                : selection.isCustomPriced
+                                  ? 'Disabled (Custom Pricing Active)'
+                                  : 'Select Discount'
+                            }
+                            disabled={
+                              loadingDiscounts || selection.isCustomPriced
+                            }
+                          />
+                        </div>
                       </div>
+                      {/* Add Service Button - Only show on last item */}
+                      {index === serviceSelections.length - 1 &&
+                        serviceSelections.length < 3 &&
+                        !isSidebarExpanded &&
+                        serviceSelections.some(sel => sel.servicePlan) && (
+                          <div className={styles.addServiceButtonContainer}>
+                            <button
+                              type="button"
+                              onClick={addServiceSelection}
+                              className={styles.addServiceButton}
+                            >
+                              <Plus size={20} />
+                              Add Service
+                            </button>
+                          </div>
+                        )}
                     </div>
-                    {/* Add Service Button - Only show on last item */}
-                    {index === serviceSelections.length - 1 &&
-                      serviceSelections.length < 3 &&
-                      !isSidebarExpanded &&
-                      serviceSelections.some(sel => sel.servicePlan) && (
-                        <div className={styles.addServiceButtonContainer}>
-                          <button
-                            type="button"
-                            onClick={addServiceSelection}
-                            className={styles.addServiceButton}
-                          >
-                            <Plus size={20} />
-                            Add Service
-                          </button>
+
+                    {/* Custom Pricing - Collapsible Fields */}
+                    {selection.servicePlan?.allow_custom_pricing &&
+                      customPricingExpanded[selection.displayOrder] && (
+                        <div className={styles.customPricingSection}>
+                          <div className={styles.customPricingFields}>
+                            <div className={styles.customPriceLabel}>
+                              Override with custom pricing
+                            </div>
+                            <div className={styles.priceInputRow}>
+                              <div className={styles.formField}>
+                                <label className={styles.fieldLabel}>
+                                  Initial Price ($)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className={styles.priceInput}
+                                  value={
+                                    selection.customInitialPrice ??
+                                    calculatedPrices[selection.displayOrder]
+                                      ?.initial ??
+                                    ''
+                                  }
+                                  onChange={e => {
+                                    const value =
+                                      parseFloat(e.target.value) || 0;
+                                    if (value < 0) return; // Prevent negative prices
+
+                                    // Update state only (don't save yet)
+                                    setServiceSelections(prev =>
+                                      prev.map((sel, idx) =>
+                                        idx === index
+                                          ? {
+                                              ...sel,
+                                              customInitialPrice: value,
+                                            }
+                                          : sel
+                                      )
+                                    );
+                                  }}
+                                  placeholder="Enter custom initial price"
+                                />
+                              </div>
+                              <div className={styles.formField}>
+                                <label className={styles.fieldLabel}>
+                                  Recurring Price ($)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className={styles.priceInput}
+                                  value={
+                                    selection.customRecurringPrice ??
+                                    calculatedPrices[selection.displayOrder]
+                                      ?.recurring ??
+                                    ''
+                                  }
+                                  onChange={e => {
+                                    const value =
+                                      parseFloat(e.target.value) || 0;
+                                    if (value < 0) return; // Prevent negative prices
+
+                                    // Update state only (don't save yet)
+                                    setServiceSelections(prev =>
+                                      prev.map((sel, idx) =>
+                                        idx === index
+                                          ? {
+                                              ...sel,
+                                              customRecurringPrice: value,
+                                            }
+                                          : sel
+                                      )
+                                    );
+                                  }}
+                                  placeholder="Enter custom recurring price"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className={styles.customPricingActions}>
+                              <button
+                                type="button"
+                                className={styles.saveCustomPriceButton}
+                                onClick={async () => {
+                                  if (
+                                    selection.servicePlan &&
+                                    selection.customInitialPrice !==
+                                      undefined &&
+                                    selection.customRecurringPrice !== undefined
+                                  ) {
+                                    // Mark as custom priced and clear discount
+                                    setServiceSelections(prev =>
+                                      prev.map((sel, idx) =>
+                                        idx === index
+                                          ? {
+                                              ...sel,
+                                              isCustomPriced: true,
+                                              discount: '', // Clear discount when using custom pricing
+                                            }
+                                          : sel
+                                      )
+                                    );
+
+                                    // Save to backend
+                                    await createOrUpdateQuoteLineItem(
+                                      selection.servicePlan,
+                                      selection.displayOrder,
+                                      {
+                                        custom_initial_price:
+                                          selection.customInitialPrice,
+                                        custom_recurring_price:
+                                          selection.customRecurringPrice,
+                                        is_custom_priced: true,
+                                        discount_id: null, // Clear discount when using custom pricing
+                                      }
+                                    );
+                                  }
+                                }}
+                              >
+                                Save Custom Price
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.clearCustomPriceButton}
+                                onClick={async () => {
+                                  if (selection.servicePlan) {
+                                    // Clear custom pricing from state
+                                    setServiceSelections(prev =>
+                                      prev.map((sel, idx) =>
+                                        idx === index
+                                          ? {
+                                              ...sel,
+                                              customInitialPrice: undefined,
+                                              customRecurringPrice: undefined,
+                                              isCustomPriced: false,
+                                            }
+                                          : sel
+                                      )
+                                    );
+
+                                    // Clear from backend
+                                    await createOrUpdateQuoteLineItem(
+                                      selection.servicePlan,
+                                      selection.displayOrder,
+                                      {
+                                        custom_initial_price: undefined,
+                                        custom_recurring_price: undefined,
+                                        is_custom_priced: false,
+                                      }
+                                    );
+                                  }
+                                }}
+                              >
+                                Clear Custom Pricing
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
                   </div>
+                ))}
+                {/* Pest Concern Coverage Pills and Add Service Button Row */}
+                <div className={styles.pestCoverageRow}>
+                  <div className={styles.pestCoverageSection}>
+                    <label className={styles.fieldLabel}>
+                      Pest Concern Coverage
+                    </label>
+                    <div className={styles.pestContainer}>
+                      {pestOptions
+                        .filter(pest => selectedPests.includes(pest.id))
+                        .sort((a, b) => {
+                          // Sort by selectedPests order - primary pest (index 0) appears first
+                          const indexA = selectedPests.indexOf(a.id);
+                          const indexB = selectedPests.indexOf(b.id);
+                          return indexA - indexB;
+                        })
+                        .map(pest => {
+                          // Check if this pest is covered by ANY selected service plan
+                          const isCovered = serviceSelections.some(sel =>
+                            sel.servicePlan?.pest_coverage?.some(
+                              (coverage: any) => coverage.pest_id === pest.id
+                            )
+                          );
 
-                  {/* Custom Pricing - Collapsible Fields */}
-                  {selection.servicePlan?.allow_custom_pricing &&
-                    customPricingExpanded[selection.displayOrder] && (
-                      <div className={styles.customPricingSection}>
-                        <div className={styles.customPricingFields}>
-                          <div className={styles.customPriceLabel}>
-                            Override with custom pricing
-                          </div>
-                          <div className={styles.priceInputRow}>
-                            <div className={styles.formField}>
-                              <label className={styles.fieldLabel}>
-                                Initial Price ($)
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className={styles.priceInput}
-                                value={
-                                  selection.customInitialPrice ??
-                                  calculatedPrices[selection.displayOrder]
-                                    ?.initial ??
-                                  ''
-                                }
-                                onChange={e => {
-                                  const value = parseFloat(e.target.value) || 0;
-                                  if (value < 0) return; // Prevent negative prices
-
-                                  // Update state only (don't save yet)
-                                  setServiceSelections(prev =>
-                                    prev.map((sel, idx) =>
-                                      idx === index
-                                        ? {
-                                            ...sel,
-                                            customInitialPrice: value,
-                                          }
-                                        : sel
-                                    )
-                                  );
-                                }}
-                                placeholder="Enter custom initial price"
-                              />
-                            </div>
-                            <div className={styles.formField}>
-                              <label className={styles.fieldLabel}>
-                                Recurring Price ($)
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className={styles.priceInput}
-                                value={
-                                  selection.customRecurringPrice ??
-                                  calculatedPrices[selection.displayOrder]
-                                    ?.recurring ??
-                                  ''
-                                }
-                                onChange={e => {
-                                  const value = parseFloat(e.target.value) || 0;
-                                  if (value < 0) return; // Prevent negative prices
-
-                                  // Update state only (don't save yet)
-                                  setServiceSelections(prev =>
-                                    prev.map((sel, idx) =>
-                                      idx === index
-                                        ? {
-                                            ...sel,
-                                            customRecurringPrice: value,
-                                          }
-                                        : sel
-                                    )
-                                  );
-                                }}
-                                placeholder="Enter custom recurring price"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className={styles.customPricingActions}>
-                            <button
-                              type="button"
-                              className={styles.saveCustomPriceButton}
-                              onClick={async () => {
-                                if (
-                                  selection.servicePlan &&
-                                  selection.customInitialPrice !== undefined &&
-                                  selection.customRecurringPrice !== undefined
-                                ) {
-                                  // Mark as custom priced and clear discount
-                                  setServiceSelections(prev =>
-                                    prev.map((sel, idx) =>
-                                      idx === index
-                                        ? {
-                                            ...sel,
-                                            isCustomPriced: true,
-                                            discount: '', // Clear discount when using custom pricing
-                                          }
-                                        : sel
-                                    )
-                                  );
-
-                                  // Save to backend
-                                  await createOrUpdateQuoteLineItem(
-                                    selection.servicePlan,
-                                    selection.displayOrder,
-                                    {
-                                      custom_initial_price:
-                                        selection.customInitialPrice,
-                                      custom_recurring_price:
-                                        selection.customRecurringPrice,
-                                      is_custom_priced: true,
-                                      discount_id: null, // Clear discount when using custom pricing
+                          return (
+                            <div
+                              key={pest.id}
+                              className={styles.pestBadge}
+                              style={
+                                !isCovered
+                                  ? {
+                                      background: '#FFE3E2',
+                                      border: '1px solid #FB2C36',
+                                      color: '#C10007',
                                     }
-                                  );
-                                }
-                              }}
+                                  : undefined
+                              }
                             >
-                              Save Custom Price
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.clearCustomPriceButton}
-                              onClick={async () => {
-                                if (selection.servicePlan) {
-                                  // Clear custom pricing from state
-                                  setServiceSelections(prev =>
-                                    prev.map((sel, idx) =>
-                                      idx === index
-                                        ? {
-                                            ...sel,
-                                            customInitialPrice: undefined,
-                                            customRecurringPrice: undefined,
-                                            isCustomPriced: false,
-                                          }
-                                        : sel
-                                    )
-                                  );
-
-                                  // Clear from backend
-                                  await createOrUpdateQuoteLineItem(
-                                    selection.servicePlan,
-                                    selection.displayOrder,
-                                    {
-                                      custom_initial_price: undefined,
-                                      custom_recurring_price: undefined,
-                                      is_custom_priced: false,
-                                    }
-                                  );
-                                }
-                              }}
-                            >
-                              Clear Custom Pricing
-                            </button>
-                          </div>
-                        </div>
+                              {isCovered ? (
+                                <svg
+                                  width="8"
+                                  height="8"
+                                  viewBox="0 0 8 8"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M6.5 2L3 5.5L1.5 4"
+                                    stroke="var(--green-600, #00A63E)"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              ) : (
+                                <CircleOff size={8} />
+                              )}
+                              {pest.custom_label}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                  {/* Add Service Button - Show next to pest concerns when sidebar is expanded */}
+                  {serviceSelections.length < 3 &&
+                    isSidebarExpanded &&
+                    serviceSelections.some(sel => sel.servicePlan) && (
+                      <div className={styles.addServiceButtonContainer}>
+                        <button
+                          type="button"
+                          onClick={addServiceSelection}
+                          className={styles.addServiceButton}
+                        >
+                          <Plus size={20} />
+                          Add Service
+                        </button>
                       </div>
                     )}
                 </div>
-              ))}
-              {/* Pest Concern Coverage Pills and Add Service Button Row */}
-              <div className={styles.pestCoverageRow}>
-                <div className={styles.pestCoverageSection}>
-                  <label className={styles.fieldLabel}>
-                    Pest Concern Coverage
-                  </label>
-                  <div className={styles.pestContainer}>
-                    {pestOptions
-                      .filter(pest => selectedPests.includes(pest.id))
-                      .sort((a, b) => {
-                        // Sort by selectedPests order - primary pest (index 0) appears first
-                        const indexA = selectedPests.indexOf(a.id);
-                        const indexB = selectedPests.indexOf(b.id);
-                        return indexA - indexB;
-                      })
-                      .map(pest => {
-                        // Check if this pest is covered by ANY selected service plan
-                        const isCovered = serviceSelections.some(sel =>
-                          sel.servicePlan?.pest_coverage?.some(
-                            (coverage: any) => coverage.pest_id === pest.id
-                          )
-                        );
 
-                        return (
-                          <div
-                            key={pest.id}
-                            className={styles.pestBadge}
-                            style={
-                              !isCovered
-                                ? {
-                                    background: '#FFE3E2',
-                                    border: '1px solid #FB2C36',
-                                    color: '#C10007',
-                                  }
-                                : undefined
-                            }
-                          >
-                            {isCovered ? (
-                              <svg
-                                width="8"
-                                height="8"
-                                viewBox="0 0 8 8"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M6.5 2L3 5.5L1.5 4"
-                                  stroke="var(--green-600, #00A63E)"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            ) : (
-                              <CircleOff size={8} />
-                            )}
-                            {pest.custom_label}
-                          </div>
-                        );
-                      })}
+                {/* Add-On Services Section */}
+                {serviceSelections[0]?.servicePlan && (
+                  <div>
+                    <EligibleAddOnSelector
+                      companyId={lead.company_id}
+                      servicePlanId={serviceSelections[0].servicePlan.id}
+                      selectedAddonIds={selectedAddOns}
+                      onToggleAddon={handleToggleAddon}
+                    />
                   </div>
-                </div>
-                {/* Add Service Button - Show next to pest concerns when sidebar is expanded */}
-                {serviceSelections.length < 3 &&
-                  isSidebarExpanded &&
-                  serviceSelections.some(sel => sel.servicePlan) && (
-                    <div className={styles.addServiceButtonContainer}>
-                      <button
-                        type="button"
-                        onClick={addServiceSelection}
-                        className={styles.addServiceButton}
-                      >
-                        <Plus size={20} />
-                        Add Service
-                      </button>
-                    </div>
-                  )}
-              </div>
+                )}
 
-              {/* Add-On Services Section */}
-              {serviceSelections[0]?.servicePlan && (
-                <div>
-                  <EligibleAddOnSelector
-                    companyId={lead.company_id}
-                    servicePlanId={serviceSelections[0].servicePlan.id}
-                    selectedAddonIds={selectedAddOns}
-                    onToggleAddon={handleToggleAddon}
-                  />
-                </div>
-              )}
+                {/* Plan Pricing Section */}
+                {serviceSelections.some(sel => sel.servicePlan) && (
+                  <>
+                    <div className={styles.planPricingContainer}>
+                      <h4 className={cardStyles.defaultText}>Plan Pricing</h4>
+                      {serviceSelections.length === 1 ? (
+                        // Single Plan Pricing Display
+                        serviceSelections[0].servicePlan &&
+                        (() => {
+                          // Find the main plan line item (not an add-on)
+                          const mainPlanLineItem = quote?.line_items?.find(
+                            (item: any) =>
+                              item.service_plan_id && !item.addon_service_id
+                          );
 
-              {/* Plan Pricing Section */}
-              {serviceSelections.some(sel => sel.servicePlan) && (
-                <>
-                  <div className={styles.planPricingContainer}>
-                    <h4 className={cardStyles.defaultText}>Plan Pricing</h4>
-                    {serviceSelections.length === 1 ? (
-                      // Single Plan Pricing Display
-                      serviceSelections[0].servicePlan &&
-                      (() => {
-                        // Find the main plan line item (not an add-on)
-                        const mainPlanLineItem = quote?.line_items?.find(
-                          (item: any) =>
-                            item.service_plan_id && !item.addon_service_id
-                        );
-
-                        return (
-                          <div className={styles.singlePlanPricing}>
-                            <div className={styles.pricingGrid}>
-                              <div className={styles.pricingColumn}>
-                                <div className={styles.pricingLabel}>
-                                  Recurring Price
-                                </div>
-                                <div className={styles.recurringPrice}>
-                                  $
-                                  {formatRecurringPrice(mainPlanLineItem?.final_recurring_price || 0)}
-                                  <span className={styles.perMonth}>/mo</span>
-                                </div>
-                                {mainPlanLineItem?.is_custom_priced ? (
-                                  <div className={styles.originalPrice}>
-                                    Custom pricing (Originally: $
-                                    {formatRecurringPrice(calculatedPrices[
-                                      serviceSelections[0].displayOrder
-                                    ]?.recurring || 0)}
-                                    /mo)
+                          return (
+                            <div className={styles.singlePlanPricing}>
+                              <div className={styles.pricingGrid}>
+                                <div className={styles.pricingColumn}>
+                                  <div className={styles.pricingLabel}>
+                                    Recurring Price
                                   </div>
-                                ) : mainPlanLineItem?.discount_id ||
-                                   mainPlanLineItem?.discount_percentage > 0 ||
-                                   mainPlanLineItem?.discount_amount > 0 ||
-                                   (mainPlanLineItem?.recurring_price &&
-                                    mainPlanLineItem?.final_recurring_price < mainPlanLineItem?.recurring_price) ? (
-                                  <div className={styles.originalPrice}>
-                                    Originally ${mainPlanLineItem?.recurring_price || 0}/mo
-                                    {mainPlanLineItem?.discount_percentage > 0 && (
-                                      <span> (-{mainPlanLineItem.discount_percentage}%)</span>
+                                  <div className={styles.recurringPrice}>
+                                    $
+                                    {formatRecurringPrice(
+                                      mainPlanLineItem?.final_recurring_price ||
+                                        0
                                     )}
-                                    {mainPlanLineItem?.discount_amount > 0 && !mainPlanLineItem?.discount_percentage && (
-                                      <span> (-${mainPlanLineItem.discount_amount})</span>
-                                    )}
+                                    <span className={styles.perMonth}>/mo</span>
                                   </div>
-                                ) : null}
-                              </div>
-                              <div className={styles.pricingColumn}>
-                                <div className={styles.pricingLabel}>
-                                  Initial Price
+                                  {mainPlanLineItem?.is_custom_priced ? (
+                                    <div className={styles.originalPrice}>
+                                      Custom pricing (Originally: $
+                                      {formatRecurringPrice(
+                                        calculatedPrices[
+                                          serviceSelections[0].displayOrder
+                                        ]?.recurring || 0
+                                      )}
+                                      /mo)
+                                    </div>
+                                  ) : mainPlanLineItem?.discount_id ||
+                                    mainPlanLineItem?.discount_percentage > 0 ||
+                                    mainPlanLineItem?.discount_amount > 0 ||
+                                    (mainPlanLineItem?.recurring_price &&
+                                      mainPlanLineItem?.final_recurring_price <
+                                        mainPlanLineItem?.recurring_price) ? (
+                                    <div className={styles.originalPrice}>
+                                      Originally $
+                                      {mainPlanLineItem?.recurring_price || 0}
+                                      /mo
+                                      {mainPlanLineItem?.discount_percentage >
+                                        0 && (
+                                        <span>
+                                          {' '}
+                                          (-
+                                          {mainPlanLineItem.discount_percentage}
+                                          %)
+                                        </span>
+                                      )}
+                                      {mainPlanLineItem?.discount_amount > 0 &&
+                                        !mainPlanLineItem?.discount_percentage && (
+                                          <span>
+                                            {' '}
+                                            (-$
+                                            {mainPlanLineItem.discount_amount})
+                                          </span>
+                                        )}
+                                    </div>
+                                  ) : null}
                                 </div>
-                                <div className={styles.initialPrice}>
-                                  $
-                                  {Math.round(
-                                    mainPlanLineItem?.final_initial_price || 0
-                                  )}
-                                </div>
-                                {mainPlanLineItem?.is_custom_priced ? (
-                                  <div className={styles.originalPrice}>
-                                    Custom pricing (Originally: $
+                                <div className={styles.pricingColumn}>
+                                  <div className={styles.pricingLabel}>
+                                    Initial Price
+                                  </div>
+                                  <div className={styles.initialPrice}>
+                                    $
                                     {Math.round(
-                                      calculatedPrices[
-                                        serviceSelections[0].displayOrder
-                                      ]?.initial || 0
-                                    )}
-                                    )
-                                  </div>
-                                ) : mainPlanLineItem?.discount_id ||
-                                   mainPlanLineItem?.discount_percentage > 0 ||
-                                   mainPlanLineItem?.discount_amount > 0 ||
-                                   (mainPlanLineItem?.initial_price &&
-                                    mainPlanLineItem?.final_initial_price < mainPlanLineItem?.initial_price) ? (
-                                  <div className={styles.originalPrice}>
-                                    Originally $
-                                    {Math.round(
-                                      mainPlanLineItem?.initial_price || 0
-                                    )}
-                                    {mainPlanLineItem?.discount_percentage > 0 && (
-                                      <span> (-{mainPlanLineItem.discount_percentage}%)</span>
-                                    )}
-                                    {mainPlanLineItem?.discount_amount > 0 && !mainPlanLineItem?.discount_percentage && (
-                                      <span> (-${mainPlanLineItem.discount_amount})</span>
+                                      mainPlanLineItem?.final_initial_price || 0
                                     )}
                                   </div>
-                                ) : null}
-                              </div>
-                              <div className={styles.pricingColumn}>
-                                <div className={styles.pricingLabel}>
-                                  Treatment Frequency
+                                  {mainPlanLineItem?.is_custom_priced ? (
+                                    <div className={styles.originalPrice}>
+                                      Custom pricing (Originally: $
+                                      {Math.round(
+                                        calculatedPrices[
+                                          serviceSelections[0].displayOrder
+                                        ]?.initial || 0
+                                      )}
+                                      )
+                                    </div>
+                                  ) : mainPlanLineItem?.discount_id ||
+                                    mainPlanLineItem?.discount_percentage > 0 ||
+                                    mainPlanLineItem?.discount_amount > 0 ||
+                                    (mainPlanLineItem?.initial_price &&
+                                      mainPlanLineItem?.final_initial_price <
+                                        mainPlanLineItem?.initial_price) ? (
+                                    <div className={styles.originalPrice}>
+                                      Originally $
+                                      {Math.round(
+                                        mainPlanLineItem?.initial_price || 0
+                                      )}
+                                      {mainPlanLineItem?.discount_percentage >
+                                        0 && (
+                                        <span>
+                                          {' '}
+                                          (-
+                                          {mainPlanLineItem.discount_percentage}
+                                          %)
+                                        </span>
+                                      )}
+                                      {mainPlanLineItem?.discount_amount > 0 &&
+                                        !mainPlanLineItem?.discount_percentage && (
+                                          <span>
+                                            {' '}
+                                            (-$
+                                            {mainPlanLineItem.discount_amount})
+                                          </span>
+                                        )}
+                                    </div>
+                                  ) : null}
                                 </div>
-                                <div className={styles.frequency}>
-                                  {serviceSelections[0].frequency
-                                    .charAt(0)
-                                    .toUpperCase() +
-                                    serviceSelections[0].frequency.slice(1)}
+                                <div className={styles.pricingColumn}>
+                                  <div className={styles.pricingLabel}>
+                                    Treatment Frequency
+                                  </div>
+                                  <div className={styles.frequency}>
+                                    {serviceSelections[0].frequency
+                                      .charAt(0)
+                                      .toUpperCase() +
+                                      serviceSelections[0].frequency.slice(1)}
+                                  </div>
+                                  <div className={styles.inspection}>
+                                    Inspection Included
+                                  </div>
                                 </div>
-                                <div className={styles.inspection}>
-                                  Inspection Included
+                                <div className={styles.buttonColumn}>
+                                  <button
+                                    type="button"
+                                    onClick={onEmailQuote}
+                                    className={styles.emailQuoteButton}
+                                  >
+                                    <Mail size={18} />
+                                    Email Quote
+                                  </button>
+                                  {lead.company?.slug &&
+                                    quote?.id &&
+                                    quote?.quote_token && (
+                                      <a
+                                        href={`/${lead.company.slug}/quote/${quote.id}?token=${quote.quote_token}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.viewQuoteLink}
+                                      >
+                                        <ExternalLink size={16} />
+                                        View Quote
+                                      </a>
+                                    )}
                                 </div>
                               </div>
-                              <div className={styles.buttonColumn}>
-                                <button
-                                  type="button"
-                                  onClick={onEmailQuote}
-                                  className={styles.emailQuoteButton}
-                                >
-                                  <Mail size={18} />
-                                  Email Quote
-                                </button>
-                              </div>
+
+                              {/* Add-Ons for Single Plan */}
+                              {quote?.line_items &&
+                                quote.line_items.filter(
+                                  (item: any) =>
+                                    item.addon_service_id != null &&
+                                    item.addon_service_id !== ''
+                                ).length > 0 && (
+                                  <div className={styles.addOnsBreakdown}>
+                                    <div className={styles.addOnsHeader}>
+                                      Add-On Services:
+                                    </div>
+                                    {quote.line_items
+                                      .filter(
+                                        (item: any) =>
+                                          item.addon_service_id != null &&
+                                          item.addon_service_id !== ''
+                                      )
+                                      .map((addonItem: any) => (
+                                        <div
+                                          key={addonItem.id}
+                                          className={styles.addonLineItem}
+                                        >
+                                          <div className={styles.addonName}>
+                                            {addonItem.plan_name}
+                                          </div>
+                                          <div className={styles.addonPrices}>
+                                            <span
+                                              className={styles.addonRecurring}
+                                            >
+                                              +$
+                                              {formatRecurringPrice(
+                                                addonItem.final_recurring_price
+                                              )}
+                                              /mo
+                                            </span>
+                                            {addonItem.final_initial_price >
+                                              0 && (
+                                              <span
+                                                className={styles.addonInitial}
+                                              >
+                                                $
+                                                {Math.round(
+                                                  addonItem.final_initial_price
+                                                )}{' '}
+                                                initial
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+
+                              {/* Total with Add-Ons */}
+                              {quote?.line_items &&
+                                quote.line_items.filter(
+                                  (item: any) =>
+                                    item.addon_service_id != null &&
+                                    item.addon_service_id !== ''
+                                ).length > 0 && (
+                                  <div className={styles.singlePlanTotal}>
+                                    <div className={styles.totalRow}>
+                                      <span className={styles.totalLabel}>
+                                        Total Recurring:
+                                      </span>
+                                      <span className={styles.totalValue}>
+                                        $
+                                        {formatRecurringPrice(
+                                          quote?.total_recurring_price || 0
+                                        )}
+                                        /mo
+                                      </span>
+                                    </div>
+                                    <div className={styles.totalRow}>
+                                      <span className={styles.totalLabel}>
+                                        Total Initial:
+                                      </span>
+                                      <span className={styles.totalValue}>
+                                        $
+                                        {Math.round(
+                                          quote?.total_initial_price || 0
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
                             </div>
+                          );
+                        })()
+                      ) : (
+                        // Multiple Plans Pricing Display - Two Column Layout
+                        <div className={styles.multiplePlansPricingGrid}>
+                          {/* Left Column: Service Items */}
+                          <div className={styles.multiplePlansPricing}>
+                            {serviceSelections
+                              .filter((sel: any) => sel.servicePlan)
+                              .map((selection: any, index: number) => {
+                                const lineItem = quote?.line_items?.find(
+                                  (item: any) =>
+                                    item.display_order ===
+                                      selection.displayOrder &&
+                                    item.service_plan_id &&
+                                    !item.addon_service_id
+                                );
+                                return (
+                                  <div
+                                    key={selection.id}
+                                    className={styles.planLineItem}
+                                  >
+                                    <div className={styles.lineItemHeader}>
+                                      Service {index + 1}:{' '}
+                                      {selection.servicePlan?.plan_name}
+                                    </div>
+                                    <div className={styles.lineItemPricing}>
+                                      <div className={styles.lineItemColumn}>
+                                        <div className={styles.lineItemLabel}>
+                                          Recurring Price
+                                        </div>
+                                        <div
+                                          className={
+                                            styles.lineItemRecurringPrice
+                                          }
+                                        >
+                                          $
+                                          {formatRecurringPrice(
+                                            lineItem?.final_recurring_price || 0
+                                          )}
+                                          <span
+                                            className={styles.lineItemPerMonth}
+                                          >
+                                            /mo
+                                          </span>
+                                        </div>
+                                        {lineItem?.is_custom_priced ? (
+                                          <div
+                                            className={
+                                              styles.lineItemOriginalPrice
+                                            }
+                                          >
+                                            Custom pricing (Originally: $
+                                            {calculatedPrices[
+                                              selection.displayOrder
+                                            ]?.recurring || 0}
+                                            /mo)
+                                          </div>
+                                        ) : lineItem?.discount_id ||
+                                          lineItem?.discount_percentage > 0 ||
+                                          lineItem?.discount_amount > 0 ||
+                                          (lineItem?.recurring_price &&
+                                            lineItem?.final_recurring_price <
+                                              lineItem?.recurring_price) ? (
+                                          <div
+                                            className={
+                                              styles.lineItemOriginalPrice
+                                            }
+                                          >
+                                            Originally $
+                                            {lineItem?.recurring_price || 0}/mo
+                                            {lineItem?.discount_percentage >
+                                              0 && (
+                                              <span>
+                                                {' '}
+                                                (-{lineItem.discount_percentage}
+                                                %)
+                                              </span>
+                                            )}
+                                            {lineItem?.discount_amount > 0 &&
+                                              !lineItem?.discount_percentage && (
+                                                <span>
+                                                  {' '}
+                                                  (-${lineItem.discount_amount})
+                                                </span>
+                                              )}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                      <div className={styles.lineItemColumn}>
+                                        <div className={styles.lineItemLabel}>
+                                          Initial Price
+                                        </div>
+                                        <div
+                                          className={
+                                            styles.lineItemInitialPrice
+                                          }
+                                        >
+                                          $
+                                          {Math.round(
+                                            lineItem?.final_initial_price || 0
+                                          )}
+                                        </div>
+                                        {lineItem?.is_custom_priced ? (
+                                          <div
+                                            className={
+                                              styles.lineItemOriginalPrice
+                                            }
+                                          >
+                                            Custom pricing (Originally: $
+                                            {Math.round(
+                                              calculatedPrices[
+                                                selection.displayOrder
+                                              ]?.initial || 0
+                                            )}
+                                            )
+                                          </div>
+                                        ) : lineItem?.discount_id ||
+                                          lineItem?.discount_percentage > 0 ||
+                                          lineItem?.discount_amount > 0 ||
+                                          (lineItem?.initial_price &&
+                                            lineItem?.final_initial_price <
+                                              lineItem?.initial_price) ? (
+                                          <div
+                                            className={
+                                              styles.lineItemOriginalPrice
+                                            }
+                                          >
+                                            Originally $
+                                            {Math.round(
+                                              lineItem?.initial_price || 0
+                                            )}
+                                            {lineItem?.discount_percentage >
+                                              0 && (
+                                              <span>
+                                                {' '}
+                                                (-{lineItem.discount_percentage}
+                                                %)
+                                              </span>
+                                            )}
+                                            {lineItem?.discount_amount > 0 &&
+                                              !lineItem?.discount_percentage && (
+                                                <span>
+                                                  {' '}
+                                                  (-${lineItem.discount_amount})
+                                                </span>
+                                              )}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                      <div className={styles.lineItemColumn}>
+                                        <div className={styles.lineItemLabel}>
+                                          Treatment Frequency
+                                        </div>
+                                        <div
+                                          className={styles.lineItemFrequency}
+                                        >
+                                          {selection.frequency
+                                            .charAt(0)
+                                            .toUpperCase() +
+                                            selection.frequency.slice(1)}
+                                        </div>
+                                        <div
+                                          className={styles.lineItemInspection}
+                                        >
+                                          Inspection Included
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
 
-                            {/* Add-Ons for Single Plan */}
+                            {/* Add-Ons Section */}
                             {quote?.line_items &&
                               quote.line_items.filter(
                                 (item: any) =>
                                   item.addon_service_id != null &&
                                   item.addon_service_id !== ''
                               ).length > 0 && (
-                                <div className={styles.addOnsBreakdown}>
-                                  <div className={styles.addOnsHeader}>
-                                    Add-On Services:
+                                <div className={styles.addOnsSection}>
+                                  <div className={styles.addOnsSectionHeader}>
+                                    Add-On Services
                                   </div>
                                   {quote.line_items
                                     .filter(
@@ -2116,720 +2469,535 @@ export function LeadQuoteSection({
                                     .map((addonItem: any) => (
                                       <div
                                         key={addonItem.id}
-                                        className={styles.addonLineItem}
+                                        className={styles.planLineItem}
                                       >
-                                        <div className={styles.addonName}>
+                                        <div className={styles.lineItemHeader}>
                                           {addonItem.plan_name}
                                         </div>
-                                        <div className={styles.addonPrices}>
-                                          <span
-                                            className={styles.addonRecurring}
+                                        <div className={styles.lineItemPricing}>
+                                          <div
+                                            className={styles.lineItemColumn}
                                           >
-                                            +${formatRecurringPrice(addonItem.final_recurring_price)}
-                                            /mo
-                                          </span>
-                                          {addonItem.final_initial_price >
-                                            0 && (
-                                            <span
-                                              className={styles.addonInitial}
+                                            <div
+                                              className={styles.lineItemLabel}
+                                            >
+                                              Recurring Price
+                                            </div>
+                                            <div
+                                              className={
+                                                styles.lineItemRecurringPrice
+                                              }
+                                            >
+                                              $
+                                              {formatRecurringPrice(
+                                                addonItem.final_recurring_price ||
+                                                  0
+                                              )}
+                                              <span
+                                                className={
+                                                  styles.lineItemPerMonth
+                                                }
+                                              >
+                                                /mo
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div
+                                            className={styles.lineItemColumn}
+                                          >
+                                            <div
+                                              className={styles.lineItemLabel}
+                                            >
+                                              Initial Price
+                                            </div>
+                                            <div
+                                              className={
+                                                styles.lineItemInitialPrice
+                                              }
                                             >
                                               $
                                               {Math.round(
-                                                addonItem.final_initial_price
-                                              )}{' '}
-                                              initial
-                                            </span>
-                                          )}
+                                                addonItem.final_initial_price ||
+                                                  0
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
                                       </div>
                                     ))}
                                 </div>
                               )}
+                          </div>
 
-                            {/* Total with Add-Ons */}
-                            {quote?.line_items &&
-                              quote.line_items.filter(
-                                (item: any) =>
-                                  item.addon_service_id != null &&
-                                  item.addon_service_id !== ''
-                              ).length > 0 && (
-                                <div className={styles.singlePlanTotal}>
-                                  <div className={styles.totalRow}>
-                                    <span className={styles.totalLabel}>
-                                      Total Recurring:
-                                    </span>
-                                    <span className={styles.totalValue}>
-                                      $
-                                      {formatRecurringPrice(quote?.total_recurring_price || 0)}
+                          {/* Right Column: Total Cost Section */}
+                          <div className={styles.totalCostSection}>
+                            <div className={styles.totalCostHeader}>
+                              Total Cost:
+                            </div>
+                            <div className={styles.totalCostContent}>
+                              <div className={styles.totalCostGrid}>
+                                <div className={styles.totalColumn}>
+                                  <div className={styles.totalLabel}>
+                                    Total Recurring
+                                  </div>
+                                  <div className={styles.totalRecurringPrice}>
+                                    $
+                                    {formatRecurringPrice(
+                                      quote?.total_recurring_price || 0
+                                    )}
+                                    <span className={styles.totalPerMonth}>
                                       /mo
                                     </span>
                                   </div>
-                                  <div className={styles.totalRow}>
-                                    <span className={styles.totalLabel}>
-                                      Total Initial:
-                                    </span>
-                                    <span className={styles.totalValue}>
-                                      $
-                                      {Math.round(
-                                        quote?.total_initial_price || 0
-                                      )}
-                                    </span>
-                                  </div>
                                 </div>
-                              )}
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      // Multiple Plans Pricing Display - Two Column Layout
-                      <div className={styles.multiplePlansPricingGrid}>
-                        {/* Left Column: Service Items */}
-                        <div className={styles.multiplePlansPricing}>
-                          {serviceSelections
-                            .filter((sel: any) => sel.servicePlan)
-                            .map((selection: any, index: number) => {
-                              const lineItem = quote?.line_items?.find(
-                                (item: any) =>
-                                  item.display_order ===
-                                    selection.displayOrder &&
-                                  item.service_plan_id &&
-                                  !item.addon_service_id
-                              );
-                              return (
-                                <div
-                                  key={selection.id}
-                                  className={styles.planLineItem}
-                                >
-                                  <div className={styles.lineItemHeader}>
-                                    Service {index + 1}:{' '}
-                                    {selection.servicePlan?.plan_name}
+                                <div className={styles.totalColumn}>
+                                  <div className={styles.totalLabel}>
+                                    Total Initial
                                   </div>
-                                  <div className={styles.lineItemPricing}>
-                                    <div className={styles.lineItemColumn}>
-                                      <div className={styles.lineItemLabel}>
-                                        Recurring Price
-                                      </div>
-                                      <div
-                                        className={
-                                          styles.lineItemRecurringPrice
-                                        }
-                                      >
-                                        $
-                                        {formatRecurringPrice(lineItem?.final_recurring_price || 0)}
-                                        <span
-                                          className={styles.lineItemPerMonth}
-                                        >
-                                          /mo
-                                        </span>
-                                      </div>
-                                      {lineItem?.is_custom_priced ? (
-                                        <div
-                                          className={
-                                            styles.lineItemOriginalPrice
-                                          }
-                                        >
-                                          Custom pricing (Originally: $
-                                          {calculatedPrices[
-                                            selection.displayOrder
-                                          ]?.recurring || 0}
-                                          /mo)
-                                        </div>
-                                      ) : lineItem?.discount_id ||
-                                         lineItem?.discount_percentage > 0 ||
-                                         lineItem?.discount_amount > 0 ||
-                                         (lineItem?.recurring_price &&
-                                          lineItem?.final_recurring_price < lineItem?.recurring_price) ? (
-                                        <div
-                                          className={
-                                            styles.lineItemOriginalPrice
-                                          }
-                                        >
-                                          Originally ${lineItem?.recurring_price || 0}/mo
-                                          {lineItem?.discount_percentage > 0 && (
-                                            <span> (-{lineItem.discount_percentage}%)</span>
-                                          )}
-                                          {lineItem?.discount_amount > 0 && !lineItem?.discount_percentage && (
-                                            <span> (-${lineItem.discount_amount})</span>
-                                          )}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    <div className={styles.lineItemColumn}>
-                                      <div className={styles.lineItemLabel}>
-                                        Initial Price
-                                      </div>
-                                      <div
-                                        className={styles.lineItemInitialPrice}
-                                      >
-                                        $
-                                        {Math.round(
-                                          lineItem?.final_initial_price || 0
-                                        )}
-                                      </div>
-                                      {lineItem?.is_custom_priced ? (
-                                        <div
-                                          className={
-                                            styles.lineItemOriginalPrice
-                                          }
-                                        >
-                                          Custom pricing (Originally: $
-                                          {Math.round(
-                                            calculatedPrices[
-                                              selection.displayOrder
-                                            ]?.initial || 0
-                                          )}
-                                          )
-                                        </div>
-                                      ) : lineItem?.discount_id ||
-                                         lineItem?.discount_percentage > 0 ||
-                                         lineItem?.discount_amount > 0 ||
-                                         (lineItem?.initial_price &&
-                                          lineItem?.final_initial_price < lineItem?.initial_price) ? (
-                                        <div
-                                          className={
-                                            styles.lineItemOriginalPrice
-                                          }
-                                        >
-                                          Originally $
-                                          {Math.round(
-                                            lineItem?.initial_price || 0
-                                          )}
-                                          {lineItem?.discount_percentage > 0 && (
-                                            <span> (-{lineItem.discount_percentage}%)</span>
-                                          )}
-                                          {lineItem?.discount_amount > 0 && !lineItem?.discount_percentage && (
-                                            <span> (-${lineItem.discount_amount})</span>
-                                          )}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    <div className={styles.lineItemColumn}>
-                                      <div className={styles.lineItemLabel}>
-                                        Treatment Frequency
-                                      </div>
-                                      <div className={styles.lineItemFrequency}>
-                                        {selection.frequency
-                                          .charAt(0)
-                                          .toUpperCase() +
-                                          selection.frequency.slice(1)}
-                                      </div>
-                                      <div
-                                        className={styles.lineItemInspection}
-                                      >
-                                        Inspection Included
-                                      </div>
-                                    </div>
+                                  <div className={styles.totalInitialPrice}>
+                                    $
+                                    {Math.round(
+                                      quote?.total_initial_price || 0
+                                    )}
                                   </div>
+                                  {(() => {
+                                    const totalBaseInitial =
+                                      quote?.line_items?.reduce(
+                                        (sum: number, item: any) =>
+                                          sum + (item.initial_price || 0),
+                                        0
+                                      ) || 0;
+                                    const savings =
+                                      totalBaseInitial -
+                                      (quote?.total_initial_price || 0);
+                                    return savings > 0 ? (
+                                      <div className={styles.totalSavings}>
+                                        Savings: ${Math.round(savings)}
+                                      </div>
+                                    ) : null;
+                                  })()}
                                 </div>
-                              );
-                            })}
+                                <div className={styles.buttonColumn}>
+                                  <button
+                                    type="button"
+                                    onClick={onEmailQuote}
+                                    className={styles.emailQuoteButton}
+                                  >
+                                    <Mail size={18} />
+                                    Email Quote
+                                  </button>
+                                  {lead.company?.slug &&
+                                    quote?.id &&
+                                    quote?.quote_token && (
+                                      <a
+                                        href={`/${lead.company.slug}/quote/${quote.id}?token=${quote.quote_token}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.viewQuoteLink}
+                                      >
+                                        <ExternalLink size={16} />
+                                        View Quote
+                                      </a>
+                                    )}
+                                </div>
+                              </div>
+                            </div>
 
-                          {/* Add-Ons Section */}
-                          {quote?.line_items &&
-                            quote.line_items.filter(
-                              (item: any) =>
-                                item.addon_service_id != null &&
-                                item.addon_service_id !== ''
-                            ).length > 0 && (
-                              <div className={styles.addOnsSection}>
-                                <div className={styles.addOnsSectionHeader}>
-                                  Add-On Services
+                            {/* Service Address Section */}
+                            {lead.primary_service_address && (
+                              <div className={styles.serviceAddressSection}>
+                                <div className={styles.serviceAddressLabel}>
+                                  Service Address:
                                 </div>
-                                {quote.line_items
-                                  .filter(
-                                    (item: any) =>
-                                      item.addon_service_id != null &&
-                                      item.addon_service_id !== ''
-                                  )
-                                  .map((addonItem: any) => (
-                                    <div
-                                      key={addonItem.id}
-                                      className={styles.planLineItem}
-                                    >
-                                      <div className={styles.lineItemHeader}>
-                                        {addonItem.plan_name}
-                                      </div>
-                                      <div className={styles.lineItemPricing}>
-                                        <div className={styles.lineItemColumn}>
-                                          <div className={styles.lineItemLabel}>
-                                            Recurring Price
-                                          </div>
-                                          <div
-                                            className={
-                                              styles.lineItemRecurringPrice
-                                            }
-                                          >
-                                            $
-                                            {formatRecurringPrice(addonItem.final_recurring_price ||
-                                                0)}
-                                            <span
-                                              className={
-                                                styles.lineItemPerMonth
-                                              }
-                                            >
-                                              /mo
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <div className={styles.lineItemColumn}>
-                                          <div className={styles.lineItemLabel}>
-                                            Initial Price
-                                          </div>
-                                          <div
-                                            className={
-                                              styles.lineItemInitialPrice
-                                            }
-                                          >
-                                            $
-                                            {Math.round(
-                                              addonItem.final_initial_price || 0
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
+                                <div className={styles.serviceAddressContent}>
+                                  <div className={styles.serviceAddressText}>
+                                    {
+                                      lead.primary_service_address
+                                        .street_address
+                                    }
+                                    {lead.primary_service_address
+                                      .apartment_unit &&
+                                      ` ${lead.primary_service_address.apartment_unit}`}
+                                    , {lead.primary_service_address.city},{' '}
+                                    {lead.primary_service_address.state}{' '}
+                                    {lead.primary_service_address.zip_code}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={onEditAddress}
+                                    className={styles.editAddressButton}
+                                    aria-label="Edit address"
+                                  >
+                                    <PenLine size={16} />
+                                  </button>
+                                </div>
                               </div>
                             )}
+                          </div>
                         </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
-                        {/* Right Column: Total Cost Section */}
-                        <div className={styles.totalCostSection}>
-                          <div className={styles.totalCostHeader}>
-                            Total Cost:
-                          </div>
-                          <div className={styles.totalCostContent}>
-                            <div className={styles.totalCostGrid}>
-                              <div className={styles.totalColumn}>
-                                <div className={styles.totalLabel}>
-                                  Total Recurring
-                                </div>
-                                <div className={styles.totalRecurringPrice}>
-                                  $
-                                  {formatRecurringPrice(quote?.total_recurring_price || 0)}
-                                  <span className={styles.totalPerMonth}>
-                                    /mo
-                                  </span>
-                                </div>
-                              </div>
-                              <div className={styles.totalColumn}>
-                                <div className={styles.totalLabel}>
-                                  Total Initial
-                                </div>
-                                <div className={styles.totalInitialPrice}>
-                                  ${Math.round(quote?.total_initial_price || 0)}
-                                </div>
-                                {(() => {
-                                  const totalBaseInitial =
-                                    quote?.line_items?.reduce(
-                                      (sum: number, item: any) =>
-                                        sum + (item.initial_price || 0),
-                                      0
-                                    ) || 0;
-                                  const savings =
-                                    totalBaseInitial -
-                                    (quote?.total_initial_price || 0);
-                                  return savings > 0 ? (
-                                    <div className={styles.totalSavings}>
-                                      Savings: ${Math.round(savings)}
-                                    </div>
-                                  ) : null;
-                                })()}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={onEmailQuote}
-                                className={styles.emailQuoteButton}
-                              >
-                                <Mail size={18} />
-                                Email Quote
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Service Address Section */}
-                          {lead.primary_service_address && (
-                            <div className={styles.serviceAddressSection}>
-                              <div className={styles.serviceAddressLabel}>
-                                Service Address:
-                              </div>
-                              <div className={styles.serviceAddressContent}>
-                                <div className={styles.serviceAddressText}>
-                                  {lead.primary_service_address.street_address}
-                                  {lead.primary_service_address
-                                    .apartment_unit &&
-                                    ` ${lead.primary_service_address.apartment_unit}`}
-                                  , {lead.primary_service_address.city},{' '}
-                                  {lead.primary_service_address.state}{' '}
-                                  {lead.primary_service_address.zip_code}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={onEditAddress}
-                                  className={styles.editAddressButton}
-                                  aria-label="Edit address"
+                {/* Plan Information Section */}
+                <div>
+                  <h4 className={cardStyles.defaultText}>Plan Information</h4>
+                  <div className={styles.planInfoContainer}>
+                    <div className={styles.tabContainer}>
+                      {[
+                        { id: 'overview', label: 'Plan Overview' },
+                        { id: 'pests', label: 'Covered Pests' },
+                        { id: 'expect', label: 'What to Expect' },
+                        { id: 'faqs', label: 'FAQs' },
+                      ].map((tab, index, array) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveServiceTab(tab.id)}
+                          className={`${styles.tabButton} ${
+                            activeServiceTab === tab.id
+                              ? styles.active
+                              : styles.inactive
+                          } ${index === 0 ? styles.firstTab : ''} ${
+                            index === array.length - 1 ? styles.lastTab : ''
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Tab Content */}
+                    <div className={styles.tabContent}>
+                      {activeServiceTab === 'overview' && (
+                        <div className={styles.tabContentInner}>
+                          <div className={styles.planOverviewScroll}>
+                            {serviceSelections
+                              .filter(sel => sel.servicePlan)
+                              .map((selection, index) => (
+                                <div
+                                  key={selection.id}
+                                  className={styles.planSection}
                                 >
-                                  <PenLine size={16} />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Plan Information Section */}
-              <div>
-                <h4 className={cardStyles.defaultText}>Plan Information</h4>
-                <div className={styles.planInfoContainer}>
-                  <div className={styles.tabContainer}>
-                    {[
-                      { id: 'overview', label: 'Plan Overview' },
-                      { id: 'pests', label: 'Covered Pests' },
-                      { id: 'expect', label: 'What to Expect' },
-                      { id: 'faqs', label: 'FAQs' },
-                    ].map((tab, index, array) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveServiceTab(tab.id)}
-                        className={`${styles.tabButton} ${
-                          activeServiceTab === tab.id
-                            ? styles.active
-                            : styles.inactive
-                        } ${index === 0 ? styles.firstTab : ''} ${
-                          index === array.length - 1 ? styles.lastTab : ''
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                  {/* Tab Content */}
-                  <div className={styles.tabContent}>
-                    {activeServiceTab === 'overview' && (
-                      <div className={styles.tabContentInner}>
-                        <div className={styles.planOverviewScroll}>
-                          {serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .map((selection, index) => (
-                              <div
-                                key={selection.id}
-                                className={styles.planSection}
-                              >
-                                <h4 className={styles.planTitle}>
-                                  {selection.servicePlan.plan_name}
-                                  {serviceSelections.filter(
-                                    sel => sel.servicePlan
-                                  ).length > 1 && (
-                                    <span className={styles.planNumber}>
-                                      ({index + 1}/
-                                      {
-                                        serviceSelections.filter(
-                                          sel => sel.servicePlan
-                                        ).length
-                                      }
-                                      )
-                                    </span>
-                                  )}
-                                  {selection.servicePlan.highlight_badge && (
-                                    <span className={styles.highlightBadge}>
-                                      {selection.servicePlan.highlight_badge}
-                                    </span>
-                                  )}
-                                </h4>
-                                <p className={styles.planDescription}>
-                                  {selection.servicePlan.plan_description}
-                                </p>
-
-                                <h5 className={styles.planFeaturesTitle}>
-                                  Plan Features
-                                </h5>
-                                {selection.servicePlan.plan_features &&
-                                Array.isArray(
-                                  selection.servicePlan.plan_features
-                                ) ? (
-                                  <ul className={styles.planFeaturesList}>
-                                    {selection.servicePlan.plan_features.map(
-                                      (feature: string, idx: number) => (
-                                        <li key={idx}>{feature}</li>
-                                      )
-                                    )}
-                                  </ul>
-                                ) : (
-                                  <p className={styles.emptyMessage}>
-                                    No features listed
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {activeServiceTab === 'pests' && (
-                      <div className={styles.tabContentInner}>
-                        <h4 className={styles.tabSectionTitle}>
-                          Covered Pests
-                        </h4>
-                        {(() => {
-                          // Collect all unique pests from all selected plans
-                          const allPestCoverage = new Map<
-                            string,
-                            { pest: any; coverageLevel: string }
-                          >();
-
-                          serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .forEach(selection => {
-                              if (selection.servicePlan.pest_coverage) {
-                                selection.servicePlan.pest_coverage.forEach(
-                                  (coverage: any) => {
-                                    const pest = pestOptions.find(
-                                      p => p.id === coverage.pest_id
-                                    );
-                                    if (
-                                      pest &&
-                                      !allPestCoverage.has(coverage.pest_id)
-                                    ) {
-                                      allPestCoverage.set(coverage.pest_id, {
-                                        pest,
-                                        coverageLevel: coverage.coverage_level,
-                                      });
-                                    }
-                                  }
-                                );
-                              }
-                            });
-
-                          if (allPestCoverage.size === 0) {
-                            return (
-                              <p className={styles.emptyMessage}>
-                                No pest coverage information available
-                              </p>
-                            );
-                          }
-
-                          return (
-                            <div className={styles.pestCoverageGrid}>
-                              {Array.from(allPestCoverage.values()).map(
-                                ({ pest, coverageLevel }) => (
-                                  <div
-                                    key={pest.id}
-                                    className={`${styles.pestCoverageItem} ${
-                                      coverageLevel !== 'full'
-                                        ? styles.partial
-                                        : ''
-                                    }`}
-                                  >
-                                    {pest.custom_label || pest.name}
-                                    {coverageLevel !== 'full' && (
-                                      <span className={styles.pestCoverageNote}>
-                                        ({coverageLevel})
+                                  <h4 className={styles.planTitle}>
+                                    {selection.servicePlan.plan_name}
+                                    {serviceSelections.filter(
+                                      sel => sel.servicePlan
+                                    ).length > 1 && (
+                                      <span className={styles.planNumber}>
+                                        ({index + 1}/
+                                        {
+                                          serviceSelections.filter(
+                                            sel => sel.servicePlan
+                                          ).length
+                                        }
+                                        )
                                       </span>
                                     )}
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    {activeServiceTab === 'expect' && (
-                      <div className={styles.tabContentInner}>
-                        <div className={styles.planOverviewScroll}>
-                          {serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .map((selection, index) => (
-                              <div
-                                key={selection.id}
-                                className={styles.planSection}
-                              >
-                                <h4 className={styles.tabSectionTitle}>
-                                  {selection.servicePlan.plan_name} - What to
-                                  Expect
-                                  {serviceSelections.filter(
-                                    sel => sel.servicePlan
-                                  ).length > 1 && (
-                                    <span className={styles.planNumber}>
-                                      {' '}
-                                      ({index + 1}/
-                                      {
-                                        serviceSelections.filter(
-                                          sel => sel.servicePlan
-                                        ).length
-                                      }
-                                      )
-                                    </span>
-                                  )}
-                                </h4>
-                                <div className={styles.expectContent}>
-                                  <p>
-                                    Treatment frequency:{' '}
-                                    <strong>
-                                      {
-                                        selection.servicePlan
-                                          .treatment_frequency
-                                      }
-                                    </strong>
-                                  </p>
-                                  <p>
-                                    Billing cycle:{' '}
-                                    <strong>
-                                      {selection.servicePlan.billing_frequency}
-                                    </strong>
-                                  </p>
-                                  {selection.servicePlan
-                                    .includes_inspection && (
-                                    <p>✓ Initial inspection included</p>
-                                  )}
-                                  <div className={styles.expectHighlight}>
-                                    <p className={styles.expectHighlightText}>
-                                      Our{' '}
-                                      {selection.servicePlan.plan_name.toLowerCase()}{' '}
-                                      provides comprehensive protection with{' '}
-                                      {
-                                        selection.servicePlan
-                                          .treatment_frequency
-                                      }{' '}
-                                      treatments to keep your property pest-free
-                                      year-round.
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {activeServiceTab === 'faqs' && (
-                      <div className={styles.tabContentInner}>
-                        <div className={styles.planOverviewScroll}>
-                          {serviceSelections
-                            .filter(sel => sel.servicePlan)
-                            .map((selection, index) => (
-                              <div
-                                key={selection.id}
-                                className={styles.planSection}
-                              >
-                                <h4 className={styles.tabSectionTitle}>
-                                  {selection.servicePlan.plan_name} - Frequently
-                                  Asked Questions
-                                  {serviceSelections.filter(
-                                    sel => sel.servicePlan
-                                  ).length > 1 && (
-                                    <span className={styles.planNumber}>
-                                      {' '}
-                                      ({index + 1}/
-                                      {
-                                        serviceSelections.filter(
-                                          sel => sel.servicePlan
-                                        ).length
-                                      }
-                                      )
-                                    </span>
-                                  )}
-                                </h4>
-                                {selection.servicePlan.plan_faqs &&
-                                Array.isArray(
-                                  selection.servicePlan.plan_faqs
-                                ) ? (
-                                  <div className={styles.faqGrid}>
-                                    {selection.servicePlan.plan_faqs.map(
-                                      (faq: any, idx: number) => (
-                                        <div
-                                          key={idx}
-                                          className={styles.faqItem}
-                                        >
-                                          <h5 className={styles.faqQuestion}>
-                                            {faq.question}
-                                          </h5>
-                                          <p className={styles.faqAnswer}>
-                                            {faq.answer}
-                                          </p>
-                                        </div>
-                                      )
+                                    {selection.servicePlan.highlight_badge && (
+                                      <span className={styles.highlightBadge}>
+                                        {selection.servicePlan.highlight_badge}
+                                      </span>
                                     )}
-                                  </div>
-                                ) : (
-                                  <p className={styles.emptyMessage}>
-                                    No FAQs available for this plan
+                                  </h4>
+                                  <p className={styles.planDescription}>
+                                    {selection.servicePlan.plan_description}
                                   </p>
+
+                                  <h5 className={styles.planFeaturesTitle}>
+                                    Plan Features
+                                  </h5>
+                                  {selection.servicePlan.plan_features &&
+                                  Array.isArray(
+                                    selection.servicePlan.plan_features
+                                  ) ? (
+                                    <ul className={styles.planFeaturesList}>
+                                      {selection.servicePlan.plan_features.map(
+                                        (feature: string, idx: number) => (
+                                          <li key={idx}>{feature}</li>
+                                        )
+                                      )}
+                                    </ul>
+                                  ) : (
+                                    <p className={styles.emptyMessage}>
+                                      No features listed
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeServiceTab === 'pests' && (
+                        <div className={styles.tabContentInner}>
+                          <h4 className={styles.tabSectionTitle}>
+                            Covered Pests
+                          </h4>
+                          {(() => {
+                            // Collect all unique pests from all selected plans
+                            const allPestCoverage = new Map<
+                              string,
+                              { pest: any; coverageLevel: string }
+                            >();
+
+                            serviceSelections
+                              .filter(sel => sel.servicePlan)
+                              .forEach(selection => {
+                                if (selection.servicePlan.pest_coverage) {
+                                  selection.servicePlan.pest_coverage.forEach(
+                                    (coverage: any) => {
+                                      const pest = pestOptions.find(
+                                        p => p.id === coverage.pest_id
+                                      );
+                                      if (
+                                        pest &&
+                                        !allPestCoverage.has(coverage.pest_id)
+                                      ) {
+                                        allPestCoverage.set(coverage.pest_id, {
+                                          pest,
+                                          coverageLevel:
+                                            coverage.coverage_level,
+                                        });
+                                      }
+                                    }
+                                  );
+                                }
+                              });
+
+                            if (allPestCoverage.size === 0) {
+                              return (
+                                <p className={styles.emptyMessage}>
+                                  No pest coverage information available
+                                </p>
+                              );
+                            }
+
+                            return (
+                              <div className={styles.pestCoverageGrid}>
+                                {Array.from(allPestCoverage.values()).map(
+                                  ({ pest, coverageLevel }) => (
+                                    <div
+                                      key={pest.id}
+                                      className={`${styles.pestCoverageItem} ${
+                                        coverageLevel !== 'full'
+                                          ? styles.partial
+                                          : ''
+                                      }`}
+                                    >
+                                      {pest.custom_label || pest.name}
+                                      {coverageLevel !== 'full' && (
+                                        <span
+                                          className={styles.pestCoverageNote}
+                                        >
+                                          ({coverageLevel})
+                                        </span>
+                                      )}
+                                    </div>
+                                  )
                                 )}
                               </div>
-                            ))}
+                            );
+                          })()}
                         </div>
+                      )}
+
+                      {activeServiceTab === 'expect' && (
+                        <div className={styles.tabContentInner}>
+                          <div className={styles.planOverviewScroll}>
+                            {serviceSelections
+                              .filter(sel => sel.servicePlan)
+                              .map((selection, index) => (
+                                <div
+                                  key={selection.id}
+                                  className={styles.planSection}
+                                >
+                                  <h4 className={styles.tabSectionTitle}>
+                                    {selection.servicePlan.plan_name} - What to
+                                    Expect
+                                    {serviceSelections.filter(
+                                      sel => sel.servicePlan
+                                    ).length > 1 && (
+                                      <span className={styles.planNumber}>
+                                        {' '}
+                                        ({index + 1}/
+                                        {
+                                          serviceSelections.filter(
+                                            sel => sel.servicePlan
+                                          ).length
+                                        }
+                                        )
+                                      </span>
+                                    )}
+                                  </h4>
+                                  <div className={styles.expectContent}>
+                                    <p>
+                                      Treatment frequency:{' '}
+                                      <strong>
+                                        {
+                                          selection.servicePlan
+                                            .treatment_frequency
+                                        }
+                                      </strong>
+                                    </p>
+                                    <p>
+                                      Billing cycle:{' '}
+                                      <strong>
+                                        {
+                                          selection.servicePlan
+                                            .billing_frequency
+                                        }
+                                      </strong>
+                                    </p>
+                                    {selection.servicePlan
+                                      .includes_inspection && (
+                                      <p>✓ Initial inspection included</p>
+                                    )}
+                                    <div className={styles.expectHighlight}>
+                                      <p className={styles.expectHighlightText}>
+                                        Our{' '}
+                                        {selection.servicePlan.plan_name.toLowerCase()}{' '}
+                                        provides comprehensive protection with{' '}
+                                        {
+                                          selection.servicePlan
+                                            .treatment_frequency
+                                        }{' '}
+                                        treatments to keep your property
+                                        pest-free year-round.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeServiceTab === 'faqs' && (
+                        <div className={styles.tabContentInner}>
+                          <div className={styles.planOverviewScroll}>
+                            {serviceSelections
+                              .filter(sel => sel.servicePlan)
+                              .map((selection, index) => (
+                                <div
+                                  key={selection.id}
+                                  className={styles.planSection}
+                                >
+                                  <h4 className={styles.tabSectionTitle}>
+                                    {selection.servicePlan.plan_name} -
+                                    Frequently Asked Questions
+                                    {serviceSelections.filter(
+                                      sel => sel.servicePlan
+                                    ).length > 1 && (
+                                      <span className={styles.planNumber}>
+                                        {' '}
+                                        ({index + 1}/
+                                        {
+                                          serviceSelections.filter(
+                                            sel => sel.servicePlan
+                                          ).length
+                                        }
+                                        )
+                                      </span>
+                                    )}
+                                  </h4>
+                                  {selection.servicePlan.plan_faqs &&
+                                  Array.isArray(
+                                    selection.servicePlan.plan_faqs
+                                  ) ? (
+                                    <div className={styles.faqGrid}>
+                                      {selection.servicePlan.plan_faqs.map(
+                                        (faq: any, idx: number) => (
+                                          <div
+                                            key={idx}
+                                            className={styles.faqItem}
+                                          >
+                                            <h5 className={styles.faqQuestion}>
+                                              {faq.question}
+                                            </h5>
+                                            <p className={styles.faqAnswer}>
+                                              {faq.answer}
+                                            </p>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <p className={styles.emptyMessage}>
+                                      No FAQs available for this plan
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preferred Scheduling Section */}
+                <div className={styles.preferredSchedulingSection}>
+                  <div className={styles.preferredSchedulingGrid}>
+                    {/* Left Column: Date and Time Dropdowns */}
+                    <div className={styles.preferredDateTimeColumn}>
+                      <div className={styles.formField}>
+                        <label className={styles.fieldLabel}>
+                          Preferred Date
+                        </label>
+                        <input
+                          type="date"
+                          className={styles.dateInput}
+                          value={preferredDate}
+                          onChange={e => onPreferredDateChange(e.target.value)}
+                        />
                       </div>
-                    )}
+                      <div className={styles.formField}>
+                        <label className={styles.fieldLabel}>
+                          Preferred Time
+                        </label>
+                        <CustomDropdown
+                          value={preferredTime}
+                          onChange={onPreferredTimeChange}
+                          placeholder="Select time"
+                          options={[
+                            { value: '', label: 'Select time' },
+                            { value: 'morning', label: 'Morning (8AM-12PM)' },
+                            {
+                              value: 'afternoon',
+                              label: 'Afternoon (12PM-5PM)',
+                            },
+                            { value: 'evening', label: 'Evening (5PM-8PM)' },
+                            { value: 'flexible', label: 'Flexible' },
+                          ]}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right Column: Action Buttons */}
+                    <div className={styles.actionButtonsColumn}>
+                      <button
+                        type="button"
+                        onClick={onNotInterested}
+                        className={styles.notInterestedButton}
+                      >
+                        Not Interested
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onReadyToSchedule}
+                        className={styles.readyToScheduleButton}
+                      >
+                        Ready to Schedule
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Preferred Scheduling Section */}
-              <div className={styles.preferredSchedulingSection}>
-                <div className={styles.preferredSchedulingGrid}>
-                  {/* Left Column: Date and Time Dropdowns */}
-                  <div className={styles.preferredDateTimeColumn}>
-                    <div className={styles.formField}>
-                      <label className={styles.fieldLabel}>
-                        Preferred Date
-                      </label>
-                      <input
-                        type="date"
-                        className={styles.dateInput}
-                        value={preferredDate}
-                        onChange={(e) => onPreferredDateChange(e.target.value)}
-                      />
-                    </div>
-                    <div className={styles.formField}>
-                      <label className={styles.fieldLabel}>
-                        Preferred Time
-                      </label>
-                      <CustomDropdown
-                        value={preferredTime}
-                        onChange={onPreferredTimeChange}
-                        placeholder="Select time"
-                        options={[
-                          { value: '', label: 'Select time' },
-                          { value: 'morning', label: 'Morning (8AM-12PM)' },
-                          { value: 'afternoon', label: 'Afternoon (12PM-5PM)' },
-                          { value: 'evening', label: 'Evening (5PM-8PM)' },
-                          { value: 'flexible', label: 'Flexible' },
-                        ]}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right Column: Action Buttons */}
-                  <div className={styles.actionButtonsColumn}>
-                    <button
-                      type="button"
-                      onClick={onNotInterested}
-                      className={styles.notInterestedButton}
-                    >
-                      Not Interested
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onReadyToSchedule}
-                      className={styles.readyToScheduleButton}
-                    >
-                      Ready to Schedule
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </InfoCard>
+      </InfoCard>
     </div>
   );
 }

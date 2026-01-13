@@ -549,12 +549,6 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 24px;
-
-    .buttonColumn {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-    }
   }
 
   .pricingColumn {
@@ -685,6 +679,13 @@
   }
 }
 
+.buttonColumn {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 // Multiple Plans Pricing - Grid Container
 .multiplePlansPricingGrid {
   display: grid;
@@ -801,13 +802,16 @@
 
 .totalCostGrid {
   display: flex;
-  gap: 40px;
+  .buttonColumn {
+    margin-left: auto;
+  }
 }
 
 .totalColumn {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-right: 40px;
 }
 
 .totalLabel {
@@ -855,13 +859,36 @@
   font-weight: 500;
   color: var(--gray-900);
   cursor: pointer;
-  margin-left: auto;
   align-self: center;
   transition: all 0.2s ease;
 
   &:hover {
     background: var(--gray-50);
     border-color: var(--gray-400);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.viewQuoteLink {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  background: transparent;
+  font-size: 13px;
+  line-height: 13px;
+  font-weight: 450;
+  color: var(--gray-700);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: var(--action-500);
   }
 
   svg {
