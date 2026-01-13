@@ -2,19 +2,23 @@
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
-import { Outfit } from 'next/font/google';
-import QuoteSteps from '@/components/Quote/QuoteSteps/QuoteSteps';
-import './quote-modal.css';
-
-const outfit = Outfit({ subsets: ['latin'] });
-
+import QuoteContent from '@/components/Quote/QuoteContent/QuoteContent';
+interface AlternativeColor {
+  hex: string;
+  cmyk: string;
+  name: string;
+  pantone: string;
+}
 interface Branding {
   primary_color: string;
   secondary_color: string;
+  alternative_colors: AlternativeColor[];
   logo_url: string;
   icon_logo_url: string;
   font_primary_name?: string;
   font_primary_url?: string;
+  font_secondary_url?: string;
+  primary_hero_image_url?: string;
   slogans?: {
     line1: string;
     line2: string;
@@ -30,6 +34,10 @@ interface Company {
   phone: string;
   website: any;
   branding?: Branding;
+  privacy_policy_url: string;
+  terms_conditions_url: string;
+  quote_terms: string;
+  quote_thanks_content: string;
 }
 
 interface Quote {
@@ -79,7 +87,7 @@ interface Quote {
   company: Company;
 }
 
-function QuoteContent() {
+function QuoteContentWrapper() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -100,13 +108,17 @@ function QuoteContent() {
 
         // Check if token is present
         if (!token) {
-          setError('Invalid or missing access token. Please use the link provided in your email.');
+          setError(
+            'Invalid or missing access token. Please use the link provided in your email.'
+          );
           setLoading(false);
           return;
         }
 
         // Fetch company data
-        const companyResponse = await fetch(`/api/companies/by-slug/${companySlug}`);
+        const companyResponse = await fetch(
+          `/api/companies/by-slug/${companySlug}`
+        );
         if (!companyResponse.ok) {
           if (companyResponse.status === 404) {
             router.push('/404');
@@ -128,7 +140,9 @@ function QuoteContent() {
             return;
           }
           if (quoteResponse.status === 403) {
-            setError('Invalid or expired access token. Please use the link provided in your email.');
+            setError(
+              'Invalid or expired access token. Please use the link provided in your email.'
+            );
             return;
           }
           throw new Error('Failed to fetch quote data');
@@ -152,88 +166,82 @@ function QuoteContent() {
   useEffect(() => {
     if (branding?.font_primary_url) {
       // Remove any existing custom font link
-      const existingLink = document.querySelector('#quote-custom-font');
+      const existingLink = document.querySelector('#primary-custom-font');
+
       if (existingLink) {
         existingLink.remove();
       }
 
       // Add new font link
       const link = document.createElement('link');
-      link.id = 'quote-custom-font';
+      link.id = 'primary-custom-font';
       link.rel = 'stylesheet';
       link.href = branding.font_primary_url;
       document.head.appendChild(link);
+    }
+
+    if (branding?.font_secondary_url) {
+      // Remove any existing custom font link
+      const existingSecondaryLink = document.querySelector(
+        '#secondary-custom-font'
+      );
+
+      if (existingSecondaryLink) {
+        existingSecondaryLink.remove();
+      }
+
+      // Add new font link
+      const secondaryLink = document.createElement('link');
+      secondaryLink.id = 'secondary-custom-font';
+      secondaryLink.rel = 'stylesheet';
+      secondaryLink.href = branding.font_secondary_url;
+      document.head.appendChild(secondaryLink);
     }
   }, [branding]);
 
   if (loading) {
     return (
-      <div className={`dh-modal-overlay ${outfit.className}`}>
-        <div className="dh-modal-content">
-          <div className="dh-modal-body">
-            <div className="quote-loading">
-              <div className="loading-spinner"></div>
-              <p>Loading your quote...</p>
-            </div>
-          </div>
-        </div>
+      <div className="quote-loading">
+        <div className="loading-spinner"></div>
+        <p>Loading your quote...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={`dh-modal-overlay ${outfit.className}`}>
-        <div className="dh-modal-content">
-          <div className="dh-modal-body">
-            <div className="quote-error">
-              <h2>Unable to Load Quote</h2>
-              <p>{error}</p>
-            </div>
-          </div>
-        </div>
+      <div className="quote-error">
+        <h2>Unable to Load Quote</h2>
+        <p>{error}</p>
       </div>
     );
   }
 
   if (!company) {
     return (
-      <div className={`dh-modal-overlay ${outfit.className}`}>
-        <div className="dh-modal-content">
-          <div className="dh-modal-body">
-            <div className="quote-error">
-              <h2>Company Not Found</h2>
-              <p>The company &quot;{companySlug}&quot; could not be found.</p>
-            </div>
-          </div>
-        </div>
+      <div className="quote-error">
+        <h2>Company Not Found</h2>
+        <p>The company &quot;{companySlug}&quot; could not be found.</p>
       </div>
     );
   }
 
   if (!quote) {
     return (
-      <div className={`dh-modal-overlay ${outfit.className}`}>
-        <div className="dh-modal-content">
-          <div className="dh-modal-body">
-            <div className="quote-error">
-              <h2>Quote Not Found</h2>
-              <p>The quote you&apos;re looking for could not be found.</p>
-            </div>
-          </div>
-        </div>
+      <div className="quote-error">
+        <h2>Quote Not Found</h2>
+        <p>The quote you&apos;re looking for could not be found.</p>
       </div>
     );
   }
 
   return (
-    <div className={`dh-modal-overlay ${outfit.className}`}>
-      <div className="dh-modal-content">
-        <div className="dh-modal-body">
-          <QuoteSteps company={company} branding={branding} quote={quote} token={token} />
-        </div>
-      </div>
-    </div>
+    <QuoteContent
+      company={company}
+      branding={branding}
+      quote={quote}
+      token={token}
+    />
   );
 }
 
@@ -241,19 +249,13 @@ export default function QuotePage() {
   return (
     <Suspense
       fallback={
-        <div className={`dh-modal-overlay ${outfit.className}`}>
-          <div className="dh-modal-content">
-            <div className="dh-modal-body">
-              <div className="quote-loading">
-                <div className="loading-spinner"></div>
-                <p>Loading...</p>
-              </div>
-            </div>
-          </div>
+        <div className="quote-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading...</p>
         </div>
       }
     >
-      <QuoteContent />
+      <QuoteContentWrapper />
     </Suspense>
   );
 }

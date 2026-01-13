@@ -219,6 +219,7 @@ export async function POST(
       const leadInsertData: any = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
+        service_address_id: ticket.service_address_id,
         lead_source: ticket.source === 'website' ? 'organic' :
                      ticket.source === 'internal' ? 'other' :
                      ticket.source === 'widget' ? 'widget_submission' :
@@ -327,13 +328,14 @@ export async function POST(
       }
 
       // After successful lead creation, geocode customer address and create service address
+      // Only do this if ticket doesn't already have a service_address_id (inherit from ticket if it does)
       try {
         const { createOrFindServiceAddress } = await import('@/lib/service-addresses');
 
         // Fetch customer data to get address
         const customer = ticket.customer;
 
-        if (customer) {
+        if (customer && !ticket.service_address_id) {
           // Try to geocode the customer's address
           const geocodeResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/internal/geocode`, {
             method: 'POST',

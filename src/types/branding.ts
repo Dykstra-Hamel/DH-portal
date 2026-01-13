@@ -44,6 +44,7 @@ export interface BrandData {
   photography_description?: string;
   photography_images?: string[];
   photography_google_drive_link?: string;
+  primary_hero_image_url?: string;
   signature_url?: string;
   signature_description?: string;
   created_at?: string;

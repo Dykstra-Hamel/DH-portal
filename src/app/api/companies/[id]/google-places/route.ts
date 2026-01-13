@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { aggregateGoogleReviews } from '@/lib/google-places/aggregate-reviews';
 
 export async function GET(
   request: NextRequest,
@@ -86,18 +87,8 @@ export async function POST(
       }
     }
 
-    // Clear the cached reviews data since listings changed
-    await supabase
-      .from('company_settings')
-      .upsert({
-        company_id: companyId,
-        setting_key: 'google_reviews_data',
-        setting_value: '{}',
-        setting_type: 'json',
-        description: 'Cached Google Reviews data including aggregated rating, review count, and last updated timestamp'
-      }, {
-        onConflict: 'company_id,setting_key'
-      });
+    // Immediately fetch and cache aggregated review data with new listings
+    await aggregateGoogleReviews(companyId);
 
     return NextResponse.json({ success: true, count: validListings.length });
   } catch (error) {
