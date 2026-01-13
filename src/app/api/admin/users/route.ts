@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
+
     // Get all users from auth.users
     const { data: authUsers, error: usersError } =
       await supabase.auth.admin.listUsers();

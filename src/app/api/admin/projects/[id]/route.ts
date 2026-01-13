@@ -22,6 +22,18 @@ export async function GET(
         activity:project_activity(
           *,
           user_profile:profiles(id, first_name, last_name, email)
+        ),
+        categories:project_category_assignments(
+          id,
+          category_id,
+          category:project_categories(
+            id,
+            name,
+            description,
+            color,
+            icon,
+            sort_order
+          )
         )
       `
       )

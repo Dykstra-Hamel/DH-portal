@@ -1,10 +1,50 @@
+// Project Category Types
+export interface ProjectCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  icon: string | null;
+  sort_order: number;
+  is_system_default: boolean;
+  company_id: string | null; // NULL = internal/system category
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectCategoryAssignment {
+  id: string;
+  project_id: string;
+  category_id: string;
+  created_at: string;
+  category?: ProjectCategory;
+}
+
+// Project type codes for shortcode generation
+export type ProjectTypeCode = 'WEB' | 'SOC' | 'EML' | 'PRT' | 'VEH' | 'DIG' | 'ADS';
+
+// Project scope types
+export type ProjectScope = 'internal' | 'external' | 'both';
+
+export const PROJECT_TYPE_CODES: Record<ProjectTypeCode, { label: string; description: string }> = {
+  WEB: { label: 'Website', description: 'Landing Pages, Full Websites' },
+  SOC: { label: 'Social Media', description: 'Social media content and campaigns' },
+  EML: { label: 'Email Media', description: 'Email templates and campaigns' },
+  PRT: { label: 'Print Media', description: 'Print materials and designs' },
+  VEH: { label: 'Vehicle Design', description: 'Vehicle wraps and graphics' },
+  DIG: { label: 'Digital Designs', description: 'Digital ads for magazines, websites, etc.' },
+  ADS: { label: 'Paid Ad Designs', description: 'Google, Bing, Yelp, YouTube ads' },
+};
+
 export interface Project {
   id: string;
   name: string;
   description: string;
-  project_type: string;
-  project_subtype: string | null;
-  status: 'coming_up' | 'design' | 'development' | 'out_to_client' | 'waiting_on_client' | 'bill_client';
+  project_type: string; // Existing broad category
+  project_subtype: string | null; // Existing specific subcategory
+  type_code?: ProjectTypeCode; // NEW: Type code for shortcode generation
+  shortcode?: string; // NEW: Auto-generated shortcode (read-only)
+  status: 'in_progress' | 'blocked' | 'on_hold' | 'pending_approval' | 'out_to_client' | 'complete';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   due_date: string;
   start_date: string | null;
@@ -17,8 +57,15 @@ export interface Project {
   tags: string[] | null;
   notes: string | null;
   primary_file_path: string | null;
+  is_internal: boolean; // TRUE = internal admin project, FALSE = client project
+  scope?: ProjectScope; // NEW: internal = agency-only, external = client-only, both = mixed work
   created_at: string;
   updated_at: string;
+
+  // Optional fields for Kanban card display
+  comments_count?: number;
+  members_count?: number;
+  progress?: { completed: number; total: number };
   requested_by_profile: {
     id: string;
     first_name: string;
@@ -37,6 +84,7 @@ export interface Project {
   };
   comments?: ProjectComment[];
   activity?: ProjectActivity[];
+  categories?: ProjectCategoryAssignment[]; // Many-to-many relationship
 }
 
 export interface ProjectFormData {
@@ -44,6 +92,7 @@ export interface ProjectFormData {
   description: string;
   project_type: string;
   project_subtype: string;
+  type_code?: string; // Optional type code for shortcode generation
   requested_by: string;
   company_id: string;
   assigned_to: string;
@@ -56,6 +105,9 @@ export interface ProjectFormData {
   quoted_price: string;
   tags: string;
   notes: string;
+  is_internal: boolean;
+  scope?: ProjectScope; // NEW: internal, external, or both
+  category_ids: string[]; // Array of category IDs for many-to-many relationship
 }
 
 export interface User {
@@ -72,6 +124,7 @@ export interface User {
 export interface Company {
   id: string;
   name: string;
+  short_code?: string; // 3-4 character code for project shortcodes (e.g., "BZB")
 }
 
 export interface ProjectFilters {
@@ -81,17 +134,23 @@ export interface ProjectFilters {
 }
 
 export const statusOptions = [
-  { value: 'coming_up', label: 'Coming Up', color: '#f59e0b' },
-  { value: 'design', label: 'Design', color: '#8b5cf6' },
-  { value: 'development', label: 'Development', color: '#3b82f6' },
-  { value: 'out_to_client', label: 'Out To Client', color: '#06b6d4' },
-  { value: 'waiting_on_client', label: 'Waiting On Client', color: '#6b7280' },
-  { value: 'bill_client', label: 'Bill Client', color: '#10b981' },
+  { value: 'in_progress', label: 'In Progress', color: '#3b82f6' },
+  { value: 'blocked', label: 'Blocked', color: '#ef4444' },
+  { value: 'on_hold', label: 'On Hold', color: '#f97316' },
+  { value: 'pending_approval', label: 'Pending Approval', color: '#eab308' },
+  { value: 'out_to_client', label: 'Out To Client', color: '#8b5cf6' },
+  { value: 'complete', label: 'Complete', color: '#10b981' },
 ];
 
 export const projectTypeOptions = [
-  { value: 'print', label: 'Print' },
-  { value: 'digital', label: 'Digital' },
+  { value: 'none', label: 'None (no shortcode)', code: null },
+  { value: 'website', label: 'Website', code: 'WEB' },
+  { value: 'social', label: 'Social Media', code: 'SOC' },
+  { value: 'email', label: 'Email Media', code: 'EML' },
+  { value: 'print', label: 'Print Media', code: 'PRT' },
+  { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
+  { value: 'digital', label: 'Digital Designs', code: 'DIG' },
+  { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
 ];
 
 export const printSubtypes = [

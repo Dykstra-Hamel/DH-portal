@@ -183,6 +183,31 @@
   }
 }
 
+.settingsInfo {
+  padding: 2rem 1.5rem;
+
+  p {
+    margin: 0 0 1rem 0;
+    color: #475569;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  a {
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+
+    &:hover {
+      opacity: 0.8;
+      text-decoration: underline;
+    }
+  }
+}
+
 .tabNavigation {
   display: flex;
   border-bottom: 1px solid #e5e7eb;

@@ -45,7 +45,8 @@ type SystemSubsection =
   | 'widgets'
   | 'pest-management'
   | 'calling'
-  | 'sms-testing';
+  | 'sms-testing'
+  | 'project-settings';
 
 type AdminSubsection =
   | UserSubsection
@@ -169,6 +170,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
       { id: 'widgets', label: 'Widget Config', legacySection: 'widgets' },
       { id: 'calling', label: 'Calling', legacySection: 'call-settings' },
       { id: 'sms-testing', label: 'SMS Testing', legacySection: 'sms-testing' },
+      { id: 'project-settings', label: 'Project Management' },
     ],
   },
 ];
@@ -263,6 +265,21 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                 /admin/pest-pressure
               </Link>{' '}
               to view the cross-company pest pressure dashboard.
+            </p>
+          </div>
+        );
+      case 'project-settings':
+        return (
+          <div>
+            <p>
+              Navigate to{' '}
+              <Link
+                href="/admin/settings/project-management"
+                style={{ color: 'var(--action-500)' }}
+              >
+                /admin/settings/project-management
+              </Link>{' '}
+              to manage internal project categories and settings.
             </p>
           </div>
         );

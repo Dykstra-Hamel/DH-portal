@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag, FileText, Map, Bug } from 'lucide-react';
+import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag, FileText, Map, Bug, CheckSquare } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
 import SalesConfigManager from './SalesConfigManager';
@@ -14,6 +14,7 @@ import EmailDomainManager from './EmailDomainManager';
 import ServicePlansManager from './ServicePlansManager';
 import ServiceAreasManager from './ServiceAreasManager';
 import PestManager from './PestManager';
+import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import styles from './CompanyManagement.module.scss';
 
@@ -39,6 +40,7 @@ interface Company {
   country: string;
   industry: string | null;
   size: string | null;
+  short_code: string | null;
   ga_property_id: string | null;
   callrail_api_token: string | null;
   callrail_account_id: string | null;
@@ -52,7 +54,7 @@ interface CompanyManagementProps {
   user: User;
 }
 
-type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pest-management' | 'service-plans' | 'service-areas' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
+type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'features' | 'pest-management' | 'service-plans' | 'service-areas' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
@@ -103,6 +105,7 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
           const { settings } = await response.json();
           setCompany({
             ...foundCompany,
+            short_code: settings.short_code?.value || null,
             ga_property_id: settings.ga_property_id?.value || null,
             callrail_api_token: settings.callrail_api_token?.value || null,
             callrail_account_id: settings.callrail_account_id?.value || null,
@@ -426,6 +429,7 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'google-places', label: 'Google Places', icon: Settings },
     { id: 'login-page', label: 'Login Page', icon: Monitor },
+    { id: 'features', label: 'Features', icon: CheckSquare },
     { id: 'pest-management', label: 'Pest Management', icon: Bug },
     { id: 'service-plans', label: 'Service Plans', icon: FileText },
     { id: 'service-areas', label: 'Service Areas', icon: Map },
@@ -536,6 +540,9 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
               saving={saving}
             />
           )}
+          {activeSection === 'features' && (
+            <CompanyFeaturesManager companyId={companyId} />
+          )}
           {activeSection === 'pest-management' && (
             <PestManager />
           )}
@@ -573,6 +580,7 @@ function OverviewSection({ company }: { company: Company }) {
           <h3>Basic Information</h3>
           <p><strong>Name:</strong> {company.name}</p>
           <p><strong>Slug:</strong> {company.slug}</p>
+          <p><strong>Short Code:</strong> {company.short_code || 'Not set'}</p>
           <p><strong>Login URL:</strong> <a href={`/login/${company.slug}`} target="_blank" rel="noopener noreferrer">/login/{company.slug}</a></p>
           <p><strong>Description:</strong> {company.description || 'Not provided'}</p>
           <p><strong>Created:</strong> {new Date(company.created_at).toLocaleDateString()}</p>
@@ -766,6 +774,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
   const [formData, setFormData] = useState({
     industry: company.industry || '',
     size: company.size || '',
+    short_code: company.short_code || '',
   });
   const [timezone, setTimezone] = useState<string>('America/New_York');
   const [businessHours, setBusinessHours] = useState<BusinessHoursData>({
@@ -810,16 +819,26 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Save business info
-    await onSave(formData);
+    // Validate short_code if provided
+    if (formData.short_code && !/^[A-Z]{3,4}$/.test(formData.short_code)) {
+      alert('Short code must be 3-4 uppercase letters');
+      return;
+    }
 
-    // Save timezone, business hours, and URLs settings separately
+    // Save business info (industry, size)
+    await onSave({ industry: formData.industry, size: formData.size });
+
+    // Save short_code, timezone, business hours, and URLs settings separately
     try {
       await fetch(`/api/companies/${company.id}/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           settings: {
+            short_code: {
+              value: formData.short_code.trim(),
+              type: 'string'
+            },
             company_timezone: {
               value: timezone,
               type: 'string'
@@ -848,6 +867,24 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     <div className={styles.section}>
       <h2>Business Information</h2>
       <form onSubmit={handleSubmit}>
+        <div className={styles.formGroup}>
+          <label>Company Short Code (3-4 uppercase letters):</label>
+          <input
+            type="text"
+            value={formData.short_code}
+            onChange={(e) => {
+              const value = e.target.value.toUpperCase();
+              if (value.length <= 4) {
+                setFormData({ ...formData, short_code: value });
+              }
+            }}
+            pattern="[A-Z]{3,4}"
+            placeholder="BZB"
+            maxLength={4}
+          />
+          <small>Used for generating project shortcodes (e.g., BZB_WEB26_ProjectName)</small>
+        </div>
+
         <div className={styles.formGroup}>
           <label>Industry:</label>
           <input

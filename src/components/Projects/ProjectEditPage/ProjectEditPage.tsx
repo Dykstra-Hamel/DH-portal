@@ -48,6 +48,8 @@ const ProjectEditPage: React.FC<ProjectEditPageProps> = ({
     quoted_price: project.quoted_price?.toString() || '',
     tags: project.tags?.join(', ') || '',
     notes: project.notes || '',
+    is_internal: project.is_internal || false,
+    category_ids: project.categories?.map(c => c.category_id) || [],
   });
 
   const handleChange = (

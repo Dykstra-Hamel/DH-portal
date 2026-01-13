@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Mails } from 'lucide-react';
 import { useNavigation, PrimaryNavItem } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import styles from './PrimarySideNav.module.scss';
 
 interface PrimarySideNavProps {
@@ -16,12 +17,17 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const pathname = usePathname();
   const { setActivePrimaryNav } = useNavigation();
   const { isAdmin, isHydrating } = useCompany();
+  const {
+    hasAccess: hasProjectManagement,
+    loading: featureLoading,
+  } = useFeatureAccess('project_management');
 
   const menuItems: Array<{
     id: PrimaryNavItem;
     href: string;
     disabled: boolean;
     superAdminOnly?: boolean;
+    requiresFeature?: 'project_management';
     icon: React.ReactElement;
     text: string;
   }> = [
@@ -133,7 +139,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       id: 'project-management' as PrimaryNavItem,
       href: '/project-management',
       disabled: false,
-      superAdminOnly: true, // Only visible to super admins
+      requiresFeature: 'project_management' as const, // Feature-gated access
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -257,12 +263,21 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     return pathname.startsWith(href);
   };
 
-  // Filter menu items based on super admin status
+  // Filter menu items based on super admin status and feature access
   // Hide super-admin-only items by default until we confirm user is admin
   const visibleMenuItems = menuItems.filter(item => {
     // For super-admin-only items, only show after hydration completes AND user is admin
     if (item.superAdminOnly) {
       return !isHydrating && isAdmin;
+    }
+    // For feature-gated items, check feature access
+    if (item.requiresFeature === 'project_management') {
+      // Admins always have access - show immediately after hydration
+      if (isAdmin) {
+        return !isHydrating;
+      }
+      // Non-admins must wait for feature check and have the feature enabled
+      return !isHydrating && !featureLoading && hasProjectManagement;
     }
     // All other items are always visible
     return true;

@@ -8,12 +8,14 @@ import {
   ProjectFormData,
   User,
   Company,
+  ProjectCategory,
   statusOptions,
   priorityOptions,
   projectTypeOptions,
   printSubtypes,
   digitalSubtypes,
 } from '@/types/project';
+import CategoryBadge from '@/components/ProjectManagement/CategorySettings/CategoryBadge';
 import styles from './ProjectForm.module.scss';
 
 interface ProjectFormProps {
@@ -48,10 +50,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     description: editingProject?.description || '',
     project_type: editingProject?.project_type || '',
     project_subtype: editingProject?.project_subtype || '',
+    type_code: editingProject?.type_code || '',
     requested_by: editingProject?.requested_by_profile?.id || currentUser.id,
     company_id: editingProject?.company?.id || userActiveCompany?.id || '',
     assigned_to: editingProject?.assigned_to_profile?.id || '',
-    status: editingProject?.status || 'coming_up',
+    status: editingProject?.status || 'in_progress',
     priority: editingProject?.priority || 'medium',
     due_date: editingProject?.due_date || '',
     start_date: editingProject?.start_date || '',
@@ -60,10 +63,16 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     quoted_price: editingProject?.quoted_price?.toString() || '',
     tags: editingProject?.tags?.join(', ') || '',
     notes: editingProject?.notes || '',
+    is_internal: editingProject?.is_internal || false,
+    scope: editingProject?.scope || 'internal', // NEW: Project scope field
+    category_ids: editingProject?.categories?.map(c => c.category_id) || [],
   });
 
   const [customSubtype, setCustomSubtype] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
+  const [isFetchingCategories, setIsFetchingCategories] = useState(false);
+  const [shortcodePreview, setShortcodePreview] = useState<string>('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -76,6 +85,31 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     'door-hangers', 'vehicle-wrap',
   ];
 
+  // Fetch available categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setIsFetchingCategories(true);
+      try {
+        const endpoint = isAdmin
+          ? '/api/admin/project-categories'
+          : '/api/project-categories';
+        const response = await fetch(endpoint);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableCategories(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      } finally {
+        setIsFetchingCategories(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchCategories();
+    }
+  }, [isOpen, isAdmin]);
+
   // Update form data when editingProject changes
   useEffect(() => {
     if (editingProject) {
@@ -84,10 +118,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         description: editingProject.description || '',
         project_type: editingProject.project_type || '',
         project_subtype: editingProject.project_subtype || '',
+        type_code: editingProject.type_code || '',
         requested_by: editingProject.requested_by_profile?.id || currentUser.id,
         company_id: editingProject.company?.id || userActiveCompany?.id || '',
         assigned_to: editingProject.assigned_to_profile?.id || '',
-        status: editingProject.status || 'coming_up',
+        status: editingProject.status || 'in_progress',
         priority: editingProject.priority || 'medium',
         due_date: editingProject.due_date || '',
         start_date: editingProject.start_date || '',
@@ -96,6 +131,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         quoted_price: editingProject.quoted_price?.toString() || '',
         tags: editingProject.tags?.join(', ') || '',
         notes: editingProject.notes || '',
+        is_internal: editingProject.is_internal || false,
+        scope: editingProject.scope || 'internal', // NEW: Project scope field
+        category_ids: editingProject.categories?.map(c => c.category_id) || [],
       });
       // Set selected tags from editing project
       setSelectedTags(editingProject.tags || []);
@@ -115,10 +153,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         description: '',
         project_type: '',
         project_subtype: '',
+        type_code: '',
         requested_by: currentUser.id,
         company_id: userActiveCompany?.id || '',
         assigned_to: '',
-        status: 'coming_up',
+        status: 'in_progress',
         priority: 'medium',
         due_date: '',
         start_date: '',
@@ -127,14 +166,40 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         quoted_price: '',
         tags: '',
         notes: '',
+        is_internal: false,
+        category_ids: [],
       });
       setSelectedTags([]);
       setCustomSubtype('');
     }
   }, [editingProject, currentUser.id, userActiveCompany?.id]);
 
+  // Automatically extract type_code from project_type
+  useEffect(() => {
+    const selectedType = projectTypeOptions.find(opt => opt.value === formData.project_type);
+    if (selectedType) {
+      setFormData(prev => ({ ...prev, type_code: selectedType.code || '' }));
+    }
+  }, [formData.project_type]);
+
+  // Update shortcode preview when type_code, name, or company changes
+  useEffect(() => {
+    if (formData.type_code && formData.name && formData.company_id) {
+      const year = new Date().getFullYear().toString().slice(-2);
+      const cleanName = formData.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      // Note: Can't show company code here since it's in company_settings, not loaded with companies
+      const preview = `[COMPANY_CODE]_${formData.type_code}${year}_${cleanName}`;
+      setShortcodePreview(preview);
+    } else {
+      setShortcodePreview('');
+    }
+  }, [formData.type_code, formData.name, formData.company_id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Note: Company short_code validation is handled by the API/database
+    // The database trigger will auto-generate the shortcode if type_code is provided
 
     try {
       setIsSubmitting(true);
@@ -143,6 +208,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         ...formData,
         project_subtype: formData.project_subtype === 'other' ? customSubtype : formData.project_subtype,
         tags: selectedTags.join(', '), // Convert tags array to comma-separated string
+        type_code: formData.type_code || undefined, // Include type_code if set
       };
       await onSubmit(submitData);
       onClose();
@@ -165,16 +231,31 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const currentSubtypes = formData.project_type === 'print' ? printSubtypes :
     formData.project_type === 'digital' ? digitalSubtypes : [];
 
+  const handleToggleCategory = (categoryId: string) => {
+    if (formData.category_ids.includes(categoryId)) {
+      setFormData({
+        ...formData,
+        category_ids: formData.category_ids.filter(id => id !== categoryId),
+      });
+    } else {
+      setFormData({
+        ...formData,
+        category_ids: [...formData.category_ids, categoryId],
+      });
+    }
+  };
+
   const handleClose = () => {
     setFormData({
       name: '',
       description: '',
       project_type: '',
       project_subtype: '',
+      type_code: '',
       requested_by: currentUser.id,
       company_id: userActiveCompany?.id || '',
       assigned_to: '',
-      status: 'coming_up',
+      status: 'in_progress',
       priority: 'medium',
       due_date: '',
       start_date: '',
@@ -183,9 +264,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       quoted_price: '',
       tags: '',
       notes: '',
+      is_internal: false,
+      category_ids: [],
     });
     setSelectedTags([]);
     setCustomSubtype('');
+    setShortcodePreview('');
     onClose();
   };
 
@@ -276,32 +360,121 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </div>
             )}
 
-            <div className={styles.formGroup}>
-              <label>Company *</label>
-              {mode === 'request' && userActiveCompany ? (
-                <input
-                  type="text"
-                  value={userActiveCompany.name}
-                  readOnly
-                  style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
-                />
-              ) : (
+            {/* Shortcode Preview */}
+            {shortcodePreview && mode === 'full' && (
+              <div className={styles.formGroup}>
+                <label>Project Shortcode (auto-generated)</label>
+                <div className={styles.shortcodePreview}>
+                  <code>{shortcodePreview}</code>
+                </div>
+                {formData.company_id && !companies.find(c => c.id === formData.company_id) && (
+                  <small style={{ color: '#dc3545' }}>
+                    ⚠ Company must have a short code set before creating projects with type codes
+                  </small>
+                )}
+              </div>
+            )}
+
+            {/* Internal Project Checkbox (Admin Only) */}
+            {isAdmin && mode === 'full' && (
+              <div className={styles.formGroup}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={formData.is_internal}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        is_internal: e.target.checked,
+                        company_id: e.target.checked ? '' : (userActiveCompany?.id || ''),
+                      })
+                    }
+                    style={{ marginRight: '8px' }}
+                  />
+                  Internal Project (Agency Use Only)
+                </label>
+              </div>
+            )}
+
+            {/* Project Scope (Admin Only) */}
+            {isAdmin && mode === 'full' && (
+              <div className={styles.formGroup}>
+                <label>Project Scope</label>
                 <select
-                  value={formData.company_id}
+                  value={formData.scope || 'internal'}
                   onChange={e =>
-                    setFormData({ ...formData, company_id: e.target.value })
+                    setFormData({
+                      ...formData,
+                      scope: e.target.value as 'internal' | 'external' | 'both',
+                    })
                   }
-                  required
                 >
-                  <option value="">Select Company</option>
-                  {companies.map(company => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
+                  <option value="internal">Internal Only</option>
+                  <option value="external">External Only</option>
+                  <option value="both">Both Internal and External</option>
                 </select>
-              )}
-            </div>
+                <small style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
+                  Internal: Agency-only work | External: Client-side only (hidden by toggle) | Both: Mixed work
+                </small>
+              </div>
+            )}
+
+            {/* Company field - hide if internal project */}
+            {!formData.is_internal && (
+              <div className={styles.formGroup}>
+                <label>Company *</label>
+                {mode === 'request' && userActiveCompany ? (
+                  <input
+                    type="text"
+                    value={userActiveCompany.name}
+                    readOnly
+                    style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
+                  />
+                ) : (
+                  <select
+                    value={formData.company_id}
+                    onChange={e =>
+                      setFormData({ ...formData, company_id: e.target.value })
+                    }
+                    required={!formData.is_internal}
+                  >
+                    <option value="">Select Company</option>
+                    {companies.map(company => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {/* Project Categories Multi-Select */}
+            {mode === 'full' && availableCategories.length > 0 && (
+              <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                <label>Project Categories</label>
+                <div className={styles.categoryMultiSelect}>
+                  {availableCategories.map((category) => {
+                    const isSelected = formData.category_ids.includes(category.id);
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        className={`${styles.categoryOption} ${isSelected ? styles.selected : ''}`}
+                        onClick={() => handleToggleCategory(category.id)}
+                      >
+                        <CategoryBadge category={category} />
+                      </button>
+                    );
+                  })}
+                </div>
+                {isFetchingCategories && (
+                  <p style={{ fontSize: '13px', color: 'var(--gray-500)', margin: '8px 0 0 0' }}>
+                    Loading categories...
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Only show Requested By field for admins in edit mode */}
             {isAdmin && editingProject ? (

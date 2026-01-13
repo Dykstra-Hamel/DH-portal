@@ -12,6 +12,7 @@ import {
   usePageActions,
 } from '@/contexts/PageActionsContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
+import { ProjectActionMenu } from '../GlobalLowerHeader/ProjectActionMenu';
 import { Settings, ArrowLeft } from 'lucide-react';
 import styles from './LayoutWrapper.module.scss';
 
@@ -52,23 +53,18 @@ function LayoutContent({ children }: LayoutWrapperProps) {
     switch (pathname) {
       case '/project-management':
         return {
-          title: 'Projects Dashboard',
-          description: 'Manage your projects across all phases.',
+          title: pageHeader?.title || 'Projects Dashboard',
+          description: pageHeader?.description || 'Manage your projects across all phases.',
           showAddButton: false,
-          actionButtons: [
-            {
-              text: 'New Project',
-              onClick: getPageAction('add-project') || (() => {}),
-            },
-            {
-              text: 'Create from Template',
-              onClick: getPageAction('create-from-template') || (() => {}),
-            },
-            {
-              text: 'New Task',
-              onClick: getPageAction('add-task') || (() => {}),
-            },
-          ],
+          projectFilterControls: pageHeader?.projectFilterControls,
+          customActions: (
+            <ProjectActionMenu
+              onNewProjectFromScratch={getPageAction('add-project') || (() => {})}
+              onNewProjectFromTemplate={getPageAction('create-from-template') || (() => {})}
+              onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
+              onNewTaskFromTemplate={getPageAction('add-task-from-template') || (() => {})}
+            />
+          ),
         };
       case '/project-management/tasks':
         return {
@@ -395,6 +391,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               supportCaseAssignmentControls={
                 pageConfig.supportCaseAssignmentControls
               }
+              projectFilterControls={pageConfig.projectFilterControls}
               customActions={pageConfig.customActions}
             />
           )}

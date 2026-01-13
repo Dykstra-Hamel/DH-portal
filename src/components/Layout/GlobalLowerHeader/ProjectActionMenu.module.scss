@@ -1,0 +1,126 @@
+.projectActionMenu {
+  position: relative;
+  display: inline-block;
+}
+
+.mainButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--action-500);
+  color: white;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 650;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 40px;
+  min-width: 40px;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: #0070d4;
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menuOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: white;
+  color: var(--gray-800);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-satoshi);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    color: var(--action-600);
+  }
+
+  &:active {
+    background: var(--gray-100);
+  }
+
+  svg {
+    color: var(--gray-400);
+    transition: color 0.15s ease;
+  }
+
+  &:hover svg {
+    color: var(--action-600);
+  }
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: white;
+  color: var(--gray-600);
+  font-size: 13px;
+  font-weight: 550;
+  font-family: var(--font-satoshi);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    color: var(--action-600);
+  }
+
+  &:active {
+    background: var(--gray-100);
+  }
+}
+
+.separator {
+  height: 1px;
+  background: var(--gray-200);
+  margin: 4px 0;
+}
