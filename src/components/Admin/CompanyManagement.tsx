@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag, FileText, Map, Bug } from 'lucide-react';
+import { ArrowLeft, Building, Globe, Mail, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag, FileText, Map, Bug, FileCheck } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
 import SalesConfigManager from './SalesConfigManager';
@@ -15,6 +15,7 @@ import ServicePlansManager from './ServicePlansManager';
 import ServiceAreasManager from './ServiceAreasManager';
 import PestManager from './PestManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
+import QuotePageSection from './QuotePageSection';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -52,7 +53,7 @@ interface CompanyManagementProps {
   user: User;
 }
 
-type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pest-management' | 'service-plans' | 'service-areas' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
+type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'pest-management' | 'service-plans' | 'service-areas' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain' | 'quote-page';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
@@ -158,7 +159,7 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     }
   };
 
-  const handleSave = async (section: ActiveSection, updatedData: Partial<Company>) => {
+  const handleSave = async (section: ActiveSection, updatedData: Partial<Company> | any) => {
     if (!company) return;
 
     try {
@@ -219,6 +220,26 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
               login_page_images: {
                 value: JSON.stringify(loginPageImages),
                 type: 'string'
+              }
+            }
+          }),
+        });
+      } else if (section === 'quote-page') {
+        // Save quote page settings
+        await fetch(`/api/companies/${companyId}/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            settings: {
+              quote_terms: {
+                value: updatedData.quote_terms || '',
+                type: 'string',
+                description: 'Terms and conditions for quote page'
+              },
+              quote_thanks_content: {
+                value: updatedData.quote_thanks_content || '',
+                type: 'string',
+                description: 'Content displayed on the quote thank you page'
               }
             }
           }),
@@ -433,6 +454,7 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     { id: 'sales-config', label: 'Sales Config', icon: Target },
     { id: 'discounts', label: 'Discounts', icon: Tag },
     { id: 'email-domain', label: 'Email Domain', icon: Mail },
+    { id: 'quote-page', label: 'Quote Page', icon: FileCheck },
   ] as const;
 
   return (
@@ -556,6 +578,13 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
           )}
           {activeSection === 'email-domain' && (
             <EmailDomainManager companyId={companyId} />
+          )}
+          {activeSection === 'quote-page' && (
+            <QuotePageSection
+              companyId={companyId}
+              onSave={(data) => handleSave('quote-page', data)}
+              saving={saving}
+            />
           )}
         </div>
       </div>

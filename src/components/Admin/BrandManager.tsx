@@ -413,6 +413,68 @@ export default function BrandManager() {
     });
   };
 
+  const handlePrimaryHeroImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCompany) return;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `hero-${Date.now()}.${fileExt}`;
+      const folderPath = `${selectedCompany.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')}/photography`;
+      const filePath = `${folderPath}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('brand-assets')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('brand-assets').getPublicUrl(filePath);
+
+      setBrandData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          primary_hero_image_url: data.publicUrl,
+        };
+      });
+
+      setToastMessage('Primary hero image uploaded successfully');
+      setToastType('success');
+      setToastVisible(true);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setToastMessage('Failed to upload primary hero image');
+      setToastType('error');
+      setToastVisible(true);
+    }
+  };
+
+  const removePrimaryHeroImage = async () => {
+    if (!selectedCompany || !brandData?.primary_hero_image_url) return;
+
+    try {
+      const path = brandData.primary_hero_image_url.split('/').pop();
+      if (path) {
+        await supabase.storage
+          .from('brand-assets')
+          .remove([`${selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/photography/${path}`]);
+      }
+    } catch (error) {
+      console.error('Error deleting image file:', error);
+    }
+
+    setBrandData(prev => {
+      if (!prev) return null;
+      return { ...prev, primary_hero_image_url: undefined };
+    });
+  };
+
   const saveBrandData = async () => {
     if (!brandData || !selectedCompany) return;
 
@@ -1039,6 +1101,41 @@ export default function BrandManager() {
             isExpanded={expandedSections.photography}
             onToggle={() => toggleSection('photography')}
           >
+            <div className={styles.formGroup}>
+              <label>Primary Hero Image</label>
+              <div className={styles.fileUploadButton}>
+                <span>Choose File</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePrimaryHeroImageUpload}
+                />
+              </div>
+              <small>
+                This image will be used as the default hero image across quotes, campaigns, and landing pages. Will be saved to: {selectedCompany.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}/photography/
+              </small>
+              {brandData.primary_hero_image_url && (
+                <div className={styles.arrayItem}>
+                  <div className={styles.imagePreviewLarge}>
+                    <Image
+                      src={brandData.primary_hero_image_url}
+                      alt="Primary Hero Image"
+                      width={300}
+                      height={200}
+                      style={{ maxWidth: '100%', height: 'auto', objectFit: 'cover' }}
+                    />
+                  </div>
+                  <button
+                    onClick={removePrimaryHeroImage}
+                    className={styles.dangerButton}
+                  >
+                    <Trash2 size={16} />
+                    Remove Image
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className={styles.formGroup}>
               <label>Photography Style Description</label>
               <textarea

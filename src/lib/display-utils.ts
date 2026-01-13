@@ -84,3 +84,57 @@ export function getPhoneDisplay(phone: string | null | undefined): string {
 
   return formatPhoneNumber(phone);
 }
+
+/**
+ * Format home size range for display
+ * Converts range format (e.g., "0-1500", "1501-2000") to user-friendly format
+ * Examples: "0-1500" → "Up to 1500 Sq. Ft.", "1501-2000" → "Up to 2000 Sq. Ft."
+ */
+export function formatHomeSizeRange(range: string | null | undefined): string {
+  if (!range || range.trim() === '') return 'Unknown';
+
+  // Parse the range (format: "min-max")
+  const parts = range.split('-');
+  if (parts.length !== 2) return range; // Return as-is if format is unexpected
+
+  const maxValue = parseInt(parts[1], 10);
+  if (isNaN(maxValue)) return range;
+
+  return `Up to ${maxValue.toLocaleString()} Sq. Ft.`;
+}
+
+/**
+ * Format yard size range for display
+ * Converts range format (e.g., "0-0.25", "0.26-0.50") to user-friendly format
+ * Examples: "0-0.25" → "Up to 1/4 Acre", "0.26-0.50" → "Up to 1/2 Acre"
+ */
+export function formatYardSizeRange(range: string | null | undefined): string {
+  if (!range || range.trim() === '') return 'Unknown';
+
+  // Parse the range (format: "min-max")
+  const parts = range.split('-');
+  if (parts.length !== 2) return range; // Return as-is if format is unexpected
+
+  const maxValue = parseFloat(parts[1]);
+  if (isNaN(maxValue)) return range;
+
+  // Convert decimal to fraction
+  let fractionDisplay: string;
+  if (maxValue === 0.25) {
+    fractionDisplay = '1/4';
+  } else if (maxValue === 0.5 || maxValue === 0.50) {
+    fractionDisplay = '1/2';
+  } else if (maxValue === 0.75) {
+    fractionDisplay = '3/4';
+  } else if (maxValue === 1.0 || maxValue === 1) {
+    fractionDisplay = '1';
+  } else if (maxValue > 1) {
+    // For values greater than 1, display as decimal
+    fractionDisplay = maxValue.toString();
+  } else {
+    // For other decimal values, display as-is
+    fractionDisplay = maxValue.toString();
+  }
+
+  return `Up to ${fractionDisplay} Acre${maxValue !== 1 ? '' : ''}`;
+}
