@@ -64,6 +64,10 @@
   h2 {
     font-size: 40px;
     line-height: 110%;
+
+    @media (width < 768px) {
+      font-size: 28px;
+    }
   }
 
   h3 {
@@ -119,6 +123,10 @@
   align-items: center;
   gap: 16px;
   margin-top: 60px;
+
+  @media (width < 600px) {
+    gap: 8px;
+  }
 }
 
 // Back button
@@ -290,7 +298,7 @@
 .plansContainer {
   margin-bottom: 40px;
   h2 {
-    margin-bottom: 40px;
+    margin-bottom: 32px;
   }
 }
 
@@ -677,6 +685,101 @@
   }
 }
 
+// Mobile FAQ Dropdown
+.faqDropdownContainer {
+  display: none; // Hidden on desktop
+
+  @media (max-width: 768px) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+}
+
+.faqDropdownLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 20px;
+}
+
+.faqDropdown {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-text);
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%232b2b2b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 20px;
+  padding-right: 40px;
+
+  &:focus {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 2px;
+  }
+}
+
+// FAQ Layout Grid (for multiple plans)
+.faqsLayoutGrid {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 40px;
+  align-items: flex-start;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+// FAQ Sidebar with Plan Buttons
+.faqsSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  @media (max-width: 768px) {
+    display: none; // Hidden on mobile, replaced by dropdown
+  }
+}
+
+.faqTabButton {
+  padding: 14px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 60px;
+  color: var(--brand-primary);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: left;
+  width: 100%;
+
+  &:hover {
+    background: var(--brand-primary);
+    color: #fff;
+  }
+
+  @media (max-width: 768px) {
+    white-space: nowrap;
+    min-width: fit-content;
+  }
+}
+
+.faqTabButtonActive {
+  background: var(--brand-primary);
+  color: white;
+}
+
 .faqsContainer {
   display: flex;
   flex-direction: column;
@@ -884,6 +987,10 @@
   li {
     min-width: 245px;
   }
+
+  @media (width < 768px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .totalItem {
@@ -1035,12 +1142,6 @@
   border-radius: 16px;
   margin-bottom: 30px;
   border: 1px solid var(--gray-300);
-
-  h3 {
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 16px;
-  }
 }
 
 .termsContent {
@@ -1154,6 +1255,12 @@
     margin-bottom: 8px;
     font-size: 16px;
     color: var(--brand-primary);
+
+    span {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-text-gray);
+    }
   }
 
   input {
@@ -1422,9 +1529,6 @@
     opacity: var(--header-bg-opacity);
     pointer-events: none;
     z-index: -1;
-    @media (max-width: 768px) {
-      background: transparent;
-    }
   }
 
   @media (max-width: 768px) {
@@ -1565,7 +1669,8 @@
     pointer-events: none;
 
     @media (max-width: 768px) {
-      background: transparent;
+      background: var(--accent-color);
+      background: linear-gradient(180deg, var(--accent-color) 0%, #fff 100%);
     }
   }
 
@@ -1580,17 +1685,15 @@
   margin: 0 auto;
   padding: 0 40px;
   display: grid;
+  position: relative;
   grid-template-columns: 1fr 1fr;
   gap: 80px;
   align-items: center;
 
-  @media (max-width: 1400px) {
-    gap: 60px;
-  }
-
   @media (max-width: 992px) {
     grid-template-columns: 1fr;
     gap: 40px;
+    padding: 0;
   }
 }
 
@@ -1598,6 +1701,10 @@
   display: flex;
   flex-direction: column;
   gap: 38px;
+
+  @media (max-width: 992px) {
+    padding: 0 20px;
+  }
 }
 
 .heroTitle {
@@ -1613,7 +1720,7 @@
   }
 
   @media (max-width: 768px) {
-    font-size: 28px;
+    font-size: 36px;
   }
 }
 
@@ -1628,7 +1735,7 @@
   align-items: center;
   gap: 16px;
   padding: 12px 20px;
-  background: #fbf6e4;
+  background: #fff4ad;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   width: fit-content;
@@ -1809,9 +1916,6 @@
   }
 
   .heroImage {
-    margin-left: -20px;
-    margin-right: -20px;
-    width: calc(100% + 39px);
     overflow: hidden;
   }
 
@@ -1987,10 +2091,33 @@
     .stepHeading {
       text-align: left;
     }
+
+    .contactSectionImageWrapper {
+      display: none;
+
+      @media (width < 1215px) {
+        display: flex;
+        border-radius: 0;
+      }
+    }
   }
 
   @media (width < 1215px) {
     grid-template-columns: 1fr;
+
+    .infoSection {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .contactDetailsHeader,
+    .infoContent {
+      padding: 20px;
+    }
+
+    .rightColumnContent {
+      display: none;
+    }
   }
 }
 
@@ -2024,10 +2151,15 @@
 
   .contactSectionImageWrapper {
     border-radius: 0;
+    height: 100%;
   }
 
   @media (width < 600px) {
     grid-template-columns: 1fr;
+
+    .contactSectionImageWrapper {
+      height: 350px;
+    }
   }
 }
 
@@ -2035,6 +2167,11 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   margin-top: 10px;
+
+  .customerCommentSection {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
 
   @media (width < 940px) {
     grid-template-columns: 1fr;
@@ -2055,4 +2192,150 @@
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+// Contact Details Header
+.contactDetailsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.addCommentLink {
+  background: none;
+  border: none;
+  color: var(--brand-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.7;
+  }
+}
+
+// Customer Comment Display
+.customerCommentSection {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--gray-300);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  p {
+    margin: 0;
+
+    &:first-of-type {
+      flex-shrink: 0;
+    }
+  }
+}
+
+.customerCommentText {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-gray);
+  margin-top: 0;
+}
+
+// Comment Modal
+.modalBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContainer {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+
+  h3 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--brand-primary);
+    margin-bottom: 12px;
+  }
+}
+
+.modalDescription {
+  font-size: 15px;
+  color: var(--color-text-gray);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.commentTextarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 20px;
+  outline: none;
+
+  &:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 1px var(--brand-primary);
+  }
+
+  &::placeholder {
+    color: var(--slate-400);
+  }
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.modalCancelButton {
+  padding: 12px 24px;
+  background: white;
+  border: 1px solid var(--gray-300);
+  color: var(--color-text-gray);
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+
+  &:hover {
+    background: var(--gray-50);
+  }
+}
+
+.modalSaveButton {
+  padding: 12px 24px;
+  background: var(--brand-secondary);
+  border: none;
+  color: white;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+
+  &:hover {
+    background: color-mix(in srgb, var(--brand-secondary) 85%, black);
+  }
 }

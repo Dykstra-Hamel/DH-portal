@@ -54,6 +54,7 @@ interface Quote {
   signed_at: string | null;
   home_size_range: string | null;
   yard_size_range: string | null;
+  customer_comments?: string | null;
   customer: {
     first_name: string;
     last_name: string;
@@ -107,6 +108,10 @@ export default function QuoteContent({
     '/images/quote-hero-placeholder.svg'
   );
   const [expandedPlanIndexes, setExpandedPlanIndexes] = useState<number[]>([0]);
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [customerComment, setCustomerComment] = useState(
+    quote.customer_comments || ''
+  );
 
   const signatureRef = useRef<SignatureCanvas>(null);
 
@@ -327,6 +332,35 @@ export default function QuoteContent({
     return today.toISOString().split('T')[0];
   };
 
+  // Handle saving customer comment
+  const handleSaveComment = async () => {
+    if (!token) {
+      console.error('Cannot save comment: missing token');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/quotes/${quote.id}/comment`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_comments: customerComment,
+          token: token,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to save comment');
+      } else {
+        setIsCommentModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Error saving comment:', error);
+    }
+  };
+
   return (
     <div className={styles.quoteContainer} style={brandingStyle}>
       <HeaderSection
@@ -414,7 +448,16 @@ export default function QuoteContent({
                   <div className={styles.infoSection}>
                     <div className={styles.infoSectionRow}>
                       <div className={styles.infoColumn}>
-                        <h3>Contact Details</h3>
+                        <div className={styles.contactDetailsHeader}>
+                          <h3>Contact Details</h3>
+                          <button
+                            type="button"
+                            onClick={() => setIsCommentModalOpen(true)}
+                            className={styles.addCommentLink}
+                          >
+                            Add Comment
+                          </button>
+                        </div>
                         <div className={styles.infoContent}>
                           <p>
                             <span>Name: </span>
@@ -452,6 +495,25 @@ export default function QuoteContent({
                             <span>Yard Size: </span>
                             {formatYardSizeRange(quote.yard_size_range)}
                           </p>
+                          {customerComment && (
+                            <div className={styles.customerCommentSection}>
+                              <p>
+                                <span>Customer Comment:</span>
+                              </p>
+                              <p className={styles.customerCommentText}>
+                                {customerComment}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className={styles.contactSectionImageWrapper}>
+                          <Image
+                            className={styles.contactSectionImage}
+                            src={heroImageUrl}
+                            alt=""
+                            fill={true}
+                            priority={true}
+                          />
                         </div>
                       </div>
                     </div>
@@ -541,6 +603,16 @@ export default function QuoteContent({
                         </p>
                       </div>
                     </div>
+                    {customerComment && (
+                      <div className={styles.customerCommentSection}>
+                        <p>
+                          <span>Customer Comment:</span>
+                        </p>
+                        <p className={styles.customerCommentText}>
+                          {customerComment}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className={styles.contactSectionImageWrapper}>
@@ -594,7 +666,9 @@ export default function QuoteContent({
                   </div>
                   <div className={styles.signatureActions}>
                     <div className={styles.dateSection}>
-                      <label>Date</label>
+                      <label>
+                        Date <span>Read only</span>
+                      </label>
                       <input
                         type="text"
                         value={new Date().toLocaleDateString()}
@@ -664,6 +738,49 @@ export default function QuoteContent({
           </div>
         </div>
       )}
+
+      {/* Comment Modal */}
+      {isCommentModalOpen && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={() => setIsCommentModalOpen(false)}
+        >
+          <div
+            className={styles.modalContainer}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3>Add a Comment</h3>
+            <p className={styles.modalDescription}>
+              Please let us know if any contact information needs to be updated
+              or if you have any concerns.
+            </p>
+            <textarea
+              className={styles.commentTextarea}
+              value={customerComment}
+              onChange={e => setCustomerComment(e.target.value)}
+              placeholder="Enter your comment here..."
+              rows={5}
+            />
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                onClick={() => setIsCommentModalOpen(false)}
+                className={styles.modalCancelButton}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveComment}
+                className={styles.modalSaveButton}
+              >
+                Save Comment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <FooterSection links={footer_links} branding={footer_branding} />
     </div>
   );
