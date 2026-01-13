@@ -46,12 +46,12 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const templateType = searchParams.get('type');
 
-    // Fetch email templates
+    // Fetch email templates (ordered by most recent first)
     let query = supabase
       .from('email_templates')
       .select('*')
       .eq('company_id', id)
-      .order('name');
+      .order('created_at', { ascending: false });
 
     if (templateType) {
       query = query.eq('template_type', templateType);

@@ -201,7 +201,10 @@ export async function POST(
             .select();
 
           if (callRecordUpdateError) {
-            console.error('Failed to update call_record with lead_id:', callRecordUpdateError);
+            console.error(
+              'Failed to update call_record with lead_id:',
+              callRecordUpdateError
+            );
             // Don't fail the request - the lead was updated successfully
           }
         }
@@ -220,16 +223,23 @@ export async function POST(
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
         service_address_id: ticket.service_address_id,
-        lead_source: ticket.source === 'website' ? 'organic' :
-                     ticket.source === 'internal' ? 'other' :
-                     ticket.source === 'widget' ? 'widget_submission' :
-                     ticket.source === 'inbound' ? 'cold_call' :
-                     ticket.source === 'outbound' ? 'cold_call' :
-                     ticket.source,
+        lead_source:
+          ticket.source === 'website'
+            ? 'organic'
+            : ticket.source === 'internal'
+              ? 'other'
+              : ticket.source === 'widget'
+                ? 'widget_submission'
+                : ticket.source === 'inbound'
+                  ? 'cold_call'
+                  : ticket.source === 'outbound'
+                    ? 'cold_call'
+                    : ticket.source,
         lead_type: ticket.type,
         service_type: ticket.service_type,
         lead_status:
-          customStatus || (assignedTo || ticket.assigned_to ? 'in_process' : 'new'),
+          customStatus ||
+          (assignedTo || ticket.assigned_to ? 'in_process' : 'new'),
         priority: ticket.priority,
         estimated_value: ticket.estimated_value || 0,
         comments: ticket.description || '',
@@ -330,30 +340,38 @@ export async function POST(
       // After successful lead creation, geocode customer address and create service address
       // Only do this if ticket doesn't already have a service_address_id (inherit from ticket if it does)
       try {
-        const { createOrFindServiceAddress } = await import('@/lib/service-addresses');
+        const { createOrFindServiceAddress } = await import(
+          '@/lib/service-addresses'
+        );
 
         // Fetch customer data to get address
         const customer = ticket.customer;
 
         if (customer && !ticket.service_address_id) {
           // Try to geocode the customer's address
-          const geocodeResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/internal/geocode`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              street: customer.address,
-              city: customer.city,
-              state: customer.state,
-              zip: customer.zip_code
-            })
-          });
+          const geocodeResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_SITE_URL}/api/internal/geocode`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                street: customer.address,
+                city: customer.city,
+                state: customer.state,
+                zip: customer.zip_code,
+              }),
+            }
+          );
 
           let coordinates = null;
           if (geocodeResponse.ok) {
             const geocodeData = await geocodeResponse.json();
             if (geocodeData.success && geocodeData.coordinates) {
               coordinates = geocodeData.coordinates;
-              console.log('✅ Successfully geocoded customer address:', coordinates);
+              console.log(
+                '✅ Successfully geocoded customer address:',
+                coordinates
+              );
             }
           } else {
             console.warn('⚠️ Geocoding failed or skipped for customer address');
@@ -372,7 +390,7 @@ export async function POST(
             street_address: streetAddress,
             city: customer.city || '',
             state: customer.state || '',
-            zip_code: customer.zip_code || ''
+            zip_code: customer.zip_code || '',
           };
 
           // Add coordinates if geocoding was successful
@@ -388,15 +406,23 @@ export async function POST(
             serviceAddressData
           );
 
-          if (serviceAddressResult.success && serviceAddressResult.serviceAddressId) {
+          if (
+            serviceAddressResult.success &&
+            serviceAddressResult.serviceAddressId
+          ) {
             // Link service address to the lead
             const { error: linkError } = await supabase
               .from('leads')
-              .update({ service_address_id: serviceAddressResult.serviceAddressId })
+              .update({
+                service_address_id: serviceAddressResult.serviceAddressId,
+              })
               .eq('id', newLead.id);
 
             if (linkError) {
-              console.error('Failed to link service address to lead:', linkError);
+              console.error(
+                'Failed to link service address to lead:',
+                linkError
+              );
             } else {
               console.log('✅ Service address linked to lead with coordinates');
 
@@ -405,11 +431,16 @@ export async function POST(
               // but at that time the service_address_id is null. Update it now.
               const { error: quoteUpdateError } = await supabase
                 .from('quotes')
-                .update({ service_address_id: serviceAddressResult.serviceAddressId })
+                .update({
+                  service_address_id: serviceAddressResult.serviceAddressId,
+                })
                 .eq('lead_id', newLead.id);
 
               if (quoteUpdateError) {
-                console.error('Failed to update quote with service address:', quoteUpdateError);
+                console.error(
+                  'Failed to update quote with service address:',
+                  quoteUpdateError
+                );
               } else {
                 console.log('✅ Quote updated with service address');
               }
@@ -418,7 +449,10 @@ export async function POST(
         }
       } catch (serviceAddressError) {
         // Don't fail the entire request if service address creation fails
-        console.error('Error creating service address for lead:', serviceAddressError);
+        console.error(
+          'Error creating service address for lead:',
+          serviceAddressError
+        );
       }
 
       // Update call_record to link it to the newly created lead
@@ -433,7 +467,10 @@ export async function POST(
           .select();
 
         if (callRecordUpdateError) {
-          console.error('Failed to update call_record with lead_id:', callRecordUpdateError);
+          console.error(
+            'Failed to update call_record with lead_id:',
+            callRecordUpdateError
+          );
           // Don't fail the request - the lead was created successfully
         }
       }
@@ -684,33 +721,10 @@ export async function POST(
         issueType = 'service_quality';
       }
 
-      // Generate summary - use call summary from call record if available
-      let summary = 'Support request';
-
-      // Try to get call summary from linked call record
-      if (ticket.call_record_id) {
-        try {
-          const { data: callRecord } = await supabase
-            .from('call_records')
-            .select('call_summary')
-            .eq('id', ticket.call_record_id)
-            .single();
-
-          if (callRecord?.call_summary) {
-            summary = callRecord.call_summary;
-          }
-        } catch (error) {
-          // Silently fall back to ticket description
-        }
-      }
-
-      // Fall back to ticket description or generic text if no call summary
-      if (summary === 'Support request') {
-        summary =
-          ticket.description ||
-          `${ticket.type} inquiry from ${ticket.source}` ||
-          'Support request';
-      }
+      const summary =
+        ticket.description ||
+        `${ticket.type} inquiry from ${ticket.source}` ||
+        'Support request';
 
       // Create a new support case from the ticket
       const supportCaseInsertData = {
@@ -720,7 +734,9 @@ export async function POST(
         issue_type: issueType,
         summary: summary.substring(0, 255), // Ensure it fits in summary field
         description: ticket.description,
-        status: customStatus || (assignedTo || ticket.assigned_to ? 'in_progress' : 'new'),
+        status:
+          customStatus ||
+          (assignedTo || ticket.assigned_to ? 'in_progress' : 'new'),
         priority: ticket.priority || 'medium',
         assigned_to: assignedTo || ticket.assigned_to || null,
         archived: false,

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import { createClient } from '@/lib/supabase/server';
 import { logActivity } from '@/lib/activity-logger';
 import { generateQuoteUrl, generateQuoteToken, getFullQuoteUrl } from '@/lib/quote-utils';
+import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/pricing-calculations';
 
 export async function POST(
   request: NextRequest,
@@ -17,6 +18,10 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    // Parse request body to get template selection and customer email
+    const body = await request.json();
+    const { templateId, customerEmail } = body;
 
     const supabase = createAdminClient();
 
@@ -138,20 +143,31 @@ export async function POST(
       ? `${getFullQuoteUrl(quoteUrlPath)}${quoteUrlPath.includes('?') ? '&' : '?'}token=${token}`
       : '';
 
-    // Fetch active quote email template for the company
-    const { data: template, error: templateError } = await supabase
+    // Fetch the selected email template (or most recent if none specified)
+    let templateQuery = supabase
       .from('email_templates')
       .select('*')
       .eq('company_id', company.id)
       .eq('template_type', 'quote')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+      .eq('is_active', true);
+
+    // If specific template selected, use it; otherwise use most recent
+    if (templateId) {
+      templateQuery = templateQuery.eq('id', templateId);
+    } else {
+      templateQuery = templateQuery
+        .order('created_at', { ascending: false })
+        .limit(1);
+    }
+
+    const { data: template, error: templateError } = await templateQuery.single();
 
     if (templateError || !template) {
       return NextResponse.json(
-        { error: 'No active quote email template found. Please create one in Settings → Automation → Templates' },
+        { error: templateId
+          ? 'Selected email template not found or inactive'
+          : 'No active quote email template found. Please create one in Settings → Automation → Templates'
+        },
         { status: 404 }
       );
     }
@@ -218,8 +234,12 @@ export async function POST(
       quoteTotalRecurringPrice: formatCurrency(quote.total_recurring_price || 0),
       quoteLineItems: quoteLineItems,
       quotePestConcerns: pestConcerns.join(', ') || 'Not specified',
-      quoteHomeSize: quote.home_size_range || 'Not specified',
-      quoteYardSize: quote.yard_size_range || 'Not specified',
+      quoteHomeSize: quote.home_size_range
+        ? formatHomeSizeRange(quote.home_size_range)
+        : 'Not specified',
+      quoteYardSize: quote.yard_size_range
+        ? formatYardSizeRange(quote.yard_size_range)
+        : 'Not specified',
 
       // Service address variables
       address: lead.primary_service_address

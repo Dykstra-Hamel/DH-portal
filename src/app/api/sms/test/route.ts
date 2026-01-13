@@ -23,12 +23,13 @@ export async function POST(request: NextRequest) {
     }
 
 
-    // Test SMS creation
+    // Test SMS creation - force new conversation for testing
     const result = await smsService.createConversation({
       companyId,
       customerNumber,
       agentId,
       retellNumber,
+      forceNew: true, // Always create new conversation for testing
       metadata: {
         test: true,
         created_via: 'test_endpoint',
@@ -58,12 +59,10 @@ export async function POST(request: NextRequest) {
 // GET method to test service status
 export async function GET() {
   try {
-    const retellApiKey = process.env.RETELL_API_KEY;
-    
     return NextResponse.json({
       success: true,
       status: 'SMS service is ready',
-      retell_configured: !!retellApiKey,
+      note: 'Retell API keys are configured per-company in company_settings',
       timestamp: new Date().toISOString(),
       endpoints: {
         send_sms: '/api/sms/send',
