@@ -412,7 +412,35 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
   useEffect(() => {
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_, session) => {
+      async (event, session) => {
+        // Handle login - only for email-based auth (password/magic link)
+        // OAuth handles this during initial mount from cache
+        const authProvider = session?.user?.app_metadata?.provider;
+        if (event === 'SIGNED_IN' && session?.user && authProvider === 'email' && availableCompanies.length === 0) {
+          setUser(session.user);
+          setIsLoading(true);
+
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile) {
+            const userIsAdmin = isAuthorizedAdminSync(profile);
+            setIsAdmin(userIsAdmin);
+
+            if (userIsAdmin) {
+              await loadAllCompanies(false);
+            } else {
+              await loadUserCompanies(session.user.id, false);
+            }
+          }
+
+          setIsLoading(false);
+        }
+
+        // Handle logout
         if (!session?.user) {
           setUser(null);
           setSelectedCompanyState(null);
@@ -426,7 +454,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadAllCompanies, loadUserCompanies, availableCompanies.length]);
 
   // Memoize context value to prevent unnecessary re-renders of consuming components
   const contextValue = useMemo(
