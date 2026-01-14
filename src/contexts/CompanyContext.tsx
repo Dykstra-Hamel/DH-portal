@@ -416,7 +416,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
         // Handle login - only for email-based auth (password/magic link)
         // OAuth handles this during initial mount from cache
         const authProvider = session?.user?.app_metadata?.provider;
-        if (event === 'SIGNED_IN' && session?.user && authProvider === 'email' && availableCompanies.length === 0) {
+        if (event === 'SIGNED_IN' && session?.user && authProvider === 'email') {
           setUser(session.user);
           setIsLoading(true);
 
@@ -454,7 +454,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
     );
 
     return () => subscription.unsubscribe();
-  }, [loadAllCompanies, loadUserCompanies, availableCompanies.length]);
+  }, [loadAllCompanies, loadUserCompanies]);
 
   // Memoize context value to prevent unnecessary re-renders of consuming components
   const contextValue = useMemo(
