@@ -48,6 +48,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isHydrating, setIsHydrating] = useState(true); // True during initial cache hydration
   const [user, setUser] = useState<any>(null);
+  const [initializedUserId, setInitializedUserId] = useState<string | null>(null);
 
   // Load branding data for a specific company (using public endpoint)
   const loadCompanyBranding = useCallback(async (companyId: string): Promise<BrandData | null> => {
@@ -241,12 +242,12 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
           return;
         }
 
-        // Skip if companies are already loaded (prevents duplicate loading)
-        if (availableCompanies.length > 0) {
+        setUser(session.user);
+
+        // Skip if we've already initialized for this specific user
+        if (initializedUserId === session.user.id) {
           return;
         }
-
-        setUser(session.user);
 
         // Try to hydrate from cache first for instant load
         const cachedProfile = getCached<any>(CACHE_KEYS.USER_PROFILE);
@@ -300,6 +301,8 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
             }
           }).catch(err => console.error('Background revalidation error:', err));
 
+          // Mark this user as initialized
+          setInitializedUserId(session.user.id);
           return; // Early return - already hydrated from cache
         }
 
@@ -334,6 +337,9 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
           // Regular users get their assigned companies
           await loadUserCompanies(session.user.id);
         }
+
+        // Mark this user as initialized
+        setInitializedUserId(session.user.id);
       } catch (error) {
         console.error('Error initializing companies:', error);
       } finally {
@@ -430,6 +436,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
           setAvailableCompanies([]);
           setIsAdmin(false);
           setIsLoading(false);
+          setInitializedUserId(null);
           // Don't remove selected company from localStorage on logout
           // This allows users to return to the same company when they log back in
         }
