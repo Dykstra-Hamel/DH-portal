@@ -50,6 +50,12 @@ export async function GET(
           ),
           addon_service:add_on_services(
             addon_description
+          ),
+          bundle_plan:bundle_plans(
+            bundle_features,
+            bundle_image_url,
+            bundle_description,
+            bundled_service_plans
           )
         ),
         customer:customers(
@@ -147,6 +153,29 @@ export async function GET(
         { error: 'Quote not found for this company' },
         { status: 404 }
       );
+    }
+
+    // For bundle line items, fetch the bundled service plans with their FAQs
+    if (quote.line_items) {
+      for (const lineItem of quote.line_items) {
+        if (lineItem.bundle_plan && lineItem.bundle_plan.bundled_service_plans) {
+          const bundledServicePlanIds = lineItem.bundle_plan.bundled_service_plans
+            .map((sp: any) => sp.service_plan_id)
+            .filter(Boolean);
+
+          if (bundledServicePlanIds.length > 0) {
+            const { data: bundledPlans } = await supabase
+              .from('service_plans')
+              .select('id, plan_name, plan_faqs, plan_features')
+              .in('id', bundledServicePlanIds);
+
+            if (bundledPlans) {
+              // Attach the full plan data (with FAQs) to the bundle
+              lineItem.bundle_plan.bundled_plans_with_faqs = bundledPlans;
+            }
+          }
+        }
+      }
     }
 
     return NextResponse.json({

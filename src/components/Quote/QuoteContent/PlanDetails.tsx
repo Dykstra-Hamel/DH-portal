@@ -82,6 +82,53 @@ const abbreviateFrequency = (frequency: string) => {
   return abbreviations[lowerFreq] || frequency;
 };
 
+// Helper function to get all FAQs from a line item (service plan or bundle)
+const getAllFaqsFromLineItem = (item: any) => {
+  const allFaqs: any[] = [];
+
+  // If it's a service plan, get its FAQs
+  if (item.service_plan?.plan_faqs) {
+    allFaqs.push(...item.service_plan.plan_faqs);
+  }
+
+  // If it's a bundle, get FAQs from all bundled service plans
+  if (item.bundle_plan?.bundled_plans_with_faqs) {
+    item.bundle_plan.bundled_plans_with_faqs.forEach((plan: any) => {
+      if (plan.plan_faqs && plan.plan_faqs.length > 0) {
+        allFaqs.push(...plan.plan_faqs);
+      }
+    });
+  }
+
+  return allFaqs;
+};
+
+// Helper function to get all features from a line item (service plan or bundle)
+const getAllFeaturesFromLineItem = (item: any) => {
+  const allFeatures: string[] = [];
+
+  // If it's a service plan, get its features
+  if (item.service_plan?.plan_features) {
+    allFeatures.push(...item.service_plan.plan_features);
+  }
+
+  // If it's a bundle, get features from all bundled service plans
+  if (item.bundle_plan?.bundled_plans_with_faqs) {
+    item.bundle_plan.bundled_plans_with_faqs.forEach((plan: any) => {
+      if (plan.plan_features && plan.plan_features.length > 0) {
+        allFeatures.push(...plan.plan_features);
+      }
+    });
+  }
+
+  // Also include bundle's own features if they exist
+  if (item.bundle_plan?.bundle_features && item.bundle_plan.bundle_features.length > 0) {
+    allFeatures.push(...item.bundle_plan.bundle_features);
+  }
+
+  return allFeatures;
+};
+
 export default function PlanDetails({
   quote,
   expandedPlanIndexes,
@@ -92,11 +139,11 @@ export default function PlanDetails({
   // State for FAQ tabs
   const [activeFaqTab, setActiveFaqTab] = useState(0);
 
-  // Get plans with FAQs
-  const plansWithFaqs = sortedLineItems.filter(
-    (item: any) =>
-      item.service_plan?.plan_faqs && item.service_plan.plan_faqs.length > 0
-  );
+  // Get plans with FAQs (including bundles with bundled service plan FAQs)
+  const plansWithFaqs = sortedLineItems.filter((item: any) => {
+    const faqs = getAllFaqsFromLineItem(item);
+    return faqs.length > 0;
+  });
 
   return (
     <>
@@ -208,19 +255,18 @@ export default function PlanDetails({
                         {/* Left Column - Content */}
                         <div className={styles.planContentLeft}>
                           {/* Plan Description */}
-                          {item.plan_description && (
+                          {(item.plan_description || item.bundle_plan?.bundle_description) && (
                             <p className={styles.planDescription}>
-                              {item.plan_description}
+                              {item.plan_description || item.bundle_plan?.bundle_description}
                             </p>
                           )}
 
                           {/* Features List */}
-                          {item.service_plan?.plan_features &&
-                            item.service_plan.plan_features.length > 0 && (
+                          {getAllFeaturesFromLineItem(item).length > 0 && (
                               <div className={styles.planIncluded}>
                                 <h4>What&apos;s Included:</h4>
                                 <ul className={styles.featuresList}>
-                                  {item.service_plan.plan_features.map(
+                                  {getAllFeaturesFromLineItem(item).map(
                                     (feature: string, fIndex: number) => (
                                       <li
                                         key={fIndex}
@@ -324,9 +370,9 @@ export default function PlanDetails({
                         <div className={styles.planContentRight}>
                           {/* Plan Image */}
                           <div className={styles.planImageWrapper}>
-                            {item.service_plan?.plan_image_url ? (
+                            {(item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url) ? (
                               <Image
-                                src={item.service_plan.plan_image_url}
+                                src={item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url}
                                 alt={item.plan_name || 'Plan image'}
                                 fill={true}
                                 className={styles.planImage}
@@ -397,7 +443,7 @@ export default function PlanDetails({
             <>
               <h2 className={styles.faqsTitle}>Frequently Asked Questions</h2>
               <div className={styles.faqsContainer}>
-                {plansWithFaqs[0].service_plan.plan_faqs.map(
+                {getAllFaqsFromLineItem(plansWithFaqs[0]).map(
                   (faq: any, faqIndex: number) => (
                     <FaqItem key={faqIndex} faq={faq} />
                   )
@@ -446,7 +492,7 @@ export default function PlanDetails({
 
                 {/* Right: FAQ Content */}
                 <div className={styles.faqsContainer}>
-                  {plansWithFaqs[activeFaqTab]?.service_plan?.plan_faqs?.map(
+                  {getAllFaqsFromLineItem(plansWithFaqs[activeFaqTab]).map(
                     (faq: any, faqIndex: number) => (
                       <FaqItem key={faqIndex} faq={faq} />
                     )
