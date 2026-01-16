@@ -94,7 +94,7 @@ export async function recalculateAllLineItemPrices(
     .eq('id', quoteId)
     .single();
 
-  if (!quote) return;
+  if (!quote) return false;
 
   const homeSizeRange = newHomeSize !== undefined ? newHomeSize : quote.home_size_range;
   const yardSizeRange = newYardSize !== undefined ? newYardSize : quote.yard_size_range;
@@ -107,7 +107,7 @@ export async function recalculateAllLineItemPrices(
     .eq('company_id', quote.company_id)
     .single();
 
-  if (!pricingSettings) return;
+  if (!pricingSettings) return false;
 
   // Fetch all line items for this quote
   const { data: lineItems } = await supabase
