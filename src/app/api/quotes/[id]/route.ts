@@ -282,7 +282,29 @@ export async function PUT(
         const linearFeetChanged = body.linear_feet_range !== undefined && body.linear_feet_range !== existingQuote.linear_feet_range;
 
         if (homeSizeChanged || yardSizeChanged || linearFeetChanged) {
-          await recalculateAllLineItemPrices(supabase, id, body.home_size_range, body.yard_size_range, body.linear_feet_range);
+          const success = await recalculateAllLineItemPrices(supabase, id, body.home_size_range, body.yard_size_range, body.linear_feet_range);
+
+          // If recalculateAllLineItemPrices returns false, it means there are bundle line items
+          // that need to be recalculated using the full bundle pricing logic.
+          // We'll fetch and update bundle line items below
+          if (!success) {
+            // Fetch bundle line items and recalculate them
+            const { data: bundleLineItems } = await supabase
+              .from('quote_line_items')
+              .select('*')
+              .eq('quote_id', id)
+              .not('bundle_plan_id', 'is', null);
+
+            if (bundleLineItems && bundleLineItems.length > 0) {
+              // For each bundle line item, trigger a recalculation by updating it
+              // The update logic below will handle the bundle pricing calculation
+              body.line_items = bundleLineItems.map((item: any) => ({
+                id: item.id,
+                bundle_plan_id: item.bundle_plan_id,
+                display_order: item.display_order,
+              }));
+            }
+          }
         }
       }
     }
