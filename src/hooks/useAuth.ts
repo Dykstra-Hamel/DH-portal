@@ -39,16 +39,9 @@ export function useAuth() {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
-
-      // Avatar sync is handled in useUser.ts hook
-
-      // Redirect to tickets/new if user is authenticated
-      if (session?.user) {
-        router.push('/tickets/new');
-      }
     });
 
     return () => subscription.unsubscribe();
@@ -150,8 +143,10 @@ export function useAuth() {
       setOtpError(error.message);
       setVerifyingOtp(false);
     } else {
-      // Success - user will be redirected by auth state change
       setVerifyingOtp(false);
+      // Reload the page to ensure CompanyContext initializes with the new session
+      // This matches the OAuth flow behavior (which also causes a full page load)
+      window.location.href = '/tickets/new';
     }
   };
 
@@ -186,6 +181,10 @@ export function useAuth() {
     if (error) {
       console.error('Error signing in with password:', error);
       setPasswordError(error.message);
+    } else {
+      // Reload the page to ensure CompanyContext initializes with the new session
+      // This matches the OAuth flow behavior (which also causes a full page load)
+      window.location.href = '/tickets/new';
     }
   };
 
@@ -248,7 +247,7 @@ export function useAuth() {
     otpError,
     passwordError,
     resetEmailSent,
-    
+
     // Actions
     signInWithGoogle,
     signInWithFacebook,
