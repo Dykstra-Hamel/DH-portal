@@ -7,13 +7,14 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   ReactNode,
 } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import { BrandData } from '@/types/branding';
-import { getCached, setCached, CACHE_KEYS } from '@/lib/cache-utils';
+import { getCached, setCached, clearCache, clearCacheByPrefix, CACHE_KEYS } from '@/lib/cache-utils';
 
 export interface Company {
   id: string;
@@ -56,8 +57,13 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
   const [availableCompanies, setAvailableCompanies] = useState<Company[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isHydrating, setIsHydrating] = useState(true); // True during initial cache hydration
+  const [isHydrating, setIsHydrating] = useState(true);
   const [user, setUser] = useState<any>(null);
+
+  // Ref to track if we've already started loading companies (prevents race conditions)
+  const isLoadingCompaniesRef = useRef(false);
+  // Ref to track the current user ID (avoids dependency on user state in effects)
+  const userIdRef = useRef<string | null>(null);
 
   // Load branding data for a specific company (using public endpoint)
   const loadCompanyBranding = useCallback(
@@ -274,24 +280,18 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
     [loadBrandingForCompany]
   );
 
-  // Initialize user and companies with cache-first approach
-  useEffect(() => {
-    const initializeCompanies = async () => {
-      const supabase = createClient();
+  // Helper function to load companies for a user
+  const loadCompaniesForUser = useCallback(
+    async (userId: string, supabase: ReturnType<typeof createClient>) => {
+      // Prevent duplicate loading
+      if (isLoadingCompaniesRef.current) {
+        return;
+      }
+
+      isLoadingCompaniesRef.current = true;
+      setIsLoading(true);
 
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session?.user) {
-          setIsLoading(false);
-          setIsHydrating(false);
-          return;
-        }
-
-        setUser(session.user);
-
         // Try to hydrate from cache first for instant load
         const cachedProfile = getCached<any>(CACHE_KEYS.USER_PROFILE);
         const cachedCompanies = getCached<Company[]>(CACHE_KEYS.COMPANIES_LIST);
@@ -303,9 +303,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
           setAvailableCompanies(cachedCompanies);
 
           // Set selected company from cache if available
-          const storedCompanyId = localStorage.getItem(
-            SELECTED_COMPANY_STORAGE_KEY
-          );
+          const storedCompanyId = localStorage.getItem(SELECTED_COMPANY_STORAGE_KEY);
           if (storedCompanyId) {
             const company = cachedCompanies.find(c => c.id === storedCompanyId);
             if (company) {
@@ -315,7 +313,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
             }
           }
 
-          // Hydration complete - set loading to false so UI can render
+          // Hydration complete
           setIsLoading(false);
           setIsHydrating(false);
 
@@ -325,42 +323,32 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
               const { data: freshProfile } = await supabase
                 .from('profiles')
                 .select('*')
-                .eq('id', session.user.id)
+                .eq('id', userId)
                 .single();
 
               if (freshProfile) {
                 setCached(CACHE_KEYS.USER_PROFILE, freshProfile);
                 const freshIsAdmin = isAuthorizedAdminSync(freshProfile);
 
-                // Only update isAdmin if it actually changed to prevent unnecessary re-renders
                 setIsAdmin(prevIsAdmin => {
                   if (prevIsAdmin !== freshIsAdmin) {
                     return freshIsAdmin;
                   }
                   return prevIsAdmin;
                 });
-
-                // DON'T refresh companies in background - they're already loaded from cache
-                // Calling loadAllCompanies(false) here causes selectedCompany object reference to change,
-                // which triggers all consuming components to re-render and appears as a "page reload"
-                // The cache TTL (5 minutes) ensures data stays reasonably fresh
               }
             })
             .catch(err => console.error('Background revalidation error:', err));
 
-          return; // Early return - already hydrated from cache
+          return;
         }
 
-        // No cache available - fetch fresh data with parallelization
-        const [profileResult] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single(),
-        ]);
-
-        const { data: profile, error: profileError } = profileResult;
+        // No cache available - fetch fresh data
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
         if (profileError || !profile) {
           console.error('Error fetching profile:', profileError);
@@ -376,48 +364,98 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
         setIsAdmin(userIsAdmin);
 
         if (userIsAdmin) {
-          // Admin users get all companies
           await loadAllCompanies(true);
         } else {
-          // Regular users get their assigned companies
-          await loadUserCompanies(session.user.id);
+          await loadUserCompanies(userId);
         }
       } catch (error) {
-        console.error('Error initializing companies:', error);
+        console.error('Error loading companies:', error);
       } finally {
         setIsLoading(false);
         setIsHydrating(false);
+        isLoadingCompaniesRef.current = false;
+      }
+    },
+    [loadAllCompanies, loadUserCompanies, loadBrandingForCompany]
+  );
+
+  // Initialize user and companies with cache-first approach
+  useEffect(() => {
+    let isCancelled = false;
+
+    const initializeCompanies = async () => {
+      const supabase = createClient();
+
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (!session?.user) {
+          setIsLoading(false);
+          setIsHydrating(false);
+          return;
+        }
+
+        // Check if onAuthStateChange already started loading
+        if (userIdRef.current === session.user.id) {
+          return;
+        }
+
+        // Set user state and ref
+        setUser(session.user);
+        userIdRef.current = session.user.id;
+
+        // Load companies for this user
+        await loadCompaniesForUser(session.user.id, supabase);
+      } catch (error) {
+        console.error('Error initializing companies:', error);
+        if (!isCancelled) {
+          setIsLoading(false);
+          setIsHydrating(false);
+        }
       }
     };
 
     initializeCompanies();
-  }, [loadAllCompanies, loadUserCompanies, loadBrandingForCompany]);
 
-  const setSelectedCompany = async (company: Company | null) => {
-    // Prevent null selection - if null is passed, use first available company
-    const companyToSet =
-      company || (availableCompanies.length > 0 ? availableCompanies[0] : null);
+    return () => {
+      isCancelled = true;
+    };
+  }, [loadCompaniesForUser]);
 
-    if (!companyToSet) {
-      setSelectedCompanyState(null);
-      localStorage.removeItem(SELECTED_COMPANY_STORAGE_KEY);
-      return;
-    }
+  const setSelectedCompany = useCallback(
+    async (company: Company | null) => {
+      // Prevent null selection - if null is passed, use first available company
+      const companyToSet =
+        company || (availableCompanies.length > 0 ? availableCompanies[0] : null);
 
-    // Lazy load branding if not already loaded
-    const companyWithBranding = await loadBrandingForCompany(companyToSet);
-    setSelectedCompanyState(companyWithBranding);
+      if (!companyToSet) {
+        setSelectedCompanyState(null);
+        localStorage.removeItem(SELECTED_COMPANY_STORAGE_KEY);
+        return;
+      }
 
-    // Update the company in availableCompanies list with loaded branding
-    setAvailableCompanies(prev =>
-      prev.map(c => (c.id === companyWithBranding.id ? companyWithBranding : c))
-    );
+      // Lazy load branding if not already loaded
+      const companyWithBranding = await loadBrandingForCompany(companyToSet);
+      setSelectedCompanyState(companyWithBranding);
 
-    // Store selection in localStorage
-    localStorage.setItem(SELECTED_COMPANY_STORAGE_KEY, companyWithBranding.id);
-  };
+      // Update the company in availableCompanies list with loaded branding
+      setAvailableCompanies(prev =>
+        prev.map(c => (c.id === companyWithBranding.id ? companyWithBranding : c))
+      );
 
-  const refreshCompanies = async () => {
+      // Store selection in localStorage
+      localStorage.setItem(SELECTED_COMPANY_STORAGE_KEY, companyWithBranding.id);
+    },
+    [availableCompanies, loadBrandingForCompany]
+  );
+
+  const refreshCompanies = useCallback(async () => {
     if (!user) return;
 
     setIsLoading(true);
@@ -432,52 +470,67 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, isAdmin, loadAllCompanies, loadUserCompanies]);
 
-  const refreshBranding = async (companyId?: string) => {
-    const targetCompanyId = companyId || selectedCompany?.id;
-    if (!targetCompanyId) return;
+  const refreshBranding = useCallback(
+    async (companyId?: string) => {
+      const targetCompanyId = companyId || selectedCompany?.id;
+      if (!targetCompanyId) return;
 
-    try {
-      const branding = await loadCompanyBranding(targetCompanyId);
+      try {
+        const branding = await loadCompanyBranding(targetCompanyId);
 
-      // Update the selected company if it matches
-      if (selectedCompany && selectedCompany.id === targetCompanyId) {
-        setSelectedCompanyState({
-          ...selectedCompany,
-          branding,
-        });
+        // Update the selected company if it matches
+        if (selectedCompany && selectedCompany.id === targetCompanyId) {
+          setSelectedCompanyState({
+            ...selectedCompany,
+            branding,
+          });
+        }
+
+        // Update in available companies list
+        setAvailableCompanies(prev =>
+          prev.map(company =>
+            company.id === targetCompanyId ? { ...company, branding } : company
+          )
+        );
+      } catch (error) {
+        console.error('Error refreshing branding:', error);
       }
+    },
+    [selectedCompany, loadCompanyBranding]
+  );
 
-      // Update in available companies list
-      setAvailableCompanies(prev =>
-        prev.map(company =>
-          company.id === targetCompanyId ? { ...company, branding } : company
-        )
-      );
-    } catch (error) {
-      console.error('Error refreshing branding:', error);
-    }
-  };
-
-  // Listen for auth changes
+  // Listen for auth changes - only handle logout to clear state
+  // Login is handled by initializeCompanies (for OAuth/page load) or via window reload (for password/OTP)
   useEffect(() => {
     const supabase = createClient();
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session?.user) {
+        // User logged out - clear all state, cache, and localStorage
         setUser(null);
+        userIdRef.current = null;
         setSelectedCompanyState(null);
         setAvailableCompanies([]);
         setIsAdmin(false);
         setIsLoading(false);
-        // Don't remove selected company from localStorage on logout
-        // This allows users to return to the same company when they log back in
+        isLoadingCompaniesRef.current = false;
+
+        // Clear cached data so next user gets fresh data
+        clearCache(CACHE_KEYS.COMPANIES_LIST);
+        clearCache(CACHE_KEYS.USER_PROFILE);
+        clearCacheByPrefix('cache:company:');
+
+        // Clear selected company from localStorage
+        localStorage.removeItem(SELECTED_COMPANY_STORAGE_KEY);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Memoize context value to prevent unnecessary re-renders of consuming components
