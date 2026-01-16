@@ -42,6 +42,7 @@ export function LeadQuoteSection({
   additionalPests,
   homeSize,
   yardSize,
+  linearFeet,
   selectedHomeSizeOption,
   selectedYardSizeOption,
   preferredDate,
@@ -55,6 +56,7 @@ export function LeadQuoteSection({
   setAdditionalPests,
   setHomeSize,
   setYardSize,
+  setLinearFeet,
   setSelectedHomeSizeOption,
   setSelectedYardSizeOption,
   onPreferredDateChange,
@@ -71,6 +73,7 @@ export function LeadQuoteSection({
   const discountsFetchedRef = useRef<Set<string>>(new Set());
   const initialLineItemCreatedRef = useRef(false);
   const lineItemCreationLockRef = useRef<Set<number>>(new Set());
+  const linearFeetTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [serviceSelections, setServiceSelections] = useState<
     Array<{
@@ -125,6 +128,8 @@ export function LeadQuoteSection({
   const [loadingDiscounts, setLoadingDiscounts] = useState(false);
   const [allServicePlans, setAllServicePlans] = useState<any[]>([]);
   const [loadingServicePlans, setLoadingServicePlans] = useState(false);
+  const [allBundles, setAllBundles] = useState<any[]>([]);
+  const [loadingBundles, setLoadingBundles] = useState(false);
   const [customPricingExpanded, setCustomPricingExpanded] = useState<
     Record<number, boolean>
   >({});
@@ -141,6 +146,49 @@ export function LeadQuoteSection({
 
   const { profile } = useUser();
 
+  // Combine service plans and bundles into a single dropdown
+  const combinedServiceOptions = useMemo(() => {
+    if (loadingServicePlans || loadingBundles) {
+      return [{ value: '', label: 'Loading...', type: 'loading' }];
+    }
+
+    const options: Array<{ value: string; label: string; type: 'service' | 'bundle'; data: any }> = [];
+
+    // Add service plans
+    allServicePlans.forEach(plan => {
+      options.push({
+        value: `service:${plan.plan_name}`,
+        label: plan.plan_name,
+        type: 'service',
+        data: plan,
+      });
+    });
+
+    // Add bundles with a prefix to distinguish them
+    allBundles.forEach(bundle => {
+      options.push({
+        value: `bundle:${bundle.bundle_name}`,
+        label: `Bundle: ${bundle.bundle_name}`,
+        type: 'bundle',
+        data: bundle,
+      });
+    });
+
+    if (options.length === 0) {
+      return [{ value: '', label: 'No plans or bundles available', type: 'empty' }];
+    }
+
+    // Sort: bundles first (by display_order), then service plans (alphabetically)
+    return options.sort((a, b) => {
+      if (a.type === 'bundle' && b.type === 'bundle') {
+        return (a.data.display_order || 0) - (b.data.display_order || 0);
+      }
+      if (a.type === 'bundle') return -1;
+      if (b.type === 'bundle') return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [allServicePlans, allBundles, loadingServicePlans, loadingBundles]);
+
   // Generate home size dropdown options
   const homeSizeOptions = useMemo(() => {
     if (!pricingSettings) return [];
@@ -148,10 +196,11 @@ export function LeadQuoteSection({
     // Use first service selection's plan for size calculations
     const firstPlan = serviceSelections[0]?.servicePlan;
     const servicePlanPricing =
-      firstPlan?.home_size_pricing && firstPlan?.yard_size_pricing
+      firstPlan?.home_size_pricing && firstPlan?.yard_size_pricing && firstPlan?.linear_feet_pricing
         ? {
             home_size_pricing: firstPlan.home_size_pricing,
             yard_size_pricing: firstPlan.yard_size_pricing,
+            linear_feet_pricing: firstPlan.linear_feet_pricing,
           }
         : undefined;
 
@@ -175,10 +224,11 @@ export function LeadQuoteSection({
     // Use first service selection's plan for size calculations
     const firstPlan = serviceSelections[0]?.servicePlan;
     const servicePlanPricing =
-      firstPlan?.home_size_pricing && firstPlan?.yard_size_pricing
+      firstPlan?.home_size_pricing && firstPlan?.yard_size_pricing && firstPlan?.linear_feet_pricing
         ? {
             home_size_pricing: firstPlan.home_size_pricing,
             yard_size_pricing: firstPlan.yard_size_pricing,
+            linear_feet_pricing: firstPlan.linear_feet_pricing,
           }
         : undefined;
 
@@ -195,7 +245,16 @@ export function LeadQuoteSection({
     }
   }, [yardSize, yardSizeOptions]);
 
-  // Pre-fill home size and yard size from quote (source of truth for pricing)
+  // Cleanup linear feet timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (linearFeetTimeoutRef.current) {
+        clearTimeout(linearFeetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Pre-fill home size, yard size, and linear feet from quote (source of truth for pricing)
   useEffect(() => {
     // Always use quote as source of truth if it exists
     if (quote?.home_size_range) {
@@ -217,7 +276,14 @@ export function LeadQuoteSection({
       // Fallback to service address only on initial load
       setSelectedYardSizeOption(lead.primary_service_address.yard_size_range);
     }
-  }, [quote?.home_size_range, quote?.yard_size_range]);
+
+    if (quote?.linear_feet_range) {
+      const parsedValue = parseFloat(quote.linear_feet_range);
+      if (!isNaN(parsedValue)) {
+        setLinearFeet(parsedValue);
+      }
+    }
+  }, [quote?.home_size_range, quote?.yard_size_range, quote?.linear_feet_range]);
 
   // Close pest dropdowns on click outside
   useEffect(() => {
@@ -484,18 +550,21 @@ export function LeadQuoteSection({
     const servicePlanItems = quote.line_items.filter(
       (item: any) => item.service_plan_id
     );
+    const bundleItems = quote.line_items.filter(
+      (item: any) => item.bundle_plan_id
+    );
     const addonItems = quote.line_items.filter(
       (item: any) => item.addon_service_id
     );
 
-    if (servicePlanItems.length === 0) {
+    if (servicePlanItems.length === 0 && bundleItems.length === 0) {
       return;
     }
 
     // Map service plan line items to service selections
-    const selectionsFromLineItems = servicePlanItems
+    const servicePlanSelections = servicePlanItems
       .sort((a: any, b: any) => a.display_order - b.display_order)
-      .map((lineItem: any, index: number) => {
+      .map((lineItem: any) => {
         // Find the full service plan data
         const servicePlan = allServicePlans.find(
           (p: any) => p.id === lineItem.service_plan_id
@@ -506,13 +575,39 @@ export function LeadQuoteSection({
           lineItem.service_frequency || servicePlan?.treatment_frequency || '';
 
         return {
-          id: (index + 1).toString(),
+          id: `service-${lineItem.display_order}`,
           servicePlan: servicePlan || null,
           displayOrder: lineItem.display_order,
           frequency: frequency,
           discount: lineItem.discount_id || '',
         };
       });
+
+    // Map bundle line items to service selections
+    const bundleSelections = bundleItems
+      .sort((a: any, b: any) => a.display_order - b.display_order)
+      .map((lineItem: any) => {
+        // Find the full bundle data
+        const bundle = allBundles.find(
+          (b: any) => b.id === lineItem.bundle_plan_id
+        );
+
+        return {
+          id: `bundle-${lineItem.display_order}`,
+          servicePlan: bundle ? {
+            plan_name: bundle.bundle_name,
+            id: bundle.id,
+            isBundle: true
+          } : null,
+          displayOrder: lineItem.display_order,
+          frequency: lineItem.billing_frequency || '',
+          discount: '',
+        };
+      });
+
+    // Combine and sort by display order
+    const selectionsFromLineItems = [...servicePlanSelections, ...bundleSelections]
+      .sort((a, b) => a.displayOrder - b.displayOrder);
 
     // Extract add-on IDs
     const addonIds = addonItems
@@ -552,7 +647,7 @@ export function LeadQuoteSection({
     };
 
     fetchAllDiscounts();
-  }, [quote?.line_items, allServicePlans, profile, fetchDiscountsForPlan]);
+  }, [quote?.line_items, allServicePlans, allBundles, profile, fetchDiscountsForPlan]);
 
   // Re-fetch discounts when profile loads if we have service selections but missing discounts
   useEffect(() => {
@@ -626,6 +721,37 @@ export function LeadQuoteSection({
     };
 
     loadAllServicePlans();
+  }, [lead.company_id]);
+
+  // Load all bundle plans for the company
+  useEffect(() => {
+    const loadAllBundles = async () => {
+      if (!lead.company_id) {
+        setAllBundles([]);
+        return;
+      }
+
+      try {
+        setLoadingBundles(true);
+        const response = await fetch(
+          `/api/admin/bundle-plans?companyId=${lead.company_id}`
+        );
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          setAllBundles(data.data.filter((bundle: any) => bundle.is_active));
+        } else {
+          setAllBundles([]);
+        }
+      } catch (error) {
+        console.error('Error loading bundle plans:', error);
+        setAllBundles([]);
+      } finally {
+        setLoadingBundles(false);
+      }
+    };
+
+    loadAllBundles();
   }, [lead.company_id]);
 
   // Add-on line item management functions
@@ -719,6 +845,83 @@ export function LeadQuoteSection({
     }
   };
 
+  const createBundleLineItem = async (bundleId: string, targetDisplayOrder?: number) => {
+    if (!quote) return;
+
+    try {
+      // Fetch bundle details
+      const response = await fetch(
+        `/api/admin/bundle-plans?companyId=${lead.company_id}`
+      );
+      const result = await response.json();
+
+      if (!result.success) throw new Error('Failed to fetch bundles');
+
+      const bundle = result.data.find((b: any) => b.id === bundleId);
+      if (!bundle) throw new Error('Bundle not found');
+
+      // Determine display order
+      // If targetDisplayOrder provided, use it (replacing existing service at that position)
+      // Otherwise, calculate next available position (adding new service)
+      let displayOrder: number;
+      if (targetDisplayOrder !== undefined) {
+        displayOrder = targetDisplayOrder;
+      } else {
+        const maxOrder = Math.max(
+          ...(quote.line_items?.map((item: any) => item.display_order) || [-1]),
+          -1
+        );
+        displayOrder = maxOrder + 1;
+      }
+
+      // Find existing line item at this display order (if updating existing)
+      const existingLineItem = quote.line_items?.find(
+        (item: any) => item.display_order === displayOrder
+      );
+
+      // Create line item data - include ID to update existing item
+      const lineItemData: any = {
+        bundle_plan_id: bundle.id,
+        display_order: displayOrder,
+      };
+
+      // If there's an existing line item, include its ID to trigger an update
+      if (existingLineItem) {
+        lineItemData.id = existingLineItem.id;
+      }
+
+      const updateResponse = await fetch(`/api/quotes/${quote.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ line_items: [lineItemData] }),
+      });
+
+      if (updateResponse.ok) {
+        const data = await updateResponse.json();
+        if (data.success && data.data) {
+          await broadcastQuoteUpdate(data.data);
+
+          // Update service selections to show the bundle
+          setServiceSelections(prev =>
+            prev.map((sel, idx) =>
+              idx === 0
+                ? {
+                    ...sel,
+                    servicePlan: { plan_name: bundle.bundle_name, id: bundle.id },
+                  }
+                : sel
+            )
+          );
+
+          onShowToast?.('Bundle added to quote', 'success');
+        }
+      }
+    } catch (error) {
+      console.error('Error adding bundle:', error);
+      onShowToast?.('Failed to add bundle', 'error');
+    }
+  };
+
   const removeServiceSelection = async (displayOrder: number) => {
     // Don't allow removing the first selection
     if (displayOrder === 0) return;
@@ -738,6 +941,10 @@ export function LeadQuoteSection({
     const lineItemToDelete = quote?.line_items?.find(
       (item: any) => item.display_order === displayOrder
     );
+
+    console.log('Removing service at display order:', displayOrder);
+    console.log('Line item to delete:', lineItemToDelete);
+    console.log('All line items:', quote?.line_items);
 
     if (lineItemToDelete && quote) {
       try {
@@ -948,11 +1155,11 @@ export function LeadQuoteSection({
       const homeSizeRange = quote.home_size_range;
       const yardSizeRange = quote.yard_size_range;
 
-      // Find existing service plan line item at this display order (not add-ons)
+      // Find existing service plan or bundle line item at this display order (not add-ons)
       const existingLineItem = quote.line_items?.find(
         (item: any) =>
           item.display_order === displayOrder &&
-          item.service_plan_id &&
+          (item.service_plan_id || item.bundle_plan_id) &&
           !item.addon_service_id
       );
 
@@ -1183,8 +1390,8 @@ export function LeadQuoteSection({
                   </div>
                 )}
                 {/* Service Selection Form */}
-                {/* Row 1: Size of Home, Yard Size, Had Pest Control Before (3 columns) */}
-                <div className={`${styles.gridRow} ${styles.threeColumns}`}>
+                {/* Row 1: Size of Home, Yard Size, Linear Feet, Had Pest Control Before (4 columns) */}
+                <div className={`${styles.gridRow} ${styles.fourColumns}`}>
                   <div className={styles.formField}>
                     <div className={styles.fieldHeader}>
                       <label className={styles.fieldLabel}>Size of Home</label>
@@ -1425,6 +1632,126 @@ export function LeadQuoteSection({
                   </div>
                   <div className={styles.formField}>
                     <div className={styles.fieldHeader}>
+                      <label className={styles.fieldLabel}>Linear Feet</label>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={linearFeet}
+                      onChange={(e) => {
+                        const newValue = e.target.value === '' ? '' : Number(e.target.value);
+                        const oldLinearFeet = linearFeet;
+
+                        // Update UI immediately for responsive feedback
+                        setLinearFeet(newValue);
+
+                        // Clear existing timeout
+                        if (linearFeetTimeoutRef.current) {
+                          clearTimeout(linearFeetTimeoutRef.current);
+                        }
+
+                        // Debounce API call - only save after user stops typing (500ms)
+                        linearFeetTimeoutRef.current = setTimeout(async () => {
+                          // Update quote only if there's a value and a quote exists
+                          if (quote && newValue !== '') {
+                            try {
+                              const response = await fetch(
+                                `/api/quotes/${quote.id}`,
+                                {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    linear_feet_range: newValue.toString(),
+                                  }),
+                                }
+                              );
+
+                              if (!response.ok) {
+                                throw new Error(
+                                  'Failed to update linear feet'
+                                );
+                              }
+
+                              const data = await response.json();
+
+                              if (data.success && data.data) {
+                                await broadcastQuoteUpdate(data.data);
+                                onShowToast?.(
+                                  'Linear feet updated successfully',
+                                  'success'
+                                );
+
+                                // Provide undo handler
+                                if (onRequestUndo) {
+                                  const undoHandler = async () => {
+                                    try {
+                                      // Revert UI state
+                                      setLinearFeet(oldLinearFeet);
+
+                                      // Revert in database
+                                      const revertResponse = await fetch(
+                                        `/api/quotes/${quote.id}`,
+                                        {
+                                          method: 'PUT',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                          },
+                                          body: JSON.stringify({
+                                            linear_feet_range: oldLinearFeet ? oldLinearFeet.toString() : null,
+                                          }),
+                                        }
+                                      );
+
+                                      if (!revertResponse.ok) {
+                                        throw new Error('Failed to undo change');
+                                      }
+
+                                      const revertData =
+                                        await revertResponse.json();
+                                      if (revertData.success && revertData.data) {
+                                        await broadcastQuoteUpdate(
+                                          revertData.data
+                                        );
+                                      }
+
+                                      onShowToast?.('Change undone', 'success');
+                                    } catch (error) {
+                                      console.error(
+                                        'Error undoing change:',
+                                        error
+                                      );
+                                      onShowToast?.(
+                                        'Failed to undo change',
+                                        'error'
+                                      );
+                                    }
+                                  };
+
+                                  onRequestUndo(undoHandler);
+                                }
+                              }
+                            } catch (error) {
+                              console.error(
+                                'Error updating linear feet:',
+                                error
+                              );
+                              onShowToast?.(
+                                'Failed to update linear feet',
+                                'error'
+                              );
+                            }
+                          }
+                        }, 500);
+                      }}
+                      placeholder="Enter linear feet"
+                      className={styles.input}
+                    />
+                  </div>
+                  <div className={styles.formField}>
+                    <div className={styles.fieldHeader}>
                       <label className={styles.fieldLabel}>
                         Have You Had Pest Control Before?
                       </label>
@@ -1530,14 +1857,15 @@ export function LeadQuoteSection({
                       <div className={styles.formField}>
                         <div className={styles.serviceHeaderRow}>
                           <label className={styles.fieldLabel}>
-                            Select Service {index + 1}
+                            {index === 0 ? 'Select Service 1' : `Select Service ${index + 1}`}
                           </label>
                           {index > 0 && (
                             <button
                               type="button"
-                              onClick={() =>
-                                removeServiceSelection(selection.displayOrder)
-                              }
+                              onClick={() => {
+                                console.log('X button clicked! Index:', index, 'Selection:', selection);
+                                removeServiceSelection(selection.displayOrder);
+                              }}
                               className={styles.removeServiceButton}
                               aria-label="Remove service"
                             >
@@ -1547,50 +1875,58 @@ export function LeadQuoteSection({
                         </div>
                         <div className={styles.serviceDropdownRow}>
                           <CustomDropdown
-                            options={
-                              loadingServicePlans
-                                ? [{ value: '', label: 'Loading plans...' }]
-                                : allServicePlans.length > 0
-                                  ? allServicePlans.map(plan => ({
-                                      value: plan.plan_name,
-                                      label: plan.plan_name,
-                                    }))
-                                  : [{ value: '', label: 'No plans available' }]
+                            options={combinedServiceOptions}
+                            value={
+                              selection.servicePlan?.plan_name
+                                ? `${(selection.servicePlan as any)?.isBundle ? 'bundle' : 'service'}:${selection.servicePlan.plan_name}`
+                                : ''
                             }
-                            value={selection.servicePlan?.plan_name || ''}
-                            onChange={async planName => {
-                              const plan = allServicePlans.find(
-                                p => p.plan_name === planName
-                              );
-                              if (plan) {
-                                // Auto-set frequency to 'one-time' for one-time plans
-                                const newFrequency =
-                                  plan.plan_category === 'one-time'
-                                    ? 'one-time'
-                                    : selection.frequency;
+                            onChange={async selectedValue => {
+                              // Parse the selected value to determine type
+                              const [type, ...nameParts] = selectedValue.split(':');
+                              const name = nameParts.join(':'); // Rejoin in case name contains ':'
 
-                                setServiceSelections(prev =>
-                                  prev.map((sel, idx) =>
-                                    idx === index
-                                      ? {
-                                          ...sel,
-                                          servicePlan: plan,
-                                          frequency: newFrequency,
-                                        }
-                                      : sel
-                                  )
+                              if (type === 'bundle') {
+                                const bundle = allBundles.find(
+                                  b => b.bundle_name === name
                                 );
-                                await createOrUpdateQuoteLineItem(
-                                  plan,
-                                  selection.displayOrder,
-                                  plan.plan_category === 'one-time'
-                                    ? { service_frequency: 'one-time' }
-                                    : {}
+                                if (bundle) {
+                                  await createBundleLineItem(bundle.id, selection.displayOrder);
+                                }
+                              } else if (type === 'service') {
+                                const plan = allServicePlans.find(
+                                  p => p.plan_name === name
                                 );
+                                if (plan) {
+                                  // Auto-set frequency to 'one-time' for one-time plans
+                                  const newFrequency =
+                                    plan.plan_category === 'one-time'
+                                      ? 'one-time'
+                                      : selection.frequency;
+
+                                  setServiceSelections(prev =>
+                                    prev.map((sel, idx) =>
+                                      idx === index
+                                        ? {
+                                            ...sel,
+                                            servicePlan: plan,
+                                            frequency: newFrequency,
+                                          }
+                                        : sel
+                                    )
+                                  );
+                                  await createOrUpdateQuoteLineItem(
+                                    plan,
+                                    selection.displayOrder,
+                                    plan.plan_category === 'one-time'
+                                      ? { service_frequency: 'one-time' }
+                                      : {}
+                                  );
+                                }
                               }
                             }}
                             placeholder="Program or Service"
-                            disabled={loadingServicePlans}
+                            disabled={loadingServicePlans || loadingBundles}
                           />
                           {selection.servicePlan?.allow_custom_pricing && (
                             <button
@@ -1954,12 +2290,28 @@ export function LeadQuoteSection({
                           return indexA - indexB;
                         })
                         .map(pest => {
-                          // Check if this pest is covered by ANY selected service plan
-                          const isCovered = serviceSelections.some(sel =>
-                            sel.servicePlan?.pest_coverage?.some(
+                          // Check if this pest is covered by ANY selected service plan or bundle
+                          const isCovered = serviceSelections.some(sel => {
+                            // Check if it's a bundle
+                            if ((sel.servicePlan as any)?.isBundle) {
+                              // Find the full bundle data
+                              const bundle = allBundles.find(b => b.id === sel.servicePlan?.id);
+                              if (bundle && bundle.bundled_service_plans) {
+                                // Check if any bundled service plan covers this pest
+                                return bundle.bundled_service_plans.some((bundledPlan: any) => {
+                                  const servicePlan = allServicePlans.find(p => p.id === bundledPlan.service_plan_id);
+                                  return servicePlan?.pest_coverage?.some(
+                                    (coverage: any) => coverage.pest_id === pest.id
+                                  );
+                                });
+                              }
+                              return false;
+                            }
+                            // Regular service plan check
+                            return sel.servicePlan?.pest_coverage?.some(
                               (coverage: any) => coverage.pest_id === pest.id
-                            )
-                          );
+                            );
+                          });
 
                           return (
                             <div
@@ -2038,10 +2390,10 @@ export function LeadQuoteSection({
                         // Single Plan Pricing Display
                         serviceSelections[0].servicePlan &&
                         (() => {
-                          // Find the main plan line item (not an add-on)
+                          // Find the main plan line item (not an add-on) - includes both service plans and bundles
                           const mainPlanLineItem = quote?.line_items?.find(
                             (item: any) =>
-                              item.service_plan_id && !item.addon_service_id
+                              (item.service_plan_id || item.bundle_plan_id) && !item.addon_service_id
                           );
 
                           return (

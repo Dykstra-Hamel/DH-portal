@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { CompanyPricingSettings } from '@/types/pricing';
-import { generateHomeSizeOptions, generateYardSizeOptions } from '@/lib/pricing-calculations';
+import { generateHomeSizeOptions, generateYardSizeOptions, generateLinearFeetOptions } from '@/lib/pricing-calculations';
 import { Save, RotateCcw } from 'lucide-react';
 import styles from './PricingSettingsManager.module.scss';
 
@@ -20,6 +20,9 @@ export default function PricingSettingsManager({ companyId, onSave }: PricingSet
     base_yard_acres: 0.25,
     yard_acres_interval: 0.25,
     max_yard_acres: 2.0,
+    base_linear_feet: 100,
+    linear_feet_interval: 50,
+    max_linear_feet: 500,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,6 +52,9 @@ export default function PricingSettingsManager({ companyId, onSave }: PricingSet
         base_yard_acres: data.base_yard_acres,
         yard_acres_interval: data.yard_acres_interval,
         max_yard_acres: data.max_yard_acres,
+        base_linear_feet: data.base_linear_feet,
+        linear_feet_interval: data.linear_feet_interval,
+        max_linear_feet: data.max_linear_feet,
       });
     } catch (err) {
       console.error('Error loading pricing settings:', err);
@@ -80,6 +86,15 @@ export default function PricingSettingsManager({ companyId, onSave }: PricingSet
         formData.max_yard_acres <= formData.base_yard_acres
       ) {
         setError('Invalid yard size values. Please check your inputs.');
+        return;
+      }
+
+      if (
+        formData.base_linear_feet <= 0 ||
+        formData.linear_feet_interval <= 0 ||
+        formData.max_linear_feet <= formData.base_linear_feet
+      ) {
+        setError('Invalid linear feet values. Please check your inputs.');
         return;
       }
 
@@ -117,6 +132,9 @@ export default function PricingSettingsManager({ companyId, onSave }: PricingSet
         base_yard_acres: settings.base_yard_acres,
         yard_acres_interval: settings.yard_acres_interval,
         max_yard_acres: settings.max_yard_acres,
+        base_linear_feet: settings.base_linear_feet,
+        linear_feet_interval: settings.linear_feet_interval,
+        max_linear_feet: settings.max_linear_feet,
       });
       setError(null);
       setSuccess(null);
@@ -143,6 +161,21 @@ export default function PricingSettingsManager({ companyId, onSave }: PricingSet
     if (!formData) return [];
     try {
       return generateYardSizeOptions({
+        id: '',
+        company_id: companyId,
+        ...formData,
+        created_at: '',
+        updated_at: '',
+      });
+    } catch {
+      return [];
+    }
+  }, [formData, companyId]);
+
+  const previewLinearFeetOptions = useMemo(() => {
+    if (!formData) return [];
+    try {
+      return generateLinearFeetOptions({
         id: '',
         company_id: companyId,
         ...formData,
@@ -287,6 +320,63 @@ export default function PricingSettingsManager({ companyId, onSave }: PricingSet
           </div>
         </div>
 
+        {/* Linear Feet Settings */}
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Linear Feet Intervals</h3>
+          <div className={styles.fieldGroup}>
+            <div className={styles.field}>
+              <label className={styles.label}>
+                Base Linear Feet
+                <span className={styles.unit}>ft</span>
+              </label>
+              <input
+                type="number"
+                className={styles.input}
+                value={formData.base_linear_feet}
+                onChange={(e) =>
+                  setFormData({ ...formData, base_linear_feet: Number(e.target.value) })
+                }
+                min="0"
+              />
+              <span className={styles.helpText}>Starting size for the first interval</span>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>
+                Interval Size
+                <span className={styles.unit}>ft</span>
+              </label>
+              <input
+                type="number"
+                className={styles.input}
+                value={formData.linear_feet_interval}
+                onChange={(e) =>
+                  setFormData({ ...formData, linear_feet_interval: Number(e.target.value) })
+                }
+                min="1"
+              />
+              <span className={styles.helpText}>Size increase for each interval step</span>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>
+                Maximum Size
+                <span className={styles.unit}>ft</span>
+              </label>
+              <input
+                type="number"
+                className={styles.input}
+                value={formData.max_linear_feet}
+                onChange={(e) =>
+                  setFormData({ ...formData, max_linear_feet: Number(e.target.value) })
+                }
+                min="1"
+              />
+              <span className={styles.helpText}>Largest size before &quot;max+&quot; option</span>
+            </div>
+          </div>
+        </div>
+
         {/* Preview Section */}
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Dropdown Preview</h3>
@@ -320,6 +410,21 @@ export default function PricingSettingsManager({ companyId, onSave }: PricingSet
                 )}
               </ul>
             </div>
+
+            <div className={styles.previewColumn}>
+              <h4 className={styles.previewTitle}>Linear Feet Options</h4>
+              <ul className={styles.previewList}>
+                {previewLinearFeetOptions.length > 0 ? (
+                  previewLinearFeetOptions.map((option) => (
+                    <li key={option.value} className={styles.previewItem}>
+                      {option.label}
+                    </li>
+                  ))
+                ) : (
+                  <li className={styles.previewError}>Invalid configuration</li>
+                )}
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -338,7 +443,7 @@ export default function PricingSettingsManager({ companyId, onSave }: PricingSet
             type="button"
             className={styles.saveButton}
             onClick={handleSave}
-            disabled={saving || previewHomeSizeOptions.length === 0 || previewYardSizeOptions.length === 0}
+            disabled={saving || previewHomeSizeOptions.length === 0 || previewYardSizeOptions.length === 0 || previewLinearFeetOptions.length === 0}
           >
             <Save size={16} />
             {saving ? 'Saving...' : 'Save Settings'}

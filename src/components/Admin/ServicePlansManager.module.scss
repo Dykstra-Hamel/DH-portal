@@ -245,6 +245,74 @@
   }
 }
 
+// Generic Table Styles (for bundles)
+.tableContainer {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  thead {
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  }
+
+  tbody {
+    tr {
+      border-bottom: 1px solid #f3f4f6;
+      transition: background 0.2s ease;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background: #f9fafb;
+      }
+    }
+
+    td {
+      padding: 16px;
+      color: #374151;
+    }
+  }
+}
+
+.activeStatus {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.inactiveStatus {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
 // Responsive adjustments
 @media (max-width: 1200px) {
   .plansTableHeader,

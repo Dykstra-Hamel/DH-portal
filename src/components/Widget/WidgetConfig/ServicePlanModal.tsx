@@ -64,7 +64,7 @@ interface ServicePlanModalProps {
 
 // Custom Interval Pricing Input Component
 interface CustomIntervalPricingInputProps {
-  dimension: 'home' | 'yard';
+  dimension: 'home' | 'yard' | 'linear_feet';
   formData: any;
   setFormData: (data: any) => void;
   companyId: string;
@@ -76,8 +76,13 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
   setFormData,
   companyId,
 }) => {
-  const pricingKey = dimension === 'home' ? 'home_size_pricing' : 'yard_size_pricing';
+  const pricingKey = dimension === 'home'
+    ? 'home_size_pricing'
+    : dimension === 'yard'
+    ? 'yard_size_pricing'
+    : 'linear_feet_pricing';
   const pricing = formData[pricingKey];
+  const isLinearFeet = dimension === 'linear_feet';
 
   // Fetch company pricing settings to know how many intervals exist
   const { settings: pricingSettings, isLoading, error } = usePricingSettings(companyId);
@@ -102,7 +107,9 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
         <p style={{ color: '#6c757d', fontSize: '14px', marginBottom: '12px' }}>
           {dimension === 'home'
             ? 'Home size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'
-            : 'Yard size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'}
+            : dimension === 'yard'
+            ? 'Yard size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'
+            : 'Linear feet pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'}
         </p>
         <p style={{ color: '#6c757d', fontSize: '14px' }}>
           Please go to <strong>Company Management → Pricing Settings</strong> to configure pricing intervals first.
@@ -121,32 +128,84 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
     return result.slice(0, length);
   };
 
+  // For linear feet, use per-foot arrays; for home/yard use custom price arrays
+  const initialPriceKey = isLinearFeet ? 'initial_price_per_foot' : 'custom_initial_prices';
+
   const initialPrices = ensureArrayLength(
-    pricing.custom_initial_prices || [],
+    pricing[initialPriceKey] || [],
     intervalCount
   );
-  const recurringPrices = ensureArrayLength(
-    pricing.custom_recurring_prices || [],
-    intervalCount
-  );
+
+  // For linear feet, ensure recurring types array exists and has correct length
+  const recurringTypes = isLinearFeet
+    ? ensureArrayLength(pricing.recurring_pricing_types || [], intervalCount).map(t => (t as unknown as 'per_foot' | 'flat') || 'per_foot')
+    : [];
+
+  // For linear feet, maintain both per_foot and flat arrays
+  const recurringPerFootPrices = isLinearFeet
+    ? ensureArrayLength(pricing.recurring_price_per_foot || [], intervalCount)
+    : [];
+  const recurringFlatPrices = isLinearFeet
+    ? ensureArrayLength(pricing.recurring_flat_price || [], intervalCount)
+    : [];
+
+  // For home/yard, just use custom recurring prices
+  const recurringPrices = !isLinearFeet
+    ? ensureArrayLength(pricing.custom_recurring_prices || [], intervalCount)
+    : [];
 
   const handlePriceChange = (
     type: 'initial' | 'recurring',
     index: number,
     value: number
   ) => {
-    const arrayKey = type === 'initial'
-      ? 'custom_initial_prices'
-      : 'custom_recurring_prices';
+    if (type === 'initial') {
+      const newPrices = [...(pricing[initialPriceKey] || [])];
+      newPrices[index] = value;
+      setFormData({
+        ...formData,
+        [pricingKey]: {
+          ...pricing,
+          [initialPriceKey]: newPrices
+        }
+      });
+    } else {
+      // Recurring: for linear feet, update the correct array based on this interval's type
+      if (isLinearFeet) {
+        const recurringType = recurringTypes[index];
+        const arrayKey = recurringType === 'flat' ? 'recurring_flat_price' : 'recurring_price_per_foot';
+        const newPrices = [...(pricing[arrayKey] || [])];
+        newPrices[index] = value;
+        setFormData({
+          ...formData,
+          [pricingKey]: {
+            ...pricing,
+            [arrayKey]: newPrices
+          }
+        });
+      } else {
+        // For home/yard, just update custom_recurring_prices
+        const newPrices = [...(pricing.custom_recurring_prices || [])];
+        newPrices[index] = value;
+        setFormData({
+          ...formData,
+          [pricingKey]: {
+            ...pricing,
+            custom_recurring_prices: newPrices
+          }
+        });
+      }
+    }
+  };
 
-    const newPrices = [...(pricing[arrayKey] || [])];
-    newPrices[index] = value;
-
+  const handleRecurringTypeChange = (index: number, newType: 'per_foot' | 'flat') => {
+    const newTypes = [...recurringTypes];
+    newTypes[index] = newType;
     setFormData({
       ...formData,
       [pricingKey]: {
         ...pricing,
-        [arrayKey]: newPrices
+        recurring_pricing_types: newTypes
       }
     });
   };
@@ -155,14 +214,21 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
     <div className={styles.customPricingGrid}>
       <div className={styles.headerRow}>
         <span>Interval</span>
-        <span>Initial Price Increase</span>
+        <span>{isLinearFeet ? 'Initial Price Per Foot' : 'Initial Price Increase'}</span>
         {formData.plan_category !== 'one-time' && (
-          <span>Recurring Price Increase</span>
+          <>
+            {isLinearFeet && <span>Recurring Type</span>}
+            <span>{isLinearFeet ? 'Recurring Price' : 'Recurring Price Increase'}</span>
+          </>
         )}
       </div>
 
       {initialPrices.map((initialPrice, index) => {
         const intervalLabel = getIntervalLabel(pricingSettings, dimension, index);
+        const intervalRecurringType = isLinearFeet ? recurringTypes[index] : null;
+        const recurringValue = isLinearFeet
+          ? (intervalRecurringType === 'flat' ? recurringFlatPrices[index] : recurringPerFootPrices[index])
+          : recurringPrices[index];
 
         return (
           <div key={index} className={styles.intervalRow}>
@@ -171,7 +237,7 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
             </div>
 
             <div className={styles.priceInput}>
-              <span>+$</span>
+              <span>{isLinearFeet ? '$' : '+$'}</span>
               <input
                 type="number"
                 step="0.01"
@@ -184,33 +250,52 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
                 )}
                 placeholder="0.00"
               />
+              {isLinearFeet && <span>/ft</span>}
             </div>
 
             {formData.plan_category !== 'one-time' && (
-              <div className={styles.priceInput}>
-                <span>+$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={recurringPrices[index]}
-                  onChange={(e) => handlePriceChange(
-                    'recurring',
-                    index,
-                    parseFloat(e.target.value) || 0
-                  )}
-                  placeholder="0.00"
-                />
-              </div>
+              <>
+                {/* Type selector for linear feet only */}
+                {isLinearFeet && (
+                  <div className={styles.priceInput}>
+                    <select
+                      value={intervalRecurringType || 'per_foot'}
+                      onChange={(e) => handleRecurringTypeChange(index, e.target.value as 'per_foot' | 'flat')}
+                      style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ddd', width: '100%' }}
+                    >
+                      <option value="per_foot">Per Foot</option>
+                      <option value="flat">Flat</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Recurring price input */}
+                <div className={styles.priceInput}>
+                  <span>{isLinearFeet ? '$' : '+$'}</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={recurringValue || 0}
+                    onChange={(e) => handlePriceChange(
+                      'recurring',
+                      index,
+                      parseFloat(e.target.value) || 0
+                    )}
+                    placeholder="0.00"
+                  />
+                  {isLinearFeet && intervalRecurringType === 'per_foot' && <span>/ft</span>}
+                </div>
+              </>
             )}
           </div>
         );
       })}
 
       <div className={styles.pricingNote}>
-        <strong>Note:</strong> These exact price increases will be applied for
-        each interval. The first interval typically has $0 increase since
-        it represents the base size.
+        <strong>Note:</strong> {isLinearFeet
+          ? 'Initial pricing is always per-foot. Each interval can have either per-foot or flat recurring pricing. Per-foot multiplies the rate by footage (e.g., 250 ft × $1.50/ft = $375/mo). Flat uses a fixed monthly price (e.g., $33/mo).'
+          : 'These exact price increases will be applied for each interval. The first interval typically has $0 increase since it represents the base size.'}
       </div>
     </div>
   );
@@ -258,6 +343,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       custom_initial_prices: [0],
       custom_recurring_prices: [0],
     },
+    linear_feet_pricing: null,
   });
 
   const [activeTab, setActiveTab] = useState('basic');
@@ -290,18 +376,19 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         })) || [],
         home_size_pricing: {
           pricing_mode: (plan as any).home_size_pricing?.pricing_mode || 'linear',
-          initial_cost_per_interval: (plan as any).home_size_pricing?.initial_cost_per_interval || 20.00,
-          recurring_cost_per_interval: (plan as any).home_size_pricing?.recurring_cost_per_interval || 10.00,
+          initial_cost_per_interval: (plan as any).home_size_pricing?.initial_cost_per_interval ?? 20.00,
+          recurring_cost_per_interval: (plan as any).home_size_pricing?.recurring_cost_per_interval ?? 10.00,
           custom_initial_prices: (plan as any).home_size_pricing?.custom_initial_prices || [0],
           custom_recurring_prices: (plan as any).home_size_pricing?.custom_recurring_prices || [0],
         },
         yard_size_pricing: {
           pricing_mode: (plan as any).yard_size_pricing?.pricing_mode || 'linear',
-          initial_cost_per_interval: (plan as any).yard_size_pricing?.initial_cost_per_interval || 25.00,
-          recurring_cost_per_interval: (plan as any).yard_size_pricing?.recurring_cost_per_interval || 15.00,
+          initial_cost_per_interval: (plan as any).yard_size_pricing?.initial_cost_per_interval ?? 25.00,
+          recurring_cost_per_interval: (plan as any).yard_size_pricing?.recurring_cost_per_interval ?? 15.00,
           custom_initial_prices: (plan as any).yard_size_pricing?.custom_initial_prices || [0],
           custom_recurring_prices: (plan as any).yard_size_pricing?.custom_recurring_prices || [0],
         },
+        linear_feet_pricing: (plan as any).linear_feet_pricing || null,
       });
     } else {
       // Reset form for new plan
@@ -339,6 +426,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
           custom_initial_prices: [0],
           custom_recurring_prices: [0],
         },
+        linear_feet_pricing: null,
       });
     }
   }, [plan]);
@@ -499,8 +587,16 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       return;
     }
 
-    if (!formData.initial_price || formData.initial_price <= 0) {
-      alert('Initial price is required and must be greater than 0');
+    // Allow $0 initial price if linear feet pricing is configured
+    const hasLinearFeetPricing = formData.linear_feet_pricing !== null && formData.linear_feet_pricing !== undefined;
+
+    if (formData.initial_price === null || formData.initial_price === undefined || formData.initial_price < 0) {
+      alert('Initial price is required and cannot be negative');
+      return;
+    }
+
+    if (!hasLinearFeetPricing && formData.initial_price === 0) {
+      alert('Initial price must be greater than 0 unless linear feet pricing is configured');
       return;
     }
 
@@ -518,8 +614,9 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
 
     // Validate subscription plans
     if (formData.plan_category !== 'one-time') {
-      if (!formData.recurring_price || formData.recurring_price <= 0) {
-        alert('Recurring price is required for subscription plans and must be greater than 0');
+      // Allow $0 recurring price if linear feet pricing is configured
+      if (!hasLinearFeetPricing && (!formData.recurring_price || formData.recurring_price <= 0)) {
+        alert('Recurring price is required for subscription plans and must be greater than 0 unless linear feet pricing is configured');
         return;
       }
       if (!formData.billing_frequency) {
@@ -625,6 +722,16 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     onChange={(e) => {
                       const newCategory = e.target.value as 'basic' | 'standard' | 'premium' | 'one-time';
 
+                      let updatedLinearFeetPricing: any = null;
+                      if (formData.linear_feet_pricing && typeof formData.linear_feet_pricing === 'object') {
+                        const linearFeet: any = formData.linear_feet_pricing;
+                        updatedLinearFeetPricing = {
+                          ...(linearFeet as any),
+                          recurring_price_per_foot: newCategory === 'one-time' ? [] : (linearFeet as any).recurring_price_per_foot,
+                          recurring_flat_price: newCategory === 'one-time' ? [] : (linearFeet as any).recurring_flat_price,
+                        };
+                      }
+
                       setFormData({
                         ...formData,
                         plan_category: newCategory,
@@ -642,6 +749,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                           recurring_cost_per_interval: newCategory === 'one-time' ? 0 : formData.yard_size_pricing.recurring_cost_per_interval,
                           custom_recurring_prices: newCategory === 'one-time' ? [] : formData.yard_size_pricing.custom_recurring_prices,
                         },
+                        linear_feet_pricing: updatedLinearFeetPricing,
                       });
                     }}
                   >
@@ -1143,10 +1251,68 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                 )}
               </div>
 
+              <div className={styles.pricingSection}>
+                <h5>Linear Feet Pricing</h5>
+
+                {/* Toggle to enable/disable linear feet pricing */}
+                <div className={styles.checkboxGroup} style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.linear_feet_pricing !== null && formData.linear_feet_pricing !== undefined}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          // Enable linear feet pricing with default structure
+                          setFormData({
+                            ...formData,
+                            linear_feet_pricing: {
+                              initial_price_per_foot: [0],
+                              recurring_pricing_types: ['per_foot'],
+                              recurring_price_per_foot: [0],
+                              recurring_flat_price: [0],
+                            } as any,
+                          });
+                        } else {
+                          // Disable linear feet pricing
+                          setFormData({
+                            ...formData,
+                            linear_feet_pricing: null,
+                          });
+                        }
+                      }}
+                      style={{ marginTop: '3px' }}
+                    />
+                    <div>
+                      <div>Use linear feet pricing for this plan</div>
+                      <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                        Enable this to charge based on linear feet measurements (e.g., foundation perimeter, fence length).
+                        Linear feet pricing is calculated by multiplying the actual linear feet by the rate for that interval.
+                      </small>
+                    </div>
+                  </label>
+                </div>
+
+                {formData.linear_feet_pricing !== null && formData.linear_feet_pricing !== undefined && (
+                  <>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
+                      Linear feet pricing is calculated by multiplying the actual linear feet by the rate for that interval.
+                      For example, 250 ft at $2.75/ft = $687.50.
+                    </p>
+
+                    <CustomIntervalPricingInput
+                      dimension="linear_feet"
+                      formData={formData}
+                      setFormData={setFormData}
+                      companyId={companyId}
+                    />
+                  </>
+                )}
+              </div>
+
               <div className={styles.pricingNote}>
-                <strong>Note:</strong> These prices are applied for each interval step above the base size.
-                For example, if a home is in the second interval (1501-2000 sq ft), the initial cost increase
-                would be 1 × Initial Cost Per Interval.
+                <strong>Note:</strong> Home and yard size pricing adds fixed amounts per interval, while linear feet pricing
+                multiplies the actual measurement by the rate. For example, if a home is in the second interval (1501-2000 sq ft),
+                the initial cost increase would be 1 × Initial Cost Per Interval. But for 250 linear feet at $2.75/ft, the total is 250 × $2.75 = $687.50.
               </div>
 
               <hr style={{ margin: '24px 0', border: 'none', borderTop: '1px solid #e9ecef' }} />
