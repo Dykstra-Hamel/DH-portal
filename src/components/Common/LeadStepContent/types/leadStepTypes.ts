@@ -104,6 +104,7 @@ export interface LeadQuoteSectionProps {
   additionalPests: string[];
   homeSize: number | '';
   yardSize: number | '';
+  linearFeet: number | '';
   selectedHomeSizeOption: string;
   selectedYardSizeOption: string;
   preferredDate: string;
@@ -117,6 +118,7 @@ export interface LeadQuoteSectionProps {
   setAdditionalPests: (pests: string[]) => void;
   setHomeSize: (size: number | '') => void;
   setYardSize: (size: number | '') => void;
+  setLinearFeet: (size: number | '') => void;
   setSelectedHomeSizeOption: (option: string) => void;
   setSelectedYardSizeOption: (option: string) => void;
   onPreferredDateChange: (date: string) => void;
