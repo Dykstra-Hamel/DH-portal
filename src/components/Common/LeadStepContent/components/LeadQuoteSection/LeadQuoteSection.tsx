@@ -157,7 +157,7 @@ export function LeadQuoteSection({
     // Add service plans
     allServicePlans.forEach(plan => {
       options.push({
-        value: `service:${plan.plan_name}`,
+        value: `service:${plan.id}`,
         label: plan.plan_name,
         type: 'service',
         data: plan,
@@ -167,7 +167,7 @@ export function LeadQuoteSection({
     // Add bundles with a prefix to distinguish them
     allBundles.forEach(bundle => {
       options.push({
-        value: `bundle:${bundle.bundle_name}`,
+        value: `bundle:${bundle.id}`,
         label: `Bundle: ${bundle.bundle_name}`,
         type: 'bundle',
         data: bundle,
@@ -1877,25 +1877,24 @@ export function LeadQuoteSection({
                           <CustomDropdown
                             options={combinedServiceOptions}
                             value={
-                              selection.servicePlan?.plan_name
-                                ? `${(selection.servicePlan as any)?.isBundle ? 'bundle' : 'service'}:${selection.servicePlan.plan_name}`
+                              selection.servicePlan?.id
+                                ? `${(selection.servicePlan as any)?.isBundle ? 'bundle' : 'service'}:${selection.servicePlan.id}`
                                 : ''
                             }
                             onChange={async selectedValue => {
                               // Parse the selected value to determine type
-                              const [type, ...nameParts] = selectedValue.split(':');
-                              const name = nameParts.join(':'); // Rejoin in case name contains ':'
+                              const [type, id] = selectedValue.split(':');
 
                               if (type === 'bundle') {
                                 const bundle = allBundles.find(
-                                  b => b.bundle_name === name
+                                  b => b.id === id
                                 );
                                 if (bundle) {
                                   await createBundleLineItem(bundle.id, selection.displayOrder);
                                 }
                               } else if (type === 'service') {
                                 const plan = allServicePlans.find(
-                                  p => p.plan_name === name
+                                  p => p.id === id
                                 );
                                 if (plan) {
                                   // Auto-set frequency to 'one-time' for one-time plans
@@ -2642,7 +2641,7 @@ export function LeadQuoteSection({
                                   (item: any) =>
                                     item.display_order ===
                                       selection.displayOrder &&
-                                    item.service_plan_id &&
+                                    (item.service_plan_id || item.bundle_plan_id) &&
                                     !item.addon_service_id
                                 );
                                 return (

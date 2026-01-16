@@ -86,7 +86,7 @@ export async function recalculateAllLineItemPrices(
   newHomeSize?: string,
   newYardSize?: string,
   newLinearFeet?: string
-) {
+): Promise<boolean> {
   // Fetch quote with company_id and current size ranges
   const { data: quote } = await supabase
     .from('quotes')
@@ -112,15 +112,28 @@ export async function recalculateAllLineItemPrices(
   // Fetch all line items for this quote
   const { data: lineItems } = await supabase
     .from('quote_line_items')
-    .select('*, service_plan:service_plans(*)')
+    .select('*, service_plan:service_plans(*), bundle_plan:bundle_plans(*)')
     .eq('quote_id', quoteId);
 
-  if (!lineItems || lineItems.length === 0) return;
+  if (!lineItems || lineItems.length === 0) return true;
+
+  // Track if we encounter any bundle line items
+  let hasBundles = false;
 
   // Recalculate each line item
   for (const lineItem of lineItems) {
     // Skip custom-priced items - they don't get recalculated
     if (lineItem.is_custom_priced) {
+      continue;
+    }
+
+    // Handle bundle line items
+    if (lineItem.bundle_plan_id) {
+      // Bundle pricing is complex and requires fetching all bundled service plans/add-ons,
+      // calculating their size-adjusted prices, then applying bundle discounts.
+      // This logic exists in the quotes API route handler.
+      // Mark that bundles exist but continue processing other line items
+      hasBundles = true;
       continue;
     }
 
@@ -265,4 +278,8 @@ export async function recalculateAllLineItemPrices(
       })
       .eq('id', quoteId);
   }
+
+  // Return false if bundles exist (they need API-level recalculation)
+  // Return true if only service plans were recalculated
+  return !hasBundles;
 }
