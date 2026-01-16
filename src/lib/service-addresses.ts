@@ -15,6 +15,7 @@ export interface ServiceAddressData {
   hasStreetView?: boolean;
   home_size_range?: string;
   yard_size_range?: string;
+  linear_feet_range?: string;
 }
 
 export interface CreateServiceAddressResult {
@@ -127,7 +128,8 @@ export async function createOrFindServiceAddress(
         address_type: addressData.address_type || 'residential',
         property_notes: addressData.property_notes?.trim() || null,
         home_size_range: addressData.home_size_range || null,
-        yard_size_range: addressData.yard_size_range || null
+        yard_size_range: addressData.yard_size_range || null,
+        linear_feet_range: addressData.linear_feet_range || null
       })
       .select('id')
       .single();
@@ -426,6 +428,7 @@ export async function updateExistingServiceAddress(
         property_notes: addressData.property_notes?.trim() || null,
         home_size_range: addressData.home_size_range || null,
         yard_size_range: addressData.yard_size_range || null,
+        linear_feet_range: addressData.linear_feet_range || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', serviceAddressId);
