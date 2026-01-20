@@ -328,6 +328,7 @@ export default function TicketReviewModal({
     if (!isOpen || !ticket.id || !user?.id) return;
 
     const displayName = getDisplayName();
+    const reviewerAvatarUrl = profile?.avatar_url || getAvatarUrl() || undefined;
 
     // Start review when modal opens
     const startReview = async () => {
@@ -369,6 +370,7 @@ export default function TicketReviewModal({
           reviewed_by_email: user.email || profile?.email || '',
           reviewed_by_first_name: profile?.first_name,
           reviewed_by_last_name: profile?.last_name,
+          reviewed_by_avatar_url: reviewerAvatarUrl,
           reviewed_at: new Date().toISOString(),
           review_expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
           timestamp: new Date().toISOString(),

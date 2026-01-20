@@ -25,6 +25,10 @@ import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { formatHeaderDate } from '@/lib/date-utils';
+import {
+  markTaskAsSeen,
+  markActionAsSeen,
+} from '@/hooks/useRealtimeCounts';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -153,6 +157,21 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
       fetchTask();
     }
   }, [taskId, loading, fetchTask]);
+
+  // Mark task as seen when it loads (for red indicator logic)
+  // The markTaskAsSeen/markActionAsSeen functions dispatch a custom event
+  // that all useRealtimeCounts instances listen to, updating the dashboard badges
+  useEffect(() => {
+    if (task && task.company_id) {
+      if (task.cadence_step_id) {
+        // This is an action (task with cadence_step_id)
+        markActionAsSeen(task.id, task.company_id);
+      } else {
+        // This is a regular task
+        markTaskAsSeen(task.id, task.company_id);
+      }
+    }
+  }, [task]);
 
   // Define handleEdit before the useEffect that uses it
   const handleEdit = useCallback(() => {

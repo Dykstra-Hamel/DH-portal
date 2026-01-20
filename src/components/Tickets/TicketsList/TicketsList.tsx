@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Ticket } from '@/types/ticket';
+import { Search } from 'lucide-react';
 import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable } from '@/components/Common/DataTable';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
@@ -13,6 +14,7 @@ import {
   TicketReviewPayload,
 } from '@/lib/realtime/ticket-review-channel';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import styles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 
 interface TicketsListProps {
   tickets: Ticket[];
@@ -54,6 +56,10 @@ function TicketsList({
   onSortChange,
   onSearchChange,
 }: TicketsListProps) {
+  // Tab and search state (managed internally, callbacks notify parent)
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Qualify modal state
   const [showQualifyModal, setShowQualifyModal] = useState(false);
   const [qualifyingTicket, setQualifyingTicket] = useState<Ticket | null>(null);
@@ -69,6 +75,7 @@ function TicketsList({
         reviewedByEmail?: string;
         reviewedByFirstName?: string;
         reviewedByLastName?: string;
+        reviewedByAvatarUrl?: string | null;
         expiresAt: string;
       }
     >
@@ -93,6 +100,7 @@ function TicketsList({
         reviewedByEmail?: string;
         reviewedByFirstName?: string;
         reviewedByLastName?: string;
+        reviewedByAvatarUrl?: string | null;
         expiresAt: string;
       }
     >();
@@ -111,6 +119,7 @@ function TicketsList({
           reviewedByEmail: ticket.reviewed_by_profile?.email,
           reviewedByFirstName: ticket.reviewed_by_profile?.first_name,
           reviewedByLastName: ticket.reviewed_by_profile?.last_name,
+          reviewedByAvatarUrl: ticket.reviewed_by_profile?.avatar_url,
           expiresAt: ticket.review_expires_at,
         });
       }
@@ -134,6 +143,7 @@ function TicketsList({
             reviewedByEmail: payload.reviewed_by_email,
             reviewedByFirstName: payload.reviewed_by_first_name,
             reviewedByLastName: payload.reviewed_by_last_name,
+            reviewedByAvatarUrl: payload.reviewed_by_avatar_url,
             expiresAt: payload.review_expires_at,
           });
         } else {
@@ -172,6 +182,66 @@ function TicketsList({
 
     return () => clearInterval(cleanupInterval);
   }, []);
+
+  // Get tabs configuration
+  const tabs = useMemo(
+    () => getTicketTabs(callRecords, tabCounts),
+    [callRecords, tabCounts]
+  );
+
+  // Handle tab change
+  const handleTabChange = useCallback(
+    (newTab: string) => {
+      setActiveTab(newTab);
+      onTabChange?.(newTab);
+    },
+    [onTabChange]
+  );
+
+  // Handle search change
+  const handleSearchChange = useCallback(
+    (newQuery: string) => {
+      setSearchQuery(newQuery);
+      onSearchChange?.(newQuery);
+    },
+    [onSearchChange]
+  );
+
+  // Filter data based on active tab
+  const filteredByTab = useMemo(() => {
+    const activeTabConfig = tabs.find(tab => tab.key === activeTab);
+    if (!activeTabConfig) return tickets;
+    return activeTabConfig.filter(tickets);
+  }, [tickets, activeTab, tabs]);
+
+  // Apply search filter
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) return filteredByTab;
+
+    const query = searchQuery.toLowerCase();
+    return filteredByTab.filter(ticket => {
+      // Search in customer name
+      const customerName =
+        `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.toLowerCase();
+      if (customerName.includes(query)) return true;
+
+      // Search in phone
+      if (ticket.customer?.phone?.toLowerCase().includes(query)) return true;
+
+      // Search in address
+      const address =
+        `${ticket.customer?.address || ''} ${ticket.customer?.city || ''} ${ticket.customer?.state || ''} ${ticket.customer?.zip_code || ''}`.toLowerCase();
+      if (address.includes(query)) return true;
+
+      // Search in type
+      if (ticket.type?.toLowerCase().includes(query)) return true;
+
+      // Search in service type
+      if (ticket.service_type?.toLowerCase().includes(query)) return true;
+
+      return false;
+    });
+  }, [filteredByTab, searchQuery]);
 
   // Handle item actions (qualify, etc.)
   const handleItemAction = (action: string, ticket: Ticket) => {
@@ -323,11 +393,6 @@ function TicketsList({
     }
   };
 
-  // Memoize customComponents to prevent LiveCallBar from unmounting/remounting
-  const customComponentsMemo = useMemo(() => ({
-    liveBar: (_props: { data: Ticket[] }) => <LiveCallBar liveTickets={liveTickets} />,
-  }), [liveTickets]);
-
   return (
     <>
       {/* Custom Toast with Undo */}
@@ -340,28 +405,58 @@ function TicketsList({
         undoLoading={isUndoing}
       />
 
+      {/* Tabs and Search Row */}
+      <div className={styles.tabsRow}>
+        <div className={styles.tabsSection}>
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
+              onClick={() => handleTabChange(tab.key)}
+            >
+              {tab.label}
+              {tab.getCount && (
+                <span className={styles.tabCount}>
+                  {tab.getCount(tickets)}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className={styles.searchSection}>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search"
+            value={searchQuery}
+            onChange={e => handleSearchChange(e.target.value)}
+          />
+          <Search size={18} className={styles.searchIcon} />
+        </div>
+      </div>
+
+      {/* Live Call Bar */}
+      <LiveCallBar liveTickets={liveTickets} />
+
       {/* DataTable Component */}
       <DataTable
-        data={tickets}
+        data={filteredData}
         loading={loading}
         title="Review & Qualify Your Leads"
         columns={getTicketColumns(reviewStatuses)}
-        tabs={getTicketTabs(callRecords, tabCounts)}
         tableType="tickets"
         onItemAction={handleItemAction}
         onDataUpdated={onTicketUpdated}
-        customComponents={customComponentsMemo}
         emptyStateMessage="No tickets found for this category."
         onShowToast={handleShowToast}
+        searchEnabled={false}
         // Infinite scroll props
         infiniteScrollEnabled={infiniteScrollEnabled}
         hasMore={hasMore}
         onLoadMore={onLoadMore}
         loadingMore={loadingMore}
-        // Callbacks only - DataTable manages its own UI state
-        onTabChange={onTabChange}
+        // Callbacks only
         onSortChange={onSortChange}
-        onSearchChange={onSearchChange}
       />
 
       {/* Qualification Modal */}

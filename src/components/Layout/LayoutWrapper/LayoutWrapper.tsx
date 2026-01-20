@@ -12,6 +12,7 @@ import {
   usePageActions,
 } from '@/contexts/PageActionsContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
+import BackToTopButton from '@/components/Common/BackToTopButton/BackToTopButton';
 import { Settings, ArrowLeft } from 'lucide-react';
 import styles from './LayoutWrapper.module.scss';
 
@@ -90,6 +91,22 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           addButtonText: 'Admin Settings',
           addButtonIcon: <Settings size={18} strokeWidth={1.75} />,
           onAddClick: () => router.push('/settings'),
+        };
+      case '/tickets/dashboard':
+        // Use dynamic page header if set (allows user's name in title)
+        if (pageHeader) {
+          return {
+            title: pageHeader.title,
+            description: pageHeader.description,
+            showAddButton: true,
+            addButtonText: 'Add Ticket',
+          };
+        }
+        return {
+          title: 'Tickets Dashboard',
+          description: '',
+          showAddButton: true,
+          addButtonText: 'Add Ticket',
         };
       case '/tickets/new':
       case '/tickets/calls-and-forms':
@@ -401,6 +418,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           <main className={styles.mainContent}>
             <section className="pageWrapper">{children}</section>
           </main>
+          <BackToTopButton />
         </div>
       </div>
     </div>

@@ -1,11 +1,5 @@
-.pageTitle {
-  color: var(--gray-800);
-  font-family: var(--font-satoshi);
-  font-size: 20px;
-  font-style: normal;
-  font-weight: 750;
-  line-height: 20px;
-}
+// Shared Tabs and Search Styles for DataTable List Components
+// Import this file in any list component that needs external tabs/search
 
 // Tabs Row - wrapper for tabs and search with 12px gap
 .tabsRow {
@@ -144,76 +138,4 @@
   font-style: normal;
   font-weight: 700;
   line-height: 14px;
-}
-
-.contentArea {
-  background: var(--white);
-  border-radius: var(--border-radius-md) 0 0 0;
-  border: 1px solid var(--border-color);
-  padding: 8px;
-  min-height: 400px;
-}
-
-.loading,
-.emptyState {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-  color: var(--gray-600);
-  font-family: var(--font-satoshi);
-  font-size: 16px;
-}
-
-.ticketsContainer {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.headerRow {
-  display: flex;
-  padding: 0px 16px 16px 16px;
-  align-items: center;
-  border-radius: 6px 6px 0 0;
-  margin-bottom: 8px;
-
-  // Header text styling
-  color: var(--gray-800);
-  font-family: var(--font-satoshi);
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.dataRows {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-// Responsive design
-@media (max-width: 768px) {
-  .container {
-    padding: 16px;
-  }
-
-  .tabsContainer {
-    flex-wrap: wrap;
-  }
-
-  .tab {
-    padding: 12px 8px;
-    min-width: 120px;
-  }
-
-  .ticketsContainer {
-    margin-top: 16px;
-  }
-
-  .headerRow {
-    padding: 12px;
-    font-size: 11px;
-  }
 }

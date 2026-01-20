@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { Search } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
@@ -18,16 +19,56 @@ import {
   subscribeToSupportCaseUpdates,
   SupportCaseUpdatePayload,
 } from '@/lib/realtime/support-case-channel';
+import styles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 
 export default function MySupportCasesPage() {
   const [supportCases, setSupportCases] = useState<SupportCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const { user } = useUser();
   const { selectedCompany } = useCompany();
   const { registerPageAction, unregisterPageAction } = usePageActions();
   const router = useRouter();
+
+  // Get tabs configuration
+  const tabs = useMemo(() => getUserSupportCaseTabs(), []);
+
+  // Handle tab change
+  const handleTabChange = useCallback((newTab: string) => {
+    setActiveTab(newTab);
+  }, []);
+
+  // Handle search change
+  const handleSearchChange = useCallback((newQuery: string) => {
+    setSearchQuery(newQuery);
+  }, []);
+
+  // Filter data based on active tab
+  const filteredByTab = useMemo(() => {
+    if (!tabs || tabs.length === 0) return supportCases;
+    const activeTabConfig = tabs.find(tab => tab.key === activeTab);
+    if (!activeTabConfig) return supportCases;
+    return activeTabConfig.filter(supportCases);
+  }, [supportCases, activeTab, tabs]);
+
+  // Apply search filter
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) return filteredByTab;
+
+    const query = searchQuery.toLowerCase();
+    return filteredByTab.filter(supportCase => {
+      const customerName =
+        `${supportCase.customer?.first_name || ''} ${supportCase.customer?.last_name || ''}`.toLowerCase();
+      if (customerName.includes(query)) return true;
+      if (supportCase.customer?.phone?.toLowerCase().includes(query)) return true;
+      if (supportCase.summary?.toLowerCase().includes(query)) return true;
+      if (supportCase.status?.toLowerCase().includes(query)) return true;
+      return false;
+    });
+  }, [filteredByTab, searchQuery]);
 
   // Fetch support cases assigned to current user
   const fetchMySupportCases = async () => {
@@ -228,15 +269,47 @@ export default function MySupportCasesPage() {
 
   return (
     <div style={{ width: '100%' }}>
+      {/* Tabs and Search Row */}
+      {tabs && tabs.length > 0 && (
+        <div className={styles.tabsRow}>
+          <div className={styles.tabsSection}>
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
+                onClick={() => handleTabChange(tab.key)}
+              >
+                {tab.label}
+                {tab.getCount && (
+                  <span className={styles.tabCount}>
+                    {tab.getCount(supportCases)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className={styles.searchSection}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search"
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+            />
+            <Search size={18} className={styles.searchIcon} />
+          </div>
+        </div>
+      )}
+
       <DataTable<SupportCase>
-        data={supportCases}
+        data={filteredData}
         title="My Support Cases"
         columns={getSupportCaseColumns()}
-        tabs={getUserSupportCaseTabs()}
         loading={loading}
         emptyStateMessage="No support cases assigned to you yet."
         tableType="supportCases"
         onItemAction={handleAction}
+        searchEnabled={false}
       />
 
       {/* Add Support Case Modal */}

@@ -20,6 +20,7 @@ import KnowledgeBase from '@/components/KnowledgeBase/KnowledgeBase';
 import AccountLinking from '@/components/AccountLinking/AccountLinking';
 import AutomationSettings from '@/components/Automation/AutomationSettings';
 import NotificationPreferences from '@/components/NotificationPreferences/NotificationPreferences';
+import AnnouncementsManager from '@/components/Admin/AnnouncementsManager';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -65,7 +66,7 @@ export default function SettingsPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'knowledge-base' | 'automation'>(
+  const [activeTab, setActiveTab] = useState<'knowledge-base' | 'automation' | 'announcements'>(
     'automation'
   );
   const [activeSection, setActiveSection] = useState<'user' | 'company'>(
@@ -321,6 +322,12 @@ export default function SettingsPage() {
                   >
                     Knowledge Base
                   </button>
+                  <button
+                    className={`${styles.tabButton} ${activeTab === 'announcements' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('announcements')}
+                  >
+                    Announcements
+                  </button>
                 </div>
 
                 {settingsLoading ? (
@@ -340,6 +347,13 @@ export default function SettingsPage() {
                     {activeTab === 'knowledge-base' && (
                       <div className={styles.knowledgeBaseSection}>
                         <KnowledgeBase companyId={selectedCompany.id} />
+                      </div>
+                    )}
+
+                    {/* Announcements Tab */}
+                    {activeTab === 'announcements' && (
+                      <div className={styles.announcementsSection}>
+                        <AnnouncementsManager companyId={selectedCompany.id} />
                       </div>
                     )}
                   </div>

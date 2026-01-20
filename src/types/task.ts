@@ -38,6 +38,9 @@ export interface Task {
   // Polymorphic relationship to any entity
   related_entity_type?: TaskRelatedEntityType;
   related_entity_id?: string;
+
+  // Cadence automation link (if this task is from a cadence step)
+  cadence_step_id?: string;
   
   // Task completion tracking
   completed_at?: string;
