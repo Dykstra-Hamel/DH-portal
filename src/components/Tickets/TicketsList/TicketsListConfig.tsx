@@ -37,28 +37,40 @@ const formatPhone = (phone?: string): string => {
   return getPhoneDisplay(phone);
 };
 
-const formatAddress = (ticket: Ticket): string => {
-  if (!ticket.customer) return 'Unknown';
+const normalizeAddressPart = (part?: string | null): string | null => {
+  if (!part) return null;
+  const trimmed = part.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') return null;
+  return trimmed;
+};
 
-  const customer = ticket.customer;
+const formatAddressFromLocation = (location?: {
+  address?: string | null;
+  street_address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+}): string => {
+  if (!location) return 'Unknown';
 
-  // Build address from city, state, zip - filtering out "none" values
-  const cityStateParts = [customer.city, customer.state, customer.zip_code]
-    .filter(Boolean)
-    .map(part => part?.trim())
-    .filter(part => part && part.toLowerCase() !== 'none');
+  const cityStateParts = [location.city, location.state, location.zip_code]
+    .map(normalizeAddressPart)
+    .filter((part): part is string => Boolean(part));
 
-  // If we have city/state info, use it
   if (cityStateParts.length > 0) {
     return cityStateParts.join(', ');
   }
 
-  // If no city/state, show street address if available
-  if (customer.address && customer.address.trim() && customer.address.toLowerCase() !== 'none') {
-    return customer.address.trim();
-  }
+  const street = normalizeAddressPart(location.street_address ?? location.address);
+  return street || 'Unknown';
+};
 
-  return 'Unknown';
+const formatAddress = (ticket: Ticket): string => {
+  return formatAddressFromLocation(
+    ticket.service_address ??
+      ticket.customer?.primary_service_address ??
+      ticket.customer
+  );
 };
 
 const formatTicketType = (type: string): string => {
@@ -129,6 +141,7 @@ export const getTicketColumns = (
       reviewedByEmail?: string;
       reviewedByFirstName?: string;
       reviewedByLastName?: string;
+      reviewedByAvatarUrl?: string | null;
       expiresAt: string;
     }
   >
@@ -316,6 +329,7 @@ export const getTicketColumns = (
               firstName={reviewStatus.reviewedByFirstName}
               lastName={reviewStatus.reviewedByLastName}
               email={reviewStatus.reviewedByEmail || ''}
+              avatarUrl={reviewStatus.reviewedByAvatarUrl}
               size="small"
               showTooltip={true}
             />

@@ -12,7 +12,6 @@ import { Toast } from '@/components/Common/Toast';
 import DefaultItemRow from './DefaultItemRow';
 import { DataTableProps, SortConfig } from './DataTable.types';
 import styles from './DataTable.module.scss';
-import { Search as SearchIcon } from 'lucide-react';
 
 export default function DataTable<T>({
   data,
@@ -110,13 +109,21 @@ export default function DataTable<T>({
   // Handle sorting
   const handleSort = (key: string) => {
     setSortConfig(prevSort => {
+      let newSort: SortConfig | null;
       if (!prevSort || prevSort.key !== key) {
-        return { key, direction: 'asc' };
+        newSort = { key, direction: 'asc' };
+      } else if (prevSort.direction === 'asc') {
+        newSort = { key, direction: 'desc' };
+      } else {
+        newSort = null; // Clear sort
       }
-      if (prevSort.direction === 'asc') {
-        return { key, direction: 'desc' };
+
+      // Notify parent of sort change
+      if (newSort) {
+        onSortChange?.(newSort.key, newSort.direction);
       }
-      return null; // Clear sort
+
+      return newSort;
     });
   };
 
@@ -247,6 +254,7 @@ export default function DataTable<T>({
     }
   };
   const tableClass = getTableClass();
+  const skeletonWidths = ['40%', '55%', '45%', '65%', '35%', '50%', '30%'];
 
   return (
     <>
@@ -263,46 +271,6 @@ export default function DataTable<T>({
             : undefined
         }
       >
-        <div className={styles.topContent}>
-          {searchEnabled && (
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className={`${styles.iconButton} ${isSearchOpen ? styles.iconButtonActive : ''}`}
-                onClick={() => setIsSearchOpen(open => !open)}
-                aria-label={isSearchOpen ? 'Hide search' : 'Show search'}
-              >
-                <SearchIcon size={18} />
-              </button>
-              <div
-                className={`${styles.searchContainer} ${isSearchOpen ? styles.searchOpen : ''}`}
-              >
-                <input
-                  type="text"
-                  className={styles.searchInput}
-                  placeholder={searchPlaceholder}
-                  value={searchQuery}
-                  onChange={e => handleSearchChange(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-          {/* Tab Navigation */}
-          {tabs && tabs.length > 0 && (
-            <div className={styles.tabsContainer}>
-              {tabs.map(tab => (
-                <button
-                  key={tab.key}
-                  className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
-                  onClick={() => handleTabChange(tab.key)}
-                >
-                  <span className={styles.tabText}>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Content Area */}
         <div className={styles.contentArea}>
           {/* Live Bar Component */}
@@ -311,7 +279,42 @@ export default function DataTable<T>({
           )}
 
           {loading ? (
-            <div className={styles.loading}>Loading...</div>
+            <div className={styles.dataContainer} aria-busy="true">
+              <div className={`${styles.headerRow} ${styles.skeletonHeaderRow}`}>
+                {columns.map((column, index) => (
+                  <div key={column.key} className={styles.skeletonCell}>
+                    <span
+                      className={styles.skeletonLine}
+                      style={{
+                        width: skeletonWidths[index % skeletonWidths.length],
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className={styles.dataRows}>
+                {Array.from({ length: 5 }).map((_, rowIndex) => (
+                  <div key={rowIndex} className={styles.skeletonRow}>
+                    {columns.map((column, colIndex) => (
+                      <div
+                        key={`${column.key}-${rowIndex}`}
+                        className={styles.skeletonCell}
+                      >
+                        <span
+                          className={styles.skeletonLine}
+                          style={{
+                            width:
+                              skeletonWidths[
+                                (colIndex + rowIndex) % skeletonWidths.length
+                              ],
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : sortedData.length === 0 ? (
             <div className={styles.emptyState}>{emptyStateMessage}</div>
           ) : (

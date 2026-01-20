@@ -539,6 +539,10 @@ export function SecondarySideNav({
           {
             items: [
               {
+                text: 'Dashboard',
+                href: '/tickets/dashboard',
+              },
+              {
                 text: 'New Tickets',
                 href: '/tickets/new',
                 count: counts.tickets,

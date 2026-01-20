@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 import { createOrFindServiceAddress, linkCustomerToServiceAddress } from '@/lib/service-addresses';
 import { geocodeCustomerAddress } from '@/lib/geocoding';
 
@@ -160,11 +161,52 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Fetch primary service addresses for customers
+    const customerIds = customers.map(customer => customer.id);
+    let primaryServiceAddressMap = new Map<string, any>();
+    if (customerIds.length > 0) {
+      const adminSupabase = createAdminClient();
+      const { data: primaryServiceAddresses, error: primaryServiceAddressError } =
+        await adminSupabase
+          .from('customer_service_addresses')
+          .select(`
+            customer_id,
+            service_address:service_addresses(
+              id,
+              street_address,
+              apartment_unit,
+              address_line_2,
+              city,
+              state,
+              zip_code,
+              home_size_range,
+              yard_size_range,
+              latitude,
+              longitude
+            )
+          `)
+          .eq('is_primary_address', true)
+          .in('customer_id', customerIds);
+
+      if (primaryServiceAddressError) {
+        console.error('Error fetching primary service addresses:', primaryServiceAddressError);
+      } else {
+        primaryServiceAddressMap = new Map(
+          (primaryServiceAddresses || []).map(address => [
+            address.customer_id,
+            address.service_address,
+          ])
+        );
+      }
+    }
+
     // Calculate lead statistics per customer with better performance
     const enhancedCustomers = customers.map(customer => {
       const leads = customer.leads || [];
       const tickets = customer.tickets || [];
       const supportCases = customer.support_cases || [];
+      const primaryServiceAddress =
+        primaryServiceAddressMap.get(customer.id) || null;
 
       // Filter tickets to only count "new" status
       const newTickets = tickets.filter((t: any) => t.status === 'new');
@@ -193,6 +235,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...customerWithoutRelations,
+        primary_service_address: primaryServiceAddress,
         lead_counts: leadCounts,
         active_leads: activeLeads,
         total_leads: leadCounts.total,

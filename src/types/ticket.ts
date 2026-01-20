@@ -100,6 +100,7 @@ export interface Ticket {
     first_name?: string;
     last_name?: string;
     email: string;
+    avatar_url?: string | null;
   };
   customer?: {
     id: string;
@@ -112,12 +113,26 @@ export interface Ticket {
     city?: string;
     state?: string;
     zip_code?: string;
+    primary_service_address?: {
+      id: string;
+      street_address?: string | null;
+      apartment_unit?: string | null;
+      address_line_2?: string | null;
+      city?: string | null;
+      state?: string | null;
+      zip_code?: string | null;
+      home_size_range?: string | null;
+      yard_size_range?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+    } | null;
   };
   assigned_user?: {
     id: string;
     email: string;
     first_name?: string;
     last_name?: string;
+    avatar_url?: string | null;
   };
   company?: {
     id: string;
