@@ -91,6 +91,9 @@ export async function PUT(
       base_yard_acres,
       yard_acres_interval,
       max_yard_acres,
+      base_linear_feet,
+      linear_feet_interval,
+      max_linear_feet,
     } = body;
 
     // Validate required fields
@@ -100,7 +103,10 @@ export async function PUT(
       max_home_sq_ft === undefined ||
       base_yard_acres === undefined ||
       yard_acres_interval === undefined ||
-      max_yard_acres === undefined
+      max_yard_acres === undefined ||
+      base_linear_feet === undefined ||
+      linear_feet_interval === undefined ||
+      max_linear_feet === undefined
     ) {
       return NextResponse.json(
         { error: 'All pricing interval fields are required' },
@@ -122,6 +128,9 @@ export async function PUT(
           base_yard_acres,
           yard_acres_interval,
           max_yard_acres,
+          base_linear_feet,
+          linear_feet_interval,
+          max_linear_feet,
         },
         { onConflict: 'company_id' }
       )

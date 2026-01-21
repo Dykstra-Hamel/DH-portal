@@ -168,6 +168,9 @@ export async function POST(
       );
     }
 
+    // Check if linear feet pricing is configured
+    const hasLinearFeetPricing = (planData as any).linear_feet_pricing !== null && (planData as any).linear_feet_pricing !== undefined;
+
     if (planData.plan_category === 'one-time') {
       // One-time service validation
       if (planData.recurring_price !== 0) {
@@ -180,9 +183,18 @@ export async function POST(
       planData.billing_frequency = null;
     } else {
       // Subscription plan validation
-      if (!planData.recurring_price || planData.recurring_price <= 0) {
+      // Allow $0 initial price if linear feet pricing is configured
+      if (!hasLinearFeetPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
         return NextResponse.json(
-          { error: 'Recurring price is required for subscription plans and must be greater than 0' },
+          { error: 'Initial price must be greater than 0 unless linear feet pricing is configured' },
+          { status: 400 }
+        );
+      }
+
+      // Allow $0 recurring price if linear feet pricing is configured
+      if (!hasLinearFeetPricing && (!planData.recurring_price || planData.recurring_price <= 0)) {
+        return NextResponse.json(
+          { error: 'Recurring price is required for subscription plans and must be greater than 0 unless linear feet pricing is configured' },
           { status: 400 }
         );
       }
@@ -267,6 +279,9 @@ export async function PUT(
       );
     }
 
+    // Check if linear feet pricing is configured
+    const hasLinearFeetPricing = (planData as any).linear_feet_pricing !== null && (planData as any).linear_feet_pricing !== undefined;
+
     // Validate and enforce recurring field rules based on plan_category
     if (planData.plan_category === 'one-time') {
       // Force recurring fields to correct values for one-time plans
@@ -274,9 +289,18 @@ export async function PUT(
       planData.billing_frequency = null;
     } else if (planData.plan_category && planData.plan_category !== 'one-time') {
       // Validate subscription plans have required fields
-      if (planData.recurring_price !== undefined && (planData.recurring_price === null || planData.recurring_price <= 0)) {
+      // Allow $0 initial price if linear feet pricing is configured
+      if (!hasLinearFeetPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
         return NextResponse.json(
-          { error: 'Subscription plans must have recurring_price > 0' },
+          { error: 'Initial price must be greater than 0 unless linear feet pricing is configured' },
+          { status: 400 }
+        );
+      }
+
+      // Allow $0 recurring price if linear feet pricing is configured
+      if (!hasLinearFeetPricing && planData.recurring_price !== undefined && (planData.recurring_price === null || planData.recurring_price <= 0)) {
+        return NextResponse.json(
+          { error: 'Subscription plans must have recurring_price > 0 unless linear feet pricing is configured' },
           { status: 400 }
         );
       }

@@ -7,6 +7,7 @@ import {
   generateHomeSizeOptions,
   generateYardSizeOptions,
   findSizeOptionByValue,
+  calculateLinearFeetPrice,
 } from './pricing-calculations';
 
 /**
@@ -83,19 +84,21 @@ export async function recalculateAllLineItemPrices(
   supabase: any,
   quoteId: string,
   newHomeSize?: string,
-  newYardSize?: string
-) {
+  newYardSize?: string,
+  newLinearFeet?: string
+): Promise<boolean> {
   // Fetch quote with company_id and current size ranges
   const { data: quote } = await supabase
     .from('quotes')
-    .select('company_id, home_size_range, yard_size_range')
+    .select('company_id, home_size_range, yard_size_range, linear_feet_range')
     .eq('id', quoteId)
     .single();
 
-  if (!quote) return;
+  if (!quote) return false;
 
   const homeSizeRange = newHomeSize !== undefined ? newHomeSize : quote.home_size_range;
   const yardSizeRange = newYardSize !== undefined ? newYardSize : quote.yard_size_range;
+  const linearFeetRange = newLinearFeet !== undefined ? newLinearFeet : quote.linear_feet_range;
 
   // Fetch pricing settings
   const { data: pricingSettings } = await supabase
@@ -104,20 +107,33 @@ export async function recalculateAllLineItemPrices(
     .eq('company_id', quote.company_id)
     .single();
 
-  if (!pricingSettings) return;
+  if (!pricingSettings) return false;
 
   // Fetch all line items for this quote
   const { data: lineItems } = await supabase
     .from('quote_line_items')
-    .select('*, service_plan:service_plans(*)')
+    .select('*, service_plan:service_plans(*), bundle_plan:bundle_plans(*)')
     .eq('quote_id', quoteId);
 
-  if (!lineItems || lineItems.length === 0) return;
+  if (!lineItems || lineItems.length === 0) return true;
+
+  // Track if we encounter any bundle line items
+  let hasBundles = false;
 
   // Recalculate each line item
   for (const lineItem of lineItems) {
     // Skip custom-priced items - they don't get recalculated
     if (lineItem.is_custom_priced) {
+      continue;
+    }
+
+    // Handle bundle line items
+    if (lineItem.bundle_plan_id) {
+      // Bundle pricing is complex and requires fetching all bundled service plans/add-ons,
+      // calculating their size-adjusted prices, then applying bundle discounts.
+      // This logic exists in the quotes API route handler.
+      // Mark that bundles exist but continue processing other line items
+      hasBundles = true;
       continue;
     }
 
@@ -134,6 +150,8 @@ export async function recalculateAllLineItemPrices(
     let homeRecurringIncrease = 0;
     let yardInitialIncrease = 0;
     let yardRecurringIncrease = 0;
+    let linearFeetInitialPrice = 0;
+    let linearFeetRecurringPrice = 0;
 
     if (servicePlan.home_size_pricing && servicePlan.yard_size_pricing) {
       const homeRangeValue = parseRangeValue(homeSizeRange);
@@ -142,6 +160,7 @@ export async function recalculateAllLineItemPrices(
       const servicePlanPricing = {
         home_size_pricing: servicePlan.home_size_pricing,
         yard_size_pricing: servicePlan.yard_size_pricing,
+        linear_feet_pricing: servicePlan.linear_feet_pricing,
       };
 
       const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
@@ -156,10 +175,25 @@ export async function recalculateAllLineItemPrices(
       yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
       // For one-time plans, never add recurring increases
       yardRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
+
+      // Calculate linear feet pricing if applicable
+      if (servicePlan.linear_feet_pricing && linearFeetRange) {
+        const linearFeetValue = parseRangeValue(linearFeetRange);
+        if (linearFeetValue > 0) {
+          const linearFeetPricing = calculateLinearFeetPrice(
+            linearFeetValue,
+            pricingSettings,
+            servicePlanPricing
+          );
+          linearFeetInitialPrice = linearFeetPricing.initialPrice;
+          // For one-time plans, never add recurring prices
+          linearFeetRecurringPrice = servicePlan.plan_category === 'one-time' ? 0 : linearFeetPricing.recurringPrice;
+        }
+      }
     }
 
-    const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
-    const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
+    const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease + linearFeetInitialPrice;
+    const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease + linearFeetRecurringPrice;
 
     // Apply existing discounts based on applies_to_price
     const discountAmount = lineItem.discount_amount || 0;
@@ -244,4 +278,8 @@ export async function recalculateAllLineItemPrices(
       })
       .eq('id', quoteId);
   }
+
+  // Return false if bundles exist (they need API-level recalculation)
+  // Return true if only service plans were recalculated
+  return !hasBundles;
 }

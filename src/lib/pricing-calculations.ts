@@ -121,6 +121,70 @@ export function formatAcresFractional(acres: number): string {
 }
 
 /**
+ * Format home size range string into human-readable display
+ * Examples: "0-1500" → "Up to 1,500 Sq Ft", "1501-2000" → "1,501-2,000 Sq Ft", "3000+" → "3,000+ Sq Ft"
+ */
+export function formatHomeSizeRange(range: string): string {
+  if (!range) return 'Not specified';
+
+  // Handle "3000+" format (open-ended)
+  if (range.includes('+')) {
+    const startValue = parseInt(range.replace('+', ''));
+    return `${startValue.toLocaleString()}+ Sq Ft`;
+  }
+
+  // Handle "0-1500" or "1501-2000" format
+  if (range.includes('-')) {
+    const [start, end] = range.split('-').map(Number);
+
+    // Special case: first interval starts at 0
+    if (start === 0) {
+      return `Up to ${end.toLocaleString()} Sq Ft`;
+    }
+
+    // Standard interval
+    return `${start.toLocaleString()}-${end.toLocaleString()} Sq Ft`;
+  }
+
+  // Fallback: return original value
+  return range;
+}
+
+/**
+ * Format yard size range string into human-readable display with fractions
+ * Examples: "0.00-0.25" → "Up to 1/4 Acre", "0.26-0.50" → "1/4 to 1/2 Acre", "2.00+" → "2+ Acres"
+ */
+export function formatYardSizeRange(range: string): string {
+  if (!range) return 'Not specified';
+
+  // Handle "2.00+" format (open-ended)
+  if (range.includes('+')) {
+    const startValue = parseFloat(range.replace('+', ''));
+    const formatted = formatAcresFractional(startValue);
+    return `${formatted}+ Acres`;
+  }
+
+  // Handle "0.00-0.25" or "0.26-0.50" format
+  if (range.includes('-')) {
+    const [start, end] = range.split('-').map(parseFloat);
+    const startFormatted = formatAcresFractional(start);
+    const endFormatted = formatAcresFractional(end);
+    const acreWord = end > 1 ? 'Acres' : 'Acre';
+
+    // Special case: first interval starts at 0
+    if (start === 0) {
+      return `Up to ${endFormatted} ${acreWord}`;
+    }
+
+    // Standard interval
+    return `${startFormatted} to ${endFormatted} ${acreWord}`;
+  }
+
+  // Fallback: return original value
+  return range;
+}
+
+/**
  * Generate yard size dropdown options based on company intervals
  * Example output: "Up to 1/4 Acre", "1/4 to 1/2 Acre", "1 to 1 1/4 Acres", "2+ Acres"
  */
@@ -211,18 +275,191 @@ export function generateYardSizeOptions(
 }
 
 /**
- * Calculate total pricing based on selected home size and yard size intervals
+ * Generate linear feet dropdown options based on company intervals
+ * Example output: "0-100 Linear Ft", "101-150 Linear Ft (+$15 initial, +$8/month)", "500+ Linear Ft"
+ */
+export function generateLinearFeetOptions(
+  companySettings: CompanyPricingSettings,
+  servicePlanPricing?: ServicePlanPricing
+): SizeOption[] {
+  const options: SizeOption[] = [];
+  const { base_linear_feet, linear_feet_interval, max_linear_feet } =
+    companySettings;
+
+  let currentSize = 0;
+  let intervalIndex = 0;
+
+  // Generate intervals: 0-base, base+1 to base+interval, etc.
+  while (currentSize <= max_linear_feet) {
+    const rangeStart = currentSize;
+    const rangeEnd =
+      currentSize === 0
+        ? base_linear_feet
+        : Math.min(currentSize + linear_feet_interval, max_linear_feet);
+
+    const isLastInterval = rangeEnd >= max_linear_feet;
+
+    // Calculate pricing increases based on interval index and mode
+    let initialIncrease = 0;
+    let recurringIncrease = 0;
+
+    if (servicePlanPricing?.linear_feet_pricing) {
+      const pricing = servicePlanPricing.linear_feet_pricing;
+      // Linear feet uses tiered pricing with per-foot or flat rates
+      // Initial pricing is based on per-foot rates in the array
+      initialIncrease = 0; // Linear feet initial pricing is calculated differently
+      recurringIncrease = 0; // Linear feet recurring pricing is calculated differently
+    }
+
+    // Build label
+    let label = '';
+    if (currentSize === 0) {
+      // First interval: "0-100 Linear Ft"
+      label = `0-${rangeEnd.toLocaleString()} Linear Ft`;
+    } else if (isLastInterval) {
+      // Last interval: "500+ Linear Ft"
+      label = `${rangeStart.toLocaleString()}+ Linear Ft`;
+    } else {
+      // Middle intervals: "101-150 Linear Ft"
+      label = `${rangeStart.toLocaleString()}-${rangeEnd.toLocaleString()} Linear Ft`;
+    }
+
+    options.push({
+      value: isLastInterval ? `${rangeStart}+` : `${rangeStart}-${rangeEnd}`,
+      label,
+      intervalIndex,
+      initialIncrease,
+      recurringIncrease,
+      rangeStart,
+      rangeEnd: isLastInterval ? null : rangeEnd,
+    });
+
+    if (isLastInterval) break;
+
+    // Move to next interval
+    if (currentSize === 0) {
+      currentSize = base_linear_feet + 1;
+    } else {
+      currentSize = rangeEnd + 1;
+    }
+    intervalIndex++;
+  }
+
+  return options;
+}
+
+/**
+ * Format linear feet range string into human-readable display
+ * Examples: "0-100" → "Up to 100 Linear Ft", "101-150" → "101-150 Linear Ft", "500+" → "500+ Linear Ft"
+ */
+export function formatLinearFeetRange(range: string): string {
+  if (!range) return 'Not specified';
+
+  // Handle "500+" format (open-ended)
+  if (range.includes('+')) {
+    const startValue = parseInt(range.replace('+', ''));
+    return `${startValue.toLocaleString()}+ Linear Ft`;
+  }
+
+  // Handle "0-100" or "101-150" format
+  if (range.includes('-')) {
+    const [start, end] = range.split('-').map(Number);
+
+    // Special case: first interval starts at 0
+    if (start === 0) {
+      return `Up to ${end.toLocaleString()} Linear Ft`;
+    }
+
+    // Standard interval
+    return `${start.toLocaleString()}-${end.toLocaleString()} Linear Ft`;
+  }
+
+  // Fallback: return original value
+  return range;
+}
+
+/**
+ * Calculate linear feet pricing based on tiered rates
+ * Unlike home/yard which add fixed amounts, linear feet pricing multiplies actual footage by the rate for that interval
+ * Initial pricing is always per-foot. Recurring can be per-foot OR flat monthly.
+ *
+ * @param linearFeet - Actual linear feet measurement
+ * @param pricingSettings - Company pricing settings for interval ranges
+ * @param servicePlanPricing - Service plan pricing with per-foot rates for each interval
+ * @returns Object with initial and recurring prices
+ */
+export function calculateLinearFeetPrice(
+  linearFeet: number,
+  pricingSettings: CompanyPricingSettings,
+  servicePlanPricing?: ServicePlanPricing
+): { initialPrice: number; recurringPrice: number } {
+  if (!servicePlanPricing?.linear_feet_pricing || linearFeet <= 0) {
+    return { initialPrice: 0, recurringPrice: 0 };
+  }
+
+  const { linear_feet_pricing } = servicePlanPricing;
+  const {
+    initial_price_per_foot,
+    recurring_pricing_types,
+    recurring_price_per_foot,
+    recurring_flat_price,
+  } = linear_feet_pricing;
+
+  // Generate options to determine which interval the linear feet falls into
+  const options = generateLinearFeetOptions(pricingSettings);
+
+  // Find the interval that contains this linear feet measurement
+  const matchingOption = options.find(option => {
+    if (option.rangeEnd === null) {
+      // This is the "max+" option
+      return linearFeet >= option.rangeStart;
+    }
+    return linearFeet >= option.rangeStart && linearFeet <= option.rangeEnd;
+  });
+
+  if (!matchingOption) {
+    return { initialPrice: 0, recurringPrice: 0 };
+  }
+
+  // Calculate initial price: always per-foot
+  const initialRate = initial_price_per_foot[matchingOption.intervalIndex] ?? initial_price_per_foot[0] ?? 0;
+  const initialPrice = linearFeet * initialRate;
+
+  // Calculate recurring price: check THIS interval's type (per-interval, not global)
+  let recurringPrice = 0;
+  const recurringType = recurring_pricing_types?.[matchingOption.intervalIndex] ?? 'per_foot';
+
+  if (recurringType === 'flat') {
+    // Flat pricing: use flat rate directly (no multiplication)
+    recurringPrice = recurring_flat_price?.[matchingOption.intervalIndex] ?? recurring_flat_price?.[0] ?? 0;
+  } else {
+    // Per-foot pricing: multiply by linear feet
+    const recurringRate = recurring_price_per_foot?.[matchingOption.intervalIndex] ?? recurring_price_per_foot?.[0] ?? 0;
+    recurringPrice = linearFeet * recurringRate;
+  }
+
+  return {
+    initialPrice,
+    recurringPrice,
+  };
+}
+
+/**
+ * Calculate total pricing based on selected home size, yard size, and linear feet intervals
  */
 export function calculateTotalPricing(
   baseInitialPrice: number,
   baseRecurringPrice: number,
   homeSizeOption?: SizeOption,
-  yardSizeOption?: SizeOption
+  yardSizeOption?: SizeOption,
+  linearFeetOption?: SizeOption
 ): PricingCalculation {
   const homeSizeInitialIncrease = homeSizeOption?.initialIncrease || 0;
   const homeSizeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
   const yardSizeInitialIncrease = yardSizeOption?.initialIncrease || 0;
   const yardSizeRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
+  const linearFeetInitialIncrease = linearFeetOption?.initialIncrease || 0;
+  const linearFeetRecurringIncrease = linearFeetOption?.recurringIncrease || 0;
 
   // Handle null/undefined baseRecurringPrice for one-time services
   const safeBaseRecurringPrice = baseRecurringPrice || 0;
@@ -234,12 +471,15 @@ export function calculateTotalPricing(
     homeSizeRecurringIncrease,
     yardSizeInitialIncrease,
     yardSizeRecurringIncrease,
+    linearFeetInitialIncrease,
+    linearFeetRecurringIncrease,
     totalInitialPrice:
-      baseInitialPrice + homeSizeInitialIncrease + yardSizeInitialIncrease,
+      baseInitialPrice + homeSizeInitialIncrease + yardSizeInitialIncrease + linearFeetInitialIncrease,
     totalRecurringPrice:
       safeBaseRecurringPrice +
       homeSizeRecurringIncrease +
-      yardSizeRecurringIncrease,
+      yardSizeRecurringIncrease +
+      linearFeetRecurringIncrease,
   };
 }
 
@@ -266,13 +506,15 @@ export function findSizeOptionByValue(
  */
 export function calculateIntervalCount(
   settings: CompanyPricingSettings,
-  dimension: 'home' | 'yard'
+  dimension: 'home' | 'yard' | 'linear_feet'
 ): number {
   // Generate the actual options and return the length
-  // This ensures the count always matches what generateHomeSizeOptions/generateYardSizeOptions creates
+  // This ensures the count always matches what generateHomeSizeOptions/generateYardSizeOptions/generateLinearFeetOptions creates
   const options = dimension === 'home'
     ? generateHomeSizeOptions(settings)
-    : generateYardSizeOptions(settings);
+    : dimension === 'yard'
+    ? generateYardSizeOptions(settings)
+    : generateLinearFeetOptions(settings);
 
   return options.length;
 }
@@ -283,7 +525,7 @@ export function calculateIntervalCount(
  */
 export function getIntervalLabel(
   settings: CompanyPricingSettings | null | undefined,
-  dimension: 'home' | 'yard',
+  dimension: 'home' | 'yard' | 'linear_feet',
   intervalIndex: number
 ): string {
   if (!settings) {
@@ -293,7 +535,9 @@ export function getIntervalLabel(
   // Generate all options and find the matching one
   const options = dimension === 'home'
     ? generateHomeSizeOptions(settings)
-    : generateYardSizeOptions(settings);
+    : dimension === 'yard'
+    ? generateYardSizeOptions(settings)
+    : generateLinearFeetOptions(settings);
 
   return options[intervalIndex]?.label || `Interval ${intervalIndex}`;
 }

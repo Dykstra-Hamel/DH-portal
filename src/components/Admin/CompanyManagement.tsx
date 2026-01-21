@@ -5,7 +5,24 @@ import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { ArrowLeft, Building, Globe, Mail, Phone, MapPin, BarChart3, Settings, Monitor, DollarSign, Target, Tag, FileText, Map, Bug, CheckSquare } from 'lucide-react';
+import {
+  ArrowLeft,
+  Building,
+  Globe,
+  Mail,
+  MapPin,
+  BarChart3,
+  Settings,
+  Monitor,
+  DollarSign,
+  Target,
+  Tag,
+  FileText,
+  Map,
+  Bug,
+  FileCheck,
+  CheckSquare,
+} from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
 import SalesConfigManager from './SalesConfigManager';
@@ -16,6 +33,7 @@ import ServiceAreasManager from './ServiceAreasManager';
 import PestManager from './PestManager';
 import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
+import QuotePageSection from './QuotePageSection';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -54,18 +72,40 @@ interface CompanyManagementProps {
   user: User;
 }
 
-type ActiveSection = 'overview' | 'contact' | 'address' | 'business' | 'analytics' | 'google-places' | 'login-page' | 'features' | 'pest-management' | 'service-plans' | 'service-areas' | 'pricing-settings' | 'sales-config' | 'discounts' | 'email-domain';
+type ActiveSection =
+  | 'overview'
+  | 'contact'
+  | 'address'
+  | 'business'
+  | 'features'
+  | 'analytics'
+  | 'google-places'
+  | 'login-page'
+  | 'pest-management'
+  | 'service-plans'
+  | 'service-areas'
+  | 'pricing-settings'
+  | 'sales-config'
+  | 'discounts'
+  | 'email-domain'
+  | 'quote-page';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
   if (!url || !url.trim()) return '';
   // Strip http:// or https:// (case-insensitive), trim, and remove trailing slashes
-  const normalized = url.replace(/^https?:\/\//i, '').trim().replace(/\/+$/, '');
+  const normalized = url
+    .replace(/^https?:\/\//i, '')
+    .trim()
+    .replace(/\/+$/, '');
   // Add https:// prefix
   return normalized ? `https://${normalized}` : '';
 }
 
-export default function CompanyManagement({ companyId, user }: CompanyManagementProps) {
+export default function CompanyManagement({
+  companyId,
+  user,
+}: CompanyManagementProps) {
   const router = useRouter();
   const supabase = createClient();
   const [company, setCompany] = useState<Company | null>(null);
@@ -74,13 +114,15 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
   const [activeSection, setActiveSection] = useState<ActiveSection>('overview');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [googlePlacesListings, setGooglePlacesListings] = useState<GooglePlaceListing[]>([]);
+  const [googlePlacesListings, setGooglePlacesListings] = useState<
+    GooglePlaceListing[]
+  >([]);
   const [websites, setWebsites] = useState<string[]>([]);
   const [loginPageImages, setLoginPageImages] = useState<string[]>([]);
   const [loginSlogans, setLoginSlogans] = useState({
     line1: '',
     line2: '',
-    line3: ''
+    line3: '',
   });
 
   useEffect(() => {
@@ -92,7 +134,7 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
       setLoading(true);
       const companies = await adminAPI.getCompanies();
       const foundCompany = companies.find((c: Company) => c.id === companyId);
-      
+
       if (!foundCompany) {
         setError('Company not found');
         return;
@@ -109,16 +151,16 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
             ga_property_id: settings.ga_property_id?.value || null,
             callrail_api_token: settings.callrail_api_token?.value || null,
             callrail_account_id: settings.callrail_account_id?.value || null,
-            google_place_id: settings.google_place_id?.value || null
+            google_place_id: settings.google_place_id?.value || null,
           });
-          
+
           // Load login page settings
           setLoginSlogans({
             line1: settings.login_slogan_line_1?.value || '',
             line2: settings.login_slogan_line_2?.value || '',
-            line3: settings.login_slogan_line_3?.value || ''
+            line3: settings.login_slogan_line_3?.value || '',
           });
-          
+
           // Load login page images
           const loginImages = settings.login_page_images?.value;
           if (loginImages) {
@@ -142,7 +184,9 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
 
       // Load Google Places listings
       try {
-        const response = await fetch(`/api/companies/${companyId}/google-places`);
+        const response = await fetch(
+          `/api/companies/${companyId}/google-places`
+        );
         if (response.ok) {
           const { listings } = await response.json();
           setGooglePlacesListings(listings || []);
@@ -161,7 +205,10 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     }
   };
 
-  const handleSave = async (section: ActiveSection, updatedData: Partial<Company>) => {
+  const handleSave = async (
+    section: ActiveSection,
+    updatedData: Partial<Company> | any
+  ) => {
     if (!company) return;
 
     try {
@@ -171,8 +218,9 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
 
       if (section === 'analytics') {
         // Save analytics settings
-        const { ga_property_id, callrail_api_token, callrail_account_id } = updatedData;
-        
+        const { ga_property_id, callrail_api_token, callrail_account_id } =
+          updatedData;
+
         await fetch(`/api/companies/${companyId}/settings`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -180,17 +228,17 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
             settings: {
               ga_property_id: {
                 value: ga_property_id?.trim() || '',
-                type: 'string'
+                type: 'string',
               },
               callrail_api_token: {
                 value: callrail_api_token?.trim() || '',
-                type: 'string'
+                type: 'string',
               },
               callrail_account_id: {
                 value: callrail_account_id?.trim() || '',
-                type: 'string'
-              }
-            }
+                type: 'string',
+              },
+            },
           }),
         });
       } else if (section === 'google-places') {
@@ -209,30 +257,52 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
             settings: {
               login_slogan_line_1: {
                 value: loginSlogans.line1.trim(),
-                type: 'string'
+                type: 'string',
               },
               login_slogan_line_2: {
                 value: loginSlogans.line2.trim(),
-                type: 'string'
+                type: 'string',
               },
               login_slogan_line_3: {
                 value: loginSlogans.line3.trim(),
-                type: 'string'
+                type: 'string',
               },
               login_page_images: {
                 value: JSON.stringify(loginPageImages),
-                type: 'string'
-              }
-            }
+                type: 'string',
+              },
+            },
+          }),
+        });
+      } else if (section === 'quote-page') {
+        // Save quote page settings
+        await fetch(`/api/companies/${companyId}/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            settings: {
+              quote_terms: {
+                value: updatedData.quote_terms || '',
+                type: 'string',
+                description: 'Terms and conditions for quote page',
+              },
+              quote_thanks_content: {
+                value: updatedData.quote_thanks_content || '',
+                type: 'string',
+                description: 'Content displayed on the quote thank you page',
+              },
+            },
           }),
         });
       } else {
         // Save company basic data
         const dataToUpdate = { ...updatedData };
         if (section === 'contact' && websites.length > 0) {
-          dataToUpdate.website = websites.filter(url => url && url.trim().length > 0);
+          dataToUpdate.website = websites.filter(
+            url => url && url.trim().length > 0
+          );
         }
-        
+
         await adminAPI.updateCompany(companyId, dataToUpdate);
       }
 
@@ -266,7 +336,7 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     const newListing: GooglePlaceListing = {
       place_id: '',
       place_name: '',
-      is_primary: googlePlacesListings.length === 0
+      is_primary: googlePlacesListings.length === 0,
     };
     setGooglePlacesListings([...googlePlacesListings, newListing]);
   };
@@ -279,9 +349,13 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     setGooglePlacesListings(updatedListings);
   };
 
-  const updateGooglePlaceListing = (index: number, field: keyof GooglePlaceListing, value: any) => {
+  const updateGooglePlaceListing = (
+    index: number,
+    field: keyof GooglePlaceListing,
+    value: any
+  ) => {
     const updatedListings = [...googlePlacesListings];
-    
+
     if (field === 'is_primary' && value === true) {
       updatedListings.forEach((listing, i) => {
         if (i !== index) {
@@ -289,13 +363,17 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
         }
       });
     }
-    
+
     (updatedListings[index] as any)[field] = value;
     setGooglePlacesListings(updatedListings);
   };
 
   // File upload utilities (based on BrandManager implementation)
-  const createAssetPath = (companyName: string, category: string, fileName: string): string => {
+  const createAssetPath = (
+    companyName: string,
+    category: string,
+    fileName: string
+  ): string => {
     const cleanCompanyName = companyName
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
@@ -316,7 +394,11 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     return `${cleanCompanyName}/${category}/${finalFileName}`;
   };
 
-  const uploadFile = async (file: File, bucket: string, category: string): Promise<string | null> => {
+  const uploadFile = async (
+    file: File,
+    bucket: string,
+    category: string
+  ): Promise<string | null> => {
     if (!company) return null;
 
     try {
@@ -366,7 +448,9 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
   };
 
   // Login page specific handlers
-  const handleLoginPageImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoginPageImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -390,7 +474,11 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
   };
 
   const removeLoginPageImage = async (indexToRemove: number) => {
-    if (!confirm('Are you sure you want to delete this image? This action cannot be undone.')) {
+    if (
+      !confirm(
+        'Are you sure you want to delete this image? This action cannot be undone.'
+      )
+    ) {
       return;
     }
 
@@ -398,7 +486,9 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     const deleted = await deleteFileFromStorage(imageToDelete);
 
     if (deleted) {
-      setLoginPageImages(prev => prev.filter((_, index) => index !== indexToRemove));
+      setLoginPageImages(prev =>
+        prev.filter((_, index) => index !== indexToRemove)
+      );
       setSuccess('Image deleted successfully');
     } else {
       setError('Failed to delete image file from storage');
@@ -413,7 +503,10 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     return (
       <div className={styles.error}>
         <h2>Company not found</h2>
-        <button onClick={() => router.push('/admin')} className={styles.backButton}>
+        <button
+          onClick={() => router.push('/admin')}
+          className={styles.backButton}
+        >
           <ArrowLeft size={16} />
           Back to Admin
         </button>
@@ -437,12 +530,16 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
     { id: 'sales-config', label: 'Sales Config', icon: Target },
     { id: 'discounts', label: 'Discounts', icon: Tag },
     { id: 'email-domain', label: 'Email Domain', icon: Mail },
+    { id: 'quote-page', label: 'Quote Page', icon: FileCheck },
   ] as const;
 
   return (
     <div className={styles.companyManagement}>
       <div className={styles.header}>
-        <button onClick={() => router.push('/admin')} className={styles.backButton}>
+        <button
+          onClick={() => router.push('/admin')}
+          className={styles.backButton}
+        >
           <ArrowLeft size={16} />
           Back to Admin
         </button>
@@ -494,28 +591,28 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
               onWebsiteAdd={addWebsite}
               onWebsiteRemove={removeWebsite}
               onWebsiteUpdate={updateWebsite}
-              onSave={(data) => handleSave('contact', data)}
+              onSave={data => handleSave('contact', data)}
               saving={saving}
             />
           )}
           {activeSection === 'address' && (
             <AddressSection
               company={company}
-              onSave={(data) => handleSave('address', data)}
+              onSave={data => handleSave('address', data)}
               saving={saving}
             />
           )}
           {activeSection === 'business' && (
             <BusinessSection
               company={company}
-              onSave={(data) => handleSave('business', data)}
+              onSave={data => handleSave('business', data)}
               saving={saving}
             />
           )}
           {activeSection === 'analytics' && (
             <AnalyticsSection
               company={company}
-              onSave={(data) => handleSave('analytics', data)}
+              onSave={data => handleSave('analytics', data)}
               saving={saving}
             />
           )}
@@ -543,9 +640,7 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
           {activeSection === 'features' && (
             <CompanyFeaturesManager companyId={companyId} />
           )}
-          {activeSection === 'pest-management' && (
-            <PestManager />
-          )}
+          {activeSection === 'pest-management' && <PestManager />}
           {activeSection === 'service-plans' && (
             <ServicePlansManager companyId={companyId} />
           )}
@@ -564,6 +659,13 @@ export default function CompanyManagement({ companyId, user }: CompanyManagement
           {activeSection === 'email-domain' && (
             <EmailDomainManager companyId={companyId} />
           )}
+          {activeSection === 'quote-page' && (
+            <QuotePageSection
+              companyId={companyId}
+              onSave={data => handleSave('quote-page', data)}
+              saving={saving}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -578,28 +680,68 @@ function OverviewSection({ company }: { company: Company }) {
       <div className={styles.overviewGrid}>
         <div className={styles.overviewCard}>
           <h3>Basic Information</h3>
-          <p><strong>Name:</strong> {company.name}</p>
-          <p><strong>Slug:</strong> {company.slug}</p>
-          <p><strong>Short Code:</strong> {company.short_code || 'Not set'}</p>
-          <p><strong>Login URL:</strong> <a href={`/login/${company.slug}`} target="_blank" rel="noopener noreferrer">/login/{company.slug}</a></p>
-          <p><strong>Description:</strong> {company.description || 'Not provided'}</p>
-          <p><strong>Created:</strong> {new Date(company.created_at).toLocaleDateString()}</p>
+          <p>
+            <strong>Name:</strong> {company.name}
+          </p>
+          <p>
+            <strong>Slug:</strong> {company.slug}
+          </p>
+          <p>
+            <strong>Short Code:</strong> {company.short_code || 'Not set'}
+          </p>
+          <p>
+            <strong>Login URL:</strong>{' '}
+            <a
+              href={`/login/${company.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              /login/{company.slug}
+            </a>
+          </p>
+          <p>
+            <strong>Description:</strong>{' '}
+            {company.description || 'Not provided'}
+          </p>
+          <p>
+            <strong>Created:</strong>{' '}
+            {new Date(company.created_at).toLocaleDateString()}
+          </p>
         </div>
         <div className={styles.overviewCard}>
           <h3>Contact</h3>
-          <p><strong>Email:</strong> {company.email || 'Not provided'}</p>
-          <p><strong>Phone:</strong> {company.phone || 'Not provided'}</p>
-          <p><strong>Websites:</strong> {company.website?.length ? `${company.website.length} website(s)` : 'None'}</p>
+          <p>
+            <strong>Email:</strong> {company.email || 'Not provided'}
+          </p>
+          <p>
+            <strong>Phone:</strong> {company.phone || 'Not provided'}
+          </p>
+          <p>
+            <strong>Websites:</strong>{' '}
+            {company.website?.length
+              ? `${company.website.length} website(s)`
+              : 'None'}
+          </p>
         </div>
         <div className={styles.overviewCard}>
           <h3>Business</h3>
-          <p><strong>Industry:</strong> {company.industry || 'Not specified'}</p>
-          <p><strong>Size:</strong> {company.size || 'Not specified'}</p>
+          <p>
+            <strong>Industry:</strong> {company.industry || 'Not specified'}
+          </p>
+          <p>
+            <strong>Size:</strong> {company.size || 'Not specified'}
+          </p>
         </div>
         <div className={styles.overviewCard}>
           <h3>Analytics</h3>
-          <p><strong>GA Property:</strong> {company.ga_property_id || 'Not configured'}</p>
-          <p><strong>CallRail:</strong> {company.callrail_api_token ? 'Configured' : 'Not configured'}</p>
+          <p>
+            <strong>GA Property:</strong>{' '}
+            {company.ga_property_id || 'Not configured'}
+          </p>
+          <p>
+            <strong>CallRail:</strong>{' '}
+            {company.callrail_api_token ? 'Configured' : 'Not configured'}
+          </p>
         </div>
       </div>
     </div>
@@ -616,14 +758,14 @@ interface ContactSectionProps {
   saving: boolean;
 }
 
-function ContactSection({ 
-  company, 
-  websites, 
-  onWebsiteAdd, 
-  onWebsiteRemove, 
-  onWebsiteUpdate, 
-  onSave, 
-  saving 
+function ContactSection({
+  company,
+  websites,
+  onWebsiteAdd,
+  onWebsiteRemove,
+  onWebsiteUpdate,
+  onSave,
+  saving,
 }: ContactSectionProps) {
   const [formData, setFormData] = useState({
     email: company.email || '',
@@ -633,16 +775,18 @@ function ContactSection({
   return (
     <div className={styles.section}>
       <h2>Contact Information</h2>
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        onSave(formData);
-      }}>
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          onSave(formData);
+        }}
+      >
         <div className={styles.formGroup}>
           <label>Email:</label>
           <input
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={e => setFormData({ ...formData, email: e.target.value })}
           />
         </div>
 
@@ -651,7 +795,7 @@ function ContactSection({
           <input
             type="tel"
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            onChange={e => setFormData({ ...formData, phone: e.target.value })}
           />
         </div>
 
@@ -663,8 +807,8 @@ function ContactSection({
                 type="text"
                 placeholder="https://example.com"
                 value={website}
-                onChange={(e) => onWebsiteUpdate(index, e.target.value)}
-                onBlur={(e) => {
+                onChange={e => onWebsiteUpdate(index, e.target.value)}
+                onBlur={e => {
                   const normalized = normalizeWebsiteUrl(e.target.value);
                   if (normalized !== e.target.value) {
                     onWebsiteUpdate(index, normalized);
@@ -676,7 +820,11 @@ function ContactSection({
               </button>
             </div>
           ))}
-          <button type="button" onClick={onWebsiteAdd} className={styles.addButton}>
+          <button
+            type="button"
+            onClick={onWebsiteAdd}
+            className={styles.addButton}
+          >
             + Add Website
           </button>
         </div>
@@ -707,16 +855,20 @@ function AddressSection({ company, onSave, saving }: AddressSectionProps) {
   return (
     <div className={styles.section}>
       <h2>Address Information</h2>
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        onSave(formData);
-      }}>
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          onSave(formData);
+        }}
+      >
         <div className={styles.formGroup}>
           <label>Address:</label>
           <input
             type="text"
             value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            onChange={e =>
+              setFormData({ ...formData, address: e.target.value })
+            }
           />
         </div>
 
@@ -726,7 +878,7 @@ function AddressSection({ company, onSave, saving }: AddressSectionProps) {
             <input
               type="text"
               value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              onChange={e => setFormData({ ...formData, city: e.target.value })}
             />
           </div>
           <div className={styles.formGroup}>
@@ -734,7 +886,9 @@ function AddressSection({ company, onSave, saving }: AddressSectionProps) {
             <input
               type="text"
               value={formData.state}
-              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, state: e.target.value })
+              }
             />
           </div>
           <div className={styles.formGroup}>
@@ -742,7 +896,9 @@ function AddressSection({ company, onSave, saving }: AddressSectionProps) {
             <input
               type="text"
               value={formData.zip_code}
-              onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, zip_code: e.target.value })
+              }
             />
           </div>
         </div>
@@ -752,7 +908,9 @@ function AddressSection({ company, onSave, saving }: AddressSectionProps) {
           <input
             type="text"
             value={formData.country}
-            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+            onChange={e =>
+              setFormData({ ...formData, country: e.target.value })
+            }
           />
         </div>
 
@@ -837,25 +995,25 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
           settings: {
             short_code: {
               value: formData.short_code.trim(),
-              type: 'string'
+              type: 'string',
             },
             company_timezone: {
               value: timezone,
-              type: 'string'
+              type: 'string',
             },
             business_hours: {
               value: businessHours,
-              type: 'json'
+              type: 'json',
             },
             terms_conditions_url: {
               value: termsUrl,
-              type: 'string'
+              type: 'string',
             },
             privacy_policy_url: {
               value: privacyUrl,
-              type: 'string'
-            }
-          }
+              type: 'string',
+            },
+          },
         }),
       });
     } catch (error) {
@@ -872,7 +1030,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
           <input
             type="text"
             value={formData.short_code}
-            onChange={(e) => {
+            onChange={e => {
               const value = e.target.value.toUpperCase();
               if (value.length <= 4) {
                 setFormData({ ...formData, short_code: value });
@@ -882,7 +1040,9 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
             placeholder="BZB"
             maxLength={4}
           />
-          <small>Used for generating project shortcodes (e.g., BZB_WEB26_ProjectName)</small>
+          <small>
+            Used for generating project shortcodes (e.g., BZB_WEB26_ProjectName)
+          </small>
         </div>
 
         <div className={styles.formGroup}>
@@ -890,7 +1050,9 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
           <input
             type="text"
             value={formData.industry}
-            onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+            onChange={e =>
+              setFormData({ ...formData, industry: e.target.value })
+            }
           />
         </div>
 
@@ -898,7 +1060,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
           <label>Company Size:</label>
           <select
             value={formData.size}
-            onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+            onChange={e => setFormData({ ...formData, size: e.target.value })}
           >
             <option value="">Select size</option>
             <option value="1-10">1-10 employees</option>
@@ -914,14 +1076,16 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
           <label>Company Timezone:</label>
           <select
             value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
+            onChange={e => setTimezone(e.target.value)}
             disabled={loadingTimezone}
           >
             <optgroup label="US Timezones">
               <option value="America/New_York">Eastern Time (ET)</option>
               <option value="America/Chicago">Central Time (CT)</option>
               <option value="America/Denver">Mountain Time (MT)</option>
-              <option value="America/Phoenix">Mountain Time - Arizona (no DST)</option>
+              <option value="America/Phoenix">
+                Mountain Time - Arizona (no DST)
+              </option>
               <option value="America/Los_Angeles">Pacific Time (PT)</option>
               <option value="America/Anchorage">Alaska Time (AKT)</option>
               <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
@@ -934,7 +1098,9 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
               <option value="Australia/Sydney">Sydney (AEDT/AEST)</option>
             </optgroup>
           </select>
-          <small>This timezone will be used for scheduling tasks and business hours</small>
+          <small>
+            This timezone will be used for scheduling tasks and business hours
+          </small>
         </div>
 
         <div className={styles.formGroup}>
@@ -949,7 +1115,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
           <input
             type="url"
             value={termsUrl}
-            onChange={(e) => setTermsUrl(e.target.value)}
+            onChange={e => setTermsUrl(e.target.value)}
             placeholder="https://example.com/terms"
           />
           <small>Link to your company&apos;s Terms & Conditions page</small>
@@ -960,7 +1126,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
           <input
             type="url"
             value={privacyUrl}
-            onChange={(e) => setPrivacyUrl(e.target.value)}
+            onChange={e => setPrivacyUrl(e.target.value)}
             placeholder="https://example.com/privacy"
           />
           <small>Link to your company&apos;s Privacy Policy page</small>
@@ -990,19 +1156,26 @@ function AnalyticsSection({ company, onSave, saving }: AnalyticsSectionProps) {
   return (
     <div className={styles.section}>
       <h2>Analytics Configuration</h2>
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        onSave(formData);
-      }}>
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          onSave(formData);
+        }}
+      >
         <div className={styles.formGroup}>
           <label>Google Analytics Property ID:</label>
           <input
             type="text"
             placeholder="e.g., 123456789"
             value={formData.ga_property_id}
-            onChange={(e) => setFormData({ ...formData, ga_property_id: e.target.value })}
+            onChange={e =>
+              setFormData({ ...formData, ga_property_id: e.target.value })
+            }
           />
-          <small>Enter the GA4 Property ID (numbers only) to enable analytics dashboard</small>
+          <small>
+            Enter the GA4 Property ID (numbers only) to enable analytics
+            dashboard
+          </small>
         </div>
 
         <div className={styles.formGroup}>
@@ -1011,7 +1184,9 @@ function AnalyticsSection({ company, onSave, saving }: AnalyticsSectionProps) {
             type="password"
             placeholder="Enter CallRail API token"
             value={formData.callrail_api_token}
-            onChange={(e) => setFormData({ ...formData, callrail_api_token: e.target.value })}
+            onChange={e =>
+              setFormData({ ...formData, callrail_api_token: e.target.value })
+            }
           />
           <small>Enter your CallRail API token to enable call analytics</small>
         </div>
@@ -1022,9 +1197,14 @@ function AnalyticsSection({ company, onSave, saving }: AnalyticsSectionProps) {
             type="text"
             placeholder="e.g., ACC28a0b8ba54bf4a1bbc85e8c5bb9aa15d"
             value={formData.callrail_account_id}
-            onChange={(e) => setFormData({ ...formData, callrail_account_id: e.target.value })}
+            onChange={e =>
+              setFormData({ ...formData, callrail_account_id: e.target.value })
+            }
           />
-          <small>Enter the specific CallRail Account ID (found in CallRail dashboard URL)</small>
+          <small>
+            Enter the specific CallRail Account ID (found in CallRail dashboard
+            URL)
+          </small>
         </div>
 
         <button type="submit" disabled={saving} className={styles.saveButton}>
@@ -1039,43 +1219,47 @@ interface GooglePlacesSectionProps {
   listings: GooglePlaceListing[];
   onAdd: () => void;
   onRemove: (index: number) => void;
-  onUpdate: (index: number, field: keyof GooglePlaceListing, value: any) => void;
+  onUpdate: (
+    index: number,
+    field: keyof GooglePlaceListing,
+    value: any
+  ) => void;
   onSave: () => void;
   saving: boolean;
 }
 
-function GooglePlacesSection({ 
-  listings, 
-  onAdd, 
-  onRemove, 
-  onUpdate, 
-  onSave, 
-  saving 
+function GooglePlacesSection({
+  listings,
+  onAdd,
+  onRemove,
+  onUpdate,
+  onSave,
+  saving,
 }: GooglePlacesSectionProps) {
   return (
     <div className={styles.section}>
       <h2>Google Places Listings</h2>
       <p>Add multiple Google Places listings to aggregate review counts.</p>
-      
+
       {listings.map((listing, index) => (
         <div key={index} className={styles.googlePlaceRow}>
           <input
             type="text"
             placeholder="Google Place ID (e.g., ChIJN1t_tDeuEmsRUsoyG83frY4)"
             value={listing.place_id}
-            onChange={(e) => onUpdate(index, 'place_id', e.target.value)}
+            onChange={e => onUpdate(index, 'place_id', e.target.value)}
           />
           <input
             type="text"
             placeholder="Business name (optional)"
             value={listing.place_name || ''}
-            onChange={(e) => onUpdate(index, 'place_name', e.target.value)}
+            onChange={e => onUpdate(index, 'place_name', e.target.value)}
           />
           <label>
             <input
               type="checkbox"
               checked={listing.is_primary}
-              onChange={(e) => onUpdate(index, 'is_primary', e.target.checked)}
+              onChange={e => onUpdate(index, 'is_primary', e.target.checked)}
             />
             Primary Location
           </label>
@@ -1105,7 +1289,11 @@ interface LoginPageSectionProps {
   };
   onImageUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onImageRemove: (index: number) => void;
-  onSloganChange: (slogans: { line1: string; line2: string; line3: string }) => void;
+  onSloganChange: (slogans: {
+    line1: string;
+    line2: string;
+    line3: string;
+  }) => void;
   onSave: () => void;
   saving: boolean;
 }
@@ -1117,17 +1305,23 @@ function LoginPageSection({
   onImageRemove,
   onSloganChange,
   onSave,
-  saving
+  saving,
 }: LoginPageSectionProps) {
-  const handleSloganChange = (field: 'line1' | 'line2' | 'line3', value: string) => {
+  const handleSloganChange = (
+    field: 'line1' | 'line2' | 'line3',
+    value: string
+  ) => {
     onSloganChange({ ...slogans, [field]: value });
   };
 
   return (
     <div className={styles.section}>
       <h2>Login Page Configuration</h2>
-      <p>Configure the images and slogans that will appear on your company&apos;s login page.</p>
-      
+      <p>
+        Configure the images and slogans that will appear on your company&apos;s
+        login page.
+      </p>
+
       {/* Login Page Images */}
       <div className={styles.formGroup}>
         <label>Login Page Images (Maximum 3):</label>
@@ -1143,11 +1337,12 @@ function LoginPageSection({
                 disabled={saving}
               />
               <small className={styles.uploadHint}>
-                Upload images that will be displayed on your login page. Supported formats: JPG, PNG, WebP. Maximum 3 images.
+                Upload images that will be displayed on your login page.
+                Supported formats: JPG, PNG, WebP. Maximum 3 images.
               </small>
             </div>
           )}
-          
+
           {images.length > 0 && (
             <div className={styles.imageGrid}>
               {images.map((image, index) => (
@@ -1172,7 +1367,7 @@ function LoginPageSection({
               ))}
             </div>
           )}
-          
+
           {images.length === 0 && (
             <div className={styles.emptyState}>
               <p>No login page images uploaded yet.</p>
@@ -1191,35 +1386,35 @@ function LoginPageSection({
               id="slogan-line1"
               type="text"
               value={slogans.line1}
-              onChange={(e) => handleSloganChange('line1', e.target.value)}
+              onChange={e => handleSloganChange('line1', e.target.value)}
               placeholder="Enter your primary slogan (e.g., 'Your Trusted Pest Control Partner')"
               maxLength={60}
               disabled={saving}
             />
             <small>{slogans.line1.length}/60 characters</small>
           </div>
-          
+
           <div className={styles.sloganField}>
             <label htmlFor="slogan-line2">Slogan Line 2:</label>
             <input
               id="slogan-line2"
               type="text"
               value={slogans.line2}
-              onChange={(e) => handleSloganChange('line2', e.target.value)}
+              onChange={e => handleSloganChange('line2', e.target.value)}
               placeholder="Enter your secondary slogan (e.g., 'Professional • Reliable • Effective')"
               maxLength={60}
               disabled={saving}
             />
             <small>{slogans.line2.length}/60 characters</small>
           </div>
-          
+
           <div className={styles.sloganField}>
             <label htmlFor="slogan-line3">Slogan Line 3:</label>
             <input
               id="slogan-line3"
               type="text"
               value={slogans.line3}
-              onChange={(e) => handleSloganChange('line3', e.target.value)}
+              onChange={e => handleSloganChange('line3', e.target.value)}
               placeholder="Enter your tertiary slogan (e.g., 'Protecting Your Home Since 1995')"
               maxLength={60}
               disabled={saving}
@@ -1230,7 +1425,11 @@ function LoginPageSection({
       </div>
 
       <div className={styles.formActions}>
-        <button onClick={onSave} disabled={saving} className={styles.saveButton}>
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className={styles.saveButton}
+        >
           {saving ? 'Saving...' : 'Save Login Page Settings'}
         </button>
       </div>

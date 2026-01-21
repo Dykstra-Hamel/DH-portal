@@ -326,7 +326,7 @@ export async function POST(
       let yardInitialIncrease = 0;
       let yardRecurringIncrease = 0;
 
-      if (pricingSettings && plan.home_size_pricing && plan.yard_size_pricing) {
+      if (pricingSettings && plan.home_size_pricing && plan.yard_size_pricing && plan.linear_feet_pricing) {
         // Parse range values (null converts to 0, matching first interval)
         const homeRangeValue = parseRangeValue(homeSizeRange);
         const yardRangeValue = parseRangeValue(yardSizeRange);
@@ -334,6 +334,7 @@ export async function POST(
         const servicePlanPricing = {
           home_size_pricing: plan.home_size_pricing,
           yard_size_pricing: plan.yard_size_pricing,
+          linear_feet_pricing: plan.linear_feet_pricing,
         };
 
         // Generate options for both dimensions

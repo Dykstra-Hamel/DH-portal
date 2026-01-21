@@ -4,7 +4,9 @@ import { UpdateQuoteRequest } from '@/types/quote';
 import {
   generateHomeSizeOptions,
   generateYardSizeOptions,
+  generateLinearFeetOptions,
   findSizeOptionByValue,
+  calculateLinearFeetPrice,
 } from '@/lib/pricing-calculations';
 import { logActivity } from '@/lib/activity-logger';
 import { recalculateAllLineItemPrices } from '@/lib/quote-utils';
@@ -88,7 +90,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateQuoteRequest & { home_size_range?: string; yard_size_range?: string } = await request.json();
+    const body: UpdateQuoteRequest & { home_size_range?: string; yard_size_range?: string; linear_feet_range?: string } = await request.json();
 
     if (!id) {
       return NextResponse.json(
@@ -102,7 +104,7 @@ export async function PUT(
     // Fetch existing quote to check if it's signed and get current size ranges
     const { data: existingQuote, error: fetchError } = await supabase
       .from('quotes')
-      .select('signed_at, quote_status, home_size_range, yard_size_range')
+      .select('signed_at, quote_status, home_size_range, yard_size_range, linear_feet_range')
       .eq('id', id)
       .single();
 
@@ -147,6 +149,14 @@ export async function PUT(
 
     if (body.yard_size_range !== undefined) {
       updateData.yard_size_range = body.yard_size_range;
+      // Size change requires reset if quote is signed
+      if (isQuoteSigned) {
+        requiresReset = true;
+      }
+    }
+
+    if (body.linear_feet_range !== undefined) {
+      updateData.linear_feet_range = body.linear_feet_range;
       // Size change requires reset if quote is signed
       if (isQuoteSigned) {
         requiresReset = true;
@@ -211,10 +221,11 @@ export async function PUT(
       }
 
       // Bi-directional sync: If size ranges updated, also update service_address
-      if ((body.home_size_range !== undefined || body.yard_size_range !== undefined)) {
+      if ((body.home_size_range !== undefined || body.yard_size_range !== undefined || body.linear_feet_range !== undefined)) {
         console.log('[Quote API] Attempting to sync size ranges to service_address', {
           home_size_range: body.home_size_range,
-          yard_size_range: body.yard_size_range
+          yard_size_range: body.yard_size_range,
+          linear_feet_range: body.linear_feet_range
         });
 
         // Fetch quote to get service_address_id
@@ -239,6 +250,10 @@ export async function PUT(
             addressUpdate.yard_size_range = body.yard_size_range;
           }
 
+          if (body.linear_feet_range !== undefined) {
+            addressUpdate.linear_feet_range = body.linear_feet_range;
+          }
+
           console.log('[Quote API] Updating service_address with:', addressUpdate);
 
           // Update service address (log any errors but don't fail the request)
@@ -261,12 +276,35 @@ export async function PUT(
 
       // Recalculate ALL line items' prices ONLY if size ranges actually changed
       // Compare against the ORIGINAL values from existingQuote (before update)
-      if (body.home_size_range !== undefined || body.yard_size_range !== undefined) {
+      if (body.home_size_range !== undefined || body.yard_size_range !== undefined || body.linear_feet_range !== undefined) {
         const homeSizeChanged = body.home_size_range !== undefined && body.home_size_range !== existingQuote.home_size_range;
         const yardSizeChanged = body.yard_size_range !== undefined && body.yard_size_range !== existingQuote.yard_size_range;
+        const linearFeetChanged = body.linear_feet_range !== undefined && body.linear_feet_range !== existingQuote.linear_feet_range;
 
-        if (homeSizeChanged || yardSizeChanged) {
-          await recalculateAllLineItemPrices(supabase, id, body.home_size_range, body.yard_size_range);
+        if (homeSizeChanged || yardSizeChanged || linearFeetChanged) {
+          const success = await recalculateAllLineItemPrices(supabase, id, body.home_size_range, body.yard_size_range, body.linear_feet_range);
+
+          // If recalculateAllLineItemPrices returns false, it means there are bundle line items
+          // that need to be recalculated using the full bundle pricing logic.
+          // We'll fetch and update bundle line items below
+          if (!success) {
+            // Fetch bundle line items and recalculate them
+            const { data: bundleLineItems } = await supabase
+              .from('quote_line_items')
+              .select('*')
+              .eq('quote_id', id)
+              .not('bundle_plan_id', 'is', null);
+
+            if (bundleLineItems && bundleLineItems.length > 0) {
+              // For each bundle line item, trigger a recalculation by updating it
+              // The update logic below will handle the bundle pricing calculation
+              body.line_items = bundleLineItems.map((item: any) => ({
+                id: item.id,
+                bundle_plan_id: item.bundle_plan_id,
+                display_order: item.display_order,
+              }));
+            }
+          }
         }
       }
     }
@@ -281,7 +319,7 @@ export async function PUT(
       // Fetch the quote to get company_id and size ranges
       const { data: quote } = await supabase
         .from('quotes')
-        .select('company_id, home_size_range, yard_size_range')
+        .select('company_id, home_size_range, yard_size_range, linear_feet_range')
         .eq('id', id)
         .single();
 
@@ -295,6 +333,7 @@ export async function PUT(
       // Get size ranges from body or existing quote
       const homeSizeRange = body.home_size_range || quote.home_size_range;
       const yardSizeRange = body.yard_size_range || quote.yard_size_range;
+      const linearFeetRange = body.linear_feet_range || quote.linear_feet_range;
 
       // Fetch company pricing settings for interval calculations
       const { data: pricingSettings } = await supabase
@@ -381,32 +420,63 @@ export async function PUT(
             let homeRecurringIncrease = 0;
             let yardInitialIncrease = 0;
             let yardRecurringIncrease = 0;
+            let linearFeetInitialPrice = 0;
+            let linearFeetRecurringPrice = 0;
 
-            if (pricingSettings && servicePlan.home_size_pricing && servicePlan.yard_size_pricing) {
-              const homeRangeValue = parseRangeValue(homeSizeRange);
-              const yardRangeValue = parseRangeValue(yardSizeRange);
+            if (pricingSettings) {
+              // Calculate home size pricing if this plan supports it
+              if (servicePlan.home_size_pricing) {
+                const homeRangeValue = parseRangeValue(homeSizeRange);
+                const servicePlanPricing = {
+                  home_size_pricing: servicePlan.home_size_pricing,
+                  yard_size_pricing: servicePlan.yard_size_pricing,
+                  linear_feet_pricing: servicePlan.linear_feet_pricing,
+                };
+                const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
+                const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
+                // For one-time plans, never add recurring increases
+                homeRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
+              }
 
-              const servicePlanPricing = {
-                home_size_pricing: servicePlan.home_size_pricing,
-                yard_size_pricing: servicePlan.yard_size_pricing,
-              };
+              // Calculate yard size pricing if this plan supports it
+              if (servicePlan.yard_size_pricing) {
+                const yardRangeValue = parseRangeValue(yardSizeRange);
+                const servicePlanPricing = {
+                  home_size_pricing: servicePlan.home_size_pricing,
+                  yard_size_pricing: servicePlan.yard_size_pricing,
+                  linear_feet_pricing: servicePlan.linear_feet_pricing,
+                };
+                const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+                const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+                yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
+                // For one-time plans, never add recurring increases
+                yardRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
+              }
 
-              const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
-              const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
-
-              const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
-              const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
-
-              homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
-              // For one-time plans, never add recurring increases
-              homeRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
-              yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
-              // For one-time plans, never add recurring increases
-              yardRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
+              // Calculate linear feet pricing if this plan supports it
+              if (servicePlan.linear_feet_pricing && linearFeetRange) {
+                const linearFeetValue = parseRangeValue(linearFeetRange);
+                if (linearFeetValue > 0) {
+                  const servicePlanPricing = {
+                    home_size_pricing: servicePlan.home_size_pricing,
+                    yard_size_pricing: servicePlan.yard_size_pricing,
+                    linear_feet_pricing: servicePlan.linear_feet_pricing,
+                  };
+                  const linearFeetPricing = calculateLinearFeetPrice(
+                    linearFeetValue,
+                    pricingSettings,
+                    servicePlanPricing
+                  );
+                  linearFeetInitialPrice = linearFeetPricing.initialPrice;
+                  // For one-time plans, never add recurring prices
+                  linearFeetRecurringPrice = servicePlan.plan_category === 'one-time' ? 0 : linearFeetPricing.recurringPrice;
+                }
+              }
             }
 
-            const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
-            const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
+            const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease + linearFeetInitialPrice;
+            const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease + linearFeetRecurringPrice;
 
             // If custom pricing is set, use custom values for final prices only
             if (isCustomPriced && customInitialPrice !== undefined && customRecurringPrice !== undefined) {
@@ -549,6 +619,8 @@ export async function PUT(
             // UPDATE the existing line item with new service plan
             const updateData: any = {
               service_plan_id: servicePlan.id,
+              bundle_plan_id: null, // Clear bundle when changing to service
+              addon_service_id: null, // Clear addon when changing to service
               plan_name: servicePlan.plan_name,
               plan_description: servicePlan.plan_description,
               // Note: plan_category is NOT stored in line items, it comes from service_plan join
@@ -579,6 +651,370 @@ export async function PUT(
                 { status: 500 }
               );
             }
+          }
+        } else if (lineItem.id && lineItem.bundle_plan_id) {
+          // Update existing line item to bundle (replacing service/addon with bundle)
+          const { data: bundle } = await supabase
+            .from('bundle_plans')
+            .select('*')
+            .eq('id', lineItem.bundle_plan_id)
+            .single();
+
+          console.log('=== BUNDLE PRICING DEBUG (UPDATE) ===');
+          console.log('Bundle data:', JSON.stringify(bundle, null, 2));
+
+          if (bundle) {
+            let initialPrice = 0;
+            let recurringPrice = 0;
+
+            const pricingMode = bundle.pricing_mode || 'global';
+
+            if (pricingMode === 'per_interval') {
+              // Per-interval pricing - determine which interval applies
+              const intervalDimension = bundle.interval_dimension || 'home';
+              let intervalIndex = 0;
+
+              // Determine the interval index based on the dimension
+              if (pricingSettings) {
+                if (intervalDimension === 'home' && homeSizeRange) {
+                  const homeRangeValue = parseRangeValue(homeSizeRange);
+                  const homeOptions = generateHomeSizeOptions(pricingSettings);
+                  const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                  intervalIndex = homeSizeOption?.intervalIndex ?? 0;
+                } else if (intervalDimension === 'yard' && yardSizeRange) {
+                  const yardRangeValue = parseRangeValue(yardSizeRange);
+                  const yardOptions = generateYardSizeOptions(pricingSettings);
+                  const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+                  intervalIndex = yardSizeOption?.intervalIndex ?? 0;
+                } else if (intervalDimension === 'linear_feet' && linearFeetRange) {
+                  const linearFeetValue = parseRangeValue(linearFeetRange);
+                  const linearFeetOptions = generateLinearFeetOptions(pricingSettings);
+                  const linearFeetOption = findSizeOptionByValue(linearFeetValue, linearFeetOptions);
+                  intervalIndex = linearFeetOption?.intervalIndex ?? 0;
+                }
+              }
+
+              // Get the pricing configuration for this interval
+              const intervalPricing = bundle.interval_pricing?.[intervalIndex];
+              console.log('Using per-interval pricing:', {
+                intervalDimension,
+                intervalIndex,
+                intervalPricing
+              });
+
+              if (intervalPricing) {
+                if (intervalPricing.pricing_type === 'custom') {
+                  // Use custom pricing for this interval
+                  initialPrice = intervalPricing.custom_initial_price || 0;
+                  recurringPrice = intervalPricing.custom_recurring_price || 0;
+                  console.log('Using custom pricing for interval:', { initialPrice, recurringPrice });
+                } else if (intervalPricing.pricing_type === 'discount') {
+                  // Calculate from bundled items and apply interval-specific discount
+                  let totalInitial = 0;
+                  let totalRecurring = 0;
+
+                  // Sum up service plans with size-based pricing
+                  console.log('Bundled service plans:', bundle.bundled_service_plans);
+                  if (bundle.bundled_service_plans && Array.isArray(bundle.bundled_service_plans)) {
+                    for (const item of bundle.bundled_service_plans) {
+                      const { data: plan } = await supabase
+                        .from('service_plans')
+                        .select('*')
+                        .eq('id', item.service_plan_id)
+                        .single();
+
+                      if (plan) {
+                        const baseInitialPrice = plan.initial_price || 0;
+                        const baseRecurringPrice = plan.plan_category === 'one-time' ? 0 : (plan.recurring_price || 0);
+
+                        let homeInitialIncrease = 0;
+                        let homeRecurringIncrease = 0;
+                        let yardInitialIncrease = 0;
+                        let yardRecurringIncrease = 0;
+                        let linearFeetInitialPrice = 0;
+                        let linearFeetRecurringPrice = 0;
+
+                        if (pricingSettings) {
+                          if (plan.home_size_pricing) {
+                            const homeRangeValue = parseRangeValue(homeSizeRange);
+                            const servicePlanPricing = {
+                              home_size_pricing: plan.home_size_pricing,
+                              yard_size_pricing: plan.yard_size_pricing,
+                              linear_feet_pricing: plan.linear_feet_pricing,
+                            };
+                            const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
+                            const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                            homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
+                            homeRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
+                          }
+
+                          if (plan.yard_size_pricing) {
+                            const yardRangeValue = parseRangeValue(yardSizeRange);
+                            const servicePlanPricing = {
+                              home_size_pricing: plan.home_size_pricing,
+                              yard_size_pricing: plan.yard_size_pricing,
+                              linear_feet_pricing: plan.linear_feet_pricing,
+                            };
+                            const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+                            const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+                            yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
+                            yardRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
+                          }
+
+                          if (plan.linear_feet_pricing && linearFeetRange) {
+                            const linearFeetValue = parseRangeValue(linearFeetRange);
+                            if (linearFeetValue > 0) {
+                              const servicePlanPricing = {
+                                home_size_pricing: plan.home_size_pricing,
+                                yard_size_pricing: plan.yard_size_pricing,
+                                linear_feet_pricing: plan.linear_feet_pricing,
+                              };
+                              const linearFeetPricing = calculateLinearFeetPrice(
+                                linearFeetValue,
+                                pricingSettings,
+                                servicePlanPricing
+                              );
+                              linearFeetInitialPrice = linearFeetPricing.initialPrice;
+                              linearFeetRecurringPrice = plan.plan_category === 'one-time' ? 0 : linearFeetPricing.recurringPrice;
+                            }
+                          }
+                        }
+
+                        const planInitialPrice = baseInitialPrice + homeInitialIncrease + yardInitialIncrease + linearFeetInitialPrice;
+                        const planRecurringPrice = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease + linearFeetRecurringPrice;
+
+                        totalInitial += planInitialPrice;
+                        totalRecurring += planRecurringPrice;
+                      }
+                    }
+                  }
+
+                  // Sum up add-ons
+                  if (bundle.bundled_add_ons && Array.isArray(bundle.bundled_add_ons)) {
+                    for (const item of bundle.bundled_add_ons) {
+                      const { data: addon } = await supabase
+                        .from('add_on_services')
+                        .select('initial_price, recurring_price')
+                        .eq('id', item.add_on_id)
+                        .single();
+
+                      if (addon) {
+                        totalInitial += addon.initial_price || 0;
+                        totalRecurring += addon.recurring_price || 0;
+                      }
+                    }
+                  }
+
+                  // Apply interval-specific discount
+                  if (intervalPricing.discount_type === 'percentage') {
+                    totalInitial = totalInitial * (1 - (intervalPricing.discount_value || 0) / 100);
+                  } else if (intervalPricing.discount_type === 'fixed') {
+                    totalInitial = Math.max(0, totalInitial - (intervalPricing.discount_value || 0));
+                  }
+
+                  const recurringDiscountType = intervalPricing.recurring_discount_type || intervalPricing.discount_type;
+                  const recurringDiscountValue = intervalPricing.recurring_discount_value ?? intervalPricing.discount_value;
+
+                  if (recurringDiscountType === 'percentage') {
+                    totalRecurring = totalRecurring * (1 - (recurringDiscountValue || 0) / 100);
+                  } else if (recurringDiscountType === 'fixed') {
+                    totalRecurring = Math.max(0, totalRecurring - (recurringDiscountValue || 0));
+                  }
+
+                  initialPrice = totalInitial;
+                  recurringPrice = totalRecurring;
+                  console.log('Interval discount pricing:', { initialPrice, recurringPrice });
+                }
+              }
+            } else if (bundle.pricing_type === 'custom') {
+              // Global custom pricing
+              initialPrice = bundle.custom_initial_price || 0;
+              recurringPrice = bundle.custom_recurring_price || 0;
+              console.log('Using global custom pricing:', { initialPrice, recurringPrice });
+            } else if (bundle.pricing_type === 'discount') {
+              // Global discount pricing
+              console.log('Using discount pricing');
+              // Calculate from bundled items and apply discount
+              let totalInitial = 0;
+              let totalRecurring = 0;
+
+              // Sum up service plans with size-based pricing
+              console.log('Bundled service plans:', bundle.bundled_service_plans);
+              if (bundle.bundled_service_plans && Array.isArray(bundle.bundled_service_plans)) {
+                for (const item of bundle.bundled_service_plans) {
+                  console.log('Fetching service plan:', item.service_plan_id);
+                  const { data: plan, error: planError } = await supabase
+                    .from('service_plans')
+                    .select('*')
+                    .eq('id', item.service_plan_id)
+                    .single();
+
+                  console.log('Service plan result:', { plan, planError });
+                  if (plan) {
+                    // Start with base prices
+                    const baseInitialPrice = plan.initial_price || 0;
+                    const baseRecurringPrice = plan.plan_category === 'one-time' ? 0 : (plan.recurring_price || 0);
+
+                    // Calculate size-based price increases
+                    let homeInitialIncrease = 0;
+                    let homeRecurringIncrease = 0;
+                    let yardInitialIncrease = 0;
+                    let yardRecurringIncrease = 0;
+                    let linearFeetInitialPrice = 0;
+                    let linearFeetRecurringPrice = 0;
+
+                    if (pricingSettings) {
+                      // Home size pricing
+                      if (plan.home_size_pricing) {
+                        const homeRangeValue = parseRangeValue(homeSizeRange);
+                        const servicePlanPricing = {
+                          home_size_pricing: plan.home_size_pricing,
+                          yard_size_pricing: plan.yard_size_pricing,
+                          linear_feet_pricing: plan.linear_feet_pricing,
+                        };
+                        const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
+                        const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                        homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
+                        homeRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
+                      }
+
+                      // Yard size pricing
+                      if (plan.yard_size_pricing) {
+                        const yardRangeValue = parseRangeValue(yardSizeRange);
+                        const servicePlanPricing = {
+                          home_size_pricing: plan.home_size_pricing,
+                          yard_size_pricing: plan.yard_size_pricing,
+                          linear_feet_pricing: plan.linear_feet_pricing,
+                        };
+                        const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+                        const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+                        yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
+                        yardRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
+                      }
+
+                      // Linear feet pricing
+                      if (plan.linear_feet_pricing && linearFeetRange) {
+                        const linearFeetValue = parseRangeValue(linearFeetRange);
+                        if (linearFeetValue > 0) {
+                          const servicePlanPricing = {
+                            home_size_pricing: plan.home_size_pricing,
+                            yard_size_pricing: plan.yard_size_pricing,
+                            linear_feet_pricing: plan.linear_feet_pricing,
+                          };
+                          const linearFeetPricing = calculateLinearFeetPrice(
+                            linearFeetValue,
+                            pricingSettings,
+                            servicePlanPricing
+                          );
+                          linearFeetInitialPrice = linearFeetPricing.initialPrice;
+                          linearFeetRecurringPrice = plan.plan_category === 'one-time' ? 0 : linearFeetPricing.recurringPrice;
+                        }
+                      }
+                    }
+
+                    // Calculate final prices with size adjustments
+                    const planInitialPrice = baseInitialPrice + homeInitialIncrease + yardInitialIncrease + linearFeetInitialPrice;
+                    const planRecurringPrice = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease + linearFeetRecurringPrice;
+
+                    totalInitial += planInitialPrice;
+                    totalRecurring += planRecurringPrice;
+                    console.log('Service plan prices (with size adjustments):', {
+                      plan_name: plan.plan_name,
+                      baseInitialPrice,
+                      baseRecurringPrice,
+                      homeInitialIncrease,
+                      homeRecurringIncrease,
+                      yardInitialIncrease,
+                      yardRecurringIncrease,
+                      linearFeetInitialPrice,
+                      linearFeetRecurringPrice,
+                      planInitialPrice,
+                      planRecurringPrice
+                    });
+                    console.log('Running totals after service plan:', { totalInitial, totalRecurring });
+                  }
+                }
+              }
+
+              // Sum up add-ons
+              console.log('Bundled add-ons:', bundle.bundled_add_ons);
+              if (bundle.bundled_add_ons && Array.isArray(bundle.bundled_add_ons)) {
+                for (const item of bundle.bundled_add_ons) {
+                  console.log('Fetching add-on:', item.add_on_id);
+                  const { data: addon, error: addonError } = await supabase
+                    .from('add_on_services')
+                    .select('initial_price, recurring_price')
+                    .eq('id', item.add_on_id)
+                    .single();
+
+                  console.log('Add-on result:', { addon, addonError });
+                  if (addon) {
+                    totalInitial += addon.initial_price || 0;
+                    totalRecurring += addon.recurring_price || 0;
+                    console.log('Running totals after add-on:', { totalInitial, totalRecurring });
+                  }
+                }
+              }
+
+              console.log('Totals before discount:', { totalInitial, totalRecurring });
+
+              // Apply discount based on applies_to_price setting
+              const appliesToPrice = bundle.applies_to_price || 'both';
+              console.log('Discount settings:', {
+                appliesToPrice,
+                discount_type: bundle.discount_type,
+                discount_value: bundle.discount_value,
+                recurring_discount_type: bundle.recurring_discount_type,
+                recurring_discount_value: bundle.recurring_discount_value
+              });
+
+              if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
+                if (bundle.discount_type === 'percentage') {
+                  totalInitial = totalInitial * (1 - (bundle.discount_value || 0) / 100);
+                } else if (bundle.discount_type === 'fixed') {
+                  totalInitial = Math.max(0, totalInitial - (bundle.discount_value || 0));
+                }
+                console.log('Initial price after discount:', totalInitial);
+              }
+
+              if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
+                const recurringDiscountType = bundle.recurring_discount_type || bundle.discount_type;
+                const recurringDiscountValue = bundle.recurring_discount_value ?? bundle.discount_value;
+
+                if (recurringDiscountType === 'percentage') {
+                  totalRecurring = totalRecurring * (1 - (recurringDiscountValue || 0) / 100);
+                } else if (recurringDiscountType === 'fixed') {
+                  totalRecurring = Math.max(0, totalRecurring - (recurringDiscountValue || 0));
+                }
+                console.log('Recurring price after discount:', totalRecurring);
+              }
+
+              initialPrice = totalInitial;
+              recurringPrice = totalRecurring;
+            }
+
+            console.log('Final prices:', { initialPrice, recurringPrice });
+            console.log('=== END BUNDLE PRICING DEBUG ===');
+
+            // Update existing line item with bundle data
+            await supabase
+              .from('quote_line_items')
+              .update({
+                bundle_plan_id: bundle.id,
+                service_plan_id: null,
+                addon_service_id: null,
+                plan_name: bundle.bundle_name,
+                plan_description: bundle.bundle_description,
+                initial_price: initialPrice,
+                recurring_price: recurringPrice,
+                final_initial_price: initialPrice,
+                final_recurring_price: recurringPrice,
+                billing_frequency: bundle.billing_frequency,
+                discount_percentage: 0,
+                discount_amount: 0,
+                is_custom_priced: false,
+              })
+              .eq('id', lineItem.id);
           }
         } else if (lineItem.id) {
           // Update existing line item (only discounts/display order, no service plan change)
@@ -700,47 +1136,74 @@ export async function PUT(
             // Always calculate the standard pricing (even for custom priced items)
             // This preserves the calculated price for reference
             const baseInitialPrice = servicePlan.initial_price || 0;
-              // For one-time plans, recurring_price should always be 0
-              const baseRecurringPrice = servicePlan.plan_category === 'one-time'
-                ? 0
-                : (servicePlan.recurring_price || 0);
+            // For one-time plans, recurring_price should always be 0
+            const baseRecurringPrice = servicePlan.plan_category === 'one-time'
+              ? 0
+              : (servicePlan.recurring_price || 0);
 
-              // Calculate size-based price increases if pricing settings exist
-              let homeInitialIncrease = 0;
-              let homeRecurringIncrease = 0;
-              let yardInitialIncrease = 0;
-              let yardRecurringIncrease = 0;
+            // Calculate size-based price increases if pricing settings exist
+            let homeInitialIncrease = 0;
+            let homeRecurringIncrease = 0;
+            let yardInitialIncrease = 0;
+            let yardRecurringIncrease = 0;
+            let linearFeetInitialPrice = 0;
+            let linearFeetRecurringPrice = 0;
 
-              if (pricingSettings && servicePlan.home_size_pricing && servicePlan.yard_size_pricing) {
-                // Parse range values
+            if (pricingSettings) {
+              // Calculate home size pricing if this plan supports it
+              if (servicePlan.home_size_pricing) {
                 const homeRangeValue = parseRangeValue(homeSizeRange);
-                const yardRangeValue = parseRangeValue(yardSizeRange);
-
-                // Generate options to find interval indices
                 const servicePlanPricing = {
                   home_size_pricing: servicePlan.home_size_pricing,
                   yard_size_pricing: servicePlan.yard_size_pricing,
+                  linear_feet_pricing: servicePlan.linear_feet_pricing,
                 };
-
                 const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
-                const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
-
-                // Find appropriate options
                 const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
-                const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
-
-                // Get price increases
                 homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
                 // For one-time plans, never add recurring increases
                 homeRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
+              }
+
+              // Calculate yard size pricing if this plan supports it
+              if (servicePlan.yard_size_pricing) {
+                const yardRangeValue = parseRangeValue(yardSizeRange);
+                const servicePlanPricing = {
+                  home_size_pricing: servicePlan.home_size_pricing,
+                  yard_size_pricing: servicePlan.yard_size_pricing,
+                  linear_feet_pricing: servicePlan.linear_feet_pricing,
+                };
+                const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+                const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
                 yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
                 // For one-time plans, never add recurring increases
                 yardRecurringIncrease = servicePlan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
               }
 
+              // Calculate linear feet pricing if this plan supports it
+              if (servicePlan.linear_feet_pricing && linearFeetRange) {
+                const linearFeetValue = parseRangeValue(linearFeetRange);
+                if (linearFeetValue > 0) {
+                  const servicePlanPricing = {
+                    home_size_pricing: servicePlan.home_size_pricing,
+                    yard_size_pricing: servicePlan.yard_size_pricing,
+                    linear_feet_pricing: servicePlan.linear_feet_pricing,
+                  };
+                  const linearFeetPricing = calculateLinearFeetPrice(
+                    linearFeetValue,
+                    pricingSettings,
+                    servicePlanPricing
+                  );
+                  linearFeetInitialPrice = linearFeetPricing.initialPrice;
+                  // For one-time plans, never add recurring prices
+                  linearFeetRecurringPrice = servicePlan.plan_category === 'one-time' ? 0 : linearFeetPricing.recurringPrice;
+                }
+              }
+            }
+
             // Calculate prices with size increases
-            const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease;
-            const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease;
+            const initialPriceWithSize = baseInitialPrice + homeInitialIncrease + yardInitialIncrease + linearFeetInitialPrice;
+            const recurringPriceWithSize = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease + linearFeetRecurringPrice;
 
             // If custom pricing is set, use custom values for final prices only
             if (isCustomPriced && customInitialPrice !== undefined && customRecurringPrice !== undefined) {
@@ -881,6 +1344,385 @@ export async function PUT(
                 .from('quote_line_items')
                 .insert({
                   ...addonData,
+                  quote_id: id,
+                });
+            }
+          }
+        } else if (lineItem.bundle_plan_id) {
+          // Create new bundle plan line items
+          const { data: bundle } = await supabase
+            .from('bundle_plans')
+            .select('*')
+            .eq('id', lineItem.bundle_plan_id)
+            .single();
+
+          console.log('=== BUNDLE PRICING DEBUG (CREATE) ===');
+          console.log('Bundle data:', JSON.stringify(bundle, null, 2));
+
+          if (bundle) {
+            let initialPrice = 0;
+            let recurringPrice = 0;
+
+            const pricingMode = bundle.pricing_mode || 'global';
+
+            if (pricingMode === 'per_interval') {
+              // Per-interval pricing - determine which interval applies
+              const intervalDimension = bundle.interval_dimension || 'home';
+              let intervalIndex = 0;
+
+              // Determine the interval index based on the dimension
+              if (pricingSettings) {
+                if (intervalDimension === 'home' && homeSizeRange) {
+                  const homeRangeValue = parseRangeValue(homeSizeRange);
+                  const homeOptions = generateHomeSizeOptions(pricingSettings);
+                  const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                  intervalIndex = homeSizeOption?.intervalIndex ?? 0;
+                } else if (intervalDimension === 'yard' && yardSizeRange) {
+                  const yardRangeValue = parseRangeValue(yardSizeRange);
+                  const yardOptions = generateYardSizeOptions(pricingSettings);
+                  const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+                  intervalIndex = yardSizeOption?.intervalIndex ?? 0;
+                } else if (intervalDimension === 'linear_feet' && linearFeetRange) {
+                  const linearFeetValue = parseRangeValue(linearFeetRange);
+                  const linearFeetOptions = generateLinearFeetOptions(pricingSettings);
+                  const linearFeetOption = findSizeOptionByValue(linearFeetValue, linearFeetOptions);
+                  intervalIndex = linearFeetOption?.intervalIndex ?? 0;
+                }
+              }
+
+              // Get the pricing configuration for this interval
+              const intervalPricing = bundle.interval_pricing?.[intervalIndex];
+              console.log('Using per-interval pricing:', {
+                intervalDimension,
+                intervalIndex,
+                intervalPricing
+              });
+
+              if (intervalPricing) {
+                if (intervalPricing.pricing_type === 'custom') {
+                  // Use custom pricing for this interval
+                  initialPrice = intervalPricing.custom_initial_price || 0;
+                  recurringPrice = intervalPricing.custom_recurring_price || 0;
+                  console.log('Using custom pricing for interval:', { initialPrice, recurringPrice });
+                } else if (intervalPricing.pricing_type === 'discount') {
+                  // Calculate from bundled items and apply interval-specific discount
+                  let totalInitial = 0;
+                  let totalRecurring = 0;
+
+                  // Sum up service plans with size-based pricing
+                  console.log('Bundled service plans:', bundle.bundled_service_plans);
+                  if (bundle.bundled_service_plans && Array.isArray(bundle.bundled_service_plans)) {
+                    for (const item of bundle.bundled_service_plans) {
+                      const { data: plan } = await supabase
+                        .from('service_plans')
+                        .select('*')
+                        .eq('id', item.service_plan_id)
+                        .single();
+
+                      if (plan) {
+                        const baseInitialPrice = plan.initial_price || 0;
+                        const baseRecurringPrice = plan.plan_category === 'one-time' ? 0 : (plan.recurring_price || 0);
+
+                        let homeInitialIncrease = 0;
+                        let homeRecurringIncrease = 0;
+                        let yardInitialIncrease = 0;
+                        let yardRecurringIncrease = 0;
+                        let linearFeetInitialPrice = 0;
+                        let linearFeetRecurringPrice = 0;
+
+                        if (pricingSettings) {
+                          if (plan.home_size_pricing) {
+                            const homeRangeValue = parseRangeValue(homeSizeRange);
+                            const servicePlanPricing = {
+                              home_size_pricing: plan.home_size_pricing,
+                              yard_size_pricing: plan.yard_size_pricing,
+                              linear_feet_pricing: plan.linear_feet_pricing,
+                            };
+                            const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
+                            const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                            homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
+                            homeRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
+                          }
+
+                          if (plan.yard_size_pricing) {
+                            const yardRangeValue = parseRangeValue(yardSizeRange);
+                            const servicePlanPricing = {
+                              home_size_pricing: plan.home_size_pricing,
+                              yard_size_pricing: plan.yard_size_pricing,
+                              linear_feet_pricing: plan.linear_feet_pricing,
+                            };
+                            const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+                            const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+                            yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
+                            yardRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
+                          }
+
+                          if (plan.linear_feet_pricing && linearFeetRange) {
+                            const linearFeetValue = parseRangeValue(linearFeetRange);
+                            if (linearFeetValue > 0) {
+                              const servicePlanPricing = {
+                                home_size_pricing: plan.home_size_pricing,
+                                yard_size_pricing: plan.yard_size_pricing,
+                                linear_feet_pricing: plan.linear_feet_pricing,
+                              };
+                              const linearFeetPricing = calculateLinearFeetPrice(
+                                linearFeetValue,
+                                pricingSettings,
+                                servicePlanPricing
+                              );
+                              linearFeetInitialPrice = linearFeetPricing.initialPrice;
+                              linearFeetRecurringPrice = plan.plan_category === 'one-time' ? 0 : linearFeetPricing.recurringPrice;
+                            }
+                          }
+                        }
+
+                        const planInitialPrice = baseInitialPrice + homeInitialIncrease + yardInitialIncrease + linearFeetInitialPrice;
+                        const planRecurringPrice = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease + linearFeetRecurringPrice;
+
+                        totalInitial += planInitialPrice;
+                        totalRecurring += planRecurringPrice;
+                      }
+                    }
+                  }
+
+                  // Sum up add-ons
+                  if (bundle.bundled_add_ons && Array.isArray(bundle.bundled_add_ons)) {
+                    for (const item of bundle.bundled_add_ons) {
+                      const { data: addon } = await supabase
+                        .from('add_on_services')
+                        .select('initial_price, recurring_price')
+                        .eq('id', item.add_on_id)
+                        .single();
+
+                      if (addon) {
+                        totalInitial += addon.initial_price || 0;
+                        totalRecurring += addon.recurring_price || 0;
+                      }
+                    }
+                  }
+
+                  // Apply interval-specific discount
+                  if (intervalPricing.discount_type === 'percentage') {
+                    totalInitial = totalInitial * (1 - (intervalPricing.discount_value || 0) / 100);
+                  } else if (intervalPricing.discount_type === 'fixed') {
+                    totalInitial = Math.max(0, totalInitial - (intervalPricing.discount_value || 0));
+                  }
+
+                  const recurringDiscountType = intervalPricing.recurring_discount_type || intervalPricing.discount_type;
+                  const recurringDiscountValue = intervalPricing.recurring_discount_value ?? intervalPricing.discount_value;
+
+                  if (recurringDiscountType === 'percentage') {
+                    totalRecurring = totalRecurring * (1 - (recurringDiscountValue || 0) / 100);
+                  } else if (recurringDiscountType === 'fixed') {
+                    totalRecurring = Math.max(0, totalRecurring - (recurringDiscountValue || 0));
+                  }
+
+                  initialPrice = totalInitial;
+                  recurringPrice = totalRecurring;
+                  console.log('Interval discount pricing:', { initialPrice, recurringPrice });
+                }
+              }
+            } else if (bundle.pricing_type === 'custom') {
+              // Global custom pricing
+              initialPrice = bundle.custom_initial_price || 0;
+              recurringPrice = bundle.custom_recurring_price || 0;
+              console.log('Using global custom pricing:', { initialPrice, recurringPrice });
+            } else if (bundle.pricing_type === 'discount') {
+              // Global discount pricing
+              console.log('Using discount pricing');
+              // Calculate from bundled items and apply discount
+              let totalInitial = 0;
+              let totalRecurring = 0;
+
+              // Sum up service plans with size-based pricing
+              console.log('Bundled service plans:', bundle.bundled_service_plans);
+              if (bundle.bundled_service_plans && Array.isArray(bundle.bundled_service_plans)) {
+                for (const item of bundle.bundled_service_plans) {
+                  console.log('Fetching service plan:', item.service_plan_id);
+                  const { data: plan, error: planError } = await supabase
+                    .from('service_plans')
+                    .select('*')
+                    .eq('id', item.service_plan_id)
+                    .single();
+
+                  console.log('Service plan result:', { plan, planError });
+                  if (plan) {
+                    // Start with base prices
+                    const baseInitialPrice = plan.initial_price || 0;
+                    const baseRecurringPrice = plan.plan_category === 'one-time' ? 0 : (plan.recurring_price || 0);
+
+                    // Calculate size-based price increases
+                    let homeInitialIncrease = 0;
+                    let homeRecurringIncrease = 0;
+                    let yardInitialIncrease = 0;
+                    let yardRecurringIncrease = 0;
+                    let linearFeetInitialPrice = 0;
+                    let linearFeetRecurringPrice = 0;
+
+                    if (pricingSettings) {
+                      // Home size pricing
+                      if (plan.home_size_pricing) {
+                        const homeRangeValue = parseRangeValue(homeSizeRange);
+                        const servicePlanPricing = {
+                          home_size_pricing: plan.home_size_pricing,
+                          yard_size_pricing: plan.yard_size_pricing,
+                          linear_feet_pricing: plan.linear_feet_pricing,
+                        };
+                        const homeOptions = generateHomeSizeOptions(pricingSettings, servicePlanPricing);
+                        const homeSizeOption = findSizeOptionByValue(homeRangeValue, homeOptions);
+                        homeInitialIncrease = homeSizeOption?.initialIncrease || 0;
+                        homeRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (homeSizeOption?.recurringIncrease || 0);
+                      }
+
+                      // Yard size pricing
+                      if (plan.yard_size_pricing) {
+                        const yardRangeValue = parseRangeValue(yardSizeRange);
+                        const servicePlanPricing = {
+                          home_size_pricing: plan.home_size_pricing,
+                          yard_size_pricing: plan.yard_size_pricing,
+                          linear_feet_pricing: plan.linear_feet_pricing,
+                        };
+                        const yardOptions = generateYardSizeOptions(pricingSettings, servicePlanPricing);
+                        const yardSizeOption = findSizeOptionByValue(yardRangeValue, yardOptions);
+                        yardInitialIncrease = yardSizeOption?.initialIncrease || 0;
+                        yardRecurringIncrease = plan.plan_category === 'one-time' ? 0 : (yardSizeOption?.recurringIncrease || 0);
+                      }
+
+                      // Linear feet pricing
+                      if (plan.linear_feet_pricing && linearFeetRange) {
+                        const linearFeetValue = parseRangeValue(linearFeetRange);
+                        if (linearFeetValue > 0) {
+                          const servicePlanPricing = {
+                            home_size_pricing: plan.home_size_pricing,
+                            yard_size_pricing: plan.yard_size_pricing,
+                            linear_feet_pricing: plan.linear_feet_pricing,
+                          };
+                          const linearFeetPricing = calculateLinearFeetPrice(
+                            linearFeetValue,
+                            pricingSettings,
+                            servicePlanPricing
+                          );
+                          linearFeetInitialPrice = linearFeetPricing.initialPrice;
+                          linearFeetRecurringPrice = plan.plan_category === 'one-time' ? 0 : linearFeetPricing.recurringPrice;
+                        }
+                      }
+                    }
+
+                    // Calculate final prices with size adjustments
+                    const planInitialPrice = baseInitialPrice + homeInitialIncrease + yardInitialIncrease + linearFeetInitialPrice;
+                    const planRecurringPrice = baseRecurringPrice + homeRecurringIncrease + yardRecurringIncrease + linearFeetRecurringPrice;
+
+                    totalInitial += planInitialPrice;
+                    totalRecurring += planRecurringPrice;
+                    console.log('Service plan prices (with size adjustments):', {
+                      plan_name: plan.plan_name,
+                      baseInitialPrice,
+                      baseRecurringPrice,
+                      homeInitialIncrease,
+                      homeRecurringIncrease,
+                      yardInitialIncrease,
+                      yardRecurringIncrease,
+                      linearFeetInitialPrice,
+                      linearFeetRecurringPrice,
+                      planInitialPrice,
+                      planRecurringPrice
+                    });
+                    console.log('Running totals after service plan:', { totalInitial, totalRecurring });
+                  }
+                }
+              }
+
+              // Sum up add-ons
+              console.log('Bundled add-ons:', bundle.bundled_add_ons);
+              if (bundle.bundled_add_ons && Array.isArray(bundle.bundled_add_ons)) {
+                for (const item of bundle.bundled_add_ons) {
+                  console.log('Fetching add-on:', item.add_on_id);
+                  const { data: addon, error: addonError } = await supabase
+                    .from('add_on_services')
+                    .select('initial_price, recurring_price')
+                    .eq('id', item.add_on_id)
+                    .single();
+
+                  console.log('Add-on result:', { addon, addonError });
+                  if (addon) {
+                    totalInitial += addon.initial_price || 0;
+                    totalRecurring += addon.recurring_price || 0;
+                    console.log('Running totals after add-on:', { totalInitial, totalRecurring });
+                  }
+                }
+              }
+
+              console.log('Totals before discount:', { totalInitial, totalRecurring });
+
+              // Apply discount based on applies_to_price setting
+              const appliesToPrice = bundle.applies_to_price || 'both';
+              console.log('Discount settings:', {
+                appliesToPrice,
+                discount_type: bundle.discount_type,
+                discount_value: bundle.discount_value,
+                recurring_discount_type: bundle.recurring_discount_type,
+                recurring_discount_value: bundle.recurring_discount_value
+              });
+
+              if (appliesToPrice === 'initial' || appliesToPrice === 'both') {
+                if (bundle.discount_type === 'percentage') {
+                  totalInitial = totalInitial * (1 - (bundle.discount_value || 0) / 100);
+                } else if (bundle.discount_type === 'fixed') {
+                  totalInitial = Math.max(0, totalInitial - (bundle.discount_value || 0));
+                }
+                console.log('Initial price after discount:', totalInitial);
+              }
+
+              if (appliesToPrice === 'recurring' || appliesToPrice === 'both') {
+                // Use recurring discount settings if available, otherwise use initial discount
+                const recurringDiscountType = bundle.recurring_discount_type || bundle.discount_type;
+                const recurringDiscountValue = bundle.recurring_discount_value ?? bundle.discount_value;
+
+                if (recurringDiscountType === 'percentage') {
+                  totalRecurring = totalRecurring * (1 - (recurringDiscountValue || 0) / 100);
+                } else if (recurringDiscountType === 'fixed') {
+                  totalRecurring = Math.max(0, totalRecurring - (recurringDiscountValue || 0));
+                }
+                console.log('Recurring price after discount:', totalRecurring);
+              }
+
+              initialPrice = totalInitial;
+              recurringPrice = totalRecurring;
+            }
+
+            console.log('Final prices:', { initialPrice, recurringPrice });
+            console.log('=== END BUNDLE PRICING DEBUG ===');
+
+            // Prepare update/insert data for bundle line item
+            const bundleData: any = {
+              bundle_plan_id: bundle.id,
+              service_plan_id: null,
+              addon_service_id: null,
+              plan_name: bundle.bundle_name,
+              plan_description: bundle.bundle_description,
+              initial_price: initialPrice,
+              recurring_price: recurringPrice,
+              final_initial_price: initialPrice,
+              final_recurring_price: recurringPrice,
+              billing_frequency: bundle.billing_frequency,
+              display_order: lineItem.display_order,
+              discount_percentage: 0,
+              discount_amount: 0,
+              is_custom_priced: false,
+            };
+
+            if (lineItem.id) {
+              // Update existing bundle line item
+              await supabase
+                .from('quote_line_items')
+                .update(bundleData)
+                .eq('id', lineItem.id);
+            } else {
+              // Create new bundle line item
+              await supabase
+                .from('quote_line_items')
+                .insert({
+                  ...bundleData,
                   quote_id: id,
                 });
             }

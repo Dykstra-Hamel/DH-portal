@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { Retell } from 'retell-sdk';
 import { findCompanyByAgentId } from '@/lib/agent-utils';
-import { isBusinessHours } from '@/lib/campaigns/business-hours';
+import { isBusinessHours, fetchCompanyBusinessHours } from '@/lib/campaigns/business-hours';
 
 // Simple rate limiting store (in production, use Redis or similar)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
@@ -41,18 +41,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the webhook is from Retell using signature verification
-    const retellWebhookSecret = process.env.RETELL_WEBHOOK_SECRET;
+    // SIGNATURE VALIDATION - Company-Specific
     const signature = request.headers.get('x-retell-signature');
-    
-    if (!retellWebhookSecret) {
-      console.error(`❌ [${requestId}] RETELL_WEBHOOK_SECRET not configured`);
-      return NextResponse.json(
-        { error: 'Webhook authentication not configured' },
-        { status: 500 }
-      );
-    }
-    
+
     if (!signature) {
       console.error(`❌ [${requestId}] Missing signature header`);
       return NextResponse.json(
@@ -61,20 +52,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const payload = await request.json();
-    
-    // Verify webhook signature using Retell SDK
-    const isValidSignature = Retell.verify(
-      JSON.stringify(payload),
-      retellWebhookSecret,
-      signature
-    );
-    
-    if (!isValidSignature) {
-      console.error(`❌ [${requestId}] Invalid webhook signature`);
+    // Parse payload to identify company (needed before we can validate signature)
+    const bodyText = await request.text();
+    let payload;
+    try {
+      payload = JSON.parse(bodyText);
+    } catch (error) {
+      console.error(`❌ [${requestId}] Invalid JSON payload`);
       return NextResponse.json(
-        { error: 'Invalid webhook signature' },
-        { status: 401 }
+        { error: 'Invalid JSON payload' },
+        { status: 400 }
       );
     }
 
@@ -90,42 +77,64 @@ export async function POST(request: NextRequest) {
 
     const { agent_id, from_number, to_number } = callInbound;
 
-    const supabase = createAdminClient();
-    
-    // Determine company from agent_id or to_number
-    let companyId = null;
-    
-    // First try to find company by agent_id
-    if (agent_id) {
-      companyId = await findCompanyByAgentId(agent_id);
-    }
-    
-    // If no company found by agent_id, try to find by phone number mapping
-    // This would require a phone number -> company mapping table if needed
-    // For now, we'll use the first company as fallback for development
-    if (!companyId) {
-      const { data: fallbackCompany } = await supabase
-        .from('companies')
-        .select('id')
-        .limit(1)
-        .single();
-      
-      if (fallbackCompany) {
-        companyId = fallbackCompany.id;
-      }
-    }
-    
-    if (!companyId) {
-      console.error(`❌ [${requestId}] No company found for this call`);
+    // Extract agent ID to identify company
+    if (!agent_id) {
+      console.error(`❌ [${requestId}] No agent_id in payload`);
       return NextResponse.json(
-        { error: 'Company not found' },
+        { error: 'agent_id required in payload' },
+        { status: 400 }
+      );
+    }
+
+    // Look up company from agent ID
+    const companyId = await findCompanyByAgentId(agent_id);
+
+    if (!companyId) {
+      console.error(`❌ [${requestId}] Company not found for agent: ${agent_id}`);
+      return NextResponse.json(
+        { error: 'Company not found for agent ID' },
         { status: 404 }
       );
     }
 
+    // Get company's Retell API key (which is also the webhook secret)
+    const supabase = createAdminClient();
+    const { data: apiKeySetting } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'retell_api_key')
+      .single();
+
+    if (!apiKeySetting?.setting_value) {
+      console.error(`❌ [${requestId}] Retell API key not configured for company: ${companyId}`);
+      return NextResponse.json(
+        { error: 'Retell API key not configured for company' },
+        { status: 500 }
+      );
+    }
+
+    // Verify signature using company-specific API key (which serves as webhook secret)
+    const isValidSignature = Retell.verify(
+      bodyText, // Use original body text, not re-stringified
+      apiKeySetting.setting_value,
+      signature
+    );
+
+    if (!isValidSignature) {
+      console.error(`❌ [${requestId}] Invalid webhook signature for company: ${companyId}`);
+      return NextResponse.json(
+        { error: 'Invalid webhook signature' },
+        { status: 401 }
+      );
+    }
+
+    console.log(`✅ [${requestId}] Signature validated for company: ${companyId}`);
+
     // Use business hours library to check current time
     const now = new Date();
-    const isDuringBusinessHours = await isBusinessHours(now, companyId);
+    const businessHoursSettings = await fetchCompanyBusinessHours(companyId);
+    const isDuringBusinessHours = isBusinessHours(now, businessHoursSettings);
 
     // Get off-hour calling setting
     const { data: offHourSetting } = await supabase

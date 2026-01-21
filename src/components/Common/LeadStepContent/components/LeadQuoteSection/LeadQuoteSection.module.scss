@@ -46,6 +46,10 @@
   display: grid;
   gap: 20px;
 
+  &.fourColumns {
+    grid-template-columns: repeat(4, minmax(0, 25%));
+  }
+
   &.threeColumns {
     grid-template-columns: repeat(3, minmax(0, 33.333%));
   }
@@ -59,6 +63,7 @@
   }
 
   @media (max-width: 768px) {
+    &.fourColumns,
     &.threeColumns,
     &.twoColumns {
       grid-template-columns: 1fr;
@@ -112,6 +117,35 @@
     background: var(--gray-100);
     color: var(--gray-500);
     cursor: not-allowed;
+  }
+}
+
+.input {
+  width: 100%;
+  padding: 7px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
   }
 }
 
@@ -549,12 +583,6 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 24px;
-
-    .buttonColumn {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-    }
   }
 
   .pricingColumn {
@@ -685,6 +713,13 @@
   }
 }
 
+.buttonColumn {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 // Multiple Plans Pricing - Grid Container
 .multiplePlansPricingGrid {
   display: grid;
@@ -801,13 +836,16 @@
 
 .totalCostGrid {
   display: flex;
-  gap: 40px;
+  .buttonColumn {
+    margin-left: auto;
+  }
 }
 
 .totalColumn {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-right: 40px;
 }
 
 .totalLabel {
@@ -855,13 +893,36 @@
   font-weight: 500;
   color: var(--gray-900);
   cursor: pointer;
-  margin-left: auto;
   align-self: center;
   transition: all 0.2s ease;
 
   &:hover {
     background: var(--gray-50);
     border-color: var(--gray-400);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.viewQuoteLink {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  background: transparent;
+  font-size: 13px;
+  line-height: 13px;
+  font-weight: 450;
+  color: var(--gray-700);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: var(--action-500);
   }
 
   svg {
@@ -1221,7 +1282,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  align-items: end;
+  align-items: flex-end;
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
@@ -1363,3 +1424,4 @@
       0 1px 1px 0 rgba(0, 105, 224, 0.12);
   }
 }
+

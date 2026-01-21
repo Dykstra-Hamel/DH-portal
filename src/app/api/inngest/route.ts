@@ -27,6 +27,9 @@ import { trainPestPressureModels } from '@/lib/inngest/functions/train-pest-pres
 import { generatePestPredictions } from '@/lib/inngest/functions/generate-pest-predictions';
 import { detectPestAnomalies } from '@/lib/inngest/functions/detect-pest-anomalies';
 
+// Google Places Review Sync
+import { syncGoogleReviews } from '@/lib/inngest/functions/sync-google-reviews';
+
 // Create the handler
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -59,6 +62,8 @@ export const { GET, POST, PUT } = serve({
     trainPestPressureModels,
     generatePestPredictions,
     detectPestAnomalies,
+    // Google Places Review Sync
+    syncGoogleReviews,
   ],
   streaming: false, // Disable streaming for compatibility
 });

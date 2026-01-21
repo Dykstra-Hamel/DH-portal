@@ -64,6 +64,7 @@ export async function GET(
         company:companies(
           id,
           name,
+          slug,
           website
         )
       `
@@ -345,6 +346,7 @@ export async function PUT(
         company:companies(
           id,
           name,
+          slug,
           website
         )
       `

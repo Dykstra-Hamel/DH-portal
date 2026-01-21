@@ -131,6 +131,7 @@ export interface Lead {
   company?: {
     id: string;
     name: string;
+    slug?: string;
     website?: string;
   };
   primary_service_address?: {

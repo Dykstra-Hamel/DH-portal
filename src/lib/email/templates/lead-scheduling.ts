@@ -39,7 +39,7 @@ export function generateLeadSchedulingEmailTemplate(
           }
         </style>
       </head>
-      <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; background-color: #f5f5f5;">
+      <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif;">
         <!-- Email Container -->
         <table role="presentation" style="width: 100%;">
           <tr>

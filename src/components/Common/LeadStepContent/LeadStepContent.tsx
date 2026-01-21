@@ -70,6 +70,7 @@ export function LeadStepContent({
 
   const [homeSize, setHomeSize] = useState<number | ''>('');
   const [yardSize, setYardSize] = useState<number | ''>('');
+  const [linearFeet, setLinearFeet] = useState<number | ''>('');
   const [selectedHomeSizeOption, setSelectedHomeSizeOption] =
     useState<string>('');
   const [selectedYardSizeOption, setSelectedYardSizeOption] =
@@ -533,6 +534,7 @@ export function LeadStepContent({
             additionalPests={additionalPests}
             homeSize={homeSize}
             yardSize={yardSize}
+            linearFeet={linearFeet}
             selectedHomeSizeOption={selectedHomeSizeOption}
             selectedYardSizeOption={selectedYardSizeOption}
             preferredDate={preferredDate}
@@ -546,6 +548,7 @@ export function LeadStepContent({
             setAdditionalPests={setAdditionalPests}
             setHomeSize={setHomeSize}
             setYardSize={setYardSize}
+            setLinearFeet={setLinearFeet}
             setSelectedHomeSizeOption={setSelectedHomeSizeOption}
             setSelectedYardSizeOption={setSelectedYardSizeOption}
             onPreferredDateChange={setPreferredDate}
