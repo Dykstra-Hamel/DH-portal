@@ -18,6 +18,7 @@
   display: flex;
   flex-direction: column;
   animation: slideIn 0.3s ease-out;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
 }
 
 @keyframes slideIn {
@@ -31,7 +32,6 @@
 
 .header {
   padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
   background: white;
 }
 
@@ -94,12 +94,36 @@
   margin-bottom: 1rem;
 }
 
-.completeCheckbox {
-  width: 24px;
-  height: 24px;
+.completeToggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-300, #d1d5db);
+  background: var(--white);
+  color: var(--success-600, #04ae6a);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  accent-color: var(--primary-color, #3b82f6);
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--success-500, #00c281);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.completeToggleDone {
+  background: var(--success-600, #04ae6a);
+  border-color: var(--success-600, #04ae6a);
+  color: var(--white);
 }
 
 .title {
@@ -110,12 +134,38 @@
   word-break: break-word;
   flex: 1;
 
+}
+
+.completed {
+  text-decoration: line-through;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.titleInput {
+  flex: 1;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-family: inherit;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--gray-300, #d1d5db);
+    background: var(--gray-50, #f9fafb);
+  }
+
   &.completed {
     text-decoration: line-through;
     color: var(--text-secondary, #9ca3af);
   }
 }
-
 .headerActions {
   display: flex;
   gap: 0.75rem;
@@ -152,6 +202,11 @@
   &:hover {
     background: #fee2e2;
   }
+}
+
+.deleteSection {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .saveButton {
@@ -248,7 +303,85 @@
   color: var(--text-primary, #374151);
   line-height: 1.6;
   margin: 0;
+}
+
+.descriptionSection {
+  gap: 0.75rem;
+}
+
+.descriptionDisplay {
+  position: relative;
+  padding: 12px;
+  border-radius: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.descriptionDisplay:hover,
+.descriptionDisplay:focus-visible {
+  background: var(--gray-50, #f9fafb);
+}
+
+.descriptionEditIcon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--gray-400, #9ca3af);
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease;
+  pointer-events: none;
+}
+
+.descriptionDisplay:hover .descriptionEditIcon,
+.descriptionDisplay:focus-visible .descriptionEditIcon {
+  opacity: 1;
+  color: var(--gray-500, #6b7280);
+}
+
+.description {
+  cursor: pointer;
+}
+
+.notes {
   white-space: pre-wrap;
+}
+
+.richTextContent {
+  white-space: normal;
+
+  p {
+    margin: 0 0 0.75rem;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  a {
+    color: var(--action-600, #0284c7);
+    text-decoration: underline;
+  }
+
+  ul,
+  ol {
+    padding-left: 1.25rem;
+    margin: 0 0 0.75rem;
+  }
+}
+
+.descriptionPlaceholder {
+  color: var(--text-secondary, #9ca3af);
+}
+
+.richTextEditor {
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.descriptionActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 // Progress Section

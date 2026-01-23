@@ -149,11 +149,51 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Fetch primary service addresses for customers
+    const customerIds = customers.map(customer => customer.id);
+    let primaryServiceAddressMap = new Map<string, any>();
+    if (customerIds.length > 0) {
+      const { data: primaryServiceAddresses, error: primaryServiceAddressError } =
+        await supabase
+          .from('customer_service_addresses')
+          .select(`
+            customer_id,
+            service_address:service_addresses(
+              id,
+              street_address,
+              apartment_unit,
+              address_line_2,
+              city,
+              state,
+              zip_code,
+              home_size_range,
+              yard_size_range,
+              latitude,
+              longitude
+            )
+          `)
+          .eq('is_primary_address', true)
+          .in('customer_id', customerIds);
+
+      if (primaryServiceAddressError) {
+        console.error('Admin Customers API: Error fetching primary service addresses:', primaryServiceAddressError);
+      } else {
+        primaryServiceAddressMap = new Map(
+          (primaryServiceAddresses || []).map(address => [
+            address.customer_id,
+            address.service_address,
+          ])
+        );
+      }
+    }
+
     // Calculate lead statistics efficiently from the joined data
     const enhancedCustomers = customers.map(customer => {
       const customerLeads = customer.leads || [];
       const customerTickets = customer.tickets || [];
       const customerSupportCases = customer.support_cases || [];
+      const primaryServiceAddress =
+        primaryServiceAddressMap.get(customer.id) || null;
 
       // Filter tickets to only count "new" status
       const newTickets = customerTickets.filter((t: any) => t.status === 'new');
@@ -171,6 +211,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...customerWithoutRelations,
+        primary_service_address: primaryServiceAddress,
         full_name: `${customer.first_name} ${customer.last_name}`,
         total_leads: customerLeads.length,
         active_leads: activeLeads.length,

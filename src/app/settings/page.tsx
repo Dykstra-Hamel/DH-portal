@@ -21,6 +21,7 @@ import KnowledgeBase from '@/components/KnowledgeBase/KnowledgeBase';
 import AccountLinking from '@/components/AccountLinking/AccountLinking';
 import AutomationSettings from '@/components/Automation/AutomationSettings';
 import NotificationPreferences from '@/components/NotificationPreferences/NotificationPreferences';
+import AnnouncementsManager from '@/components/Admin/AnnouncementsManager';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -66,9 +67,9 @@ export default function SettingsPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'knowledge-base' | 'automation' | 'project-management'>(
-    'automation'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'knowledge-base' | 'automation' | 'announcements' | 'project-management'
+  >('automation');
   const [activeSection, setActiveSection] = useState<'user' | 'company'>(
     'user'
   );
@@ -328,6 +329,12 @@ export default function SettingsPage() {
                   >
                     Project Management
                   </button>
+                  <button
+                    className={`${styles.tabButton} ${activeTab === 'announcements' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('announcements')}
+                  >
+                    Announcements
+                  </button>
                 </div>
 
                 {settingsLoading ? (
@@ -361,12 +368,21 @@ export default function SettingsPage() {
                           <p>
                             <Link
                               href="/settings/project-management"
-                              style={{ color: 'var(--action-500)', fontWeight: 600 }}
+                              style={{
+                                color: 'var(--action-500)',
+                                fontWeight: 600,
+                              }}
                             >
                               Go to Project Management Settings →
                             </Link>
                           </p>
                         </div>
+                      </div>
+                    )}
+                    {/* Announcements Tab */}
+                    {activeTab === 'announcements' && (
+                      <div className={styles.announcementsSection}>
+                        <AnnouncementsManager companyId={selectedCompany.id} />
                       </div>
                     )}
                   </div>

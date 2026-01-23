@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
 
     // Build select query - use !inner modifier on categories if filtering by category
     const categoryRelation = categoryId
-      ? 'categories:project_category_assignments!inner(id, category_id, category:project_categories(id, name, description, color, icon, sort_order))'
-      : 'categories:project_category_assignments(id, category_id, category:project_categories(id, name, description, color, icon, sort_order))';
+      ? 'categories:project_category_assignments!inner(id, category_id, category:project_categories(id, name, description, sort_order))'
+      : 'categories:project_category_assignments(id, category_id, category:project_categories(id, name, description, sort_order))';
 
     // First get projects with company info and category assignments
     let query = supabase
@@ -49,13 +49,18 @@ export async function GET(request: NextRequest) {
       )
       .order('created_at', { ascending: false });
 
-    // Apply scope filter for internal/client projects
-    if (scope === 'internal') {
-      query = query.eq('is_internal', true);
+    // Apply scope filter - scopeFilter takes precedence over scope param
+    if (scopeFilter) {
+      // New scopeFilter format: comma-separated values like 'internal,both' or 'external,both'
+      const scopes = scopeFilter.split(',').map(s => s.trim());
+      query = query.in('scope', scopes);
+    } else if (scope === 'internal') {
+      // Legacy scope param support
+      query = query.in('scope', ['internal', 'both']);
     } else if (scope === 'client') {
-      query = query.eq('is_internal', false);
+      query = query.in('scope', ['external', 'both']);
     }
-    // scope === 'all' means no filter on is_internal
+    // scope === 'all' or no filter means no scope filter
 
     // Apply other filters if provided
     if (companyId) {
@@ -69,12 +74,6 @@ export async function GET(request: NextRequest) {
     }
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo);
-    }
-
-    // Apply scope filter if provided (e.g., 'internal,both' or 'external,both')
-    if (scopeFilter) {
-      const scopes = scopeFilter.split(',');
-      query = query.in('scope', scopes);
     }
 
     // Apply category filter if provided
@@ -96,6 +95,52 @@ export async function GET(request: NextRequest) {
     if (!projects || projects.length === 0) {
       return NextResponse.json([]);
     }
+
+    const projectIds = projects.map(project => project.id);
+
+    // Fetch comment counts per project
+    const { data: projectComments, error: commentsError } = await supabase
+      .from('project_comments')
+      .select('project_id')
+      .in('project_id', projectIds);
+
+    if (commentsError) {
+      console.error('Error fetching project comments:', commentsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch project comments' },
+        { status: 500 }
+      );
+    }
+
+    const commentCounts = new Map<string, number>();
+    (projectComments || []).forEach(comment => {
+      commentCounts.set(
+        comment.project_id,
+        (commentCounts.get(comment.project_id) || 0) + 1
+      );
+    });
+
+    // Fetch assigned members per project (distinct assigned_to in tasks)
+    const { data: projectTasks, error: tasksError } = await supabase
+      .from('project_tasks')
+      .select('project_id, assigned_to')
+      .in('project_id', projectIds);
+
+    if (tasksError) {
+      console.error('Error fetching project tasks:', tasksError);
+      return NextResponse.json(
+        { error: 'Failed to fetch project tasks' },
+        { status: 500 }
+      );
+    }
+
+    const memberSets = new Map<string, Set<string>>();
+    (projectTasks || []).forEach(task => {
+      if (!task.assigned_to) return;
+      const set = memberSets.get(task.project_id) || new Set<string>();
+      set.add(task.assigned_to);
+      memberSets.set(task.project_id, set);
+    });
 
     // Get all unique user IDs from projects
     const userIds = new Set<string>();
@@ -137,6 +182,8 @@ export async function GET(request: NextRequest) {
       assigned_to_profile: project.assigned_to
         ? profileMap.get(project.assigned_to) || null
         : null,
+      comments_count: commentCounts.get(project.id) || 0,
+      members_count: memberSets.get(project.id)?.size || 0,
     }));
 
     return NextResponse.json(enhancedProjects);
@@ -180,16 +227,19 @@ export async function POST(request: NextRequest) {
       tags,
       notes,
       primary_file_path,
-      is_internal = false,
+      scope = 'internal', // Project scope: internal, external, or both
       category_ids = [],
-      type_code, // NEW: Project type code for shortcode generation
+      type_code, // Project type code for shortcode generation
     } = body;
 
     // Validate required fields
-    // For internal projects, company_id is optional
-    const requiredFieldValidation = is_internal
-      ? { name: !!name, project_type: !!project_type, requested_by: !!requested_by, due_date: !!due_date }
-      : { name: !!name, project_type: !!project_type, requested_by: !!requested_by, company_id: !!company_id, due_date: !!due_date };
+    const requiredFieldValidation = {
+      name: !!name,
+      project_type: !!project_type,
+      requested_by: !!requested_by,
+      company_id: !!company_id,
+      due_date: !!due_date,
+    };
 
     const missingFields = Object.entries(requiredFieldValidation)
       .filter(([_, value]) => !value)
@@ -252,9 +302,9 @@ export async function POST(request: NextRequest) {
         description,
         project_type,
         project_subtype: project_subtype || null,
-        type_code: type_code || null, // NEW: Type code for shortcode generation
+        type_code: type_code || null, // Type code for shortcode generation
         requested_by,
-        company_id: is_internal ? null : company_id, // Internal projects don't need company_id
+        company_id,
         assigned_to: assigned_to || null,
         status,
         priority,
@@ -265,7 +315,7 @@ export async function POST(request: NextRequest) {
         tags: tagsArray,
         notes,
         primary_file_path: primary_file_path || null,
-        is_internal,
+        scope, // Project scope: internal, external, or both
       })
       .select(
         `

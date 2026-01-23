@@ -1,0 +1,141 @@
+// Shared Tabs and Search Styles for DataTable List Components
+// Import this file in any list component that needs external tabs/search
+
+// Tabs Row - wrapper for tabs and search with 12px gap
+.tabsRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+// Tabs Section - tabs with border bottom
+.tabsSection {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+}
+
+// Search Section - search with border bottom
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  padding-bottom: 10px;
+
+  &:focus-within {
+    border-bottom-color: var(--gray-800, #252c37);
+  }
+}
+
+.searchInput {
+  width: 182px;
+  padding: 0;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-300, #d1d5db);
+  background: transparent;
+  border: none;
+  outline: none;
+  transition: color 0.2s ease;
+  text-align: left;
+
+  &::placeholder {
+    color: var(--gray-300, #d1d5db);
+  }
+
+  &:focus {
+    color: var(--gray-800, #252c37);
+
+    &::placeholder {
+      color: var(--gray-500, #6a7282);
+    }
+  }
+}
+
+.searchIcon {
+  color: var(--gray-300, #d1d5db);
+  flex-shrink: 0;
+}
+
+.searchSection:focus-within .searchIcon {
+  color: var(--gray-800, #252c37);
+}
+
+.searchSection:focus-within .searchInput {
+  color: var(--gray-800, #252c37);
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 8px;
+
+  &:first-child {
+    padding-left: 0;
+
+    &::after {
+      left: 0;
+    }
+  }
+
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  color: var(--gray-600, #525252);
+  font-family: var(--font-satoshi, inherit);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--gray-800, #262626);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -1px;
+    height: 3px;
+    background: transparent;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition:
+      transform 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  &.active {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--action-500, #0088cc);
+
+    &::after {
+      background: var(--action-500, #0088cc);
+      transform: scaleX(1);
+    }
+  }
+}
+
+.tabCount {
+  color: var(--action-600);
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+}

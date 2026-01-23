@@ -55,11 +55,13 @@ interface SupportCaseAssignmentControls {
 interface ProjectFilterControls {
   selectedCompanyId?: string | null;
   selectedAssignedTo?: string | null | undefined;
+  selectedStatus?: string | null;
   companies: Array<{ id: string; name: string }>;
   assignableUsers: AssignableUser[];
   currentUser: { id: string; name: string; email: string; avatar?: string };
   onCompanyChange: (companyId: string | null) => void;
   onAssignedToChange: (userId: string | null) => void;
+  onStatusChange?: (status: string | null) => void;
 }
 
 interface GlobalLowerHeaderProps {
@@ -122,6 +124,8 @@ export function GlobalLowerHeader({
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isProjectCompanyOpen, setIsProjectCompanyOpen] = useState(false);
   const [isProjectAssignedToOpen, setIsProjectAssignedToOpen] = useState(false);
+  const [isProjectStatusOpen, setIsProjectStatusOpen] = useState(false);
+  const [hasShadow, setHasShadow] = useState(false);
 
   const leadTypeRef = useRef<HTMLDivElement>(null);
   const assignedToRef = useRef<HTMLDivElement>(null);
@@ -130,6 +134,7 @@ export function GlobalLowerHeader({
   const supportStatusRef = useRef<HTMLDivElement>(null);
   const projectCompanyRef = useRef<HTMLDivElement>(null);
   const projectAssignedToRef = useRef<HTMLDivElement>(null);
+  const projectStatusRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -176,10 +181,49 @@ export function GlobalLowerHeader({
       ) {
         setIsProjectAssignedToOpen(false);
       }
+      if (
+        projectStatusRef.current &&
+        !projectStatusRef.current.contains(event.target as Node)
+      ) {
+        setIsProjectStatusOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const mainContent =
+      document.querySelector<HTMLElement>('[data-scroll-container="main"]') ||
+      document.querySelector<HTMLElement>('main');
+    const docScrollElement = document.scrollingElement as HTMLElement | null;
+
+    const getScrollTop = () => {
+      const mainScrollTop = mainContent?.scrollTop ?? 0;
+      const windowScrollTop =
+        window.scrollY || docScrollElement?.scrollTop || 0;
+      return Math.max(mainScrollTop, windowScrollTop);
+    };
+
+    const handleScroll = () => {
+      const nextHasShadow = getScrollTop() > 50;
+      setHasShadow(prev => (prev === nextHasShadow ? prev : nextHasShadow));
+    };
+
+    handleScroll();
+    const targets = new Set<HTMLElement | Window>([window]);
+    if (mainContent) {
+      targets.add(mainContent);
+    }
+    targets.forEach(target =>
+      target.addEventListener('scroll', handleScroll, { passive: true })
+    );
+    return () => {
+      targets.forEach(target =>
+        target.removeEventListener('scroll', handleScroll)
+      );
+    };
   }, []);
 
   const getLeadTypeDisplay = () => {
@@ -350,8 +394,26 @@ export function GlobalLowerHeader({
     return { name: 'All Users', subtitle: '', avatar: null };
   };
 
+  const getProjectStatusDisplay = () => {
+    if (!projectFilterControls) return 'All Statuses';
+    const { selectedStatus } = projectFilterControls;
+
+    if (!selectedStatus) return 'All Statuses';
+
+    const statusMap: Record<string, string> = {
+      not_started: 'Not Started',
+      in_progress: 'In Progress',
+      on_hold: 'On Hold',
+      completed: 'Completed',
+      cancelled: 'Cancelled',
+    };
+    return statusMap[selectedStatus] || 'All Statuses';
+  };
+
   return (
-    <div className={styles.globalLowerHeader}>
+    <div
+      className={`${styles.globalLowerHeader} ${hasShadow ? styles.globalLowerHeaderScrolled : ''}`}
+    >
       <div className={styles.headerContent}>
         <div className={styles.leftSection}>
           <h1 className={styles.title}>{title}</h1>
@@ -1036,6 +1098,56 @@ export function GlobalLowerHeader({
                 </div>
               )}
             </div>
+
+            {/* Status Filter Dropdown */}
+            {projectFilterControls.onStatusChange && (
+              <div className={styles.controlGroup} ref={projectStatusRef}>
+                <label className={styles.controlLabel}>Status:</label>
+                <button
+                  className={styles.controlDropdown}
+                  onClick={() => setIsProjectStatusOpen(!isProjectStatusOpen)}
+                >
+                  <span className={styles.controlValue}>
+                    {getProjectStatusDisplay()}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`${styles.chevron} ${isProjectStatusOpen ? styles.open : ''}`}
+                  />
+                </button>
+                {isProjectStatusOpen && (
+                  <div className={styles.dropdownMenu}>
+                    <button
+                      className={`${styles.dropdownOption} ${!projectFilterControls.selectedStatus ? styles.selected : ''}`}
+                      onClick={() => {
+                        projectFilterControls.onStatusChange!(null);
+                        setIsProjectStatusOpen(false);
+                      }}
+                    >
+                      All Statuses
+                    </button>
+                    {[
+                      { value: 'not_started', label: 'Not Started' },
+                      { value: 'in_progress', label: 'In Progress' },
+                      { value: 'on_hold', label: 'On Hold' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'cancelled', label: 'Cancelled' },
+                    ].map(({ value, label }) => (
+                      <button
+                        key={value}
+                        className={`${styles.dropdownOption} ${projectFilterControls.selectedStatus === value ? styles.selected : ''}`}
+                        onClick={() => {
+                          projectFilterControls.onStatusChange!(value);
+                          setIsProjectStatusOpen(false);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {((actionButtons && actionButtons?.length > 0) ||

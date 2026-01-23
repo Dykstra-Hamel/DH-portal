@@ -137,9 +137,9 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     },
     {
       id: 'project-management' as PrimaryNavItem,
-      href: '/project-management',
+      href: '/admin/project-management',
       disabled: false,
-      requiresFeature: 'project_management' as const, // Feature-gated access
+      superAdminOnly: true, // Only visible to global admins (profile.role === 'admin')
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -259,6 +259,9 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     }
     if (href === '/campaigns') {
       return pathname.startsWith('/campaigns');
+    }
+    if (href === '/admin/project-management') {
+      return pathname.startsWith('/admin/project-management') || pathname.startsWith('/project-management');
     }
     return pathname.startsWith(href);
   };

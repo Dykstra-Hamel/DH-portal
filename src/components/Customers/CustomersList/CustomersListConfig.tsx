@@ -19,14 +19,35 @@ const getCustomerFullName = (customer: Customer): string => {
   return `${customer.first_name} ${customer.last_name}`.trim();
 };
 
-const formatCustomerAddress = (customer: Customer): string => {
-  const parts = [
-    customer.address,
-    customer.city,
-    customer.state,
-    customer.zip_code,
-  ].filter(Boolean);
+const normalizeAddressPart = (part?: string | null): string | null => {
+  if (!part) return null;
+  const trimmed = part.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'none') return null;
+  return trimmed;
+};
 
+const getCustomerAddressParts = (customer: Customer) => {
+  const serviceAddress = customer.primary_service_address;
+  const street = normalizeAddressPart(
+    serviceAddress?.street_address ?? customer.address
+  );
+  const apartmentUnit = normalizeAddressPart(serviceAddress?.apartment_unit);
+  const streetLine = [street, apartmentUnit].filter(Boolean).join(' ');
+  const city = normalizeAddressPart(serviceAddress?.city ?? customer.city);
+  const state = normalizeAddressPart(serviceAddress?.state ?? customer.state);
+  const zip = normalizeAddressPart(serviceAddress?.zip_code ?? customer.zip_code);
+
+  return {
+    streetLine,
+    city,
+    state,
+    zip,
+  };
+};
+
+const formatCustomerAddress = (customer: Customer): string => {
+  const { streetLine, city, state, zip } = getCustomerAddressParts(customer);
+  const parts = [streetLine, city, state, zip].filter(Boolean);
   return parts.join(', ') || 'N/A';
 };
 
@@ -63,22 +84,23 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
       title: 'Address',
       sortable: false,
       render: (customer: Customer) => {
-        const hasAddress = customer.address || customer.city || customer.state || customer.zip_code;
+        const { streetLine, city, state, zip } = getCustomerAddressParts(customer);
+        const hasAddress = streetLine || city || state || zip;
         return (
           <div>
             {hasAddress ? (
               <>
-                {customer.address && (
+                {streetLine && (
                   <div className={styles.addressLine}>
                     <MapPin size={14} />
-                    <span>{customer.address}</span>
+                    <span>{streetLine}</span>
                   </div>
                 )}
-                {(customer.city || customer.state || customer.zip_code) && (
-                  <div className={`${styles.addressLine} ${customer.address ? styles.indented : ''}`}>
-                    {!customer.address && <MapPin size={14} />}
+                {(city || state || zip) && (
+                  <div className={`${styles.addressLine} ${streetLine ? styles.indented : ''}`}>
+                    {!streetLine && <MapPin size={14} />}
                     <span>
-                      {[customer.city, customer.state, customer.zip_code].filter(Boolean).join(', ')}
+                      {[city, state, zip].filter(Boolean).join(', ')}
                     </span>
                   </div>
                 )}

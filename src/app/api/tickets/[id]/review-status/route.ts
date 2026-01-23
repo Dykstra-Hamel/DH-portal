@@ -36,19 +36,30 @@ export async function PUT(
       );
     }
 
-    // Verify user has access to this ticket's company
-    const { data: userCompany, error: userCompanyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', ticket.company_id)
+    // Check if user is an admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
       .single();
 
-    if (userCompanyError || !userCompany) {
-      return NextResponse.json(
-        { error: 'Access denied to this ticket' },
-        { status: 403 }
-      );
+    const isAdmin = profile?.role === 'admin';
+
+    // Verify user has access to this ticket's company (admins bypass this check)
+    if (!isAdmin) {
+      const { data: userCompany, error: userCompanyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', ticket.company_id)
+        .single();
+
+      if (userCompanyError || !userCompany) {
+        return NextResponse.json(
+          { error: 'Access denied to this ticket' },
+          { status: 403 }
+        );
+      }
     }
 
     let updateData: any = {};
@@ -122,7 +133,8 @@ export async function PUT(
           id,
           first_name,
           last_name,
-          email
+          email,
+          avatar_url
         )
       `
       )

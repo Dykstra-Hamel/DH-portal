@@ -1,8 +1,7 @@
 .pageContainer {
   padding: 0 16px;
-  max-width: 1240px;
   width: 100%;
-  margin: 0 auto;
+  max-width: 100%;
 
   @media (min-width: 769px) {
     padding: 0;
@@ -115,51 +114,180 @@
   margin-bottom: 24px;
 }
 
-// Category Tabs (Horizontal tabs like data tables)
+// Tabs Row - wrapper for tabs and search (matching tickets/dashboard)
+.tabsRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+// Tabs Section - tabs with border bottom (matching tickets/dashboard)
+.tabsSection {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    height: 0;
+  }
+}
+
+// Search Section - search with border bottom (matching tickets/dashboard)
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  padding-bottom: 10px;
+  flex-shrink: 0;
+
+  &:focus-within {
+    border-bottom-color: var(--gray-800, #252c37);
+  }
+}
+
+.searchInput {
+  width: 182px;
+  padding: 0;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-300, #d1d5db);
+  background: transparent;
+  border: none;
+  outline: none;
+  transition: color 0.2s ease;
+  text-align: left;
+
+  &::placeholder {
+    color: var(--gray-300, #d1d5db);
+  }
+
+  &:focus {
+    color: var(--gray-800, #252c37);
+
+    &::placeholder {
+      color: var(--gray-500, #6a7282);
+    }
+  }
+}
+
+.searchIcon {
+  color: var(--gray-300, #d1d5db);
+  flex-shrink: 0;
+}
+
+.searchSection:focus-within .searchIcon {
+  color: var(--gray-800, #252c37);
+}
+
+.searchSection:focus-within .searchInput {
+  color: var(--gray-800, #252c37);
+}
+
+// Category Tab (matching tickets/dashboard tabs)
+.categoryTab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 8px;
+  white-space: nowrap;
+
+  &:first-child {
+    padding-left: 0;
+
+    &::after {
+      left: 0;
+    }
+  }
+
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  color: var(--gray-600, #525252);
+  font-family: var(--font-satoshi, inherit);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 18px;
+
+  &:hover {
+    color: var(--gray-800, #262626);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -1px;
+    height: 3px;
+    background: transparent;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition:
+      transform 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  &.active {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--action-500, #0088cc);
+
+    &::after {
+      background: var(--action-500, #0088cc);
+      transform: scaleX(1);
+    }
+  }
+}
+
+.tabCount {
+  color: var(--action-600, #007ab3);
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+// Legacy categoryTabs class for backwards compatibility
 .categoryTabs {
   display: flex;
   gap: 8px;
   margin-bottom: 20px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px; // For focus outline
-}
-
-.categoryTab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  font-family: "Satoshi Variable", var(--font-satoshi);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--UI-Gray-600, #6B7280);
-  border-bottom: 3px solid transparent;
-
-  &:hover:not(.active) {
-    color: var(--UI-Gray-800, #252C37);
-    border-bottom-color: var(--UI-Gray-300, #D1D5DB);
-  }
-
-  &.active {
-    color: var(--action-500);
-    border-bottom-color: var(--action-500);
-  }
+  padding-bottom: 2px;
 }
 
 // View Tabs (Updated to match Figma)
 .viewTabs {
-  display: flex;
+  display: inline-flex;
+  width: fit-content;
   gap: 4px;
   border-radius: 8px;
   border: 1px solid var(--UI-Gray-300, #D1D5DB);
   background: var(--White, #FFF);
   padding: 4px;
+}
+
+// View Controls Row
+.viewControls {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 32px;
 }
 
 .viewTab {

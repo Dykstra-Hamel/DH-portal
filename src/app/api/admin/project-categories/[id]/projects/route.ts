@@ -60,7 +60,7 @@ export async function GET(
           status,
           priority,
           due_date,
-          is_internal,
+          scope,
           company:companies (
             id,
             name

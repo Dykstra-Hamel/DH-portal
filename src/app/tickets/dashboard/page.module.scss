@@ -1,0 +1,384 @@
+.dashboardContainer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionNoGap {
+  gap: 0;
+}
+
+.sectionTitle {
+  color: var(--UX-Colors-Neutral-Colors-Neutral-900, #171717);
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 28px;
+  margin: 0;
+  padding: 0;
+}
+
+.sectionTitleSpaced {
+  margin-bottom: 20px;
+}
+
+// Tabs Row - wrapper for tabs and search with 12px gap
+.tabsRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+// Tabs Section - tabs with border bottom
+.tabsSection {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+}
+
+// Search Section - search with border bottom
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  padding-bottom: 10px;
+
+  &:focus-within {
+    border-bottom-color: var(--gray-800, #252c37);
+  }
+}
+
+.searchInput {
+  width: 182px;
+  padding: 0;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-300, #d1d5db);
+  background: transparent;
+  border: none;
+  outline: none;
+  transition: color 0.2s ease;
+  text-align: left;
+
+  &::placeholder {
+    color: var(--gray-300, #d1d5db);
+  }
+
+  &:focus {
+    color: var(--gray-800, #252c37);
+
+    &::placeholder {
+      color: var(--gray-500, #6a7282);
+    }
+  }
+}
+
+.searchIcon {
+  color: var(--gray-300, #d1d5db);
+  flex-shrink: 0;
+}
+
+.searchSection:focus-within .searchIcon {
+  color: var(--gray-800, #252c37);
+}
+
+.searchSection:focus-within .searchInput {
+  color: var(--gray-800, #252c37);
+}
+
+
+// Legacy tabsContainer for backwards compatibility
+.tabsContainer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 19px;
+}
+
+.tabsWrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 8px;
+
+  &:first-child {
+    padding-left: 0;
+
+    &::after {
+      left: 0;
+    }
+  }
+
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  color: var(--gray-600, #525252);
+  font-family: var(--font-satoshi, inherit);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--gray-800, #262626);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -1px;
+    height: 3px;
+    background: transparent;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition:
+      transform 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  &.active {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--action-500, #0088cc);
+
+    &::after {
+      background: var(--action-500, #0088cc);
+      transform: scaleX(1);
+    }
+  }
+}
+
+.tabCount {
+  color: var(--action-600, #007ab3);
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+// Container for My Actions, My Tasks, and Announcements boxes
+.actionsTasksBoxes {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex-wrap: wrap;
+  width: 100%;
+
+  @media (max-width: 600px) {
+    flex-direction: column;
+  }
+}
+
+.actionsTasksCard {
+  width: 100%;
+  background: var(--UX-Colors-White, #fff);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 8px;
+  padding: 35px;
+  margin-top: 35px;
+  box-sizing: border-box;
+}
+
+// Action/Task/Announcement Box Shared Styles
+.actionBox,
+.taskBox,
+.announcementBox {
+  display: flex;
+  flex-direction: column;
+  width: 318px;
+  height: 119px;
+  padding: 24px;
+  background: var(--UX-Colors-White, #fff);
+  border: 1px solid var(--UX-Colors-Neutral-Colors-Neutral-Border, #dedede);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+  text-align: left;
+  position: relative;
+  box-sizing: border-box;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 10px 20px rgba(0, 0, 0, 0.02),
+      0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow:
+      0 10px 20px rgba(0, 0, 0, 0.02),
+      0 4px 12px rgba(0, 0, 0, 0.1),
+      0 0 0 3px rgba(0, 136, 204, 0.1);
+  }
+
+  @media (max-width: 600px) {
+    width: 100%;
+    height: auto;
+    min-height: 119px;
+  }
+}
+
+.announcementBox {
+  width: auto;
+  height: auto;
+  min-height: 119px;
+  max-height: 119px;
+  flex: 1;
+  min-width: 280px;
+  padding-right: 130px;
+  overflow: visible;
+}
+
+.boxHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.boxTitle {
+  color: var(--UX-Colors-Neutral-Colors-Neutral-900, #171717);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.boxDescription {
+  color: var(--UX-Colors-Neutral-Colors-Neutral-500, #737373);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  margin: 0;
+  flex: 1;
+}
+
+// Badge Styles
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  background: var(--UX-Colors-White, #fff);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 6px;
+  color: var(--gray-500, #6b7280);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.badgeNew {
+  background: var(--UX-Colors-Error-Colors-Error-500, #ef4444);
+  border-color: var(--UX-Colors-Error-Colors-Error-500, #ef4444);
+  color: var(--UX-Colors-White, #fff);
+}
+
+// Spinner animation for loading state
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--gray-400, #9ca3af);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Announcements Specific Styles
+.announcementsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 0;
+}
+
+.announcementItem {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+
+  strong {
+    display: block;
+    color: var(--UX-Colors-Neutral-Colors-Neutral-800, #262626);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  p {
+    color: var(--UX-Colors-Neutral-Colors-Neutral-600, #525252);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 18px;
+    margin: 0;
+  }
+}
+
+.expandButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--gray-400, #99a1af);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: var(--gray-500, #6a7282);
+  }
+}
+
+.announcementImage {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 128px;
+  height: 161px;
+  object-fit: contain;
+  pointer-events: none;
+}

@@ -30,8 +30,6 @@ export async function GET(
             id,
             name,
             description,
-            color,
-            icon,
             sort_order
           )
         )
@@ -133,6 +131,19 @@ export async function PUT(
       );
     }
 
+    // Parse tags - can be string (comma-separated), array, or null
+    let parsedTags: string[] | null = null;
+    if (tags) {
+      if (Array.isArray(tags)) {
+        parsedTags = tags.filter((t: string) => t.trim());
+      } else if (typeof tags === 'string') {
+        parsedTags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+      }
+      if (parsedTags && parsedTags.length === 0) {
+        parsedTags = null;
+      }
+    }
+
     const { data: project, error } = await supabase
       .from('projects')
       .update({
@@ -148,7 +159,7 @@ export async function PUT(
         completion_date: completion_date || null,
         is_billable: is_billable === 'true' || is_billable === true,
         quoted_price: quoted_price ? parseFloat(quoted_price) : null,
-        tags,
+        tags: parsedTags,
         notes,
         primary_file_path: primary_file_path || null,
         updated_at: new Date().toISOString(),

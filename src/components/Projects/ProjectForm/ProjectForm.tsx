@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { X } from 'lucide-react';
 import {
@@ -63,8 +63,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     quoted_price: editingProject?.quoted_price?.toString() || '',
     tags: editingProject?.tags?.join(', ') || '',
     notes: editingProject?.notes || '',
-    is_internal: editingProject?.is_internal || false,
-    scope: editingProject?.scope || 'internal', // NEW: Project scope field
+    scope: editingProject?.scope || 'internal', // Project scope field
     category_ids: editingProject?.categories?.map(c => c.category_id) || [],
   });
 
@@ -75,6 +74,57 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const [shortcodePreview, setShortcodePreview] = useState<string>('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
+
+  const getUserRole = (user: any) => {
+    if (user?.profiles?.role) return user.profiles.role;
+    if (user?.role) return user.role;
+    if (Array.isArray(user?.roles)) {
+      if (user.roles.includes('admin')) return 'admin';
+      if (user.roles.includes('super_admin')) return 'super_admin';
+    }
+    return null;
+  };
+
+  const getUserDisplayName = (user: any) => {
+    const profile = user?.profiles;
+    const firstName = profile?.first_name || user?.first_name || '';
+    const lastName = profile?.last_name || user?.last_name || '';
+    const email = profile?.email || user?.email || '';
+    const name = `${firstName} ${lastName}`.trim();
+    return name ? (email ? `${name} (${email})` : name) : email || 'User';
+  };
+
+  const assignableUsers = useMemo(() => {
+    const shouldFilterByRole = users.some(user => getUserRole(user));
+    const adminUsers = shouldFilterByRole
+      ? users.filter(user => {
+          const role = getUserRole(user);
+          return role ? isAdminRole(role) : false;
+        })
+      : users;
+
+    const assignedId = formData.assigned_to || editingProject?.assigned_to_profile?.id;
+    if (assignedId && !adminUsers.some(user => user.id === assignedId)) {
+      const assignedUser = users.find(user => user.id === assignedId);
+      if (assignedUser) {
+        return [...adminUsers, assignedUser];
+      }
+      if (editingProject?.assigned_to_profile) {
+        return [
+          ...adminUsers,
+          {
+            id: assignedId,
+            profiles: editingProject.assigned_to_profile,
+            email: editingProject.assigned_to_profile.email,
+          },
+        ];
+      }
+    }
+
+    return adminUsers;
+  }, [editingProject?.assigned_to_profile?.id, formData.assigned_to, users]);
 
   const PRESET_PROJECT_TAGS = [
     'seo', 'social-media', 'content', 'design', 'development',
@@ -131,8 +181,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         quoted_price: editingProject.quoted_price?.toString() || '',
         tags: editingProject.tags?.join(', ') || '',
         notes: editingProject.notes || '',
-        is_internal: editingProject.is_internal || false,
-        scope: editingProject.scope || 'internal', // NEW: Project scope field
+        scope: editingProject.scope || 'internal', // Project scope field
         category_ids: editingProject.categories?.map(c => c.category_id) || [],
       });
       // Set selected tags from editing project
@@ -166,7 +215,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         quoted_price: '',
         tags: '',
         notes: '',
-        is_internal: false,
+        scope: 'internal',
         category_ids: [],
       });
       setSelectedTags([]);
@@ -264,7 +313,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       quoted_price: '',
       tags: '',
       notes: '',
-      is_internal: false,
+      scope: 'internal',
       category_ids: [],
     });
     setSelectedTags([]);
@@ -326,7 +375,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
             {formData.project_type && (
               <div className={styles.formGroup}>
-                <label>Project Subtype *</label>
+                <label>Project Subtype</label>
                 <select
                   value={formData.project_subtype}
                   onChange={e => {
@@ -335,7 +384,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                       setCustomSubtype('');
                     }
                   }}
-                  required
                 >
                   <option value="">Select Subtype</option>
                   {currentSubtypes.map(subtype => (
@@ -375,27 +423,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </div>
             )}
 
-            {/* Internal Project Checkbox (Admin Only) */}
-            {isAdmin && mode === 'full' && (
-              <div className={styles.formGroup}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={formData.is_internal}
-                    onChange={e =>
-                      setFormData({
-                        ...formData,
-                        is_internal: e.target.checked,
-                        company_id: e.target.checked ? '' : (userActiveCompany?.id || ''),
-                      })
-                    }
-                    style={{ marginRight: '8px' }}
-                  />
-                  Internal Project (Agency Use Only)
-                </label>
-              </div>
-            )}
-
             {/* Project Scope (Admin Only) */}
             {isAdmin && mode === 'full' && (
               <div className={styles.formGroup}>
@@ -419,35 +446,33 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </div>
             )}
 
-            {/* Company field - hide if internal project */}
-            {!formData.is_internal && (
-              <div className={styles.formGroup}>
-                <label>Company *</label>
-                {mode === 'request' && userActiveCompany ? (
-                  <input
-                    type="text"
-                    value={userActiveCompany.name}
-                    readOnly
-                    style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
-                  />
-                ) : (
-                  <select
-                    value={formData.company_id}
-                    onChange={e =>
-                      setFormData({ ...formData, company_id: e.target.value })
-                    }
-                    required={!formData.is_internal}
-                  >
-                    <option value="">Select Company</option>
-                    {companies.map(company => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )}
+            {/* Company field */}
+            <div className={styles.formGroup}>
+              <label>Company *</label>
+              {mode === 'request' && userActiveCompany ? (
+                <input
+                  type="text"
+                  value={userActiveCompany.name}
+                  readOnly
+                  style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
+                />
+              ) : (
+                <select
+                  value={formData.company_id}
+                  onChange={e =>
+                    setFormData({ ...formData, company_id: e.target.value })
+                  }
+                  required
+                >
+                  <option value="">Select Company</option>
+                  {companies.map(company => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
 
             {/* Project Categories Multi-Select */}
             {mode === 'full' && availableCategories.length > 0 && (
@@ -525,11 +550,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                     }
                   >
                     <option value="">Unassigned</option>
-                    {users.map(user => (
+                    {assignableUsers.map(user => (
                       <option key={user.id} value={user.id}>
-                        {user.profiles?.first_name || ''}{' '}
-                        {user.profiles?.last_name || ''} (
-                        {user.profiles?.email || user.email})
+                        {getUserDisplayName(user)}
                       </option>
                     ))}
                   </select>

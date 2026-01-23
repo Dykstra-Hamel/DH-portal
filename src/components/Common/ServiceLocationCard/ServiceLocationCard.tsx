@@ -45,6 +45,7 @@ interface ServiceLocationCardProps {
   onExpand?: () => void;
   forceCollapse?: boolean;
   isCompact?: boolean;
+  inSidebar?: boolean;
 }
 
 export function ServiceLocationCard({
@@ -67,6 +68,7 @@ export function ServiceLocationCard({
   onExpand,
   forceCollapse = false,
   isCompact = false,
+  inSidebar = false,
 }: ServiceLocationCardProps) {
   const [selectedHomeSizeOption, setSelectedHomeSizeOption] = useState<string>('');
   const [selectedYardSizeOption, setSelectedYardSizeOption] = useState<string>('');
@@ -211,6 +213,7 @@ export function ServiceLocationCard({
         onExpand={onExpand}
         forceCollapse={forceCollapse}
         isCompact={isCompact}
+        inSidebar={inSidebar}
       >
         <div className={styles.cardContent}>
           {serviceAddress ? (
@@ -305,6 +308,7 @@ export function ServiceLocationCard({
       onExpand={onExpand}
       forceCollapse={forceCollapse}
       isCompact={isCompact}
+      inSidebar={inSidebar}
     >
       <div className={styles.cardContent}>
         <div className={styles.serviceLocationGrid}>

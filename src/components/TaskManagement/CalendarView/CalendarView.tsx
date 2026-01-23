@@ -71,7 +71,12 @@ export function CalendarView({ tasks, onTaskClick }: CalendarViewProps) {
   const getTasksForDate = (date: Date): Task[] => {
     const dateStr = date.toISOString().split('T')[0];
     return tasks.filter(task => {
-      const taskDate = new Date(task.due_date).toISOString().split('T')[0];
+      // Skip tasks without a valid due_date
+      if (!task.due_date) return false;
+      const taskDateObj = new Date(task.due_date);
+      // Check if the date is valid
+      if (isNaN(taskDateObj.getTime())) return false;
+      const taskDate = taskDateObj.toISOString().split('T')[0];
       return taskDate === dateStr;
     });
   };

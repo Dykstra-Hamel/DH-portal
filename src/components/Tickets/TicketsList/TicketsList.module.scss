@@ -7,95 +7,143 @@
   line-height: 20px;
 }
 
-.topContent {
+// Tabs Row - wrapper for tabs and search with 12px gap
+.tabsRow {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.tabsContainer {
+// Tabs Section - tabs with border bottom
+.tabsSection {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0;
-  position: relative;
-  top: 1px;
-  margin-bottom: 0;
+  gap: 4px;
+  width: 100%;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+}
+
+// Search Section - search with border bottom
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  padding-bottom: 10px;
+
+  &:focus-within {
+    border-bottom-color: var(--gray-800, #252c37);
+  }
+}
+
+.searchInput {
+  width: 182px;
+  padding: 0;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-300, #d1d5db);
+  background: transparent;
+  border: none;
+  outline: none;
+  transition: color 0.2s ease;
+  text-align: left;
+
+  &::placeholder {
+    color: var(--gray-300, #d1d5db);
+  }
+
+  &:focus {
+    color: var(--gray-800, #252c37);
+
+    &::placeholder {
+      color: var(--gray-500, #6a7282);
+    }
+  }
+}
+
+.searchIcon {
+  color: var(--gray-300, #d1d5db);
+  flex-shrink: 0;
+}
+
+.searchSection:focus-within .searchIcon {
+  color: var(--gray-800, #252c37);
+}
+
+.searchSection:focus-within .searchInput {
+  color: var(--gray-800, #252c37);
 }
 
 .tab {
-  display: flex;
-  padding: 16px 12px;
-  align-items: flex-end;
-  gap: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--gray-100);
-  cursor: pointer;
-  transition: all 0.2s ease;
   position: relative;
-  margin-left: -2px;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 8px;
 
   &:first-child {
-    margin-left: 0;
+    padding-left: 0;
+
+    &::after {
+      left: 0;
+    }
   }
 
-  &::before {
-    content: '';
-    position: absolute;
-    top: -6px;
-    z-index: 10;
-    right: 0;
-    height: 6px;
-    background: var(--slate-50);
-    border-radius: 4px 4px 0 0;
-    transition: background-color 0.2s ease;
-  }
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  color: var(--gray-600, #525252);
+  font-family: var(--font-satoshi, inherit);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
 
   &:hover {
-    opacity: 0.8;
+    color: var(--gray-800, #262626);
   }
 
-  .tabText {
-    color: var(--gray-700);
-    text-align: right;
-    font-family: var(--font-satoshi);
-    font-size: 14px;
-    font-style: normal;
-    font-weight: 500;
-    line-height: 14px;
-  }
-
-  .tabCount {
-    color: var(--action-600);
-    font-family: var(--font-satoshi);
-    font-size: 14px;
-    font-style: normal;
-    font-weight: 700;
-    line-height: 14px;
+  &::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -1px;
+    height: 3px;
+    background: transparent;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition:
+      transform 0.2s ease,
+      background-color 0.2s ease;
   }
 
   &.active {
-    background: var(--white);
-    border-bottom: 1px solid var(--white);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--action-500, #0088cc);
 
-    &::before {
-      background: var(--action-500);
-      z-index: 100;
-      overflow: visible;
-      left: -1px;
-      width: calc(100% + 1px);
-    }
-
-    .tabText {
-      color: var(--gray-800);
-      text-align: right;
-      font-family: var(--font-satoshi);
-      font-size: 14px;
-      font-style: normal;
-      font-weight: 700;
-      line-height: 14px;
+    &::after {
+      background: var(--action-500, #0088cc);
+      transform: scaleX(1);
     }
   }
+}
+
+.tabCount {
+  color: var(--action-600);
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
 }
 
 .contentArea {

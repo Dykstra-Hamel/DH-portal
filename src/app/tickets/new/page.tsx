@@ -77,7 +77,7 @@ function TicketsPageContent() {
   // Filter/sort refs - store current values without causing re-renders
   const currentTabRef = useRef('all');
   const sortByRef = useRef('created_at');
-  const sortOrderRef = useRef<'asc' | 'desc'>('desc');
+  const sortOrderRef = useRef<'asc' | 'desc'>('asc');
   const searchQueryRef = useRef('');
 
   // Modal state for URL parameter handling
@@ -364,7 +364,7 @@ function TicketsPageContent() {
 
       switch (eventType) {
         case 'INSERT':
-          // Prepend new ticket to the top of the list - fetch full data with joins
+          // Add new ticket to the list - fetch full data with joins
           if (newRecord && selectedCompany?.id) {
             // Check if already exists to prevent duplicates
             const exists = tickets.some(ticket => ticket.id === newRecord.id);
@@ -411,12 +411,15 @@ function TicketsPageContent() {
                       );
                       // Don't add if ticket is closed
                       if (!exists && newRecord.status !== 'closed') {
+                        if (sortOrderRef.current === 'asc') {
+                          return [...prev, newRecord];
+                        }
                         return [newRecord, ...prev];
                       }
                       return prev;
                     });
                   } else if (fullTicket) {
-                    // Prepend new ticket to top of list (unless closed)
+                    // Add new ticket to list (unless closed)
                     // Don't add closed tickets to the list
                     if (fullTicket.status === 'closed') {
                       return;
@@ -427,6 +430,9 @@ function TicketsPageContent() {
                         ticket => ticket.id === fullTicket.id
                       );
                       if (!exists) {
+                        if (sortOrderRef.current === 'asc') {
+                          return [...prev, fullTicket];
+                        }
                         return [fullTicket, ...prev];
                       }
                       return prev;
@@ -767,8 +773,10 @@ function TicketsPageContent() {
                 const exists = prev.some(ticket => ticket.id === fullTicket.id);
                 if (!exists) {
                   wasAdded = true;
-                  const newTickets = [fullTicket, ...prev];
-                  return newTickets;
+                  if (sortOrderRef.current === 'asc') {
+                    return [...prev, fullTicket];
+                  }
+                  return [fullTicket, ...prev];
                 }
                 return prev;
               });

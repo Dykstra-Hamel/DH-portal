@@ -32,15 +32,15 @@ export async function GET(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email),
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
         comments:project_task_comments(
           *,
-          user_profile:profiles(id, first_name, last_name, email)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
         ),
         activity:project_task_activity(
           *,
-          user_profile:profiles(id, first_name, last_name, email)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
         )
       `
       )
@@ -62,8 +62,8 @@ export async function GET(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email)
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
       `
       )
       .eq('parent_task_id', taskId)
@@ -169,8 +169,8 @@ export async function PUT(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email)
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
       `
       )
       .single();

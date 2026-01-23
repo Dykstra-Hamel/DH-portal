@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get projects for this company where user is either requester or assigned
-    // Filter only client projects (is_internal = FALSE)
+    // Filter only client projects (scope = 'external' or 'both')
     const { data: projects, error } = await supabase
       .from('projects')
       .select(
@@ -59,15 +59,13 @@ export async function GET(request: NextRequest) {
             id,
             name,
             description,
-            color,
-            icon,
             sort_order
           )
         )
       `
       )
       .eq('company_id', companyId)
-      .eq('is_internal', false)
+      .in('scope', ['external', 'both'])
       .or(`requested_by.eq.${user.id},assigned_to.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
@@ -222,7 +220,7 @@ export async function POST(request: NextRequest) {
           : tags)
       : [];
 
-    // Insert the project (is_internal = false for client projects)
+    // Insert the project (scope defaults to 'external' for client projects)
     const { data: project, error } = await supabase
       .from('projects')
       .insert({
@@ -243,8 +241,7 @@ export async function POST(request: NextRequest) {
         tags: tagsArray,
         notes,
         primary_file_path: primary_file_path || null,
-        is_internal: false, // Always false for client projects
-        scope, // Default to 'external'
+        scope, // Default to 'external' for client projects
       })
       .select(
         `

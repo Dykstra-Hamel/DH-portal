@@ -53,11 +53,13 @@ interface SupportCaseAssignmentControls {
 interface ProjectFilterControls {
   selectedCompanyId?: string | null;
   selectedAssignedTo?: string | null | undefined;
+  selectedStatus?: string | null;
   companies: Array<{ id: string; name: string }>;
   assignableUsers: AssignableUser[];
   currentUser: { id: string; name: string; email: string; avatar?: string };
   onCompanyChange: (companyId: string | null) => void;
   onAssignedToChange: (userId: string | null) => void;
+  onStatusChange?: (status: string | null) => void;
 }
 
 interface PageHeaderConfig {

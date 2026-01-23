@@ -1,18 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   X,
-  Edit,
   Trash2,
   User as UserIcon,
   Calendar,
   MessageSquare,
+  Check,
   CheckSquare,
   Plus,
   Activity as ActivityIcon,
+  Flag,
+  Pencil,
 } from 'lucide-react';
 import { ProjectTask, taskPriorityOptions } from '@/types/project';
+import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import styles from './ProjectTaskDetail.module.scss';
 
 interface ProjectTaskDetailProps {
@@ -38,33 +41,70 @@ export default function ProjectTaskDetail({
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editFormData, setEditFormData] = useState({
-    title: task?.title || '',
-    description: task?.description || '',
-    priority: task?.priority || 'medium',
-    assigned_to: task?.assigned_to || null,
-    due_date: task?.due_date || '',
-    start_date: task?.start_date || '',
-  });
+  const [titleDraft, setTitleDraft] = useState(task?.title || '');
+  const [priorityDraft, setPriorityDraft] = useState(task?.priority || 'medium');
+  const [assignedToDraft, setAssignedToDraft] = useState(task?.assigned_to || '');
+  const [dueDateDraft, setDueDateDraft] = useState('');
+  const [startDateDraft, setStartDateDraft] = useState('');
+  const [descriptionDraft, setDescriptionDraft] = useState(task?.description || '');
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [isUpdatingComplete, setIsUpdatingComplete] = useState(false);
 
-  if (!task) return null;
+  const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
-  const getPriorityColor = (priority: string) => {
-    return taskPriorityOptions.find(p => p.value === priority)?.color || '#6b7280';
+  const getUserRole = (user: any) => {
+    if (user?.profiles?.role) return user.profiles.role;
+    if (user?.role) return user.role;
+    if (Array.isArray(user?.roles)) {
+      if (user.roles.includes('admin')) return 'admin';
+      if (user.roles.includes('super_admin')) return 'super_admin';
+    }
+    return null;
   };
 
-  const getPriorityLabel = (priority: string) => {
-    return taskPriorityOptions.find(p => p.value === priority)?.label || priority;
+  const getUserDisplayName = (user: any) => {
+    const profile = user?.profiles;
+    const firstName = profile?.first_name || user?.first_name || '';
+    const lastName = profile?.last_name || user?.last_name || '';
+    const email = profile?.email || user?.email || '';
+    const name = `${firstName} ${lastName}`.trim();
+    return name ? (email ? `${name} (${email})` : name) : email || 'User';
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Not set';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+  const assignableUsers = useMemo(() => {
+    const shouldFilterByRole = users.some(user => getUserRole(user));
+    const adminUsers = shouldFilterByRole
+      ? users.filter((user) => {
+          const role = getUserRole(user);
+          return role ? isAdminRole(role) : false;
+        })
+      : users;
+
+    if (task?.assigned_to && !adminUsers.some(user => user.id === task.assigned_to)) {
+      const assignedUser = users.find(user => user.id === task.assigned_to);
+      if (assignedUser) {
+        return [...adminUsers, assignedUser];
+      }
+      if (task.assigned_to_profile) {
+        return [
+          ...adminUsers,
+          {
+            id: task.assigned_to,
+            profiles: task.assigned_to_profile,
+            email: task.assigned_to_profile.email,
+          },
+        ];
+      }
+    }
+
+    return adminUsers;
+  }, [task?.assigned_to, users]);
+
+  const formatDateInput = (dateString: string | null) => {
+    if (!dateString) return '';
+    return dateString.split('T')[0];
   };
 
   const formatDateTime = (dateString: string | null) => {
@@ -94,6 +134,17 @@ export default function ProjectTaskDetail({
     if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
     return formatDateTime(dateString);
   };
+
+  useEffect(() => {
+    if (!task) return;
+    setTitleDraft(task.title || '');
+    setPriorityDraft(task.priority || 'medium');
+    setAssignedToDraft(task.assigned_to || '');
+    setDueDateDraft(formatDateInput(task.due_date));
+    setStartDateDraft(formatDateInput(task.start_date));
+    setDescriptionDraft(task.description || '');
+    setIsEditingDescription(false);
+  }, [task]);
 
   const getActivityMessage = (activity: any): string => {
     const priorityLabel = (priority: string) => taskPriorityOptions.find(p => p.value === priority)?.label || priority;
@@ -131,6 +182,8 @@ export default function ProjectTaskDetail({
     }
   };
 
+  if (!task) return null;
+
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
@@ -152,30 +205,106 @@ export default function ProjectTaskDetail({
     }
   };
 
-  const handleEdit = () => {
-    // Initialize form data when entering edit mode
-    setEditFormData({
-      title: task.title,
-      description: task.description || '',
-      priority: task.priority,
-      assigned_to: task.assigned_to || null,
-      due_date: task.due_date || '',
-      start_date: task.start_date || '',
-    });
-    setIsEditMode(true);
-  };
+  const handleTitleSave = async () => {
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle || nextTitle === task.title) {
+      setTitleDraft(task.title || '');
+      return;
+    }
 
-  const handleCancelEdit = () => {
-    setIsEditMode(false);
-  };
-
-  const handleSaveEdit = async () => {
+    setIsSavingTitle(true);
     try {
-      await onUpdate(task.id, editFormData);
-      setIsEditMode(false);
+      await onUpdate(task.id, { title: nextTitle });
     } catch (error) {
-      console.error('Error updating task:', error);
+      console.error('Error updating title:', error);
+      alert('Failed to update title. Please try again.');
+      setTitleDraft(task.title || '');
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
+
+  const handleTitleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleTitleSave();
+      event.currentTarget.blur();
+    }
+    if (event.key === 'Escape') {
+      setTitleDraft(task.title || '');
+      event.currentTarget.blur();
+    }
+  };
+
+  const handlePriorityChange = async (value: string) => {
+    setPriorityDraft(value as ProjectTask['priority']);
+    try {
+      await onUpdate(task.id, { priority: value as ProjectTask['priority'] });
+    } catch (error) {
+      console.error('Error updating priority:', error);
+      alert('Failed to update priority. Please try again.');
+      setPriorityDraft(task.priority || 'medium');
+    }
+  };
+
+  const handleAssignedToChange = async (value: string) => {
+    setAssignedToDraft(value);
+    try {
+      await onUpdate(task.id, { assigned_to: value || null });
+    } catch (error) {
+      console.error('Error updating assignee:', error);
+      alert('Failed to update assignee. Please try again.');
+      setAssignedToDraft(task.assigned_to || '');
+    }
+  };
+
+  const handleDateChange = async (field: 'due_date' | 'start_date', value: string) => {
+    if (field === 'due_date') {
+      setDueDateDraft(value);
+    } else {
+      setStartDateDraft(value);
+    }
+    try {
+      await onUpdate(task.id, {
+        [field]: value ? new Date(value).toISOString() : null,
+      });
+    } catch (error) {
+      console.error('Error updating date:', error);
+      alert('Failed to update date. Please try again.');
+      setDueDateDraft(formatDateInput(task.due_date));
+      setStartDateDraft(formatDateInput(task.start_date));
+    }
+  };
+
+  const handleDescriptionSave = async () => {
+    const nextDescription = descriptionDraft.trim();
+    setIsSavingDescription(true);
+    try {
+      await onUpdate(task.id, { description: nextDescription ? descriptionDraft : null });
+      setIsEditingDescription(false);
+    } catch (error) {
+      console.error('Error updating description:', error);
+      alert('Failed to update description. Please try again.');
+    } finally {
+      setIsSavingDescription(false);
+    }
+  };
+
+  const handleDescriptionCancel = () => {
+    setDescriptionDraft(task.description || '');
+    setIsEditingDescription(false);
+  };
+
+  const handleToggleComplete = async () => {
+    if (isUpdatingComplete) return;
+    setIsUpdatingComplete(true);
+    try {
+      await onUpdate(task.id, { is_completed: !task.is_completed });
+    } catch (error) {
+      console.error('Error updating completion:', error);
       alert('Failed to update task. Please try again.');
+    } finally {
+      setIsUpdatingComplete(false);
     }
   };
 
@@ -186,27 +315,6 @@ export default function ProjectTaskDetail({
         <div className={styles.header}>
           <div className={styles.headerTop}>
             <div className={styles.badges}>
-              {isEditMode ? (
-                <select
-                  className={styles.editSelect}
-                  value={editFormData.priority}
-                  onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value as any })}
-                  style={{ backgroundColor: getPriorityColor(editFormData.priority), color: 'white' }}
-                >
-                  {taskPriorityOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span
-                  className={styles.priorityBadge}
-                  style={{ backgroundColor: getPriorityColor(task.priority) }}
-                >
-                  {getPriorityLabel(task.priority)}
-                </span>
-              )}
               {task.is_completed && (
                 <span className={styles.completedBadge}>
                   <CheckSquare size={14} />
@@ -219,73 +327,88 @@ export default function ProjectTaskDetail({
             </button>
           </div>
           <div className={styles.titleRow}>
-            {!isEditMode && (
-              <input
-                type="checkbox"
-                checked={task.is_completed}
-                onChange={(e) => onUpdate(task.id, { is_completed: e.target.checked })}
-                className={styles.completeCheckbox}
-              />
-            )}
-            {isEditMode ? (
-              <input
-                type="text"
-                className={styles.editTitleInput}
-                value={editFormData.title}
-                onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
-              />
-            ) : (
-              <h2 className={`${styles.title} ${task.is_completed ? styles.completed : ''}`}>
-                {task.title}
-              </h2>
-            )}
-          </div>
-          <div className={styles.headerActions}>
-            {isEditMode ? (
-              <>
-                <button onClick={handleSaveEdit} className={styles.saveButton}>
-                  <CheckSquare size={16} />
-                  Save
-                </button>
-                <button onClick={handleCancelEdit} className={styles.cancelEditButton}>
-                  <X size={16} />
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={handleEdit} className={styles.editButton}>
-                  <Edit size={16} />
-                  Edit
-                </button>
-                <button onClick={handleDelete} className={styles.deleteButton}>
-                  <Trash2 size={16} />
-                  Delete
-                </button>
-              </>
-            )}
+            <button
+              type="button"
+              className={`${styles.completeToggle} ${task.is_completed ? styles.completeToggleDone : ''}`}
+              onClick={handleToggleComplete}
+              aria-label={task.is_completed ? 'Mark task incomplete' : 'Mark task complete'}
+              disabled={isUpdatingComplete}
+            >
+              {task.is_completed && <Check size={14} />}
+            </button>
+            <input
+              type="text"
+              className={`${styles.titleInput} ${task.is_completed ? styles.completed : ''}`}
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              disabled={isSavingTitle}
+              placeholder="Task title"
+            />
           </div>
         </div>
 
         {/* Content */}
         <div className={styles.content}>
           {/* Description */}
-          {(task.description || isEditMode) && (
-            <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>Description</h3>
-              {isEditMode ? (
-                <textarea
-                  className={styles.editTextarea}
-                  value={editFormData.description}
-                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                  rows={4}
+          <div className={`${styles.section} ${styles.descriptionSection}`}>
+            {isEditingDescription ? (
+              <>
+                <RichTextEditor
+                  value={descriptionDraft}
+                  onChange={setDescriptionDraft}
                   placeholder="Add a description..."
+                  className={styles.richTextEditor}
                 />
-              ) : (
-                <p className={styles.description}>{task.description}</p>
-              )}
-            </div>
-          )}
+                <div className={styles.descriptionActions}>
+                  <button
+                    type="button"
+                    className={styles.saveButton}
+                    onClick={handleDescriptionSave}
+                    disabled={isSavingDescription}
+                  >
+                    {isSavingDescription ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.cancelEditButton}
+                    onClick={handleDescriptionCancel}
+                    disabled={isSavingDescription}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div
+                className={styles.descriptionDisplay}
+                onClick={() => setIsEditingDescription(true)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setIsEditingDescription(true);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <span className={styles.descriptionEditIcon} aria-hidden="true">
+                  <Pencil size={14} />
+                </span>
+                {descriptionDraft ? (
+                  <div
+                    className={`${styles.description} ${styles.richTextContent}`}
+                    dangerouslySetInnerHTML={{ __html: descriptionDraft }}
+                  />
+                ) : (
+                  <div className={`${styles.description} ${styles.richTextContent} ${styles.descriptionPlaceholder}`}>
+                    Add a description...
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Details Grid */}
           <div className={styles.section}>
@@ -296,30 +419,18 @@ export default function ProjectTaskDetail({
                   <UserIcon size={14} />
                   Assigned To
                 </div>
-                {isEditMode ? (
-                  <select
-                    className={styles.editSelect}
-                    value={editFormData.assigned_to || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, assigned_to: e.target.value || null })}
-                  >
-                    <option value="">Unassigned</option>
-                    {users.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.profiles?.first_name} {user.profiles?.last_name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className={styles.detailValue}>
-                    {task.assigned_to_profile ? (
-                      <>
-                        {task.assigned_to_profile.first_name} {task.assigned_to_profile.last_name}
-                      </>
-                    ) : (
-                      <span className={styles.unassigned}>Unassigned</span>
-                    )}
-                  </div>
-                )}
+                <select
+                  className={styles.editSelect}
+                  value={assignedToDraft}
+                  onChange={(e) => handleAssignedToChange(e.target.value)}
+                >
+                  <option value="">Unassigned</option>
+                  {assignableUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {getUserDisplayName(user)}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className={styles.detailItem}>
@@ -340,21 +451,33 @@ export default function ProjectTaskDetail({
 
               <div className={styles.detailItem}>
                 <div className={styles.detailLabel}>
+                  <Flag size={14} />
+                  Priority
+                </div>
+                <select
+                  className={styles.editSelect}
+                  value={priorityDraft}
+                  onChange={(e) => handlePriorityChange(e.target.value)}
+                >
+                  {taskPriorityOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.detailItem}>
+                <div className={styles.detailLabel}>
                   <Calendar size={14} />
                   Due Date
                 </div>
-                {isEditMode ? (
-                  <input
-                    type="date"
-                    className={styles.editInput}
-                    value={editFormData.due_date || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
-                  />
-                ) : (
-                  <div className={styles.detailValue}>
-                    {formatDate(task.due_date)}
-                  </div>
-                )}
+                <input
+                  type="date"
+                  className={styles.editInput}
+                  value={dueDateDraft}
+                  onChange={(e) => handleDateChange('due_date', e.target.value)}
+                />
               </div>
 
               <div className={styles.detailItem}>
@@ -362,18 +485,12 @@ export default function ProjectTaskDetail({
                   <Calendar size={14} />
                   Start Date
                 </div>
-                {isEditMode ? (
-                  <input
-                    type="date"
-                    className={styles.editInput}
-                    value={editFormData.start_date || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, start_date: e.target.value })}
-                  />
-                ) : (
-                  <div className={styles.detailValue}>
-                    {formatDate(task.start_date)}
-                  </div>
-                )}
+                <input
+                  type="date"
+                  className={styles.editInput}
+                  value={startDateDraft}
+                  onChange={(e) => handleDateChange('start_date', e.target.value)}
+                />
               </div>
             </div>
           </div>
@@ -507,6 +624,13 @@ export default function ProjectTaskDetail({
               </div>
             </div>
           )}
+
+          <div className={styles.deleteSection}>
+            <button onClick={handleDelete} className={styles.deleteButton}>
+              <Trash2 size={16} />
+              Delete Task
+            </button>
+          </div>
 
           {/* Metadata */}
           <div className={styles.metadata}>

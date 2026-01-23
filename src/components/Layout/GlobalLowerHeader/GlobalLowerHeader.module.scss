@@ -3,13 +3,20 @@
   padding: 16px 0;
   border-bottom: 1px solid #e5e5e5;
   background-color: var(--white);
+  position: relative;
+  z-index: 50;
+  transition: box-shadow 0.2s ease;
+}
+
+.globalLowerHeaderScrolled {
+  box-shadow: 0 4px 6px color-mix(in srgb, var(--gray-200) 60%, transparent);
 }
 
 .headerContent {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1240px;
+  max-width: 1309px;
   margin: 0 auto;
   gap: 24px;
 }
@@ -24,6 +31,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  margin-left: auto;
 }
 
 .controlGroup {
@@ -385,6 +393,18 @@
   span {
     font-size: 14px;
     font-weight: 600;
+  }
+}
+
+.deleteButton {
+  background: #dc2626;
+
+  &:hover:not(:disabled) {
+    background: #b91c1c;
+  }
+
+  &:focus:not(:disabled) {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3);
   }
 }
 

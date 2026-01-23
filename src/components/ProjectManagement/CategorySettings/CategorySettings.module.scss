@@ -120,6 +120,14 @@
   color: var(--gray-800);
 }
 
+.categoryBadgeIcon {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--gray-400, #9ca3af);
+  display: inline-block;
+}
+
 .categoryDetails {
   display: flex;
   flex-direction: column;

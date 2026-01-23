@@ -3,8 +3,6 @@ export interface ProjectCategory {
   id: string;
   name: string;
   description: string | null;
-  color: string | null;
-  icon: string | null;
   sort_order: number;
   is_system_default: boolean;
   company_id: string | null; // NULL = internal/system category
@@ -57,10 +55,12 @@ export interface Project {
   tags: string[] | null;
   notes: string | null;
   primary_file_path: string | null;
-  is_internal: boolean; // TRUE = internal admin project, FALSE = client project
-  scope?: ProjectScope; // NEW: internal = agency-only, external = client-only, both = mixed work
+  scope?: ProjectScope; // internal = agency-only, external = client-only, both = mixed work
   created_at: string;
   updated_at: string;
+
+  // Progress tracking (auto-calculated by database trigger)
+  progress_percentage?: number;
 
   // Optional fields for Kanban card display
   comments_count?: number;
@@ -105,8 +105,7 @@ export interface ProjectFormData {
   quoted_price: string;
   tags: string;
   notes: string;
-  is_internal: boolean;
-  scope?: ProjectScope; // NEW: internal, external, or both
+  scope?: ProjectScope; // internal, external, or both
   category_ids: string[]; // Array of category IDs for many-to-many relationship
 }
 
@@ -118,6 +117,7 @@ export interface User {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
 }
 
@@ -183,7 +183,7 @@ export const priorityOptions = [
 // Project Task Types
 export interface ProjectTask {
   id: string;
-  project_id: string;
+  project_id: string | null; // Optional - tasks can exist without a project
   parent_task_id: string | null;
 
   // Basic Info
@@ -235,12 +235,14 @@ export interface ProjectTask {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   } | null;
   created_by_profile?: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
   subtasks?: ProjectTask[];
   comments?: ProjectTaskComment[];
@@ -272,6 +274,7 @@ export interface ProjectTaskComment {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
 }
 
@@ -290,6 +293,7 @@ export interface ProjectTaskActivity {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
 }
 
@@ -331,6 +335,7 @@ export interface ProjectComment {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
 }
 
@@ -353,6 +358,7 @@ export interface ProjectActivity {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
 }
 

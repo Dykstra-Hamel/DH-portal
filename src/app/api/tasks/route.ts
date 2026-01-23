@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
+    const sortBy = searchParams.get('sortBy') || 'created_at';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
 
     if (!companyId) {
       return NextResponse.json(
@@ -126,6 +128,9 @@ export async function GET(request: NextRequest) {
     if (relatedEntityId) {
       query = query.eq('related_entity_id', relatedEntityId);
     }
+
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
     // Apply pagination
     query = query.range(offset, offset + limit - 1);
