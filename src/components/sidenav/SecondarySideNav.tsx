@@ -434,7 +434,7 @@ export function SecondarySideNav({
             items: [
               {
                 text: 'Dashboard',
-                href: '/project-management',
+                href: '/admin/project-management',
                 icon: (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -476,7 +476,7 @@ export function SecondarySideNav({
               },
               {
                 text: 'Tasks',
-                href: '/project-management/tasks',
+                href: '/admin/project-management/tasks',
                 icon: (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -494,34 +494,6 @@ export function SecondarySideNav({
                     />
                     <path
                       d="M6 9L8 11L12 7"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ),
-              },
-              {
-                text: 'Reports',
-                href: '/project-management/reports',
-                icon: (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 18 18"
-                    fill="none"
-                  >
-                    <path
-                      d="M15 2H3C2.44772 2 2 2.44772 2 3V15C2 15.5523 2.44772 16 3 16H15C15.5523 16 16 15.5523 16 15V3C16 2.44772 15.5523 2 15 2Z"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M6 13V10M9 13V7M12 13V4"
                       stroke="currentColor"
                       strokeWidth="1.5"
                       strokeLinecap="round"
@@ -684,6 +656,9 @@ export function SecondarySideNav({
                 {group.items.map(item => {
                   const isActive =
                     pathname === item.href ||
+                    (item.href === '/admin/project-management' &&
+                      pathname.startsWith('/admin/project-management/') &&
+                      !pathname.startsWith('/admin/project-management/tasks')) ||
                     (item.href === '/customers' &&
                       pathname.startsWith('/customers/')) ||
                     (item.href === '/tickets/new' &&

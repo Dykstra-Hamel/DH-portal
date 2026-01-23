@@ -24,8 +24,17 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('companyId');
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
+    const scope = searchParams.get('scope') || 'internal'; // internal, client, all
+    const categoryId = searchParams.get('categoryId');
+    const assignedTo = searchParams.get('assignedTo');
+    const scopeFilter = searchParams.get('scopeFilter'); // NEW: e.g., 'internal,both' or 'external,both'
 
-    // First get projects with company info
+    // Build select query - use !inner modifier on categories if filtering by category
+    const categoryRelation = categoryId
+      ? 'categories:project_category_assignments!inner(id, category_id, category:project_categories(id, name, description, sort_order))'
+      : 'categories:project_category_assignments(id, category_id, category:project_categories(id, name, description, sort_order))';
+
+    // First get projects with company info and category assignments
     let query = supabase
       .from('projects')
       .select(
@@ -34,12 +43,26 @@ export async function GET(request: NextRequest) {
         company:companies(
           id,
           name
-        )
+        ),
+        ${categoryRelation}
       `
       )
       .order('created_at', { ascending: false });
 
-    // Apply filters if provided
+    // Apply scope filter - scopeFilter takes precedence over scope param
+    if (scopeFilter) {
+      // New scopeFilter format: comma-separated values like 'internal,both' or 'external,both'
+      const scopes = scopeFilter.split(',').map(s => s.trim());
+      query = query.in('scope', scopes);
+    } else if (scope === 'internal') {
+      // Legacy scope param support
+      query = query.in('scope', ['internal', 'both']);
+    } else if (scope === 'client') {
+      query = query.in('scope', ['external', 'both']);
+    }
+    // scope === 'all' or no filter means no scope filter
+
+    // Apply other filters if provided
     if (companyId) {
       query = query.eq('company_id', companyId);
     }
@@ -48,6 +71,14 @@ export async function GET(request: NextRequest) {
     }
     if (priority) {
       query = query.eq('priority', priority);
+    }
+    if (assignedTo) {
+      query = query.eq('assigned_to', assignedTo);
+    }
+
+    // Apply category filter if provided
+    if (categoryId) {
+      query = query.eq('categories.category_id', categoryId);
     }
 
     const { data: projects, error } = await query;
@@ -64,6 +95,52 @@ export async function GET(request: NextRequest) {
     if (!projects || projects.length === 0) {
       return NextResponse.json([]);
     }
+
+    const projectIds = projects.map(project => project.id);
+
+    // Fetch comment counts per project
+    const { data: projectComments, error: commentsError } = await supabase
+      .from('project_comments')
+      .select('project_id')
+      .in('project_id', projectIds);
+
+    if (commentsError) {
+      console.error('Error fetching project comments:', commentsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch project comments' },
+        { status: 500 }
+      );
+    }
+
+    const commentCounts = new Map<string, number>();
+    (projectComments || []).forEach(comment => {
+      commentCounts.set(
+        comment.project_id,
+        (commentCounts.get(comment.project_id) || 0) + 1
+      );
+    });
+
+    // Fetch assigned members per project (distinct assigned_to in tasks)
+    const { data: projectTasks, error: tasksError } = await supabase
+      .from('project_tasks')
+      .select('project_id, assigned_to')
+      .in('project_id', projectIds);
+
+    if (tasksError) {
+      console.error('Error fetching project tasks:', tasksError);
+      return NextResponse.json(
+        { error: 'Failed to fetch project tasks' },
+        { status: 500 }
+      );
+    }
+
+    const memberSets = new Map<string, Set<string>>();
+    (projectTasks || []).forEach(task => {
+      if (!task.assigned_to) return;
+      const set = memberSets.get(task.project_id) || new Set<string>();
+      set.add(task.assigned_to);
+      memberSets.set(task.project_id, set);
+    });
 
     // Get all unique user IDs from projects
     const userIds = new Set<string>();
@@ -105,6 +182,8 @@ export async function GET(request: NextRequest) {
       assigned_to_profile: project.assigned_to
         ? profileMap.get(project.assigned_to) || null
         : null,
+      comments_count: commentCounts.get(project.id) || 0,
+      members_count: memberSets.get(project.id)?.size || 0,
     }));
 
     return NextResponse.json(enhancedProjects);
@@ -139,7 +218,7 @@ export async function POST(request: NextRequest) {
       requested_by,
       company_id,
       assigned_to,
-      status = 'coming_up',
+      status = 'in_progress',
       priority = 'medium',
       due_date,
       start_date,
@@ -148,24 +227,65 @@ export async function POST(request: NextRequest) {
       tags,
       notes,
       primary_file_path,
+      scope = 'internal', // Project scope: internal, external, or both
+      category_ids = [],
+      type_code, // Project type code for shortcode generation
     } = body;
 
     // Validate required fields
-    if (!name || !project_type || !requested_by || !company_id || !due_date) {
+    const requiredFieldValidation = {
+      name: !!name,
+      project_type: !!project_type,
+      requested_by: !!requested_by,
+      company_id: !!company_id,
+      due_date: !!due_date,
+    };
+
+    const missingFields = Object.entries(requiredFieldValidation)
+      .filter(([_, value]) => !value)
+      .map(([key, _]) => key);
+
+    if (missingFields.length > 0) {
       return NextResponse.json(
         {
-          error:
-            'Missing required fields: name, project_type, requested_by, company_id, due_date',
-          details: {
-            name: !!name,
-            project_type: !!project_type,
-            requested_by: !!requested_by,
-            company_id: !!company_id,
-            due_date: !!due_date,
-          },
+          error: `Missing required fields: ${missingFields.join(', ')}`,
+          details: requiredFieldValidation,
         },
         { status: 400 }
       );
+    }
+
+    // Validate type_code and company short_code
+    if (type_code) {
+      // Validate type_code format
+      const validTypeCodes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS'];
+      if (!validTypeCodes.includes(type_code)) {
+        return NextResponse.json(
+          { error: `Invalid type_code. Must be one of: ${validTypeCodes.join(', ')}` },
+          { status: 400 }
+        );
+      }
+
+      // Check if company has a short_code in company_settings
+      const { data: shortCodeSetting, error: shortCodeError } = await supabase
+        .from('company_settings')
+        .select('setting_value')
+        .eq('company_id', company_id)
+        .eq('setting_key', 'short_code')
+        .single();
+
+      if (shortCodeError) {
+        console.error('Error fetching short code:', shortCodeError);
+      }
+
+      console.log('Short code setting for company', company_id, ':', shortCodeSetting);
+
+      if (!shortCodeSetting || !shortCodeSetting.setting_value) {
+        return NextResponse.json(
+          { error: 'Company must have a short code before creating projects with type codes. Please add one in Company Settings.' },
+          { status: 400 }
+        );
+      }
     }
 
     // Convert tags string to array
@@ -182,6 +302,7 @@ export async function POST(request: NextRequest) {
         description,
         project_type,
         project_subtype: project_subtype || null,
+        type_code: type_code || null, // Type code for shortcode generation
         requested_by,
         company_id,
         assigned_to: assigned_to || null,
@@ -194,6 +315,7 @@ export async function POST(request: NextRequest) {
         tags: tagsArray,
         notes,
         primary_file_path: primary_file_path || null,
+        scope, // Project scope: internal, external, or both
       })
       .select(
         `
@@ -212,6 +334,36 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create project', details: error.message },
         { status: 500 }
       );
+    }
+
+    // Manually log project creation with the authenticated user's ID
+    // (The trigger can't get auth.uid() when using admin client, so we do it manually)
+    try {
+      await supabase.from('project_activity').insert({
+        project_id: project.id,
+        user_id: user.id,
+        action_type: 'created',
+      });
+    } catch (activityError) {
+      console.error('Error logging project activity:', activityError);
+      // Don't fail the request if activity logging fails
+    }
+
+    // Handle category assignments if provided
+    if (category_ids && Array.isArray(category_ids) && category_ids.length > 0) {
+      const categoryAssignments = category_ids.map((categoryId: string) => ({
+        project_id: project.id,
+        category_id: categoryId,
+      }));
+
+      const { error: categoryError } = await supabase
+        .from('project_category_assignments')
+        .insert(categoryAssignments);
+
+      if (categoryError) {
+        console.error('Error assigning categories to project:', categoryError);
+        // Don't fail the whole request, just log the error
+      }
     }
 
     // Get profiles for the users involved in this project

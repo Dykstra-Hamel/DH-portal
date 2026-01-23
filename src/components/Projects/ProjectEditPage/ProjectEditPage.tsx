@@ -48,6 +48,8 @@ const ProjectEditPage: React.FC<ProjectEditPageProps> = ({
     quoted_price: project.quoted_price?.toString() || '',
     tags: project.tags?.join(', ') || '',
     notes: project.notes || '',
+    scope: project.scope || 'internal',
+    category_ids: project.categories?.map(c => c.category_id) || [],
   });
 
   const handleChange = (
@@ -77,7 +79,7 @@ const ProjectEditPage: React.FC<ProjectEditPageProps> = ({
       }
 
       // Navigate back to detail page
-      router.push(`/project-management/${project.id}`);
+      router.push(`/admin/project-management/${project.id}`);
     } catch (err) {
       console.error('Error updating project:', err);
       setError(err instanceof Error ? err.message : 'Failed to update project');
@@ -86,11 +88,11 @@ const ProjectEditPage: React.FC<ProjectEditPageProps> = ({
   };
 
   const handleCancel = () => {
-    router.push(`/project-management/${project.id}`);
+    router.push(`/admin/project-management/${project.id}`);
   };
 
   const handleBackToList = () => {
-    router.push('/project-management');
+    router.push('/admin/project-management');
   };
 
   return (
@@ -102,7 +104,7 @@ const ProjectEditPage: React.FC<ProjectEditPageProps> = ({
         </button>
         <span className={styles.breadcrumbSeparator}>/</span>
         <button
-          onClick={() => router.push(`/project-management/${project.id}`)}
+          onClick={() => router.push(`/admin/project-management/${project.id}`)}
           className={styles.breadcrumbLink}
         >
           {project.name}

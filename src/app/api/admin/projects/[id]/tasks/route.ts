@@ -39,8 +39,8 @@ export async function GET(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email)
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
       `
       )
       .eq('project_id', projectId)
@@ -132,8 +132,8 @@ export async function POST(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email)
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
       `
       )
       .single();

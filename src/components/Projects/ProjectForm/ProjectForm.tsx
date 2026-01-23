@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { X } from 'lucide-react';
 import {
@@ -8,12 +8,14 @@ import {
   ProjectFormData,
   User,
   Company,
+  ProjectCategory,
   statusOptions,
   priorityOptions,
   projectTypeOptions,
   printSubtypes,
   digitalSubtypes,
 } from '@/types/project';
+import CategoryBadge from '@/components/ProjectManagement/CategorySettings/CategoryBadge';
 import styles from './ProjectForm.module.scss';
 
 interface ProjectFormProps {
@@ -48,10 +50,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     description: editingProject?.description || '',
     project_type: editingProject?.project_type || '',
     project_subtype: editingProject?.project_subtype || '',
+    type_code: editingProject?.type_code || '',
     requested_by: editingProject?.requested_by_profile?.id || currentUser.id,
     company_id: editingProject?.company?.id || userActiveCompany?.id || '',
     assigned_to: editingProject?.assigned_to_profile?.id || '',
-    status: editingProject?.status || 'coming_up',
+    status: editingProject?.status || 'in_progress',
     priority: editingProject?.priority || 'medium',
     due_date: editingProject?.due_date || '',
     start_date: editingProject?.start_date || '',
@@ -60,12 +63,68 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     quoted_price: editingProject?.quoted_price?.toString() || '',
     tags: editingProject?.tags?.join(', ') || '',
     notes: editingProject?.notes || '',
+    scope: editingProject?.scope || 'internal', // Project scope field
+    category_ids: editingProject?.categories?.map(c => c.category_id) || [],
   });
 
   const [customSubtype, setCustomSubtype] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
+  const [isFetchingCategories, setIsFetchingCategories] = useState(false);
+  const [shortcodePreview, setShortcodePreview] = useState<string>('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
+
+  const getUserRole = (user: any) => {
+    if (user?.profiles?.role) return user.profiles.role;
+    if (user?.role) return user.role;
+    if (Array.isArray(user?.roles)) {
+      if (user.roles.includes('admin')) return 'admin';
+      if (user.roles.includes('super_admin')) return 'super_admin';
+    }
+    return null;
+  };
+
+  const getUserDisplayName = (user: any) => {
+    const profile = user?.profiles;
+    const firstName = profile?.first_name || user?.first_name || '';
+    const lastName = profile?.last_name || user?.last_name || '';
+    const email = profile?.email || user?.email || '';
+    const name = `${firstName} ${lastName}`.trim();
+    return name ? (email ? `${name} (${email})` : name) : email || 'User';
+  };
+
+  const assignableUsers = useMemo(() => {
+    const shouldFilterByRole = users.some(user => getUserRole(user));
+    const adminUsers = shouldFilterByRole
+      ? users.filter(user => {
+          const role = getUserRole(user);
+          return role ? isAdminRole(role) : false;
+        })
+      : users;
+
+    const assignedId = formData.assigned_to || editingProject?.assigned_to_profile?.id;
+    if (assignedId && !adminUsers.some(user => user.id === assignedId)) {
+      const assignedUser = users.find(user => user.id === assignedId);
+      if (assignedUser) {
+        return [...adminUsers, assignedUser];
+      }
+      if (editingProject?.assigned_to_profile) {
+        return [
+          ...adminUsers,
+          {
+            id: assignedId,
+            profiles: editingProject.assigned_to_profile,
+            email: editingProject.assigned_to_profile.email,
+          },
+        ];
+      }
+    }
+
+    return adminUsers;
+  }, [editingProject?.assigned_to_profile?.id, formData.assigned_to, users]);
 
   const PRESET_PROJECT_TAGS = [
     'seo', 'social-media', 'content', 'design', 'development',
@@ -76,6 +135,31 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     'door-hangers', 'vehicle-wrap',
   ];
 
+  // Fetch available categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setIsFetchingCategories(true);
+      try {
+        const endpoint = isAdmin
+          ? '/api/admin/project-categories'
+          : '/api/project-categories';
+        const response = await fetch(endpoint);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableCategories(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      } finally {
+        setIsFetchingCategories(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchCategories();
+    }
+  }, [isOpen, isAdmin]);
+
   // Update form data when editingProject changes
   useEffect(() => {
     if (editingProject) {
@@ -84,10 +168,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         description: editingProject.description || '',
         project_type: editingProject.project_type || '',
         project_subtype: editingProject.project_subtype || '',
+        type_code: editingProject.type_code || '',
         requested_by: editingProject.requested_by_profile?.id || currentUser.id,
         company_id: editingProject.company?.id || userActiveCompany?.id || '',
         assigned_to: editingProject.assigned_to_profile?.id || '',
-        status: editingProject.status || 'coming_up',
+        status: editingProject.status || 'in_progress',
         priority: editingProject.priority || 'medium',
         due_date: editingProject.due_date || '',
         start_date: editingProject.start_date || '',
@@ -96,6 +181,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         quoted_price: editingProject.quoted_price?.toString() || '',
         tags: editingProject.tags?.join(', ') || '',
         notes: editingProject.notes || '',
+        scope: editingProject.scope || 'internal', // Project scope field
+        category_ids: editingProject.categories?.map(c => c.category_id) || [],
       });
       // Set selected tags from editing project
       setSelectedTags(editingProject.tags || []);
@@ -115,10 +202,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         description: '',
         project_type: '',
         project_subtype: '',
+        type_code: '',
         requested_by: currentUser.id,
         company_id: userActiveCompany?.id || '',
         assigned_to: '',
-        status: 'coming_up',
+        status: 'in_progress',
         priority: 'medium',
         due_date: '',
         start_date: '',
@@ -127,14 +215,40 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         quoted_price: '',
         tags: '',
         notes: '',
+        scope: 'internal',
+        category_ids: [],
       });
       setSelectedTags([]);
       setCustomSubtype('');
     }
   }, [editingProject, currentUser.id, userActiveCompany?.id]);
 
+  // Automatically extract type_code from project_type
+  useEffect(() => {
+    const selectedType = projectTypeOptions.find(opt => opt.value === formData.project_type);
+    if (selectedType) {
+      setFormData(prev => ({ ...prev, type_code: selectedType.code || '' }));
+    }
+  }, [formData.project_type]);
+
+  // Update shortcode preview when type_code, name, or company changes
+  useEffect(() => {
+    if (formData.type_code && formData.name && formData.company_id) {
+      const year = new Date().getFullYear().toString().slice(-2);
+      const cleanName = formData.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      // Note: Can't show company code here since it's in company_settings, not loaded with companies
+      const preview = `[COMPANY_CODE]_${formData.type_code}${year}_${cleanName}`;
+      setShortcodePreview(preview);
+    } else {
+      setShortcodePreview('');
+    }
+  }, [formData.type_code, formData.name, formData.company_id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Note: Company short_code validation is handled by the API/database
+    // The database trigger will auto-generate the shortcode if type_code is provided
 
     try {
       setIsSubmitting(true);
@@ -143,6 +257,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         ...formData,
         project_subtype: formData.project_subtype === 'other' ? customSubtype : formData.project_subtype,
         tags: selectedTags.join(', '), // Convert tags array to comma-separated string
+        type_code: formData.type_code || undefined, // Include type_code if set
       };
       await onSubmit(submitData);
       onClose();
@@ -165,16 +280,31 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const currentSubtypes = formData.project_type === 'print' ? printSubtypes :
     formData.project_type === 'digital' ? digitalSubtypes : [];
 
+  const handleToggleCategory = (categoryId: string) => {
+    if (formData.category_ids.includes(categoryId)) {
+      setFormData({
+        ...formData,
+        category_ids: formData.category_ids.filter(id => id !== categoryId),
+      });
+    } else {
+      setFormData({
+        ...formData,
+        category_ids: [...formData.category_ids, categoryId],
+      });
+    }
+  };
+
   const handleClose = () => {
     setFormData({
       name: '',
       description: '',
       project_type: '',
       project_subtype: '',
+      type_code: '',
       requested_by: currentUser.id,
       company_id: userActiveCompany?.id || '',
       assigned_to: '',
-      status: 'coming_up',
+      status: 'in_progress',
       priority: 'medium',
       due_date: '',
       start_date: '',
@@ -183,9 +313,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       quoted_price: '',
       tags: '',
       notes: '',
+      scope: 'internal',
+      category_ids: [],
     });
     setSelectedTags([]);
     setCustomSubtype('');
+    setShortcodePreview('');
     onClose();
   };
 
@@ -242,7 +375,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
             {formData.project_type && (
               <div className={styles.formGroup}>
-                <label>Project Subtype *</label>
+                <label>Project Subtype</label>
                 <select
                   value={formData.project_subtype}
                   onChange={e => {
@@ -251,7 +384,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                       setCustomSubtype('');
                     }
                   }}
-                  required
                 >
                   <option value="">Select Subtype</option>
                   {currentSubtypes.map(subtype => (
@@ -276,6 +408,45 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </div>
             )}
 
+            {/* Shortcode Preview */}
+            {shortcodePreview && mode === 'full' && (
+              <div className={styles.formGroup}>
+                <label>Project Shortcode (auto-generated)</label>
+                <div className={styles.shortcodePreview}>
+                  <code>{shortcodePreview}</code>
+                </div>
+                {formData.company_id && !companies.find(c => c.id === formData.company_id) && (
+                  <small style={{ color: '#dc3545' }}>
+                    ⚠ Company must have a short code set before creating projects with type codes
+                  </small>
+                )}
+              </div>
+            )}
+
+            {/* Project Scope (Admin Only) */}
+            {isAdmin && mode === 'full' && (
+              <div className={styles.formGroup}>
+                <label>Project Scope</label>
+                <select
+                  value={formData.scope || 'internal'}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      scope: e.target.value as 'internal' | 'external' | 'both',
+                    })
+                  }
+                >
+                  <option value="internal">Internal Only</option>
+                  <option value="external">External Only</option>
+                  <option value="both">Both Internal and External</option>
+                </select>
+                <small style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>
+                  Internal: Agency-only work | External: Client-side only (hidden by toggle) | Both: Mixed work
+                </small>
+              </div>
+            )}
+
+            {/* Company field */}
             <div className={styles.formGroup}>
               <label>Company *</label>
               {mode === 'request' && userActiveCompany ? (
@@ -302,6 +473,33 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 </select>
               )}
             </div>
+
+            {/* Project Categories Multi-Select */}
+            {mode === 'full' && availableCategories.length > 0 && (
+              <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                <label>Project Categories</label>
+                <div className={styles.categoryMultiSelect}>
+                  {availableCategories.map((category) => {
+                    const isSelected = formData.category_ids.includes(category.id);
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        className={`${styles.categoryOption} ${isSelected ? styles.selected : ''}`}
+                        onClick={() => handleToggleCategory(category.id)}
+                      >
+                        <CategoryBadge category={category} />
+                      </button>
+                    );
+                  })}
+                </div>
+                {isFetchingCategories && (
+                  <p style={{ fontSize: '13px', color: 'var(--gray-500)', margin: '8px 0 0 0' }}>
+                    Loading categories...
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Only show Requested By field for admins in edit mode */}
             {isAdmin && editingProject ? (
@@ -352,11 +550,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                     }
                   >
                     <option value="">Unassigned</option>
-                    {users.map(user => (
+                    {assignableUsers.map(user => (
                       <option key={user.id} value={user.id}>
-                        {user.profiles?.first_name || ''}{' '}
-                        {user.profiles?.last_name || ''} (
-                        {user.profiles?.email || user.email})
+                        {getUserDisplayName(user)}
                       </option>
                     ))}
                   </select>

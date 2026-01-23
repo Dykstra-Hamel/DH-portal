@@ -130,7 +130,7 @@ export default function ProjectEdit({ params }: ProjectEditPageProps) {
       <div style={{ padding: '2rem' }}>
         <h2>Error</h2>
         <p>{error}</p>
-        <button onClick={() => router.push('/project-management')}>
+        <button onClick={() => router.push('/admin/project-management')}>
           Back to Projects
         </button>
       </div>

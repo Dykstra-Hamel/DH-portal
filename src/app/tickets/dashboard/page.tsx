@@ -2,9 +2,18 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Ticket, TicketFormData } from '@/types/ticket';
-import { Lead } from '@/types/lead';
-import { SupportCase } from '@/types/support-case';
+import {
+  Ticket,
+  TicketFormData,
+  ticketPriorityOptions,
+  ticketStatusOptions,
+} from '@/types/ticket';
+import { Lead, leadStatusOptions } from '@/types/lead';
+import {
+  SupportCase,
+  supportCasePriorityOptions,
+  supportCaseStatusOptions,
+} from '@/types/support-case';
 import { Task } from '@/types/task';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -23,9 +32,6 @@ import {
 } from '@/lib/realtime/ticket-review-channel';
 import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable, ColumnDefinition } from '@/components/Common/DataTable';
-import { getTicketColumns } from '@/components/Tickets/TicketsList/TicketsListConfig';
-import { getLeadColumns } from '@/components/Leads/LeadsList/LeadsListConfig';
-import { getSupportCaseColumns } from '@/components/SupportCases/SupportCasesList/SupportCasesListConfig';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import {
   Modal,
@@ -45,8 +51,7 @@ import tableStyles from '@/components/Common/DataTable/DataTable.module.scss';
 import styles from './page.module.scss';
 
 // Define tab types
-type UnassignedTab = 'all' | 'new' | 'sales' | 'support' | 'scheduling';
-type AssignedTab = 'all_my' | 'my_sales' | 'my_scheduled' | 'my_support' | 'closed';
+type DashboardTab = 'new' | 'my' | 'closed';
 
 interface Announcement {
   id: string;
@@ -56,13 +61,50 @@ interface Announcement {
   published_by: string;
 }
 
-type DashboardItem =
-  | (Ticket & { _type: 'ticket'; _typeSortLabel?: string })
-  | (Lead & { _type: 'lead'; _typeSortLabel?: string })
-  | (SupportCase & { _type: 'support_case'; _typeSortLabel?: string });
+type DashboardSortLabels = {
+  _typeSortLabel?: string;
+  _statusSortLabel?: string;
+  _prioritySortLabel?: string;
+};
 
-const DASHBOARD_OVERVIEW_COLUMN_WIDTHS = '120px 180px 140px 250px 120px 1fr';
+type DashboardItem =
+  | (Ticket & { _type: 'ticket' } & DashboardSortLabels)
+  | (Lead & { _type: 'lead' } & DashboardSortLabels)
+  | (SupportCase & { _type: 'support_case' } & DashboardSortLabels);
+
+const DASHBOARD_OVERVIEW_COLUMN_WIDTHS =
+  '120px 180px 140px 250px 120px 120px 120px 1fr';
 const TICKETS_PAGE_SIZE = 25;
+const INSPIRATIONAL_QUOTES = [
+  { text: 'Focus on the customer, not the competition.', author: 'Jeff Bezos' },
+  { text: 'Done is better than perfect.', author: 'Sheryl Sandberg' },
+  { text: 'Ideas are easy. Execution is everything.', author: 'John Doerr' },
+  { text: 'What gets measured gets improved.', author: 'Peter Drucker' },
+  { text: 'Culture eats strategy for breakfast.', author: 'Peter Drucker' },
+  { text: 'Innovation distinguishes a leader from a follower.', author: 'Steve Jobs' },
+  { text: 'Quality is not an act, it is a habit.', author: 'Aristotle' },
+  { text: 'The best marketing is a great product.', author: 'Steve Jobs' },
+  { text: 'Time is the scarcest resource.', author: 'Peter Drucker' },
+  { text: 'Well done is better than well said.', author: 'Benjamin Franklin' },
+  { text: 'Make it simple, but significant.', author: 'Don Draper' },
+  { text: 'Hire character. Train skill.', author: 'Peter Schutz' },
+  { text: 'Speed beats perfection.', author: 'Unknown' },
+  { text: 'Plan the work. Work the plan.', author: 'Unknown' },
+  { text: 'Small improvements add up to big results.', author: 'Unknown' },
+  { text: 'Make every detail count.', author: 'Walt Disney' },
+  { text: 'The way to get started is to begin doing.', author: 'Walt Disney' },
+  { text: 'Clarity is power.', author: 'Unknown' },
+  { text: 'Great teams build great products.', author: 'Unknown' },
+  { text: 'Measure twice, cut once.', author: 'Unknown' },
+] as const;
+let dashboardQuoteIndex: number | null = null;
+
+const getDashboardQuote = () => {
+  if (dashboardQuoteIndex === null) {
+    dashboardQuoteIndex = Math.floor(Math.random() * INSPIRATIONAL_QUOTES.length);
+  }
+  return INSPIRATIONAL_QUOTES[dashboardQuoteIndex];
+};
 
 const formatTimeInQueue = (createdAt: string): string => {
   const now = new Date().getTime();
@@ -130,6 +172,38 @@ const getDashboardItemTypeLabel = (item: DashboardItem): string => {
   return 'New';
 };
 
+const NA_PRIORITY_LABEL = 'N/A';
+
+const getOptionLabel = (
+  value: string | null | undefined,
+  options: ReadonlyArray<{ value: string; label: string }>
+): string => {
+  if (!value) return '';
+  return options.find(option => option.value === value)?.label || value;
+};
+
+const getDashboardItemStatusLabel = (item: DashboardItem): string => {
+  if (item._type === 'lead') {
+    return getOptionLabel(item.lead_status, leadStatusOptions);
+  }
+  if (item._type === 'support_case') {
+    return getOptionLabel(item.status, supportCaseStatusOptions);
+  }
+  return getOptionLabel(item.status, ticketStatusOptions);
+};
+
+const getDashboardItemPriorityLabel = (item: DashboardItem): string => {
+  if (item._type === 'lead') {
+    return NA_PRIORITY_LABEL;
+  }
+  if (item._type === 'support_case') {
+    return (
+      getOptionLabel(item.priority, supportCasePriorityOptions) || NA_PRIORITY_LABEL
+    );
+  }
+  return getOptionLabel(item.priority, ticketPriorityOptions) || NA_PRIORITY_LABEL;
+};
+
 // Search filter helper - searches all string values in an object recursively
 const filterBySearch = <T extends object>(items: T[], query: string): T[] => {
   if (!query.trim()) return items;
@@ -145,6 +219,25 @@ const filterBySearch = <T extends object>(items: T[], query: string): T[] => {
   };
 
   return items.filter(item => searchInObject(item));
+};
+
+const getAnnouncementsLastViewed = (companyId: string): number => {
+  try {
+    const key = `lastViewed_announcements_${companyId}`;
+    const timestamp = localStorage.getItem(key);
+    return timestamp ? parseInt(timestamp, 10) : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const setAnnouncementsLastViewed = (companyId: string): void => {
+  try {
+    const key = `lastViewed_announcements_${companyId}`;
+    localStorage.setItem(key, Date.now().toString());
+  } catch {
+    // Ignore localStorage errors
+  }
 };
 
 const DashboardSkeleton = () => (
@@ -189,6 +282,8 @@ function TicketsDashboardContent() {
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [myActions, setMyActions] = useState<Task[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [hasNewAnnouncements, setHasNewAnnouncements] = useState(false);
   const [reviewStatuses, setReviewStatuses] = useState<
     Map<
       string,
@@ -210,14 +305,24 @@ function TicketsDashboardContent() {
   const [loadingSupportCases, setLoadingSupportCases] = useState(false);
   const [loadingMyData, setLoadingMyData] = useState(false);
 
+  // Total counts for tabs (not affected by pagination)
+  const [totalCounts, setTotalCounts] = useState({
+    unassignedTickets: 0,
+    unassignedLeads: 0,
+    unassignedScheduling: 0,
+    unassignedSupportCases: 0,
+    myLeads: 0,
+    mySupportCases: 0,
+    closedLeads: 0,
+    closedSupportCases: 0,
+  });
+
   // Tab states
-  const [unassignedTab, setUnassignedTab] = useState<UnassignedTab>('all');
-  const [assignedTab, setAssignedTab] = useState<AssignedTab>('all_my');
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('new');
 
   // Search states
-  const [unassignedSearch, setUnassignedSearch] = useState('');
-  const [assignedSearch, setAssignedSearch] = useState('');
-  const [unassignedVisibleCount, setUnassignedVisibleCount] = useState(5);
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableVisibleCount, setTableVisibleCount] = useState(5);
   const [ticketsHasMore, setTicketsHasMore] = useState(false);
   const [loadingTicketsMore, setLoadingTicketsMore] = useState(false);
   const ticketsPageRef = useRef(1);
@@ -237,8 +342,8 @@ function TicketsDashboardContent() {
   });
 
   useEffect(() => {
-    setUnassignedVisibleCount(5);
-  }, [unassignedTab]);
+    setTableVisibleCount(5);
+  }, [dashboardTab]);
 
   // Modal state for ticket review
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -256,6 +361,12 @@ function TicketsDashboardContent() {
   useEffect(() => {
     selectedCompanyRef.current = selectedCompany;
   }, [selectedCompany]);
+
+  // User ref for realtime updates
+  const userIdRef = useRef(user?.id);
+  useEffect(() => {
+    userIdRef.current = user?.id;
+  }, [user?.id]);
 
   // Register the 'add' action for the header button
   useEffect(() => {
@@ -561,6 +672,7 @@ function TicketsDashboardContent() {
   const fetchAnnouncements = useCallback(async (companyId: string) => {
     if (!companyId) return;
 
+    setLoadingAnnouncements(true);
     try {
       const response = await fetch(`/api/companies/${companyId}/announcements`);
       if (response.ok) {
@@ -569,6 +681,108 @@ function TicketsDashboardContent() {
       }
     } catch (error) {
       console.error('Error fetching announcements:', error);
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  }, []);
+
+  // Fetch total counts for tabs (not affected by pagination)
+  const fetchTotalCounts = useCallback(async (companyId: string, userId?: string) => {
+    if (!companyId) return;
+
+    try {
+      const supabase = createClient();
+
+      // Fetch all counts in parallel
+      const [
+        unassignedTicketsResult,
+        unassignedLeadsResult,
+        unassignedSchedulingResult,
+        unassignedSupportCasesResult,
+        myLeadsResult,
+        mySupportCasesResult,
+        closedLeadsResult,
+        closedSupportCasesResult,
+      ] = await Promise.all([
+        // Unassigned tickets (excluding live and closed)
+        supabase
+          .from('tickets')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .neq('status', 'live')
+          .neq('status', 'closed')
+          .or('archived.is.null,archived.eq.false'),
+        // Unassigned leads (excluding scheduling status)
+        supabase
+          .from('leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .is('assigned_to', null)
+          .in('lead_status', ['new', 'in_process', 'quoted']),
+        // Unassigned scheduling (leads with scheduling status)
+        supabase
+          .from('leads')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .is('assigned_to', null)
+          .eq('lead_status', 'scheduling'),
+        // Unassigned support cases
+        supabase
+          .from('support_cases')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .is('assigned_to', null)
+          .or('archived.is.null,archived.eq.false'),
+        // My leads (assigned to user, active statuses)
+        userId
+          ? supabase
+              .from('leads')
+              .select('id', { count: 'exact', head: true })
+              .eq('company_id', companyId)
+              .eq('assigned_to', userId)
+              .in('lead_status', ['in_process', 'quoted', 'scheduling'])
+          : Promise.resolve({ count: 0 }),
+        // My support cases (assigned to user)
+        userId
+          ? supabase
+              .from('support_cases')
+              .select('id', { count: 'exact', head: true })
+              .eq('company_id', companyId)
+              .eq('assigned_to', userId)
+              .or('archived.is.null,archived.eq.false')
+          : Promise.resolve({ count: 0 }),
+        // Closed leads (won/lost)
+        userId
+          ? supabase
+              .from('leads')
+              .select('id', { count: 'exact', head: true })
+              .eq('company_id', companyId)
+              .eq('assigned_to', userId)
+              .in('lead_status', ['won', 'lost'])
+          : Promise.resolve({ count: 0 }),
+        // Closed support cases (resolved/closed)
+        userId
+          ? supabase
+              .from('support_cases')
+              .select('id', { count: 'exact', head: true })
+              .eq('company_id', companyId)
+              .eq('assigned_to', userId)
+              .in('status', ['resolved', 'closed'])
+          : Promise.resolve({ count: 0 }),
+      ]);
+
+      setTotalCounts({
+        unassignedTickets: unassignedTicketsResult.count || 0,
+        unassignedLeads: unassignedLeadsResult.count || 0,
+        unassignedScheduling: unassignedSchedulingResult.count || 0,
+        unassignedSupportCases: unassignedSupportCasesResult.count || 0,
+        myLeads: myLeadsResult.count || 0,
+        mySupportCases: mySupportCasesResult.count || 0,
+        closedLeads: closedLeadsResult.count || 0,
+        closedSupportCases: closedSupportCasesResult.count || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching total counts:', error);
     }
   }, []);
 
@@ -579,12 +793,35 @@ function TicketsDashboardContent() {
       fetchLeads(selectedCompany.id);
       fetchSupportCases(selectedCompany.id);
       fetchAnnouncements(selectedCompany.id);
+      fetchTotalCounts(selectedCompany.id, user?.id);
 
       if (user?.id) {
         fetchMyData(selectedCompany.id, user.id);
       }
     }
-  }, [selectedCompany?.id, user?.id, fetchTickets, fetchLeads, fetchSupportCases, fetchMyData, fetchAnnouncements]);
+  }, [selectedCompany?.id, user?.id, fetchTickets, fetchLeads, fetchSupportCases, fetchMyData, fetchAnnouncements, fetchTotalCounts]);
+
+  useEffect(() => {
+    if (!selectedCompany?.id) {
+      setHasNewAnnouncements(false);
+      return;
+    }
+    if (announcements.length === 0) {
+      setHasNewAnnouncements(false);
+      return;
+    }
+
+    const lastViewed = getAnnouncementsLastViewed(selectedCompany.id);
+    if (lastViewed === 0) {
+      setHasNewAnnouncements(true);
+      return;
+    }
+
+    const hasNew = announcements.some(
+      announcement => new Date(announcement.published_at).getTime() > lastViewed
+    );
+    setHasNewAnnouncements(hasNew);
+  }, [announcements, selectedCompany?.id]);
 
   // Realtime subscription
   useEffect(() => {
@@ -654,6 +891,8 @@ function TicketsDashboardContent() {
                 }
                 return prev;
               });
+              // Refresh counts for new ticket
+              fetchTotalCounts(currentCompanyId, userIdRef.current);
             }
           } catch (err) {
             console.error('Error fetching new ticket for realtime:', err);
@@ -690,6 +929,8 @@ function TicketsDashboardContent() {
                 updatedTicket.status === 'closed'
               ) {
                 setTickets(prev => prev.filter(t => t.id !== record_id));
+                // Refresh counts when ticket is removed
+                fetchTotalCounts(currentCompanyId, userIdRef.current);
               } else {
                 // Update existing ticket or add if not present
                 setTickets(prev => {
@@ -713,9 +954,12 @@ function TicketsDashboardContent() {
           }
         } else if (action === 'DELETE' && record_id) {
           setTickets(prev => prev.filter(t => t.id !== record_id));
+          // Refresh counts when ticket is deleted
+          fetchTotalCounts(currentCompanyId, userIdRef.current);
         } else {
           // Fallback: refetch for unknown actions
           fetchTickets(currentCompanyId, { showLoading: false });
+          fetchTotalCounts(currentCompanyId, userIdRef.current);
         }
       } else if (table === 'call_records') {
         // For call records, update the parent ticket
@@ -754,8 +998,10 @@ function TicketsDashboardContent() {
         }
       } else if (table === 'leads') {
         fetchLeads(currentCompanyId);
+        fetchTotalCounts(currentCompanyId, userIdRef.current);
       } else if (table === 'support_cases') {
         fetchSupportCases(currentCompanyId);
+        fetchTotalCounts(currentCompanyId, userIdRef.current);
       }
     });
 
@@ -768,7 +1014,7 @@ function TicketsDashboardContent() {
         currentChannelRef.current = null;
       }
     };
-  }, [selectedCompany?.id, fetchTickets, fetchLeads, fetchSupportCases]);
+  }, [selectedCompany?.id, user?.id, fetchTickets, fetchLeads, fetchSupportCases, fetchTotalCounts]);
 
   // Filter live tickets for LiveCallBar
   const liveTickets = useMemo(
@@ -927,34 +1173,26 @@ function TicketsDashboardContent() {
     router.push('/tickets/tasks');
   }, [router]);
 
-  // Get columns
-  const ticketColumns = useMemo(() => getTicketColumns(reviewStatuses), [reviewStatuses]);
-  const leadColumns = useMemo(() => getLeadColumns(), []);
-  const supportCaseColumns = useMemo(() => getSupportCaseColumns(), []);
-  const unassignedTabCounts = useMemo(
+  const handleAnnouncementsOpen = useCallback(() => {
+    setShowAnnouncementsModal(true);
+    if (selectedCompany?.id) {
+      setAnnouncementsLastViewed(selectedCompany.id);
+      setHasNewAnnouncements(false);
+    }
+  }, [selectedCompany?.id]);
+
+  // Get columns - use total counts for tab badges (not affected by pagination)
+  const tableTabCounts = useMemo(
     () => ({
-      all:
-        tickets.filter(ticket => ticket.status !== 'live').length +
-        leads.length +
-        supportCases.length,
-      new: tickets.filter(ticket => ticket.status !== 'live').length,
-      sales: leads.filter(l => l.lead_status !== 'scheduling').length,
-      support: supportCases.length,
-      scheduling: leads.filter(l => l.lead_status === 'scheduling').length,
+      new:
+        totalCounts.unassignedTickets +
+        totalCounts.unassignedLeads +
+        totalCounts.unassignedScheduling +
+        totalCounts.unassignedSupportCases,
+      my: totalCounts.myLeads + totalCounts.mySupportCases,
+      closed: totalCounts.closedLeads + totalCounts.closedSupportCases,
     }),
-    [tickets, leads, supportCases]
-  );
-  const assignedTabCounts = useMemo(
-    () => ({
-      all_my: myLeads.length + mySupportCases.length,
-      my_sales: myLeads.filter(l => ['in_process', 'quoted'].includes(l.lead_status)).length,
-      my_scheduled: myLeads.filter(l => l.lead_status === 'scheduling').length,
-      my_support: mySupportCases.length,
-      closed:
-        myLeads.filter(l => ['won', 'lost'].includes(l.lead_status)).length +
-        mySupportCases.filter(c => ['resolved', 'closed'].includes(c.status)).length,
-    }),
-    [myLeads, mySupportCases]
+    [totalCounts]
   );
   const dashboardOverviewColumns = useMemo<ColumnDefinition<DashboardItem>[]>(
     () => [
@@ -1004,6 +1242,37 @@ function TicketsDashboardContent() {
         ),
       },
       {
+        key: 'status',
+        title: 'Status',
+        width: '120px',
+        sortable: true,
+        sortKey: '_statusSortLabel',
+        render: (item: DashboardItem) => (
+          <span className={tableStyles.formatCell}>
+            {getDashboardItemStatusLabel(item)}
+          </span>
+        ),
+      },
+      {
+        key: 'priority',
+        title: 'Priority',
+        width: '120px',
+        sortable: true,
+        sortKey: '_prioritySortLabel',
+        render: (item: DashboardItem) => {
+          const label = getDashboardItemPriorityLabel(item);
+          return (
+            <span
+              className={`${tableStyles.formatCell} ${
+                label === NA_PRIORITY_LABEL ? tableStyles.mutedText : ''
+              }`}
+            >
+              {label}
+            </span>
+          );
+        },
+      },
+      {
         key: 'type',
         title: 'Type',
         width: '120px',
@@ -1047,17 +1316,7 @@ function TicketsDashboardContent() {
             }
           }
 
-          let label = 'View';
-          if (item._type === 'ticket') {
-            label = 'Review Ticket';
-          } else if (item._type === 'lead') {
-            label =
-              item.lead_status === 'scheduling'
-                ? 'Schedule Service'
-                : 'Manage Lead';
-          } else if (item._type === 'support_case') {
-            label = 'View Issue';
-          }
+          const label = 'Review Ticket';
           return (
             <button
               className={tableStyles.actionButton}
@@ -1122,95 +1381,50 @@ function TicketsDashboardContent() {
     ]
   );
 
-  // Get current data for unassigned section based on tab
-  const getUnassignedData = () => {
-    switch (unassignedTab) {
-      case 'all': {
+  // Get current data for dashboard table based on tab
+  const getDashboardTableData = () => {
+    switch (dashboardTab) {
+      case 'new': {
         // Sort oldest to newest (ascending by created_at)
         // Add _typeSortLabel for sortable Type column (alphabetically: New < Sales < Scheduling < Support)
         const combinedData = [
           ...tickets
             .filter(ticket => ticket.status !== 'live')
             .map(ticket => ({
-            ...ticket,
-            _type: 'ticket' as const,
-            _typeSortLabel: 'New',
-          })),
+              ...ticket,
+              _type: 'ticket' as const,
+              _typeSortLabel: 'New',
+              _statusSortLabel: getOptionLabel(ticket.status, ticketStatusOptions),
+              _prioritySortLabel:
+                getOptionLabel(ticket.priority, ticketPriorityOptions) || NA_PRIORITY_LABEL,
+            })),
           ...leads.map(lead => ({
             ...lead,
             _type: 'lead' as const,
             _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
+            _statusSortLabel: getOptionLabel(lead.lead_status, leadStatusOptions),
+            _prioritySortLabel: NA_PRIORITY_LABEL,
           })),
           ...supportCases.map(supportCase => ({
             ...supportCase,
             _type: 'support_case' as const,
             _typeSortLabel: 'Support',
+            _statusSortLabel: getOptionLabel(supportCase.status, supportCaseStatusOptions),
+            _prioritySortLabel:
+              getOptionLabel(supportCase.priority, supportCasePriorityOptions) ||
+              NA_PRIORITY_LABEL,
           })),
         ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
         return {
-          data: filterBySearch(combinedData, unassignedSearch),
+          data: filterBySearch(combinedData, tableSearch),
           columns: dashboardOverviewColumns,
           loading: loading || loadingLeads || loadingSupportCases,
           tableType: 'tickets' as const,
           customColumnWidths: DASHBOARD_OVERVIEW_COLUMN_WIDTHS,
         };
       }
-      case 'new':
-        return {
-          data: filterBySearch(
-            tickets.filter(ticket => ticket.status !== 'live'),
-            unassignedSearch
-          ),
-          columns: ticketColumns,
-          loading,
-          tableType: 'tickets' as const,
-          customColumnWidths: undefined,
-        };
-      case 'sales':
-        // Show sales leads (exclude scheduling leads)
-        return {
-          data: filterBySearch(leads.filter(l => l.lead_status !== 'scheduling'), unassignedSearch),
-          columns: leadColumns,
-          loading: loadingLeads,
-          tableType: 'leads' as const,
-          customColumnWidths: undefined,
-        };
-      case 'support':
-        return {
-          data: filterBySearch(supportCases, unassignedSearch),
-          columns: supportCaseColumns,
-          loading: loadingSupportCases,
-          tableType: 'supportCases' as const,
-          customColumnWidths: undefined,
-        };
-      case 'scheduling':
-        // Show only scheduling leads
-        return {
-          data: filterBySearch(leads.filter(l => l.lead_status === 'scheduling'), unassignedSearch),
-          columns: leadColumns,
-          loading: loadingLeads,
-          tableType: 'leads' as const,
-          customColumnWidths: undefined,
-        };
-      default:
-        return {
-          data: filterBySearch(
-            tickets.filter(ticket => ticket.status !== 'live'),
-            unassignedSearch
-          ),
-          columns: ticketColumns,
-          loading,
-          tableType: 'tickets' as const,
-          customColumnWidths: undefined,
-        };
-    }
-  };
-
-  // Get current data for assigned section based on tab
-  const getAssignedData = () => {
-    switch (assignedTab) {
-      case 'all_my': {
+      case 'my': {
         // Combine leads and support cases, sort oldest to newest
         // Add _typeSortLabel for sortable Type column (alphabetically: New < Sales < Scheduling < Support)
         const combinedData = [
@@ -1218,80 +1432,83 @@ function TicketsDashboardContent() {
             ...lead,
             _type: 'lead' as const,
             _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
+            _statusSortLabel: getOptionLabel(lead.lead_status, leadStatusOptions),
+            _prioritySortLabel: NA_PRIORITY_LABEL,
           })),
           ...mySupportCases.map(supportCase => ({
             ...supportCase,
             _type: 'support_case' as const,
             _typeSortLabel: 'Support',
+            _statusSortLabel: getOptionLabel(supportCase.status, supportCaseStatusOptions),
+            _prioritySortLabel:
+              getOptionLabel(supportCase.priority, supportCasePriorityOptions) ||
+              NA_PRIORITY_LABEL,
           })),
         ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         return {
-          data: filterBySearch(combinedData, assignedSearch),
+          data: filterBySearch(combinedData, tableSearch),
           columns: dashboardOverviewColumns,
           loading: loadingMyData,
           tableType: 'leads' as const,
           customColumnWidths: DASHBOARD_OVERVIEW_COLUMN_WIDTHS,
         };
       }
-      case 'my_sales':
-        return {
-          data: filterBySearch(myLeads.filter(l => ['in_process', 'quoted'].includes(l.lead_status)), assignedSearch),
-          columns: leadColumns,
-          loading: loadingMyData,
-          tableType: 'leads' as const,
-          customColumnWidths: undefined,
-        };
-      case 'my_scheduled':
-        return {
-          data: filterBySearch(myLeads.filter(l => l.lead_status === 'scheduling'), assignedSearch),
-          columns: leadColumns,
-          loading: loadingMyData,
-          tableType: 'leads' as const,
-          customColumnWidths: undefined,
-        };
-      case 'my_support':
-        return {
-          data: filterBySearch(mySupportCases, assignedSearch),
-          columns: supportCaseColumns,
-          loading: loadingMyData,
-          tableType: 'supportCases' as const,
-          customColumnWidths: undefined,
-        };
       case 'closed': {
-        const closedData = [
-          ...myLeads.filter(l => ['won', 'lost'].includes(l.lead_status)),
-          ...mySupportCases.filter(c => ['resolved', 'closed'].includes(c.status)),
-        ];
+        const combinedData = [
+          ...myLeads
+            .filter(l => ['won', 'lost'].includes(l.lead_status))
+            .map(lead => ({
+              ...lead,
+              _type: 'lead' as const,
+              _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
+              _statusSortLabel: getOptionLabel(lead.lead_status, leadStatusOptions),
+              _prioritySortLabel: NA_PRIORITY_LABEL,
+            })),
+          ...mySupportCases
+            .filter(c => ['resolved', 'closed'].includes(c.status))
+            .map(supportCase => ({
+              ...supportCase,
+              _type: 'support_case' as const,
+              _typeSortLabel: 'Support',
+              _statusSortLabel: getOptionLabel(
+                supportCase.status,
+                supportCaseStatusOptions
+              ),
+              _prioritySortLabel:
+                getOptionLabel(supportCase.priority, supportCasePriorityOptions) ||
+                NA_PRIORITY_LABEL,
+            })),
+        ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         return {
-          data: filterBySearch(closedData, assignedSearch),
-          columns: leadColumns,
+          data: filterBySearch(combinedData, tableSearch),
+          columns: dashboardOverviewColumns,
           loading: loadingMyData,
           tableType: 'leads' as const,
-          customColumnWidths: undefined,
+          customColumnWidths: DASHBOARD_OVERVIEW_COLUMN_WIDTHS,
         };
       }
       default:
         return {
-          data: filterBySearch(myLeads, assignedSearch),
-          columns: leadColumns,
-          loading: loadingMyData,
-          tableType: 'leads' as const,
-          customColumnWidths: undefined,
+          data: filterBySearch([], tableSearch),
+          columns: dashboardOverviewColumns,
+          loading: false,
+          tableType: 'tickets' as const,
+          customColumnWidths: DASHBOARD_OVERVIEW_COLUMN_WIDTHS,
         };
     }
   };
 
-  const unassignedContent = getUnassignedData();
-  const assignedContent = getAssignedData();
-  const unassignedData = (unassignedContent.data || []) as any[];
-  const unassignedVisibleData = unassignedData.slice(0, unassignedVisibleCount);
-  const canLoadMoreTickets =
-    (unassignedTab === 'all' || unassignedTab === 'new') && ticketsHasMore;
-  const showUnassignedLoadMore =
-    unassignedData.length > unassignedVisibleCount || canLoadMoreTickets;
-  const handleUnassignedLoadMore = () => {
-    const nextVisibleCount = unassignedVisibleCount + 5;
-    setUnassignedVisibleCount(nextVisibleCount);
+  const tableContent = getDashboardTableData();
+  const tableData = (tableContent.data || []) as any[];
+  const tableVisibleData =
+    dashboardTab === 'new' ? tableData.slice(0, tableVisibleCount) : tableData;
+  const canLoadMoreTickets = dashboardTab === 'new' && ticketsHasMore;
+  const tableHasMore =
+    dashboardTab === 'new' &&
+    (tableData.length > tableVisibleCount || canLoadMoreTickets);
+  const handleTableLoadMore = () => {
+    const nextVisibleCount = tableVisibleCount + 5;
+    setTableVisibleCount(nextVisibleCount);
 
     if (
       canLoadMoreTickets &&
@@ -1306,120 +1523,30 @@ function TicketsDashboardContent() {
     }
   };
 
+  const tableEmptyStateMessage =
+    dashboardTab === 'new'
+      ? 'No unassigned items at the moment.'
+      : 'No assigned items in this category.';
+
   // Check for new items in actions/tasks
   const hasNewActions = newItemIndicators.my_actions || false;
   const hasNewTasks = newItemIndicators.my_tasks || false;
+  const [randomQuote, setRandomQuote] = useState<
+    (typeof INSPIRATIONAL_QUOTES)[number] | null
+  >(null);
+  useEffect(() => {
+    setRandomQuote(getDashboardQuote());
+  }, []);
 
   return (
     <div className={styles.dashboardContainer}>
-      {/* Unassigned Tickets Section */}
-      <section className={`${styles.section} ${styles.sectionNoGap}`}>
-        <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>Unassigned Tickets</h2>
-
-        {/* Tabs */}
-        <div className={styles.tabsRow}>
-          <div className={styles.tabsSection}>
-            <button
-              className={`${styles.tab} ${unassignedTab === 'all' ? styles.active : ''}`}
-              onClick={() => setUnassignedTab('all')}
-            >
-              All Tickets
-              <span className={styles.tabCount}>{unassignedTabCounts.all}</span>
-            </button>
-            <button
-              className={`${styles.tab} ${unassignedTab === 'new' ? styles.active : ''}`}
-              onClick={() => setUnassignedTab('new')}
-            >
-              New
-              <span className={styles.tabCount}>{unassignedTabCounts.new}</span>
-            </button>
-            <button
-              className={`${styles.tab} ${unassignedTab === 'sales' ? styles.active : ''}`}
-              onClick={() => setUnassignedTab('sales')}
-            >
-              Sales
-              <span className={styles.tabCount}>{unassignedTabCounts.sales}</span>
-            </button>
-            <button
-              className={`${styles.tab} ${unassignedTab === 'support' ? styles.active : ''}`}
-              onClick={() => setUnassignedTab('support')}
-            >
-              Support
-              <span className={styles.tabCount}>{unassignedTabCounts.support}</span>
-            </button>
-            <button
-              className={`${styles.tab} ${unassignedTab === 'scheduling' ? styles.active : ''}`}
-              onClick={() => setUnassignedTab('scheduling')}
-            >
-              Scheduling
-              <span className={styles.tabCount}>{unassignedTabCounts.scheduling}</span>
-            </button>
-          </div>
-          <div className={styles.searchSection}>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Search"
-              value={unassignedSearch}
-              onChange={e => setUnassignedSearch(e.target.value)}
-            />
-            <Search size={18} className={styles.searchIcon} />
-          </div>
-        </div>
-
-        {/* Live Calls Bar */}
-        <LiveCallBar liveTickets={liveTickets} />
-
-        {/* Data Table */}
-        {selectedCompany && (
-          <Suspense fallback={<DashboardSkeleton />}>
-            <DataTable
-              key={`unassigned-${unassignedTab}`}
-              data={unassignedVisibleData as any[]}
-              loading={unassignedContent.loading}
-              title="Unassigned"
-              columns={unassignedContent.columns as any}
-              tabs={[]}
-              onItemAction={
-                (unassignedTab === 'all'
-                  ? handleDashboardItemAction
-                  : unassignedTab === 'sales' || unassignedTab === 'scheduling'
-                  ? handleLeadAction
-                  : unassignedTab === 'support'
-                  ? handleSupportCaseAction
-                  : handleTicketAction) as any
-              }
-              tableType={unassignedContent.tableType}
-              customColumnWidths={unassignedContent.customColumnWidths}
-              searchEnabled={false}
-              emptyStateMessage="No unassigned items at the moment."
-            />
-          </Suspense>
-        )}
-        {selectedCompany && showUnassignedLoadMore && (
-          <div className={styles.loadMoreWrapper}>
-            <button
-              type="button"
-              className={styles.loadMoreButton}
-              onClick={handleUnassignedLoadMore}
-              disabled={loadingTicketsMore}
-            >
-              Load more
-            </button>
-          </div>
-        )}
-
-      </section>
-
       {/* Your Action & Tasks Section */}
       <section className={`${styles.section} ${styles.sectionNoGap}`}>
-        <div className={styles.actionsTasksRow}>
-          {/* Left Column: Your Action & Tasks */}
-          <div className={styles.actionsTasksLeftColumn}>
-            <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>Your Actions &amp; Tasks</h2>
-            <div className={styles.actionsTasksBoxes}>
-              {/* My Actions Box */}
-              <button className={styles.actionBox} onClick={handleActionsClick}>
+        <div className={styles.actionsTasksCard}>
+          <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>Your Actions &amp; Tasks</h2>
+          <div className={styles.actionsTasksBoxes}>
+            {/* My Actions Box */}
+            <button className={styles.actionBox} onClick={handleActionsClick}>
               <div className={styles.boxHeader}>
                 <span className={styles.boxTitle}>My Actions</span>
                 {loadingMyData ? (
@@ -1455,82 +1582,76 @@ function TicketsDashboardContent() {
                 Tasks that are personally assigned within a given customer account or personal task.
               </p>
             </button>
-            </div>
-          </div>
 
-          {/* Right Column: Important Announcements */}
-          <div className={styles.announcementsSection}>
-            <h2 className={`${styles.announcementsTitle} ${styles.sectionTitleSpaced}`}>Important Announcements</h2>
-            {announcements.length === 0 ? (
-              <p className={styles.boxDescription}>No announcements at this time.</p>
-            ) : (
-              <>
-                <div className={styles.announcementsList}>
-                  {[...announcements]
-                    .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
-                    .slice(0, 1)
-                    .map((ann) => (
-                      <div key={ann.id} className={styles.announcementItem}>
-                        <strong>{ann.title}</strong>
-                        <p>{ann.content}</p>
-                      </div>
-                    ))}
-                </div>
-                {announcements.length > 1 && (
-                  <button
-                    className={styles.expandButton}
-                    onClick={() => setShowAnnouncementsModal(true)}
-                  >
-                    + Expand To See More ({announcements.length - 1})
-                  </button>
+            {/* Important Announcements Box */}
+            <button
+              type="button"
+              className={styles.announcementBox}
+              onClick={handleAnnouncementsOpen}
+            >
+              <div className={styles.boxHeader}>
+                <span className={styles.boxTitle}>Announcements</span>
+                {loadingAnnouncements ? (
+                  <span className={styles.badge}>
+                    <Loader2 size={14} className={styles.spinner} />
+                  </span>
+                ) : (
+                  <span className={`${styles.badge} ${hasNewAnnouncements ? styles.badgeNew : ''}`}>
+                    {announcements.length}
+                  </span>
                 )}
-              </>
-            )}
+              </div>
+              {randomQuote && (
+                <div className={styles.announcementsList}>
+                  <div className={styles.announcementItem}>
+                    <strong>{randomQuote.text}</strong>
+                    <p>- {randomQuote.author}</p>
+                  </div>
+                </div>
+              )}
+              {announcements.length > 1 && (
+                <span className={styles.expandButton}>
+                  + Expand To See More ({announcements.length - 1})
+                </span>
+              )}
+              <img
+                src="/images/announcements-agent.png"
+                alt=""
+                aria-hidden="true"
+                className={styles.announcementImage}
+              />
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Your Assigned Tickets Section */}
+      {/* Tickets Table Section */}
       <section className={`${styles.section} ${styles.sectionNoGap}`}>
-        <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>Your Assigned Tickets</h2>
+        <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>Tickets</h2>
 
         {/* Tabs */}
-        <div className={styles.tabsContainer}>
-          <div className={styles.tabsWrapper}>
+        <div className={styles.tabsRow}>
+          <div className={styles.tabsSection}>
             <button
-              className={`${styles.tab} ${assignedTab === 'all_my' ? styles.active : ''}`}
-              onClick={() => setAssignedTab('all_my')}
+              className={`${styles.tab} ${dashboardTab === 'new' ? styles.active : ''}`}
+              onClick={() => setDashboardTab('new')}
             >
-              All My Tickets
-              <span className={styles.tabCount}>{assignedTabCounts.all_my}</span>
+              New Tickets
+              <span className={styles.tabCount}>{tableTabCounts.new}</span>
             </button>
             <button
-              className={`${styles.tab} ${assignedTab === 'my_sales' ? styles.active : ''}`}
-              onClick={() => setAssignedTab('my_sales')}
+              className={`${styles.tab} ${dashboardTab === 'my' ? styles.active : ''}`}
+              onClick={() => setDashboardTab('my')}
             >
-              My Sales Tickets
-              <span className={styles.tabCount}>{assignedTabCounts.my_sales}</span>
+              My Tickets
+              <span className={styles.tabCount}>{tableTabCounts.my}</span>
             </button>
             <button
-              className={`${styles.tab} ${assignedTab === 'my_scheduled' ? styles.active : ''}`}
-              onClick={() => setAssignedTab('my_scheduled')}
-            >
-              My Scheduled Tickets
-              <span className={styles.tabCount}>{assignedTabCounts.my_scheduled}</span>
-            </button>
-            <button
-              className={`${styles.tab} ${assignedTab === 'my_support' ? styles.active : ''}`}
-              onClick={() => setAssignedTab('my_support')}
-            >
-              My Support Tickets
-              <span className={styles.tabCount}>{assignedTabCounts.my_support}</span>
-            </button>
-            <button
-              className={`${styles.tab} ${assignedTab === 'closed' ? styles.active : ''}`}
-              onClick={() => setAssignedTab('closed')}
+              className={`${styles.tab} ${dashboardTab === 'closed' ? styles.active : ''}`}
+              onClick={() => setDashboardTab('closed')}
             >
               Closed
-              <span className={styles.tabCount}>{assignedTabCounts.closed}</span>
+              <span className={styles.tabCount}>{tableTabCounts.closed}</span>
             </button>
           </div>
           <div className={styles.searchSection}>
@@ -1538,34 +1659,34 @@ function TicketsDashboardContent() {
               type="text"
               className={styles.searchInput}
               placeholder="Search"
-              value={assignedSearch}
-              onChange={e => setAssignedSearch(e.target.value)}
+              value={tableSearch}
+              onChange={e => setTableSearch(e.target.value)}
             />
             <Search size={18} className={styles.searchIcon} />
           </div>
         </div>
 
+        {dashboardTab === 'new' && <LiveCallBar liveTickets={liveTickets} />}
+
         {/* Data Table */}
-        {selectedCompany && user && (
+        {selectedCompany && (
           <Suspense fallback={<DashboardSkeleton />}>
             <DataTable
-              key={`assigned-${assignedTab}`}
-              data={assignedContent.data as any[]}
-              loading={assignedContent.loading}
-              title="Your Tickets"
-              columns={assignedContent.columns as any}
+              key={`dashboard-${dashboardTab}`}
+              data={tableVisibleData as any[]}
+              loading={tableContent.loading}
+              title="Tickets"
+              columns={tableContent.columns as any}
               tabs={[]}
-              onItemAction={
-                (assignedTab === 'all_my'
-                  ? handleDashboardItemAction
-                  : assignedTab === 'my_support'
-                  ? handleSupportCaseAction
-                  : handleLeadAction) as any
-              }
-              tableType={assignedContent.tableType}
-              customColumnWidths={assignedContent.customColumnWidths}
+              onItemAction={handleDashboardItemAction as any}
+              infiniteScrollEnabled={dashboardTab === 'new'}
+              hasMore={tableHasMore}
+              onLoadMore={handleTableLoadMore}
+              loadingMore={loadingTicketsMore}
+              tableType={tableContent.tableType}
+              customColumnWidths={tableContent.customColumnWidths}
               searchEnabled={false}
-              emptyStateMessage="No assigned items in this category."
+              emptyStateMessage={tableEmptyStateMessage}
             />
           </Suspense>
         )}

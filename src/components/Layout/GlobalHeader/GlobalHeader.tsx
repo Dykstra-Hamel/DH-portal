@@ -2,6 +2,7 @@
 
 import { Menu } from 'lucide-react';
 import { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Breadcrumbs } from '../Breadcrumbs/Breadcrumbs';
 import { SearchBar } from '../SearchBar/SearchBar';
 import { NotificationIcon } from '../NotificationIcon/NotificationIcon';
@@ -15,6 +16,9 @@ interface GlobalHeaderProps {
 }
 
 export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) {
+  const pathname = usePathname();
+  const hideSearchAndCompany = pathname === '/project-management';
+
   return (
     <header className={styles.globalHeader}>
       <div className={styles.headerContent}>
@@ -34,8 +38,8 @@ export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) 
         </div>
         <div className={styles.rightSection}>
           {rightActions}
-          <SearchBar />
-          <GlobalCompanyDropdown />
+          {!hideSearchAndCompany && <SearchBar />}
+          {!hideSearchAndCompany && <GlobalCompanyDropdown />}
           <NotificationIcon />
           <UserAvatar />
         </div>

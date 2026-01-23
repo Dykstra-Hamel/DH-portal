@@ -12,6 +12,7 @@ import {
   usePageActions,
 } from '@/contexts/PageActionsContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
+import { ProjectActionMenu } from '../GlobalLowerHeader/ProjectActionMenu';
 import BackToTopButton from '@/components/Common/BackToTopButton/BackToTopButton';
 import { Settings, ArrowLeft } from 'lucide-react';
 import styles from './LayoutWrapper.module.scss';
@@ -53,25 +54,29 @@ function LayoutContent({ children }: LayoutWrapperProps) {
     switch (pathname) {
       case '/project-management':
         return {
-          title: 'Projects Dashboard',
-          description: 'Manage your projects across all phases.',
+          title: pageHeader?.title || 'Projects Dashboard',
+          description:
+            pageHeader?.description ||
+            'Manage your projects across all phases.',
           showAddButton: false,
-          actionButtons: [
-            {
-              text: 'New Project',
-              onClick: getPageAction('add-project') || (() => {}),
-            },
-            {
-              text: 'Create from Template',
-              onClick: getPageAction('create-from-template') || (() => {}),
-            },
-            {
-              text: 'New Task',
-              onClick: getPageAction('add-task') || (() => {}),
-            },
-          ],
+          projectFilterControls: pageHeader?.projectFilterControls,
+          customActions: (
+            <ProjectActionMenu
+              onNewProjectFromScratch={
+                getPageAction('add-project') || (() => {})
+              }
+              onNewProjectFromTemplate={
+                getPageAction('create-from-template') || (() => {})
+              }
+              onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
+              onNewTaskFromTemplate={
+                getPageAction('add-task-from-template') || (() => {})
+              }
+            />
+          ),
         };
       case '/project-management/tasks':
+      case '/admin/project-management/tasks':
         return {
           title: 'Tasks',
           description: 'View and manage all tasks.',
@@ -171,6 +176,27 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           title: 'Admin Dashboard',
           description: 'Manage system settings and user administration here.',
           showAddButton: false,
+        };
+      case '/admin/project-management':
+        return {
+          title: pageHeader?.title || 'Admin Project Dashboard',
+          description: pageHeader?.description || 'Internal Project and Task Management',
+          showAddButton: false,
+          projectFilterControls: pageHeader?.projectFilterControls,
+          customActions: (
+            <ProjectActionMenu
+              onNewProjectFromScratch={
+                getPageAction('add-project') || (() => {})
+              }
+              onNewProjectFromTemplate={
+                getPageAction('create-from-template') || (() => {})
+              }
+              onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
+              onNewTaskFromTemplate={
+                getPageAction('add-task-from-template') || (() => {})
+              }
+            />
+          ),
         };
       case '/tickets/leads':
         return {
@@ -307,6 +333,22 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           return null;
         }
 
+        // Show lower header for project detail pages
+        if (
+          pathname.match(/^\/project-management\/[^\/]+$/) ||
+          pathname.match(/^\/admin\/project-management\/[^\/]+$/)
+        ) {
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
         // Show lower header for task detail pages
         if (pathname.match(/^\/tickets\/tasks\/[^\/]+$/)) {
           // Use dynamic page header if set, otherwise hide header
@@ -412,10 +454,11 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               supportCaseAssignmentControls={
                 pageConfig.supportCaseAssignmentControls
               }
+              projectFilterControls={pageConfig.projectFilterControls}
               customActions={pageConfig.customActions}
             />
           )}
-          <main className={styles.mainContent}>
+          <main className={styles.mainContent} data-scroll-container="main">
             <section className="pageWrapper">{children}</section>
           </main>
           <BackToTopButton />

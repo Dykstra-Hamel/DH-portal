@@ -1,8 +1,7 @@
 .pageContainer {
   padding: 0 16px;
-  max-width: 1240px;
   width: 100%;
-  margin: 0 auto;
+  max-width: 100%;
 
   @media (min-width: 769px) {
     padding: 0;
@@ -115,35 +114,114 @@
   margin-bottom: 24px;
 }
 
-.viewTabs {
+// Tabs Row - wrapper for tabs and search (matching tickets/dashboard)
+.tabsRow {
   display: flex;
-  gap: 4px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 32px;
 }
 
-.viewTab {
+// Tabs Section - tabs with border bottom (matching tickets/dashboard)
+.tabsSection {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    height: 0;
+  }
+}
+
+// Search Section - search with border bottom (matching tickets/dashboard)
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  padding-bottom: 10px;
+  flex-shrink: 0;
+
+  &:focus-within {
+    border-bottom-color: var(--gray-800, #252c37);
+  }
+}
+
+.searchInput {
+  width: 182px;
+  padding: 0;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-300, #d1d5db);
+  background: transparent;
+  border: none;
+  outline: none;
+  transition: color 0.2s ease;
+  text-align: left;
+
+  &::placeholder {
+    color: var(--gray-300, #d1d5db);
+  }
+
+  &:focus {
+    color: var(--gray-800, #252c37);
+
+    &::placeholder {
+      color: var(--gray-500, #6a7282);
+    }
+  }
+}
+
+.searchIcon {
+  color: var(--gray-300, #d1d5db);
+  flex-shrink: 0;
+}
+
+.searchSection:focus-within .searchIcon {
+  color: var(--gray-800, #252c37);
+}
+
+.searchSection:focus-within .searchInput {
+  color: var(--gray-800, #252c37);
+}
+
+// Category Tab (matching tickets/dashboard tabs)
+.categoryTab {
   position: relative;
   display: inline-flex;
   align-items: center;
   padding: 10px 14px;
   gap: 8px;
+  white-space: nowrap;
+
+  &:first-child {
+    padding-left: 0;
+
+    &::after {
+      left: 0;
+    }
+  }
+
   border: none;
   background: transparent;
   box-shadow: none;
   cursor: pointer;
   transition: color 0.2s ease;
-  color: var(--gray-600);
-  font-family: var(--font-satoshi);
+  color: var(--gray-600, #525252);
+  font-family: var(--font-satoshi, inherit);
   font-size: 14px;
   font-style: normal;
   font-weight: 600;
   line-height: 18px;
 
-  svg {
-    flex-shrink: 0;
-  }
-
   &:hover {
-    color: var(--gray-800);
+    color: var(--gray-800, #262626);
   }
 
   &::after {
@@ -165,17 +243,156 @@
     background: transparent;
     border: none;
     box-shadow: none;
-    color: var(--action-500);
-
-    svg {
-      color: var(--action-500);
-    }
+    color: var(--action-500, #0088cc);
 
     &::after {
-      background: var(--action-500);
+      background: var(--action-500, #0088cc);
       transform: scaleX(1);
     }
   }
+}
+
+.tabCount {
+  color: var(--action-600, #007ab3);
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+// Legacy categoryTabs class for backwards compatibility
+.categoryTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+// View Tabs (Updated to match Figma)
+.viewTabs {
+  display: inline-flex;
+  width: fit-content;
+  gap: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--UI-Gray-300, #D1D5DB);
+  background: var(--White, #FFF);
+  padding: 4px;
+}
+
+// View Controls Row
+.viewControls {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.viewTab {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+
+  // Inactive state
+  color: var(--UI-Gray-400, #99A1AF);
+  font-family: "Satoshi Variable", var(--font-satoshi);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 14px;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(.active) {
+    color: var(--UI-Gray-600);
+  }
+
+  &.active {
+    background: var(--UI-Gray-100, #F3F4F6);
+    color: var(--UI-Gray-950, #0C0E12);
+  }
+}
+
+// Responsive: Horizontal scroll for category tabs on mobile
+@media (max-width: 768px) {
+  .categoryTabs {
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--UI-Gray-300);
+      border-radius: 2px;
+    }
+  }
+}
+
+.categoryFilter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.filterLabel {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-700);
+  font-family: var(--font-satoshi);
+  white-space: nowrap;
+}
+
+.filterSelect {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-800);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--action-400);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--gray-100);
+  }
+}
+
+.noCompanyMessage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--gray-600);
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  text-align: center;
 }
 
 .viewContent {

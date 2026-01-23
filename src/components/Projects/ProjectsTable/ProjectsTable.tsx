@@ -22,7 +22,7 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
   const router = useRouter();
 
   const handleProjectClick = (projectId: string) => {
-    router.push(`/project-management/${projectId}`);
+    router.push(`/admin/project-management/${projectId}`);
   };
 
   const getStatusColor = (status: string) => {

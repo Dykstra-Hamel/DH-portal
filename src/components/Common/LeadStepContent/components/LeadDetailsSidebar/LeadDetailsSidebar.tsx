@@ -467,12 +467,13 @@ export function LeadDetailsSidebar({
       onSectionClick={() => setActiveSection('sidebar')}
     >
           <InfoCard
-            title="Contact Information"
+            title="Contact Info"
             icon={<SquareUserRound size={20} />}
             startExpanded={false}
             onExpand={handleCardExpand}
             forceCollapse={!isSidebarExpanded}
             isCompact={!isSidebarExpanded}
+            inSidebar={true}
           >
             <CustomerInformation
               ticket={createTicketFromLead}
@@ -543,6 +544,7 @@ export function LeadDetailsSidebar({
               onExpand={handleCardExpand}
               forceCollapse={!isSidebarExpanded}
               isCompact={!isSidebarExpanded}
+              inSidebar={true}
             />
           </div>
 
@@ -554,6 +556,7 @@ export function LeadDetailsSidebar({
             forceCollapse={!isSidebarExpanded}
             forceExpand={shouldExpandActivity}
             isCompact={!isSidebarExpanded}
+            inSidebar={true}
           >
             <ActivityFeed
               entityType="lead"
@@ -569,6 +572,7 @@ export function LeadDetailsSidebar({
             onExpand={handleCardExpand}
             forceCollapse={!isSidebarExpanded}
             isCompact={!isSidebarExpanded}
+            inSidebar={true}
           >
             <NotesSection
               entityType="lead"
@@ -594,6 +598,7 @@ export function LeadDetailsSidebar({
             onExpand={handleCardExpand}
             forceCollapse={!isSidebarExpanded}
             isCompact={!isSidebarExpanded}
+            inSidebar={true}
           >
             <LeadCallFormInfo lead={lead} />
           </InfoCard>

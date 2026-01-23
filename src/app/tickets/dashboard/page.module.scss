@@ -186,37 +186,33 @@
   line-height: 14px;
 }
 
-// Actions & Tasks Row - 2 column layout (50/50)
-.actionsTasksRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-
-  @media (max-width: 900px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-// Left column container with title and boxes
-.actionsTasksLeftColumn {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-// Container for My Actions and My Tasks boxes
+// Container for My Actions, My Tasks, and Announcements boxes
 .actionsTasksBoxes {
   display: flex;
   gap: 12px;
+  align-items: stretch;
+  flex-wrap: wrap;
+  width: 100%;
 
   @media (max-width: 600px) {
     flex-direction: column;
   }
 }
 
-// Action/Task Box Shared Styles
+.actionsTasksCard {
+  width: 100%;
+  background: var(--UX-Colors-White, #fff);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 8px;
+  padding: 35px;
+  margin-top: 35px;
+  box-sizing: border-box;
+}
+
+// Action/Task/Announcement Box Shared Styles
 .actionBox,
-.taskBox {
+.taskBox,
+.announcementBox {
   display: flex;
   flex-direction: column;
   width: 318px;
@@ -255,19 +251,15 @@
   }
 }
 
-.announcementsSection {
-  display: flex;
-  flex-direction: column;
-}
-
-.announcementsTitle {
-  color: var(--UX-Colors-Neutral-Colors-Neutral-900, #171717);
-  font-size: 18px;
-  font-style: normal;
-  font-weight: 600;
-  line-height: 28px;
-  margin: 0 0 16px 0;
-  padding: 0;
+.announcementBox {
+  width: auto;
+  height: auto;
+  min-height: 119px;
+  max-height: 119px;
+  flex: 1;
+  min-width: 280px;
+  padding-right: 130px;
+  overflow: visible;
 }
 
 .boxHeader {
@@ -337,13 +329,13 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .announcementItem {
-  padding: 12px 0;
-  background: var(--UX-Colors-Neutral-Colors-Neutral-50, #fafafa);
-  border-radius: 8px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 
   strong {
     display: block;
@@ -381,34 +373,12 @@
   }
 }
 
-.loadMoreWrapper {
-  display: flex;
-  justify-content: center;
-  margin-top: 12px;
-}
-
-.loadMoreButton {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--gray-300, #d1d5db);
-  background: var(--white);
-  color: var(--gray-700, #374152);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
-
-  &:hover {
-    background: var(--gray-100, #f3f4f6);
-    border-color: var(--gray-400, #99a1af);
-    color: var(--gray-900, #161a22);
-  }
-}
-
-// Assigned Tickets Section
-.assignedTicketsSection {
-  margin-top: 8px;
+.announcementImage {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 128px;
+  height: 161px;
+  object-fit: contain;
+  pointer-events: none;
 }

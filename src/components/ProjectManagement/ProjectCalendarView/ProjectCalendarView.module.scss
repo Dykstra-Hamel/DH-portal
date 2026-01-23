@@ -63,7 +63,7 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
-  grid-auto-rows: minmax(100px, auto);
+  grid-auto-rows: minmax(140px, auto);
 }
 
 .calendarDay {
@@ -75,9 +75,10 @@
   flex-direction: column;
   gap: 6px;
   transition: all 0.2s ease;
-  min-height: 100px;
+  min-height: 140px;
   min-width: 0;
   overflow: hidden;
+  cursor: pointer;
 
   &:hover {
     border-color: var(--action-300);
@@ -121,8 +122,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  overflow-y: auto;
-  max-height: 120px;
+  overflow: hidden;
 }
 
 .projectItem {
@@ -131,13 +131,69 @@
   border-left-width: 3px;
   border-radius: 4px;
   padding: 6px 8px;
-  cursor: pointer;
+  cursor: inherit;
   transition: all 0.2s ease;
 
   &:hover {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transform: translateY(-1px);
   }
+}
+
+.moreProjects {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-600);
+  padding: 2px 6px;
+}
+
+.dayModalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px;
+}
+
+.modalProjectList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modalProjectItem {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: white;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    border-color: var(--action-300);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+  }
+}
+
+.modalProjectName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.modalProjectMeta {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.noProjects {
+  font-size: 14px;
+  color: var(--gray-500);
 }
 
 .projectItemName {
@@ -163,11 +219,11 @@
 
 @media (max-width: 1024px) {
   .calendarGrid {
-    grid-auto-rows: minmax(80px, auto);
+    grid-auto-rows: minmax(120px, auto);
   }
 
   .calendarDay {
-    min-height: 80px;
+    min-height: 120px;
     padding: 6px;
   }
 
@@ -196,11 +252,11 @@
 
   .calendarGrid {
     gap: 4px;
-    grid-auto-rows: minmax(60px, auto);
+    grid-auto-rows: minmax(96px, auto);
   }
 
   .calendarDay {
-    min-height: 60px;
+    min-height: 96px;
     padding: 4px;
   }
 
@@ -208,10 +264,6 @@
     font-size: 12px;
     width: 20px;
     height: 20px;
-  }
-
-  .projectsList {
-    max-height: 80px;
   }
 
   .projectItem {

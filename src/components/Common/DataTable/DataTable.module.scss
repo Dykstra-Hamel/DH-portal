@@ -273,6 +273,10 @@
   gap: 6px;
 }
 
+.mutedText {
+  color: var(--gray-400, #9ca3af);
+}
+
 .serviceTypeCell {
   display: flex;
   align-items: center;

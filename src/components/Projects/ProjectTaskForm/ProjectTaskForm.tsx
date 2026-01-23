@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save } from 'lucide-react';
 import {
   ProjectTask,
@@ -42,6 +42,57 @@ export default function ProjectTaskForm({
     start_date: '',
     parent_task_id: '',
   });
+
+  const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
+
+  const getUserRole = (user: any) => {
+    if (user?.profiles?.role) return user.profiles.role;
+    if (user?.role) return user.role;
+    if (Array.isArray(user?.roles)) {
+      if (user.roles.includes('admin')) return 'admin';
+      if (user.roles.includes('super_admin')) return 'super_admin';
+    }
+    return null;
+  };
+
+  const getUserDisplayName = (user: any) => {
+    const profile = user?.profiles;
+    const firstName = profile?.first_name || user?.first_name || '';
+    const lastName = profile?.last_name || user?.last_name || '';
+    const email = profile?.email || user?.email || '';
+    const name = `${firstName} ${lastName}`.trim();
+    return name ? (email ? `${name} (${email})` : name) : email || 'User';
+  };
+
+  const assignableUsers = useMemo(() => {
+    const shouldFilterByRole = users.some(user => getUserRole(user));
+    const adminUsers = shouldFilterByRole
+      ? users.filter(user => {
+          const role = getUserRole(user);
+          return role ? isAdminRole(role) : false;
+        })
+      : users;
+
+    const assignedId = formData.assigned_to || editingTask?.assigned_to || '';
+    if (assignedId && !adminUsers.some(user => user.id === assignedId)) {
+      const assignedUser = users.find(user => user.id === assignedId);
+      if (assignedUser) {
+        return [...adminUsers, assignedUser];
+      }
+      if (editingTask?.assigned_to_profile) {
+        return [
+          ...adminUsers,
+          {
+            id: assignedId,
+            profiles: editingTask.assigned_to_profile,
+            email: editingTask.assigned_to_profile.email,
+          },
+        ];
+      }
+    }
+
+    return adminUsers;
+  }, [editingTask?.assigned_to, formData.assigned_to, users]);
 
   useEffect(() => {
     if (editingTask) {
@@ -201,9 +252,9 @@ export default function ProjectTaskForm({
                     className={styles.select}
                   >
                     <option value="">Unassigned</option>
-                    {users.map(u => (
+                    {assignableUsers.map(u => (
                       <option key={u.id} value={u.id}>
-                        {u.profiles?.first_name} {u.profiles?.last_name} ({u.email})
+                        {getUserDisplayName(u)}
                       </option>
                     ))}
                   </select>

@@ -12,6 +12,7 @@ interface InfoCardProps {
   forceCollapse?: boolean;
   forceExpand?: boolean;
   isCompact?: boolean;
+  inSidebar?: boolean;
 }
 
 export function InfoCard({
@@ -25,15 +26,16 @@ export function InfoCard({
   forceCollapse = false,
   forceExpand = false,
   isCompact = false,
+  inSidebar = false,
 }: InfoCardProps) {
   const [isExpanded, setIsExpanded] = useState(startExpanded);
 
   // Force collapse when forceCollapse prop becomes true
   useEffect(() => {
-    if (forceCollapse) {
+    if (forceCollapse && !forceExpand) {
       setIsExpanded(false);
     }
-  }, [forceCollapse]);
+  }, [forceCollapse, forceExpand]);
 
   // Force expand when forceExpand prop becomes true
   useEffect(() => {
@@ -57,7 +59,7 @@ export function InfoCard({
 
   return (
     <div
-      className={`${styles.infoCard} ${isCompact ? styles.compact : ''} ${className}`}
+      className={`${styles.infoCard} ${isCompact ? styles.compact : ''} ${inSidebar ? styles.inSidebar : ''} ${className}`}
     >
       <div
         className={`${styles.header} ${isCollapsible ? styles.clickable : ''} ${!isExpanded ? styles.collapsed : styles.expanded}`}

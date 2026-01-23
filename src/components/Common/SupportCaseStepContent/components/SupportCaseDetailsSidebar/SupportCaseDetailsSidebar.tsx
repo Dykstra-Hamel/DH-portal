@@ -61,12 +61,13 @@ export function SupportCaseDetailsSidebar({
       onSectionClick={() => setActiveSection('sidebar')}
     >
       <InfoCard
-        title="Contact Information"
+        title="Contact Info"
         icon={<SquareUserRound size={20} />}
         startExpanded={false}
         onExpand={handleCardExpand}
         forceCollapse={!isSidebarExpanded}
         isCompact={!isSidebarExpanded}
+        inSidebar={true}
       >
         <CustomerInformation
           ticket={createTicketFromSupportCase}
@@ -94,6 +95,7 @@ export function SupportCaseDetailsSidebar({
         onExpand={handleCardExpand}
         forceCollapse={!isSidebarExpanded}
         isCompact={!isSidebarExpanded}
+        inSidebar={true}
       />
 
       <InfoCard
@@ -103,6 +105,7 @@ export function SupportCaseDetailsSidebar({
         onExpand={handleCardExpand}
         forceCollapse={!isSidebarExpanded}
         isCompact={!isSidebarExpanded}
+        inSidebar={true}
       >
         <ActivityFeed
           entityType="support_case"
@@ -118,6 +121,7 @@ export function SupportCaseDetailsSidebar({
         onExpand={handleCardExpand}
         forceCollapse={!isSidebarExpanded}
         isCompact={!isSidebarExpanded}
+        inSidebar={true}
       >
         <NotesSection
           entityType="support_case"
@@ -148,6 +152,7 @@ export function SupportCaseDetailsSidebar({
         onExpand={handleCardExpand}
         forceCollapse={!isSidebarExpanded}
         isCompact={!isSidebarExpanded}
+        inSidebar={true}
       >
         <div className={styles.cardContent}>
           {supportCase.ticket ? (

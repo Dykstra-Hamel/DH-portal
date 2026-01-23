@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Project } from '@/types/project';
+import { Project, statusOptions } from '@/types/project';
 import { Task } from '@/types/taskManagement';
 import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
 import styles from './ProjectsView.module.scss';
 
-type ProjectStatus = 'coming_up' | 'design' | 'development' | 'out_to_client' | 'waiting_on_client' | 'bill_client';
+type ProjectStatus = Project['status'];
 
 interface ProjectsViewProps {
   projects: Project[];
@@ -57,23 +57,25 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { color: string; textColor: string; label: string }> = {
-      coming_up: { color: '#f3f4f6', textColor: '#6b7280', label: 'Coming Up' },
-      design: { color: '#ddd6fe', textColor: '#5b21b6', label: 'Design' },
-      development: { color: '#dbeafe', textColor: '#1e40af', label: 'Development' },
-      out_to_client: { color: '#fef3c7', textColor: '#b45309', label: 'Out To Client' },
-      waiting_on_client: { color: '#fee2e2', textColor: '#991b1b', label: 'Waiting On Client' },
-      bill_client: { color: '#d1fae5', textColor: '#065f46', label: 'Bill Client' },
-    };
+  const hexToRgba = (hex: string, alpha: number) => {
+    const sanitized = hex.replace('#', '');
+    if (sanitized.length !== 6) return hex;
+    const r = parseInt(sanitized.slice(0, 2), 16);
+    const g = parseInt(sanitized.slice(2, 4), 16);
+    const b = parseInt(sanitized.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
 
-    const config = statusConfig[status] || statusConfig.coming_up;
+  const getStatusBadge = (status: ProjectStatus) => {
+    const option = statusOptions.find(item => item.value === status);
+    const color = option?.color ?? '#6b7280';
+    const label = option?.label ?? status;
     return (
       <span
         className={styles.statusBadge}
-        style={{ background: config.color, color: config.textColor }}
+        style={{ background: hexToRgba(color, 0.16), color }}
       >
-        {config.label}
+        {label}
       </span>
     );
   };
@@ -118,12 +120,11 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
           onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | 'all')}
         >
           <option value="all">All Status</option>
-          <option value="coming_up">Coming Up</option>
-          <option value="design">Design</option>
-          <option value="development">Development</option>
-          <option value="out_to_client">Out To Client</option>
-          <option value="waiting_on_client">Waiting On Client</option>
-          <option value="bill_client">Bill Client</option>
+          {statusOptions.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
 
         <select

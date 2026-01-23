@@ -48,7 +48,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       setActivePrimaryNav('customers');
     } else if (pathname.startsWith('/brand')) {
       setActivePrimaryNav('brand');
-    } else if (pathname.startsWith('/project-management')) {
+    } else if (pathname.startsWith('/project-management') || pathname.startsWith('/admin/project-management')) {
       setActivePrimaryNav('project-management');
     } else if (pathname.startsWith('/dashboard')) {
       setActivePrimaryNav('dashboard');
