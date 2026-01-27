@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useStarredItems } from '@/hooks/useStarredItems';
 import ProjectForm from '@/components/Projects/ProjectForm/ProjectForm';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { ProjectKanbanView } from '@/components/ProjectManagement/ProjectKanbanView/ProjectKanbanView';
@@ -26,9 +27,18 @@ export default function AdminProjectManagementDashboard() {
   const { registerPageAction, setPageHeader } = usePageActions();
   const { user, profile } = useUser();
   const { selectedCompany, isLoading: companyLoading } = useCompany();
+  const { isStarred, toggleStar } = useStarredItems();
 
   // View and modal state
   const [currentView, setCurrentView] = useState<ViewType>('kanban');
+  const [kanbanGroupBy, setKanbanGroupBy] = useState<'date' | 'status'>(() => {
+    // Load saved preference from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('projectManagement.kanbanGroupBy');
+      return (saved === 'status' ? 'status' : 'date') as 'date' | 'status';
+    }
+    return 'date';
+  });
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showTemplateSelectorModal, setShowTemplateSelectorModal] = useState(false);
@@ -67,6 +77,13 @@ export default function AdminProjectManagementDashboard() {
       router.push('/dashboard');
     }
   }, [profile, isAdmin, router]);
+
+  // Save kanban groupBy preference to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('projectManagement.kanbanGroupBy', kanbanGroupBy);
+    }
+  }, [kanbanGroupBy]);
 
   // Helper function to get authentication headers
   const getAuthHeaders = async () => {
@@ -167,9 +184,13 @@ export default function AdminProjectManagementDashboard() {
         params.append('companyId', filterCompanyId);
       }
 
-      // Add category filter if selected
+      // Add category filter if selected (handle "billing" as special case)
       if (selectedCategoryId) {
-        params.append('categoryId', selectedCategoryId);
+        if (selectedCategoryId === 'billing') {
+          params.append('isBillable', 'true');
+        } else {
+          params.append('categoryId', selectedCategoryId);
+        }
       }
 
       // Add assigned_to filter if selected
@@ -272,21 +293,32 @@ export default function AdminProjectManagementDashboard() {
       ).length;
     });
 
+    // Add billing count (projects with is_billable = true)
+    counts['billing'] = projectsToCount.filter((project) => project.is_billable).length;
+
     return counts;
   }, [allProjectsForCounts, projects, availableCategories]);
 
+  // Add starred status to projects
+  const projectsWithStarred = useMemo(() => {
+    return projects.map(project => ({
+      ...project,
+      is_starred: isStarred('project', project.id),
+    }));
+  }, [projects, isStarred]);
+
   // Filter projects by search query
   const filteredProjects = useMemo(() => {
-    if (!searchQuery.trim()) return projects;
+    if (!searchQuery.trim()) return projectsWithStarred;
 
     const query = searchQuery.toLowerCase();
-    return projects.filter((project) =>
+    return projectsWithStarred.filter((project) =>
       project.name.toLowerCase().includes(query) ||
       project.description?.toLowerCase().includes(query) ||
       project.shortcode?.toLowerCase().includes(query) ||
       project.company?.name.toLowerCase().includes(query)
     );
-  }, [projects, searchQuery]);
+  }, [projectsWithStarred, searchQuery]);
 
   const taskStatsByProject = useMemo(() => {
     const stats: Record<string, { completed: number; total: number }> = {};
@@ -396,7 +428,24 @@ export default function AdminProjectManagementDashboard() {
 
   // Default assigned filter to all users (null)
 
-  const handleProjectClick = (project: Project) => {
+  const handleProjectClick = async (project: Project) => {
+    // Mark mention notifications as read for this project
+    if (project.has_unread_mentions && user) {
+      try {
+        await fetch('/api/notifications/mark-project-mentions-read', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            projectId: project.id,
+          }),
+        });
+      } catch (error) {
+        console.error('Error marking notifications as read:', error);
+      }
+    }
+
     router.push(`/admin/project-management/${project.id}`);
   };
 
@@ -588,6 +637,11 @@ export default function AdminProjectManagementDashboard() {
     }
   }, [fetchProjects, user]);
 
+  const handleToggleStar = useCallback(async (projectId: string) => {
+    await toggleStar('project', projectId);
+    // The UI will update automatically through the isStarred check in projectsWithStarred
+  }, [toggleStar]);
+
   // Don't render for non-admins (after all hooks have been called)
   if (!isAdmin) {
     return null;
@@ -615,6 +669,13 @@ export default function AdminProjectManagementDashboard() {
               <span className={styles.tabCount}>{categoryCounts[category.id] || 0}</span>
             </button>
           ))}
+          <button
+            className={`${styles.categoryTab} ${selectedCategoryId === 'billing' ? styles.active : ''}`}
+            onClick={() => setSelectedCategoryId('billing')}
+          >
+            Billing
+            <span className={styles.tabCount}>{categoryCounts['billing'] || 0}</span>
+          </button>
         </div>
         <div className={styles.searchSection}>
           <input
@@ -660,6 +721,24 @@ export default function AdminProjectManagementDashboard() {
             Calendar
           </button>
         </div>
+
+        {/* Kanban Group By Toggle - RIGHT SIDE */}
+        {currentView === 'kanban' && (
+          <div className={styles.kanbanGroupToggle}>
+            <button
+              className={`${styles.groupToggleButton} ${kanbanGroupBy === 'date' ? styles.active : ''}`}
+              onClick={() => setKanbanGroupBy('date')}
+            >
+              Due Date
+            </button>
+            <button
+              className={`${styles.groupToggleButton} ${kanbanGroupBy === 'status' ? styles.active : ''}`}
+              onClick={() => setKanbanGroupBy('status')}
+            >
+              Status
+            </button>
+          </div>
+        )}
       </div>
 
       {/* View Content */}
@@ -678,6 +757,8 @@ export default function AdminProjectManagementDashboard() {
                 onProjectClick={handleProjectClick}
                 onUpdateProject={handleUpdateProject}
                 onAddTask={() => setShowTaskModal(true)}
+                onToggleStar={handleToggleStar}
+                groupBy={kanbanGroupBy}
               />
             )}
             {currentView === 'list' && (
@@ -686,6 +767,7 @@ export default function AdminProjectManagementDashboard() {
                 tasks={tasks.map(convertToTask)}
                 onEditProject={handleEditProject}
                 onDeleteProject={handleDeleteProject}
+                onToggleStar={handleToggleStar}
               />
             )}
             {currentView === 'calendar' && (

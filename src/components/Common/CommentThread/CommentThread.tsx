@@ -1,20 +1,139 @@
 import React, { useState } from 'react';
-import { Comment, getUserById } from '@/types/taskManagement';
+import { Comment, CommentAttachment, getUserById } from '@/types/taskManagement';
 import { CommentInput } from '../CommentInput/CommentInput';
 import styles from './CommentThread.module.scss';
 
 interface CommentThreadProps {
   comments: Comment[];
-  onAddComment: (content: string, parentCommentId?: string) => void;
+  onAddComment: (content: string, parentCommentId?: string, attachments?: File[]) => void;
   currentUserId: string;
 }
 
 interface CommentItemProps {
   comment: Comment;
   replies: Comment[];
-  onReply: (content: string, parentCommentId: string) => void;
+  onReply: (content: string, parentCommentId: string, attachments?: File[]) => void;
   currentUserId: string;
   level?: number;
+}
+
+function getFileTypeClass(mimeType: string): string {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType.includes('word')) return 'word';
+  if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'excel';
+  return 'file';
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function AttachmentDisplay({ attachment }: { attachment: CommentAttachment }) {
+  const fileType = getFileTypeClass(attachment.mime_type);
+  const isImage = attachment.mime_type.startsWith('image/');
+
+  return (
+    <a
+      href={attachment.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={styles.attachmentItem}
+      download={!isImage ? attachment.file_name : undefined}
+    >
+      <div className={`${styles.attachmentIcon} ${styles[fileType]}`}>
+        {isImage ? (
+          <img
+            src={attachment.url}
+            alt={attachment.file_name}
+            className={styles.attachmentThumbnail}
+          />
+        ) : (
+          <FileTypeIcon type={fileType} />
+        )}
+      </div>
+      <div className={styles.attachmentInfo}>
+        <span className={styles.attachmentName}>{attachment.file_name}</span>
+        <span className={styles.attachmentSize}>{formatFileSize(attachment.file_size)}</span>
+      </div>
+      <div className={styles.downloadIcon}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path
+            d="M7 1.75V10.5M7 10.5L3.5 7M7 10.5L10.5 7"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M1.75 12.25H12.25"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+    </a>
+  );
+}
+
+function FileTypeIcon({ type }: { type: string }) {
+  switch (type) {
+    case 'pdf':
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'word':
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'excel':
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    default:
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+  }
 }
 
 function CommentItem({ comment, replies, onReply, currentUserId, level = 0 }: CommentItemProps) {
@@ -22,8 +141,8 @@ function CommentItem({ comment, replies, onReply, currentUserId, level = 0 }: Co
   const user = getUserById(comment.user_id);
   const isCurrentUser = comment.user_id === currentUserId;
 
-  const handleReply = (content: string) => {
-    onReply(content, comment.id);
+  const handleReply = (content: string, attachments?: File[]) => {
+    onReply(content, comment.id, attachments);
     setShowReplyInput(false);
   };
 
@@ -56,6 +175,14 @@ function CommentItem({ comment, replies, onReply, currentUserId, level = 0 }: Co
       </div>
 
       <div className={styles.commentContent}>{comment.content}</div>
+
+      {comment.attachments && comment.attachments.length > 0 && (
+        <div className={styles.attachmentsList}>
+          {comment.attachments.map((attachment) => (
+            <AttachmentDisplay key={attachment.id} attachment={attachment} />
+          ))}
+        </div>
+      )}
 
       <div className={styles.commentActions}>
         <button
@@ -115,12 +242,12 @@ export function CommentThread({ comments, onAddComment, currentUserId }: Comment
   const getReplies = (commentId: string) =>
     comments.filter(c => c.parent_comment_id === commentId);
 
-  const handleAddTopLevelComment = (content: string) => {
-    onAddComment(content);
+  const handleAddTopLevelComment = (content: string, attachments?: File[]) => {
+    onAddComment(content, undefined, attachments);
   };
 
-  const handleReply = (content: string, parentCommentId: string) => {
-    onAddComment(content, parentCommentId);
+  const handleReply = (content: string, parentCommentId: string, attachments?: File[]) => {
+    onAddComment(content, parentCommentId, attachments);
   };
 
   return (

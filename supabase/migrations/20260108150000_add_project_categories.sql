@@ -6,7 +6,7 @@
 -- ============================================================================
 -- Stores project categories (both internal admin categories and company-specific)
 CREATE TABLE IF NOT EXISTS project_categories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
   description TEXT,
   color VARCHAR(7), -- Hex color for UI display (#RRGGBB)
@@ -35,7 +35,7 @@ COMMENT ON COLUMN project_categories.is_system_default IS 'System default catego
 -- ============================================================================
 -- Junction table for many-to-many relationship (projects can have multiple categories)
 CREATE TABLE IF NOT EXISTS project_category_assignments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   category_id UUID NOT NULL REFERENCES project_categories(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

@@ -1,0 +1,76 @@
+.starButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  color: #94a3b8; // Default gray color
+
+  &:hover {
+    background: rgba(148, 163, 184, 0.1);
+    color: #fbbf24; // Gold on hover
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+
+  // When starred, show gold color
+  .starIcon {
+    transition: all 0.2s ease;
+  }
+
+  &:has(path[fill='currentColor']) {
+    color: #fbbf24; // Gold for filled star
+
+    &:hover {
+      color: #f59e0b; // Darker gold on hover
+    }
+  }
+}
+
+// Size variants
+.small {
+  padding: 2px;
+
+  .starIcon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.medium {
+  padding: 4px;
+
+  .starIcon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.large {
+  padding: 6px;
+
+  .starIcon {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.starIcon {
+  display: block;
+  transition: transform 0.2s ease;
+
+  .starButton:hover & {
+    transform: scale(1.1);
+  }
+}

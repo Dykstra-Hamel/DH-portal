@@ -13,6 +13,19 @@ export const STORAGE_CONFIG = {
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB (brand-assets bucket limit)
   ALLOWED_TYPES: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
 
+  // Allowed types for comment attachments (images + documents)
+  ATTACHMENT_ALLOWED_TYPES: [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ],
+
   CATEGORIES: {
     ALTERNATE_LOGOS: 'alternate-logos',
     ICON_LOGOS: 'icon-logos',
@@ -20,6 +33,7 @@ export const STORAGE_CONFIG = {
     PHOTOGRAPHY: 'photography',
     IMAGE_LIBRARY: 'image-library', // ALL campaign uploads
     EMAIL_LOGOS: 'email-logos',
+    COMMENT_ATTACHMENTS: 'comment-attachments',
   }
 } as const;
 

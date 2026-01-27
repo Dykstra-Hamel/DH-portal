@@ -113,6 +113,113 @@
   word-break: break-word;
 }
 
+.attachmentsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 48px;
+}
+
+.attachmentItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  max-width: 280px;
+
+  &:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+
+    .downloadIcon {
+      color: var(--action-600);
+    }
+  }
+}
+
+.attachmentIcon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+
+  &.image {
+    background: var(--gray-100);
+  }
+
+  &.pdf {
+    color: #dc2626;
+    background: #fef2f2;
+  }
+
+  &.word {
+    color: #2563eb;
+    background: #eff6ff;
+  }
+
+  &.excel {
+    color: #16a34a;
+    background: #f0fdf4;
+  }
+
+  &.file {
+    color: var(--gray-500);
+    background: var(--gray-100);
+  }
+}
+
+.attachmentThumbnail {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.attachmentInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.attachmentName {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--gray-800);
+  font-family: var(--font-satoshi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachmentSize {
+  font-size: 11px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+}
+
+.downloadIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--gray-400);
+  transition: color 0.2s ease;
+}
+
 .commentActions {
   display: flex;
   gap: 12px;
@@ -197,6 +304,15 @@
 
   .commentContent {
     padding-left: 44px;
+  }
+
+  .attachmentsList {
+    padding-left: 44px;
+    flex-direction: column;
+  }
+
+  .attachmentItem {
+    max-width: 100%;
   }
 
   .commentActions {

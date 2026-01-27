@@ -189,6 +189,10 @@
   color: #6b7280;
 }
 
+.deadlineOverdue {
+  color: var(--error-600, #e7000b);
+}
+
 .actions {
   display: flex;
   gap: 6px;

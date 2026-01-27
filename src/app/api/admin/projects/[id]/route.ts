@@ -21,7 +21,7 @@ export async function GET(
         ),
         activity:project_activity(
           *,
-          user_profile:profiles(id, first_name, last_name, email)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
         ),
         categories:project_category_assignments(
           id,
@@ -58,7 +58,7 @@ export async function GET(
 
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email')
+      .select('id, first_name, last_name, email, avatar_url')
       .in('id', userIds);
 
     if (profilesError) {
@@ -119,6 +119,8 @@ export async function PUT(
       tags,
       notes,
       primary_file_path,
+      scope,
+      category_ids,
     } = body;
 
     // Validate required fields
@@ -162,6 +164,7 @@ export async function PUT(
         tags: parsedTags,
         notes,
         primary_file_path: primary_file_path || null,
+        scope: scope || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -182,6 +185,46 @@ export async function PUT(
         { error: 'Failed to update project' },
         { status: 500 }
       );
+    }
+
+    // Handle category assignments if category_ids is provided
+    if (category_ids !== undefined) {
+      // Use admin client for category assignment updates
+      const adminSupabase = createAdminClient();
+
+      // Delete all existing category assignments
+      const { error: deleteError } = await adminSupabase
+        .from('project_category_assignments')
+        .delete()
+        .eq('project_id', id);
+
+      if (deleteError) {
+        console.error('Error deleting category assignments:', deleteError);
+        return NextResponse.json(
+          { error: 'Failed to update category assignments' },
+          { status: 500 }
+        );
+      }
+
+      // Create new category assignments if category_ids is not empty
+      if (Array.isArray(category_ids) && category_ids.length > 0) {
+        const assignments = category_ids.map(category_id => ({
+          project_id: id,
+          category_id,
+        }));
+
+        const { error: insertError } = await adminSupabase
+          .from('project_category_assignments')
+          .insert(assignments);
+
+        if (insertError) {
+          console.error('Error creating category assignments:', insertError);
+          return NextResponse.json(
+            { error: 'Failed to create category assignments' },
+            { status: 500 }
+          );
+        }
+      }
     }
 
     // Get profiles for the users involved in this project

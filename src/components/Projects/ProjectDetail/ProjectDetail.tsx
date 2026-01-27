@@ -32,6 +32,7 @@ import {
   printSubtypes,
   digitalSubtypes,
 } from '@/types/project';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import styles from './ProjectDetail.module.scss';
 
 const PRESET_PROJECT_TAGS = [
@@ -83,6 +84,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     project_subtype: project.project_subtype || '',
     is_billable: project.is_billable || false,
     quoted_price: project.quoted_price?.toString() || '',
+    scope: project.scope || '',
+    category_ids: project.categories?.map(c => c.category_id) || [],
   }));
   const [customSubtype, setCustomSubtype] = useState('');
   const [toastMessage, setToastMessage] = useState('');
@@ -91,9 +94,30 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   const [pendingExpandCard, setPendingExpandCard] = useState<string | null>(
     null
   );
+  const [availableCategories, setAvailableCategories] = useState<Array<{ id: string; name: string }>>([]);
   const hasUserEditedRef = React.useRef(false);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = React.useRef<string>('');
+
+  // Filter status options based on project categories and is_billable
+  const availableStatusOptions = useMemo(() => {
+    const hasPrintCategory = availableCategories.some(
+      cat => editFormData.category_ids.includes(cat.id) && cat.name === 'Print'
+    );
+    const isBillable = editFormData.is_billable || project.is_billable || false;
+
+    return statusOptions.filter(status => {
+      // Using extended statusOptions with requiresCategory and requiresBillable
+      if (status.requiresCategory === 'Print' && !hasPrintCategory) {
+        return false;
+      }
+      // Using extended statusOptions with requiresCategory and requiresBillable
+      if (status.requiresBillable && !isBillable) {
+        return false;
+      }
+      return true;
+    });
+  }, [availableCategories, editFormData.category_ids, editFormData.is_billable, project.is_billable]);
 
   const formatScope = (scope?: string | null) => {
     switch (scope) {
@@ -238,6 +262,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         : rawSubtype,
       is_billable: source.is_billable || false,
       quoted_price: source.quoted_price?.toString() || '',
+      scope: source.scope || '',
+      category_ids: source.categories?.map(c => c.category_id) || [],
     };
 
     // Store the initial state to compare against later
@@ -251,6 +277,22 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   React.useEffect(() => {
     resetFormData(project);
   }, [project, resetFormData]);
+
+  // Fetch available categories
+  React.useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/admin/project-categories');
+        if (response.ok) {
+          const categories = await response.json();
+          setAvailableCategories(categories);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const currentSubtypes = useMemo(
     () => getSubtypesForType(editFormData.project_type),
@@ -287,6 +329,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           project_subtype: resolvedSubtype || null,
           is_billable: editFormData.is_billable,
           quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
+          scope: editFormData.scope || null,
+          category_ids: editFormData.category_ids,
         }),
       });
 
@@ -406,7 +450,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     }
 
     return adminUsers;
-  }, [editFormData.assigned_to, project.assigned_to_profile?.id, users]);
+  }, [editFormData.assigned_to, project.assigned_to_profile, users]);
 
   const assignedTaskSummaries = useMemo(() => {
     const profilesById = new Map<string, ProjectUser['profiles']>();
@@ -416,7 +460,15 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
     const counts = new Map<
       string,
-      { id: string; name: string; email?: string; count: number }
+      {
+        id: string;
+        name: string;
+        email?: string;
+        count: number;
+        avatarUrl?: string | null;
+        firstName?: string;
+        lastName?: string;
+      }
     >();
 
     tasks.forEach(task => {
@@ -424,14 +476,12 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
       const profile =
         task.assigned_to_profile || profilesById.get(task.assigned_to);
-      const nameParts = [profile?.first_name, profile?.last_name].filter(
-        Boolean
-      );
-      const name =
-        nameParts.length > 0
-          ? nameParts.join(' ')
-          : profile?.email || 'Unknown User';
+      const firstName = profile?.first_name || '';
+      const lastName = profile?.last_name || '';
+      const nameParts = [firstName, lastName].filter(Boolean);
+      const name = nameParts.length > 0 ? nameParts.join(' ') : profile?.email || 'Unknown User';
       const email = profile?.email;
+      const avatarUrl = profile?.avatar_url ?? null;
 
       const existing = counts.get(task.assigned_to);
       if (existing) {
@@ -441,6 +491,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           id: task.assigned_to,
           name,
           email,
+          avatarUrl,
+          firstName: firstName || undefined,
+          lastName: lastName || undefined,
           count: 1,
         });
       }
@@ -617,7 +670,16 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <Flag size={16} />
             <div>
               <div className={styles.infoLabel}>Project Scope</div>
-              <div className={styles.infoValue}>{formatScope(project.scope)}</div>
+              <select
+                className={styles.editSelect}
+                value={editFormData.scope}
+                onChange={(e) => handleFieldChange('scope', e.target.value)}
+              >
+                <option value="">Not set</option>
+                <option value="internal">Internal Only</option>
+                <option value="external">External Only</option>
+                <option value="both">Internal + External</option>
+              </select>
             </div>
           </div>
 
@@ -625,17 +687,28 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <Tag size={16} />
             <div>
               <div className={styles.infoLabel}>Project Categories</div>
-              {project.categories && project.categories.length > 0 ? (
-                <div className={styles.categoryList}>
-                  {project.categories.map((assignment) => (
-                    <span key={assignment.id} className={styles.categoryBadge}>
-                      {assignment.category?.name || 'Uncategorized'}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className={styles.infoValue}>None</div>
-              )}
+              <div className={styles.categoryCheckboxes}>
+                {availableCategories.length > 0 ? (
+                  availableCategories.map((category) => (
+                    <label key={category.id} className={styles.categoryCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={editFormData.category_ids.includes(category.id)}
+                        onChange={(e) => {
+                          hasUserEditedRef.current = true;
+                          const newCategoryIds = e.target.checked
+                            ? [...editFormData.category_ids, category.id]
+                            : editFormData.category_ids.filter((id) => id !== category.id);
+                          setEditFormData({ ...editFormData, category_ids: newCategoryIds });
+                        }}
+                      />
+                      <span>{category.name}</span>
+                    </label>
+                  ))
+                ) : (
+                  <div className={styles.infoValue}>No categories available</div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -648,7 +721,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 value={editFormData.status}
                 onChange={(e) => handleFieldChange('status', e.target.value as typeof editFormData.status)}
               >
-                {statusOptions.map((option) => (
+                {availableStatusOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -833,15 +906,25 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <div>
               <div className={styles.infoLabel}>Requested By</div>
               {project.requested_by_profile ? (
-                <>
-                  <div className={styles.infoValue}>
-                    {project.requested_by_profile.first_name}{' '}
-                    {project.requested_by_profile.last_name}
+                <div className={styles.infoPerson}>
+                  <MiniAvatar
+                    firstName={project.requested_by_profile.first_name || undefined}
+                    lastName={project.requested_by_profile.last_name || undefined}
+                    email={project.requested_by_profile.email}
+                    avatarUrl={project.requested_by_profile.avatar_url || null}
+                    size="small"
+                    showTooltip={true}
+                  />
+                  <div>
+                    <div className={styles.infoValue}>
+                      {project.requested_by_profile.first_name}{' '}
+                      {project.requested_by_profile.last_name}
+                    </div>
+                    <div className={styles.infoEmail}>
+                      {project.requested_by_profile.email}
+                    </div>
                   </div>
-                  <div className={styles.infoEmail}>
-                    {project.requested_by_profile.email}
-                  </div>
-                </>
+                </div>
               ) : (
                 <div className={styles.infoValue}>Not set</div>
               )}
@@ -875,11 +958,21 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 <div className={styles.assignedTasksList}>
                   {assignedTaskSummaries.map(summary => (
                     <div key={summary.id} className={styles.assignedTaskItem}>
-                      <div>
-                        <div className={styles.infoValue}>{summary.name}</div>
-                        {summary.email && summary.email !== summary.name && (
-                          <div className={styles.infoEmail}>{summary.email}</div>
-                        )}
+                      <div className={styles.assignedTaskPerson}>
+                        <MiniAvatar
+                          firstName={summary.firstName}
+                          lastName={summary.lastName}
+                          email={summary.email || ''}
+                          avatarUrl={summary.avatarUrl || null}
+                          size="small"
+                          showTooltip={true}
+                        />
+                        <div>
+                          <div className={styles.infoValue}>{summary.name}</div>
+                          {summary.email && summary.email !== summary.name && (
+                            <div className={styles.infoEmail}>{summary.email}</div>
+                          )}
+                        </div>
                       </div>
                       <div className={styles.assignedTaskCount}>{summary.count}</div>
                     </div>
@@ -908,10 +1001,15 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <div className={styles.activityFeed}>
               {project.activity.map(activity => (
                 <div key={activity.id} className={styles.activityItem}>
-                  <div className={styles.activityAvatar}>
-                    {activity.user_profile?.first_name?.[0]}
-                    {activity.user_profile?.last_name?.[0]}
-                  </div>
+                  <MiniAvatar
+                    firstName={activity.user_profile?.first_name || undefined}
+                    lastName={activity.user_profile?.last_name || undefined}
+                    email={activity.user_profile?.email || ''}
+                    avatarUrl={activity.user_profile?.avatar_url || null}
+                    size="small"
+                    showTooltip={true}
+                    className={styles.activityAvatar}
+                  />
                   <div className={styles.activityContent}>
                     <div className={styles.activityText}>
                       <span className={styles.activityUser}>

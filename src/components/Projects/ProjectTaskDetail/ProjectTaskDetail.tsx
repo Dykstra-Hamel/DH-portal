@@ -14,6 +14,8 @@ import {
   Flag,
   Pencil,
 } from 'lucide-react';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
+import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { ProjectTask, taskPriorityOptions } from '@/types/project';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import styles from './ProjectTaskDetail.module.scss';
@@ -27,6 +29,9 @@ interface ProjectTaskDetailProps {
   onCreateSubtask: () => void;
   onUpdateProgress: (progress: number) => Promise<void>;
   users: any[]; // List of users for assignment dropdown
+  highlightedCommentId?: string | null;
+  onToggleStar?: (taskId: string) => void;
+  isStarred?: (taskId: string) => boolean;
 }
 
 export default function ProjectTaskDetail({
@@ -38,6 +43,9 @@ export default function ProjectTaskDetail({
   onCreateSubtask,
   onUpdateProgress,
   users,
+  highlightedCommentId,
+  onToggleStar,
+  isStarred,
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -145,6 +153,14 @@ export default function ProjectTaskDetail({
     setDescriptionDraft(task.description || '');
     setIsEditingDescription(false);
   }, [task]);
+
+  useEffect(() => {
+    if (!highlightedCommentId) return;
+    const element = document.getElementById(`task-comment-${highlightedCommentId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedCommentId, task?.id, task?.comments?.length]);
 
   const getActivityMessage = (activity: any): string => {
     const priorityLabel = (priority: string) => taskPriorityOptions.find(p => p.value === priority)?.label || priority;
@@ -322,9 +338,18 @@ export default function ProjectTaskDetail({
                 </span>
               )}
             </div>
-            <button onClick={onClose} className={styles.closeButton}>
-              <X size={20} />
-            </button>
+            <div className={styles.headerActions}>
+              {onToggleStar && isStarred && (
+                <StarButton
+                  isStarred={isStarred(task.id)}
+                  onToggle={() => onToggleStar(task.id)}
+                  size="medium"
+                />
+              )}
+              <button onClick={onClose} className={styles.closeButton}>
+                <X size={20} />
+              </button>
+            </div>
           </div>
           <div className={styles.titleRow}>
             <button
@@ -576,10 +601,28 @@ export default function ProjectTaskDetail({
             {task.comments && task.comments.length > 0 && (
               <div className={styles.comments}>
                 {task.comments.map(comment => (
-                  <div key={comment.id} className={styles.comment}>
+                  <div
+                    key={comment.id}
+                    id={`task-comment-${comment.id}`}
+                    className={`${styles.comment} ${
+                      highlightedCommentId === comment.id
+                        ? styles.commentHighlight
+                        : ''
+                    }`}
+                  >
                     <div className={styles.commentHeader}>
-                      <div className={styles.commentAuthor}>
-                        {comment.user_profile?.first_name} {comment.user_profile?.last_name}
+                      <div className={styles.commentHeaderLeft}>
+                        <MiniAvatar
+                          firstName={comment.user_profile?.first_name || undefined}
+                          lastName={comment.user_profile?.last_name || undefined}
+                          email={comment.user_profile?.email || ''}
+                          avatarUrl={comment.user_profile?.avatar_url || null}
+                          size="small"
+                          showTooltip={true}
+                        />
+                        <div className={styles.commentAuthor}>
+                          {comment.user_profile?.first_name} {comment.user_profile?.last_name}
+                        </div>
                       </div>
                       <div className={styles.commentDate}>
                         {formatDateTime(comment.created_at)}

@@ -1,9 +1,52 @@
+.kanbanWrapper {
+  position: relative;
+}
+
 .kanbanContainer {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden; // No horizontal overflow
   overflow-y: visible;
   padding-bottom: 16px;
+
+  &.statusView {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+.statusScrollArrow {
+  position: absolute;
+  right: -50px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  background: var(--white, #ffffff);
+  color: var(--gray-700, #374151);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  z-index: 3;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    background: var(--gray-50, #f9fafb);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+  }
+
+  &:active {
+    transform: translateY(-50%) scale(0.96);
+  }
+}
+
+.statusScrollArrowLeft {
+  right: auto;
+  left: -50px;
 }
 
 .kanbanBoard {
@@ -11,6 +54,11 @@
   gap: 16px;
   width: 100%;
   max-width: 100%;
+
+  &.statusView {
+    width: auto;
+    min-width: 100%;
+  }
 }
 
 // Wrapper for each column (header + container + add button)
@@ -19,6 +67,11 @@
   flex-direction: column;
   flex: 1;
   min-width: 0; // Allow flex shrinking
+
+  &.statusView {
+    flex: 0 0 315px; // Fixed width for status columns
+    min-width: 315px;
+  }
 }
 
 // Column header - OUTSIDE the gray container
@@ -61,6 +114,11 @@
   border: 1px solid var(--UI-Gray-200, #e5e7eb);
 }
 
+.statusColumn {
+  background: var(--UI-Gray-100, #f3f4f6);
+  border: 1px solid var(--UI-Gray-200, #e5e7eb);
+}
+
 .columnContent {
   display: flex;
   flex-direction: column;
@@ -76,6 +134,11 @@
 .kanbanColumnWrapper:not(:first-child) .columnContent {
   padding-left: 0;
   padding-right: 0;
+}
+
+// Override: Status view columns should all have equal padding
+.kanbanColumnWrapper.statusView .columnContent {
+  padding: 12px;
 }
 
 .draggableProject {
@@ -165,6 +228,14 @@
     width: 14px;
     height: 14px;
     color: var(--gray-950, #0c0e12);
+  }
+}
+
+.overdueDate {
+  color: var(--error-600, #e7000b);
+
+  svg {
+    color: var(--error-600, #e7000b);
   }
 }
 
@@ -266,6 +337,25 @@
     height: 14px;
     color: var(--gray-400, #99a1af);
   }
+
+  &.hasMention {
+    color: var(--action-600, #0284c7);
+    font-weight: 600;
+    animation: mentionPulse 2s ease-in-out infinite;
+
+    svg {
+      color: var(--action-600, #0284c7);
+    }
+  }
+}
+
+@keyframes mentionPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 // Progress Section
@@ -282,6 +372,12 @@
   align-items: center;
   justify-content: space-between;
   width: var(--kanban-progress-width);
+}
+
+.progressLabelWithStar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .progressLabel {

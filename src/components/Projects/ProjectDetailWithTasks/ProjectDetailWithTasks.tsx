@@ -1,15 +1,18 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import { Check, ChevronDown, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
+import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { Project, ProjectComment, ProjectTask, User as ProjectUser } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
+import { useStarredItems } from '@/hooks/useStarredItems';
 import { adminAPI } from '@/lib/api-client';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import ProjectDetail from '../ProjectDetail/ProjectDetail';
@@ -28,13 +31,49 @@ interface ProjectDetailWithTasksProps {
 const formatHeaderDate = (value?: string | null) => {
   if (!value) return 'Not set';
   return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    year: '2-digit',
   });
 };
 
+const getDaysUntilDue = (dueDate: string | null) => {
+  if (!dueDate) return '';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+
+  const diffTime = due.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return '(Overdue)';
+  } else if (diffDays === 0) {
+    return '(Due Today)';
+  } else if (diffDays === 1) {
+    return '(1 Day From Now)';
+  } else {
+    return `(${diffDays} Days From Now)`;
+  }
+};
+
+const isDueDateOverdue = (dueDate: string | null) => {
+  if (!dueDate) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+
+  return due < today;
+};
+
 export default function ProjectDetailWithTasks({ project, user, onProjectUpdate }: ProjectDetailWithTasksProps) {
+  const { isStarred, toggleStar } = useStarredItems();
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
@@ -49,6 +88,9 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [commentAvatarError, setCommentAvatarError] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const dragCounterRef = React.useRef(0);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
@@ -64,9 +106,37 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     project.description || ''
   );
   const [isSavingProjectDescription, setIsSavingProjectDescription] = useState(false);
+  const [highlightedProjectCommentId, setHighlightedProjectCommentId] = useState<string | null>(null);
+  const [highlightedTaskCommentId, setHighlightedTaskCommentId] = useState<string | null>(null);
+  const highlightTimeoutRef = React.useRef<number | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const processedCommentRef = React.useRef<string | null>(null);
   const { setPageHeader } = usePageActions();
   const { getAvatarUrl, getDisplayName, getInitials } = useUser();
+  const getCommentHtml = React.useCallback(
+    (html: string) => {
+      if (typeof window === 'undefined') return html;
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const mentionNodes = doc.querySelectorAll('span[data-type="mention"]');
+        mentionNodes.forEach((node) => {
+          const id = node.getAttribute('data-id');
+          if (id && id === user.id) {
+            node.setAttribute('data-mention-self', 'true');
+          } else {
+            node.removeAttribute('data-mention-self');
+          }
+        });
+        return doc.body.innerHTML;
+      } catch (error) {
+        return html;
+      }
+    },
+    [user.id]
+  );
+  const commentFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const {
     tasks,
@@ -304,9 +374,13 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     const projectName = project.name || 'Project Details';
     const headerTitle = companyName ? `${companyName} - ${projectName}` : projectName;
 
+    const isOverdue = isDueDateOverdue(project.due_date);
+    const daysText = getDaysUntilDue(project.due_date);
+    const dueDateColor = isOverdue ? '#ef4444' : '#111827';
+
     setPageHeader({
       title: headerTitle,
-      description: `<span style="margin-right: 12px;">Due Date: ${formatHeaderDate(project.due_date)}</span><span>Updated: ${formatHeaderDate(project.updated_at)}</span>`,
+      description: `<span style="margin-right: 12px; color: ${dueDateColor};">Due Date: ${formatHeaderDate(project.due_date)} ${daysText}</span><span class="${headerStyles.updatedText}">Updated: ${formatHeaderDate(project.updated_at)}</span>`,
       customActions: (
         <>
           <button
@@ -339,16 +413,71 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     return () => setPageHeader(null);
   }, [setPageHeader]);
 
-  const handleTaskClick = (task: ProjectTask) => {
-    // Fetch full task details
-    fetch(`/api/admin/projects/${project.id}/tasks/${task.id}`)
+  const openTaskDetailById = React.useCallback((taskId: string) => {
+    fetch(`/api/admin/projects/${project.id}/tasks/${taskId}`)
       .then(res => res.json())
       .then(fullTask => {
         setSelectedTask(fullTask);
         setIsTaskDetailOpen(true);
       })
       .catch(err => console.error('Error fetching task details:', err));
+  }, [project.id]);
+
+  const handleTaskClick = (task: ProjectTask) => {
+    openTaskDetailById(task.id);
   };
+
+  React.useEffect(() => {
+    const commentId = searchParams.get('commentId');
+    const taskId = searchParams.get('taskId');
+    if (!commentId) return;
+
+    const key = `${taskId || 'project'}:${commentId}`;
+    if (processedCommentRef.current === key) {
+      return;
+    }
+
+    if (taskId) {
+      setHighlightedTaskCommentId(commentId);
+      if (!selectedTask || selectedTask.id !== taskId) {
+        openTaskDetailById(taskId);
+      }
+    } else {
+      setIsCommentsCollapsed(false);
+      setHighlightedProjectCommentId(commentId);
+    }
+
+    processedCommentRef.current = key;
+  }, [openTaskDetailById, searchParams, selectedTask]);
+
+  React.useEffect(() => {
+    if (!highlightedProjectCommentId) return;
+    const element = document.getElementById(`project-comment-${highlightedProjectCommentId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedProjectCommentId, comments.length]);
+
+  React.useEffect(() => {
+    if (!highlightedProjectCommentId && !highlightedTaskCommentId) {
+      return;
+    }
+
+    if (highlightTimeoutRef.current) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
+
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedProjectCommentId(null);
+      setHighlightedTaskCommentId(null);
+    }, 2400);
+
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, [highlightedProjectCommentId, highlightedTaskCommentId]);
 
   const handleTaskFormSubmit = async (formData: any) => {
     if (editingTask) {
@@ -456,11 +585,6 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   // Get only top-level tasks for parent task selector
   const parentTasks = tasks.filter(t => !t.parent_task_id);
 
-  const rawAvatarUrl = getAvatarUrl();
-  const commentAvatarUrl =
-    commentAvatarError || !rawAvatarUrl || rawAvatarUrl === 'null' || rawAvatarUrl === 'undefined'
-      ? null
-      : rawAvatarUrl;
 
   const formatCommentDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -473,12 +597,19 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     });
   };
 
+  // Check if rich text HTML has actual content (not just empty tags)
+  const isRichTextEmpty = (html: string) => {
+    const textContent = html.replace(/<[^>]*>/g, '').trim();
+    return textContent.length === 0;
+  };
+
   const handleSubmitComment = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newComment.trim()) return;
+    if (isRichTextEmpty(newComment) && pendingAttachments.length === 0) return;
 
     setIsSubmittingComment(true);
     try {
+      // First create the comment
       const response = await fetch(`/api/admin/projects/${project.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -490,8 +621,29 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       }
 
       const comment = await response.json();
+
+      // If there are attachments, upload them
+      if (pendingAttachments.length > 0) {
+        const formData = new FormData();
+        pendingAttachments.forEach(file => formData.append('files', file));
+
+        const attachmentResponse = await fetch(
+          `/api/admin/projects/${project.id}/comments/${comment.id}/attachments`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+
+        if (attachmentResponse.ok) {
+          const uploadedAttachments = await attachmentResponse.json();
+          comment.attachments = uploadedAttachments;
+        }
+      }
+
       setComments(prev => [...prev, comment]);
       setNewComment('');
+      setPendingAttachments([]);
     } catch (error) {
       console.error('Error posting comment:', error);
       setToastMessage('Failed to post comment.');
@@ -501,6 +653,96 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       setIsSubmittingComment(false);
     }
   };
+
+  const handleCommentFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      const newFiles = Array.from(event.target.files);
+      setPendingAttachments(prev => [...prev, ...newFiles]);
+      event.target.value = ''; // Reset so same file can be selected again
+    }
+  };
+
+  const removeCommentAttachment = (index: number) => {
+    setPendingAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingFile(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDraggingFile(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+
+    // Allowed file types for attachments
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      const validFiles = droppedFiles.filter(file => allowedTypes.includes(file.type));
+
+      if (validFiles.length > 0) {
+        setPendingAttachments(prev => [...prev, ...validFiles]);
+      }
+
+      if (validFiles.length < droppedFiles.length) {
+        setToastMessage('Some files were not added (unsupported file type)');
+        setToastType('error');
+        setShowToast(true);
+      }
+    }
+  }, []);
+
+  const rawAvatarUrl = getAvatarUrl();
+  const commentAvatarUrl =
+    commentAvatarError || !rawAvatarUrl || rawAvatarUrl === 'null' || rawAvatarUrl === 'undefined'
+      ? null
+      : rawAvatarUrl;
+
+  // Convert users to mention format for RichTextEditor
+  const mentionUsers = useMemo(() => {
+    console.log('Converting users for mentions, raw users:', users);
+    const converted = users.map(u => ({
+      id: u.profiles?.id || u.id,
+      first_name: u.profiles?.first_name || null,
+      last_name: u.profiles?.last_name || null,
+      email: u.profiles?.email || u.email || null,
+      avatar_url: u.profiles?.avatar_url || null,
+    }));
+    console.log('Converted mentionUsers:', converted);
+    return converted;
+  }, [users]);
 
   const handleSaveProjectDescription = async () => {
     if (isSavingProjectDescription) return;
@@ -567,7 +809,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
   const handleUpdateComment = useCallback(async () => {
     if (!editingCommentId) return;
-    if (!editingCommentText.trim()) {
+    if (isRichTextEmpty(editingCommentText)) {
       setToastMessage('Comment cannot be empty.');
       setToastType('error');
       setShowToast(true);
@@ -641,7 +883,39 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   }, [editingCommentId, project.id]);
 
   return (
-    <div className={styles.container}>
+    <div
+      className={styles.container}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* File Drop Zone Overlay */}
+      {isDraggingFile && (
+        <div className={styles.dropZoneOverlay}>
+          <div className={styles.dropZoneContent}>
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <path
+                d="M24 32V16M24 16L18 22M24 16L30 22"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M40 32V38C40 39.0609 39.5786 40.0783 38.8284 40.8284C38.0783 41.5786 37.0609 42 36 42H12C10.9391 42 9.92172 41.5786 9.17157 40.8284C8.42143 40.0783 8 39.0609 8 38V32"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className={styles.dropZoneText}>Drop files to attach to comment</span>
+            <span className={styles.dropZoneSubtext}>Images (JPEG, PNG, WebP) and documents (PDF, Word, Excel)</span>
+          </div>
+        </div>
+      )}
+
       <Toast
         message={toastMessage}
         isVisible={showToast}
@@ -687,19 +961,28 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
           <div className={styles.contentLeft}>
             <div className={styles.projectSummary}>
               <div className={styles.projectHeader}>
-                <button
-                  type="button"
-                  className={`${styles.projectCompleteToggle} ${isProjectComplete ? styles.projectCompleteToggleDone : ''}`}
-                  onClick={handleToggleProjectComplete}
-                  disabled={isCompletingProject}
-                  aria-label={isProjectComplete ? 'Mark project incomplete' : 'Mark project complete'}
-                  title={isProjectComplete ? 'Mark project incomplete' : 'Mark project complete'}
-                >
-                  {isProjectComplete && <Check size={14} />}
-                </button>
-                <span className={styles.projectShortcode}>
-                  {project.shortcode || 'No Shortcode'}
-                </span>
+                <div className={styles.projectHeaderLeft}>
+                  <button
+                    type="button"
+                    className={`${styles.projectCompleteToggle} ${isProjectComplete ? styles.projectCompleteToggleDone : ''}`}
+                    onClick={handleToggleProjectComplete}
+                    disabled={isCompletingProject}
+                    aria-label={isProjectComplete ? 'Mark project incomplete' : 'Mark project complete'}
+                    title={isProjectComplete ? 'Mark project incomplete' : 'Mark project complete'}
+                  >
+                    {isProjectComplete && <Check size={14} />}
+                  </button>
+                  <h1 className={styles.projectShortcode}>
+                    {project.shortcode || 'No Shortcode'}
+                  </h1>
+                </div>
+                <div className={styles.projectHeaderRight}>
+                  <StarButton
+                    isStarred={isStarred('project', project.id)}
+                    onToggle={() => toggleStar('project', project.id)}
+                    size="large"
+                  />
+                </div>
               </div>
               {isEditingProjectDescription ? (
                 <div className={styles.projectDescriptionEditor}>
@@ -790,6 +1073,8 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                 onUpdateTask={handleUpdateTaskInline}
                 onDeleteTask={handleDeleteTaskFromList}
                 onReorderTasks={handleReorderTasks}
+                onToggleStar={(taskId) => toggleStar('task', taskId)}
+                isStarred={(taskId) => isStarred('task', taskId)}
                 isLoading={isLoading}
                 showHeader={false}
               />
@@ -828,8 +1113,25 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                               new Date(comment.created_at).getTime()
                         );
                         return (
-                          <div key={comment.id} className={styles.commentItem}>
+                          <div
+                            key={comment.id}
+                            id={`project-comment-${comment.id}`}
+                            className={`${styles.commentItem} ${
+                              highlightedProjectCommentId === comment.id
+                                ? styles.commentHighlight
+                                : ''
+                            }`}
+                          >
                             <div className={styles.commentMeta}>
+                              <MiniAvatar
+                                firstName={comment.user_profile?.first_name || undefined}
+                                lastName={comment.user_profile?.last_name || undefined}
+                                email={comment.user_profile?.email || ''}
+                                avatarUrl={comment.user_profile?.avatar_url || null}
+                                size="small"
+                                showTooltip={true}
+                                className={styles.commentAvatarMini}
+                              />
                               <div className={styles.commentMetaDetails}>
                                 <span className={styles.commentAuthor}>{authorName}</span>
                                 <span className={styles.commentDate}>
@@ -848,7 +1150,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                                         className={styles.commentActionButton}
                                         onClick={handleUpdateComment}
                                         aria-label="Save comment"
-                                        disabled={isUpdatingComment || !editingCommentText.trim()}
+                                        disabled={isUpdatingComment || isRichTextEmpty(editingCommentText)}
                                       >
                                         <Check size={14} />
                                       </button>
@@ -887,15 +1189,87 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                               )}
                             </div>
                             {isEditing ? (
-                              <textarea
-                                className={styles.commentEditInput}
+                              <RichTextEditor
                                 value={editingCommentText}
-                                onChange={event => setEditingCommentText(event.target.value)}
-                                rows={2}
-                                autoFocus
+                                onChange={setEditingCommentText}
+                                placeholder="Edit comment..."
+                                className={styles.commentEditRichEditor}
+                                compact
+                                mentionUsers={mentionUsers}
                               />
                             ) : (
-                              <div className={styles.commentText}>{comment.comment}</div>
+                              <>
+                                <div
+                                  className={styles.commentText}
+                                  dangerouslySetInnerHTML={{ __html: getCommentHtml(comment.comment) }}
+                                />
+                                {comment.attachments && comment.attachments.length > 0 && (() => {
+                                  const imageAttachments = comment.attachments.filter(
+                                    (attachment: { mime_type?: string | null }) =>
+                                      attachment.mime_type?.startsWith('image/')
+                                  );
+                                  const fileAttachments = comment.attachments.filter(
+                                    (attachment: { mime_type?: string | null }) =>
+                                      !attachment.mime_type?.startsWith('image/')
+                                  );
+
+                                  return (
+                                    <>
+                                      {imageAttachments.length > 0 && (
+                                        <div className={styles.commentImageAttachments}>
+                                          {imageAttachments.map((attachment: { id: string; url: string; file_name: string }) => (
+                                            <a
+                                              key={attachment.id}
+                                              href={attachment.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className={styles.commentImageLink}
+                                            >
+                                              <img
+                                                src={attachment.url}
+                                                alt={attachment.file_name}
+                                                className={styles.commentImage}
+                                              />
+                                            </a>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {fileAttachments.length > 0 && (
+                                        <div className={styles.commentAttachments}>
+                                          {fileAttachments.map((attachment: { id: string; url: string; file_name: string; mime_type?: string | null }) => (
+                                            <a
+                                              key={attachment.id}
+                                              href={attachment.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className={styles.attachmentCard}
+                                            >
+                                              <div className={styles.attachmentIcon}>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                  <path
+                                                    d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                  />
+                                                  <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                              </div>
+                                              <div className={styles.attachmentInfo}>
+                                                <span className={styles.attachmentName}>{attachment.file_name}</span>
+                                                {attachment.mime_type === 'application/pdf' && (
+                                                  <span className={styles.attachmentBadge}>PDF</span>
+                                                )}
+                                              </div>
+                                            </a>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </>
                             )}
                           </div>
                         );
@@ -918,17 +1292,60 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                     ) : (
                       <div className={styles.commentAvatar}>{getInitials()}</div>
                     )}
+                    <div className={styles.commentInputWrapper}>
+                      <RichTextEditor
+                        value={newComment}
+                        onChange={setNewComment}
+                        placeholder="Add a comment... Use @ to mention someone"
+                        className={styles.commentRichEditor}
+                        compact
+                        mentionUsers={mentionUsers}
+                      />
+                      {pendingAttachments.length > 0 && (
+                        <div className={styles.pendingAttachments}>
+                          {pendingAttachments.map((file, index) => (
+                            <div key={`${file.name}-${index}`} className={styles.pendingAttachment}>
+                              <span className={styles.pendingAttachmentName}>{file.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeCommentAttachment(index)}
+                                className={styles.removeAttachmentButton}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <input
-                      type="text"
-                      placeholder="Comment"
-                      value={newComment}
-                      onChange={(event) => setNewComment(event.target.value)}
-                      className={styles.commentInput}
+                      ref={commentFileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      onChange={handleCommentFileSelect}
+                      className={styles.hiddenFileInput}
                     />
+                    <button
+                      type="button"
+                      className={styles.attachButton}
+                      onClick={() => commentFileInputRef.current?.click()}
+                      title="Attach file"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                        <path
+                          d="M15.75 8.25L9.31 14.69C8.5 15.49 7.41 15.94 6.28 15.94C5.14 15.94 4.05 15.49 3.25 14.69C2.44 13.88 1.99 12.79 1.99 11.66C1.99 10.52 2.44 9.43 3.25 8.62L9.69 2.18C10.22 1.65 10.95 1.35 11.7 1.35C12.46 1.35 13.19 1.65 13.72 2.18C14.26 2.72 14.56 3.45 14.56 4.2C14.56 4.96 14.26 5.69 13.72 6.22L7.28 12.66C7.01 12.93 6.65 13.08 6.27 13.08C5.89 13.08 5.53 12.93 5.26 12.66C4.99 12.39 4.84 12.03 4.84 11.65C4.84 11.27 4.99 10.91 5.26 10.64L11.32 4.58"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
                     <button
                       type="submit"
                       className={styles.commentSubmit}
-                      disabled={isSubmittingComment || !newComment.trim()}
+                      disabled={isSubmittingComment || (isRichTextEmpty(newComment) && pendingAttachments.length === 0)}
                     >
                       {isSubmittingComment ? 'Posting...' : 'Post'}
                     </button>
@@ -984,6 +1401,9 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
         onCreateSubtask={handleCreateSubtask}
         onUpdateProgress={handleUpdateProgress}
         users={users}
+        highlightedCommentId={highlightedTaskCommentId}
+        onToggleStar={(taskId) => toggleStar('task', taskId)}
+        isStarred={(taskId) => isStarred('task', taskId)}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Task, Project, getUserById, getClientById, getProjectById } from '@/types/taskManagement';
+import { Task, getUserById, getClientById, getProjectById } from '@/types/taskManagement';
+import { Project } from '@/types/project';
 import { PriorityBadge } from '../shared/PriorityBadge';
 import { ProjectBadge } from '../shared/ProjectBadge';
 import { UserAvatar } from '../shared/UserAvatar';
@@ -16,6 +17,9 @@ type GroupByOption = 'week' | 'month' | 'project';
 export function ArchiveView({ tasks, projects, onTaskClick }: ArchiveViewProps) {
   const [groupBy, setGroupBy] = useState<GroupByOption>('month');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Helper to find project from props
+  const getProject = (projectId: string) => projects.find(p => p.id === projectId);
 
   // Filter tasks by search query
   const filteredTasks = useMemo(() => {
@@ -49,7 +53,7 @@ export function ArchiveView({ tasks, projects, onTaskClick }: ArchiveViewProps) 
       } else {
         // Group by project
         if (task.project_id) {
-          const project = getProjectById(task.project_id);
+          const project = getProject(task.project_id);
           groupKey = project ? project.name : 'No Project';
         } else {
           groupKey = 'No Project';
@@ -214,7 +218,7 @@ export function ArchiveView({ tasks, projects, onTaskClick }: ArchiveViewProps) 
               </div>
               <div className={styles.taskList}>
                 {groupTasks.map((task) => {
-                  const project = task.project_id ? getProjectById(task.project_id) : undefined;
+                  const project = task.project_id ? getProject(task.project_id) : undefined;
                   const client = task.client_id ? getClientById(task.client_id) : undefined;
                   const assignedUser = task.assigned_to ? getUserById(task.assigned_to) : undefined;
 
@@ -250,7 +254,7 @@ export function ArchiveView({ tasks, projects, onTaskClick }: ArchiveViewProps) 
                           {project && (
                             <ProjectBadge
                               projectName={project.name}
-                              projectType={project.type}
+                              projectType={project.project_type as any}
                               size="small"
                             />
                           )}

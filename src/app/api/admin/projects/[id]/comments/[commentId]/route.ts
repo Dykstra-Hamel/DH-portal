@@ -41,7 +41,7 @@ export async function PATCH(
       .select(
         `
         *,
-        user_profile:profiles(id, first_name, last_name, email)
+        user_profile:profiles(id, first_name, last_name, email, avatar_url)
       `
       )
       .single();

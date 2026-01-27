@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('categoryId');
     const assignedTo = searchParams.get('assignedTo');
     const scopeFilter = searchParams.get('scopeFilter'); // NEW: e.g., 'internal,both' or 'external,both'
+    const isBillable = searchParams.get('isBillable'); // NEW: filter by is_billable
 
     // Build select query - use !inner modifier on categories if filtering by category
     const categoryRelation = categoryId
@@ -74,6 +75,9 @@ export async function GET(request: NextRequest) {
     }
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo);
+    }
+    if (isBillable === 'true') {
+      query = query.eq('is_billable', true);
     }
 
     // Apply category filter if provided
@@ -142,6 +146,44 @@ export async function GET(request: NextRequest) {
       memberSets.set(task.project_id, set);
     });
 
+    // Check for unread mention notifications for the current user
+    // reference_id is the comment_id, so we need to join with project_comments to get project_id
+    const { data: unreadMentions, error: mentionsError } = await supabase
+      .from('notifications')
+      .select('reference_id')
+      .eq('user_id', user.id)
+      .eq('type', 'mention')
+      .eq('reference_type', 'project_comment')
+      .eq('read', false);
+
+    if (mentionsError) {
+      console.error('Error fetching unread mentions:', mentionsError);
+    }
+
+    // Get comment IDs from notifications
+    const commentIds = (unreadMentions || [])
+      .map(mention => mention.reference_id)
+      .filter(Boolean);
+
+    // Map comment IDs to project IDs
+    const projectsWithMentions = new Set<string>();
+    if (commentIds.length > 0) {
+      const { data: comments, error: commentsError } = await supabase
+        .from('project_comments')
+        .select('id, project_id')
+        .in('id', commentIds);
+
+      if (commentsError) {
+        console.error('Error fetching comments for mentions:', commentsError);
+      } else {
+        (comments || []).forEach(comment => {
+          if (projectIds.includes(comment.project_id)) {
+            projectsWithMentions.add(comment.project_id);
+          }
+        });
+      }
+    }
+
     // Get all unique user IDs from projects
     const userIds = new Set<string>();
     projects.forEach(project => {
@@ -157,7 +199,7 @@ export async function GET(request: NextRequest) {
     // Get profiles for these users
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email')
+      .select('id, first_name, last_name, email, avatar_url')
       .in('id', Array.from(userIds));
 
     if (profilesError) {
@@ -184,6 +226,7 @@ export async function GET(request: NextRequest) {
         : null,
       comments_count: commentCounts.get(project.id) || 0,
       members_count: memberSets.get(project.id)?.size || 0,
+      has_unread_mentions: projectsWithMentions.has(project.id),
     }));
 
     return NextResponse.json(enhancedProjects);
@@ -374,7 +417,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email')
+      .select('id, first_name, last_name, email, avatar_url')
       .in('id', userIds);
 
     if (profilesError) {
