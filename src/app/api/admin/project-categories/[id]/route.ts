@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 // GET /api/admin/project-categories/[id] - Get single internal category
 export async function GET(
@@ -104,8 +105,11 @@ export async function PUT(
       );
     }
 
+    // Use admin client for update operations
+    const adminSupabase = createAdminClient();
+
     // Check for duplicate name (excluding current category)
-    const { data: existing } = await supabase
+    const { data: existing } = await adminSupabase
       .from('project_categories')
       .select('id')
       .is('company_id', null)
@@ -121,7 +125,7 @@ export async function PUT(
     }
 
     // Update internal category
-    const { data: category, error } = await supabase
+    const { data: category, error } = await adminSupabase
       .from('project_categories')
       .update({
         name,
@@ -185,57 +189,26 @@ export async function DELETE(
       );
     }
 
-    // Get category to check if it's system default
-    const { data: category } = await supabase
-      .from('project_categories')
-      .select('is_system_default')
-      .eq('id', id)
-      .is('company_id', null)
-      .single();
+    // Use admin client for deletion to bypass RLS
+    const adminSupabase = createAdminClient();
 
-    if (!category) {
-      return NextResponse.json(
-        { error: 'Category not found' },
-        { status: 404 }
-      );
-    }
-
-    // Prevent deletion of system default categories
-    if (category.is_system_default) {
-      return NextResponse.json(
-        { error: 'Cannot delete system default categories' },
-        { status: 403 }
-      );
-    }
-
-    // Check if any projects are using this category
-    const { data: assignments, error: assignmentError } = await supabase
+    // Delete all project_category_assignments for this category
+    // This will unlink projects from the category but keep the projects
+    const { error: assignmentError } = await adminSupabase
       .from('project_category_assignments')
-      .select('project_id')
+      .delete()
       .eq('category_id', id);
 
     if (assignmentError) {
-      console.error('Error checking category assignments:', assignmentError);
+      console.error('Error deleting category assignments:', assignmentError);
       return NextResponse.json(
-        { error: 'Failed to check category usage' },
+        { error: 'Failed to delete category assignments' },
         { status: 500 }
       );
     }
 
-    if (assignments && assignments.length > 0) {
-      return NextResponse.json(
-        {
-          error: 'Cannot delete category',
-          message: 'This category is being used by projects',
-          projectCount: assignments.length,
-          projectIds: assignments.map(a => a.project_id),
-        },
-        { status: 409 }
-      );
-    }
-
     // Delete the category
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from('project_categories')
       .delete()
       .eq('id', id)

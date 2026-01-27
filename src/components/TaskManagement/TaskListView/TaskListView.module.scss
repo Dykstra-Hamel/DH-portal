@@ -86,7 +86,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr 1fr 1fr 0.8fr;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr 0.8fr;
   gap: 16px;
   padding: 16px 20px;
   background: #f9fafb;
@@ -99,6 +99,24 @@
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+
+  &.sortable {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #0080f0;
+    }
+  }
+}
+
+.sortIcon {
+  font-size: 14px;
+  line-height: 1;
 }
 
 .tableBody {
@@ -108,7 +126,7 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr 1fr 1fr 0.8fr;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr 0.8fr;
   gap: 16px;
   padding: 16px 20px;
   border-bottom: 1px solid #f3f4f6;
@@ -121,6 +139,23 @@
 
   &:hover {
     background: #f9fafb;
+  }
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #fef3c7;
+  border-bottom: 1px solid #fbbf24;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  letter-spacing: 0.025em;
+
+  svg {
+    color: #fbbf24;
   }
 }
 
@@ -213,9 +248,331 @@
   }
 }
 
+// Currently Working On Section
+.currentlyWorkingOnSection {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 0 11px 0 #e8e8ea;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.sectionHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #252c37;
+  margin: 0;
+
+  svg {
+    color: #fbbf24;
+  }
+}
+
+.viewToggle {
+  display: flex;
+  gap: 8px;
+  background: #f3f4f6;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.toggleButton {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-satoshi);
+
+  &:hover {
+    color: #252c37;
+  }
+
+  &.active {
+    background: white;
+    color: #0080f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.starredTasksTable {
+  background: #f9fafb;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.emptyStarredState {
+  padding: 40px 20px;
+  text-align: center;
+
+  p {
+    font-size: 14px;
+    color: #9ca3af;
+    margin: 0;
+  }
+}
+
+// Project Cards Grid
+.projectsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.projectCard {
+  width: 100%;
+  background: white;
+  border: 1px solid var(--UI-Gray-300, #d1d5db);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  cursor: pointer;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border-color: var(--UI-Gray-400);
+  }
+}
+
+// Card Top Row (Date + Company)
+.cardTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+}
+
+.dateSection {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gray-950, #0c0e12);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: var(--gray-950, #0c0e12);
+  }
+}
+
+.overdueDate {
+  color: var(--error-600, #e7000b);
+
+  svg {
+    color: var(--error-600, #e7000b);
+  }
+}
+
+.companySection {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gray-400, #99a1af);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: var(--gray-400, #99a1af);
+  }
+}
+
+// Project Meta Row (Code)
+.projectMeta {
+  display: flex;
+  align-items: center;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+}
+
+.projectCode {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-950, #0c0e12);
+  line-height: 16px;
+}
+
+// Project Name
+.projectName {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+  color: var(--gray-950, #0c0e12);
+  margin: 0;
+  line-height: 1.3;
+
+  // Truncate if too long
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// Project Description
+.projectDescription {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--gray-500, #6b7280);
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+  line-height: 1.4;
+  margin: 0;
+
+  // Truncate if too long
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// Card Metrics Row
+.cardMetrics {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.metricItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--gray-400, #99a1af);
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-weight: 500;
+  line-height: 16px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: var(--gray-400, #99a1af);
+  }
+}
+
+// Progress Section
+.progressSection {
+  --kanban-progress-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.progressHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: var(--kanban-progress-width);
+}
+
+.progressLabelWithStar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progressLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-950, #0c0e12);
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+}
+
+.progressBarContainer {
+  flex: 0 0 var(--kanban-progress-width);
+  width: var(--kanban-progress-width);
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  background: #05b62e;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.progressFraction {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-950, #0c0e12);
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+}
+
+.progressBarRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.externalBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
 @media (max-width: 1200px) {
   .tableHeader,
   .tableRow {
-    grid-template-columns: 2fr 1fr 1fr 0.9fr 0.9fr 0.9fr 0.9fr 0.8fr;
+    grid-template-columns: 2fr 1fr 1fr 0.9fr 0.9fr 0.8fr;
+  }
+
+  .projectsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .projectsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionHeaderRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .viewToggle {
+    width: 100%;
+
+    .toggleButton {
+      flex: 1;
+      text-align: center;
+    }
   }
 }

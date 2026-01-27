@@ -42,7 +42,7 @@ export interface Project {
   project_subtype: string | null; // Existing specific subcategory
   type_code?: ProjectTypeCode; // NEW: Type code for shortcode generation
   shortcode?: string; // NEW: Auto-generated shortcode (read-only)
-  status: 'in_progress' | 'blocked' | 'on_hold' | 'pending_approval' | 'out_to_client' | 'complete';
+  status: 'in_progress' | 'blocked' | 'on_hold' | 'pending_approval' | 'out_to_client' | 'ready_to_print' | 'printing' | 'bill_client' | 'complete';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   due_date: string;
   start_date: string | null;
@@ -66,17 +66,20 @@ export interface Project {
   comments_count?: number;
   members_count?: number;
   progress?: { completed: number; total: number };
+  has_unread_mentions?: boolean;
   requested_by_profile: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
   assigned_to_profile: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   } | null;
   company: {
     id: string;
@@ -85,6 +88,7 @@ export interface Project {
   comments?: ProjectComment[];
   activity?: ProjectActivity[];
   categories?: ProjectCategoryAssignment[]; // Many-to-many relationship
+  is_starred?: boolean; // Whether the current user has starred this project
 }
 
 export interface ProjectFormData {
@@ -139,6 +143,9 @@ export const statusOptions = [
   { value: 'on_hold', label: 'On Hold', color: '#f97316' },
   { value: 'pending_approval', label: 'Pending Approval', color: '#eab308' },
   { value: 'out_to_client', label: 'Out To Client', color: '#8b5cf6' },
+  { value: 'ready_to_print', label: 'Ready To Print', color: '#06b6d4', requiresCategory: 'Print' },
+  { value: 'printing', label: 'Printing', color: '#0891b2', requiresCategory: 'Print' },
+  { value: 'bill_client', label: 'Bill Client', color: '#059669', requiresBillable: true },
   { value: 'complete', label: 'Complete', color: '#10b981' },
 ];
 
@@ -276,6 +283,7 @@ export interface ProjectTaskComment {
     email: string;
     avatar_url?: string | null;
   };
+  attachments?: ProjectCommentAttachment[];
 }
 
 export interface ProjectTaskActivity {
@@ -323,6 +331,16 @@ export const taskPriorityOptions = [
   { value: 'critical', label: 'Critical', color: '#ef4444' },
 ];
 
+export interface ProjectCommentAttachment {
+  id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  url: string;
+  created_at: string;
+}
+
 export interface ProjectComment {
   id: string;
   project_id: string;
@@ -337,6 +355,7 @@ export interface ProjectComment {
     email: string;
     avatar_url?: string | null;
   };
+  attachments?: ProjectCommentAttachment[];
 }
 
 export interface ProjectActivity {

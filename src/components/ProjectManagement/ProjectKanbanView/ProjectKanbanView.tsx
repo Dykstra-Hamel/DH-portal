@@ -1,8 +1,11 @@
-import React, { useState, useRef, useEffect, DragEvent } from 'react';
+import React, { useState, useRef, useEffect, useCallback, DragEvent } from 'react';
 import { Project } from '@/types/project';
+import { StarButton } from '@/components/Common/StarButton/StarButton';
 import styles from './ProjectKanbanView.module.scss';
 
 type DateCategory = 'due_today' | 'this_week' | 'this_month' | 'coming_up';
+type StatusCategory = 'in_progress' | 'blocked' | 'on_hold' | 'pending_approval' | 'out_to_client' | 'ready_to_print' | 'printing' | 'bill_client' | 'complete';
+type KanbanGroupBy = 'date' | 'status';
 
 interface ProjectKanbanViewProps {
   projects: Project[];
@@ -10,18 +13,32 @@ interface ProjectKanbanViewProps {
   onProjectClick: (project: Project) => void;
   onUpdateProject: (project: Project) => void;
   onAddTask?: (projectId?: string) => void;
+  onToggleStar?: (projectId: string) => void;
+  groupBy?: KanbanGroupBy;
 }
 
-interface DateColumn {
-  id: DateCategory;
+interface Column {
+  id: DateCategory | StatusCategory;
   title: string;
 }
 
-const columns: DateColumn[] = [
+const dateColumns: Column[] = [
   { id: 'due_today', title: 'Due Today' },
   { id: 'this_week', title: 'Due This Week' },
   { id: 'this_month', title: 'Due This Month' },
   { id: 'coming_up', title: 'Coming Up' },
+];
+
+const statusColumns: Column[] = [
+  { id: 'in_progress', title: 'In Progress' },
+  { id: 'blocked', title: 'Blocked' },
+  { id: 'on_hold', title: 'On Hold' },
+  { id: 'pending_approval', title: 'Pending Approval' },
+  { id: 'out_to_client', title: 'Out To Client' },
+  { id: 'ready_to_print', title: 'Ready To Print' },
+  { id: 'printing', title: 'Printing' },
+  { id: 'bill_client', title: 'Bill Client' },
+  { id: 'complete', title: 'Complete' },
 ];
 
 // SVG Icons
@@ -135,61 +152,74 @@ export function ProjectKanbanView({
   projects,
   taskStatsByProject,
   onProjectClick,
+  onUpdateProject,
   onAddTask,
+  onToggleStar,
+  groupBy = 'date',
 }: ProjectKanbanViewProps) {
   // Simple drag state
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
+  const [draggedFromColumn, setDraggedFromColumn] = useState<string | null>(null);
+  const [dropToColumn, setDropToColumn] = useState<string | null>(null);
 
   // Custom order for Due Today column
   const [dueTodayOrder, setDueTodayOrder] = useState<string[]>([]);
 
+  // Auto-scroll state
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Get current columns based on groupBy
+  const columns = groupBy === 'date' ? dateColumns : statusColumns;
+
   // Scroll state
-  const [columnScrollStates, setColumnScrollStates] = useState<Record<DateCategory, boolean>>({
-    'due_today': false,
-    'this_week': false,
-    'this_month': false,
-    'coming_up': false,
-  });
+  const [columnScrollStates, setColumnScrollStates] = useState<Record<string, boolean>>({});
+  const [showStatusScrollLeft, setShowStatusScrollLeft] = useState(false);
+  const [showStatusScrollRight, setShowStatusScrollRight] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const columnRefs = useRef<Record<DateCategory, HTMLDivElement | null>>({
-    'due_today': null,
-    'this_week': null,
-    'this_month': null,
-    'coming_up': null,
-  });
+  const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Initialize order when projects change
   useEffect(() => {
-    const dueTodayProjects = projects.filter(p => getDateCategory(p) === 'due_today');
-    const dueTodayIds = dueTodayProjects.map(p => p.id);
+    if (groupBy === 'date') {
+      const dueTodayProjects = projects.filter(p => getDateCategory(p) === 'due_today');
+      const dueTodayIds = dueTodayProjects.map(p => p.id);
 
-    setDueTodayOrder(prevOrder => {
-      const validPrevOrder = prevOrder.filter(id => dueTodayIds.includes(id));
-      const newIds = dueTodayIds.filter(id => !prevOrder.includes(id));
-      return [...validPrevOrder, ...newIds];
-    });
-  }, [projects]);
-
-  const getProjectsByDateCategory = (category: DateCategory): Project[] => {
-    const categoryProjects = projects.filter(p => getDateCategory(p) === category);
-
-    if (category === 'due_today' && dueTodayOrder.length > 0) {
-      return [...categoryProjects].sort((a, b) => {
-        const aIdx = dueTodayOrder.indexOf(a.id);
-        const bIdx = dueTodayOrder.indexOf(b.id);
-        if (aIdx === -1) return 1;
-        if (bIdx === -1) return -1;
-        return aIdx - bIdx;
+      setDueTodayOrder(prevOrder => {
+        const validPrevOrder = prevOrder.filter(id => dueTodayIds.includes(id));
+        const newIds = dueTodayIds.filter(id => !prevOrder.includes(id));
+        return [...validPrevOrder, ...newIds];
       });
+    }
+  }, [projects, groupBy]);
+
+  const getProjectsByCategory = (columnId: string): Project[] => {
+    let categoryProjects: Project[];
+
+    if (groupBy === 'date') {
+      categoryProjects = projects.filter(p => getDateCategory(p) === columnId);
+
+      if (columnId === 'due_today' && dueTodayOrder.length > 0) {
+        return [...categoryProjects].sort((a, b) => {
+          const aIdx = dueTodayOrder.indexOf(a.id);
+          const bIdx = dueTodayOrder.indexOf(b.id);
+          if (aIdx === -1) return 1;
+          if (bIdx === -1) return -1;
+          return aIdx - bIdx;
+        });
+      }
+    } else {
+      // Group by status
+      categoryProjects = projects.filter(p => p.status === columnId);
     }
 
     return categoryProjects;
   };
 
-  const checkColumnScroll = (columnId: DateCategory) => {
+  const checkColumnScroll = (columnId: string) => {
     const columnContent = columnRefs.current[columnId];
     if (!columnContent) return;
     const { scrollTop, scrollHeight, clientHeight } = columnContent;
@@ -202,17 +232,148 @@ export function ProjectKanbanView({
 
   useEffect(() => {
     columns.forEach(column => checkColumnScroll(column.id));
-  }, [projects]);
+  }, [projects, columns]);
+
+  const updateStatusOverflow = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || groupBy !== 'status') {
+      setShowStatusScrollLeft(false);
+      setShowStatusScrollRight(false);
+      return;
+    }
+
+    const hasOverflow = container.scrollWidth > container.clientWidth + 4;
+    const canScrollLeft = container.scrollLeft > 4;
+    const canScrollRight =
+      container.scrollLeft + container.clientWidth < container.scrollWidth - 4;
+
+    setShowStatusScrollLeft(hasOverflow && canScrollLeft);
+    setShowStatusScrollRight(hasOverflow && canScrollRight);
+  }, [groupBy]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    updateStatusOverflow();
+
+    const handleScroll = () => updateStatusOverflow();
+    const handleResize = () => updateStatusOverflow();
+
+    container.addEventListener('scroll', handleScroll);
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [updateStatusOverflow]);
+
+  useEffect(() => {
+    updateStatusOverflow();
+  }, [projects, columns, updateStatusOverflow]);
+
+  const handleStatusScroll = (direction: 'left' | 'right') => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const firstColumn = container.querySelector<HTMLElement>(
+      `.${styles.kanbanColumnWrapper}`
+    );
+    const columnWidth = firstColumn?.offsetWidth || 315;
+    const gap = 16;
+    const scrollByAmount = (columnWidth + gap) * 4;
+
+    container.scrollBy({
+      left: direction === 'left' ? -scrollByAmount : scrollByAmount,
+      behavior: 'smooth',
+    });
+  };
+
+  // Auto-scroll when dragging near edges
+  const handleDragOverContainer = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (!isDragging || groupBy !== 'status') return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const scrollZoneWidth = 100; // pixels from edge to trigger scroll
+    const scrollSpeed = 15; // pixels per interval
+
+    const mouseX = e.clientX - containerRect.left;
+
+    // Clear any existing interval
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+
+    // Check if near left edge
+    if (mouseX < scrollZoneWidth && container.scrollLeft > 0) {
+      autoScrollIntervalRef.current = setInterval(() => {
+        if (container.scrollLeft > 0) {
+          container.scrollLeft -= scrollSpeed;
+        } else if (autoScrollIntervalRef.current) {
+          clearInterval(autoScrollIntervalRef.current);
+          autoScrollIntervalRef.current = null;
+        }
+      }, 50);
+    }
+    // Check if near right edge
+    else if (
+      mouseX > containerRect.width - scrollZoneWidth &&
+      container.scrollLeft + container.clientWidth < container.scrollWidth
+    ) {
+      autoScrollIntervalRef.current = setInterval(() => {
+        if (container.scrollLeft + container.clientWidth < container.scrollWidth) {
+          container.scrollLeft += scrollSpeed;
+        } else if (autoScrollIntervalRef.current) {
+          clearInterval(autoScrollIntervalRef.current);
+          autoScrollIntervalRef.current = null;
+        }
+      }, 50);
+    }
+  }, [isDragging, groupBy]);
+
+  // Clean up auto-scroll interval
+  useEffect(() => {
+    return () => {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+        autoScrollIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   // Drag handlers
-  const handleDragStart = (e: DragEvent<HTMLDivElement>, projectId: string) => {
+  const handleDragStart = (e: DragEvent<HTMLDivElement>, projectId: string, columnId: string) => {
     setDraggedId(projectId);
+    setDraggedFromColumn(columnId);
+    setIsDragging(true);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragEnd = () => {
-    // Perform the reorder if we have a valid drop target
-    if (draggedId && dropTargetId && dropPosition) {
+    // Clear auto-scroll interval
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+
+    // Handle status change when dragging between columns in status view
+    if (groupBy === 'status' && draggedId && dropToColumn && draggedFromColumn !== dropToColumn) {
+      const draggedProject = projects.find(p => p.id === draggedId);
+      if (draggedProject && onUpdateProject) {
+        onUpdateProject({
+          ...draggedProject,
+          status: dropToColumn as StatusCategory,
+        });
+      }
+    }
+
+    // Perform the reorder if we have a valid drop target (for Due Today column)
+    if (groupBy === 'date' && draggedId && dropTargetId && dropPosition) {
       setDueTodayOrder(prevOrder => {
         const newOrder = [...prevOrder];
         const draggedIndex = newOrder.indexOf(draggedId);
@@ -239,6 +400,9 @@ export function ProjectKanbanView({
     setDraggedId(null);
     setDropTargetId(null);
     setDropPosition(null);
+    setDraggedFromColumn(null);
+    setDropToColumn(null);
+    setIsDragging(false);
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>, projectId: string) => {
@@ -263,33 +427,44 @@ export function ProjectKanbanView({
     // Don't clear immediately - let dragOver on another card set new target
   };
 
-  const handleColumnDragOver = (e: DragEvent<HTMLDivElement>) => {
+  const handleColumnDragOver = (e: DragEvent<HTMLDivElement>, columnId: string) => {
     e.preventDefault();
+    if (groupBy === 'status') {
+      setDropToColumn(columnId);
+    }
   };
 
-  const handleColumnDrop = (e: DragEvent<HTMLDivElement>) => {
+  const handleColumnDrop = (e: DragEvent<HTMLDivElement>, columnId: string) => {
     e.preventDefault();
-    // The actual reorder happens in handleDragEnd
+    setDropToColumn(columnId);
+    // The actual reorder/status change happens in handleDragEnd
   };
 
   return (
-    <div ref={containerRef} className={styles.kanbanContainer}>
-      <div className={styles.kanbanBoard}>
+    <div className={styles.kanbanWrapper}>
+      <div
+        ref={containerRef}
+        className={`${styles.kanbanContainer} ${groupBy === 'status' ? styles.statusView : ''}`}
+        onDragOver={handleDragOverContainer}
+      >
+        <div className={`${styles.kanbanBoard} ${groupBy === 'status' ? styles.statusView : ''}`}>
         {columns.map((column) => {
-          const columnProjects = getProjectsByDateCategory(column.id);
-          const isDueTodayColumn = column.id === 'due_today';
+          const columnProjects = getProjectsByCategory(column.id);
+          const isDueTodayColumn = groupBy === 'date' && column.id === 'due_today';
+          const isStatusColumn = groupBy === 'status';
+          const isDraggable = isDueTodayColumn || isStatusColumn;
 
           return (
-            <div key={column.id} className={styles.kanbanColumnWrapper}>
+            <div key={column.id} className={`${styles.kanbanColumnWrapper} ${groupBy === 'status' ? styles.statusView : ''}`}>
               <div className={styles.columnHeader}>
                 <span className={styles.columnTitle}>{column.title}</span>
                 <span className={styles.columnCount}>({columnProjects.length})</span>
               </div>
 
               <div
-                className={`${styles.kanbanColumn} ${isDueTodayColumn ? styles.dueTodayColumn : ''}`}
-                onDragOver={handleColumnDragOver}
-                onDrop={handleColumnDrop}
+                className={`${styles.kanbanColumn} ${isDueTodayColumn ? styles.dueTodayColumn : ''} ${isStatusColumn ? styles.statusColumn : ''}`}
+                onDragOver={(e) => handleColumnDragOver(e, column.id)}
+                onDrop={(e) => handleColumnDrop(e, column.id)}
               >
                 <div
                   ref={(el) => { columnRefs.current[column.id] = el; }}
@@ -308,21 +483,27 @@ export function ProjectKanbanView({
                         key={project.id}
                         className={`
                           ${styles.draggableProject}
-                          ${isDueTodayColumn ? styles.draggable : ''}
+                          ${isDraggable ? styles.draggable : ''}
                           ${isDragging ? styles.dragging : ''}
                           ${showDropBefore ? styles.dropBefore : ''}
                           ${showDropAfter ? styles.dropAfter : ''}
                         `}
-                        draggable={isDueTodayColumn}
-                        onDragStart={isDueTodayColumn ? (e) => handleDragStart(e, project.id) : undefined}
-                        onDragEnd={isDueTodayColumn ? handleDragEnd : undefined}
-                        onDragOver={isDueTodayColumn ? (e) => handleDragOver(e, project.id) : undefined}
-                        onDragLeave={isDueTodayColumn ? handleDragLeave : undefined}
+                        draggable={isDraggable}
+                        onDragStart={isDraggable ? (e) => handleDragStart(e, project.id, column.id) : undefined}
+                        onDragEnd={isDraggable ? handleDragEnd : undefined}
+                        onDragOver={isDraggable ? (e) => handleDragOver(e, project.id) : undefined}
+                        onDragLeave={isDraggable ? handleDragLeave : undefined}
                         onClick={() => onProjectClick(project)}
                       >
                         <div className={styles.projectCard}>
                           <div className={styles.cardTopRow}>
-                            <div className={styles.dateSection}>
+                            <div
+                              className={`${styles.dateSection} ${
+                                project.due_date && isPastDue(new Date(project.due_date))
+                                  ? styles.overdueDate
+                                  : ''
+                              }`}
+                            >
                               <ClockIcon />
                               <span>{project.due_date ? formatDateShort(project.due_date) : 'No date'}</span>
                             </div>
@@ -349,7 +530,7 @@ export function ProjectKanbanView({
                           })()}
 
                           <div className={styles.cardMetrics}>
-                            <div className={styles.metricItem}>
+                            <div className={`${styles.metricItem} ${project.has_unread_mentions ? styles.hasMention : ''}`}>
                               <CommentIcon />
                               <span>{project.comments_count ?? 0} Comments</span>
                             </div>
@@ -361,7 +542,16 @@ export function ProjectKanbanView({
 
                           <div className={styles.progressSection}>
                             <div className={styles.progressHeader}>
-                              <span className={styles.progressLabel}>Progress</span>
+                              <div className={styles.progressLabelWithStar}>
+                                <span className={styles.progressLabel}>Progress</span>
+                                {onToggleStar && (
+                                  <StarButton
+                                    isStarred={project.is_starred || false}
+                                    onToggle={() => onToggleStar(project.id)}
+                                    size="small"
+                                  />
+                                )}
+                              </div>
                               <span className={styles.progressFraction}>
                                 {progress.completed}/{progress.total}
                               </span>
@@ -408,7 +598,44 @@ export function ProjectKanbanView({
             </div>
           );
         })}
+        </div>
       </div>
+      {groupBy === 'status' && showStatusScrollLeft && (
+        <button
+          type="button"
+          className={`${styles.statusScrollArrow} ${styles.statusScrollArrowLeft}`}
+          onClick={() => handleStatusScroll('left')}
+          aria-label="Scroll status columns left"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M15 6L9 12L15 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      )}
+      {groupBy === 'status' && showStatusScrollRight && (
+        <button
+          type="button"
+          className={styles.statusScrollArrow}
+          onClick={() => handleStatusScroll('right')}
+          aria-label="Scroll status columns"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M9 6L15 12L9 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

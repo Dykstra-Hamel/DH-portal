@@ -4,6 +4,7 @@ import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Check, ChevronDown, Pencil, Calendar, MessageSquare, Trash2, GripVertical } from 'lucide-react';
 import { ProjectTask } from '@/types/project';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
+import { StarButton } from '@/components/Common/StarButton/StarButton';
 import styles from './ProjectTaskList.module.scss';
 
 interface ProjectTaskListProps {
@@ -13,6 +14,8 @@ interface ProjectTaskListProps {
   onUpdateTask?: (taskId: string, updates: Partial<ProjectTask>) => Promise<void>;
   onDeleteTask?: (taskId: string) => Promise<void>;
   onReorderTasks?: (taskIds: string[]) => Promise<void>;
+  onToggleStar?: (taskId: string) => void;
+  isStarred?: (taskId: string) => boolean;
   isLoading?: boolean;
   showHeader?: boolean;
 }
@@ -24,6 +27,8 @@ export default function ProjectTaskList({
   onUpdateTask,
   onDeleteTask,
   onReorderTasks,
+  onToggleStar,
+  isStarred,
   isLoading = false,
   showHeader = true,
 }: ProjectTaskListProps) {
@@ -38,6 +43,23 @@ export default function ProjectTaskList({
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
+
+  // Close date picker when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setDatePickerTaskId(null);
+      }
+    };
+
+    if (datePickerTaskId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [datePickerTaskId]);
 
   const sortedTasks = useMemo(() => {
     return [...tasks].sort((a, b) => {
@@ -205,9 +227,18 @@ export default function ProjectTaskList({
   // Generate calendar days for the date picker
   const generateCalendarDays = useCallback((taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
-    const selectedDate = task?.due_date ? new Date(task.due_date) : null;
+
+    // Parse the date string directly to avoid timezone issues
+    let selectedDate = null;
+    let currentMonth = new Date();
+
+    if (task?.due_date) {
+      const [year, month, day] = task.due_date.split('-').map(Number);
+      selectedDate = new Date(year, month - 1, day);
+      currentMonth = selectedDate;
+    }
+
     const today = new Date();
-    const currentMonth = selectedDate || today;
 
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -346,6 +377,18 @@ export default function ProjectTaskList({
             {/* Hover actions overlay */}
             {!isEditing && (
               <div className={styles.hoverActions}>
+                {onToggleStar && isStarred && (
+                  <div
+                    className={styles.starWrapper}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <StarButton
+                      isStarred={isStarred(task.id)}
+                      onToggle={() => onToggleStar(task.id)}
+                      size="small"
+                    />
+                  </div>
+                )}
                 <button
                   type="button"
                   className={styles.actionIcon}
@@ -358,7 +401,14 @@ export default function ProjectTaskList({
                   type="button"
                   className={styles.actionIcon}
                   onClick={(e) => handleCalendarClick(e, task.id)}
-                  title="Set due date"
+                  title={
+                    task.due_date
+                      ? (() => {
+                          const [year, month, day] = task.due_date.split('-');
+                          return `Due on ${month}/${day}/${year.slice(2)}`;
+                        })()
+                      : 'No due date set.'
+                  }
                 >
                   <Calendar size={14} />
                 </button>

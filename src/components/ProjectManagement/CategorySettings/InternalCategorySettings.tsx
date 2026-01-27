@@ -250,12 +250,7 @@ export default function InternalCategorySettings() {
                   <button
                     className={styles.iconButton}
                     onClick={() => handleDeleteClick(category)}
-                    disabled={category.is_system_default}
-                    title={
-                      category.is_system_default
-                        ? 'System categories cannot be deleted'
-                        : 'Delete category'
-                    }
+                    title="Delete category"
                   >
                     <Trash2 />
                   </button>

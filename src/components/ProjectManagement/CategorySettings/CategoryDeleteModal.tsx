@@ -50,7 +50,6 @@ export default function CategoryDeleteModal({
   if (!isOpen || !category) return null;
 
   const hasProjects = projectsUsingCategory.length > 0;
-  const isSystemDefault = category.is_system_default;
 
   return (
     <div className={styles.modal} onClick={handleClose}>
@@ -60,17 +59,7 @@ export default function CategoryDeleteModal({
         </div>
 
         <div className={styles.modalBody}>
-          {isSystemDefault ? (
-            <div className={styles.deleteWarning}>
-              <div className={styles.deleteWarningTitle}>
-                <AlertTriangle size={16} style={{ display: 'inline', marginRight: '8px' }} />
-                Cannot Delete System Category
-              </div>
-              <p className={styles.deleteWarningText}>
-                &quot;{category.name}&quot; is a system default category and cannot be deleted.
-              </p>
-            </div>
-          ) : hasProjects ? (
+          {hasProjects ? (
             <>
               <div className={styles.deleteWarning}>
                 <div className={styles.deleteWarningTitle}>
@@ -79,8 +68,8 @@ export default function CategoryDeleteModal({
                 </div>
                 <p className={styles.deleteWarningText}>
                   This category is currently assigned to {projectsUsingCategory.length}{' '}
-                  project{projectsUsingCategory.length !== 1 ? 's' : ''}. You must remove this
-                  category from all projects before you can delete it.
+                  project{projectsUsingCategory.length !== 1 ? 's' : ''}. If you delete this category,
+                  the projects will remain but will no longer have this category assigned.
                 </p>
               </div>
 
@@ -96,6 +85,10 @@ export default function CategoryDeleteModal({
                   ))}
                 </ul>
               </div>
+              <p style={{ fontSize: '14px', color: 'var(--gray-700)', margin: '16px 0 0 0' }}>
+                Are you sure you want to delete the category &quot;{category.name}&quot;? This action
+                cannot be undone.
+              </p>
             </>
           ) : (
             <p style={{ fontSize: '14px', color: 'var(--gray-700)', margin: 0 }}>
@@ -114,18 +107,16 @@ export default function CategoryDeleteModal({
             onClick={handleClose}
             disabled={isDeleting}
           >
-            {hasProjects || isSystemDefault ? 'Close' : 'Cancel'}
+            Cancel
           </button>
-          {!hasProjects && !isSystemDefault && (
-            <button
-              type="button"
-              className={`${styles.button} ${styles.danger}`}
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? 'Deleting...' : 'Delete Category'}
-            </button>
-          )}
+          <button
+            type="button"
+            className={`${styles.button} ${styles.danger}`}
+            onClick={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Category'}
+          </button>
         </div>
       </div>
     </div>

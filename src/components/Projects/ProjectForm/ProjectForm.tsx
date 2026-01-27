@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { X } from 'lucide-react';
 import {
@@ -72,6 +72,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
   const [isFetchingCategories, setIsFetchingCategories] = useState(false);
   const [shortcodePreview, setShortcodePreview] = useState<string>('');
+  const [companyShortCodes, setCompanyShortCodes] = useState<Record<string, string>>({});
+  const fetchedCompanyCodesRef = useRef<Record<string, boolean>>({});
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -124,7 +126,13 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     }
 
     return adminUsers;
-  }, [editingProject?.assigned_to_profile?.id, formData.assigned_to, users]);
+  }, [editingProject?.assigned_to_profile, formData.assigned_to, users]);
+
+  const sortedCompanies = useMemo(() => {
+    return [...companies].sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+    );
+  }, [companies]);
 
   const PRESET_PROJECT_TAGS = [
     'seo', 'social-media', 'content', 'design', 'development',
@@ -134,6 +142,26 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     'print', 'digital', 'billboard', 'business-cards',
     'door-hangers', 'vehicle-wrap',
   ];
+
+  // Filter status options based on project categories and is_billable
+  const availableStatusOptions = useMemo(() => {
+    const hasPrintCategory = availableCategories.some(
+      cat => formData.category_ids.includes(cat.id) && cat.name === 'Print'
+    );
+    const isBillable = formData.is_billable === 'true';
+
+    return statusOptions.filter(status => {
+      // Using extended statusOptions with requiresCategory and requiresBillable
+      if (status.requiresCategory === 'Print' && !hasPrintCategory) {
+        return false;
+      }
+      // Using extended statusOptions with requiresCategory and requiresBillable
+      if (status.requiresBillable && !isBillable) {
+        return false;
+      }
+      return true;
+    });
+  }, [availableCategories, formData.category_ids, formData.is_billable]);
 
   // Fetch available categories
   useEffect(() => {
@@ -231,18 +259,55 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     }
   }, [formData.project_type]);
 
+  // Fetch company short code when company changes (for shortcode preview)
+  useEffect(() => {
+    const companyId = formData.company_id;
+    if (!companyId || fetchedCompanyCodesRef.current[companyId]) return;
+
+    fetchedCompanyCodesRef.current[companyId] = true;
+
+    const fetchShortCode = async () => {
+      try {
+        const response = await fetch(`/api/companies/${companyId}/settings`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch company settings');
+        }
+        const data = await response.json();
+        const shortCode = data?.settings?.short_code?.value;
+        setCompanyShortCodes(prev => ({
+          ...prev,
+          [companyId]: typeof shortCode === 'string' ? shortCode : '',
+        }));
+      } catch (error) {
+        console.error('Error fetching company short code:', error);
+        setCompanyShortCodes(prev => ({ ...prev, [companyId]: '' }));
+      }
+    };
+
+    fetchShortCode();
+  }, [formData.company_id]);
+
   // Update shortcode preview when type_code, name, or company changes
   useEffect(() => {
     if (formData.type_code && formData.name && formData.company_id) {
       const year = new Date().getFullYear().toString().slice(-2);
-      const cleanName = formData.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
-      // Note: Can't show company code here since it's in company_settings, not loaded with companies
-      const preview = `[COMPANY_CODE]_${formData.type_code}${year}_${cleanName}`;
-      setShortcodePreview(preview);
+      const cleanName = formData.name
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 20);
+      const companyCode = companyShortCodes[formData.company_id];
+      if (companyCode !== undefined) {
+        const prefix = companyCode || '[COMPANY_CODE]';
+        const preview = `${prefix}_${formData.type_code}${year}_${cleanName}`;
+        setShortcodePreview(preview);
+      } else {
+        setShortcodePreview('');
+      }
     } else {
       setShortcodePreview('');
     }
-  }, [formData.type_code, formData.name, formData.company_id]);
+  }, [formData.type_code, formData.name, formData.company_id, companyShortCodes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -415,7 +480,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 <div className={styles.shortcodePreview}>
                   <code>{shortcodePreview}</code>
                 </div>
-                {formData.company_id && !companies.find(c => c.id === formData.company_id) && (
+                {formData.company_id && companyShortCodes[formData.company_id] === '' && (
                   <small style={{ color: '#dc3545' }}>
                     ⚠ Company must have a short code set before creating projects with type codes
                   </small>
@@ -465,7 +530,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                   required
                 >
                   <option value="">Select Company</option>
-                  {companies.map(company => (
+                  {sortedCompanies.map(company => (
                     <option key={company.id} value={company.id}>
                       {company.name}
                     </option>
@@ -566,7 +631,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                       setFormData({ ...formData, status: e.target.value })
                     }
                   >
-                    {statusOptions.map(status => (
+                    {availableStatusOptions.map(status => (
                       <option key={status.value} value={status.value}>
                         {status.label}
                       </option>

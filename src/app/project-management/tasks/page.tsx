@@ -11,8 +11,8 @@ import { TaskListView } from '@/components/TaskManagement/TaskListView/TaskListV
 import {
   Task,
   RecurringFrequency,
-  Project,
 } from '@/types/taskManagement';
+import { Project } from '@/types/project';
 import styles from '../projectManagement.module.scss';
 
 type ViewType = 'list' | 'calendar' | 'archive';
@@ -285,7 +285,7 @@ export default function TasksPage() {
             {currentView === 'archive' && (
               <ArchiveView
                 tasks={filteredTasks.filter(t => t.status === 'completed')}
-                projects={projects.filter(p => p.status === 'completed')}
+                projects={projects.filter(p => p.status === 'complete')}
                 onTaskClick={handleTaskClick}
               />
             )}

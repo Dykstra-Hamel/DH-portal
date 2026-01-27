@@ -137,32 +137,32 @@
 
   h3 {
     margin: 0;
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--gray-800);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-900);
     text-wrap-mode: nowrap;
     transition: all 0.5s;
   }
 }
 
 .icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--gray-800);
+  color: var(--gray-500);
   transition: all 0.3s;
 
   svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
   }
 }
 
 .toggleButton {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -177,6 +177,8 @@
   }
 
   svg {
+    width: 16px;
+    height: 16px;
     transition: transform 0.2s ease-in-out;
   }
 

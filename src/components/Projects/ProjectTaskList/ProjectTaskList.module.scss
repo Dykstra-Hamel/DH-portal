@@ -215,6 +215,12 @@
   z-index: 5;
 }
 
+.starWrapper {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
 .actionIcon {
   display: flex;
   align-items: center;
@@ -270,7 +276,7 @@
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   padding: 12px;
-  z-index: 100;
+  z-index: 1000;
   min-width: 260px;
 }
 
@@ -366,10 +372,16 @@
 }
 
 .completed {
-  opacity: 0.6;
-
   .taskName {
     text-decoration: line-through;
+    opacity: 0.6;
+  }
+
+  .completeToggle,
+  .collapseToggle,
+  .dragHandle,
+  .assigneeSection {
+    opacity: 0.6;
   }
 }
 

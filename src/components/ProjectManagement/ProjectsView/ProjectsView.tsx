@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Project, statusOptions } from '@/types/project';
 import { Task } from '@/types/taskManagement';
 import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
+import { StarButton } from '@/components/Common/StarButton/StarButton';
 import styles from './ProjectsView.module.scss';
 
 type ProjectStatus = Project['status'];
@@ -11,9 +12,10 @@ interface ProjectsViewProps {
   tasks: Task[];
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
+  onToggleStar?: (projectId: string) => void;
 }
 
-export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }: ProjectsViewProps) {
+export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, onToggleStar }: ProjectsViewProps) {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,6 +57,14 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
 
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const isPastDue = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const compareDate = new Date(date);
+    compareDate.setHours(0, 0, 0, 0);
+    return compareDate < today;
   };
 
   const hexToRgba = (hex: string, alpha: number) => {
@@ -203,10 +213,25 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
                     </div>
                   </div>
                   <div className={styles.cell}>
-                    <div className={styles.deadline}>{formatDate(project.due_date)}</div>
+                    <div
+                      className={`${styles.deadline} ${
+                        project.due_date && isPastDue(new Date(project.due_date))
+                          ? styles.deadlineOverdue
+                          : ''
+                      }`}
+                    >
+                      {formatDate(project.due_date)}
+                    </div>
                   </div>
                   <div className={styles.cell}>
                     <div className={styles.actions}>
+                      {onToggleStar && (
+                        <StarButton
+                          isStarred={project.is_starred || false}
+                          onToggle={() => onToggleStar(project.id)}
+                          size="small"
+                        />
+                      )}
                       <button
                         className={styles.actionButton}
                         onClick={() => onEditProject(project)}

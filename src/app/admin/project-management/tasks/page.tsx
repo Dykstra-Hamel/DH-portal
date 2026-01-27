@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useUser } from '@/hooks/useUser';
+import { useStarredItems } from '@/hooks/useStarredItems';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { CalendarView } from '@/components/TaskManagement/CalendarView/CalendarView';
 import { ArchiveView } from '@/components/TaskManagement/ArchiveView/ArchiveView';
 import { TaskListView } from '@/components/TaskManagement/TaskListView/TaskListView';
-import { Task, Project } from '@/types/taskManagement';
-import { ProjectTask } from '@/types/project';
+import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
+import { Task } from '@/types/taskManagement';
+import { ProjectTask, Project, User } from '@/types/project';
 import { createClient } from '@/lib/supabase/client';
 import styles from '@/app/project-management/projectManagement.module.scss';
 
@@ -17,10 +19,15 @@ type ViewType = 'list' | 'calendar' | 'archive';
 export default function AdminTasksPage() {
   const { registerPageAction } = usePageActions();
   const { user } = useUser();
+  const { isStarred, toggleStar, refetch: refetchStarredItems } = useStarredItems();
   const [currentView, setCurrentView] = useState<ViewType>('list');
-  const [showMyTasksOnly, setShowMyTasksOnly] = useState(true);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | undefined>();
+
+  // Task detail sidebar state
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<ProjectTask | null>(null);
+  const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
 
   // State for API data
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
@@ -51,16 +58,45 @@ export default function AdminTasksPage() {
     tags: [],
     created_at: projectTask.created_at || new Date().toISOString(),
     updated_at: projectTask.updated_at || new Date().toISOString(),
+    is_starred: isStarred('task', projectTask.id),
   });
 
-  // Filter tasks based on My Tasks toggle
+  // Filter tasks - always show only tasks assigned to current user
   const filteredTasks = useMemo(() => {
     const convertedTasks = tasks.map(convertToTask);
-    if (showMyTasksOnly && user?.id) {
+    // Always filter to current user's tasks (removed toggle)
+    if (user?.id) {
       return convertedTasks.filter(task => task.assigned_to === user.id);
     }
     return convertedTasks;
-  }, [tasks, showMyTasksOnly, user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, user?.id, isStarred]);
+
+  // Calculate task stats by project for progress bars
+  const taskStatsByProject = useMemo(() => {
+    const stats: Record<string, { completed: number; total: number }> = {};
+
+    tasks.forEach((task) => {
+      if (!task.project_id) return;
+      const current = stats[task.project_id] || { completed: 0, total: 0 };
+      current.total += 1;
+      if (task.is_completed) {
+        current.completed += 1;
+      }
+      stats[task.project_id] = current;
+    });
+
+    return stats;
+  }, [tasks]);
+
+  // Enrich projects with starred status and progress
+  const projectsWithStarred = useMemo(() => {
+    return projects.map(project => ({
+      ...project,
+      is_starred: isStarred('project', project.id),
+      progress: taskStatsByProject[project.id] || { completed: 0, total: 0 },
+    }));
+  }, [projects, isStarred, taskStatsByProject]);
 
   // Register page actions (Add buttons in header)
   useEffect(() => {
@@ -110,16 +146,47 @@ export default function AdminTasksPage() {
     }
   }, []);
 
+  // Fetch users for task assignment
+  const fetchUsers = useCallback(async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/admin/users', { headers });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  }, []);
+
+  // Open task detail sidebar
+  const openTaskDetailById = useCallback(async (taskId: string, projectId: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/projects/${projectId}/tasks/${taskId}`, { headers });
+
+      if (response.ok) {
+        const fullTask = await response.json();
+        setSelectedTaskDetail(fullTask);
+        setIsTaskDetailOpen(true);
+      }
+    } catch (error) {
+      console.error('Error fetching task details:', error);
+    }
+  }, []);
+
   // Initial data fetch
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchTasks(), fetchProjects()]);
+      await Promise.all([fetchTasks(), fetchProjects(), fetchUsers()]);
       setIsLoading(false);
     };
 
     fetchData();
-  }, [fetchTasks, fetchProjects]);
+  }, [fetchTasks, fetchProjects, fetchUsers]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSaveTask = useCallback(async (taskData: any) => {
@@ -193,9 +260,111 @@ export default function AdminTasksPage() {
   }, [fetchTasks]);
 
   const handleTaskClick = useCallback((task: Task) => {
-    setSelectedTask(task);
-    setShowTaskModal(true);
+    if (task.project_id) {
+      openTaskDetailById(task.id, task.project_id);
+    }
+  }, [openTaskDetailById]);
+
+  const handleToggleStar = useCallback(async (taskId: string) => {
+    await toggleStar('task', taskId);
+    // Refetch tasks to update the starred status in the UI
+    await fetchTasks();
+  }, [toggleStar, fetchTasks]);
+
+  const handleToggleStarProject = useCallback(async (projectId: string) => {
+    await toggleStar('project', projectId);
+    // Refetch projects to update the starred status in the UI
+    await fetchProjects();
+  }, [toggleStar, fetchProjects]);
+
+  const handleProjectClick = useCallback((project: Project) => {
+    // Navigate to project detail page
+    window.location.href = `/admin/project-management/${project.id}`;
   }, []);
+
+  // Task detail sidebar handlers
+  const handleUpdateTask = useCallback(async (taskId: string, updates: Partial<ProjectTask>) => {
+    if (!selectedTaskDetail?.project_id) return;
+
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(updates),
+      });
+
+      if (response.ok) {
+        const updatedTask = await response.json();
+        setSelectedTaskDetail(updatedTask);
+        await fetchTasks();
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  }, [selectedTaskDetail, fetchTasks]);
+
+  const handleDeleteTaskFromDetail = useCallback(async () => {
+    if (!selectedTaskDetail?.project_id || !selectedTaskDetail?.id) return;
+
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}`, {
+        method: 'DELETE',
+        headers,
+      });
+
+      if (response.ok) {
+        setIsTaskDetailOpen(false);
+        setSelectedTaskDetail(null);
+        await fetchTasks();
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  }, [selectedTaskDetail, fetchTasks]);
+
+  const handleAddComment = useCallback(async (comment: string) => {
+    if (!selectedTaskDetail?.project_id || !selectedTaskDetail?.id) return;
+
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}/comments`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ content: comment }),
+      });
+
+      if (response.ok) {
+        // Refresh task to get new comment
+        const updatedTask = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}`, {
+          headers,
+        }).then(res => res.json());
+
+        setSelectedTaskDetail(updatedTask);
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+    }
+  }, [selectedTaskDetail]);
+
+  const handleCreateSubtask = useCallback(() => {
+    // For now, just close the sidebar - subtask creation would need additional implementation
+    setIsTaskDetailOpen(false);
+  }, []);
+
+  const handleUpdateProgress = useCallback(async (progress: number) => {
+    if (!selectedTaskDetail?.project_id || !selectedTaskDetail?.id) return;
+
+    await handleUpdateTask(selectedTaskDetail.id, {
+      progress_percentage: progress,
+    });
+
+    setSelectedTaskDetail({
+      ...selectedTaskDetail,
+      progress_percentage: progress,
+    });
+  }, [selectedTaskDetail, handleUpdateTask]);
 
   return (
     <div className={styles.pageContainer}>
@@ -230,21 +399,6 @@ export default function AdminTasksPage() {
             Archive
           </button>
         </div>
-
-        <div className={styles.toggleSwitch}>
-          <button
-            className={`${styles.toggleButton} ${showMyTasksOnly ? styles.active : ''}`}
-            onClick={() => setShowMyTasksOnly(true)}
-          >
-            My Tasks
-          </button>
-          <button
-            className={`${styles.toggleButton} ${!showMyTasksOnly ? styles.active : ''}`}
-            onClick={() => setShowMyTasksOnly(false)}
-          >
-            All Tasks
-          </button>
-        </div>
       </div>
 
       {/* View Content */}
@@ -259,9 +413,12 @@ export default function AdminTasksPage() {
             {currentView === 'list' && (
               <TaskListView
                 tasks={filteredTasks}
-                projects={projects}
+                projects={projectsWithStarred}
                 onTaskClick={handleTaskClick}
                 onDeleteTask={handleDeleteTask}
+                onToggleStar={handleToggleStar}
+                onProjectClick={handleProjectClick}
+                onToggleStarProject={handleToggleStarProject}
               />
             )}
             {currentView === 'calendar' && (
@@ -273,7 +430,7 @@ export default function AdminTasksPage() {
             {currentView === 'archive' && (
               <ArchiveView
                 tasks={filteredTasks.filter(t => t.status === 'completed')}
-                projects={projects.filter(p => p.status === 'completed')}
+                projects={projectsWithStarred.filter(p => p.status === 'complete')}
                 onTaskClick={handleTaskClick}
               />
             )}
@@ -291,6 +448,23 @@ export default function AdminTasksPage() {
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
         task={selectedTask}
+      />
+
+      {/* Task Detail Sidebar */}
+      <ProjectTaskDetail
+        task={selectedTaskDetail}
+        onClose={() => {
+          setIsTaskDetailOpen(false);
+          setSelectedTaskDetail(null);
+        }}
+        onUpdate={handleUpdateTask}
+        onDelete={handleDeleteTaskFromDetail}
+        onAddComment={handleAddComment}
+        onCreateSubtask={handleCreateSubtask}
+        onUpdateProgress={handleUpdateProgress}
+        users={users}
+        onToggleStar={(taskId) => toggleStar('task', taskId)}
+        isStarred={(taskId) => isStarred('task', taskId)}
       />
     </div>
   );
