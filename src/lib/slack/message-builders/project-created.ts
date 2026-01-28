@@ -62,6 +62,10 @@ export function buildProjectCreatedMessage(
         },
         {
           type: 'mrkdwn',
+          text: `*Assigned to:*\n${projectData.assignedToName || '_Unassigned_'}`,
+        },
+        {
+          type: 'mrkdwn',
           text: `*Status:*\n${projectData.status}`,
         },
       ],
@@ -86,22 +90,24 @@ export function buildProjectCreatedMessage(
       ],
     });
 
-    // Interactive button (separate actions block)
-    blocks.push({
-      type: 'actions',
-      block_id: 'project_actions',
-      elements: [
-        {
-          type: 'button',
-          action_id: 'assign_project',
-          text: {
-            type: 'plain_text',
-            text: '👤 Assign Project',
+    // Interactive button (separate actions block) - only show if project is unassigned
+    if (!projectData.assignedToName) {
+      blocks.push({
+        type: 'actions',
+        block_id: 'project_actions',
+        elements: [
+          {
+            type: 'button',
+            action_id: 'assign_project',
+            text: {
+              type: 'plain_text',
+              text: '👤 Assign Project',
+            },
+            value: projectData.projectId,
           },
-          value: projectData.projectId,
-        },
-      ],
-    });
+        ],
+      });
+    }
   }
 
   // Add divider
