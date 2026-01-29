@@ -447,6 +447,13 @@ export async function POST(request: NextRequest) {
           'Unknown';
         const requesterEmail = requesterProfile?.email || 'unknown@example.com';
 
+        // Get assigned user info if project is assigned
+        const assignedProfile = project.assigned_to ? profileMap.get(project.assigned_to) : null;
+        const assignedToName = assignedProfile
+          ? `${assignedProfile.first_name || ''} ${assignedProfile.last_name || ''}`.trim()
+          : undefined;
+        const assignedToEmail = assignedProfile?.email;
+
         // Prepare notification data
         const emailData: EmailProjectData = {
           projectId: project.id,
@@ -472,8 +479,10 @@ export async function POST(request: NextRequest) {
           requesterName,
           requesterEmail,
           companyName: project.company.name,
+          assignedToName,
+          assignedToEmail,
           timestamp: new Date().toISOString(),
-          actionUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin`,
+          actionUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin/project-management/${project.id}`,
         };
 
         // Send notifications
