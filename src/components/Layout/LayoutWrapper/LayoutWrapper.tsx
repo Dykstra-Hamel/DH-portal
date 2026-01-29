@@ -180,7 +180,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
       case '/admin/project-management':
         return {
           title: pageHeader?.title || 'Admin Project Dashboard',
-          description: pageHeader?.description || 'Internal Project and Task Management',
+          description:
+            pageHeader?.description || 'Internal Project and Task Management',
           showAddButton: false,
           projectFilterControls: pageHeader?.projectFilterControls,
           customActions: (
@@ -197,6 +198,17 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               }
             />
           ),
+        };
+      case '/admin/monthly-services':
+        return {
+          title: pageHeader?.title || 'Monthly Services',
+          description:
+            pageHeader?.description ||
+            'Track recurring marketing tasks for client companies',
+          showAddButton: true,
+          addButtonText: 'New Monthly Service',
+          onAddClick: getPageAction('add-monthly-service') || (() => {}),
+          customActions: pageHeader?.customActions,
         };
       case '/tickets/leads':
         return {
@@ -338,6 +350,19 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           pathname.match(/^\/project-management\/[^\/]+$/) ||
           pathname.match(/^\/admin\/project-management\/[^\/]+$/)
         ) {
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
+        // Show lower header for monthly service detail pages
+        if (pathname.match(/^\/admin\/monthly-services\/[^\/]+$/)) {
           if (pageHeader) {
             return {
               title: pageHeader.title,

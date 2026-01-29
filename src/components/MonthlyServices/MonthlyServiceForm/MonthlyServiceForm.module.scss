@@ -1,0 +1,323 @@
+.addServiceForm {
+  display: block;
+  position: relative;
+  width: 100%;
+}
+
+.formContent {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.required {
+  color: #ef4444;
+}
+
+.input,
+.select,
+.textarea {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background-color: white;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+  }
+}
+
+.textarea {
+  resize: vertical;
+  font-family: inherit;
+  min-height: 80px;
+}
+
+.addButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+  }
+
+  svg {
+    color: #6b7280;
+  }
+}
+
+.addAnotherButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  margin-top: 16px;
+  background-color: white;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+    border-style: solid;
+  }
+
+  svg {
+    color: #6b7280;
+  }
+}
+
+.emptyState {
+  padding: 32px;
+  text-align: center;
+  background-color: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: #6b7280;
+  }
+}
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.taskCard {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.taskCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.taskCardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.gripIcon {
+  color: #9ca3af;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.taskCardActions {
+  display: flex;
+  gap: 4px;
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 16px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.deleteButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: white;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: #fef2f2;
+    border-color: #f87171;
+  }
+}
+
+.taskCardBody {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background-color: white;
+}
+
+.error {
+  padding: 12px 16px;
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancelButton,
+.submitButton {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.cancelButton {
+  background-color: white;
+  border: 1px solid #d1d5db;
+  color: #374151;
+
+  &:hover:not(:disabled) {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+  }
+}
+
+.submitButton {
+  background-color: #3b82f6;
+  border: 1px solid #3b82f6;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: #2563eb;
+    border-color: #2563eb;
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .formContent {
+    gap: 24px;
+  }
+
+  .taskCardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .taskCardActions {
+    align-self: flex-end;
+  }
+}

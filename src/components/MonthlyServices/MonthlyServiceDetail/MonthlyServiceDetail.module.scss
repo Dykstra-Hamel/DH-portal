@@ -1,0 +1,332 @@
+.container {
+  width: 100%;
+  padding: 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.headerInfo {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.companyLogo {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #F9FAFB;
+  padding: 8px;
+}
+
+.serviceName {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.companyName {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.description {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.statusBadge {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.editButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background-color: #3B82F6;
+  border: 1px solid #3B82F6;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: #2563EB;
+    border-color: #2563EB;
+  }
+}
+
+.monthSelector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.monthInput {
+  :global(.MuiInputBase-root) {
+    font-size: 14px;
+    background-color: white;
+    border-radius: 6px;
+
+    fieldset {
+      border-color: #D1D5DB;
+      transition: border-color 0.15s ease;
+    }
+
+    &:hover fieldset {
+      border-color: #9CA3AF;
+    }
+
+    &.Mui-focused fieldset {
+      border-color: #3B82F6;
+      border-width: 1px;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  }
+
+  :global(.MuiInputBase-input) {
+    padding: 8px 12px;
+    color: #1F2937;
+    cursor: pointer;
+  }
+
+  :global(.MuiIconButton-root) {
+    color: #6B7280;
+
+    &:hover {
+      background-color: rgba(59, 130, 246, 0.1);
+    }
+  }
+}
+
+.section {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  margin: 0 0 20px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.emptyState {
+  padding: 40px;
+  text-align: center;
+  color: #6B7280;
+  font-size: 14px;
+}
+
+.templatesList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.templateCard {
+  padding: 16px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+}
+
+.templateHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.templateNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #3B82F6;
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.templateTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.templateDescription {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #6B7280;
+  line-height: 1.5;
+}
+
+.templateMeta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.metaItem {
+  padding: 4px 8px;
+  background: white;
+  border: 1px solid #D1D5DB;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.weeksGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.weekCard {
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.weekHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #F9FAFB;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.weekTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.weekProgress {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6B7280;
+}
+
+.progressBar {
+  height: 4px;
+  background: #E5E7EB;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.noTasks {
+  padding: 40px 20px;
+  text-align: center;
+  color: #9CA3AF;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: #6B7280;
+  font-size: 14px;
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .headerInfo {
+    flex-direction: column;
+  }
+
+  .companyLogo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .serviceName {
+    font-size: 20px;
+  }
+
+  .headerActions {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .monthSelector {
+    flex-wrap: wrap;
+  }
+
+  .editButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .templateMeta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
