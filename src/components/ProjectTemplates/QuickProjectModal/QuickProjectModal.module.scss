@@ -53,6 +53,39 @@
   gap: 8px;
 }
 
+.shortcodePreview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gray-700);
+
+  label {
+    font-weight: 600;
+    color: var(--gray-700);
+  }
+}
+
+.shortcodeValue {
+  background: var(--gray-50);
+  border: 1px dashed var(--gray-300);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--gray-950);
+  font-family: var(--font-satoshi);
+
+  code {
+    font-family: var(--font-satoshi);
+  }
+}
+
+.shortcodeWarning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--error-600, #e7000b);
+}
+
 .formRow {
   display: grid;
   grid-template-columns: 1fr 1fr;

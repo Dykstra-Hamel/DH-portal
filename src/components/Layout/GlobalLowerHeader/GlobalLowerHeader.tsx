@@ -65,7 +65,7 @@ interface ProjectFilterControls {
 }
 
 interface GlobalLowerHeaderProps {
-  title: string;
+  title: ReactNode;
   description: string;
   showAddButton?: boolean;
   addButtonText?: string;
@@ -126,6 +126,7 @@ export function GlobalLowerHeader({
   const [isProjectAssignedToOpen, setIsProjectAssignedToOpen] = useState(false);
   const [isProjectStatusOpen, setIsProjectStatusOpen] = useState(false);
   const [hasShadow, setHasShadow] = useState(false);
+  const [companySearchQuery, setCompanySearchQuery] = useState('');
 
   const leadTypeRef = useRef<HTMLDivElement>(null);
   const assignedToRef = useRef<HTMLDivElement>(null);
@@ -956,27 +957,44 @@ export function GlobalLowerHeader({
               </button>
               {isProjectCompanyOpen && (
                 <div className={styles.dropdownMenu}>
+                  <div className={styles.searchContainer}>
+                    <input
+                      type="text"
+                      placeholder="Search companies..."
+                      className={styles.searchInput}
+                      value={companySearchQuery}
+                      onChange={(e) => setCompanySearchQuery(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
                   <button
                     className={`${styles.dropdownOption} ${!projectFilterControls.selectedCompanyId ? styles.selected : ''}`}
                     onClick={() => {
                       projectFilterControls.onCompanyChange(null);
                       setIsProjectCompanyOpen(false);
+                      setCompanySearchQuery('');
                     }}
                   >
                     All Companies
                   </button>
-                  {projectFilterControls.companies.map((company) => (
-                    <button
-                      key={company.id}
-                      className={`${styles.dropdownOption} ${projectFilterControls.selectedCompanyId === company.id ? styles.selected : ''}`}
-                      onClick={() => {
-                        projectFilterControls.onCompanyChange(company.id);
-                        setIsProjectCompanyOpen(false);
-                      }}
-                    >
-                      {company.name}
-                    </button>
-                  ))}
+                  {projectFilterControls.companies
+                    .filter((company) =>
+                      company.name.toLowerCase().includes(companySearchQuery.toLowerCase())
+                    )
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((company) => (
+                      <button
+                        key={company.id}
+                        className={`${styles.dropdownOption} ${projectFilterControls.selectedCompanyId === company.id ? styles.selected : ''}`}
+                        onClick={() => {
+                          projectFilterControls.onCompanyChange(company.id);
+                          setIsProjectCompanyOpen(false);
+                          setCompanySearchQuery('');
+                        }}
+                      >
+                        {company.name}
+                      </button>
+                    ))}
                 </div>
               )}
             </div>

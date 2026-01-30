@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
-import { ProjectTemplate, Company } from '@/types/project';
+import { ProjectTemplate, Company, projectTypeOptions } from '@/types/project';
 import styles from './QuickProjectModal.module.scss';
 
 interface QuickProjectModalProps {
@@ -20,15 +20,102 @@ export interface QuickProjectData {
 }
 
 export function QuickProjectModal({ isOpen, onClose, onSubmit, template, companies }: QuickProjectModalProps) {
+  const getDefaultDueDate = (startDate: string) => {
+    if (!startDate) return '';
+    if (template.default_due_date_offset_days === null || template.default_due_date_offset_days === undefined) {
+      return '';
+    }
+    const dueDate = new Date(startDate);
+    dueDate.setDate(dueDate.getDate() + template.default_due_date_offset_days);
+    return dueDate.toISOString().split('T')[0];
+  };
+
   const [formData, setFormData] = useState<QuickProjectData>({
     template_id: template.id,
     project_name: '',
     company_id: '',
     start_date: new Date().toISOString().split('T')[0],
-    due_date: '',
+    due_date: getDefaultDueDate(new Date().toISOString().split('T')[0]),
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasCustomDueDate, setHasCustomDueDate] = useState(false);
+  const [companyShortCodes, setCompanyShortCodes] = useState<Record<string, string>>({});
+  const [shortcodePreview, setShortcodePreview] = useState('');
+  const fetchedCompanyCodesRef = useRef<Record<string, boolean>>({});
+
+  const templateTypeCode = useMemo(() => {
+    return projectTypeOptions.find((option) => option.value === template.project_type)?.code || '';
+  }, [template.project_type]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData({
+      template_id: template.id,
+      project_name: '',
+      company_id: '',
+      start_date: new Date().toISOString().split('T')[0],
+      due_date: getDefaultDueDate(new Date().toISOString().split('T')[0]),
+    });
+    setHasCustomDueDate(false);
+  }, [isOpen, template]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const companyId = formData.company_id;
+    if (!companyId || fetchedCompanyCodesRef.current[companyId]) return;
+
+    fetchedCompanyCodesRef.current[companyId] = true;
+
+    const fetchShortCode = async () => {
+      try {
+        const response = await fetch(`/api/companies/${companyId}/settings`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch company settings');
+        }
+        const data = await response.json();
+        const shortCode = data?.settings?.short_code?.value;
+        setCompanyShortCodes((prev) => ({
+          ...prev,
+          [companyId]: typeof shortCode === 'string' ? shortCode : '',
+        }));
+      } catch (fetchError) {
+        console.error('Error fetching company short code:', fetchError);
+        setCompanyShortCodes((prev) => ({ ...prev, [companyId]: '' }));
+      }
+    };
+
+    fetchShortCode();
+  }, [formData.company_id, isOpen]);
+
+  useEffect(() => {
+    if (templateTypeCode && formData.project_name && formData.company_id) {
+      const year = new Date().getFullYear().toString().slice(-2);
+      const cleanName = formData.project_name
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const companyCode = companyShortCodes[formData.company_id];
+      if (companyCode !== undefined) {
+        const prefix = companyCode || '[COMPANY_CODE]';
+        const preview = `${prefix}_${templateTypeCode}${year}_${cleanName}`;
+        setShortcodePreview(preview);
+      } else {
+        setShortcodePreview('');
+      }
+    } else {
+      setShortcodePreview('');
+    }
+  }, [formData.project_name, formData.company_id, companyShortCodes, templateTypeCode]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (hasCustomDueDate) return;
+    setFormData((prev) => ({
+      ...prev,
+      due_date: getDefaultDueDate(prev.start_date),
+    }));
+  }, [formData.start_date, hasCustomDueDate, isOpen, template]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,8 +131,9 @@ export function QuickProjectModal({ isOpen, onClose, onSubmit, template, compani
         project_name: '',
         company_id: '',
         start_date: new Date().toISOString().split('T')[0],
-        due_date: '',
+        due_date: getDefaultDueDate(new Date().toISOString().split('T')[0]),
       });
+      setHasCustomDueDate(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project');
     } finally {
@@ -107,6 +195,20 @@ export function QuickProjectModal({ isOpen, onClose, onSubmit, template, compani
             />
           </div>
 
+          {shortcodePreview && (
+            <div className={styles.shortcodePreview}>
+              <label>Project Shortcode (auto-generated)</label>
+              <div className={styles.shortcodeValue}>
+                <code>{shortcodePreview}</code>
+              </div>
+              {formData.company_id && companyShortCodes[formData.company_id] === '' && (
+                <p className={styles.shortcodeWarning}>
+                  Company short code is not set. Please add one in Company Settings.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className={styles.formGroup}>
             <label htmlFor="company_id" className={styles.label}>
               Company <span className={styles.required}>*</span>
@@ -154,7 +256,10 @@ export function QuickProjectModal({ isOpen, onClose, onSubmit, template, compani
                 id="due_date"
                 className={styles.input}
                 value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                onChange={(e) => {
+                  setHasCustomDueDate(true);
+                  setFormData({ ...formData, due_date: e.target.value });
+                }}
                 min={formData.start_date}
               />
             </div>

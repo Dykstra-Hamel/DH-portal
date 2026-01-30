@@ -605,7 +605,10 @@ export default function AdminProjectManagementDashboard() {
       let dueDate = projectData.due_date;
       if (!dueDate && projectData.start_date) {
         const startDate = new Date(projectData.start_date);
-        startDate.setDate(startDate.getDate() + 30);
+        const offset =
+          selectedTemplate?.default_due_date_offset_days ??
+          30;
+        startDate.setDate(startDate.getDate() + offset);
         dueDate = startDate.toISOString().split('T')[0];
       }
 
@@ -635,7 +638,7 @@ export default function AdminProjectManagementDashboard() {
       console.error('Error creating project from template:', error);
       throw error;
     }
-  }, [fetchProjects, user]);
+  }, [fetchProjects, selectedTemplate, user]);
 
   const handleToggleStar = useCallback(async (projectId: string) => {
     await toggleStar('project', projectId);

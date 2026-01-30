@@ -1,4 +1,6 @@
 // Project Category Types
+export type CategoryType = 'internal' | 'external';
+
 export interface ProjectCategory {
   id: string;
   name: string;
@@ -10,10 +12,22 @@ export interface ProjectCategory {
   updated_at: string;
 }
 
+// Project Type Subtypes (related to project types, not categories)
+export interface ProjectTypeSubtype {
+  id: string;
+  project_type: ProjectTypeCode; // WEB, SOC, EML, etc.
+  name: string;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProjectCategoryAssignment {
   id: string;
   project_id: string;
   category_id: string;
+  category_type: CategoryType; // internal or external categorization
   created_at: string;
   category?: ProjectCategory;
 }
@@ -84,6 +98,11 @@ export interface Project {
   company: {
     id: string;
     name: string;
+    branding?: {
+      icon_logo_url?: string;
+    } | {
+      icon_logo_url?: string;
+    }[] | null;
   };
   comments?: ProjectComment[];
   activity?: ProjectActivity[];
@@ -254,6 +273,11 @@ export interface ProjectTask {
   subtasks?: ProjectTask[];
   comments?: ProjectTaskComment[];
   activity?: ProjectTaskActivity[];
+  categories?: Array<{
+    id: string;
+    name: string;
+    category_type: CategoryType;
+  }>;
 }
 
 export interface ProjectTaskFormData {
@@ -390,21 +414,28 @@ export interface ProjectTemplate {
   project_subtype: string | null;
   is_active: boolean;
   template_data: Record<string, any> | null;
+  default_assigned_to: string | null;
+  default_scope: ProjectScope;
+  default_due_date_offset_days: number;
+  default_is_billable?: boolean | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   tasks?: ProjectTemplateTask[];
+  categories?: ProjectCategoryAssignment[];
 }
 
 export interface ProjectTemplateTask {
   id: string;
   template_id: string;
+  parent_task_id?: string | null;
   title: string;
   description: string | null;
   priority: 'low' | 'medium' | 'high' | 'critical';
   due_date_offset_days: number;
   display_order: number;
   tags: string[] | null;
+  default_assigned_to: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -416,13 +447,21 @@ export interface ProjectTemplateFormData {
   project_subtype: string;
   is_active: string;
   template_data: string;
+  default_assigned_to: string;
+  default_scope: string;
+  default_due_date_offset_days: string;
+  default_is_billable?: string;
+  category_ids?: string[];
   tasks: Array<{
+    temp_id?: string;
+    parent_temp_id?: string | null;
     title: string;
     description: string;
     priority: string;
     due_date_offset_days: string;
     display_order: string;
     tags: string;
+    default_assigned_to: string;
   }>;
 }
 

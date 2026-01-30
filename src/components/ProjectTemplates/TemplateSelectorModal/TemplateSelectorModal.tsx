@@ -15,6 +15,15 @@ export function TemplateSelectorModal({ isOpen, onClose, onSelectTemplate }: Tem
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('');
 
+  // Strip HTML tags from description for card display
+  const stripHtml = (html: string | null | undefined): string => {
+    if (!html) return '';
+    // Create a temporary div to parse HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
@@ -113,7 +122,7 @@ export function TemplateSelectorModal({ isOpen, onClose, onSelectTemplate }: Tem
                 </div>
 
                 {template.description && (
-                  <p className={styles.templateDescription}>{template.description}</p>
+                  <p className={styles.templateDescription}>{stripHtml(template.description)}</p>
                 )}
 
                 <div className={styles.cardFooter}>

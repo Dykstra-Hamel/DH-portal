@@ -41,6 +41,10 @@ export async function GET(
         activity:project_task_activity(
           *,
           user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        ),
+        project_task_category_assignments(
+          category_type,
+          category:project_categories(id, name)
         )
       `
       )
@@ -76,8 +80,21 @@ export async function GET(
         )
       : [];
 
+    // Flatten categories with category_type
+    // For /admin/ routes, filter to only include internal categories
+    const categories = task.project_task_category_assignments
+      ?.filter((assignment: any) => assignment.category_type === 'internal')
+      .map((assignment: any) => ({
+        ...assignment.category,
+        category_type: assignment.category_type,
+      }))
+      .filter((category: any) => category !== null) || [];
+
+    const { project_task_category_assignments, ...taskWithoutAssignments } = task;
+
     const taskWithSubtasks = {
-      ...task,
+      ...taskWithoutAssignments,
+      categories,
       subtasks: subtasks || [],
       activity: sortedActivity,
     };
@@ -118,6 +135,8 @@ export async function PUT(
 
     // Parse request body
     const body = await request.json();
+    console.log('PUT /tasks/[taskId] - Request body:', JSON.stringify(body));
+    console.log('PUT /tasks/[taskId] - taskId:', taskId, 'projectId:', projectId);
 
     // Prepare update data
     const updateData: any = {};
@@ -160,7 +179,12 @@ export async function PUT(
     if (body.recurring_end_date !== undefined) updateData.recurring_end_date = body.recurring_end_date || null;
     if (body.next_recurrence_date !== undefined) updateData.next_recurrence_date = body.next_recurrence_date || null;
 
+    // Always update the updated_at timestamp (even if only updating categories)
+    // This prevents empty updates which cause PGRST116 errors
+    updateData.updated_at = new Date().toISOString();
+
     // Update task
+    console.log('PUT /tasks/[taskId] - updateData:', JSON.stringify(updateData));
     const { data: task, error } = await supabase
       .from('project_tasks')
       .update(updateData)
@@ -175,15 +199,86 @@ export async function PUT(
       )
       .single();
 
+    console.log('PUT /tasks/[taskId] - Update result:', { task: !!task, error });
+
     if (error) {
       if (error.code === 'PGRST116') {
+        console.error('Task not found - taskId:', taskId, 'projectId:', projectId);
         return NextResponse.json({ error: 'Task not found' }, { status: 404 });
       }
       console.error('Error updating task:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(task);
+    // Handle category updates if provided
+    // For /admin/ routes, always use 'internal' category_type
+    if (body.category_ids !== undefined) {
+      console.log('PUT /tasks/[taskId] - Updating categories:', body.category_ids);
+
+      // Delete existing internal category assignments
+      const { error: deleteError } = await supabase
+        .from('project_task_category_assignments')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('category_type', 'internal');
+
+      if (deleteError) {
+        console.error('Error deleting existing task categories:', deleteError);
+      }
+
+      // Insert new category assignments if any
+      if (Array.isArray(body.category_ids) && body.category_ids.length > 0) {
+        const categoryAssignments = body.category_ids.map((categoryId: string) => ({
+          task_id: taskId,
+          category_id: categoryId,
+          category_type: 'internal', // Admin routes always use internal categories
+        }));
+
+        console.log('PUT /tasks/[taskId] - Inserting category assignments:', categoryAssignments);
+
+        const { error: categoryError } = await supabase
+          .from('project_task_category_assignments')
+          .insert(categoryAssignments);
+
+        if (categoryError) {
+          console.error('Error updating task categories:', categoryError);
+          // Don't fail the whole request, just log the error
+        } else {
+          console.log('PUT /tasks/[taskId] - Categories updated successfully');
+        }
+      }
+    }
+
+    // Fetch task with categories
+    const { data: taskWithCategories } = await supabase
+      .from('project_tasks')
+      .select(
+        `
+        *,
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        project_task_category_assignments(
+          category_type,
+          category:project_categories(id, name)
+        )
+      `
+      )
+      .eq('id', taskId)
+      .single();
+
+    // Flatten categories with category_type
+    // For /admin/ routes, filter to only include internal categories
+    const categories = taskWithCategories?.project_task_category_assignments
+      ?.filter((assignment: any) => assignment.category_type === 'internal')
+      .map((assignment: any) => ({
+        ...assignment.category,
+        category_type: assignment.category_type,
+      }))
+      .filter((category: any) => category !== null) || [];
+
+    const { project_task_category_assignments, ...taskData } = taskWithCategories || task;
+
+    return NextResponse.json({ ...taskData, categories });
   } catch (error) {
     console.error('Error in PUT /api/admin/projects/[id]/tasks/[taskId]:', error);
     return NextResponse.json(

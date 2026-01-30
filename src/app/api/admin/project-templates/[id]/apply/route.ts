@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { projectTypeOptions } from '@/types/project';
 
 // POST /api/admin/project-templates/[id]/apply - Apply template to create project with tasks
 export async function POST(
@@ -37,13 +38,17 @@ export async function POST(
       );
     }
 
-    // Fetch template with tasks
+    // Fetch template with tasks and categories
     const { data: template, error: templateError } = await supabase
       .from('project_templates')
       .select(
         `
         *,
-        tasks:project_template_tasks(*)
+        tasks:project_template_tasks(*),
+        categories:project_template_category_assignments(
+          id,
+          category_id
+        )
       `
       )
       .eq('id', templateId)
@@ -63,23 +68,62 @@ export async function POST(
       );
     }
 
+    const templateTypeCode =
+      projectTypeOptions.find((option) => option.value === template.project_type)?.code || null;
+
+    if (templateTypeCode) {
+      const { data: shortCodeSetting, error: shortCodeError } = await supabase
+        .from('company_settings')
+        .select('setting_value')
+        .eq('company_id', body.company_id)
+        .eq('setting_key', 'short_code')
+        .maybeSingle();
+
+      if (shortCodeError) {
+        console.error('Error fetching short code:', shortCodeError);
+      }
+
+      if (!shortCodeSetting?.setting_value) {
+        return NextResponse.json(
+          { error: 'Company must have a short code before creating projects with type codes. Please add one in Company Settings.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Calculate due date based on template offset
+    const projectStartDate = body.start_date ? new Date(body.start_date) : new Date();
+    let calculatedDueDate = null;
+    if (template.default_due_date_offset_days !== null) {
+      const dueDate = new Date(projectStartDate);
+      dueDate.setDate(dueDate.getDate() + template.default_due_date_offset_days);
+      calculatedDueDate = dueDate.toISOString().split('T')[0];
+    }
+
     // Merge template data with provided project data
     const projectData = {
       name: body.name,
       description: body.description || template.description || null,
       project_type: template.project_type,
       project_subtype: template.project_subtype,
+      type_code: templateTypeCode,
       company_id: body.company_id,
       requested_by: body.requested_by,
-      assigned_to: body.assigned_to || null,
-      status: body.status || 'coming_up',
+      assigned_to: body.assigned_to || template.default_assigned_to || null,
+      status: body.status || 'in_progress',
       priority: body.priority || 'medium',
-      due_date: body.due_date || null,
+      due_date: body.due_date || calculatedDueDate || null,
       start_date: body.start_date || null,
-      is_billable: body.is_billable || false,
+      is_billable:
+        body.is_billable === 'true' ||
+        body.is_billable === true ||
+        (body.is_billable === undefined || body.is_billable === null
+          ? template.default_is_billable ?? false
+          : false),
       quoted_price: body.quoted_price || null,
       tags: body.tags || template.template_data?.tags || null,
       notes: body.notes || null,
+      scope: template.default_scope || 'internal',
     };
 
     // Create project
@@ -97,14 +141,39 @@ export async function POST(
       );
     }
 
-    // Create tasks from template if they exist
+    // Copy category assignments from template to project
+    if (template.categories && template.categories.length > 0) {
+      const categoryAssignments = template.categories.map((cat: any) => ({
+        project_id: project.id,
+        category_id: cat.category_id,
+        category_type: 'internal', // Default to internal, can be adjusted based on template
+      }));
+
+      const { error: categoryError } = await supabase
+        .from('project_category_assignments')
+        .insert(categoryAssignments);
+
+      if (categoryError) {
+        console.error('Error assigning categories to project:', categoryError);
+        // Don't fail the whole request, just log the error
+      }
+    }
+
+    // Create tasks from template if they exist (supports subtasks)
     if (template.tasks && template.tasks.length > 0) {
       const projectStartDate = body.start_date
         ? new Date(body.start_date)
         : new Date();
 
-      const tasksToCreate = template.tasks.map((templateTask: any) => {
-        // Calculate due date based on offset
+      const parentTemplateTasks = template.tasks.filter(
+        (templateTask: any) => !templateTask.parent_task_id
+      );
+      const childTemplateTasks = template.tasks.filter(
+        (templateTask: any) => templateTask.parent_task_id
+      );
+      const taskIdMap = new Map<string, string>();
+
+      for (const templateTask of parentTemplateTasks) {
         let taskDueDate = null;
         if (templateTask.due_date_offset_days !== null) {
           const dueDate = new Date(projectStartDate);
@@ -112,29 +181,68 @@ export async function POST(
           taskDueDate = dueDate.toISOString().split('T')[0];
         }
 
-        return {
-          project_id: project.id,
-          title: templateTask.title,
-          description: templateTask.description,
-          priority: templateTask.priority,
-          due_date: taskDueDate,
-          start_date: body.start_date || null,
-          display_order: templateTask.display_order,
-          created_by: user.id,
-          assigned_to: body.assigned_to || null,
-          is_completed: false,
-          progress_percentage: 0,
-        };
-      });
+        const { data: createdTask, error: createError } = await supabase
+          .from('project_tasks')
+          .insert({
+            project_id: project.id,
+            title: templateTask.title,
+            description: templateTask.description,
+            priority: templateTask.priority,
+            due_date: taskDueDate,
+            start_date: body.start_date || null,
+            display_order: templateTask.display_order,
+            created_by: user.id,
+            assigned_to: templateTask.default_assigned_to || body.assigned_to || null,
+            is_completed: false,
+            progress_percentage: 0,
+            parent_task_id: null,
+          })
+          .select('id')
+          .single();
 
-      const { error: tasksError } = await supabase
-        .from('project_tasks')
-        .insert(tasksToCreate);
+        if (createError || !createdTask) {
+          console.error('Error creating parent task from template:', createError);
+        } else {
+          taskIdMap.set(templateTask.id, createdTask.id);
+        }
+      }
 
-      if (tasksError) {
-        console.error('Error creating tasks from template:', tasksError);
-        // Project is created, but tasks failed - still return success
-        // Admin can manually add tasks if needed
+      if (childTemplateTasks.length > 0) {
+        const tasksToCreate = childTemplateTasks.map((templateTask: any) => {
+          let taskDueDate = null;
+          if (templateTask.due_date_offset_days !== null) {
+            const dueDate = new Date(projectStartDate);
+            dueDate.setDate(dueDate.getDate() + templateTask.due_date_offset_days);
+            taskDueDate = dueDate.toISOString().split('T')[0];
+          }
+
+          return {
+            project_id: project.id,
+            title: templateTask.title,
+            description: templateTask.description,
+            priority: templateTask.priority,
+            due_date: taskDueDate,
+            start_date: body.start_date || null,
+            display_order: templateTask.display_order,
+            created_by: user.id,
+            assigned_to: templateTask.default_assigned_to || body.assigned_to || null,
+            is_completed: false,
+            progress_percentage: 0,
+            parent_task_id: templateTask.parent_task_id
+              ? taskIdMap.get(templateTask.parent_task_id) || null
+              : null,
+          };
+        });
+
+        const { error: tasksError } = await supabase
+          .from('project_tasks')
+          .insert(tasksToCreate);
+
+        if (tasksError) {
+          console.error('Error creating child tasks from template:', tasksError);
+          // Project is created, but tasks failed - still return success
+          // Admin can manually add tasks if needed
+        }
       }
     }
 
@@ -144,7 +252,13 @@ export async function POST(
       .select(
         `
         *,
-        company:companies(id, name),
+        company:companies(
+          id,
+          name,
+          branding:brands!company_id(
+            icon_logo_url
+          )
+        ),
         requested_by_profile:profiles!projects_requested_by_fkey(id, first_name, last_name, email),
         assigned_to_profile:profiles!projects_assigned_to_fkey(id, first_name, last_name, email)
       `

@@ -25,12 +25,11 @@ import {
   Project,
   ProjectActivity,
   ProjectTask,
+  ProjectTypeSubtype,
   User as ProjectUser,
   statusOptions,
   priorityOptions,
   projectTypeOptions,
-  printSubtypes,
-  digitalSubtypes,
 } from '@/types/project';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import styles from './ProjectDetail.module.scss';
@@ -43,12 +42,6 @@ const PRESET_PROJECT_TAGS = [
   'print', 'digital', 'billboard', 'business-cards',
   'door-hangers', 'vehicle-wrap',
 ];
-
-const getSubtypesForType = (projectType: string | null | undefined) => {
-  if (projectType === 'print') return printSubtypes;
-  if (projectType === 'digital') return digitalSubtypes;
-  return [];
-};
 
 interface ProjectDetailProps {
   project: Project;
@@ -76,6 +69,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     status: project.status || 'in_progress',
     priority: project.priority || 'medium',
     assigned_to: project.assigned_to_profile?.id || '',
+    requested_by: project.requested_by_profile?.id || '',
     due_date: project.due_date || '',
     start_date: project.start_date || '',
     completion_date: project.completion_date || '',
@@ -87,14 +81,17 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     scope: project.scope || '',
     category_ids: project.categories?.map(c => c.category_id) || [],
   }));
-  const [customSubtype, setCustomSubtype] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
   const [pendingExpandCard, setPendingExpandCard] = useState<string | null>(
     null
   );
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [isChangingRequestedBy, setIsChangingRequestedBy] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableSubtypes, setAvailableSubtypes] = useState<ProjectTypeSubtype[]>([]);
+  const [isFetchingSubtypes, setIsFetchingSubtypes] = useState(false);
   const hasUserEditedRef = React.useRef(false);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = React.useRef<string>('');
@@ -235,14 +232,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   };
 
   const resetFormData = React.useCallback((source: Project) => {
-    const subtypes = getSubtypesForType(source.project_type);
-    const supportsSubtypeSelect = subtypes.length > 0;
-    const rawSubtype = source.project_subtype || '';
-    const hasCustomSubtype =
-      supportsSubtypeSelect &&
-      rawSubtype &&
-      !subtypes.find(option => option.value === rawSubtype);
-
     const newFormData = {
       name: source.name || '',
       description: source.description || '',
@@ -250,16 +239,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       status: source.status || 'in_progress',
       priority: source.priority || 'medium',
       assigned_to: source.assigned_to_profile?.id || '',
+      requested_by: source.requested_by_profile?.id || '',
       due_date: source.due_date || '',
       start_date: source.start_date || '',
       completion_date: source.completion_date || '',
       tags: source.tags || [],
       project_type: source.project_type || '',
-      project_subtype: supportsSubtypeSelect
-        ? hasCustomSubtype
-          ? 'other'
-          : rawSubtype
-        : rawSubtype,
+      project_subtype: source.project_subtype || '',
       is_billable: source.is_billable || false,
       quoted_price: source.quoted_price?.toString() || '',
       scope: source.scope || '',
@@ -267,11 +253,10 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     };
 
     // Store the initial state to compare against later
-    lastSavedDataRef.current = JSON.stringify({ formData: newFormData, customSubtype: hasCustomSubtype ? rawSubtype : '' });
+    lastSavedDataRef.current = JSON.stringify(newFormData);
     hasUserEditedRef.current = false;
 
     setEditFormData(newFormData);
-    setCustomSubtype(hasCustomSubtype ? rawSubtype : '');
   }, []);
 
   React.useEffect(() => {
@@ -294,19 +279,39 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     fetchCategories();
   }, []);
 
-  const currentSubtypes = useMemo(
-    () => getSubtypesForType(editFormData.project_type),
-    [editFormData.project_type]
-  );
+  // Fetch available subtypes when project type changes
+  React.useEffect(() => {
+    const fetchSubtypes = async () => {
+      // Get the type_code from the selected project_type
+      const selectedType = projectTypeOptions.find(opt => opt.value === editFormData.project_type);
+      const typeCode = selectedType?.code;
+
+      if (!typeCode) {
+        setAvailableSubtypes([]);
+        return;
+      }
+
+      setIsFetchingSubtypes(true);
+      try {
+        const response = await fetch(`/api/admin/project-types/${typeCode}/subtypes`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSubtypes(data);
+        } else {
+          setAvailableSubtypes([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch subtypes:', error);
+        setAvailableSubtypes([]);
+      } finally {
+        setIsFetchingSubtypes(false);
+      }
+    };
+
+    fetchSubtypes();
+  }, [editFormData.project_type]);
 
   const handleSaveEdit = React.useCallback(async () => {
-    const subtypes = getSubtypesForType(editFormData.project_type);
-    const supportsSubtypeSelect = subtypes.length > 0;
-    const resolvedSubtype = supportsSubtypeSelect
-      ? editFormData.project_subtype === 'other'
-        ? customSubtype.trim()
-        : editFormData.project_subtype
-      : editFormData.project_subtype;
 
     try {
       const response = await fetch(`/api/admin/projects/${project.id}`, {
@@ -321,12 +326,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           status: editFormData.status,
           priority: editFormData.priority,
           assigned_to: editFormData.assigned_to || null,
+          requested_by: editFormData.requested_by || null,
           due_date: editFormData.due_date,
           start_date: editFormData.start_date || null,
           completion_date: editFormData.completion_date || null,
           tags: editFormData.tags,
           project_type: editFormData.project_type,
-          project_subtype: resolvedSubtype || null,
+          project_subtype: editFormData.project_subtype || null,
           is_billable: editFormData.is_billable,
           quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
           scope: editFormData.scope || null,
@@ -351,7 +357,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       setToastType('error');
       setShowToast(true);
     }
-  }, [customSubtype, editFormData, onProjectUpdate, project.id]);
+  }, [editFormData, onProjectUpdate, project.id]);
 
   React.useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -360,7 +366,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     }
 
     // Check if data has actually changed from last saved state
-    const currentData = JSON.stringify({ formData: editFormData, customSubtype });
+    const currentData = JSON.stringify(editFormData);
     if (currentData === lastSavedDataRef.current) {
       return;
     }
@@ -380,7 +386,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [customSubtype, editFormData, handleSaveEdit]);
+  }, [editFormData, handleSaveEdit]);
 
   const handleToggleTag = (tag: string) => {
     hasUserEditedRef.current = true;
@@ -452,6 +458,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     return adminUsers;
   }, [editFormData.assigned_to, project.assigned_to_profile, users]);
 
+  const requestedByProfile = useMemo(() => {
+    const requestedId = editFormData.requested_by;
+    if (!requestedId) return project.requested_by_profile || null;
+    const match = users.find(user => (user.profiles?.id || user.id) === requestedId);
+    return match?.profiles || project.requested_by_profile || null;
+  }, [editFormData.requested_by, project.requested_by_profile, users]);
+
   const assignedTaskSummaries = useMemo(() => {
     const profilesById = new Map<string, ProjectUser['profiles']>();
     users.forEach(projectUser => {
@@ -508,6 +521,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   }, [tasks, users]);
 
   const handleCardExpand = (cardId: string) => {
+    setExpandedCardId(cardId);
     if (!isSidebarExpanded) {
       setPendingExpandCard(cardId);
       setIsSidebarExpanded(true);
@@ -527,6 +541,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   const shouldForceExpand = (cardId: string) =>
     pendingExpandCard === cardId;
 
+  const shouldForceCollapse = (cardId: string) =>
+    !isSidebarExpanded || (!!expandedCardId && expandedCardId !== cardId);
+
   return (
     <>
       <Toast
@@ -544,14 +561,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<LayoutGrid size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('overview')}
-        forceCollapse={!isSidebarExpanded}
+        forceCollapse={shouldForceCollapse('overview')}
         forceExpand={shouldForceExpand('overview')}
         isCompact={!isSidebarExpanded}
         inSidebar={true}
       >
-        <div className={styles.cardContent}>
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           <div className={styles.infoItem}>
-            <FileText size={16} />
             <div>
               <div className={styles.infoLabel}>Project Name</div>
               <input
@@ -564,7 +580,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Building size={16} />
             <div>
               <div className={styles.infoLabel}>Company</div>
               <div className={styles.infoValue}>
@@ -574,7 +589,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Hash size={16} />
             <div>
               <div className={styles.infoLabel}>Shortcode</div>
               <div className={styles.infoValue}>{project.shortcode || 'Not set'}</div>
@@ -582,7 +596,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <FileText size={16} />
             <div>
               <div className={styles.infoLabel}>Project Type</div>
               <select
@@ -595,7 +608,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     project_type: e.target.value,
                     project_subtype: '',
                   });
-                  setCustomSubtype('');
                 }}
               >
                 <option value="">Select Project Type</option>
@@ -609,65 +621,33 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <FileText size={16} />
             <div>
               <div className={styles.infoLabel}>Project Subtype</div>
-              {currentSubtypes.length > 0 ? (
-                <>
-                  <select
-                    className={styles.editSelect}
-                    value={editFormData.project_subtype}
-                    onChange={(e) => {
-                      hasUserEditedRef.current = true;
-                      setEditFormData({
-                        ...editFormData,
-                        project_subtype: e.target.value,
-                      });
-                      if (e.target.value !== 'other') {
-                        setCustomSubtype('');
-                      }
-                    }}
-                  >
-                    <option value="">Select Subtype</option>
-                    {currentSubtypes.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  {editFormData.project_subtype === 'other' && (
-                    <input
-                      type="text"
-                      className={styles.editInput}
-                      value={customSubtype}
-                      onChange={(e) => {
-                        hasUserEditedRef.current = true;
-                        setCustomSubtype(e.target.value);
-                      }}
-                      placeholder="Enter custom subtype"
-                    />
-                  )}
-                </>
-              ) : (
-                <input
-                  type="text"
-                  className={styles.editInput}
-                  value={editFormData.project_subtype}
-                  onChange={(e) => {
-                    hasUserEditedRef.current = true;
-                    setEditFormData({
-                      ...editFormData,
-                      project_subtype: e.target.value,
-                    });
-                  }}
-                  placeholder="Enter subtype"
-                />
-              )}
+              <select
+                className={styles.editSelect}
+                value={editFormData.project_subtype}
+                onChange={(e) => {
+                  hasUserEditedRef.current = true;
+                  setEditFormData({
+                    ...editFormData,
+                    project_subtype: e.target.value,
+                  });
+                }}
+                disabled={isFetchingSubtypes}
+              >
+                <option value="">
+                  {isFetchingSubtypes ? 'Loading subtypes...' : availableSubtypes.length === 0 ? 'No subtypes available' : 'Select Subtype'}
+                </option>
+                {availableSubtypes.map(subtype => (
+                  <option key={subtype.id} value={subtype.name}>
+                    {subtype.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className={styles.infoItem}>
-            <Flag size={16} />
             <div>
               <div className={styles.infoLabel}>Project Scope</div>
               <select
@@ -752,21 +732,27 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <DollarSign size={16} />
             <div>
               <div className={styles.infoLabel}>Is Billable</div>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={editFormData.is_billable}
-                  onChange={(e) => {
-                    hasUserEditedRef.current = true;
-                    setEditFormData({
-                      ...editFormData,
-                      is_billable: e.target.checked,
-                      quoted_price: e.target.checked ? editFormData.quoted_price : '',
-                    });
-                  }}
-                />
-                <span>Yes</span>
-              </label>
+              <div className={styles.toggleRow}>
+                <label className={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={editFormData.is_billable}
+                    onChange={(e) => {
+                      hasUserEditedRef.current = true;
+                      setEditFormData({
+                        ...editFormData,
+                        is_billable: e.target.checked,
+                        quoted_price: e.target.checked ? editFormData.quoted_price : '',
+                      });
+                    }}
+                    aria-label="Is billable"
+                  />
+                  <span className={styles.toggleSlider}></span>
+                </label>
+                <span className={styles.toggleText}>
+                  {editFormData.is_billable ? 'Yes' : 'No'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -827,14 +813,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<Calendar size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('timeline')}
-        forceCollapse={!isSidebarExpanded}
+        forceCollapse={shouldForceCollapse('timeline')}
         forceExpand={shouldForceExpand('timeline')}
         isCompact={!isSidebarExpanded}
         inSidebar={true}
       >
-        <div className={styles.cardContent}>
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           <div className={styles.infoItem}>
-            <Calendar size={16} />
             <div>
               <div className={styles.infoLabel}>Due Date</div>
               <input
@@ -847,7 +832,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Calendar size={16} />
             <div>
               <div className={styles.infoLabel}>Start Date</div>
               <input
@@ -860,7 +844,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Calendar size={16} />
             <div>
               <div className={styles.infoLabel}>Completion Date</div>
               <input
@@ -873,7 +856,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Clock size={16} />
             <div>
               <div className={styles.infoLabel}>Created</div>
               <div className={styles.infoValue}>{formatDate(project.created_at)}</div>
@@ -881,7 +863,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Clock size={16} />
             <div>
               <div className={styles.infoLabel}>Last Updated</div>
               <div className={styles.infoValue}>{formatDate(project.updated_at)}</div>
@@ -895,33 +876,56 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<Users size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('people')}
-        forceCollapse={!isSidebarExpanded}
+        forceCollapse={shouldForceCollapse('people')}
         forceExpand={shouldForceExpand('people')}
         isCompact={!isSidebarExpanded}
         inSidebar={true}
       >
-        <div className={styles.cardContent}>
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           <div className={styles.infoItem}>
-            <UserIcon size={16} />
             <div>
-              <div className={styles.infoLabel}>Requested By</div>
-              {project.requested_by_profile ? (
+              <div className={styles.infoHeaderRow}>
+                <div className={styles.infoLabel}>Requested By</div>
+                <button
+                  type="button"
+                  className={styles.changeLink}
+                  onClick={() => setIsChangingRequestedBy(prev => !prev)}
+                >
+                  {isChangingRequestedBy ? 'Done' : 'Change'}
+                </button>
+              </div>
+              {isChangingRequestedBy ? (
+                <select
+                  className={styles.editSelect}
+                  value={editFormData.requested_by || ''}
+                  onChange={(e) => {
+                    handleFieldChange('requested_by', e.target.value);
+                    setIsChangingRequestedBy(false);
+                  }}
+                >
+                  <option value="">Select User</option>
+                  {assignableUsers.map((projectUser) => (
+                    <option key={projectUser.id} value={projectUser.id}>
+                      {getUserDisplayName(projectUser)}
+                    </option>
+                  ))}
+                </select>
+              ) : requestedByProfile ? (
                 <div className={styles.infoPerson}>
                   <MiniAvatar
-                    firstName={project.requested_by_profile.first_name || undefined}
-                    lastName={project.requested_by_profile.last_name || undefined}
-                    email={project.requested_by_profile.email}
-                    avatarUrl={project.requested_by_profile.avatar_url || null}
+                    firstName={requestedByProfile.first_name || undefined}
+                    lastName={requestedByProfile.last_name || undefined}
+                    email={requestedByProfile.email}
+                    avatarUrl={requestedByProfile.avatar_url || null}
                     size="small"
                     showTooltip={true}
                   />
                   <div>
                     <div className={styles.infoValue}>
-                      {project.requested_by_profile.first_name}{' '}
-                      {project.requested_by_profile.last_name}
+                      {requestedByProfile.first_name} {requestedByProfile.last_name}
                     </div>
                     <div className={styles.infoEmail}>
-                      {project.requested_by_profile.email}
+                      {requestedByProfile.email}
                     </div>
                   </div>
                 </div>
@@ -932,7 +936,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <UserIcon size={16} />
             <div>
               <div className={styles.infoLabel}>Assigned To</div>
               <select
@@ -951,7 +954,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Users size={16} />
             <div>
               <div className={styles.infoLabel}>Assigned Tasks</div>
               {assignedTaskSummaries.length > 0 ? (
@@ -991,12 +993,12 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<ActivityIcon size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('activity')}
-        forceCollapse={!isSidebarExpanded}
+        forceCollapse={shouldForceCollapse('activity')}
         forceExpand={shouldForceExpand('activity')}
         isCompact={!isSidebarExpanded}
         inSidebar={true}
       >
-        <div className={styles.cardContent}>
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           {project.activity && project.activity.length > 0 ? (
             <div className={styles.activityFeed}>
               {project.activity.map(activity => (

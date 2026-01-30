@@ -43,7 +43,10 @@ export async function GET(request: NextRequest) {
         *,
         company:companies(
           id,
-          name
+          name,
+          branding:brands!company_id(
+            icon_logo_url
+          )
         ),
         ${categoryRelation}
       `
@@ -365,7 +368,10 @@ export async function POST(request: NextRequest) {
         *,
         company:companies(
           id,
-          name
+          name,
+          branding:brands!company_id(
+            icon_logo_url
+          )
         )
       `
       )

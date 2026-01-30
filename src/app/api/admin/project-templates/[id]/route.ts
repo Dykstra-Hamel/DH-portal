@@ -26,13 +26,23 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Fetch template with tasks
+    // Fetch template with tasks and categories
     const { data: template, error } = await supabase
       .from('project_templates')
       .select(
         `
         *,
-        tasks:project_template_tasks(*)
+        tasks:project_template_tasks(*),
+        categories:project_template_category_assignments(
+          id,
+          category_id,
+          category:project_categories(
+            id,
+            name,
+            description,
+            sort_order
+          )
+        )
       `
       )
       .eq('id', id)
@@ -96,6 +106,10 @@ export async function PUT(
         project_subtype: body.project_subtype || null,
         is_active: body.is_active !== false,
         template_data: body.template_data || null,
+        default_assigned_to: body.default_assigned_to || null,
+        default_scope: body.default_scope || 'internal',
+        default_due_date_offset_days: body.default_due_date_offset_days ?? 30,
+        default_is_billable: body.default_is_billable === true,
       })
       .eq('id', id);
 
@@ -107,44 +121,118 @@ export async function PUT(
       );
     }
 
-    // Handle tasks update if provided
+    // Handle tasks update if provided (supports subtasks)
     if (body.tasks && Array.isArray(body.tasks)) {
-      // Delete existing tasks
       await supabase.from('project_template_tasks').delete().eq('template_id', id);
 
-      // Insert new tasks
       if (body.tasks.length > 0) {
-        const tasksToInsert = body.tasks.map((task: any, index: number) => ({
-          template_id: id,
-          title: task.title,
-          description: task.description || null,
-          priority: task.priority || 'medium',
-          due_date_offset_days: task.due_date_offset_days || 0,
-          display_order: task.display_order ?? index,
-          tags: task.tags || null,
-        }));
+        const parentTasks = body.tasks.filter((task: any) => !task.parent_temp_id);
+        const childTasks = body.tasks.filter((task: any) => task.parent_temp_id);
+        const parentIdMap = new Map<string, string>();
 
-        const { error: tasksError } = await supabase
-          .from('project_template_tasks')
-          .insert(tasksToInsert);
+        for (const [index, task] of parentTasks.entries()) {
+          const { data: createdTask, error: parentError } = await supabase
+            .from('project_template_tasks')
+            .insert({
+              template_id: id,
+              title: task.title,
+              description: task.description || null,
+              priority: task.priority || 'medium',
+              due_date_offset_days: task.due_date_offset_days || 0,
+              display_order: task.display_order ?? index,
+              tags: task.tags || null,
+              default_assigned_to: task.default_assigned_to || null,
+              parent_task_id: null,
+            })
+            .select('id')
+            .single();
 
-        if (tasksError) {
-          console.error('Error updating template tasks:', tasksError);
-          return NextResponse.json(
-            { error: 'Failed to update template tasks' },
-            { status: 500 }
-          );
+          if (parentError || !createdTask) {
+            console.error('Error updating parent template task:', parentError);
+            return NextResponse.json(
+              { error: 'Failed to update template tasks' },
+              { status: 500 }
+            );
+          }
+
+          if (task.temp_id) {
+            parentIdMap.set(task.temp_id, createdTask.id);
+          }
+        }
+
+        if (childTasks.length > 0) {
+          const tasksToInsert = childTasks.map((task: any, index: number) => ({
+            template_id: id,
+            title: task.title,
+            description: task.description || null,
+            priority: task.priority || 'medium',
+            due_date_offset_days: task.due_date_offset_days || 0,
+            display_order: task.display_order ?? index,
+            tags: task.tags || null,
+            default_assigned_to: task.default_assigned_to || null,
+            parent_task_id: task.parent_temp_id
+              ? parentIdMap.get(task.parent_temp_id) || null
+              : null,
+          }));
+
+          const { error: tasksError } = await supabase
+            .from('project_template_tasks')
+            .insert(tasksToInsert);
+
+          if (tasksError) {
+            console.error('Error updating template tasks:', tasksError);
+            return NextResponse.json(
+              { error: 'Failed to update template tasks' },
+              { status: 500 }
+            );
+          }
         }
       }
     }
 
-    // Fetch updated template with tasks
+    // Handle category assignments update
+    if (body.category_ids !== undefined) {
+      // Delete existing category assignments
+      await supabase
+        .from('project_template_category_assignments')
+        .delete()
+        .eq('template_id', id);
+
+      // Insert new category assignments if provided
+      if (Array.isArray(body.category_ids) && body.category_ids.length > 0) {
+        const categoryAssignments = body.category_ids.map((categoryId: string) => ({
+          template_id: id,
+          category_id: categoryId,
+        }));
+
+        const { error: categoryError } = await supabase
+          .from('project_template_category_assignments')
+          .insert(categoryAssignments);
+
+        if (categoryError) {
+          console.error('Error updating categories for template:', categoryError);
+          // Don't fail the whole request, just log the error
+        }
+      }
+    }
+
+    // Fetch updated template with tasks and categories
     const { data: updatedTemplate } = await supabase
       .from('project_templates')
       .select(
         `
         *,
-        tasks:project_template_tasks(*)
+        tasks:project_template_tasks(*),
+        categories:project_template_category_assignments(
+          id,
+          category_id,
+          category:project_categories(
+            id,
+            name,
+            description,
+            sort_order
+          )
+        )
       `
       )
       .eq('id', id)
