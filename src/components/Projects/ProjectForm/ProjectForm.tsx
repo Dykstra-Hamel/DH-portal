@@ -9,13 +9,13 @@ import {
   User,
   Company,
   ProjectCategory,
+  ProjectTypeSubtype,
   statusOptions,
   priorityOptions,
   projectTypeOptions,
-  printSubtypes,
-  digitalSubtypes,
 } from '@/types/project';
 import CategoryBadge from '@/components/ProjectManagement/CategorySettings/CategoryBadge';
+import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import styles from './ProjectForm.module.scss';
 
 interface ProjectFormProps {
@@ -67,13 +67,15 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     category_ids: editingProject?.categories?.map(c => c.category_id) || [],
   });
 
-  const [customSubtype, setCustomSubtype] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
   const [isFetchingCategories, setIsFetchingCategories] = useState(false);
+  const [availableSubtypes, setAvailableSubtypes] = useState<ProjectTypeSubtype[]>([]);
+  const [isFetchingSubtypes, setIsFetchingSubtypes] = useState(false);
   const [shortcodePreview, setShortcodePreview] = useState<string>('');
   const [companyShortCodes, setCompanyShortCodes] = useState<Record<string, string>>({});
   const fetchedCompanyCodesRef = useRef<Record<string, boolean>>({});
+  const [showRequestedBySelect, setShowRequestedBySelect] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -127,6 +129,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
     return adminUsers;
   }, [editingProject?.assigned_to_profile, formData.assigned_to, users]);
+
+  const requestedByUser = useMemo(() => {
+    const requestedId = formData.requested_by;
+    if (!requestedId) return null;
+    return users.find(user => (user.profiles?.id || user.id) === requestedId) || null;
+  }, [formData.requested_by, users]);
 
   const sortedCompanies = useMemo(() => {
     return [...companies].sort((a, b) =>
@@ -188,6 +196,36 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     }
   }, [isOpen, isAdmin]);
 
+  // Fetch available subtypes when type_code changes
+  useEffect(() => {
+    const fetchSubtypes = async () => {
+      if (!formData.type_code) {
+        setAvailableSubtypes([]);
+        return;
+      }
+
+      setIsFetchingSubtypes(true);
+      try {
+        const response = await fetch(`/api/admin/project-types/${formData.type_code}/subtypes`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSubtypes(data);
+        } else {
+          setAvailableSubtypes([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch subtypes:', error);
+        setAvailableSubtypes([]);
+      } finally {
+        setIsFetchingSubtypes(false);
+      }
+    };
+
+    if (isOpen && formData.type_code) {
+      fetchSubtypes();
+    }
+  }, [isOpen, formData.type_code]);
+
   // Update form data when editingProject changes
   useEffect(() => {
     if (editingProject) {
@@ -214,15 +252,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       });
       // Set selected tags from editing project
       setSelectedTags(editingProject.tags || []);
-      // Handle custom subtype
-      const isPrint = editingProject.project_type === 'print';
-      const isDigital = editingProject.project_type === 'digital';
-      const subtypes = isPrint ? printSubtypes : isDigital ? digitalSubtypes : [];
-      const isOther = editingProject.project_subtype &&
-        !subtypes.find(s => s.value === editingProject.project_subtype);
-      if (isOther) {
-        setCustomSubtype(editingProject.project_subtype || '');
-      }
     } else {
       // Reset form for new project
       setFormData({
@@ -247,7 +276,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         category_ids: [],
       });
       setSelectedTags([]);
-      setCustomSubtype('');
+      setShowRequestedBySelect(false);
     }
   }, [editingProject, currentUser.id, userActiveCompany?.id]);
 
@@ -294,8 +323,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       const cleanName = formData.name
         .replace(/[^a-zA-Z0-9 ]/g, '')
         .replace(/\s+/g, ' ')
-        .trim()
-        .substring(0, 20);
+        .trim();
       const companyCode = companyShortCodes[formData.company_id];
       if (companyCode !== undefined) {
         const prefix = companyCode || '[COMPANY_CODE]';
@@ -317,10 +345,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
     try {
       setIsSubmitting(true);
-      // If "other" is selected, use custom subtype
       const submitData = {
         ...formData,
-        project_subtype: formData.project_subtype === 'other' ? customSubtype : formData.project_subtype,
         tags: selectedTags.join(', '), // Convert tags array to comma-separated string
         type_code: formData.type_code || undefined, // Include type_code if set
       };
@@ -340,10 +366,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       setSelectedTags([...selectedTags, tag]);
     }
   };
-
-  // Get current subtypes based on project type
-  const currentSubtypes = formData.project_type === 'print' ? printSubtypes :
-    formData.project_type === 'digital' ? digitalSubtypes : [];
 
   const handleToggleCategory = (categoryId: string) => {
     if (formData.category_ids.includes(categoryId)) {
@@ -382,7 +404,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       category_ids: [],
     });
     setSelectedTags([]);
-    setCustomSubtype('');
+    setShowRequestedBySelect(false);
     setShortcodePreview('');
     onClose();
   };
@@ -415,6 +437,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 onChange={e =>
                   setFormData({ ...formData, name: e.target.value })
                 }
+                maxLength={100}
                 required
               />
             </div>
@@ -425,7 +448,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 value={formData.project_type}
                 onChange={e => {
                   setFormData({ ...formData, project_type: e.target.value, project_subtype: '' });
-                  setCustomSubtype('');
                 }}
                 required
               >
@@ -438,38 +460,25 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </select>
             </div>
 
-            {formData.project_type && (
+            {formData.type_code && (
               <div className={styles.formGroup}>
                 <label>Project Subtype</label>
                 <select
                   value={formData.project_subtype}
                   onChange={e => {
                     setFormData({ ...formData, project_subtype: e.target.value });
-                    if (e.target.value !== 'other') {
-                      setCustomSubtype('');
-                    }
                   }}
+                  disabled={isFetchingSubtypes}
                 >
-                  <option value="">Select Subtype</option>
-                  {currentSubtypes.map(subtype => (
-                    <option key={subtype.value} value={subtype.value}>
-                      {subtype.label}
+                  <option value="">
+                    {isFetchingSubtypes ? 'Loading subtypes...' : availableSubtypes.length === 0 ? 'No subtypes available' : 'Select Subtype'}
+                  </option>
+                  {availableSubtypes.map(subtype => (
+                    <option key={subtype.id} value={subtype.name}>
+                      {subtype.name}
                     </option>
                   ))}
                 </select>
-              </div>
-            )}
-
-            {formData.project_subtype === 'other' && (
-              <div className={styles.formGroup}>
-                <label>Custom Subtype *</label>
-                <input
-                  type="text"
-                  value={customSubtype}
-                  onChange={e => setCustomSubtype(e.target.value)}
-                  placeholder="Enter custom project subtype"
-                  required
-                />
               </div>
             )}
 
@@ -566,26 +575,39 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </div>
             )}
 
-            {/* Only show Requested By field for admins in edit mode */}
-            {isAdmin && editingProject ? (
+            {/* Requested By */}
+            {isAdmin && mode === 'full' ? (
               <div className={styles.formGroup}>
-                <label>Requested By *</label>
-                <select
-                  value={formData.requested_by}
-                  onChange={e =>
-                    setFormData({ ...formData, requested_by: e.target.value })
-                  }
-                  required
-                >
-                  <option value="">Select User</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.profiles?.first_name || ''}{' '}
-                      {user.profiles?.last_name || ''} (
-                      {user.profiles?.email || user.email})
-                    </option>
-                  ))}
-                </select>
+                <div className={styles.inlineLabelRow}>
+                  <label>Requested By *</label>
+                  <button
+                    type="button"
+                    className={styles.changeLink}
+                    onClick={() => setShowRequestedBySelect(prev => !prev)}
+                  >
+                    {showRequestedBySelect ? 'Done' : 'Change'}
+                  </button>
+                </div>
+                {showRequestedBySelect ? (
+                  <select
+                    value={formData.requested_by}
+                    onChange={e =>
+                      setFormData({ ...formData, requested_by: e.target.value })
+                    }
+                    required
+                  >
+                    <option value="">Select User</option>
+                    {assignableUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {getUserDisplayName(user)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className={styles.readOnlyValue}>
+                    {requestedByUser ? getUserDisplayName(requestedByUser) : 'Not set'}
+                  </div>
+                )}
               </div>
             ) : (
               <div className={styles.formGroup}>
@@ -697,21 +719,27 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 </div>
 
                 <div className={styles.formGroup}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={formData.is_billable === 'true'}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          is_billable: e.target.checked ? 'true' : 'false',
-                          quoted_price: e.target.checked ? formData.quoted_price : '',
-                        })
-                      }
-                      style={{ marginRight: '8px' }}
-                    />
-                    Is Billable?
-                  </label>
+                  <label>Is Billable</label>
+                  <div className={styles.toggleRow}>
+                    <label className={styles.toggle}>
+                      <input
+                        type="checkbox"
+                        checked={formData.is_billable === 'true'}
+                        onChange={e =>
+                          setFormData({
+                            ...formData,
+                            is_billable: e.target.checked ? 'true' : 'false',
+                            quoted_price: e.target.checked ? formData.quoted_price : '',
+                          })
+                        }
+                        aria-label="Is billable"
+                      />
+                      <span className={styles.toggleSlider}></span>
+                    </label>
+                    <span className={styles.toggleText}>
+                      {formData.is_billable === 'true' ? 'Yes' : 'No'}
+                    </span>
+                  </div>
                 </div>
 
                 {formData.is_billable === 'true' && (
@@ -738,12 +766,13 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
           <div className={styles.formGroup}>
             <label>Description</label>
-            <textarea
+            <RichTextEditor
               value={formData.description}
-              onChange={e =>
-                setFormData({ ...formData, description: e.target.value })
+              onChange={(value) =>
+                setFormData({ ...formData, description: value })
               }
-              rows={3}
+              placeholder="Add a project description..."
+              className={styles.richTextField}
             />
           </div>
 

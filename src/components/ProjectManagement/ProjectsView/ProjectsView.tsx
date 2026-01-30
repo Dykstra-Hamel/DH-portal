@@ -191,7 +191,7 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
                     <div className={styles.clientName}>{project.company.name}</div>
                   </div>
                   <div className={styles.cell}>
-                    <ProjectBadge projectName={project.project_type} projectType={project.project_type as any} size="small" />
+                    <ProjectBadge projectName={project.project_type} projectType={project.project_type as any} size="medium" />
                   </div>
                   <div className={styles.cell}>
                     {getStatusBadge(project.status)}

@@ -8,12 +8,29 @@ import { Edit, Trash2, Copy, CheckCircle, XCircle } from 'lucide-react';
 interface TemplateListProps {
   onEdit: (template: ProjectTemplate) => void;
   onRefresh: number;
+  searchQuery?: string;
+  filterProjectType?: string;
+  filterIsActive?: boolean | null;
 }
 
-const TemplateList: React.FC<TemplateListProps> = ({ onEdit, onRefresh }) => {
+const TemplateList: React.FC<TemplateListProps> = ({
+  onEdit,
+  onRefresh,
+  searchQuery = '',
+  filterProjectType = 'all',
+  filterIsActive = null,
+}) => {
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  // Strip HTML tags from description for card display
+  const stripHtml = (html: string | null | undefined): string => {
+    if (!html) return '';
+    // Create a temporary div to parse HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  };
 
   useEffect(() => {
     fetchTemplates();
@@ -82,8 +99,28 @@ const TemplateList: React.FC<TemplateListProps> = ({ onEdit, onRefresh }) => {
   };
 
   const filteredTemplates = templates.filter((template) => {
-    if (filter === 'active') return template.is_active;
-    if (filter === 'inactive') return !template.is_active;
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        template.name.toLowerCase().includes(query) ||
+        template.description?.toLowerCase().includes(query) ||
+        template.project_type.toLowerCase().includes(query) ||
+        template.project_subtype?.toLowerCase().includes(query);
+
+      if (!matchesSearch) return false;
+    }
+
+    // Project type filter
+    if (filterProjectType !== 'all' && template.project_type !== filterProjectType) {
+      return false;
+    }
+
+    // Active status filter
+    if (filterIsActive !== null && template.is_active !== filterIsActive) {
+      return false;
+    }
+
     return true;
   });
 
@@ -98,32 +135,13 @@ const TemplateList: React.FC<TemplateListProps> = ({ onEdit, onRefresh }) => {
 
   return (
     <div className={styles.templateList}>
-      <div className={styles.filters}>
-        <button
-          className={filter === 'all' ? styles.filterActive : styles.filterButton}
-          onClick={() => setFilter('all')}
-        >
-          All ({templates.length})
-        </button>
-        <button
-          className={filter === 'active' ? styles.filterActive : styles.filterButton}
-          onClick={() => setFilter('active')}
-        >
-          Active ({templates.filter((t) => t.is_active).length})
-        </button>
-        <button
-          className={
-            filter === 'inactive' ? styles.filterActive : styles.filterButton
-          }
-          onClick={() => setFilter('inactive')}
-        >
-          Inactive ({templates.filter((t) => !t.is_active).length})
-        </button>
-      </div>
-
       {filteredTemplates.length === 0 ? (
         <div className={styles.emptyState}>
-          <p>No templates found.</p>
+          <p>
+            {templates.length === 0
+              ? 'No templates created yet. Click "New Template" to create your first template.'
+              : 'No templates match your filters.'}
+          </p>
         </div>
       ) : (
         <div className={styles.grid}>
@@ -157,7 +175,7 @@ const TemplateList: React.FC<TemplateListProps> = ({ onEdit, onRefresh }) => {
               </div>
 
               {template.description && (
-                <p className={styles.cardDescription}>{template.description}</p>
+                <p className={styles.cardDescription}>{stripHtml(template.description)}</p>
               )}
 
               <div className={styles.cardMeta}>

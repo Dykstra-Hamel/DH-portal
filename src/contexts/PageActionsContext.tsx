@@ -63,7 +63,7 @@ interface ProjectFilterControls {
 }
 
 interface PageHeaderConfig {
-  title: string;
+  title: ReactNode;
   description: string;
   leadAssignmentControls?: LeadAssignmentControls;
   supportCaseAssignmentControls?: SupportCaseAssignmentControls;

@@ -5,7 +5,7 @@ import { Plus, Edit2, Trash2, GripVertical } from 'lucide-react';
 import { ProjectCategory } from '@/types/project';
 import CategoryFormModal from './CategoryFormModal';
 import CategoryDeleteModal from './CategoryDeleteModal';
-import CategoryBadge from './CategoryBadge';
+import ProjectTypeSubtypesManager from './ProjectTypeSubtypesManager';
 import styles from './CategorySettings.module.scss';
 
 export default function InternalCategorySettings() {
@@ -225,8 +225,6 @@ export default function InternalCategorySettings() {
                 </div>
 
                 <div className={styles.categoryInfo}>
-                  <CategoryBadge category={category} showIcon />
-
                   <div className={styles.categoryDetails}>
                     <h3 className={styles.categoryName}>{category.name}</h3>
                     {category.description && (
@@ -278,6 +276,9 @@ export default function InternalCategorySettings() {
         projectsUsingCategory={projectsForCategory}
         isInternal={true}
       />
+
+      {/* Project Type Subtypes Manager */}
+      <ProjectTypeSubtypesManager />
     </div>
   );
 }

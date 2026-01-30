@@ -198,6 +198,14 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             />
           ),
         };
+      case '/admin/project-management/templates':
+        return {
+          title: pageHeader?.title || 'Project Templates',
+          description: pageHeader?.description || 'Manage project templates with pre-configured tasks',
+          showAddButton: true,
+          addButtonText: 'New Template',
+          onAddClick: getPageAction('add-template') || (() => {}),
+        };
       case '/tickets/leads':
         return {
           title: 'Leads',

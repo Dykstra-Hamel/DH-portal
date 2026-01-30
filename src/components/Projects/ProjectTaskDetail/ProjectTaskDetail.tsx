@@ -13,10 +13,11 @@ import {
   Activity as ActivityIcon,
   Flag,
   Pencil,
+  Tag,
 } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
-import { ProjectTask, taskPriorityOptions } from '@/types/project';
+import { ProjectTask, taskPriorityOptions, ProjectCategory } from '@/types/project';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import styles from './ProjectTaskDetail.module.scss';
 
@@ -32,6 +33,7 @@ interface ProjectTaskDetailProps {
   highlightedCommentId?: string | null;
   onToggleStar?: (taskId: string) => void;
   isStarred?: (taskId: string) => boolean;
+  availableCategories?: ProjectCategory[]; // Available categories for this project
 }
 
 export default function ProjectTaskDetail({
@@ -46,6 +48,7 @@ export default function ProjectTaskDetail({
   highlightedCommentId,
   onToggleStar,
   isStarred,
+  availableCategories = [],
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -59,6 +62,7 @@ export default function ProjectTaskDetail({
   const [isSavingDescription, setIsSavingDescription] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [isUpdatingComplete, setIsUpdatingComplete] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -152,6 +156,9 @@ export default function ProjectTaskDetail({
     setStartDateDraft(formatDateInput(task.start_date));
     setDescriptionDraft(task.description || '');
     setIsEditingDescription(false);
+    // Set selected categories from task
+    const categoryIds = task.categories?.map(cat => cat.id) || [];
+    setSelectedCategoryIds(categoryIds);
   }, [task]);
 
   useEffect(() => {
@@ -321,6 +328,25 @@ export default function ProjectTaskDetail({
       alert('Failed to update task. Please try again.');
     } finally {
       setIsUpdatingComplete(false);
+    }
+  };
+
+  const handleCategoryChange = async (categoryId: string) => {
+    const isCurrentlySelected = selectedCategoryIds.includes(categoryId);
+    const newSelectedIds = isCurrentlySelected
+      ? selectedCategoryIds.filter(id => id !== categoryId)
+      : [...selectedCategoryIds, categoryId];
+
+    setSelectedCategoryIds(newSelectedIds);
+
+    try {
+      // Update categories via API
+      await onUpdate(task.id, { category_ids: newSelectedIds } as any);
+    } catch (error) {
+      console.error('Error updating categories:', error);
+      alert('Failed to update categories. Please try again.');
+      // Revert on error
+      setSelectedCategoryIds(selectedCategoryIds);
     }
   };
 
@@ -517,6 +543,32 @@ export default function ProjectTaskDetail({
                   onChange={(e) => handleDateChange('start_date', e.target.value)}
                 />
               </div>
+
+              {availableCategories.length > 0 && (
+                <div className={`${styles.detailItem} ${styles.detailItemFullWidth}`}>
+                  <div className={styles.detailLabel}>
+                    <Tag size={14} />
+                    Categories
+                  </div>
+                  <div className={styles.categorySelector}>
+                    {availableCategories.map((category) => (
+                      <label key={category.id} className={styles.categoryCheckbox}>
+                        <input
+                          type="checkbox"
+                          checked={selectedCategoryIds.includes(category.id)}
+                          onChange={() => handleCategoryChange(category.id)}
+                        />
+                        <span className={styles.categoryLabel}>{category.name}</span>
+                      </label>
+                    ))}
+                    {availableCategories.length === 0 && (
+                      <span className={styles.noCategoriesText}>
+                        No categories available for this project
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

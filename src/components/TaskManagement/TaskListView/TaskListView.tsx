@@ -4,6 +4,7 @@ import { Project } from '@/types/project';
 import { PriorityBadge } from '../shared/PriorityBadge';
 import { ProjectBadge } from '../shared/ProjectBadge';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
+import { CompanyIcon } from '@/components/Common/CompanyIcon/CompanyIcon';
 import styles from './TaskListView.module.scss';
 
 type SortField = 'title' | 'project' | 'client' | 'status' | 'priority' | 'due_date';
@@ -156,8 +157,10 @@ export function TaskListView({ tasks, projects, onTaskClick, onDeleteTask, onTog
     };
   }, [starredTasks, regularTasks, statusFilter, priorityFilter, searchQuery, projects, sortField, sortDirection]);
 
-  const formatDate = (dateString: string): string => {
+  const formatDate = (dateString?: string | null): string => {
+    if (!dateString) return 'Not Set';
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'Not Set';
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -178,8 +181,10 @@ export function TaskListView({ tasks, projects, onTaskClick, onDeleteTask, onTog
   };
 
   const isOverdue = (dueDate: string, status: TaskStatus): boolean => {
-    if (status === 'completed') return false;
-    return new Date(dueDate) < new Date();
+    if (status === 'completed' || !dueDate) return false;
+    const parsed = new Date(dueDate);
+    if (Number.isNaN(parsed.getTime())) return false;
+    return parsed < new Date();
   };
 
   // Render a single task row
@@ -322,11 +327,16 @@ export function TaskListView({ tasks, projects, onTaskClick, onDeleteTask, onTog
             <span>{project.due_date ? formatDateShort(project.due_date) : 'No date'}</span>
           </div>
           <div className={styles.companySection}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" stroke="currentColor" strokeWidth="2" />
-              <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2" />
-            </svg>
-            <span>{project.company?.name || 'No company'}</span>
+            <CompanyIcon
+              companyName={project.company?.name || 'No company'}
+              iconUrl={
+                Array.isArray(project.company?.branding)
+                  ? project.company.branding[0]?.icon_logo_url
+                  : project.company?.branding?.icon_logo_url
+              }
+              size="medium"
+              showTooltip={true}
+            />
           </div>
         </div>
 
@@ -338,13 +348,9 @@ export function TaskListView({ tasks, projects, onTaskClick, onDeleteTask, onTog
 
         <h3 className={styles.projectName}>{project.name}</h3>
 
-        {project.description && (() => {
-          const descriptionText = stripHtml(project.description);
-          if (!descriptionText) return null;
-          return (
-            <p className={styles.projectDescription}>{descriptionText}</p>
-          );
-        })()}
+        <p className={styles.projectDescription}>
+          {project.description ? stripHtml(project.description) : ''}
+        </p>
 
         <div className={styles.cardMetrics}>
           <div className={styles.metricItem}>
@@ -378,6 +384,9 @@ export function TaskListView({ tasks, projects, onTaskClick, onDeleteTask, onTog
             <span className={styles.progressFraction}>
               {progress.completed}/{progress.total}
             </span>
+            {(project.scope === 'external' || project.scope === 'both') && (
+              <span className={styles.externalBadge}>External</span>
+            )}
           </div>
           <div className={styles.progressBarRow}>
             <div className={styles.progressBarContainer}>
@@ -386,9 +395,28 @@ export function TaskListView({ tasks, projects, onTaskClick, onDeleteTask, onTog
                 style={{ width: `${progress.percentage}%` }}
               />
             </div>
-            {(project.scope === 'external' || project.scope === 'both') && (
-              <span className={styles.externalBadge}>External</span>
-            )}
+            {(() => {
+              const status = [
+                { value: 'planning', label: 'Planning', color: '#9333ea' },
+                { value: 'in_progress', label: 'In Progress', color: '#0080f0' },
+                { value: 'blocked', label: 'Blocked', color: '#ef4444' },
+                { value: 'on_hold', label: 'On Hold', color: '#f59e0b' },
+                { value: 'pending_approval', label: 'Pending Approval', color: '#f59e0b' },
+                { value: 'out_to_client', label: 'Out To Client', color: '#8b5cf6' },
+                { value: 'ready_to_print', label: 'Ready To Print', color: '#06b6d4' },
+                { value: 'printing', label: 'Printing', color: '#06b6d4' },
+                { value: 'bill_client', label: 'Bill Client', color: '#10b981' },
+                { value: 'complete', label: 'Complete', color: '#22c55e' },
+              ].find(s => s.value === project.status);
+              return status ? (
+                <span
+                  className={styles.statusBadge}
+                  style={{ color: status.color }}
+                >
+                  {status.label}
+                </span>
+              ) : null;
+            })()}
           </div>
         </div>
       </div>

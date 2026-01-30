@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
-import { Check, ChevronDown, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
-import { Project, ProjectComment, ProjectTask, User as ProjectUser } from '@/types/project';
+import { Project, ProjectComment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
@@ -78,6 +78,12 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
+  const [isHeaderStatusOpen, setIsHeaderStatusOpen] = useState(false);
+  const [isHeaderPriorityOpen, setIsHeaderPriorityOpen] = useState(false);
+  const [isUpdatingHeaderStatus, setIsUpdatingHeaderStatus] = useState(false);
+  const [isUpdatingHeaderPriority, setIsUpdatingHeaderPriority] = useState(false);
+  const headerStatusRef = useRef<HTMLDivElement>(null);
+  const headerPriorityRef = useRef<HTMLDivElement>(null);
   const [users, setUsers] = useState<ProjectUser[]>([]);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [comments, setComments] = useState<ProjectComment[]>([]);
@@ -166,6 +172,46 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     }
   }, [project.description, project.id, isEditingProjectDescription]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (headerStatusRef.current && !headerStatusRef.current.contains(event.target as Node)) {
+        setIsHeaderStatusOpen(false);
+      }
+      if (headerPriorityRef.current && !headerPriorityRef.current.contains(event.target as Node)) {
+        setIsHeaderPriorityOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const statusLabel = useMemo(() => {
+    return statusOptions.find(option => option.value === project.status)?.label || project.status;
+  }, [project.status]);
+
+  const priorityLabel = useMemo(() => {
+    return priorityOptions.find(option => option.value === project.priority)?.label || project.priority;
+  }, [project.priority]);
+
+  const availableStatusOptions = useMemo(() => {
+    const hasPrintCategory =
+      project.categories?.some(category =>
+        category.category?.name === 'Print' || (category as any).name === 'Print'
+      ) || false;
+    const isBillable = project.is_billable || false;
+
+    return statusOptions.filter(status => {
+      if (status.requiresCategory === 'Print' && !hasPrintCategory) {
+        return false;
+      }
+      if (status.requiresBillable && !isBillable) {
+        return false;
+      }
+      return true;
+    });
+  }, [project.categories, project.is_billable]);
+
   const fetchComments = useCallback(async () => {
     try {
       const response = await fetch(`/api/admin/projects/${project.id}/comments`);
@@ -208,6 +254,96 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       alert('Failed to delete project. Please try again.');
     }
   }, [project.id, project.name, router]);
+
+  const handleBackToProjects = useCallback(() => {
+    router.push('/admin/project-management');
+  }, [router]);
+
+  const updateProjectFields = useCallback(async (updates: Partial<Project> & { assigned_to?: string | null; requested_by?: string | null }) => {
+    const payload: Record<string, any> = {
+      name: updates.name ?? project.name,
+      description: updates.description ?? project.description,
+      project_type: updates.project_type ?? project.project_type,
+      project_subtype: updates.project_subtype ?? project.project_subtype,
+      assigned_to: updates.assigned_to ?? project.assigned_to_profile?.id ?? null,
+      status: updates.status ?? project.status,
+      priority: updates.priority ?? project.priority,
+      due_date: updates.due_date ?? project.due_date,
+      start_date: updates.start_date ?? project.start_date,
+      completion_date: updates.completion_date ?? project.completion_date,
+      is_billable: updates.is_billable ?? project.is_billable,
+      quoted_price: updates.quoted_price ?? project.quoted_price,
+      tags: updates.tags ?? project.tags,
+      notes: updates.notes ?? project.notes,
+      primary_file_path: updates.primary_file_path ?? project.primary_file_path,
+      scope: updates.scope ?? project.scope,
+    };
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'requested_by')) {
+      payload.requested_by = updates.requested_by ?? null;
+    }
+
+    const response = await fetch(`/api/admin/projects/${project.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update project');
+    }
+  }, [project]);
+
+  const handleHeaderStatusChange = useCallback(async (status: Project['status']) => {
+    if (status === project.status) {
+      setIsHeaderStatusOpen(false);
+      return;
+    }
+    setIsUpdatingHeaderStatus(true);
+    setIsHeaderStatusOpen(false);
+    try {
+      await updateProjectFields({
+        status,
+        completion_date: status === 'complete' ? new Date().toISOString() : null,
+      });
+      setToastMessage('Project status updated.');
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error updating project status:', error);
+      setToastMessage('Failed to update project status.');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsUpdatingHeaderStatus(false);
+    }
+  }, [onProjectUpdate, project.status, updateProjectFields]);
+
+  const handleHeaderPriorityChange = useCallback(async (priority: Project['priority']) => {
+    if (priority === project.priority) {
+      setIsHeaderPriorityOpen(false);
+      return;
+    }
+    setIsUpdatingHeaderPriority(true);
+    setIsHeaderPriorityOpen(false);
+    try {
+      await updateProjectFields({ priority });
+      setToastMessage('Project priority updated.');
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error updating project priority:', error);
+      setToastMessage('Failed to update project priority.');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsUpdatingHeaderPriority(false);
+    }
+  }, [onProjectUpdate, project.priority, updateProjectFields]);
 
   const handleCompleteProject = useCallback(async () => {
     if (isCompletingProject) return;
@@ -379,34 +515,105 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     const dueDateColor = isOverdue ? '#ef4444' : '#111827';
 
     setPageHeader({
-      title: headerTitle,
-      description: `<span style="margin-right: 12px; color: ${dueDateColor};">Due Date: ${formatHeaderDate(project.due_date)} ${daysText}</span><span class="${headerStyles.updatedText}">Updated: ${formatHeaderDate(project.updated_at)}</span>`,
+      title: (
+        <span className={headerStyles.titleContent}>
+          <button
+            type="button"
+            onClick={handleBackToProjects}
+            className={headerStyles.backButton}
+            aria-label="Back to project management"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <span>{headerTitle}</span>
+        </span>
+      ),
+      description: `<span class="${headerStyles.projectDetailDescription}"><span style="margin-right: 12px; color: ${dueDateColor};">Due Date: ${formatHeaderDate(project.due_date)} ${daysText}</span><span class="${headerStyles.updatedText}">Updated: ${formatHeaderDate(project.updated_at)}</span></span>`,
       customActions: (
         <>
+          <div className={headerStyles.controlGroup} ref={headerStatusRef}>
+            <label className={headerStyles.controlLabel}>Status:</label>
+            <button
+              className={headerStyles.controlDropdown}
+              onClick={() => setIsHeaderStatusOpen(!isHeaderStatusOpen)}
+              type="button"
+              disabled={isUpdatingHeaderStatus}
+            >
+              <span className={headerStyles.controlValue}>{statusLabel}</span>
+              <ChevronDown
+                size={16}
+                className={`${headerStyles.chevron} ${isHeaderStatusOpen ? headerStyles.open : ''}`}
+              />
+            </button>
+            {isHeaderStatusOpen && (
+              <div className={headerStyles.dropdownMenu}>
+                {availableStatusOptions.map(option => (
+                  <button
+                    key={option.value}
+                    className={`${headerStyles.dropdownOption} ${project.status === option.value ? headerStyles.selected : ''}`}
+                    onClick={() => handleHeaderStatusChange(option.value as Project['status'])}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className={headerStyles.controlGroup} ref={headerPriorityRef}>
+            <label className={headerStyles.controlLabel}>Priority:</label>
+            <button
+              className={headerStyles.controlDropdown}
+              onClick={() => setIsHeaderPriorityOpen(!isHeaderPriorityOpen)}
+              type="button"
+              disabled={isUpdatingHeaderPriority}
+            >
+              <span className={headerStyles.controlValue}>{priorityLabel}</span>
+              <ChevronDown
+                size={16}
+                className={`${headerStyles.chevron} ${isHeaderPriorityOpen ? headerStyles.open : ''}`}
+              />
+            </button>
+            {isHeaderPriorityOpen && (
+              <div className={headerStyles.dropdownMenu}>
+                {priorityOptions.map(option => (
+                  <button
+                    key={option.value}
+                    className={`${headerStyles.dropdownOption} ${project.priority === option.value ? headerStyles.selected : ''}`}
+                    onClick={() => handleHeaderPriorityChange(option.value as Project['priority'])}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
-            className={headerStyles.addLeadButton}
-            onClick={handleCreateTask}
-            type="button"
-          >
-            <Plus size={18} />
-            <span>Create Task</span>
-          </button>
-          <button
-            className={`${headerStyles.addLeadButton} ${headerStyles.deleteButton}`}
+            className={`${headerStyles.addLeadButton} ${headerStyles.deleteButton} ${headerStyles.iconOnlyButton}`}
             onClick={handleDeleteProject}
             type="button"
+            aria-label="Delete project"
           >
             <Trash2 size={18} />
-            <span>Delete Project</span>
           </button>
         </>
       ),
     });
   }, [
     project,
-    handleCreateTask,
+    handleBackToProjects,
     handleDeleteProject,
+    availableStatusOptions,
+    handleHeaderPriorityChange,
+    handleHeaderStatusChange,
+    isHeaderPriorityOpen,
+    isHeaderStatusOpen,
+    isUpdatingHeaderPriority,
+    isUpdatingHeaderStatus,
+    priorityLabel,
     setPageHeader,
+    statusLabel,
   ]);
 
   React.useEffect(() => {
@@ -1077,6 +1284,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                 isStarred={(taskId) => isStarred('task', taskId)}
                 isLoading={isLoading}
                 showHeader={false}
+                onAddTask={handleCreateTask}
               />
             )}
 
@@ -1404,6 +1612,11 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
         highlightedCommentId={highlightedTaskCommentId}
         onToggleStar={(taskId) => toggleStar('task', taskId)}
         isStarred={(taskId) => isStarred('task', taskId)}
+        availableCategories={
+          project.categories
+            ?.map(assignment => assignment.category)
+            .filter((cat): cat is NonNullable<typeof cat> => cat !== null && cat !== undefined) || []
+        }
       />
     </div>
   );

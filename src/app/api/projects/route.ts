@@ -50,7 +50,10 @@ export async function GET(request: NextRequest) {
         *,
         company:companies(
           id,
-          name
+          name,
+          branding:brands!company_id(
+            icon_logo_url
+          )
         ),
         categories:project_category_assignments(
           id,

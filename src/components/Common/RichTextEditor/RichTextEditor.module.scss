@@ -59,6 +59,7 @@
 // Compact mode styles
 .compact {
   position: relative;
+  overflow: visible;
 }
 
 .compactToolbarWrapper {
@@ -91,6 +92,7 @@
   position: absolute;
   bottom: 57px;
   right: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;

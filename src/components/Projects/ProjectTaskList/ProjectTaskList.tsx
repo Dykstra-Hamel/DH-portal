@@ -18,6 +18,7 @@ interface ProjectTaskListProps {
   isStarred?: (taskId: string) => boolean;
   isLoading?: boolean;
   showHeader?: boolean;
+  onAddTask?: () => void;
 }
 
 export default function ProjectTaskList({
@@ -31,6 +32,7 @@ export default function ProjectTaskList({
   isStarred,
   isLoading = false,
   showHeader = true,
+  onAddTask,
 }: ProjectTaskListProps) {
   const [collapsedTasks, setCollapsedTasks] = useState<Record<string, boolean>>({});
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -309,6 +311,8 @@ export default function ProjectTaskList({
     const hasChildren = !isSubtask && (childTasksByParent.get(task.id) || []).length > 0;
     const isCollapsed = !!collapsedTasks[task.id];
     const profile = task.assigned_to_profile;
+    const dueDateLabel = task.due_date ? formatDateShort(task.due_date) : null;
+    const isOverdue = !!task.due_date && !task.is_completed && isPastDue(task.due_date);
 
     return (
       <div
@@ -372,6 +376,11 @@ export default function ProjectTaskList({
               />
             ) : (
               <span className={styles.taskName}>{task.title || 'Untitled task'}</span>
+            )}
+            {dueDateLabel && (
+              <span className={`${styles.taskDueDate} ${isOverdue ? styles.taskDueDateOverdue : ''}`}>
+                Due {dueDateLabel}
+              </span>
             )}
 
             {/* Hover actions overlay */}
@@ -540,6 +549,14 @@ export default function ProjectTaskList({
         </div>
       )}
 
+      {onAddTask && (
+        <div className={styles.addTaskRow}>
+          <button type="button" className={styles.addTaskButton} onClick={onAddTask}>
+            + Add Task
+          </button>
+        </div>
+      )}
+
       {/* Delete confirmation modal */}
       {deleteConfirmTaskId && (
         <div className={styles.modalOverlay} onClick={handleDeleteCancel}>
@@ -560,3 +577,21 @@ export default function ProjectTaskList({
     </div>
   );
 }
+
+const formatDateShort = (dateString: string): string => {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
+};
+
+const isPastDue = (dateString: string): boolean => {
+  const dueDate = new Date(dateString);
+  if (Number.isNaN(dueDate.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+  return dueDate < today;
+};

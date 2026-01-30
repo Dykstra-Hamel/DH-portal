@@ -17,7 +17,11 @@ interface GlobalHeaderProps {
 
 export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) {
   const pathname = usePathname();
-  const hideSearchAndCompany = pathname === '/project-management';
+  const hideSearchAndCompany =
+    pathname === '/project-management' ||
+    pathname === '/admin/project-management' ||
+    pathname.startsWith('/admin/project-management/tasks') ||
+    pathname.startsWith('/admin/project-management/templates');
 
   return (
     <header className={styles.globalHeader}>

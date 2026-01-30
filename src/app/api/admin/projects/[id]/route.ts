@@ -17,7 +17,10 @@ export async function GET(
         *,
         company:companies(
           id,
-          name
+          name,
+          branding:brands!company_id(
+            icon_logo_url
+          )
         ),
         activity:project_activity(
           *,
@@ -108,6 +111,7 @@ export async function PUT(
       description,
       project_type,
       project_subtype,
+      requested_by,
       assigned_to,
       status,
       priority,
@@ -146,27 +150,33 @@ export async function PUT(
       }
     }
 
+    const updateData: Record<string, any> = {
+      name,
+      description,
+      project_type,
+      project_subtype: project_subtype || null,
+      assigned_to: assigned_to || null,
+      status,
+      priority,
+      due_date,
+      start_date: start_date || null,
+      completion_date: completion_date || null,
+      is_billable: is_billable === 'true' || is_billable === true,
+      quoted_price: quoted_price ? parseFloat(quoted_price) : null,
+      tags: parsedTags,
+      notes,
+      primary_file_path: primary_file_path || null,
+      scope: scope || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (requested_by !== undefined) {
+      updateData.requested_by = requested_by || null;
+    }
+
     const { data: project, error } = await supabase
       .from('projects')
-      .update({
-        name,
-        description,
-        project_type,
-        project_subtype: project_subtype || null,
-        assigned_to: assigned_to || null,
-        status,
-        priority,
-        due_date,
-        start_date: start_date || null,
-        completion_date: completion_date || null,
-        is_billable: is_billable === 'true' || is_billable === true,
-        quoted_price: quoted_price ? parseFloat(quoted_price) : null,
-        tags: parsedTags,
-        notes,
-        primary_file_path: primary_file_path || null,
-        scope: scope || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select(
         `
