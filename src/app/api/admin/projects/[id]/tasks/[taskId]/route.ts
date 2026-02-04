@@ -34,6 +34,8 @@ export async function GET(
         *,
         assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
         created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         comments:project_task_comments(
           *,
           user_profile:profiles(id, first_name, last_name, email, avatar_url)
@@ -165,8 +167,8 @@ export async function PUT(
     if (body.actual_hours !== undefined) {
       updateData.actual_hours = body.actual_hours ? parseFloat(body.actual_hours) : null;
     }
-    if (body.blocked_by !== undefined) updateData.blocked_by = body.blocked_by;
-    if (body.blocking !== undefined) updateData.blocking = body.blocking;
+    if (body.blocks_task_id !== undefined) updateData.blocks_task_id = body.blocks_task_id || null;
+    if (body.blocked_by_task_id !== undefined) updateData.blocked_by_task_id = body.blocked_by_task_id || null;
     if (body.blocker_reason !== undefined) updateData.blocker_reason = body.blocker_reason || null;
     if (body.display_order !== undefined) updateData.display_order = body.display_order;
     if (body.parent_task_id !== undefined) updateData.parent_task_id = body.parent_task_id || null;
@@ -194,7 +196,9 @@ export async function PUT(
         `
         *,
         assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date)
       `
       )
       .single();
@@ -208,6 +212,14 @@ export async function PUT(
       }
       console.error('Error updating task:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Update project's updated_at timestamp when task is updated
+    if (projectId) {
+      await supabase
+        .from('projects')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', projectId);
     }
 
     // Handle category updates if provided
@@ -257,6 +269,8 @@ export async function PUT(
         *,
         assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
         created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         project_task_category_assignments(
           category_type,
           category:project_categories(id, name)
@@ -286,6 +300,15 @@ export async function PUT(
       { status: 500 }
     );
   }
+}
+
+// PATCH /api/admin/projects/[id]/tasks/[taskId] - Partially update a task
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; taskId: string }> }
+) {
+  // PATCH uses the same logic as PUT for task updates
+  return PUT(request, { params });
 }
 
 // DELETE /api/admin/projects/[id]/tasks/[taskId] - Delete a task

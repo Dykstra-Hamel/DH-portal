@@ -3,229 +3,38 @@ import React, {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   DragEvent,
 } from 'react';
-import { Project, statusOptions } from '@/types/project';
-import { StarButton } from '@/components/Common/StarButton/StarButton';
-import { CompanyIcon } from '@/components/Common/CompanyIcon/CompanyIcon';
+import { Project, ProjectDepartment } from '@/types/project';
+import { ProjectCard } from '@/components/Common/ProjectCard/ProjectCard';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectKanbanView.module.scss';
-
-type DateCategory = 'due_today' | 'this_week' | 'this_month' | 'coming_up';
-type StatusCategory =
-  | 'in_progress'
-  | 'blocked'
-  | 'on_hold'
-  | 'pending_approval'
-  | 'out_to_client'
-  | 'ready_to_print'
-  | 'printing'
-  | 'bill_client'
-  | 'complete';
-type KanbanGroupBy = 'date' | 'status';
 
 interface ProjectKanbanViewProps {
   projects: Project[];
+  departments: ProjectDepartment[];
   taskStatsByProject?: Record<string, { completed: number; total: number }>;
+  userTaskStatsByProject?: Record<string, { completed: number; total: number }>;
   onProjectClick: (project: Project) => void;
   onUpdateProject: (project: Project) => void;
-  onAddTask?: (projectId?: string) => void;
   onToggleStar?: (projectId: string) => void;
-  groupBy?: KanbanGroupBy;
 }
 
 interface Column {
-  id: DateCategory | StatusCategory;
+  id: string;
   title: string;
+  icon?: string | null;
 }
-
-const dateColumns: Column[] = [
-  { id: 'due_today', title: 'Due Today' },
-  { id: 'this_week', title: 'Due This Week' },
-  { id: 'this_month', title: 'Next 30 Days' },
-  { id: 'coming_up', title: 'Coming Up' },
-];
-
-const statusColumns: Column[] = [
-  { id: 'in_progress', title: 'In Progress' },
-  { id: 'blocked', title: 'Blocked' },
-  { id: 'on_hold', title: 'On Hold' },
-  { id: 'pending_approval', title: 'Pending Approval' },
-  { id: 'out_to_client', title: 'Out To Client' },
-  { id: 'ready_to_print', title: 'Ready To Print' },
-  { id: 'printing', title: 'Printing' },
-  { id: 'bill_client', title: 'Bill Client' },
-  { id: 'complete', title: 'Complete' },
-];
-
-// SVG Icons
-const ClockIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="15"
-    height="15"
-    viewBox="0 0 15 15"
-    fill="none"
-  >
-    <path
-      d="M7.33317 3.33329V7.33329L9.99984 8.66663M13.9998 7.33329C13.9998 11.0152 11.0151 14 7.33317 14C3.65127 14 0.666504 11.0152 0.666504 7.33329C0.666504 3.65139 3.65127 0.666626 7.33317 0.666626C11.0151 0.666626 13.9998 3.65139 13.9998 7.33329Z"
-      stroke="currentColor"
-      strokeWidth="1.33333"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const CommentIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="15"
-    height="14"
-    viewBox="0 0 15 14"
-    fill="none"
-  >
-    <path
-      d="M7.33317 5.99996H7.33984M9.99984 5.99996H10.0065M4.6665 5.99996H4.67317M13.9998 9.99996C13.9998 10.3536 13.8594 10.6927 13.6093 10.9428C13.3593 11.1928 13.0201 11.3333 12.6665 11.3333H3.88517C3.53158 11.3334 3.19249 11.4739 2.9425 11.724L1.4745 13.192C1.40831 13.2581 1.32397 13.3032 1.23216 13.3215C1.14035 13.3397 1.04519 13.3304 0.958709 13.2945C0.872226 13.2587 0.798306 13.1981 0.746294 13.1202C0.694283 13.0424 0.666516 12.9509 0.666504 12.8573V1.99996C0.666504 1.64634 0.80698 1.3072 1.05703 1.05715C1.30708 0.807102 1.64622 0.666626 1.99984 0.666626H12.6665C13.0201 0.666626 13.3593 0.807102 13.6093 1.05715C13.8594 1.3072 13.9998 1.64634 13.9998 1.99996V9.99996Z"
-      stroke="currentColor"
-      strokeWidth="1.33333"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const MembersIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="15"
-    height="15"
-    viewBox="0 0 15 15"
-    fill="none"
-  >
-    <path
-      d="M11.3332 12.6666C11.3332 11.6058 10.9117 10.5883 10.1616 9.8382C9.41145 9.08805 8.39404 8.66663 7.33317 8.66663M7.33317 8.66663C6.2723 8.66663 5.25489 9.08805 4.50474 9.8382C3.7546 10.5883 3.33317 11.6058 3.33317 12.6666M7.33317 8.66663C8.80593 8.66663 9.99984 7.47272 9.99984 5.99996C9.99984 4.5272 8.80593 3.33329 7.33317 3.33329C5.86041 3.33329 4.6665 4.5272 4.6665 5.99996C4.6665 7.47272 5.86041 8.66663 7.33317 8.66663ZM13.9998 7.33329C13.9998 11.0152 11.0151 14 7.33317 14C3.65127 14 0.666504 11.0152 0.666504 7.33329C0.666504 3.65139 3.65127 0.666626 7.33317 0.666626C11.0151 0.666626 13.9998 3.65139 13.9998 7.33329Z"
-      stroke="currentColor"
-      strokeWidth="1.33333"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const PlusIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="14"
-    height="14"
-    viewBox="0 0 14 14"
-    fill="none"
-  >
-    <path
-      d="M7 1V13M1 7H13"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-// Date utilities
-const isToday = (date: Date): boolean => {
-  const today = new Date();
-  return date.toDateString() === today.toDateString();
-};
-
-const isPastDue = (date: Date): boolean => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const compareDate = new Date(date);
-  compareDate.setHours(0, 0, 0, 0);
-  return compareDate < today;
-};
-
-const isThisWeek = (date: Date): boolean => {
-  const today = new Date();
-  const currentDay = today.getDay();
-  const monday = new Date(today);
-  const daysSinceMonday = currentDay === 0 ? 6 : currentDay - 1;
-  monday.setDate(today.getDate() - daysSinceMonday);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return date >= monday && date <= sunday && !isToday(date);
-};
-
-const isWithinNext30Days = (date: Date): boolean => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const compareDate = new Date(date);
-  compareDate.setHours(0, 0, 0, 0);
-  const thirtyDaysFromNow = new Date(today);
-  thirtyDaysFromNow.setDate(today.getDate() + 30);
-  return compareDate > today && compareDate <= thirtyDaysFromNow && !isToday(date) && !isThisWeek(date);
-};
-
-const getDateCategory = (project: Project): DateCategory => {
-  if (!project.due_date) return 'coming_up';
-  const dueDate = new Date(project.due_date);
-  if (isToday(dueDate) || isPastDue(dueDate)) return 'due_today';
-  if (isThisWeek(dueDate)) return 'this_week';
-  if (isWithinNext30Days(dueDate)) return 'this_month';
-  return 'coming_up';
-};
-
-const formatDateShort = (dateString: string): string => {
-  const date = new Date(dateString);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const year = String(date.getFullYear()).slice(-2);
-  return `${month}/${day}/${year}`;
-};
-
-const calculateProgress = (
-  project: Project,
-  taskStats?: { completed: number; total: number }
-): { completed: number; total: number; percentage: number } => {
-  const completed = taskStats?.completed ?? project.progress?.completed ?? 0;
-  const total = taskStats?.total ?? project.progress?.total ?? 0;
-  const derivedPercentage =
-    total > 0 ? Math.round((completed / total) * 100) : 0;
-  const percentage =
-    taskStats || project.progress
-      ? derivedPercentage
-      : (project.progress_percentage ?? derivedPercentage);
-  return { completed, total, percentage };
-};
-
-const stripHtml = (value: string) =>
-  value
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const getProjectStaleness = (project: Project): 'fresh' | 'stale-2' | 'stale-3' => {
-  if (!project.updated_at) return 'fresh';
-  const updatedDate = new Date(project.updated_at);
-  const today = new Date();
-  const diffTime = Math.abs(today.getTime() - updatedDate.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays >= 10) return 'stale-3';
-  if (diffDays >= 5) return 'stale-2';
-  return 'fresh';
-};
 
 export function ProjectKanbanView({
   projects,
+  departments,
   taskStatsByProject,
+  userTaskStatsByProject,
   onProjectClick,
   onUpdateProject,
-  onAddTask,
   onToggleStar,
-  groupBy = 'date',
 }: ProjectKanbanViewProps) {
   // Simple drag state
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -238,63 +47,45 @@ export function ProjectKanbanView({
   );
   const [dropToColumn, setDropToColumn] = useState<string | null>(null);
 
-  // Custom order for Due Today column
-  const [dueTodayOrder, setDueTodayOrder] = useState<string[]>([]);
-
   // Auto-scroll state
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Get current columns based on groupBy
-  const columns = groupBy === 'date' ? dateColumns : statusColumns;
+  // Build columns from departments
+  const columns: Column[] = useMemo(() => [
+    ...departments.map(dept => ({
+      id: dept.id,
+      title: dept.name,
+      icon: dept.icon,
+    })),
+  ], [departments]);
 
   // Scroll state
   const [columnScrollStates, setColumnScrollStates] = useState<
     Record<string, boolean>
   >({});
-  const [showStatusScrollLeft, setShowStatusScrollLeft] = useState(false);
-  const [showStatusScrollRight, setShowStatusScrollRight] = useState(false);
+  const [showScrollLeft, setShowScrollLeft] = useState(false);
+  const [showScrollRight, setShowScrollRight] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Initialize order when projects change
-  useEffect(() => {
-    if (groupBy === 'date') {
-      const dueTodayProjects = projects.filter(
-        p => getDateCategory(p) === 'due_today'
-      );
-      const dueTodayIds = dueTodayProjects.map(p => p.id);
+  const getProjectsByDepartment = (columnId: string): Project[] => {
+    // Projects assigned to this department
+    const departmentProjects = projects.filter(p => p.current_department_id === columnId);
 
-      setDueTodayOrder(prevOrder => {
-        const validPrevOrder = prevOrder.filter(id => dueTodayIds.includes(id));
-        const newIds = dueTodayIds.filter(id => !prevOrder.includes(id));
-        return [...validPrevOrder, ...newIds];
-      });
-    }
-  }, [projects, groupBy]);
+    // Sort by closest due date at top
+    return [...departmentProjects].sort((a, b) => {
+      // Projects without due dates go to the bottom
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
 
-  const getProjectsByCategory = (columnId: string): Project[] => {
-    let categoryProjects: Project[];
-
-    if (groupBy === 'date') {
-      categoryProjects = projects.filter(p => getDateCategory(p) === columnId);
-
-      if (columnId === 'due_today' && dueTodayOrder.length > 0) {
-        return [...categoryProjects].sort((a, b) => {
-          const aIdx = dueTodayOrder.indexOf(a.id);
-          const bIdx = dueTodayOrder.indexOf(b.id);
-          if (aIdx === -1) return 1;
-          if (bIdx === -1) return -1;
-          return aIdx - bIdx;
-        });
-      }
-    } else {
-      // Group by status
-      categoryProjects = projects.filter(p => p.status === columnId);
-    }
-
-    return categoryProjects;
+      // Sort by due date (earliest first)
+      const dateA = parseDateString(a.due_date)?.getTime() ?? Infinity;
+      const dateB = parseDateString(b.due_date)?.getTime() ?? Infinity;
+      return dateA - dateB;
+    });
   };
 
   const checkColumnScroll = (columnId: string) => {
@@ -312,11 +103,11 @@ export function ProjectKanbanView({
     columns.forEach(column => checkColumnScroll(column.id));
   }, [projects, columns]);
 
-  const updateStatusOverflow = useCallback(() => {
+  const updateOverflow = useCallback(() => {
     const container = containerRef.current;
-    if (!container || groupBy !== 'status') {
-      setShowStatusScrollLeft(false);
-      setShowStatusScrollRight(false);
+    if (!container) {
+      setShowScrollLeft(false);
+      setShowScrollRight(false);
       return;
     }
 
@@ -325,18 +116,18 @@ export function ProjectKanbanView({
     const canScrollRight =
       container.scrollLeft + container.clientWidth < container.scrollWidth - 4;
 
-    setShowStatusScrollLeft(hasOverflow && canScrollLeft);
-    setShowStatusScrollRight(hasOverflow && canScrollRight);
-  }, [groupBy]);
+    setShowScrollLeft(hasOverflow && canScrollLeft);
+    setShowScrollRight(hasOverflow && canScrollRight);
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    updateStatusOverflow();
+    updateOverflow();
 
-    const handleScroll = () => updateStatusOverflow();
-    const handleResize = () => updateStatusOverflow();
+    const handleScroll = () => updateOverflow();
+    const handleResize = () => updateOverflow();
 
     container.addEventListener('scroll', handleScroll);
     window.addEventListener('resize', handleResize);
@@ -345,13 +136,13 @@ export function ProjectKanbanView({
       container.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleResize);
     };
-  }, [updateStatusOverflow]);
+  }, [updateOverflow]);
 
   useEffect(() => {
-    updateStatusOverflow();
-  }, [projects, columns, updateStatusOverflow]);
+    updateOverflow();
+  }, [projects, columns, updateOverflow]);
 
-  const handleStatusScroll = (direction: 'left' | 'right') => {
+  const handleScroll = (direction: 'left' | 'right') => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -371,7 +162,7 @@ export function ProjectKanbanView({
   // Auto-scroll when dragging near edges
   const handleDragOverContainer = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
-      if (!isDragging || groupBy !== 'status') return;
+      if (!isDragging) return;
 
       const container = containerRef.current;
       if (!container) return;
@@ -417,7 +208,7 @@ export function ProjectKanbanView({
         }, 50);
       }
     },
-    [isDragging, groupBy]
+    [isDragging]
   );
 
   // Clean up auto-scroll interval
@@ -449,9 +240,8 @@ export function ProjectKanbanView({
       autoScrollIntervalRef.current = null;
     }
 
-    // Handle status change when dragging between columns in status view
+    // Handle department change when dragging between columns
     if (
-      groupBy === 'status' &&
       draggedId &&
       dropToColumn &&
       draggedFromColumn !== dropToColumn
@@ -460,34 +250,9 @@ export function ProjectKanbanView({
       if (draggedProject && onUpdateProject) {
         onUpdateProject({
           ...draggedProject,
-          status: dropToColumn as StatusCategory,
+          current_department_id: dropToColumn,
         });
       }
-    }
-
-    // Perform the reorder if we have a valid drop target (for Due Today column)
-    if (groupBy === 'date' && draggedId && dropTargetId && dropPosition) {
-      setDueTodayOrder(prevOrder => {
-        const newOrder = [...prevOrder];
-        const draggedIndex = newOrder.indexOf(draggedId);
-        const targetIndex = newOrder.indexOf(dropTargetId);
-
-        if (draggedIndex === -1 || targetIndex === -1) return prevOrder;
-        if (draggedIndex === targetIndex) return prevOrder;
-
-        // Remove dragged item
-        newOrder.splice(draggedIndex, 1);
-
-        // Find new target index (it may have shifted after removal)
-        const newTargetIndex = newOrder.indexOf(dropTargetId);
-
-        // Insert at the correct position
-        const insertIndex =
-          dropPosition === 'before' ? newTargetIndex : newTargetIndex + 1;
-        newOrder.splice(insertIndex, 0, draggedId);
-
-        return newOrder;
-      });
     }
 
     // Reset all drag state
@@ -526,48 +291,43 @@ export function ProjectKanbanView({
     columnId: string
   ) => {
     e.preventDefault();
-    if (groupBy === 'status') {
-      setDropToColumn(columnId);
-    }
+    setDropToColumn(columnId);
   };
 
   const handleColumnDrop = (e: DragEvent<HTMLDivElement>, columnId: string) => {
     e.preventDefault();
     setDropToColumn(columnId);
-    // The actual reorder/status change happens in handleDragEnd
+    // The actual department change happens in handleDragEnd
   };
 
   return (
     <div className={styles.kanbanWrapper}>
       <div
         ref={containerRef}
-        className={`${styles.kanbanContainer} ${groupBy === 'status' ? styles.statusView : ''}`}
+        className={`${styles.kanbanContainer} ${styles.departmentView}`}
         onDragOver={handleDragOverContainer}
       >
-        <div
-          className={`${styles.kanbanBoard} ${groupBy === 'status' ? styles.statusView : ''}`}
-        >
+        <div className={`${styles.kanbanBoard} ${styles.departmentView}`}>
           {columns.map(column => {
-            const columnProjects = getProjectsByCategory(column.id);
-            const isDueTodayColumn =
-              groupBy === 'date' && column.id === 'due_today';
-            const isStatusColumn = groupBy === 'status';
-            const isDraggable = isDueTodayColumn || isStatusColumn;
+            const columnProjects = getProjectsByDepartment(column.id);
 
             return (
               <div
                 key={column.id}
-                className={`${styles.kanbanColumnWrapper} ${groupBy === 'status' ? styles.statusView : ''}`}
+                className={`${styles.kanbanColumnWrapper} ${styles.departmentView}`}
               >
                 <div className={styles.columnHeader}>
-                  <span className={styles.columnTitle}>{column.title}</span>
+                  <span className={styles.columnTitle}>
+                    {column.icon && <span className={styles.columnIcon}>{column.icon}</span>}
+                    {column.title}
+                  </span>
                   <span className={styles.columnCount}>
                     ({columnProjects.length})
                   </span>
                 </div>
 
                 <div
-                  className={`${styles.kanbanColumn} ${isDueTodayColumn ? styles.dueTodayColumn : ''} ${isStatusColumn ? styles.statusColumn : ''}`}
+                  className={`${styles.kanbanColumn} ${styles.departmentColumn}`}
                   onDragOver={e => handleColumnDragOver(e, column.id)}
                   onDrop={e => handleColumnDrop(e, column.id)}
                 >
@@ -578,171 +338,55 @@ export function ProjectKanbanView({
                     className={styles.columnContent}
                     onScroll={() => checkColumnScroll(column.id)}
                   >
+                    {columnProjects.length === 0 &&
+                      isDragging &&
+                      dropToColumn === column.id && (
+                        <div className={styles.emptyDropIndicator} />
+                      )}
                     {columnProjects.map(project => {
-                      const progress = calculateProgress(
-                        project,
-                        taskStatsByProject?.[project.id]
-                      );
                       const isDragging = draggedId === project.id;
                       const isDropTarget = dropTargetId === project.id;
                       const showDropBefore =
                         isDropTarget && dropPosition === 'before';
                       const showDropAfter =
                         isDropTarget && dropPosition === 'after';
-                      const staleness = getProjectStaleness(project);
 
                       return (
                         <div
                           key={project.id}
                           className={`
                           ${styles.draggableProject}
-                          ${isDraggable ? styles.draggable : ''}
+                          ${styles.draggable}
                           ${isDragging ? styles.dragging : ''}
                           ${showDropBefore ? styles.dropBefore : ''}
                           ${showDropAfter ? styles.dropAfter : ''}
                         `}
-                          draggable={isDraggable}
-                          onDragStart={
-                            isDraggable
-                              ? e => handleDragStart(e, project.id, column.id)
-                              : undefined
-                          }
-                          onDragEnd={isDraggable ? handleDragEnd : undefined}
-                          onDragOver={
-                            isDraggable
-                              ? e => handleDragOver(e, project.id)
-                              : undefined
-                          }
-                          onDragLeave={
-                            isDraggable ? handleDragLeave : undefined
-                          }
-                          onClick={() => onProjectClick(project)}
+                          draggable={true}
+                          onDragStart={e => handleDragStart(e, project.id, column.id)}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={e => handleDragOver(e, project.id)}
+                          onDragLeave={handleDragLeave}
                         >
-                          <div className={`${styles.projectCard} ${staleness === 'stale-2' ? styles.staleCard2 : ''} ${staleness === 'stale-3' ? styles.staleCard3 : ''} ${project.has_unread_mentions ? styles.hasMentionBorder : ''}`}>
-                            <div className={styles.cardTopRow}>
-                              <div
-                                className={`${styles.dateSection} ${
-                                  project.due_date &&
-                                  isPastDue(new Date(project.due_date))
-                                    ? styles.overdueDate
-                                    : ''
-                                }`}
-                              >
-                                <ClockIcon />
-                                <span>
-                                  {project.due_date
-                                    ? formatDateShort(project.due_date)
-                                    : 'No date'}
-                                </span>
-                                {(project.scope === 'external' ||
-                                  project.scope === 'both') && (
-                                  <span className={styles.externalBadgeInTopRow}>
-                                    External
-                                  </span>
-                                )}
-                              </div>
-                              <div className={styles.companySection}>
-                                <CompanyIcon
-                                  companyName={project.company?.name || 'No company'}
-                                  iconUrl={
-                                    Array.isArray(project.company?.branding)
-                                      ? project.company.branding[0]?.icon_logo_url
-                                      : project.company?.branding?.icon_logo_url
-                                  }
-                                  size="medium"
-                                  showTooltip={true}
-                                />
-                              </div>
-                            </div>
-
-                            {project.shortcode && (
-                              <div className={styles.projectMeta}>
-                                <span className={styles.projectCode}>
-                                  {project.shortcode}
-                                </span>
-                              </div>
-                            )}
-
-                            <h3 className={styles.projectName}>
-                              {project.name}
-                            </h3>
-
-                            <p className={styles.projectDescription}>
-                              {(() => {
-                                const descriptionText = project.description
-                                  ? stripHtml(project.description)
-                                  : '';
-                                return descriptionText || '\u00A0'; // Non-breaking space to reserve height
-                              })()}
-                            </p>
-
-                            <div className={styles.cardMetrics}>
-                              <div
-                                className={`${styles.metricItem} ${project.has_unread_mentions ? styles.hasMention : ''}`}
-                              >
-                                <CommentIcon />
-                                <span>
-                                  {project.comments_count ?? 0} Comments
-                                </span>
-                              </div>
-                              <div className={styles.metricItem}>
-                                <MembersIcon />
-                                <span>
-                                  {project.members_count ?? 0} Members
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className={styles.progressSection}>
-                              <div className={styles.progressHeader}>
-                                <div className={styles.progressLabelWithStar}>
-                                  <span className={styles.progressLabel}>
-                                    Progress
-                                  </span>
-                                  {onToggleStar && (
-                                    <StarButton
-                                      isStarred={project.is_starred || false}
-                                      onToggle={() => onToggleStar(project.id)}
-                                      size="small"
-                                    />
-                                  )}
-                                </div>
-                                <span className={styles.progressFraction}>
-                                  {progress.completed}/{progress.total}
-                                </span>
-                              </div>
-                              <div className={styles.progressBarRow}>
-                                <div className={styles.progressBarContainer}>
-                                  <div
-                                    className={styles.progressBarFill}
-                                    style={{ width: `${progress.percentage}%` }}
-                                  />
-                                </div>
-                                {(() => {
-                                  const status = statusOptions.find(
-                                    s => s.value === project.status
-                                  );
-                                  return status ? (
-                                    <span
-                                      className={styles.statusBadge}
-                                      style={{
-                                        color: status.color,
-                                      }}
-                                    >
-                                      {status.label}
-                                    </span>
-                                  ) : null;
-                                })()}
-                              </div>
-                            </div>
-                          </div>
+                          <ProjectCard
+                            project={project}
+                            taskStats={taskStatsByProject?.[project.id]}
+                            userTaskStats={userTaskStatsByProject?.[project.id]}
+                            onToggleStar={onToggleStar}
+                            onProjectClick={onProjectClick}
+                            onStatusChange={(proj, newStatus) => {
+                              onUpdateProject({
+                                ...proj,
+                                status: newStatus as Project['status'],
+                              });
+                            }}
+                          />
                         </div>
                       );
                     })}
 
                     {columnProjects.length === 0 && (
                       <div className={styles.emptyColumn}>
-                        No projects in this column
+                        No projects in this department
                       </div>
                     )}
                   </div>
@@ -752,27 +396,17 @@ export function ProjectKanbanView({
                   )}
                 </div>
 
-                <button
-                  className={styles.addTaskButton}
-                  onClick={e => {
-                    e.stopPropagation();
-                    onAddTask?.();
-                  }}
-                >
-                  <PlusIcon />
-                  <span>Add Task</span>
-                </button>
               </div>
             );
           })}
         </div>
       </div>
-      {groupBy === 'status' && showStatusScrollLeft && (
+      {showScrollLeft && (
         <button
           type="button"
-          className={`${styles.statusScrollArrow} ${styles.statusScrollArrowLeft}`}
-          onClick={() => handleStatusScroll('left')}
-          aria-label="Scroll status columns left"
+          className={`${styles.scrollArrow} ${styles.scrollArrowLeft}`}
+          onClick={() => handleScroll('left')}
+          aria-label="Scroll department columns left"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -791,12 +425,12 @@ export function ProjectKanbanView({
           </svg>
         </button>
       )}
-      {groupBy === 'status' && showStatusScrollRight && (
+      {showScrollRight && (
         <button
           type="button"
-          className={styles.statusScrollArrow}
-          onClick={() => handleStatusScroll('right')}
-          aria-label="Scroll status columns"
+          className={styles.scrollArrow}
+          onClick={() => handleScroll('right')}
+          aria-label="Scroll department columns"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

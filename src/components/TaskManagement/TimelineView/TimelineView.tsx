@@ -4,6 +4,7 @@ import { PriorityBadge } from '../shared/PriorityBadge';
 import { StatusBadge } from '../shared/StatusBadge';
 import { ProjectBadge } from '../shared/ProjectBadge';
 import { UserAvatar } from '../shared/UserAvatar';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './TimelineView.module.scss';
 
 interface TimelineViewProps {
@@ -15,18 +16,24 @@ interface TimelineViewProps {
 export function TimelineView({ tasks, projects, onTaskClick }: TimelineViewProps) {
   // Sort tasks by due date
   const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+    return [...tasks].sort(
+      (a, b) =>
+        (parseDateString(a.due_date)?.getTime() ?? Number.POSITIVE_INFINITY) -
+        (parseDateString(b.due_date)?.getTime() ?? Number.POSITIVE_INFINITY)
+    );
   }, [tasks]);
 
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
+    const date = parseDateString(dateString);
+    if (!date) return 'Not Set';
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const isOverdue = (dueDate: string): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const taskDueDate = new Date(dueDate);
+    const taskDueDate = parseDateString(dueDate);
+    if (!taskDueDate) return false;
     taskDueDate.setHours(0, 0, 0, 0);
     return taskDueDate < today;
   };

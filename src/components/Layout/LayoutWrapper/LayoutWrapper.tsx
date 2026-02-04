@@ -315,6 +315,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           if (pageHeader) {
             return {
               title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
               description: pageHeader.description,
               showAddButton: false,
             };
@@ -332,6 +333,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           if (pageHeader) {
             return {
               title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
               description: pageHeader.description,
               showAddButton: false,
               leadAssignmentControls: pageHeader.leadAssignmentControls,
@@ -349,6 +351,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           if (pageHeader) {
             return {
               title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
               description: pageHeader.description,
               showAddButton: false,
               customActions: pageHeader.customActions,
@@ -363,6 +366,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           if (pageHeader) {
             return {
               title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
               description: pageHeader.description,
               showAddButton: false,
               customActions: pageHeader.customActions,
@@ -377,6 +381,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           if (pageHeader) {
             return {
               title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
               description: pageHeader.description,
               showAddButton: false,
               supportCaseAssignmentControls:
@@ -392,6 +397,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           if (pageHeader) {
             return {
               title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
               description: pageHeader.description,
               showAddButton: true,
               addButtonText: 'Open Tickets',
@@ -448,6 +454,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           {pageConfig && (
             <GlobalLowerHeader
               title={pageConfig.title}
+              titleLeading={'titleLeading' in pageConfig ? pageConfig.titleLeading : undefined}
               description={pageConfig.description}
               showAddButton={pageConfig.showAddButton}
               addButtonText={pageConfig.addButtonText}

@@ -5,6 +5,7 @@ import { X, Save } from 'lucide-react';
 import {
   ProjectTask,
   ProjectTaskFormData,
+  ProjectCategory,
   User,
   taskPriorityOptions,
 } from '@/types/project';
@@ -18,6 +19,9 @@ interface ProjectTaskFormProps {
   users: User[];
   projectId: string;
   parentTasks?: ProjectTask[]; // For creating subtasks
+  projectMembers?: Array<{ user_id: string }>; // Project members
+  projectAssignedTo?: string | null; // Project's assigned_to user
+  availableCategories?: ProjectCategory[];
 }
 
 export default function ProjectTaskForm({
@@ -28,6 +32,9 @@ export default function ProjectTaskForm({
   users,
   projectId,
   parentTasks = [],
+  projectMembers = [],
+  projectAssignedTo = null,
+  availableCategories = [],
 }: ProjectTaskFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +48,11 @@ export default function ProjectTaskForm({
     due_date: '',
     start_date: '',
     parent_task_id: '',
+    category_ids: [],
   });
+
+  const [dependencyType, setDependencyType] = useState<'blocks' | 'blocked_by' | 'none'>('none');
+  const [dependencyTaskId, setDependencyTaskId] = useState<string>('');
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -65,34 +76,41 @@ export default function ProjectTaskForm({
   };
 
   const assignableUsers = useMemo(() => {
-    const shouldFilterByRole = users.some(user => getUserRole(user));
-    const adminUsers = shouldFilterByRole
-      ? users.filter(user => {
-          const role = getUserRole(user);
-          return role ? isAdminRole(role) : false;
-        })
-      : users;
+    // Get member IDs from project
+    const memberIds = new Set(projectMembers.map(m => m.user_id));
 
+    // Add project's assigned_to
+    if (projectAssignedTo) {
+      memberIds.add(projectAssignedTo);
+    }
+
+    // Filter users to members only
+    let filteredUsers = users.filter(u => {
+      const userId = u.profiles?.id || u.id;
+      return memberIds.has(userId);
+    });
+
+    // Always include current assignee even if not a member
     const assignedId = formData.assigned_to || editingTask?.assigned_to || '';
-    if (assignedId && !adminUsers.some(user => user.id === assignedId)) {
-      const assignedUser = users.find(user => user.id === assignedId);
+    if (assignedId && !filteredUsers.some(user => (user.profiles?.id || user.id) === assignedId)) {
+      const assignedUser = users.find(user => (user.profiles?.id || user.id) === assignedId);
       if (assignedUser) {
-        return [...adminUsers, assignedUser];
-      }
-      if (editingTask?.assigned_to_profile) {
-        return [
-          ...adminUsers,
+        filteredUsers = [...filteredUsers, assignedUser];
+      } else if (editingTask?.assigned_to_profile) {
+        // If assigned user not found in users list but we have the profile, add it
+        filteredUsers = [
+          ...filteredUsers,
           {
-            id: assignedId,
+            id: editingTask.assigned_to,
             profiles: editingTask.assigned_to_profile,
             email: editingTask.assigned_to_profile.email,
-          },
+          } as User,
         ];
       }
     }
 
-    return adminUsers;
-  }, [editingTask?.assigned_to, formData.assigned_to, users]);
+    return filteredUsers;
+  }, [formData.assigned_to, editingTask?.assigned_to, editingTask?.assigned_to_profile, projectMembers, projectAssignedTo, users]);
 
   useEffect(() => {
     if (editingTask) {
@@ -105,7 +123,20 @@ export default function ProjectTaskForm({
         due_date: editingTask.due_date || '',
         start_date: editingTask.start_date || '',
         parent_task_id: editingTask.parent_task_id || '',
+        category_ids: editingTask.categories?.map(category => category.id).slice(0, 1) || [],
       });
+
+      // Set dependency state
+      if (editingTask.blocks_task_id) {
+        setDependencyType('blocks');
+        setDependencyTaskId(editingTask.blocks_task_id);
+      } else if (editingTask.blocked_by_task_id) {
+        setDependencyType('blocked_by');
+        setDependencyTaskId(editingTask.blocked_by_task_id);
+      } else {
+        setDependencyType('none');
+        setDependencyTaskId('');
+      }
     } else {
       // Reset form for new task
       setFormData({
@@ -117,7 +148,10 @@ export default function ProjectTaskForm({
         due_date: '',
         start_date: '',
         parent_task_id: '',
+        category_ids: [],
       });
+      setDependencyType('none');
+      setDependencyTaskId('');
     }
     setError(null);
   }, [editingTask, isOpen]);
@@ -135,13 +169,28 @@ export default function ProjectTaskForm({
     setError(null);
 
     try {
-      await onSubmit(formData);
+      // Add dependency fields to formData
+      const submitData = {
+        ...formData,
+        blocks_task_id: dependencyType === 'blocks' ? dependencyTaskId || null : null,
+        blocked_by_task_id: dependencyType === 'blocked_by' ? dependencyTaskId || null : null,
+      };
+
+      await onSubmit(submitData);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save task');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCategoryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    setFormData(prev => ({
+      ...prev,
+      category_ids: value ? [value] : [],
+    }));
   };
 
   if (!isOpen) return null;
@@ -233,6 +282,28 @@ export default function ProjectTaskForm({
                   </p>
                 </div>
               )}
+
+              {availableCategories.length > 0 && (
+                <div className={styles.formGroup}>
+                  <label htmlFor="category_id" className={styles.label}>
+                    Category
+                  </label>
+                  <select
+                    id="category_id"
+                    name="category_id"
+                    value={formData.category_ids?.[0] || ''}
+                    onChange={handleCategoryChange}
+                    className={styles.select}
+                  >
+                    <option value="">None</option>
+                    {availableCategories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </section>
 
             {/* Assignment & Priority */}
@@ -315,6 +386,65 @@ export default function ProjectTaskForm({
                   />
                 </div>
               </div>
+            </section>
+
+            {/* Task Dependencies */}
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>Task Dependencies</h3>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="dependency_type" className={styles.label}>
+                    Dependency Type
+                  </label>
+                  <select
+                    id="dependency_type"
+                    value={dependencyType}
+                    onChange={(e) => {
+                      setDependencyType(e.target.value as 'blocks' | 'blocked_by' | 'none');
+                      if (e.target.value === 'none') {
+                        setDependencyTaskId('');
+                      }
+                    }}
+                    className={styles.select}
+                  >
+                    <option value="none">None</option>
+                    <option value="blocks">This task blocks...</option>
+                    <option value="blocked_by">This task is blocked by...</option>
+                  </select>
+                </div>
+
+                {dependencyType !== 'none' && (
+                  <div className={styles.formGroup}>
+                    <label htmlFor="dependency_task" className={styles.label}>
+                      {dependencyType === 'blocks' ? 'Task Being Blocked' : 'Blocking Task'}
+                    </label>
+                    <select
+                      id="dependency_task"
+                      value={dependencyTaskId}
+                      onChange={(e) => setDependencyTaskId(e.target.value)}
+                      className={styles.select}
+                    >
+                      <option value="">Select a task</option>
+                      {parentTasks
+                        .filter(task => task.id !== editingTask?.id) // Can't block yourself
+                        .map(task => (
+                          <option key={task.id} value={task.id}>
+                            {task.title}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {dependencyType !== 'none' && (
+                <p className={styles.fieldHelp}>
+                  {dependencyType === 'blocks'
+                    ? 'Select a task that cannot start until this task is completed'
+                    : 'Select a task that must be completed before this task can start'}
+                </p>
+              )}
             </section>
 
             {/* Additional Notes */}

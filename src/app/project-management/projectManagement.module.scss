@@ -123,12 +123,28 @@
   margin-bottom: 32px;
 }
 
+.tabsLeft {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex: 1;
+}
+
+.tabsRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tabsSectionCompact {
+  width: auto;
+}
+
 // Tabs Section - tabs with border bottom (matching tickets/dashboard)
 .tabsSection {
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 100%;
   border-bottom: 1px solid var(--gray-300, #d1d5db);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -149,6 +165,38 @@
 
   &:focus-within {
     border-bottom-color: var(--gray-800, #252c37);
+  }
+}
+
+.filterControls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.categorySelect {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  padding-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.categorySelectInput {
+  min-width: 180px;
+  padding: 0;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-300, #d1d5db);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus {
+    color: var(--gray-800, #252c37);
   }
 }
 
@@ -277,8 +325,8 @@
   width: fit-content;
   gap: 4px;
   border-radius: 8px;
-  border: 1px solid var(--UI-Gray-300, #D1D5DB);
-  background: var(--White, #FFF);
+  border: 1px solid var(--UI-Gray-300, #d1d5db);
+  background: var(--White, #fff);
   padding: 4px;
 }
 
@@ -335,8 +383,8 @@
   border-radius: 6px;
 
   // Inactive state
-  color: var(--UI-Gray-400, #99A1AF);
-  font-family: "Satoshi Variable", var(--font-satoshi);
+  color: var(--UI-Gray-400, #99a1af);
+  font-family: 'Satoshi Variable', var(--font-satoshi);
   font-size: 13px;
   font-weight: 650;
   line-height: 14px;
@@ -350,8 +398,34 @@
   }
 
   &.active {
-    background: var(--UI-Gray-100, #F3F4F6);
-    color: var(--UI-Gray-950, #0C0E12);
+    background: var(--UI-Gray-100, #f3f4f6);
+    color: var(--UI-Gray-950, #0c0e12);
+  }
+}
+
+// Status Filter Dropdown
+.statusFilter {
+  padding: 8px 12px;
+  border: 1px solid var(--UI-Gray-300, #d1d5db);
+  border-radius: 6px;
+  background: var(--white, #ffffff);
+  color: var(--UI-Gray-950, #0c0e12);
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  min-width: 140px;
+
+  &:hover {
+    border-color: var(--UI-Gray-400, #9ca3af);
+  }
+
+  &:focus {
+    border-color: var(--action-500, #0080f0);
+    box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
   }
 }
 

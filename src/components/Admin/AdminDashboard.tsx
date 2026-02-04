@@ -20,6 +20,7 @@ import TemplateLibraryManager from './TemplateLibraryManager';
 import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
 import InternalCategorySettings from '../ProjectManagement/CategorySettings/InternalCategorySettings';
+import InternalDepartmentSettings from '../ProjectManagement/DepartmentSettings/InternalDepartmentSettings';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -270,7 +271,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           </div>
         );
       case 'project-settings':
-        return <InternalCategorySettings />;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+            <InternalDepartmentSettings />
+            <InternalCategorySettings />
+          </div>
+        );
       default:
         return <UsersManager />;
     }

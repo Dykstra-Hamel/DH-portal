@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Task } from '@/types/taskManagement';
 import { PriorityBadge } from '../shared/PriorityBadge';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './CalendarView.module.scss';
 
 interface CalendarViewProps {
@@ -69,15 +70,16 @@ export function CalendarView({ tasks, onTaskClick }: CalendarViewProps) {
   }, [currentDate]);
 
   const getTasksForDate = (date: Date): Task[] => {
-    const dateStr = date.toISOString().split('T')[0];
     return tasks.filter(task => {
       // Skip tasks without a valid due_date
       if (!task.due_date) return false;
-      const taskDateObj = new Date(task.due_date);
-      // Check if the date is valid
-      if (isNaN(taskDateObj.getTime())) return false;
-      const taskDate = taskDateObj.toISOString().split('T')[0];
-      return taskDate === dateStr;
+      const taskDateObj = parseDateString(task.due_date);
+      if (!taskDateObj) return false;
+      return (
+        taskDateObj.getFullYear() === date.getFullYear() &&
+        taskDateObj.getMonth() === date.getMonth() &&
+        taskDateObj.getDate() === date.getDate()
+      );
     });
   };
 

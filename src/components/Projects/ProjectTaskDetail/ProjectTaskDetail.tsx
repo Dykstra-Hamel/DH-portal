@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   X,
   Trash2,
@@ -34,6 +34,9 @@ interface ProjectTaskDetailProps {
   onToggleStar?: (taskId: string) => void;
   isStarred?: (taskId: string) => boolean;
   availableCategories?: ProjectCategory[]; // Available categories for this project
+  projectMembers?: Array<{ user_id: string }>; // Project members
+  projectAssignedTo?: string | null; // Project's assigned_to user
+  availableTasks?: ProjectTask[]; // All tasks in project for dependency selection
 }
 
 export default function ProjectTaskDetail({
@@ -49,10 +52,14 @@ export default function ProjectTaskDetail({
   onToggleStar,
   isStarred,
   availableCategories = [],
+  projectMembers = [],
+  projectAssignedTo = null,
+  availableTasks = [],
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task?.title || '');
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const [priorityDraft, setPriorityDraft] = useState(task?.priority || 'medium');
   const [assignedToDraft, setAssignedToDraft] = useState(task?.assigned_to || '');
   const [dueDateDraft, setDueDateDraft] = useState('');
@@ -63,6 +70,8 @@ export default function ProjectTaskDetail({
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [isUpdatingComplete, setIsUpdatingComplete] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [dependencyType, setDependencyType] = useState<'blocks' | 'blocked_by' | 'none'>('none');
+  const [dependencyTaskId, setDependencyTaskId] = useState<string>('');
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -86,22 +95,30 @@ export default function ProjectTaskDetail({
   };
 
   const assignableUsers = useMemo(() => {
-    const shouldFilterByRole = users.some(user => getUserRole(user));
-    const adminUsers = shouldFilterByRole
-      ? users.filter((user) => {
-          const role = getUserRole(user);
-          return role ? isAdminRole(role) : false;
-        })
-      : users;
+    // Get member IDs from project
+    const memberIds = new Set(projectMembers.map(m => m.user_id));
 
-    if (task?.assigned_to && !adminUsers.some(user => user.id === task.assigned_to)) {
-      const assignedUser = users.find(user => user.id === task.assigned_to);
+    // Add project's assigned_to
+    if (projectAssignedTo) {
+      memberIds.add(projectAssignedTo);
+    }
+
+    // Filter users to members only
+    let filteredUsers = users.filter(u => {
+      const userId = u.profiles?.id || u.id;
+      return memberIds.has(userId);
+    });
+
+    // Always include current assignee even if not a member
+    const currentAssignee = task?.assigned_to || assignedToDraft;
+    if (currentAssignee && !filteredUsers.some(u => (u.profiles?.id || u.id) === currentAssignee)) {
+      const assignedUser = users.find(u => (u.profiles?.id || u.id) === currentAssignee);
       if (assignedUser) {
-        return [...adminUsers, assignedUser];
-      }
-      if (task.assigned_to_profile) {
-        return [
-          ...adminUsers,
+        filteredUsers = [...filteredUsers, assignedUser];
+      } else if (task?.assigned_to_profile) {
+        // If assigned user not found in users list but we have the profile, add it
+        filteredUsers = [
+          ...filteredUsers,
           {
             id: task.assigned_to,
             profiles: task.assigned_to_profile,
@@ -111,12 +128,28 @@ export default function ProjectTaskDetail({
       }
     }
 
-    return adminUsers;
-  }, [task?.assigned_to, users]);
+    return filteredUsers;
+  }, [task?.assigned_to, task?.assigned_to_profile, assignedToDraft, projectMembers, projectAssignedTo, users]);
 
   const formatDateInput = (dateString: string | null) => {
     if (!dateString) return '';
     return dateString.split('T')[0];
+  };
+
+  // Format a date-only string (YYYY-MM-DD) to local date without timezone conversion
+  const formatDateOnly = (dateString: string): string => {
+    const datePart = dateString.split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+
+    if (!year || !month || !day) return 'Invalid Date';
+
+    // Create date in local timezone
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   const formatDateTime = (dateString: string | null) => {
@@ -158,8 +191,27 @@ export default function ProjectTaskDetail({
     setIsEditingDescription(false);
     // Set selected categories from task
     const categoryIds = task.categories?.map(cat => cat.id) || [];
-    setSelectedCategoryIds(categoryIds);
+    setSelectedCategoryIds(categoryIds.slice(0, 1));
+
+    // Set dependency state
+    if (task.blocks_task_id) {
+      setDependencyType('blocks');
+      setDependencyTaskId(task.blocks_task_id);
+    } else if (task.blocked_by_task_id) {
+      setDependencyType('blocked_by');
+      setDependencyTaskId(task.blocked_by_task_id);
+    } else {
+      setDependencyType('none');
+      setDependencyTaskId('');
+    }
   }, [task]);
+
+  useEffect(() => {
+    const textarea = titleInputRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [titleDraft]);
 
   useEffect(() => {
     if (!highlightedCommentId) return;
@@ -189,11 +241,11 @@ export default function ProjectTaskDetail({
         return `changed priority from ${priorityLabel(activity.old_value)} to ${priorityLabel(activity.new_value)}`;
       case 'due_date_changed':
         if (!activity.old_value && activity.new_value) {
-          return `set due date to ${new Date(activity.new_value).toLocaleDateString()}`;
+          return `set due date to ${formatDateOnly(activity.new_value)}`;
         } else if (activity.old_value && !activity.new_value) {
           return 'removed the due date';
         }
-        return `changed due date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`;
+        return `changed due date from ${formatDateOnly(activity.old_value)} to ${formatDateOnly(activity.new_value)}`;
       case 'assigned':
       case 'unassigned':
         if (activity.action_type === 'unassigned') {
@@ -247,7 +299,7 @@ export default function ProjectTaskDetail({
     }
   };
 
-  const handleTitleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTitleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       handleTitleSave();
@@ -299,6 +351,38 @@ export default function ProjectTaskDetail({
     }
   };
 
+  const handleDependencyTypeChange = async (type: 'blocks' | 'blocked_by' | 'none') => {
+    setDependencyType(type);
+    if (type === 'none') {
+      setDependencyTaskId('');
+      // Clear both dependency fields
+      try {
+        await onUpdate(task.id, {
+          blocks_task_id: null,
+          blocked_by_task_id: null,
+        });
+      } catch (error) {
+        console.error('Error clearing dependency:', error);
+        alert('Failed to clear dependency. Please try again.');
+      }
+    }
+  };
+
+  const handleDependencyTaskChange = async (taskId: string) => {
+    setDependencyTaskId(taskId);
+    try {
+      const updates: Partial<ProjectTask> = {
+        blocks_task_id: dependencyType === 'blocks' ? (taskId || null) : null,
+        blocked_by_task_id: dependencyType === 'blocked_by' ? (taskId || null) : null,
+      };
+      await onUpdate(task.id, updates);
+    } catch (error) {
+      console.error('Error updating dependency:', error);
+      alert('Failed to update dependency. Please try again.');
+      setDependencyTaskId(task.blocks_task_id || task.blocked_by_task_id || '');
+    }
+  };
+
   const handleDescriptionSave = async () => {
     const nextDescription = descriptionDraft.trim();
     setIsSavingDescription(true);
@@ -331,11 +415,15 @@ export default function ProjectTaskDetail({
     }
   };
 
-  const handleCategoryChange = async (categoryId: string) => {
-    const isCurrentlySelected = selectedCategoryIds.includes(categoryId);
-    const newSelectedIds = isCurrentlySelected
-      ? selectedCategoryIds.filter(id => id !== categoryId)
-      : [...selectedCategoryIds, categoryId];
+  const handleCategoryChange = async (categoryId: string | null) => {
+    const previousSelectedIds = selectedCategoryIds;
+    const isNoneOption = !categoryId;
+    const isCurrentlySelected = !isNoneOption && selectedCategoryIds.includes(categoryId);
+    const newSelectedIds = isNoneOption ? [] : isCurrentlySelected ? [] : [categoryId];
+
+    if (isNoneOption && previousSelectedIds.length === 0) {
+      return;
+    }
 
     setSelectedCategoryIds(newSelectedIds);
 
@@ -346,7 +434,7 @@ export default function ProjectTaskDetail({
       console.error('Error updating categories:', error);
       alert('Failed to update categories. Please try again.');
       // Revert on error
-      setSelectedCategoryIds(selectedCategoryIds);
+      setSelectedCategoryIds(previousSelectedIds);
     }
   };
 
@@ -387,8 +475,7 @@ export default function ProjectTaskDetail({
             >
               {task.is_completed && <Check size={14} />}
             </button>
-            <input
-              type="text"
+            <textarea
               className={`${styles.titleInput} ${task.is_completed ? styles.completed : ''}`}
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
@@ -396,6 +483,8 @@ export default function ProjectTaskDetail({
               onKeyDown={handleTitleKeyDown}
               disabled={isSavingTitle}
               placeholder="Task title"
+              rows={1}
+              ref={titleInputRef}
             />
           </div>
         </div>
@@ -544,17 +633,67 @@ export default function ProjectTaskDetail({
                 />
               </div>
 
+              {/* Task Dependencies */}
+              <div className={styles.detailItem}>
+                <div className={styles.detailLabel}>
+                  <CheckSquare size={14} />
+                  Dependency Type
+                </div>
+                <select
+                  className={styles.editSelect}
+                  value={dependencyType}
+                  onChange={(e) => handleDependencyTypeChange(e.target.value as 'blocks' | 'blocked_by' | 'none')}
+                >
+                  <option value="none">None</option>
+                  <option value="blocks">This task blocks...</option>
+                  <option value="blocked_by">This task is blocked by...</option>
+                </select>
+              </div>
+
+              {dependencyType !== 'none' && (
+                <div className={styles.detailItem}>
+                  <div className={styles.detailLabel}>
+                    <CheckSquare size={14} />
+                    {dependencyType === 'blocks' ? 'Task Being Blocked' : 'Blocking Task'}
+                  </div>
+                  <select
+                    className={styles.editSelect}
+                    value={dependencyTaskId}
+                    onChange={(e) => handleDependencyTaskChange(e.target.value)}
+                  >
+                    <option value="">Select a task</option>
+                    {availableTasks
+                      .filter(t => t.id !== task?.id) // Can't block yourself
+                      .map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
               {availableCategories.length > 0 && (
                 <div className={`${styles.detailItem} ${styles.detailItemFullWidth}`}>
                   <div className={styles.detailLabel}>
                     <Tag size={14} />
-                    Categories
+                    Category
                   </div>
                   <div className={styles.categorySelector}>
+                    <label className={styles.categoryCheckbox}>
+                      <input
+                        type="radio"
+                        name={`task-category-${task?.id ?? 'task'}`}
+                        checked={selectedCategoryIds.length === 0}
+                        onChange={() => handleCategoryChange(null)}
+                      />
+                      <span className={styles.categoryLabel}>No Category</span>
+                    </label>
                     {availableCategories.map((category) => (
                       <label key={category.id} className={styles.categoryCheckbox}>
                         <input
-                          type="checkbox"
+                          type="radio"
+                          name={`task-category-${task?.id ?? 'task'}`}
                           checked={selectedCategoryIds.includes(category.id)}
                           onChange={() => handleCategoryChange(category.id)}
                         />

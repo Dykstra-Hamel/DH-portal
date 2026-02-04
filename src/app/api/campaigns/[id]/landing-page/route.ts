@@ -18,14 +18,18 @@ export async function GET(
     const { id: campaignId } = await params;
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customerId');
+    const preview = searchParams.get('preview'); // Check for preview mode
 
     // Check if this is an authenticated admin request (for editing) or public request (for viewing)
     const authSupabase = await createClient();
     const { data: { user } } = await authSupabase.auth.getUser();
-    const isAdminRequest = !!user && (!customerId || customerId === 'preview');
 
-    // For public requests, customerId is required
-    if (!isAdminRequest && !customerId) {
+    // Preview mode: can be accessed by anyone (authenticated or not) when preview=true
+    const isPreviewMode = customerId === 'preview' || preview === 'true';
+    const isAdminRequest = !!user && (!customerId || isPreviewMode);
+
+    // For public requests (non-preview, non-admin), customerId is required
+    if (!isAdminRequest && !customerId && !isPreviewMode) {
       return NextResponse.json(
         { success: false, error: 'Customer ID is required' },
         { status: 400 }
@@ -98,12 +102,12 @@ export async function GET(
       );
     }
 
-    // Fetch customer with service address (or use mock data for admin requests)
+    // Fetch customer with service address (or use mock data for preview mode)
     let customer;
-    if (isAdminRequest) {
-      // For admin requests, provide mock customer data for preview purposes
+    if (isPreviewMode) {
+      // For preview mode, provide mock customer data regardless of authentication
       customer = {
-        id: 'admin-preview',
+        id: 'preview',
         first_name: 'John',
         last_name: 'Doe',
         email: 'customer@example.com',

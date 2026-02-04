@@ -9,12 +9,14 @@
   overflow-y: visible;
   padding-bottom: 16px;
 
-  &.statusView {
+  &.statusView,
+  &.departmentView {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
 }
 
+.scrollArrow,
 .statusScrollArrow {
   position: absolute;
   right: -50px;
@@ -47,6 +49,7 @@
   }
 }
 
+.scrollArrowLeft,
 .statusScrollArrowLeft {
   right: auto;
   left: -50px;
@@ -58,7 +61,8 @@
   width: 100%;
   max-width: 100%;
 
-  &.statusView {
+  &.statusView,
+  &.departmentView {
     width: auto;
     min-width: 100%;
   }
@@ -71,9 +75,14 @@
   flex: 1;
   min-width: 0; // Allow flex shrinking
 
-  &.statusView {
-    flex: 0 0 315px; // Fixed width for status columns
+  &.statusView,
+  &.departmentView {
+    flex: 0 0 315px; // Fixed width for status/department columns
     min-width: 315px;
+  }
+
+  &.unassignedColumn {
+    opacity: 0.85;
   }
 }
 
@@ -86,11 +95,19 @@
 }
 
 .columnTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--UI-Gray-800, #252c37);
   font-family: 'Satoshi Variable', var(--font-satoshi);
   font-size: 16px;
   font-weight: 700;
   line-height: 125%;
+}
+
+.columnIcon {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .columnCount {
@@ -117,26 +134,60 @@
   border: 1px solid var(--UI-Gray-200, #e5e7eb);
 }
 
-.statusColumn {
-  background: var(--UI-Gray-100, #f3f4f6);
-  border: 1px solid var(--UI-Gray-200, #e5e7eb);
+.statusColumn,
+.departmentColumn {
+  // Transparent background for status/department columns
 }
 
 .columnContent {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: 14px;
+  padding: 12px 4px 12px 12px;
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
   min-height: 200px;
   max-height: calc(100vh - 350px);
   -webkit-overflow-scrolling: touch;
 }
 
-// Override: Status view columns should all have equal padding
-.kanbanColumnWrapper.statusView .columnContent {
-  padding: 12px;
+.columnContent::-webkit-scrollbar {
+  width: 1px;
+}
+
+.kanbanColumnWrapper:hover .columnContent::-webkit-scrollbar,
+.kanbanColumnWrapper:focus-within .columnContent::-webkit-scrollbar {
+  width: 1px;
+}
+
+.columnContent::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.kanbanColumnWrapper:hover .columnContent::-webkit-scrollbar-thumb,
+.kanbanColumnWrapper:focus-within .columnContent::-webkit-scrollbar-thumb {
+  background: var(--gray-300, #d1d5db);
+  border-radius: 999px;
+}
+
+.kanbanColumnWrapper:hover .columnContent::-webkit-scrollbar-track,
+.kanbanColumnWrapper:focus-within .columnContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kanbanColumnWrapper:hover .columnContent,
+.kanbanColumnWrapper:focus-within .columnContent {
+  scrollbar-color: var(--gray-300, #d1d5db) transparent;
+}
+
+// Override: Status/Department view columns should all have equal padding
+.kanbanColumnWrapper.statusView .columnContent,
+.kanbanColumnWrapper.departmentView .columnContent {
+  padding: 10px 0;
 }
 
 .draggableProject {
@@ -152,10 +203,6 @@
     &:active {
       cursor: grabbing;
     }
-  }
-
-  &:hover {
-    opacity: 0.95;
   }
 
   &.dragging {
@@ -199,7 +246,6 @@
   flex-direction: column;
   gap: 4px;
   transition: all 0.2s ease;
-  overflow: hidden;
 
   &:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -259,86 +305,60 @@
   // Card with unread mentions - blue border
   &.hasMentionBorder {
     border-color: var(--action-500, #0080f0);
-    border-width: 1px;
+    border-width: 2px;
   }
 }
 
-// Card Top Row (Date + Company)
-.cardTopRow {
+.newCommentBadge {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  transform: translateY(-50%);
+  background: white;
+  color: var(--action-500, #0080f0);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+  padding: 0 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+// Card Header Wrapper (Left: Star/Shortcode/Name, Right: Company Logo)
+.cardHeaderWrapper {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
+  gap: 12px;
   font-family: 'Satoshi Variable', var(--font-satoshi);
 }
 
-.dateSection {
+.cardHeaderLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0; // Allow text truncation
+}
+
+.cardHeaderRight {
+  display: flex;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+// Card Header Row (Star + Shortcode)
+.cardHeaderRow {
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: var(--gray-950, #0c0e12);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 16px;
-
-  svg {
-    width: 14px;
-    height: 14px;
-    color: var(--gray-950, #0c0e12);
-  }
+  gap: 5px;
 }
 
-.overdueDate {
-  color: var(--error-600, #e7000b);
-
-  svg {
-    color: var(--error-600, #e7000b);
-  }
-}
-
-.companySection {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--gray-400, #99a1af);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 16px;
-
-  svg {
-    width: 14px;
-    height: 14px;
-    color: var(--gray-400, #99a1af);
-  }
-}
-
-// Project Meta Row (Code + Category)
-.projectMeta {
-  display: flex;
-  align-items: center;
-  font-family: 'Satoshi Variable', var(--font-satoshi);
-}
-
-.projectCode {
+.projectShortcode {
   font-size: 12px;
   font-weight: 600;
   color: var(--gray-950, #0c0e12);
-  line-height: 16px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.metaDash {
-  color: var(--gray-500, #6b7280);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.projectType {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--gray-500, #6b7280);
   line-height: 16px;
 }
 
@@ -376,28 +396,29 @@
   overflow: hidden;
 }
 
-// Card Metrics Row
-.cardMetrics {
+// Card Info Row (Comments, Task Completion, Avatar, Due Date)
+.cardInfoRow {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding-top: 4px;
+  gap: 10px;
+  padding-top: 8px;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
 }
 
-.metricItem {
+.infoItem {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 12px;
   color: var(--gray-400, #99a1af);
-  font-family: 'Satoshi Variable', var(--font-satoshi);
   font-weight: 500;
   line-height: 16px;
 
   svg {
-    width: 14px;
-    height: 14px;
+    width: 17px;
+    height: 16px;
     color: var(--gray-400, #99a1af);
+    flex-shrink: 0;
   }
 
   &.hasMention {
@@ -421,110 +442,232 @@
   }
 }
 
-// Progress Section
-.progressSection {
-  --kanban-progress-width: 190px;
+.assigneeInfo {
   display: flex;
-  flex-direction: column;
-  padding-top: 4px;
+  align-items: center;
+  gap: 6px;
 }
 
-.progressHeader {
+.assigneeName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-950, #0c0e12);
+  line-height: 16px;
+}
+
+.unassignedAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--gray-300, #d1d5db);
+  color: var(--gray-600, #4b5563);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+// Due Date (in info row)
+.dueDate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gray-950, #0c0e12);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  margin-left: auto;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: var(--gray-400, #99a1af);
+  }
+}
+
+.overdueDate {
+  color: var(--error-600, #e7000b);
+
+  svg {
+    color: var(--error-600, #e7000b);
+  }
+}
+
+// Row 5: Members + Separator
+.cardMembersRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  padding-top: 8px;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
 }
 
-.progressLabelWithStar {
+.membersCount {
+  color: var(--gray-400, #99a1af);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.separator {
+  position: relative;
+  top: 4px;
+  flex: 1;
+  height: 1px;
+  background: #D1D5DB;
+}
+
+.clientVisibleBadge {
+  color: var(--gray-400, #99a1af);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+// Row 6: Status + Total Tasks + Fraction
+.cardStatusRow {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 0 0 var(--kanban-progress-width);
-  width: var(--kanban-progress-width);
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
 }
 
-.progressFraction {
+.statusInfo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+
+  svg {
+    width: 17px;
+    height: 16px;
+    color: currentColor;
+  }
+
+  &.statusInfoClickable {
+    cursor: pointer;
+    padding: 4px 8px;
+    margin: -4px -8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+  }
+}
+
+.statusText {
   font-size: 12px;
   font-weight: 600;
-  color: var(--gray-950, #0c0e12);
-  font-family: 'Satoshi Variable', var(--font-satoshi);
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-left: -25px;
+  line-height: 16px;
+  color: inherit;
 }
 
-.externalBadgeInHeader {
-  display: inline-flex;
+.statusDropdown {
+  position: fixed;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  min-width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.statusOption {
+  display: flex;
   align-items: center;
-  padding: 2px 6px;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 500;
-  font-family: 'Satoshi Variable', var(--font-satoshi);
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  white-space: nowrap;
+  color: var(--gray-900);
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--gray-100);
+  }
+
+  &.active {
+    background-color: var(--action-50, #eff6ff);
+    color: var(--action-600, #0284c7);
+    font-weight: 600;
+  }
+}
+
+.statusColorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   flex-shrink: 0;
+}
+
+.totalTasksInfo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-left: auto;
 }
 
-.externalBadgeInTopRow {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  font-family: 'Satoshi Variable', var(--font-satoshi);
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-left: 6px;
-}
-
-.progressLabel {
+.totalTasksLabel {
   font-size: 12px;
   font-weight: 500;
-  color: var(--gray-950, #0c0e12);
-  font-family: 'Satoshi Variable', var(--font-satoshi);
+  color: var(--gray-400, #99a1af);
+  line-height: 16px;
 }
 
-.progressBarContainer {
-  flex: 0 0 var(--kanban-progress-width);
-  width: var(--kanban-progress-width);
-  height: 4px;
-  background: #e5e7eb;
-  border-radius: 2px;
+.tasksFraction {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-950, #0c0e12);
+  line-height: 16px;
+}
+
+// Row 7: Progress Bar
+.cardProgressRow {
+  display: flex;
+  width: 100%;
+  padding-top: 6px;
+}
+
+.progressBarWithPercentage {
+  position: relative;
+  width: 100%;
+  height: 13px;
+  background: var(--gray-200, #e5e7eb);
+  border-radius: 10px;
   overflow: hidden;
 }
 
-.progressBarFill {
+.progressBar {
+  position: relative;
   height: 100%;
-  background: #05b62e;
-  border-radius: 2px;
+  border-radius: 10px;
   transition: width 0.3s ease;
-}
-
-.progressBarRow {
+  min-width: 30px; // Ensure enough space for percentage text
   display: flex;
   align-items: center;
-  width: 100%;
-  gap: 6px;
+  justify-content: flex-end;
+  padding-right: 6px;
 }
 
-.statusBadge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: auto;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 9px;
+.percentageText {
+  font-size: 10px;
   font-weight: 600;
-  font-family: 'Satoshi Variable', var(--font-satoshi);
+  color: white;
+  line-height: 1;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .emptyColumn {
@@ -539,37 +682,11 @@
   font-family: var(--font-satoshi);
 }
 
-// Add Task Button - OUTSIDE the column container
-.addTaskButton {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  width: 100%;
-  margin-top: 12px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: var(--gray-400, #99a1af);
-  font-family: 'Satoshi Variable', var(--font-satoshi);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 0.2s ease;
-
-  svg {
-    width: 14px;
-    height: 14px;
-    color: var(--gray-400);
-  }
-
-  &:hover {
-    color: var(--action-500);
-
-    svg {
-      color: var(--action-500);
-    }
-  }
+.emptyDropIndicator {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--action-500, #3b82f6);
+  margin: 6px 0 12px;
 }
 
 .scrollGradient {
@@ -614,5 +731,21 @@
 
   .projectName {
     font-size: 13px;
+  }
+
+  .cardInfoRow {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cardStatusRow {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .totalTasksInfo {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
   }
 }

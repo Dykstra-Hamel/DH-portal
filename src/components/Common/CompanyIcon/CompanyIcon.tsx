@@ -99,7 +99,8 @@ export function CompanyIcon({
               alt={companyName}
               className={styles.iconImage}
               onError={handleImageError}
-              fill
+              width={pixelSize}
+              height={pixelSize}
               loading="lazy"
             />
           ) : (

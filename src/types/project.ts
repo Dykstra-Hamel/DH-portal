@@ -12,6 +12,18 @@ export interface ProjectCategory {
   updated_at: string;
 }
 
+// Project Department Types
+export interface ProjectDepartment {
+  id: string;
+  name: string;
+  icon: string | null;
+  company_id: string | null;
+  sort_order: number;
+  is_system_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Project Type Subtypes (related to project types, not categories)
 export interface ProjectTypeSubtype {
   id: string;
@@ -48,6 +60,23 @@ export const PROJECT_TYPE_CODES: Record<ProjectTypeCode, { label: string; descri
   ADS: { label: 'Paid Ad Designs', description: 'Google, Bing, Yelp, YouTube ads' },
 };
 
+export interface ProjectMember {
+  id: string;
+  project_id: string;
+  user_id: string;
+  added_via: 'manual' | 'task_assignment' | 'project_assignment';
+  added_by: string | null;
+  created_at: string;
+  updated_at: string;
+  user_profile?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    avatar_url?: string | null;
+  };
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -56,7 +85,7 @@ export interface Project {
   project_subtype: string | null; // Existing specific subcategory
   type_code?: ProjectTypeCode; // NEW: Type code for shortcode generation
   shortcode?: string; // NEW: Auto-generated shortcode (read-only)
-  status: 'in_progress' | 'blocked' | 'on_hold' | 'pending_approval' | 'out_to_client' | 'ready_to_print' | 'printing' | 'bill_client' | 'complete';
+  status: 'new' | 'in_progress' | 'on_hold' | 'internal_review' | 'out_to_client' | 'ready_to_print' | 'printing' | 'bill_client' | 'complete';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   due_date: string;
   start_date: string | null;
@@ -108,6 +137,9 @@ export interface Project {
   activity?: ProjectActivity[];
   categories?: ProjectCategoryAssignment[]; // Many-to-many relationship
   is_starred?: boolean; // Whether the current user has starred this project
+  members?: ProjectMember[]; // Project members
+  current_department_id: string | null;
+  current_department?: ProjectDepartment; // For joins
 }
 
 export interface ProjectFormData {
@@ -130,6 +162,7 @@ export interface ProjectFormData {
   notes: string;
   scope?: ProjectScope; // internal, external, or both
   category_ids: string[]; // Array of category IDs for many-to-many relationship
+  current_department_id?: string; // Optional department ID
 }
 
 export interface User {
@@ -157,15 +190,15 @@ export interface ProjectFilters {
 }
 
 export const statusOptions = [
-  { value: 'in_progress', label: 'In Progress', color: '#3b82f6' },
-  { value: 'blocked', label: 'Blocked', color: '#ef4444' },
-  { value: 'on_hold', label: 'On Hold', color: '#f97316' },
-  { value: 'pending_approval', label: 'Pending Approval', color: '#eab308' },
+  { value: 'new', label: 'New', color: '#3b82f6' }, // Blue (was In Progress color)
+  { value: 'in_progress', label: 'In Progress', color: '#05B62E' }, // Custom green
+  { value: 'on_hold', label: 'On Hold', color: '#ef4444' }, // Red (was Blocked color)
+  { value: 'internal_review', label: 'Internal Review', color: '#eab308' }, // Yellow (was Pending Approval color)
   { value: 'out_to_client', label: 'Out To Client', color: '#8b5cf6' },
   { value: 'ready_to_print', label: 'Ready To Print', color: '#06b6d4', requiresCategory: 'Print' },
   { value: 'printing', label: 'Printing', color: '#0891b2', requiresCategory: 'Print' },
   { value: 'bill_client', label: 'Bill Client', color: '#059669', requiresBillable: true },
-  { value: 'complete', label: 'Complete', color: '#10b981' },
+  { value: 'complete', label: 'Complete', color: '#99a1af' }, // Gray (icon color from project cards)
 ];
 
 export const projectTypeOptions = [
@@ -236,9 +269,9 @@ export interface ProjectTask {
   progress_percentage: number;
   actual_hours: number | null;
 
-  // Dependencies & Blockers
-  blocked_by: string[] | null;
-  blocking: string[] | null;
+  // Dependencies & Blockers (one-to-one relationships)
+  blocks_task_id: string | null; // The ONE task this task is blocking
+  blocked_by_task_id: string | null; // The ONE task blocking this task
   blocker_reason: string | null;
 
   // Order & Display
@@ -278,6 +311,21 @@ export interface ProjectTask {
     name: string;
     category_type: CategoryType;
   }>;
+  // Task dependencies (one-to-one, populated by joins)
+  blocking_task?: {
+    id: string;
+    title: string;
+    is_completed: boolean;
+    assigned_to: string | null;
+    due_date: string | null;
+  } | null; // The ONE task this task is blocking
+  blocked_by_task?: {
+    id: string;
+    title: string;
+    is_completed: boolean;
+    assigned_to: string | null;
+    due_date: string | null;
+  } | null; // The ONE task blocking this task
 }
 
 export interface ProjectTaskFormData {
@@ -289,8 +337,12 @@ export interface ProjectTaskFormData {
   due_date: string;
   start_date: string;
   parent_task_id: string;
+  blocks_task_id?: string | null;
+  blocked_by_task_id?: string | null;
+  blocker_reason?: string | null;
   recurring_frequency: string;
   recurring_end_date: string;
+  category_ids?: string[];
 }
 
 export interface ProjectTaskComment {
@@ -410,6 +462,7 @@ export interface ProjectTemplate {
   id: string;
   name: string;
   description: string | null;
+  notes: string | null;
   project_type: string;
   project_subtype: string | null;
   is_active: boolean;
@@ -418,11 +471,14 @@ export interface ProjectTemplate {
   default_scope: ProjectScope;
   default_due_date_offset_days: number;
   default_is_billable?: boolean | null;
+  initial_department_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   tasks?: ProjectTemplateTask[];
   categories?: ProjectCategoryAssignment[];
+  default_members?: Array<{ id: string; user_id: string }>;
+  initial_department?: ProjectDepartment; // For joins
 }
 
 export interface ProjectTemplateTask {
@@ -436,13 +492,21 @@ export interface ProjectTemplateTask {
   display_order: number;
   tags: string[] | null;
   default_assigned_to: string | null;
+  blocks_task_id: string | null;
+  blocked_by_task_id: string | null;
   created_at: string;
   updated_at: string;
+  categories?: Array<{
+    id: string;
+    category_id: string;
+    category?: ProjectCategory;
+  }>;
 }
 
 export interface ProjectTemplateFormData {
   name: string;
   description: string;
+  notes: string;
   project_type: string;
   project_subtype: string;
   is_active: string;
@@ -451,7 +515,9 @@ export interface ProjectTemplateFormData {
   default_scope: string;
   default_due_date_offset_days: string;
   default_is_billable?: string;
+  initial_department_id?: string;
   category_ids?: string[];
+  default_member_ids?: string[];
   tasks: Array<{
     temp_id?: string;
     parent_temp_id?: string | null;
@@ -462,7 +528,16 @@ export interface ProjectTemplateFormData {
     display_order: string;
     tags: string;
     default_assigned_to: string;
+    blocks_task_id?: string | null;
+    blocked_by_task_id?: string | null;
+    category_ids?: string[];
   }>;
+}
+
+// Apply Template Options
+export interface ApplyTemplateOptions {
+  templateId: string;
+  mergeDescription: boolean; // true = append, false = replace
 }
 
 // Recurring Task Types

@@ -9,6 +9,7 @@ import {
   User,
   Company,
   ProjectCategory,
+  ProjectDepartment,
   ProjectTypeSubtype,
   statusOptions,
   priorityOptions,
@@ -54,7 +55,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     requested_by: editingProject?.requested_by_profile?.id || currentUser.id,
     company_id: editingProject?.company?.id || userActiveCompany?.id || '',
     assigned_to: editingProject?.assigned_to_profile?.id || '',
-    status: editingProject?.status || 'in_progress',
+    status: editingProject?.status || 'new',
     priority: editingProject?.priority || 'medium',
     due_date: editingProject?.due_date || '',
     start_date: editingProject?.start_date || '',
@@ -65,11 +66,13 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     notes: editingProject?.notes || '',
     scope: editingProject?.scope || 'internal', // Project scope field
     category_ids: editingProject?.categories?.map(c => c.category_id) || [],
+    current_department_id: editingProject?.current_department_id || '',
   });
 
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
   const [isFetchingCategories, setIsFetchingCategories] = useState(false);
+  const [availableDepartments, setAvailableDepartments] = useState<ProjectDepartment[]>([]);
+  const [isFetchingDepartments, setIsFetchingDepartments] = useState(false);
   const [availableSubtypes, setAvailableSubtypes] = useState<ProjectTypeSubtype[]>([]);
   const [isFetchingSubtypes, setIsFetchingSubtypes] = useState(false);
   const [shortcodePreview, setShortcodePreview] = useState<string>('');
@@ -142,15 +145,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     );
   }, [companies]);
 
-  const PRESET_PROJECT_TAGS = [
-    'seo', 'social-media', 'content', 'design', 'development',
-    'ppc', 'google-ads', 'facebook-ads', 'email', 'analytics',
-    'branding', 'website', 'blog', 'video', 'photography',
-    'local-seo', 'gmb', 'reviews', 'reporting', 'strategy',
-    'print', 'digital', 'billboard', 'business-cards',
-    'door-hangers', 'vehicle-wrap',
-  ];
-
   // Filter status options based on project categories and is_billable
   const availableStatusOptions = useMemo(() => {
     const hasPrintCategory = availableCategories.some(
@@ -196,6 +190,29 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     }
   }, [isOpen, isAdmin]);
 
+  // Fetch available departments
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      setIsFetchingDepartments(true);
+      try {
+        const endpoint = '/api/admin/project-departments';
+        const response = await fetch(endpoint);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableDepartments(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch departments:', error);
+      } finally {
+        setIsFetchingDepartments(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchDepartments();
+    }
+  }, [isOpen]);
+
   // Fetch available subtypes when type_code changes
   useEffect(() => {
     const fetchSubtypes = async () => {
@@ -238,7 +255,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         requested_by: editingProject.requested_by_profile?.id || currentUser.id,
         company_id: editingProject.company?.id || userActiveCompany?.id || '',
         assigned_to: editingProject.assigned_to_profile?.id || '',
-        status: editingProject.status || 'in_progress',
+        status: editingProject.status || 'new',
         priority: editingProject.priority || 'medium',
         due_date: editingProject.due_date || '',
         start_date: editingProject.start_date || '',
@@ -249,9 +266,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         notes: editingProject.notes || '',
         scope: editingProject.scope || 'internal', // Project scope field
         category_ids: editingProject.categories?.map(c => c.category_id) || [],
+        current_department_id: editingProject.current_department_id || '',
       });
-      // Set selected tags from editing project
-      setSelectedTags(editingProject.tags || []);
     } else {
       // Reset form for new project
       setFormData({
@@ -263,7 +279,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         requested_by: currentUser.id,
         company_id: userActiveCompany?.id || '',
         assigned_to: '',
-        status: 'in_progress',
+        status: 'new',
         priority: 'medium',
         due_date: '',
         start_date: '',
@@ -274,8 +290,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         notes: '',
         scope: 'internal',
         category_ids: [],
+        current_department_id: '',
       });
-      setSelectedTags([]);
       setShowRequestedBySelect(false);
     }
   }, [editingProject, currentUser.id, userActiveCompany?.id]);
@@ -340,6 +356,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate department is selected for full mode
+    if (mode === 'full' && !formData.current_department_id) {
+      alert('Please select an initial department for this project.');
+      return;
+    }
+
     // Note: Company short_code validation is handled by the API/database
     // The database trigger will auto-generate the shortcode if type_code is provided
 
@@ -347,7 +369,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       setIsSubmitting(true);
       const submitData = {
         ...formData,
-        tags: selectedTags.join(', '), // Convert tags array to comma-separated string
         type_code: formData.type_code || undefined, // Include type_code if set
       };
       await onSubmit(submitData);
@@ -356,14 +377,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       console.error('Error submitting form:', error);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleToggleTag = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter(t => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
     }
   };
 
@@ -391,7 +404,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       requested_by: currentUser.id,
       company_id: userActiveCompany?.id || '',
       assigned_to: '',
-      status: 'in_progress',
+      status: 'new',
       priority: 'medium',
       due_date: '',
       start_date: '',
@@ -403,7 +416,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       scope: 'internal',
       category_ids: [],
     });
-    setSelectedTags([]);
     setShowRequestedBySelect(false);
     setShortcodePreview('');
     onClose();
@@ -575,6 +587,34 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               </div>
             )}
 
+            {/* Department Selector */}
+            {mode === 'full' && availableDepartments.length > 0 && (
+              <div className={styles.formGroup}>
+                <label>
+                  Initial Department <span style={{ color: 'red' }}>*</span>
+                </label>
+                <select
+                  value={formData.current_department_id || ''}
+                  onChange={e =>
+                    setFormData({ ...formData, current_department_id: e.target.value })
+                  }
+                  required
+                >
+                  <option value="">Select a department</option>
+                  {availableDepartments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.icon ? `${department.icon} ` : ''}{department.name}
+                    </option>
+                  ))}
+                </select>
+                {isFetchingDepartments && (
+                  <p style={{ fontSize: '13px', color: 'var(--gray-500)', margin: '8px 0 0 0' }}>
+                    Loading departments...
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Requested By */}
             {isAdmin && mode === 'full' ? (
               <div className={styles.formGroup}>
@@ -652,6 +692,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                     onChange={e =>
                       setFormData({ ...formData, status: e.target.value })
                     }
+                    disabled
+                    style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
                   >
                     {availableStatusOptions.map(status => (
                       <option key={status.value} value={status.value}>
@@ -774,25 +816,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               placeholder="Add a project description..."
               className={styles.richTextField}
             />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Tags</label>
-            <div className={styles.presetTagsContainer}>
-              {PRESET_PROJECT_TAGS.map((tag) => {
-                const isSelected = selectedTags.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    className={`${styles.presetTag} ${isSelected ? styles.selected : ''}`}
-                    onClick={() => handleToggleTag(tag)}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {mode === 'full' && (

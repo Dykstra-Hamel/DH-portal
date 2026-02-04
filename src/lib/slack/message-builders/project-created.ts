@@ -1,5 +1,19 @@
 import { ProjectNotificationData } from '../types';
 
+// Strip HTML tags from text
+const stripHtml = (html: string): string => {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 export function buildProjectCreatedMessage(
   projectData: ProjectNotificationData
 ): {
@@ -15,11 +29,15 @@ export function buildProjectCreatedMessage(
 
   const fallbackText = `New project request: ${projectData.projectName} (${projectData.priority} priority)`;
 
-  // Truncate description to avoid text limits
-  const description = projectData.description
-    ? projectData.description.length > 200
-      ? `${projectData.description.substring(0, 200)}...`
-      : projectData.description
+  // Strip HTML and truncate description to avoid text limits
+  const cleanDescription = projectData.description
+    ? stripHtml(projectData.description)
+    : '';
+
+  const description = cleanDescription
+    ? cleanDescription.length > 200
+      ? `${cleanDescription.substring(0, 200)}...`
+      : cleanDescription
     : '_No description provided_';
 
   const blocks: any[] = [
