@@ -778,17 +778,34 @@ export function TaskListView({
   };
 
   // Render a single task row
-  const renderTaskRow = (task: Task, actionsMode: 'full' | 'star-only' = 'full') => {
+  const renderTaskRow = (
+    task: Task,
+    options: { actionsMode?: 'full' | 'star-only'; showToggle?: boolean } = {}
+  ) => {
     const project = getProjectForTask(task.project_id);
     const clientName = project?.company?.name || '—'; // FIXED: Use real company data
     const projectShortcode = project?.shortcode
       ? formatProjectShortcode(project.shortcode)
       : '—';
     const overdue = isOverdue(task.due_date, task.status);
+    const { actionsMode = 'full', showToggle = false } = options;
     const showFullActions = actionsMode === 'full';
 
     return (
       <div key={task.id} className={styles.tableRow} onClick={() => onTaskClick(task)}>
+        {showToggle && (
+          <div className={styles.cell}>
+            <button
+              type="button"
+              className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''}`}
+              onClick={(event) => handleToggleComplete(event, task)}
+              aria-label={task.status === 'completed' ? 'Mark task incomplete' : 'Mark task complete'}
+              disabled={!onToggleComplete}
+            >
+              {task.status === 'completed' && <Check size={12} />}
+            </button>
+          </div>
+        )}
         <div className={styles.cell}>
           <div className={styles.taskTitle}>{task.title}</div>
         </div>
@@ -914,9 +931,7 @@ export function TaskListView({
     return (
       <div className={styles.currentlyWorkingOnSection}>
         <div className={styles.sectionHeaderRow}>
-          <div className={styles.sectionHeaderCenter}>
-            <h2 className={styles.sectionTitle}>Currently Working On</h2>
-          </div>
+          <h2 className={styles.sectionTitle}>Currently Working On</h2>
           <div className={styles.viewToggle}>
             <button
               className={`${styles.toggleButton} ${starredView === 'tasks' ? styles.active : ''}`}
@@ -937,6 +952,7 @@ export function TaskListView({
           {starredView === 'tasks' ? (
             <div className={styles.starredTasksTable}>
               <div className={styles.tableHeader}>
+                <div className={styles.headerCell}></div>
                 <div className={styles.headerCell}>Task Title</div>
                 <div className={styles.headerCell}>Project</div>
                 <div className={styles.headerCell}>Project Code</div>
@@ -951,7 +967,7 @@ export function TaskListView({
                     <p>No starred tasks. Star tasks to see them here.</p>
                   </div>
                 ) : (
-                  starredTasks.map((task) => renderTaskRow(task, 'star-only'))
+                  starredTasks.map((task) => renderTaskRow(task, { actionsMode: 'star-only', showToggle: true }))
                 )}
               </div>
             </div>

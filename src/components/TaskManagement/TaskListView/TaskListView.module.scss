@@ -646,19 +646,14 @@
 }
 
 .sectionHeaderRow {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  justify-content: center;
   align-items: center;
   margin-bottom: 10px;
   flex-wrap: wrap;
   gap: 10px;
   width: 100%;
-}
-
-.sectionHeaderCenter {
-  flex: 1;
-  display: flex;
-  justify-content: center;
 }
 
 .sectionTitle {
@@ -671,6 +666,8 @@
   letter-spacing: 0.08em;
   color: #252c37;
   margin: 0;
+  grid-column: 2;
+  justify-self: center;
 
   svg {
     color: #fbbf24;
@@ -683,6 +680,8 @@
   background: #f3f4f6;
   padding: 2px;
   border-radius: 999px;
+  grid-column: 3;
+  justify-self: end;
 }
 
 .toggleButton {
@@ -737,7 +736,7 @@
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
-  --starred-columns: 2fr 1.2fr 0.9fr 1.2fr 0.9fr 0.9fr 64px;
+  --starred-columns: 32px 2fr 1.2fr 0.9fr 1.2fr 0.9fr 0.9fr 64px;
 }
 
 .starredTasksTable .tableHeader,
@@ -745,8 +744,16 @@
   grid-template-columns: var(--starred-columns);
 }
 
+.starredTasksTable .headerCell:first-child {
+  text-align: center;
+}
+
 .starredTasksTable .headerCell:last-child {
   text-align: center;
+}
+
+.starredTasksTable .cell:first-child {
+  justify-content: center;
 }
 
 .starredTasksTable .cell:last-child {
@@ -1227,7 +1234,7 @@
   }
 
   .starredTasksTable {
-    --starred-columns: 2fr 1fr 1fr 0.9fr 0.9fr 0.8fr 56px;
+    --starred-columns: 28px 2fr 1fr 1fr 0.9fr 0.9fr 0.8fr 56px;
   }
 }
 

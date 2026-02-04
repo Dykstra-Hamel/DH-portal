@@ -4,12 +4,12 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
-import { ArrowLeft, Check, ChevronDown, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
-import { Project, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
+import { Project, ProjectAttachment, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
@@ -102,8 +102,8 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [commentAvatarError, setCommentAvatarError] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
-  const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const dragCounterRef = React.useRef(0);
+  const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
+  const commentComposerDragCounterRef = React.useRef(0);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
@@ -123,6 +123,10 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [highlightedTaskCommentId, setHighlightedTaskCommentId] = useState<string | null>(null);
   const highlightTimeoutRef = React.useRef<number | null>(null);
   const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
+  const [projectAttachments, setProjectAttachments] = useState<ProjectAttachment[]>(project.attachments || []);
+  const [uploadingProjectAttachment, setUploadingProjectAttachment] = useState(false);
+  const [isDraggingProjectFile, setIsDraggingProjectFile] = useState(false);
+  const projectDragCounterRef = React.useRef(0);
   const router = useRouter();
   const searchParams = useSearchParams();
   const processedCommentRef = React.useRef<string | null>(null);
@@ -989,34 +993,35 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     setPendingAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
+  // Comment composer drag and drop handlers
+  const handleCommentComposerDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    dragCounterRef.current++;
+    commentComposerDragCounterRef.current++;
     if (e.dataTransfer.types.includes('Files')) {
-      setIsDraggingFile(true);
+      setIsDraggingOverCommentComposer(true);
     }
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleCommentComposerDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
-      setIsDraggingFile(false);
+    commentComposerDragCounterRef.current--;
+    if (commentComposerDragCounterRef.current === 0) {
+      setIsDraggingOverCommentComposer(false);
     }
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleCommentComposerDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleCommentComposerDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    dragCounterRef.current = 0;
-    setIsDraggingFile(false);
+    commentComposerDragCounterRef.current = 0;
+    setIsDraggingOverCommentComposer(false);
 
     // Allowed file types for attachments
     const allowedTypes = [
@@ -1055,7 +1060,6 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
   // Convert users to mention format for RichTextEditor
   const mentionUsers = useMemo(() => {
-    console.log('Converting users for mentions, raw users:', users);
     const converted = users.map(u => ({
       id: u.profiles?.id || u.id,
       first_name: u.profiles?.first_name || null,
@@ -1063,7 +1067,6 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       email: u.profiles?.email || u.email || null,
       avatar_url: u.profiles?.avatar_url || null,
     }));
-    console.log('Converted mentionUsers:', converted);
     return converted;
   }, [users]);
 
@@ -1205,39 +1208,174 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     }
   }, [editingCommentId, project.id]);
 
+  // Project Attachments Handlers
+  const canEditProject = useMemo(() => {
+    const profile = user as any;
+    return (
+      profile?.is_admin ||
+      project.requested_by_profile?.id === user.id ||
+      project.assigned_to_profile?.id === user.id ||
+      project.members?.some((m: { user_id: string }) => m.user_id === user.id)
+    );
+  }, [user, project]);
+
+
+  const handleProjectFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingProjectAttachment(true);
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          let errorMessage = 'Failed to upload attachment';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            // If response is not JSON, use status text
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+      }
+
+      // Fetch fresh attachments from server
+      const attachmentsResponse = await fetch(`/api/admin/projects/${project.id}/attachments`);
+      if (attachmentsResponse.ok) {
+        const { attachments } = await attachmentsResponse.json();
+        setProjectAttachments(attachments);
+      }
+
+      setToastMessage(`${files.length} file(s) uploaded successfully.`);
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error uploading attachment:', error);
+      setToastMessage(error instanceof Error ? error.message : 'Failed to upload file(s).');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setUploadingProjectAttachment(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  }, [project.id, onProjectUpdate]);
+
+  const handleDeleteProjectAttachment = useCallback(async (attachmentId: string) => {
+    if (!confirm('Are you sure you want to delete this attachment?')) return;
+
+    try {
+      const response = await fetch(
+        `/api/admin/projects/${project.id}/attachments?id=${attachmentId}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete attachment');
+      }
+
+      setProjectAttachments(prev => prev.filter(a => a.id !== attachmentId));
+      setToastMessage('Attachment deleted.');
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error deleting attachment:', error);
+      setToastMessage('Failed to delete attachment.');
+      setToastType('error');
+      setShowToast(true);
+    }
+  }, [project.id, onProjectUpdate]);
+
+  const handleProjectDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    projectDragCounterRef.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingProjectFile(true);
+    }
+  }, []);
+
+  const handleProjectDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    projectDragCounterRef.current--;
+    if (projectDragCounterRef.current === 0) {
+      setIsDraggingProjectFile(false);
+    }
+  }, []);
+
+  const handleProjectDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleProjectDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    projectDragCounterRef.current = 0;
+    setIsDraggingProjectFile(false);
+
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length === 0) return;
+
+    setUploadingProjectAttachment(true);
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          let errorMessage = 'Failed to upload attachment';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            // If response is not JSON, use status text
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+      }
+
+      // Fetch fresh attachments from server
+      const attachmentsResponse = await fetch(`/api/admin/projects/${project.id}/attachments`);
+      if (attachmentsResponse.ok) {
+        const { attachments } = await attachmentsResponse.json();
+        setProjectAttachments(attachments);
+      }
+
+      setToastMessage(`${files.length} file(s) uploaded successfully.`);
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error uploading attachment:', error);
+      setToastMessage(error instanceof Error ? error.message : 'Failed to upload file(s).');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setUploadingProjectAttachment(false);
+    }
+  }, [project.id, onProjectUpdate]);
+
   return (
-    <div
-      className={styles.container}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      {/* File Drop Zone Overlay */}
-      {isDraggingFile && (
-        <div className={styles.dropZoneOverlay}>
-          <div className={styles.dropZoneContent}>
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <path
-                d="M24 32V16M24 16L18 22M24 16L30 22"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M40 32V38C40 39.0609 39.5786 40.0783 38.8284 40.8284C38.0783 41.5786 37.0609 42 36 42H12C10.9391 42 9.92172 41.5786 9.17157 40.8284C8.42143 40.0783 8 39.0609 8 38V32"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className={styles.dropZoneText}>Drop files to attach to comment</span>
-            <span className={styles.dropZoneSubtext}>Images (JPEG, PNG, WebP) and documents (PDF, Word, Excel)</span>
-          </div>
-        </div>
-      )}
+    <div className={styles.container}>
 
       <Toast
         message={toastMessage}
@@ -1370,6 +1508,101 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                 <button onClick={clearError}>×</button>
               </div>
             )}
+
+            {/* Project Attachments Section */}
+            <div
+              className={styles.projectAttachments}
+              onDragEnter={handleProjectDragEnter}
+              onDragLeave={handleProjectDragLeave}
+              onDragOver={handleProjectDragOver}
+              onDrop={handleProjectDrop}
+            >
+              {canEditProject && (
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleProjectFileSelect}
+                  disabled={uploadingProjectAttachment}
+                  style={{ display: 'none' }}
+                  id="project-file-input"
+                />
+              )}
+
+              {(projectAttachments.length > 0 || canEditProject) && (
+                <div className={styles.attachmentsGrid}>
+                  {projectAttachments.map((attachment) => {
+                    const isImage = attachment.mime_type.startsWith('image/');
+
+                    return (
+                      <div key={attachment.id} className={styles.attachmentItem}>
+                        {isImage ? (
+                          <div className={styles.imageWrapper}>
+                            <img
+                              src={`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`}
+                              alt={attachment.file_name}
+                              loading="lazy"
+                            />
+                            {canEditProject && (
+                              <button
+                                className={styles.deleteImageButton}
+                                onClick={() => handleDeleteProjectAttachment(attachment.id)}
+                                aria-label="Delete attachment"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <a
+                            href={`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`}
+                            download={attachment.file_name}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.documentWrapper}
+                          >
+                            <div className={styles.documentIcon}>
+                              <FileText size={48} />
+                            </div>
+                            {canEditProject && (
+                              <button
+                                className={styles.deleteImageButton}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleDeleteProjectAttachment(attachment.id);
+                                }}
+                                aria-label="Delete attachment"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </a>
+                        )}
+                        <span className={styles.attachmentFileName}>{attachment.file_name}</span>
+                      </div>
+                    );
+                  })}
+
+                  {canEditProject && (
+                    <div
+                      className={`${styles.attachmentItem} ${styles.addNewBox} ${isDraggingProjectFile ? styles.addNewBoxActive : ''}`}
+                      onClick={() => document.getElementById('project-file-input')?.click()}
+                    >
+                      <div className={styles.addNewContent}>
+                        {uploadingProjectAttachment ? (
+                          <span className={styles.addNewText}>Uploading...</span>
+                        ) : (
+                          <>
+                            <span className={styles.addNewPlus}>+</span>
+                            <span className={styles.addNewText}>Add File</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className={styles.sectionHeader}>
               <button
@@ -1630,7 +1863,14 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                     <div className={styles.commentsEmpty}>No comments yet.</div>
                   )}
 
-                  <form onSubmit={handleSubmitComment} className={styles.commentComposer}>
+                  <form
+                    onSubmit={handleSubmitComment}
+                    className={`${styles.commentComposer} ${isDraggingOverCommentComposer ? styles.commentComposerDragActive : ''}`}
+                    onDragEnter={handleCommentComposerDragEnter}
+                    onDragLeave={handleCommentComposerDragLeave}
+                    onDragOver={handleCommentComposerDragOver}
+                    onDrop={handleCommentComposerDrop}
+                  >
                     {commentAvatarUrl ? (
                       <Image
                         src={commentAvatarUrl}

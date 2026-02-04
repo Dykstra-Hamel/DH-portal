@@ -1,6 +1,6 @@
 -- Create project_departments table
 CREATE TABLE project_departments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   icon TEXT,
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,

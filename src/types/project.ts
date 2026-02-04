@@ -140,6 +140,7 @@ export interface Project {
   members?: ProjectMember[]; // Project members
   current_department_id: string | null;
   current_department?: ProjectDepartment; // For joins
+  attachments?: ProjectAttachment[]; // Project attachments
 }
 
 export interface ProjectFormData {
@@ -415,6 +416,16 @@ export interface ProjectCommentAttachment {
   mime_type: string;
   url: string;
   created_at: string;
+}
+
+export interface ProjectAttachment {
+  id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by: string;
+  uploaded_at: string;
 }
 
 export interface ProjectComment {
