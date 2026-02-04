@@ -4,21 +4,23 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
-import { ArrowLeft, Check, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
-import { Project, ProjectComment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
+import { Project, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
 import { adminAPI } from '@/lib/api-client';
+import { parseDateString } from '@/lib/date-utils';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import ProjectDetail from '../ProjectDetail/ProjectDetail';
 import ProjectTaskList from '../ProjectTaskList/ProjectTaskList';
 import ProjectTaskForm from '../ProjectTaskForm/ProjectTaskForm';
 import ProjectTaskDetail from '../ProjectTaskDetail/ProjectTaskDetail';
+import ApplyTemplateModal from '../ApplyTemplateModal/ApplyTemplateModal';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './ProjectDetailWithTasks.module.scss';
 
@@ -30,7 +32,9 @@ interface ProjectDetailWithTasksProps {
 
 const formatHeaderDate = (value?: string | null) => {
   if (!value) return 'Not set';
-  return new Date(value).toLocaleDateString('en-US', {
+  const parsed = parseDateString(value);
+  if (!parsed) return 'Not set';
+  return parsed.toLocaleDateString('en-US', {
     month: '2-digit',
     day: '2-digit',
     year: '2-digit',
@@ -43,7 +47,8 @@ const getDaysUntilDue = (dueDate: string | null) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const due = new Date(dueDate);
+  const due = parseDateString(dueDate);
+  if (!due) return '';
   due.setHours(0, 0, 0, 0);
 
   const diffTime = due.getTime() - today.getTime();
@@ -66,7 +71,8 @@ const isDueDateOverdue = (dueDate: string | null) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const due = new Date(dueDate);
+  const due = parseDateString(dueDate);
+  if (!due) return false;
   due.setHours(0, 0, 0, 0);
 
   return due < today;
@@ -79,12 +85,13 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
   const [isHeaderStatusOpen, setIsHeaderStatusOpen] = useState(false);
-  const [isHeaderPriorityOpen, setIsHeaderPriorityOpen] = useState(false);
+  const [isHeaderDepartmentOpen, setIsHeaderDepartmentOpen] = useState(false);
   const [isUpdatingHeaderStatus, setIsUpdatingHeaderStatus] = useState(false);
-  const [isUpdatingHeaderPriority, setIsUpdatingHeaderPriority] = useState(false);
+  const [isUpdatingHeaderDepartment, setIsUpdatingHeaderDepartment] = useState(false);
   const headerStatusRef = useRef<HTMLDivElement>(null);
-  const headerPriorityRef = useRef<HTMLDivElement>(null);
+  const headerDepartmentRef = useRef<HTMLDivElement>(null);
   const [users, setUsers] = useState<ProjectUser[]>([]);
+  const [departments, setDepartments] = useState<ProjectDepartment[]>([]);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [comments, setComments] = useState<ProjectComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -115,6 +122,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [highlightedProjectCommentId, setHighlightedProjectCommentId] = useState<string | null>(null);
   const [highlightedTaskCommentId, setHighlightedTaskCommentId] = useState<string | null>(null);
   const highlightTimeoutRef = React.useRef<number | null>(null);
+  const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const processedCommentRef = React.useRef<string | null>(null);
@@ -155,11 +163,16 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     clearError,
   } = useProjectTasks(project.id);
 
-  // Fetch tasks and users on mount
+  // Fetch tasks, users, and departments on mount
   React.useEffect(() => {
     fetchTasks(project.id);
     // Also fetch users for assignment
     adminAPI.getUsers().then(data => setUsers(data || [])).catch(() => {});
+    // Fetch departments
+    fetch('/api/admin/project-departments')
+      .then(res => res.json())
+      .then(data => setDepartments(data || []))
+      .catch(() => {});
   }, [project.id, fetchTasks]);
 
   React.useEffect(() => {
@@ -177,8 +190,8 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       if (headerStatusRef.current && !headerStatusRef.current.contains(event.target as Node)) {
         setIsHeaderStatusOpen(false);
       }
-      if (headerPriorityRef.current && !headerPriorityRef.current.contains(event.target as Node)) {
-        setIsHeaderPriorityOpen(false);
+      if (headerDepartmentRef.current && !headerDepartmentRef.current.contains(event.target as Node)) {
+        setIsHeaderDepartmentOpen(false);
       }
     };
 
@@ -190,9 +203,84 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     return statusOptions.find(option => option.value === project.status)?.label || project.status;
   }, [project.status]);
 
-  const priorityLabel = useMemo(() => {
-    return priorityOptions.find(option => option.value === project.priority)?.label || project.priority;
-  }, [project.priority]);
+  const departmentLabel = useMemo(() => {
+    if (!project.current_department_id) return 'Unassigned';
+    const department = departments.find(d => d.id === project.current_department_id);
+    return department?.name || 'Unassigned';
+  }, [project.current_department_id, departments]);
+
+  const availableTaskCategories = useMemo(() => {
+    return (
+      project.categories
+        ?.map(assignment => assignment.category)
+        .filter((cat): cat is NonNullable<typeof cat> => cat !== null && cat !== undefined) || []
+    );
+  }, [project.categories]);
+
+  const taskGroups = useMemo(() => {
+    if (!tasks || tasks.length === 0) {
+      return { groups: [], otherTasks: [] as ProjectTask[] };
+    }
+
+    const taskById = new Map<string, ProjectTask>();
+    tasks.forEach(task => taskById.set(task.id, task));
+
+    const resolveCategory = (task: ProjectTask) => {
+      let current: ProjectTask | undefined = task;
+      while (current) {
+        const category = current.categories?.[0];
+        if (category) return category;
+        if (!current.parent_task_id) break;
+        current = taskById.get(current.parent_task_id);
+      }
+      return null;
+    };
+
+    const groupsMap = new Map<
+      string,
+      { title: string; tasks: ProjectTask[] }
+    >();
+    const otherTasks: ProjectTask[] = [];
+
+    tasks.forEach(task => {
+      const category = resolveCategory(task);
+      if (!category) {
+        otherTasks.push(task);
+        return;
+      }
+      const key = category.id || category.name;
+      const existing = groupsMap.get(key);
+      if (existing) {
+        existing.tasks.push(task);
+      } else {
+        groupsMap.set(key, { title: category.name, tasks: [task] });
+      }
+    });
+
+    const groups = Array.from(groupsMap.values()).sort((a, b) =>
+      a.title.localeCompare(b.title)
+    );
+
+    return { groups, otherTasks };
+  }, [tasks]);
+
+  const taskSections = useMemo(() => {
+    const sections = taskGroups.groups.map(group => ({
+      key: group.title,
+      title: group.title,
+      tasks: group.tasks,
+    }));
+
+    if (taskGroups.otherTasks.length > 0) {
+      sections.push({
+        key: 'other',
+        title: 'Other Tasks',
+        tasks: taskGroups.otherTasks,
+      });
+    }
+
+    return sections;
+  }, [taskGroups]);
 
   const availableStatusOptions = useMemo(() => {
     const hasPrintCategory =
@@ -202,6 +290,9 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     const isBillable = project.is_billable || false;
 
     return statusOptions.filter(status => {
+      if (status.value === 'new') {
+        return false;
+      }
       if (status.requiresCategory === 'Print' && !hasPrintCategory) {
         return false;
       }
@@ -259,7 +350,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     router.push('/admin/project-management');
   }, [router]);
 
-  const updateProjectFields = useCallback(async (updates: Partial<Project> & { assigned_to?: string | null; requested_by?: string | null }) => {
+  const updateProjectFields = useCallback(async (updates: Partial<Project> & { assigned_to?: string | null; requested_by?: string | null; current_department_id?: string | null }) => {
     const payload: Record<string, any> = {
       name: updates.name ?? project.name,
       description: updates.description ?? project.description,
@@ -281,6 +372,10 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
     if (Object.prototype.hasOwnProperty.call(updates, 'requested_by')) {
       payload.requested_by = updates.requested_by ?? null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'current_department_id')) {
+      payload.current_department_id = updates.current_department_id ?? null;
     }
 
     const response = await fetch(`/api/admin/projects/${project.id}`, {
@@ -322,28 +417,28 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     }
   }, [onProjectUpdate, project.status, updateProjectFields]);
 
-  const handleHeaderPriorityChange = useCallback(async (priority: Project['priority']) => {
-    if (priority === project.priority) {
-      setIsHeaderPriorityOpen(false);
+  const handleHeaderDepartmentChange = useCallback(async (departmentId: string | null) => {
+    if (departmentId === project.current_department_id) {
+      setIsHeaderDepartmentOpen(false);
       return;
     }
-    setIsUpdatingHeaderPriority(true);
-    setIsHeaderPriorityOpen(false);
+    setIsUpdatingHeaderDepartment(true);
+    setIsHeaderDepartmentOpen(false);
     try {
-      await updateProjectFields({ priority });
-      setToastMessage('Project priority updated.');
+      await updateProjectFields({ current_department_id: departmentId });
+      setToastMessage('Project department updated.');
       setToastType('success');
       setShowToast(true);
       onProjectUpdate?.();
     } catch (error) {
-      console.error('Error updating project priority:', error);
-      setToastMessage('Failed to update project priority.');
+      console.error('Error updating project department:', error);
+      setToastMessage('Failed to update project department.');
       setToastType('error');
       setShowToast(true);
     } finally {
-      setIsUpdatingHeaderPriority(false);
+      setIsUpdatingHeaderDepartment(false);
     }
-  }, [onProjectUpdate, project.priority, updateProjectFields]);
+  }, [onProjectUpdate, project.current_department_id, updateProjectFields]);
 
   const handleCompleteProject = useCallback(async () => {
     if (isCompletingProject) return;
@@ -515,20 +610,18 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     const dueDateColor = isOverdue ? '#ef4444' : '#111827';
 
     setPageHeader({
-      title: (
-        <span className={headerStyles.titleContent}>
-          <button
-            type="button"
-            onClick={handleBackToProjects}
-            className={headerStyles.backButton}
-            aria-label="Back to project management"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <span>{headerTitle}</span>
-        </span>
+      title: headerTitle,
+      titleLeading: (
+        <button
+          type="button"
+          onClick={handleBackToProjects}
+          className={headerStyles.backButton}
+          aria-label="Back to project management"
+        >
+          <ArrowLeft size={16} />
+        </button>
       ),
-      description: `<span class="${headerStyles.projectDetailDescription}"><span style="margin-right: 12px; color: ${dueDateColor};">Due Date: ${formatHeaderDate(project.due_date)} ${daysText}</span><span class="${headerStyles.updatedText}">Updated: ${formatHeaderDate(project.updated_at)}</span></span>`,
+      description: `<span style="margin-right: 12px; color: ${dueDateColor};">Due Date: ${formatHeaderDate(project.due_date)} ${daysText}</span><span class="${headerStyles.updatedText}">Updated: ${formatHeaderDate(project.updated_at)}</span>`,
       customActions: (
         <>
           <div className={headerStyles.controlGroup} ref={headerStatusRef}>
@@ -560,35 +653,53 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
               </div>
             )}
           </div>
-          <div className={headerStyles.controlGroup} ref={headerPriorityRef}>
-            <label className={headerStyles.controlLabel}>Priority:</label>
+          <div className={headerStyles.controlGroup} ref={headerDepartmentRef}>
+            <label className={headerStyles.controlLabel}>Department:</label>
             <button
               className={headerStyles.controlDropdown}
-              onClick={() => setIsHeaderPriorityOpen(!isHeaderPriorityOpen)}
+              onClick={() => setIsHeaderDepartmentOpen(!isHeaderDepartmentOpen)}
               type="button"
-              disabled={isUpdatingHeaderPriority}
+              disabled={isUpdatingHeaderDepartment}
             >
-              <span className={headerStyles.controlValue}>{priorityLabel}</span>
+              <span className={headerStyles.controlValue}>{departmentLabel}</span>
               <ChevronDown
                 size={16}
-                className={`${headerStyles.chevron} ${isHeaderPriorityOpen ? headerStyles.open : ''}`}
+                className={`${headerStyles.chevron} ${isHeaderDepartmentOpen ? headerStyles.open : ''}`}
               />
             </button>
-            {isHeaderPriorityOpen && (
+            {isHeaderDepartmentOpen && (
               <div className={headerStyles.dropdownMenu}>
-                {priorityOptions.map(option => (
+                <button
+                  className={`${headerStyles.dropdownOption} ${!project.current_department_id ? headerStyles.selected : ''}`}
+                  onClick={() => handleHeaderDepartmentChange(null)}
+                  type="button"
+                >
+                  Unassigned
+                </button>
+                {departments.map(department => (
                   <button
-                    key={option.value}
-                    className={`${headerStyles.dropdownOption} ${project.priority === option.value ? headerStyles.selected : ''}`}
-                    onClick={() => handleHeaderPriorityChange(option.value as Project['priority'])}
+                    key={department.id}
+                    className={`${headerStyles.dropdownOption} ${project.current_department_id === department.id ? headerStyles.selected : ''}`}
+                    onClick={() => handleHeaderDepartmentChange(department.id)}
                     type="button"
                   >
-                    {option.label}
+                    {department.name}
                   </button>
                 ))}
               </div>
             )}
           </div>
+          {project.status === 'new' && (
+            <button
+              className={styles.templateButton}
+              onClick={() => setIsApplyTemplateOpen(true)}
+              type="button"
+              aria-label="Use Template"
+            >
+              <FileText size={16} />
+              Use Template
+            </button>
+          )}
           <button
             className={`${headerStyles.addLeadButton} ${headerStyles.deleteButton} ${headerStyles.iconOnlyButton}`}
             onClick={handleDeleteProject}
@@ -605,15 +716,16 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     handleBackToProjects,
     handleDeleteProject,
     availableStatusOptions,
-    handleHeaderPriorityChange,
     handleHeaderStatusChange,
-    isHeaderPriorityOpen,
+    handleHeaderDepartmentChange,
     isHeaderStatusOpen,
-    isUpdatingHeaderPriority,
+    isHeaderDepartmentOpen,
     isUpdatingHeaderStatus,
-    priorityLabel,
+    isUpdatingHeaderDepartment,
     setPageHeader,
     statusLabel,
+    departmentLabel,
+    departments,
   ]);
 
   React.useEffect(() => {
@@ -707,12 +819,14 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
   const handleToggleComplete = async (taskId: string, isCompleted: boolean) => {
     await updateTask(project.id, taskId, { is_completed: isCompleted });
+    onProjectUpdate?.();
   };
 
   // Handler for inline task updates (title, due_date, etc.)
   const handleUpdateTaskInline = useCallback(async (taskId: string, updates: Partial<ProjectTask>) => {
     await updateTask(project.id, taskId, updates);
-  }, [project.id, updateTask]);
+    onProjectUpdate?.();
+  }, [project.id, updateTask, onProjectUpdate]);
 
   // Handler for deleting a task from the list
   const handleDeleteTaskFromList = useCallback(async (taskId: string) => {
@@ -761,6 +875,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     ).then(res => res.json());
 
     setSelectedTask(updatedTask);
+    onProjectUpdate?.();
   };
 
   const handleUpdateProgress = async (progress: number) => {
@@ -851,6 +966,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       setComments(prev => [...prev, comment]);
       setNewComment('');
       setPendingAttachments([]);
+      onProjectUpdate?.();
     } catch (error) {
       console.error('Error posting comment:', error);
       setToastMessage('Failed to post comment.');
@@ -1268,24 +1384,51 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                 />
               </button>
               <h2 className={styles.sectionTitle}>
-                Tasks <span className={styles.sectionCount}>({tasks.length})</span>
+                Tasks
               </h2>
             </div>
 
             {!isTasksCollapsed && (
-              <ProjectTaskList
-                tasks={tasks}
-                onTaskClick={handleTaskClick}
-                onToggleComplete={handleToggleComplete}
-                onUpdateTask={handleUpdateTaskInline}
-                onDeleteTask={handleDeleteTaskFromList}
-                onReorderTasks={handleReorderTasks}
-                onToggleStar={(taskId) => toggleStar('task', taskId)}
-                isStarred={(taskId) => isStarred('task', taskId)}
-                isLoading={isLoading}
-                showHeader={false}
-                onAddTask={handleCreateTask}
-              />
+              <div className={styles.taskCategoryList}>
+                {taskSections.length === 0 ? (
+                  <ProjectTaskList
+                    tasks={[]}
+                    onTaskClick={handleTaskClick}
+                    onToggleComplete={handleToggleComplete}
+                    onUpdateTask={handleUpdateTaskInline}
+                    onDeleteTask={handleDeleteTaskFromList}
+                    onReorderTasks={handleReorderTasks}
+                    onToggleStar={(taskId) => toggleStar('task', taskId)}
+                    isStarred={(taskId) => isStarred('task', taskId)}
+                    isLoading={isLoading}
+                    showHeader={false}
+                    onAddTask={handleCreateTask}
+                  />
+                ) : (
+                  taskSections.map((section, index) => (
+                    <div key={section.key} className={styles.taskCategorySection}>
+                      <div className={styles.taskCategoryHeader}>
+                        <h3 className={styles.taskCategoryTitle}>{section.title}</h3>
+                      </div>
+                      <ProjectTaskList
+                        tasks={section.tasks}
+                        onTaskClick={handleTaskClick}
+                        onToggleComplete={handleToggleComplete}
+                        onUpdateTask={handleUpdateTaskInline}
+                        onDeleteTask={handleDeleteTaskFromList}
+                        onReorderTasks={handleReorderTasks}
+                        onToggleStar={(taskId) => toggleStar('task', taskId)}
+                        isStarred={(taskId) => isStarred('task', taskId)}
+                        isLoading={isLoading}
+                        showHeader={false}
+                        onAddTask={
+                          index === taskSections.length - 1 ? handleCreateTask : undefined
+                        }
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
             )}
 
             <div className={styles.commentsSection}>
@@ -1588,6 +1731,9 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
         users={users}
         projectId={project.id}
         parentTasks={parentTasks}
+        projectMembers={project.members}
+        projectAssignedTo={project.assigned_to_profile?.id}
+        availableCategories={availableTaskCategories}
       />
 
       {/* Task Detail Sidebar */}
@@ -1603,6 +1749,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
           const response = await fetch(`/api/admin/projects/${project.id}/tasks/${taskId}`);
           const updatedTask = await response.json();
           setSelectedTask(updatedTask);
+          onProjectUpdate?.();
         }}
         onDelete={() => handleDeleteTask()}
         onAddComment={handleAddComment}
@@ -1612,12 +1759,26 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
         highlightedCommentId={highlightedTaskCommentId}
         onToggleStar={(taskId) => toggleStar('task', taskId)}
         isStarred={(taskId) => isStarred('task', taskId)}
-        availableCategories={
-          project.categories
-            ?.map(assignment => assignment.category)
-            .filter((cat): cat is NonNullable<typeof cat> => cat !== null && cat !== undefined) || []
-        }
+        availableCategories={availableTaskCategories}
+        projectMembers={project.members}
+        projectAssignedTo={project.assigned_to_profile?.id}
+        availableTasks={tasks}
       />
+
+      {/* Apply Template Modal */}
+      {isApplyTemplateOpen && (
+        <ApplyTemplateModal
+          isOpen={isApplyTemplateOpen}
+          onClose={() => setIsApplyTemplateOpen(false)}
+          projectId={project.id}
+          onSuccess={() => {
+            setIsApplyTemplateOpen(false);
+            fetchTasks(project.id);
+            onProjectUpdate?.();
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

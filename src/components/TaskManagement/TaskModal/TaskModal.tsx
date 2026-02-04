@@ -18,7 +18,6 @@ interface TaskFormData {
   start_date: string;
   recurring_frequency: string;
   recurring_end_date: string;
-  tags: string[];
 }
 
 interface TaskModalProps {
@@ -31,30 +30,6 @@ interface TaskModalProps {
   users?: Array<{ id: string; first_name?: string; last_name?: string; profiles?: { first_name: string; last_name: string } }>; // Optional users list from API
 }
 
-// Preset tags for pest control marketing
-const PRESET_TAGS = [
-  'seo',
-  'social-media',
-  'content',
-  'design',
-  'development',
-  'ppc',
-  'google-ads',
-  'facebook-ads',
-  'email',
-  'analytics',
-  'branding',
-  'website',
-  'blog',
-  'video',
-  'photography',
-  'local-seo',
-  'gmb',
-  'reviews',
-  'reporting',
-  'strategy',
-];
-
 export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, users }: TaskModalProps) {
   const [formData, setFormData] = useState({
     title: '',
@@ -66,7 +41,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
     assigned_to: '',
     due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     start_date: '',
-    tags: [] as string[],
     recurring_frequency: 'none' as string,
     recurring_end_date: '',
   });
@@ -98,7 +72,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
         assigned_to: task.assigned_to || '',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         start_date: isProjectTask(task) && task.start_date ? task.start_date.split('T')[0] : '',
-        tags: isProjectTask(task) ? [] : ((task as Task).tags || []),
         recurring_frequency: task.recurring_frequency || 'none',
         recurring_end_date: task.recurring_end_date ? task.recurring_end_date.split('T')[0] : '',
       });
@@ -113,7 +86,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
         assigned_to: '',
         due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         start_date: '',
-        tags: [],
         recurring_frequency: 'none',
         recurring_end_date: '',
       });
@@ -134,7 +106,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
       assigned_to: formData.assigned_to || undefined,
       due_date: formData.due_date ? new Date(formData.due_date).toISOString() : undefined,
       start_date: formData.start_date ? new Date(formData.start_date).toISOString() : undefined,
-      tags: formData.tags,
       recurring_frequency: formData.recurring_frequency === 'none' ? undefined : formData.recurring_frequency,
       recurring_end_date: formData.recurring_end_date ? new Date(formData.recurring_end_date).toISOString() : undefined,
     };
@@ -153,22 +124,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
   const handleDelete = () => {
     if (task && onDelete && window.confirm('Are you sure you want to delete this task?')) {
       onDelete(task.id);
-    }
-  };
-
-  const handleToggleTag = (tag: string) => {
-    if (formData.tags.includes(tag)) {
-      // Remove tag
-      setFormData({
-        ...formData,
-        tags: formData.tags.filter(t => t !== tag),
-      });
-    } else {
-      // Add tag
-      setFormData({
-        ...formData,
-        tags: [...formData.tags, tag],
-      });
     }
   };
 
@@ -283,7 +238,8 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
                   const firstName = user.first_name || profile?.first_name || '';
                   const lastName = user.last_name || profile?.last_name || '';
                   const email = (user as { email?: string }).email || '';
-                  const displayName = `${firstName} ${lastName}`.trim() || email || 'User';
+                  const name = `${firstName} ${lastName}`.trim();
+                  const displayName = name && email ? `${name} (${email})` : name || email || 'User';
                   return (
                     <option key={user.id} value={user.id}>
                       {displayName}
@@ -365,26 +321,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
             )}
           </div>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>
-              Tags
-            </label>
-            <div className={styles.presetTagsContainer}>
-              {PRESET_TAGS.map((tag) => {
-                const isSelected = formData.tags.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    className={`${styles.presetTag} ${isSelected ? styles.selected : ''}`}
-                    onClick={() => handleToggleTag(tag)}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </ModalMiddle>
 
         <ModalBottom className={styles.modalBottom}>

@@ -12,6 +12,7 @@ export default function InternalCategorySettings() {
   const [categories, setCategories] = useState<ProjectCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -127,6 +128,7 @@ export default function InternalCategorySettings() {
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
+    setDraggingIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -136,6 +138,7 @@ export default function InternalCategorySettings() {
 
   const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
+    setDraggingIndex(null);
 
     const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
 
@@ -214,13 +217,17 @@ export default function InternalCategorySettings() {
             {categories.map((category, index) => (
               <div
                 key={category.id}
-                className={styles.categoryCard}
-                draggable
+                className={`${styles.categoryCard} ${draggingIndex === index ? styles.dragging : ''}`}
+                draggable={true}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={() => setDraggingIndex(null)}
               >
-                <div className={styles.dragHandle}>
+                <div
+                  className={styles.dragHandle}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   <GripVertical />
                 </div>
 

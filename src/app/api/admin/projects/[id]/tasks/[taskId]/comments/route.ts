@@ -170,6 +170,14 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Update project's updated_at timestamp if task has a project
+    if (projectId) {
+      await supabase
+        .from('projects')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', projectId);
+    }
+
     // Extract mentioned user IDs and create notifications
     const mentionedUserIds = extractMentionedUserIds(body.comment);
 

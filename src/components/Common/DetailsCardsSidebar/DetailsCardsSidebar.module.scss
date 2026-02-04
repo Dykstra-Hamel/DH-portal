@@ -70,7 +70,7 @@
   background: #fff;
   border-radius: 8px;
   border: 1px solid var(--gray-300);
-  overflow: hidden;
+  overflow: visible;
   padding: 2px;
 }
 
@@ -128,7 +128,7 @@
   position: relative;
   padding: 0;
   height: 100%;
-  overflow: auto;
+  overflow: visible;
 
   // Remove border from the last item (whether it's an InfoCard or a wrapper div)
   > *:last-child {

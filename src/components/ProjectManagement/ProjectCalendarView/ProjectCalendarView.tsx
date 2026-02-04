@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Project, statusOptions } from '@/types/project';
 import { Modal, ModalMiddle, ModalTop } from '@/components/Common/Modal/Modal';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectCalendarView.module.scss';
 
 interface ProjectCalendarViewProps {
@@ -46,7 +47,8 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
 
   const getProjectsForDate = (date: Date): Project[] => {
     return projects.filter(project => {
-      const deadlineDate = new Date(project.due_date);
+      const deadlineDate = parseDateString(project.due_date);
+      if (!deadlineDate) return false;
       return (
         deadlineDate.getDate() === date.getDate() &&
         deadlineDate.getMonth() === date.getMonth() &&

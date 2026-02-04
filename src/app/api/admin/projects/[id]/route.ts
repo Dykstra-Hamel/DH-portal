@@ -35,6 +35,21 @@ export async function GET(
             description,
             sort_order
           )
+        ),
+        members:project_members(
+          id,
+          user_id,
+          added_via,
+          added_by,
+          created_at,
+          updated_at,
+          user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url)
+        ),
+        current_department:project_departments(
+          id,
+          name,
+          icon,
+          sort_order
         )
       `
       )
@@ -124,7 +139,9 @@ export async function PUT(
       notes,
       primary_file_path,
       scope,
+      current_department_id,
       category_ids,
+      company_id,
     } = body;
 
     // Validate required fields
@@ -174,6 +191,14 @@ export async function PUT(
       updateData.requested_by = requested_by || null;
     }
 
+    if (current_department_id !== undefined) {
+      updateData.current_department_id = current_department_id || null;
+    }
+
+    if (company_id !== undefined) {
+      updateData.company_id = company_id;
+    }
+
     const { data: project, error } = await supabase
       .from('projects')
       .update(updateData)
@@ -184,6 +209,12 @@ export async function PUT(
         company:companies(
           id,
           name
+        ),
+        current_department:project_departments(
+          id,
+          name,
+          icon,
+          sort_order
         )
       `
       )

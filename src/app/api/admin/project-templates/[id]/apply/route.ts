@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { projectTypeOptions } from '@/types/project';
+import { sendProjectCreatedNotification as sendEmail } from '@/lib/email/project-notifications';
+import {
+  EmailRecipient,
+  ProjectNotificationData as EmailProjectData,
+} from '@/lib/email/types';
+import { ProjectNotificationData as SlackProjectData } from '@/lib/slack/types';
 
 // POST /api/admin/project-templates/[id]/apply - Apply template to create project with tasks
 export async function POST(
@@ -38,7 +44,7 @@ export async function POST(
       );
     }
 
-    // Fetch template with tasks and categories
+    // Fetch template with tasks, categories, and default members
     const { data: template, error: templateError } = await supabase
       .from('project_templates')
       .select(
@@ -48,6 +54,10 @@ export async function POST(
         categories:project_template_category_assignments(
           id,
           category_id
+        ),
+        default_members:project_template_members(
+          id,
+          user_id
         )
       `
       )
@@ -110,7 +120,7 @@ export async function POST(
       company_id: body.company_id,
       requested_by: body.requested_by,
       assigned_to: body.assigned_to || template.default_assigned_to || null,
-      status: body.status || 'in_progress',
+      status: body.status || 'new',
       priority: body.priority || 'medium',
       due_date: body.due_date || calculatedDueDate || null,
       start_date: body.start_date || null,
@@ -122,7 +132,7 @@ export async function POST(
           : false),
       quoted_price: body.quoted_price || null,
       tags: body.tags || template.template_data?.tags || null,
-      notes: body.notes || null,
+      notes: body.notes || template.notes || null,
       scope: template.default_scope || 'internal',
     };
 
@@ -155,6 +165,25 @@ export async function POST(
 
       if (categoryError) {
         console.error('Error assigning categories to project:', categoryError);
+        // Don't fail the whole request, just log the error
+      }
+    }
+
+    // Add default members from template to project
+    if (template.default_members && template.default_members.length > 0) {
+      const memberInserts = template.default_members.map((m: any) => ({
+        project_id: project.id,
+        user_id: m.user_id,
+        added_via: 'manual',
+        added_by: user.id,
+      }));
+
+      const { error: memberError } = await supabase
+        .from('project_members')
+        .insert(memberInserts);
+
+      if (memberError) {
+        console.error('Error adding default members to project:', memberError);
         // Don't fail the whole request, just log the error
       }
     }
@@ -265,6 +294,91 @@ export async function POST(
       )
       .eq('id', project.id)
       .single();
+
+    // Trigger notifications (fire-and-forget)
+    const triggerNotifications = async () => {
+      try {
+        if (!completeProject) return;
+
+        const requesterProfile = completeProject.requested_by_profile;
+        const requesterName =
+          `${requesterProfile?.first_name || ''} ${requesterProfile?.last_name || ''}`.trim() ||
+          'Unknown';
+        const requesterEmail = requesterProfile?.email || 'unknown@example.com';
+
+        // Get assigned user info if project is assigned
+        const assignedProfile = completeProject.assigned_to_profile;
+        const assignedToName = assignedProfile
+          ? `${assignedProfile.first_name || ''} ${assignedProfile.last_name || ''}`.trim()
+          : undefined;
+        const assignedToEmail = assignedProfile?.email;
+
+        // Prepare notification data
+        const emailData: EmailProjectData = {
+          projectId: completeProject.id,
+          projectName: completeProject.name,
+          projectType: completeProject.project_type,
+          description: completeProject.description,
+          dueDate: completeProject.due_date,
+          priority: completeProject.priority,
+          requesterName,
+          requesterEmail,
+          companyName: completeProject.company?.name || 'Unknown Company',
+        };
+
+        const slackData: SlackProjectData = {
+          id: completeProject.id,
+          projectId: completeProject.id,
+          projectName: completeProject.name,
+          projectType: completeProject.project_type,
+          description: completeProject.description,
+          dueDate: completeProject.due_date,
+          priority: completeProject.priority as 'low' | 'medium' | 'high' | 'urgent',
+          status: completeProject.status,
+          requesterName,
+          requesterEmail,
+          companyName: completeProject.company?.name || 'Unknown Company',
+          assignedToName,
+          assignedToEmail,
+          timestamp: new Date().toISOString(),
+          actionUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin/project-management/${completeProject.id}`,
+        };
+
+        // Send email notification to assigned user (if assigned)
+        let emailPromise: Promise<any> = Promise.resolve();
+        if (assignedToEmail && assignedToName) {
+          const assignedRecipient: EmailRecipient = {
+            email: assignedToEmail,
+            name: assignedToName,
+          };
+          emailPromise = sendEmail(assignedRecipient, emailData).catch(error =>
+            console.error('Failed to send email notification:', error)
+          );
+        }
+
+        const { sendProjectCreatedNotification } = await import(
+          '@/lib/slack/project-notifications'
+        );
+
+        setImmediate(async () => {
+          try {
+            const result = await sendProjectCreatedNotification(slackData);
+            if (!result.success) {
+              console.error('Failed to send Slack notification:', result.error);
+            }
+          } catch (error) {
+            console.error('Error in Slack notification:', error);
+          }
+        });
+
+        await emailPromise;
+      } catch (error) {
+        console.error('Failed to send notifications:', error);
+      }
+    };
+
+    // Call notifications asynchronously (don't await)
+    triggerNotifications();
 
     return NextResponse.json(completeProject, { status: 201 });
   } catch (error) {

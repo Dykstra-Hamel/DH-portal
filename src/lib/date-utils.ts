@@ -6,6 +6,28 @@ export function formatDateForApi(date: Date): string {
 }
 
 /**
+ * Format a date-only string (YYYY-MM-DD) in local time without timezone shift.
+ */
+export function formatDateOnlyLocal(dateString: string): Date | null {
+  if (!dateString) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Parse a date string into a Date, preserving local date-only values.
+ */
+export function parseDateString(dateString?: string | null): Date | null {
+  if (!dateString) return null;
+  const localDate = formatDateOnlyLocal(dateString);
+  const parsed = localDate ?? new Date(dateString);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
  * Format duration in minutes to a readable string
  */
 export function formatDuration(minutes: number): string {

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       ? 'categories:project_category_assignments!inner(id, category_id, category:project_categories(id, name, description, sort_order))'
       : 'categories:project_category_assignments(id, category_id, category:project_categories(id, name, description, sort_order))';
 
-    // First get projects with company info and category assignments
+    // First get projects with company info, category assignments, and department info
     let query = supabase
       .from('projects')
       .select(
@@ -48,7 +48,13 @@ export async function GET(request: NextRequest) {
             icon_logo_url
           )
         ),
-        ${categoryRelation}
+        ${categoryRelation},
+        current_department:project_departments(
+          id,
+          name,
+          icon,
+          sort_order
+        )
       `
       )
       .order('created_at', { ascending: false });
@@ -127,26 +133,26 @@ export async function GET(request: NextRequest) {
       );
     });
 
-    // Fetch assigned members per project (distinct assigned_to in tasks)
-    const { data: projectTasks, error: tasksError } = await supabase
-      .from('project_tasks')
-      .select('project_id, assigned_to')
+    // Fetch project members count from project_members table
+    const { data: projectMembers, error: membersError } = await supabase
+      .from('project_members')
+      .select('project_id')
       .in('project_id', projectIds);
 
-    if (tasksError) {
-      console.error('Error fetching project tasks:', tasksError);
+    if (membersError) {
+      console.error('Error fetching project members:', membersError);
       return NextResponse.json(
-        { error: 'Failed to fetch project tasks' },
+        { error: 'Failed to fetch project members' },
         { status: 500 }
       );
     }
 
-    const memberSets = new Map<string, Set<string>>();
-    (projectTasks || []).forEach(task => {
-      if (!task.assigned_to) return;
-      const set = memberSets.get(task.project_id) || new Set<string>();
-      set.add(task.assigned_to);
-      memberSets.set(task.project_id, set);
+    const memberCounts = new Map<string, number>();
+    (projectMembers || []).forEach(member => {
+      memberCounts.set(
+        member.project_id,
+        (memberCounts.get(member.project_id) || 0) + 1
+      );
     });
 
     // Check for unread mention notifications for the current user
@@ -228,7 +234,7 @@ export async function GET(request: NextRequest) {
         ? profileMap.get(project.assigned_to) || null
         : null,
       comments_count: commentCounts.get(project.id) || 0,
-      members_count: memberSets.get(project.id)?.size || 0,
+      members_count: memberCounts.get(project.id) || 0,
       has_unread_mentions: projectsWithMentions.has(project.id),
     }));
 
@@ -491,15 +497,17 @@ export async function POST(request: NextRequest) {
           actionUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin/project-management/${project.id}`,
         };
 
-        // Send notifications
-        const testRecipient: EmailRecipient = {
-          email: 'austin@dykstrahamel.com',
-          name: 'Austin',
-        };
-
-        const emailPromise = sendEmail(testRecipient, emailData).catch(error =>
-          console.error('Failed to send email notification:', error)
-        );
+        // Send email notification to assigned user (if assigned)
+        let emailPromise: Promise<any> = Promise.resolve();
+        if (assignedToEmail && assignedToName) {
+          const assignedRecipient: EmailRecipient = {
+            email: assignedToEmail,
+            name: assignedToName,
+          };
+          emailPromise = sendEmail(assignedRecipient, emailData).catch(error =>
+            console.error('Failed to send email notification:', error)
+          );
+        }
 
         const { sendProjectCreatedNotification } = await import(
           '@/lib/slack/project-notifications'

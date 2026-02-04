@@ -85,7 +85,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr 0.8fr;
+  grid-template-columns: 2fr 1.2fr 0.8fr 1.2fr 1fr 1fr 0.8fr;
   gap: 16px;
   padding: 16px 20px;
   background: #f9fafb;
@@ -125,7 +125,7 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr 0.8fr;
+  grid-template-columns: 2fr 1.2fr 0.8fr 1.2fr 1fr 1fr 0.8fr;
   gap: 16px;
   padding: 16px 20px;
   border-bottom: 1px solid #f3f4f6;
@@ -174,6 +174,12 @@
   color: #6b7280;
 }
 
+.projectShortcode {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
 .noProject {
   font-size: 12px;
   color: #9ca3af;
@@ -188,11 +194,17 @@
 .dueDate {
   font-size: 13px;
   color: #6b7280;
+  margin-left: 0;
 
   &.overdue {
     color: #dc2626;
     font-weight: 550;
   }
+}
+
+.overdue {
+  color: #dc2626;
+  font-weight: 550;
 }
 
 .actions {
@@ -247,30 +259,416 @@
   }
 }
 
+.groupedTasks {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 0 11px 0 #e8e8ea;
+  padding: 12px 0;
+}
+
+.companyGroup {
+  padding: 10px 20px 20px;
+  margin-bottom: 12px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.companyGroupHeader {
+  font-size: 20px;
+  font-weight: 700;
+  color: #252c37;
+  margin-bottom: 8px;
+}
+
+.projectGroup {
+  padding: 6px 0 12px 14px;
+
+  &:last-child {
+    padding-bottom: 0;
+  }
+}
+
+.projectGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.projectGroupIcon {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.projectGroupTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #252c37;
+}
+
+.projectGroupCode {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.projectDueDate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gray-950, #0c0e12);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: var(--gray-400, #99a1af);
+  }
+}
+
+.projectDueDateOverdue {
+  color: var(--error-600, #e7000b);
+
+  svg {
+    color: var(--error-600, #e7000b);
+  }
+}
+
+.projectTaskList {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.personalTasksSection {
+  padding: 8px 20px 10px;
+}
+
+.personalTasksHeader {
+  font-size: 15px;
+  font-weight: 700;
+  color: #252c37;
+  margin: 10px 0 8px;
+}
+
+.projectTaskItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #252c37;
+  cursor: pointer;
+
+  &:hover {
+    color: #111827;
+  }
+
+  &:hover .hoverActions {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+.projectTaskToggle {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-300, #d1d5db);
+  background: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--success-600, #04ae6a);
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    border-color: var(--success-500, #00c281);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+.projectTaskToggleDone {
+  background: var(--success-600, #04ae6a);
+  color: var(--white);
+  border-color: var(--success-600, #04ae6a);
+}
+
+.taskTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+.taskTitleText {
+  font-weight: 500;
+}
+
+.taskEditInput {
+  flex: 1;
+  min-width: 120px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900, #111827);
+  border: 1px solid var(--action-500, #0ea5e9);
+  border-radius: 4px;
+  padding: 4px 8px;
+  outline: none;
+  background: var(--white);
+
+  &:focus {
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+  }
+}
+
+.taskDueDate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gray-950, #0c0e12);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: var(--gray-400, #99a1af);
+  }
+}
+
+.taskDueDateOverdue {
+  color: var(--error-600, #e7000b);
+
+  svg {
+    color: var(--error-600, #e7000b);
+  }
+}
+
+.taskMetaActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.hoverActions {
+  position: static;
+  transform: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  padding: 0;
+  border-radius: 6px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
+  z-index: 5;
+}
+
+.starWrapper {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.actionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--gray-500, #6b7280);
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: var(--gray-100, #f3f4f6);
+    color: var(--gray-700, #374151);
+  }
+}
+
+.deleteIcon:hover {
+  background: var(--red-50, #fef2f2);
+  color: var(--red-600, #dc2626);
+}
+
+.datePicker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--white);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  z-index: 1000;
+  min-width: 260px;
+}
+
+.datePickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900, #111827);
+  margin-bottom: 12px;
+}
+
+.datePickerLabel {
+  flex: 1;
+  text-align: center;
+}
+
+.datePickerNav {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--gray-600, #4b5563);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-100, #f3f4f6);
+  }
+}
+
+.datePickerWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-500, #6b7280);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.datePickerDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.datePickerDay {
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--gray-900, #111827);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-100, #f3f4f6);
+  }
+}
+
+.otherMonth {
+  color: var(--gray-400, #9ca3af);
+}
+
+.today {
+  background: var(--action-100, #d6e9ff);
+  color: var(--action-700, #0054c2);
+  font-weight: 700;
+}
+
+.selected {
+  background: var(--action-500, #0ea5e9);
+  color: var(--white);
+  font-weight: 700;
+}
+
+.datePickerClear {
+  margin-top: 10px;
+  width: 100%;
+  border: none;
+  background: var(--gray-100, #f3f4f6);
+  color: var(--gray-700, #374151);
+  border-radius: 6px;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-200, #e5e7eb);
+  }
+}
+
+.taskCompleted {
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
 // Currently Working On Section
 .currentlyWorkingOnSection {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 0 11px 0 #e8e8ea;
-  padding: 24px;
-  margin-bottom: 32px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  padding: 10px 12px;
+  margin: 12px auto 16px;
+  max-width: 1200px;
+  box-shadow: none;
+  width: 100%;
 }
 
 .sectionHeaderRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 10px;
+  width: 100%;
+}
+
+.sectionHeaderCenter {
+  flex: 1;
+  display: flex;
+  justify-content: center;
 }
 
 .sectionTitle {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 20px;
+  gap: 6px;
+  font-size: 13px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: #252c37;
   margin: 0;
 
@@ -281,18 +679,18 @@
 
 .viewToggle {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   background: #f3f4f6;
-  padding: 4px;
-  border-radius: 8px;
+  padding: 2px;
+  border-radius: 999px;
 }
 
 .toggleButton {
-  padding: 8px 16px;
+  padding: 4px 10px;
   border: none;
   background: transparent;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 600;
   color: #6b7280;
   cursor: pointer;
@@ -310,11 +708,53 @@
   }
 }
 
+.currentlyWorkingOnBody {
+  width: 100%;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.currentlyWorkingOnSection .tableHeader {
+  padding: 8px 12px;
+  gap: 12px;
+}
+
+.currentlyWorkingOnSection .tableRow {
+  padding: 8px 12px;
+  gap: 12px;
+}
+
+.currentlyWorkingOnSection .headerCell {
+  font-size: 10px;
+}
+
+.currentlyWorkingOnSection .cell {
+  font-size: 13px;
+}
+
 .starredTasksTable {
   background: #f9fafb;
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
+  --starred-columns: 2fr 1.2fr 0.9fr 1.2fr 0.9fr 0.9fr 64px;
+}
+
+.starredTasksTable .tableHeader,
+.starredTasksTable .tableRow {
+  grid-template-columns: var(--starred-columns);
+}
+
+.starredTasksTable .headerCell:last-child {
+  text-align: center;
+}
+
+.starredTasksTable .cell:last-child {
+  justify-content: center;
+}
+
+.starredTasksTable .actions {
+  justify-content: center;
 }
 
 .emptyStarredState {
@@ -331,26 +771,20 @@
 // Project Cards Grid
 .projectsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
 }
 
 .projectCard {
-  width: 315px; // Match kanban card width
+  width: 100%;
   background: white;
   border: 1px solid var(--UI-Gray-300, #d1d5db);
   border-radius: 14px;
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   transition: all 0.2s ease;
-  overflow: hidden;
-
-  &:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    border-color: var(--UI-Gray-400);
-  }
   cursor: pointer;
 
   &:hover {
@@ -359,7 +793,44 @@
   }
 }
 
-// Card Top Row (Date + Company)
+// Card Header Wrapper (Left: Star/Shortcode/Name, Right: Company Logo)
+.cardHeaderWrapper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+}
+
+.cardHeaderLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0; // Allow text truncation
+}
+
+.cardHeaderRight {
+  display: flex;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+// Card Header Row (Star + Shortcode)
+.cardHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.projectShortcode {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-950, #0c0e12);
+  line-height: 16px;
+}
+
+// Card Top Row (Date + Company) - OLD, keeping for backwards compatibility
 .cardTopRow {
   display: flex;
   justify-content: space-between;
@@ -384,6 +855,14 @@
 }
 
 .overdueDate {
+  color: var(--error-600, #e7000b);
+
+  svg {
+    color: var(--error-600, #e7000b);
+  }
+}
+
+.dueDate.overdueDate {
   color: var(--error-600, #e7000b);
 
   svg {
@@ -430,9 +909,10 @@
   margin: 0;
   line-height: 1.3;
 
-  // Truncate if too long
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
+  // Truncate to single line with ellipsis
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -440,14 +920,12 @@
 // Project Description
 .projectDescription {
   font-size: 12px;
-  font-weight: 400;
-  color: var(--gray-500, #6b7280);
+  font-weight: 550;
+  color: var(--gray-950, #0a0a0a);
   font-family: 'Satoshi Variable', var(--font-satoshi);
   line-height: 1.4;
   margin: 0;
-
-  // Always reserve space for 2 lines (font-size * line-height * 2 lines)
-  min-height: calc(12px * 1.4 * 2);
+  min-height: calc(1.4em * 2); // Always reserve space for 2 lines
 
   // Truncate if too long
   display: -webkit-box;
@@ -456,7 +934,172 @@
   overflow: hidden;
 }
 
-// Card Metrics Row
+// Card Info Row (Comments, Task Completion, Avatar, Due Date)
+.cardInfoRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+}
+
+.infoItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--gray-400, #99a1af);
+  font-weight: 500;
+  line-height: 16px;
+
+  svg {
+    width: 17px;
+    height: 16px;
+    color: var(--gray-400, #99a1af);
+    flex-shrink: 0;
+  }
+}
+
+.assigneeInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.assigneeName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-950, #0c0e12);
+  line-height: 16px;
+}
+
+// Due Date (in info row)
+.cardInfoRow .dueDate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gray-950, #0c0e12);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  margin-left: auto;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    color: var(--gray-400, #99a1af);
+  }
+}
+
+// Row 5: Members + Separator
+.cardMembersRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+}
+
+.membersCount {
+  color: var(--gray-950, #0c0e12);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.separator {
+  flex: 1;
+  height: 1px;
+  background: var(--gray-300, #d1d5db);
+}
+
+// Row 6: Status + Total Tasks + Fraction
+.cardStatusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+}
+
+.statusInfo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  svg {
+    width: 17px;
+    height: 16px;
+    color: currentColor;
+  }
+}
+
+.statusText {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: inherit;
+}
+
+.totalTasksInfo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.totalTasksLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-400, #99a1af);
+  line-height: 16px;
+}
+
+.tasksFraction {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-950, #0c0e12);
+  line-height: 16px;
+}
+
+// Row 7: Progress Bar
+.cardProgressRow {
+  display: flex;
+  width: 100%;
+  padding-top: 6px;
+}
+
+.progressBarWithPercentage {
+  position: relative;
+  width: 100%;
+  height: 13px;
+  background: var(--gray-200, #e5e7eb);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progressBar {
+  position: relative;
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.3s ease;
+  min-width: 30px; // Ensure enough space for percentage text
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+}
+
+.percentageText {
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+// Card Metrics Row - OLD, keeping for backwards compatibility
 .cardMetrics {
   display: flex;
   align-items: center;
@@ -580,7 +1223,11 @@
   }
 
   .projectsGrid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+
+  .starredTasksTable {
+    --starred-columns: 2fr 1fr 1fr 0.9fr 0.9fr 0.8fr 56px;
   }
 }
 
@@ -591,7 +1238,7 @@
 
   .sectionHeaderRow {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .viewToggle {

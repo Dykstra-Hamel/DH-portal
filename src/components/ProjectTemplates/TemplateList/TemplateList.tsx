@@ -146,7 +146,19 @@ const TemplateList: React.FC<TemplateListProps> = ({
       ) : (
         <div className={styles.grid}>
           {filteredTemplates.map((template) => (
-            <div key={template.id} className={styles.card}>
+            <div
+              key={template.id}
+              className={styles.card}
+              role="button"
+              tabIndex={0}
+              onClick={() => onEdit(template)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onEdit(template);
+                }
+              }}
+            >
               <div className={styles.cardHeader}>
                 <div className={styles.cardTitle}>
                   <h3>{template.name}</h3>
@@ -190,7 +202,10 @@ const TemplateList: React.FC<TemplateListProps> = ({
 
               <div className={styles.cardActions}>
                 <button
-                  onClick={() => handleToggleActive(template)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleToggleActive(template);
+                  }}
                   className={styles.actionButton}
                   title={template.is_active ? 'Deactivate' : 'Activate'}
                 >
@@ -201,14 +216,20 @@ const TemplateList: React.FC<TemplateListProps> = ({
                   )}
                 </button>
                 <button
-                  onClick={() => onEdit(template)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEdit(template);
+                  }}
                   className={styles.actionButton}
                   title="Edit"
                 >
                   <Edit size={16} />
                 </button>
                 <button
-                  onClick={() => handleDelete(template)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDelete(template);
+                  }}
                   className={styles.deleteButton}
                   title="Delete"
                 >

@@ -264,12 +264,6 @@
   margin: 0;
 }
 
-.titleContent {
-  display: inline-flex;
-  align-items: center;
-  gap: 16px;
-}
-
 .backButton {
   width: 32px;
   height: 32px;
@@ -298,6 +292,25 @@
   }
 }
 
+.leftSectionWithLeading {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.titleLeading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.titleStack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .description {
   font-family:
     'Satoshi Variable',
@@ -321,17 +334,15 @@
   }
 }
 
-.projectDetailDescription {
-  margin-left: 60px;
-  display: inline-flex;
-  align-items: center;
+.updatedText {
+  color: var(--gray-500);
 }
-
 
 .rightSection {
   display: flex;
   align-items: center;
   gap: 17px;
+  flex-shrink: 0;
 }
 
 // Filter styles
