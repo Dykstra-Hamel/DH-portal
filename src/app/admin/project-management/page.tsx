@@ -22,7 +22,7 @@ import { Search } from 'lucide-react';
 import styles from '../../project-management/projectManagement.module.scss';
 
 type ViewType = 'kanban' | 'list' | 'calendar';
-type ProjectStatusTab = 'current' | 'new' | 'completed';
+type ProjectStatusTab = 'current' | 'new' | 'on_hold' | 'completed';
 
 export default function AdminProjectManagementDashboard() {
   const router = useRouter();
@@ -335,12 +335,14 @@ export default function AdminProjectManagementDashboard() {
     const isCompleteStatus = (status?: string | null) =>
       status === 'complete' || status === 'completed';
     const isNewStatus = (status?: string | null) => status === 'new';
+    const isOnHoldStatus = (status?: string | null) => status === 'on_hold';
 
     return {
       current: projectsWithStarred.filter(
-        (project) => !isNewStatus(project.status) && !isCompleteStatus(project.status)
+        (project) => !isNewStatus(project.status) && !isCompleteStatus(project.status) && !isOnHoldStatus(project.status)
       ).length,
       new: projectsWithStarred.filter((project) => isNewStatus(project.status)).length,
+      on_hold: projectsWithStarred.filter((project) => isOnHoldStatus(project.status)).length,
       completed: projectsWithStarred.filter((project) => isCompleteStatus(project.status)).length,
     };
   }, [projectsWithStarred]);
@@ -349,17 +351,21 @@ export default function AdminProjectManagementDashboard() {
     const isCompleteStatus = (status?: string | null) =>
       status === 'complete' || status === 'completed';
     const isNewStatus = (status?: string | null) => status === 'new';
+    const isOnHoldStatus = (status?: string | null) => status === 'on_hold';
 
     let projects = filteredProjects;
 
     // Apply status tab filter
     if (projectStatusTab === 'new') {
       projects = projects.filter((project) => isNewStatus(project.status));
+    } else if (projectStatusTab === 'on_hold') {
+      projects = projects.filter((project) => isOnHoldStatus(project.status));
     } else if (projectStatusTab === 'completed') {
       projects = projects.filter((project) => isCompleteStatus(project.status));
     } else {
+      // Current tab: exclude new, on_hold, and completed
       projects = projects.filter(
-        (project) => !isNewStatus(project.status) && !isCompleteStatus(project.status)
+        (project) => !isNewStatus(project.status) && !isOnHoldStatus(project.status) && !isCompleteStatus(project.status)
       );
     }
 
@@ -751,6 +757,13 @@ export default function AdminProjectManagementDashboard() {
             >
               New Project Requests
               <span className={styles.tabCount}>{statusTabCounts.new}</span>
+            </button>
+            <button
+              className={`${styles.categoryTab} ${projectStatusTab === 'on_hold' ? styles.active : ''}`}
+              onClick={() => setProjectStatusTab('on_hold')}
+            >
+              On Hold
+              <span className={styles.tabCount}>{statusTabCounts.on_hold}</span>
             </button>
             <button
               className={`${styles.categoryTab} ${projectStatusTab === 'completed' ? styles.active : ''}`}
