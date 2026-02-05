@@ -9,6 +9,7 @@ import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
+import { ImageLightbox } from '@/components/Common/ImageLightbox/ImageLightbox';
 import { Project, ProjectAttachment, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
@@ -127,6 +128,9 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [uploadingProjectAttachment, setUploadingProjectAttachment] = useState(false);
   const [isDraggingProjectFile, setIsDraggingProjectFile] = useState(false);
   const projectDragCounterRef = React.useRef(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
+  const [currentLightboxImages, setCurrentLightboxImages] = useState<Array<{ id: string; url: string; name: string }>>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const processedCommentRef = React.useRef<string | null>(null);
@@ -1374,8 +1378,59 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     }
   }, [project.id, onProjectUpdate]);
 
+  // Lightbox handlers
+  const imageAttachments = useMemo(
+    () => projectAttachments.filter(a => a.mime_type.startsWith('image/')),
+    [projectAttachments]
+  );
+
+  const lightboxImages = useMemo(
+    () => imageAttachments.map(attachment => ({
+      id: attachment.id,
+      url: `/api/admin/projects/${project.id}/attachments/${attachment.id}/url`,
+      name: attachment.file_name
+    })),
+    [imageAttachments, project.id]
+  );
+
+  const handleImageClick = useCallback((attachmentId: string) => {
+    const index = imageAttachments.findIndex(a => a.id === attachmentId);
+    if (index !== -1) {
+      setCurrentLightboxImages(lightboxImages);
+      setLightboxImageIndex(index);
+      setLightboxOpen(true);
+    }
+  }, [imageAttachments, lightboxImages]);
+
+  const handleCloseLightbox = useCallback(() => {
+    setLightboxOpen(false);
+    setCurrentLightboxImages([]);
+  }, []);
+
+  const handleNavigateLightbox = useCallback((index: number) => {
+    setLightboxImageIndex(index);
+  }, []);
+
+  const handleCommentImageClick = useCallback((commentImages: Array<{ id: string; url: string; name: string }>, imageId: string) => {
+    const index = commentImages.findIndex(img => img.id === imageId);
+    if (index !== -1) {
+      setCurrentLightboxImages(commentImages);
+      setLightboxImageIndex(index);
+      setLightboxOpen(true);
+    }
+  }, []);
+
   return (
     <div className={styles.container}>
+      {/* Image Lightbox */}
+      {lightboxOpen && currentLightboxImages.length > 0 && (
+        <ImageLightbox
+          images={currentLightboxImages}
+          currentIndex={lightboxImageIndex}
+          onClose={handleCloseLightbox}
+          onNavigate={handleNavigateLightbox}
+        />
+      )}
 
       <Toast
         message={toastMessage}
@@ -1536,7 +1591,11 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                     return (
                       <div key={attachment.id} className={styles.attachmentItem}>
                         {isImage ? (
-                          <div className={styles.imageWrapper}>
+                          <div
+                            className={styles.imageWrapper}
+                            onClick={() => handleImageClick(attachment.id)}
+                            style={{ cursor: 'pointer' }}
+                          >
                             <img
                               src={`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`}
                               alt={attachment.file_name}
@@ -1545,7 +1604,10 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                             {canEditProject && (
                               <button
                                 className={styles.deleteImageButton}
-                                onClick={() => handleDeleteProjectAttachment(attachment.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteProjectAttachment(attachment.id);
+                                }}
                                 aria-label="Delete attachment"
                               >
                                 <X size={14} />
@@ -1555,7 +1617,6 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                         ) : (
                           <a
                             href={`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`}
-                            download={attachment.file_name}
                             target="_blank"
                             rel="noopener noreferrer"
                             className={styles.documentWrapper}
@@ -1797,24 +1858,29 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                                       !attachment.mime_type?.startsWith('image/')
                                   );
 
+                                  const commentLightboxImages = imageAttachments.map((attachment: { id: string; url: string; file_name: string }) => ({
+                                    id: attachment.id,
+                                    url: attachment.url,
+                                    name: attachment.file_name
+                                  }));
+
                                   return (
                                     <>
                                       {imageAttachments.length > 0 && (
                                         <div className={styles.commentImageAttachments}>
                                           {imageAttachments.map((attachment: { id: string; url: string; file_name: string }) => (
-                                            <a
+                                            <div
                                               key={attachment.id}
-                                              href={attachment.url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
                                               className={styles.commentImageLink}
+                                              onClick={() => handleCommentImageClick(commentLightboxImages, attachment.id)}
+                                              style={{ cursor: 'pointer' }}
                                             >
                                               <img
                                                 src={attachment.url}
                                                 alt={attachment.file_name}
                                                 className={styles.commentImage}
                                               />
-                                            </a>
+                                            </div>
                                           ))}
                                         </div>
                                       )}

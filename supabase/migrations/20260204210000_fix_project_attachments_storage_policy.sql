@@ -57,7 +57,3 @@ CREATE POLICY "Users can view project files they have access to" ON storage.obje
             )
         )
     );
-
--- Add comment to explain the policy
-COMMENT ON POLICY "Users can view project files they have access to" ON storage.objects IS
-'Allows users to view project files if they are the requestor, assignee, member of the project, or member of the project company. Checks both primary_file_path and attachments JSONB array.';
