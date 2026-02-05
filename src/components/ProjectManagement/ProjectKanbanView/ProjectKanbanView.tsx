@@ -51,6 +51,11 @@ export function ProjectKanbanView({
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Click-and-drag scroll state
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
   // Build columns from departments
   const columns: Column[] = useMemo(() => [
     ...departments.map(dept => ({
@@ -64,10 +69,9 @@ export function ProjectKanbanView({
   const [columnScrollStates, setColumnScrollStates] = useState<
     Record<string, boolean>
   >({});
-  const [showScrollLeft, setShowScrollLeft] = useState(false);
-  const [showScrollRight, setShowScrollRight] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewContentRef = useRef<HTMLDivElement | null>(null);
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const getProjectsByDepartment = (columnId: string): Project[] => {
@@ -103,61 +107,14 @@ export function ProjectKanbanView({
     columns.forEach(column => checkColumnScroll(column.id));
   }, [projects, columns]);
 
-  const updateOverflow = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) {
-      setShowScrollLeft(false);
-      setShowScrollRight(false);
-      return;
+  // Find and store reference to parent .viewContent container
+  useEffect(() => {
+    if (containerRef.current) {
+      // Find parent with class containing "viewContent"
+      const viewContentElement = containerRef.current.closest('[class*="viewContent"]') as HTMLDivElement;
+      viewContentRef.current = viewContentElement;
     }
-
-    const hasOverflow = container.scrollWidth > container.clientWidth + 4;
-    const canScrollLeft = container.scrollLeft > 4;
-    const canScrollRight =
-      container.scrollLeft + container.clientWidth < container.scrollWidth - 4;
-
-    setShowScrollLeft(hasOverflow && canScrollLeft);
-    setShowScrollRight(hasOverflow && canScrollRight);
   }, []);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    updateOverflow();
-
-    const handleScroll = () => updateOverflow();
-    const handleResize = () => updateOverflow();
-
-    container.addEventListener('scroll', handleScroll);
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [updateOverflow]);
-
-  useEffect(() => {
-    updateOverflow();
-  }, [projects, columns, updateOverflow]);
-
-  const handleScroll = (direction: 'left' | 'right') => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const firstColumn = container.querySelector<HTMLElement>(
-      `.${styles.kanbanColumnWrapper}`
-    );
-    const columnWidth = firstColumn?.offsetWidth || 315;
-    const gap = 16;
-    const scrollByAmount = (columnWidth + gap) * 4;
-
-    container.scrollBy({
-      left: direction === 'left' ? -scrollByAmount : scrollByAmount,
-      behavior: 'smooth',
-    });
-  };
 
   // Auto-scroll when dragging near edges
   const handleDragOverContainer = useCallback(
@@ -220,6 +177,45 @@ export function ProjectKanbanView({
       }
     };
   }, []);
+
+  // Click-and-drag scroll handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only start drag if clicking on the container itself, not on cards
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(`.${styles.projectCard}`) ||
+      target.closest(`.${styles.draggableProject}`)
+    ) {
+      return;
+    }
+
+    const viewContent = viewContentRef.current;
+    if (!viewContent) return;
+
+    setIsMouseDown(true);
+    setStartX(e.clientX); // Use clientX for more accurate positioning
+    setScrollLeft(viewContent.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseDown(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsMouseDown(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDown) return;
+    e.preventDefault();
+
+    const viewContent = viewContentRef.current;
+    if (!viewContent) return;
+
+    const x = e.clientX;
+    const distance = startX - x; // Calculate how far we've moved
+    viewContent.scrollLeft = scrollLeft + distance;
+  };
 
   // Drag handlers
   const handleDragStart = (
@@ -306,6 +302,10 @@ export function ProjectKanbanView({
         ref={containerRef}
         className={`${styles.kanbanContainer} ${styles.departmentView}`}
         onDragOver={handleDragOverContainer}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
       >
         <div className={`${styles.kanbanBoard} ${styles.departmentView}`}>
           {columns.map(column => {
@@ -401,54 +401,6 @@ export function ProjectKanbanView({
           })}
         </div>
       </div>
-      {showScrollLeft && (
-        <button
-          type="button"
-          className={`${styles.scrollArrow} ${styles.scrollArrowLeft}`}
-          onClick={() => handleScroll('left')}
-          aria-label="Scroll department columns left"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <path
-              d="M15 6L9 12L15 18"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      )}
-      {showScrollRight && (
-        <button
-          type="button"
-          className={styles.scrollArrow}
-          onClick={() => handleScroll('right')}
-          aria-label="Scroll department columns"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <path
-              d="M9 6L15 12L9 18"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { sendTaskUnblockedNotifications } from '@/lib/slack';
 
 // GET /api/admin/projects/[id]/tasks/[taskId] - Get a single task
 export async function GET(
@@ -140,6 +141,39 @@ export async function PUT(
     console.log('PUT /tasks/[taskId] - Request body:', JSON.stringify(body));
     console.log('PUT /tasks/[taskId] - taskId:', taskId, 'projectId:', projectId);
 
+    // Fetch current task state before update
+    const { data: currentTask, error: fetchError } = await supabase
+      .from('project_tasks')
+      .select('is_completed, blocked_by_task_id, blocked_by_task:blocked_by_task_id(id, title, is_completed)')
+      .eq('id', taskId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching current task:', fetchError);
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // Before allowing completion, check if task is blocked
+    if (body.is_completed && !currentTask.is_completed) {
+      // Check if task has an active blocker
+      const { data: hasBlocker } = await supabase
+        .rpc('has_blocking_dependency', { task_uuid: taskId });
+
+      if (hasBlocker) {
+        // Get blocker details
+        const { data: blocker } = await supabase
+          .rpc('get_blocking_task', { task_uuid: taskId });
+
+        return NextResponse.json(
+          {
+            error: 'Cannot complete task: blocked by another task',
+            blockedBy: blocker
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Prepare update data
     const updateData: any = {};
 
@@ -220,6 +254,54 @@ export async function PUT(
         .from('projects')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', projectId);
+    }
+
+    // Handle task completion - notify and move department
+    if (body.is_completed && !currentTask.is_completed) {
+      // Fetch tasks that were blocked by this one
+      const { data: unblockedTasks } = await supabase
+        .rpc('get_all_blocked_tasks', { task_uuid: taskId });
+
+      if (unblockedTasks && unblockedTasks.length > 0) {
+        // Trigger Slack notifications (fire-and-forget)
+        setImmediate(async () => {
+          try {
+            // Fetch project name for notification
+            const { data: project } = await supabase
+              .from('projects')
+              .select('name')
+              .eq('id', projectId)
+              .single();
+
+            await sendTaskUnblockedNotifications(unblockedTasks, {
+              id: task.id,
+              title: task.title,
+              project_id: task.project_id || projectId,
+              project: { name: project?.name || 'Unknown Project' }
+            });
+          } catch (error) {
+            console.error('Error sending Slack notifications:', error);
+          }
+        });
+
+        // Auto-move project to first unblocked task's department (if set)
+        const firstUnblockedTask = unblockedTasks[0];
+        if (firstUnblockedTask.department_id) {
+          // Fetch current project department
+          const { data: project } = await supabase
+            .from('projects')
+            .select('current_department_id')
+            .eq('id', projectId)
+            .single();
+
+          if (project && project.current_department_id !== firstUnblockedTask.department_id) {
+            await supabase
+              .from('projects')
+              .update({ current_department_id: firstUnblockedTask.department_id })
+              .eq('id', projectId);
+          }
+        }
+      }
     }
 
     // Handle category updates if provided

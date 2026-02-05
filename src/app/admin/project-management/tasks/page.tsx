@@ -59,6 +59,7 @@ export default function AdminTasksPage() {
     created_at: projectTask.created_at || new Date().toISOString(),
     updated_at: projectTask.updated_at || new Date().toISOString(),
     is_starred: isStarred('task', projectTask.id),
+    blocked_by_task: projectTask.blocked_by_task || null,
   });
 
   // Filter tasks - always show only tasks assigned to current user

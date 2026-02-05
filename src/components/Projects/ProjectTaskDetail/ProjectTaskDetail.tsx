@@ -14,6 +14,7 @@ import {
   Flag,
   Pencil,
   Tag,
+  Lock,
 } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
@@ -70,8 +71,8 @@ export default function ProjectTaskDetail({
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [isUpdatingComplete, setIsUpdatingComplete] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
-  const [dependencyType, setDependencyType] = useState<'blocks' | 'blocked_by' | 'none'>('none');
-  const [dependencyTaskId, setDependencyTaskId] = useState<string>('');
+  const [blocksTaskId, setBlocksTaskId] = useState<string>('');
+  const [blockedByTaskId, setBlockedByTaskId] = useState<string>('');
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -194,16 +195,8 @@ export default function ProjectTaskDetail({
     setSelectedCategoryIds(categoryIds.slice(0, 1));
 
     // Set dependency state
-    if (task.blocks_task_id) {
-      setDependencyType('blocks');
-      setDependencyTaskId(task.blocks_task_id);
-    } else if (task.blocked_by_task_id) {
-      setDependencyType('blocked_by');
-      setDependencyTaskId(task.blocked_by_task_id);
-    } else {
-      setDependencyType('none');
-      setDependencyTaskId('');
-    }
+    setBlocksTaskId(task.blocks_task_id || '');
+    setBlockedByTaskId(task.blocked_by_task_id || '');
   }, [task]);
 
   useEffect(() => {
@@ -351,35 +344,23 @@ export default function ProjectTaskDetail({
     }
   };
 
-  const handleDependencyTypeChange = async (type: 'blocks' | 'blocked_by' | 'none') => {
-    setDependencyType(type);
-    if (type === 'none') {
-      setDependencyTaskId('');
-      // Clear both dependency fields
-      try {
-        await onUpdate(task.id, {
-          blocks_task_id: null,
-          blocked_by_task_id: null,
-        });
-      } catch (error) {
-        console.error('Error clearing dependency:', error);
-        alert('Failed to clear dependency. Please try again.');
-      }
+  const handleBlocksTaskChange = async (taskId: string) => {
+    setBlocksTaskId(taskId);
+    try {
+      await onUpdate(task.id, { blocks_task_id: taskId || null });
+    } catch (error) {
+      console.error('Error updating blocks_task_id:', error);
+      setBlocksTaskId(task.blocks_task_id || '');
     }
   };
 
-  const handleDependencyTaskChange = async (taskId: string) => {
-    setDependencyTaskId(taskId);
+  const handleBlockedByTaskChange = async (taskId: string) => {
+    setBlockedByTaskId(taskId);
     try {
-      const updates: Partial<ProjectTask> = {
-        blocks_task_id: dependencyType === 'blocks' ? (taskId || null) : null,
-        blocked_by_task_id: dependencyType === 'blocked_by' ? (taskId || null) : null,
-      };
-      await onUpdate(task.id, updates);
+      await onUpdate(task.id, { blocked_by_task_id: taskId || null });
     } catch (error) {
-      console.error('Error updating dependency:', error);
-      alert('Failed to update dependency. Please try again.');
-      setDependencyTaskId(task.blocks_task_id || task.blocked_by_task_id || '');
+      console.error('Error updating blocked_by_task_id:', error);
+      setBlockedByTaskId(task.blocked_by_task_id || '');
     }
   };
 
@@ -404,12 +385,20 @@ export default function ProjectTaskDetail({
 
   const handleToggleComplete = async () => {
     if (isUpdatingComplete) return;
+
+    // Check if task is blocked
+    if (!task.is_completed && task.blocked_by_task && !task.blocked_by_task.is_completed) {
+      alert(`Cannot complete task: blocked by "${task.blocked_by_task.title}"`);
+      return;
+    }
+
     setIsUpdatingComplete(true);
     try {
       await onUpdate(task.id, { is_completed: !task.is_completed });
     } catch (error) {
       console.error('Error updating completion:', error);
-      alert('Failed to update task. Please try again.');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update task';
+      alert(errorMsg);
     } finally {
       setIsUpdatingComplete(false);
     }
@@ -468,12 +457,31 @@ export default function ProjectTaskDetail({
           <div className={styles.titleRow}>
             <button
               type="button"
-              className={`${styles.completeToggle} ${task.is_completed ? styles.completeToggleDone : ''}`}
+              className={`${styles.completeToggle} ${
+                task.is_completed ? styles.completeToggleDone : ''
+              } ${
+                task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.completeToggleBlocked : ''
+              }`}
               onClick={handleToggleComplete}
-              aria-label={task.is_completed ? 'Mark task incomplete' : 'Mark task complete'}
+              aria-label={
+                task.blocked_by_task && !task.blocked_by_task.is_completed
+                  ? 'Task is blocked'
+                  : task.is_completed
+                  ? 'Mark task incomplete'
+                  : 'Mark task complete'
+              }
               disabled={isUpdatingComplete}
+              title={
+                task.blocked_by_task && !task.blocked_by_task.is_completed
+                  ? `Blocked by: ${task.blocked_by_task.title}`
+                  : undefined
+              }
             >
-              {task.is_completed && <Check size={14} />}
+              {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+                <Lock size={14} />
+              ) : task.is_completed ? (
+                <Check size={14} />
+              ) : null}
             </button>
             <textarea
               className={`${styles.titleInput} ${task.is_completed ? styles.completed : ''}`}
@@ -633,45 +641,50 @@ export default function ProjectTaskDetail({
                 />
               </div>
 
-              {/* Task Dependencies */}
+              {/* Is Blocking Dropdown */}
               <div className={styles.detailItem}>
                 <div className={styles.detailLabel}>
                   <CheckSquare size={14} />
-                  Dependency Type
+                  Is Blocking
                 </div>
                 <select
                   className={styles.editSelect}
-                  value={dependencyType}
-                  onChange={(e) => handleDependencyTypeChange(e.target.value as 'blocks' | 'blocked_by' | 'none')}
+                  value={blocksTaskId}
+                  onChange={(e) => handleBlocksTaskChange(e.target.value)}
                 >
-                  <option value="none">None</option>
-                  <option value="blocks">This task blocks...</option>
-                  <option value="blocked_by">This task is blocked by...</option>
+                  <option value="">None</option>
+                  {availableTasks
+                    .filter(t => t.id !== task?.id && t.id !== blockedByTaskId)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
                 </select>
               </div>
 
-              {dependencyType !== 'none' && (
-                <div className={styles.detailItem}>
-                  <div className={styles.detailLabel}>
-                    <CheckSquare size={14} />
-                    {dependencyType === 'blocks' ? 'Task Being Blocked' : 'Blocking Task'}
-                  </div>
-                  <select
-                    className={styles.editSelect}
-                    value={dependencyTaskId}
-                    onChange={(e) => handleDependencyTaskChange(e.target.value)}
-                  >
-                    <option value="">Select a task</option>
-                    {availableTasks
-                      .filter(t => t.id !== task?.id) // Can't block yourself
-                      .map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.title}
-                        </option>
-                      ))}
-                  </select>
+              {/* Is Blocked By Dropdown */}
+              <div className={styles.detailItem}>
+                <div className={styles.detailLabel}>
+                  <CheckSquare size={14} />
+                  Is Blocked By
                 </div>
-              )}
+                <select
+                  className={styles.editSelect}
+                  value={blockedByTaskId}
+                  onChange={(e) => handleBlockedByTaskChange(e.target.value)}
+                >
+                  <option value="">None</option>
+                  {availableTasks
+                    .filter(t => t.id !== task?.id && t.id !== blocksTaskId)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} {!t.is_completed && '⏳'}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
 
               {availableCategories.length > 0 && (
                 <div className={`${styles.detailItem} ${styles.detailItemFullWidth}`}>

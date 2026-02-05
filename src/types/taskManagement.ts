@@ -46,6 +46,13 @@ export interface Task {
   updated_at: string;
   is_starred?: boolean; // Whether the current user has starred this task
   categories?: TaskCategory[]; // Categories assigned to this task
+  blocked_by_task?: {
+    id: string;
+    title: string;
+    is_completed: boolean;
+    assigned_to: string | null;
+    due_date: string | null;
+  } | null; // The task blocking this task
 }
 
 export interface Project {

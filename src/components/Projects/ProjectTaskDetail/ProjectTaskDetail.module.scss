@@ -899,3 +899,25 @@
     grid-template-columns: 1fr;
   }
 }
+
+.completeToggleBlocked {
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: white !important;
+  cursor: not-allowed !important;
+
+  &:hover {
+    background-color: #dc2626 !important;
+    border-color: #dc2626 !important;
+  }
+}
+
+.blockingWarning {
+  padding: 8px 12px;
+  background-color: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #78350f;
+  margin-top: 8px;
+}

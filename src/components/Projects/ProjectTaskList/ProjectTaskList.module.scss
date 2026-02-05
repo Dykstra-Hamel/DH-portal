@@ -143,6 +143,18 @@
   border-color: var(--success-600, #04ae6a);
 }
 
+.completeToggleBlocked {
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: white !important;
+  cursor: not-allowed !important;
+
+  &:hover {
+    background-color: #dc2626 !important;
+    border-color: #dc2626 !important;
+  }
+}
+
 .collapseToggle {
   border: none;
   background: transparent;

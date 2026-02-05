@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { Check, ChevronDown, Pencil, Calendar, MessageSquare, Trash2, GripVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronDown, Lock, Pencil, Calendar, MessageSquare, Trash2, GripVertical, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProjectTask } from '@/types/project';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
@@ -376,11 +376,16 @@ export default function ProjectTaskList({
           {/* Complete toggle */}
           <button
             type="button"
-            className={`${styles.completeToggle} ${task.is_completed ? styles.completeToggleDone : ''}`}
+            className={`${styles.completeToggle} ${task.is_completed ? styles.completeToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.completeToggleBlocked : ''}`}
             onClick={(event) => handleToggleComplete(event, task)}
             aria-label={task.is_completed ? 'Mark task incomplete' : 'Mark task complete'}
+            disabled={!!(task.blocked_by_task && !task.blocked_by_task.is_completed)}
           >
-            {task.is_completed && <Check size={14} />}
+            {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+              <Lock size={14} />
+            ) : task.is_completed ? (
+              <Check size={14} />
+            ) : null}
           </button>
 
           {/* Collapse toggle for parent tasks */}

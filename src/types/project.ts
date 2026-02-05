@@ -274,6 +274,7 @@ export interface ProjectTask {
   blocks_task_id: string | null; // The ONE task this task is blocking
   blocked_by_task_id: string | null; // The ONE task blocking this task
   blocker_reason: string | null;
+  department_id: string | null; // Optional department assignment
 
   // Order & Display
   display_order: number;
@@ -341,6 +342,7 @@ export interface ProjectTaskFormData {
   blocks_task_id?: string | null;
   blocked_by_task_id?: string | null;
   blocker_reason?: string | null;
+  department_id?: string | null;
   recurring_frequency: string;
   recurring_end_date: string;
   category_ids?: string[];

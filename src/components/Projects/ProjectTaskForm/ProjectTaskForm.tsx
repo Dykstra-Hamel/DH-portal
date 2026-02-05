@@ -51,8 +51,8 @@ export default function ProjectTaskForm({
     category_ids: [],
   });
 
-  const [dependencyType, setDependencyType] = useState<'blocks' | 'blocked_by' | 'none'>('none');
-  const [dependencyTaskId, setDependencyTaskId] = useState<string>('');
+  const [blocksTaskId, setBlocksTaskId] = useState<string>('');
+  const [blockedByTaskId, setBlockedByTaskId] = useState<string>('');
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -127,16 +127,8 @@ export default function ProjectTaskForm({
       });
 
       // Set dependency state
-      if (editingTask.blocks_task_id) {
-        setDependencyType('blocks');
-        setDependencyTaskId(editingTask.blocks_task_id);
-      } else if (editingTask.blocked_by_task_id) {
-        setDependencyType('blocked_by');
-        setDependencyTaskId(editingTask.blocked_by_task_id);
-      } else {
-        setDependencyType('none');
-        setDependencyTaskId('');
-      }
+      setBlocksTaskId(editingTask.blocks_task_id || '');
+      setBlockedByTaskId(editingTask.blocked_by_task_id || '');
     } else {
       // Reset form for new task
       setFormData({
@@ -150,8 +142,8 @@ export default function ProjectTaskForm({
         parent_task_id: '',
         category_ids: [],
       });
-      setDependencyType('none');
-      setDependencyTaskId('');
+      setBlocksTaskId('');
+      setBlockedByTaskId('');
     }
     setError(null);
   }, [editingTask, isOpen]);
@@ -172,8 +164,8 @@ export default function ProjectTaskForm({
       // Add dependency fields to formData
       const submitData = {
         ...formData,
-        blocks_task_id: dependencyType === 'blocks' ? dependencyTaskId || null : null,
-        blocked_by_task_id: dependencyType === 'blocked_by' ? dependencyTaskId || null : null,
+        blocks_task_id: blocksTaskId || null,
+        blocked_by_task_id: blockedByTaskId || null,
       };
 
       await onSubmit(submitData);
@@ -392,59 +384,55 @@ export default function ProjectTaskForm({
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>Task Dependencies</h3>
 
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <label htmlFor="dependency_type" className={styles.label}>
-                    Dependency Type
-                  </label>
-                  <select
-                    id="dependency_type"
-                    value={dependencyType}
-                    onChange={(e) => {
-                      setDependencyType(e.target.value as 'blocks' | 'blocked_by' | 'none');
-                      if (e.target.value === 'none') {
-                        setDependencyTaskId('');
-                      }
-                    }}
-                    className={styles.select}
-                  >
-                    <option value="none">None</option>
-                    <option value="blocks">This task blocks...</option>
-                    <option value="blocked_by">This task is blocked by...</option>
-                  </select>
-                </div>
-
-                {dependencyType !== 'none' && (
-                  <div className={styles.formGroup}>
-                    <label htmlFor="dependency_task" className={styles.label}>
-                      {dependencyType === 'blocks' ? 'Task Being Blocked' : 'Blocking Task'}
-                    </label>
-                    <select
-                      id="dependency_task"
-                      value={dependencyTaskId}
-                      onChange={(e) => setDependencyTaskId(e.target.value)}
-                      className={styles.select}
-                    >
-                      <option value="">Select a task</option>
-                      {parentTasks
-                        .filter(task => task.id !== editingTask?.id) // Can't block yourself
-                        .map(task => (
-                          <option key={task.id} value={task.id}>
-                            {task.title}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                )}
+              {/* Is Blocking Dropdown */}
+              <div className={styles.formGroup}>
+                <label htmlFor="blocksTaskId" className={styles.label}>
+                  Is Blocking
+                </label>
+                <select
+                  id="blocksTaskId"
+                  value={blocksTaskId}
+                  onChange={(e) => setBlocksTaskId(e.target.value)}
+                  className={styles.select}
+                >
+                  <option value="">None</option>
+                  {parentTasks
+                    .filter(t => t.id !== editingTask?.id && t.id !== blockedByTaskId)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
+                </select>
+                <span className={styles.helpText}>
+                  Select a task that cannot start until this task is completed
+                </span>
               </div>
 
-              {dependencyType !== 'none' && (
-                <p className={styles.fieldHelp}>
-                  {dependencyType === 'blocks'
-                    ? 'Select a task that cannot start until this task is completed'
-                    : 'Select a task that must be completed before this task can start'}
-                </p>
-              )}
+              {/* Is Blocked By Dropdown */}
+              <div className={styles.formGroup}>
+                <label htmlFor="blockedByTaskId" className={styles.label}>
+                  Is Blocked By
+                </label>
+                <select
+                  id="blockedByTaskId"
+                  value={blockedByTaskId}
+                  onChange={(e) => setBlockedByTaskId(e.target.value)}
+                  className={styles.select}
+                >
+                  <option value="">None</option>
+                  {parentTasks
+                    .filter(t => t.id !== editingTask?.id && t.id !== blocksTaskId)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
+                </select>
+                <span className={styles.helpText}>
+                  Select a task that must be completed before this task can start
+                </span>
+              </div>
             </section>
 
             {/* Additional Notes */}
