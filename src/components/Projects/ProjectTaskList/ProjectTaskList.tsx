@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { Check, ChevronDown, Pencil, Calendar, MessageSquare, Trash2, GripVertical } from 'lucide-react';
+import { Check, ChevronDown, Lock, Pencil, Calendar, MessageSquare, Trash2, GripVertical, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProjectTask } from '@/types/project';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectTaskList.module.scss';
 
 interface ProjectTaskListProps {
@@ -18,6 +19,7 @@ interface ProjectTaskListProps {
   isStarred?: (taskId: string) => boolean;
   isLoading?: boolean;
   showHeader?: boolean;
+  onAddTask?: () => void;
 }
 
 export default function ProjectTaskList({
@@ -31,11 +33,13 @@ export default function ProjectTaskList({
   isStarred,
   isLoading = false,
   showHeader = true,
+  onAddTask,
 }: ProjectTaskListProps) {
   const [collapsedTasks, setCollapsedTasks] = useState<Record<string, boolean>>({});
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [datePickerTaskId, setDatePickerTaskId] = useState<string | null>(null);
+  const [calendarMonthByTask, setCalendarMonthByTask] = useState<Record<string, Date>>({});
   const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -68,8 +72,8 @@ export default function ProjectTaskList({
         return a.display_order - b.display_order;
       }
       // Fall back to due_date sorting
-      const aVal = a.due_date ? new Date(a.due_date).getTime() : Infinity;
-      const bVal = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+      const aVal = a.due_date ? (parseDateString(a.due_date)?.getTime() ?? Infinity) : Infinity;
+      const bVal = b.due_date ? (parseDateString(b.due_date)?.getTime() ?? Infinity) : Infinity;
 
       if (aVal === bVal) {
         return (a.title || '').localeCompare(b.title || '');
@@ -141,9 +145,26 @@ export default function ProjectTaskList({
   };
 
   // Date picker handlers
-  const handleCalendarClick = (event: React.MouseEvent, taskId: string) => {
+  const getInitialCalendarMonth = (task?: ProjectTask) => {
+    if (task?.due_date) {
+      const [year, month] = task.due_date.split('-').map(Number);
+      return new Date(year, month - 1, 1);
+    }
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  };
+
+  const handleCalendarClick = (event: React.MouseEvent, task: ProjectTask) => {
     event.stopPropagation();
-    setDatePickerTaskId(datePickerTaskId === taskId ? null : taskId);
+    const nextTaskId = datePickerTaskId === task.id ? null : task.id;
+    setDatePickerTaskId(nextTaskId);
+
+    if (nextTaskId) {
+      setCalendarMonthByTask(prev => ({
+        ...prev,
+        [task.id]: prev[task.id] || getInitialCalendarMonth(task),
+      }));
+    }
   };
 
   const handleDateSelect = async (taskId: string, date: string) => {
@@ -235,7 +256,13 @@ export default function ProjectTaskList({
     if (task?.due_date) {
       const [year, month, day] = task.due_date.split('-').map(Number);
       selectedDate = new Date(year, month - 1, day);
-      currentMonth = selectedDate;
+    }
+
+    const storedMonth = calendarMonthByTask[taskId];
+    if (storedMonth) {
+      currentMonth = new Date(storedMonth.getFullYear(), storedMonth.getMonth(), 1);
+    } else if (selectedDate) {
+      currentMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
     }
 
     const today = new Date();
@@ -284,7 +311,16 @@ export default function ProjectTaskList({
     }
 
     return { days, monthLabel: currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) };
-  }, [tasks]);
+  }, [tasks, calendarMonthByTask]);
+
+  const handleMonthChange = (event: React.MouseEvent, taskId: string, direction: 'prev' | 'next') => {
+    event.stopPropagation();
+    setCalendarMonthByTask(prev => {
+      const current = prev[taskId] || getInitialCalendarMonth(tasks.find(t => t.id === taskId));
+      const nextMonth = new Date(current.getFullYear(), current.getMonth() + (direction === 'next' ? 1 : -1), 1);
+      return { ...prev, [taskId]: nextMonth };
+    });
+  };
 
   if (isLoading) {
     return (
@@ -309,6 +345,8 @@ export default function ProjectTaskList({
     const hasChildren = !isSubtask && (childTasksByParent.get(task.id) || []).length > 0;
     const isCollapsed = !!collapsedTasks[task.id];
     const profile = task.assigned_to_profile;
+    const dueDateLabel = task.due_date ? formatDateShort(task.due_date) : null;
+    const isOverdue = !!task.due_date && !task.is_completed && isPastDue(task.due_date);
 
     return (
       <div
@@ -338,11 +376,16 @@ export default function ProjectTaskList({
           {/* Complete toggle */}
           <button
             type="button"
-            className={`${styles.completeToggle} ${task.is_completed ? styles.completeToggleDone : ''}`}
+            className={`${styles.completeToggle} ${task.is_completed ? styles.completeToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.completeToggleBlocked : ''}`}
             onClick={(event) => handleToggleComplete(event, task)}
             aria-label={task.is_completed ? 'Mark task incomplete' : 'Mark task complete'}
+            disabled={!!(task.blocked_by_task && !task.blocked_by_task.is_completed)}
           >
-            {task.is_completed && <Check size={14} />}
+            {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+              <Lock size={14} />
+            ) : task.is_completed ? (
+              <Check size={14} />
+            ) : null}
           </button>
 
           {/* Collapse toggle for parent tasks */}
@@ -373,6 +416,11 @@ export default function ProjectTaskList({
             ) : (
               <span className={styles.taskName}>{task.title || 'Untitled task'}</span>
             )}
+            {dueDateLabel && (
+              <span className={`${styles.taskDueDate} ${isOverdue ? styles.taskDueDateOverdue : ''}`}>
+                Due {dueDateLabel}
+              </span>
+            )}
 
             {/* Hover actions overlay */}
             {!isEditing && (
@@ -400,7 +448,7 @@ export default function ProjectTaskList({
                 <button
                   type="button"
                   className={styles.actionIcon}
-                  onClick={(e) => handleCalendarClick(e, task.id)}
+                  onClick={(e) => handleCalendarClick(e, task)}
                   title={
                     task.due_date
                       ? (() => {
@@ -438,7 +486,25 @@ export default function ProjectTaskList({
                   const { days, monthLabel } = generateCalendarDays(task.id);
                   return (
                     <>
-                      <div className={styles.datePickerHeader}>{monthLabel}</div>
+                      <div className={styles.datePickerHeader}>
+                        <button
+                          type="button"
+                          className={styles.datePickerNav}
+                          onClick={(event) => handleMonthChange(event, task.id, 'prev')}
+                          aria-label="Previous month"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        <span className={styles.datePickerLabel}>{monthLabel}</span>
+                        <button
+                          type="button"
+                          className={styles.datePickerNav}
+                          onClick={(event) => handleMonthChange(event, task.id, 'next')}
+                          aria-label="Next month"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
                       <div className={styles.datePickerWeekdays}>
                         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
                           <span key={day}>{day}</span>
@@ -540,6 +606,14 @@ export default function ProjectTaskList({
         </div>
       )}
 
+      {onAddTask && (
+        <div className={styles.addTaskRow}>
+          <button type="button" className={styles.addTaskButton} onClick={onAddTask}>
+            + Add Task
+          </button>
+        </div>
+      )}
+
       {/* Delete confirmation modal */}
       {deleteConfirmTaskId && (
         <div className={styles.modalOverlay} onClick={handleDeleteCancel}>
@@ -560,3 +634,33 @@ export default function ProjectTaskList({
     </div>
   );
 }
+
+const formatDateShort = (dateString: string): string => {
+  // Parse date string directly to avoid timezone conversion issues
+  // Expected format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+  const datePart = dateString.split('T')[0];
+  const [year, month, day] = datePart.split('-');
+
+  if (!year || !month || !day) return '';
+
+  const monthStr = month.padStart(2, '0');
+  const dayStr = day.padStart(2, '0');
+  const yearStr = year.slice(-2);
+
+  return `${monthStr}/${dayStr}/${yearStr}`;
+};
+
+const isPastDue = (dateString: string): boolean => {
+  // Parse date string directly to avoid timezone conversion issues
+  const datePart = dateString.split('T')[0];
+  const [year, month, day] = datePart.split('-').map(Number);
+
+  if (!year || !month || !day) return false;
+
+  // Create date in local timezone
+  const dueDate = new Date(year, month - 1, day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return dueDate < today;
+};

@@ -19,6 +19,8 @@ import FormAnalytics from './FormAnalytics';
 import TemplateLibraryManager from './TemplateLibraryManager';
 import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
+import InternalCategorySettings from '../ProjectManagement/CategorySettings/InternalCategorySettings';
+import InternalDepartmentSettings from '../ProjectManagement/DepartmentSettings/InternalDepartmentSettings';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -270,17 +272,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         );
       case 'project-settings':
         return (
-          <div>
-            <p>
-              Navigate to{' '}
-              <Link
-                href="/admin/settings/project-management"
-                style={{ color: 'var(--action-500)' }}
-              >
-                /admin/settings/project-management
-              </Link>{' '}
-              to manage internal project categories and settings.
-            </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+            <InternalDepartmentSettings />
+            <InternalCategorySettings />
           </div>
         );
       default:

@@ -59,6 +59,7 @@ export default function AdminTasksPage() {
     created_at: projectTask.created_at || new Date().toISOString(),
     updated_at: projectTask.updated_at || new Date().toISOString(),
     is_starred: isStarred('task', projectTask.id),
+    blocked_by_task: projectTask.blocked_by_task || null,
   });
 
   // Filter tasks - always show only tasks assigned to current user
@@ -277,6 +278,23 @@ export default function AdminTasksPage() {
     await fetchProjects();
   }, [toggleStar, fetchProjects]);
 
+  const handleInlineTaskUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/project-tasks/${taskId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(updates),
+      });
+
+      if (response.ok) {
+        await fetchTasks();
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  }, [fetchTasks]);
+
   const handleProjectClick = useCallback((project: Project) => {
     // Navigate to project detail page
     window.location.href = `/admin/project-management/${project.id}`;
@@ -303,6 +321,29 @@ export default function AdminTasksPage() {
       console.error('Error updating task:', error);
     }
   }, [selectedTaskDetail, fetchTasks]);
+
+  const handleToggleTaskComplete = useCallback(async (taskId: string, isCompleted: boolean) => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/project-tasks/${taskId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ is_completed: isCompleted }),
+      });
+
+      if (response.ok) {
+        const updatedTask = await response.json();
+        if (selectedTaskDetail?.id === updatedTask.id) {
+          setSelectedTaskDetail(updatedTask);
+        }
+        await fetchTasks();
+      } else {
+        console.error('Error updating task completion:', await response.text());
+      }
+    } catch (error) {
+      console.error('Error updating task completion:', error);
+    }
+  }, [fetchTasks, selectedTaskDetail]);
 
   const handleDeleteTaskFromDetail = useCallback(async () => {
     if (!selectedTaskDetail?.project_id || !selectedTaskDetail?.id) return;
@@ -419,6 +460,10 @@ export default function AdminTasksPage() {
                 onToggleStar={handleToggleStar}
                 onProjectClick={handleProjectClick}
                 onToggleStarProject={handleToggleStarProject}
+                onToggleComplete={handleToggleTaskComplete}
+                onUpdateTask={handleInlineTaskUpdate}
+                currentUserId={user?.id}
+                groupTasksByProject
               />
             )}
             {currentView === 'calendar' && (
@@ -448,6 +493,8 @@ export default function AdminTasksPage() {
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
         task={selectedTask}
+        projects={projects}
+        users={users}
       />
 
       {/* Task Detail Sidebar */}

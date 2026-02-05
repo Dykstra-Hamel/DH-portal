@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { sendTaskUnblockedNotifications } from '@/lib/slack';
 
 // GET /api/admin/projects/[id]/tasks/[taskId] - Get a single task
 export async function GET(
@@ -34,6 +35,8 @@ export async function GET(
         *,
         assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
         created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         comments:project_task_comments(
           *,
           user_profile:profiles(id, first_name, last_name, email, avatar_url)
@@ -41,6 +44,10 @@ export async function GET(
         activity:project_task_activity(
           *,
           user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        ),
+        project_task_category_assignments(
+          category_type,
+          category:project_categories(id, name)
         )
       `
       )
@@ -76,8 +83,21 @@ export async function GET(
         )
       : [];
 
+    // Flatten categories with category_type
+    // For /admin/ routes, filter to only include internal categories
+    const categories = task.project_task_category_assignments
+      ?.filter((assignment: any) => assignment.category_type === 'internal')
+      .map((assignment: any) => ({
+        ...assignment.category,
+        category_type: assignment.category_type,
+      }))
+      .filter((category: any) => category !== null) || [];
+
+    const { project_task_category_assignments, ...taskWithoutAssignments } = task;
+
     const taskWithSubtasks = {
-      ...task,
+      ...taskWithoutAssignments,
+      categories,
       subtasks: subtasks || [],
       activity: sortedActivity,
     };
@@ -118,6 +138,41 @@ export async function PUT(
 
     // Parse request body
     const body = await request.json();
+    console.log('PUT /tasks/[taskId] - Request body:', JSON.stringify(body));
+    console.log('PUT /tasks/[taskId] - taskId:', taskId, 'projectId:', projectId);
+
+    // Fetch current task state before update
+    const { data: currentTask, error: fetchError } = await supabase
+      .from('project_tasks')
+      .select('is_completed, blocked_by_task_id, blocked_by_task:blocked_by_task_id(id, title, is_completed)')
+      .eq('id', taskId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching current task:', fetchError);
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // Before allowing completion, check if task is blocked
+    if (body.is_completed && !currentTask.is_completed) {
+      // Check if task has an active blocker
+      const { data: hasBlocker } = await supabase
+        .rpc('has_blocking_dependency', { task_uuid: taskId });
+
+      if (hasBlocker) {
+        // Get blocker details
+        const { data: blocker } = await supabase
+          .rpc('get_blocking_task', { task_uuid: taskId });
+
+        return NextResponse.json(
+          {
+            error: 'Cannot complete task: blocked by another task',
+            blockedBy: blocker
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // Prepare update data
     const updateData: any = {};
@@ -146,8 +201,8 @@ export async function PUT(
     if (body.actual_hours !== undefined) {
       updateData.actual_hours = body.actual_hours ? parseFloat(body.actual_hours) : null;
     }
-    if (body.blocked_by !== undefined) updateData.blocked_by = body.blocked_by;
-    if (body.blocking !== undefined) updateData.blocking = body.blocking;
+    if (body.blocks_task_id !== undefined) updateData.blocks_task_id = body.blocks_task_id || null;
+    if (body.blocked_by_task_id !== undefined) updateData.blocked_by_task_id = body.blocked_by_task_id || null;
     if (body.blocker_reason !== undefined) updateData.blocker_reason = body.blocker_reason || null;
     if (body.display_order !== undefined) updateData.display_order = body.display_order;
     if (body.parent_task_id !== undefined) updateData.parent_task_id = body.parent_task_id || null;
@@ -160,7 +215,12 @@ export async function PUT(
     if (body.recurring_end_date !== undefined) updateData.recurring_end_date = body.recurring_end_date || null;
     if (body.next_recurrence_date !== undefined) updateData.next_recurrence_date = body.next_recurrence_date || null;
 
+    // Always update the updated_at timestamp (even if only updating categories)
+    // This prevents empty updates which cause PGRST116 errors
+    updateData.updated_at = new Date().toISOString();
+
     // Update task
+    console.log('PUT /tasks/[taskId] - updateData:', JSON.stringify(updateData));
     const { data: task, error } = await supabase
       .from('project_tasks')
       .update(updateData)
@@ -170,20 +230,151 @@ export async function PUT(
         `
         *,
         assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date)
       `
       )
       .single();
 
+    console.log('PUT /tasks/[taskId] - Update result:', { task: !!task, error });
+
     if (error) {
       if (error.code === 'PGRST116') {
+        console.error('Task not found - taskId:', taskId, 'projectId:', projectId);
         return NextResponse.json({ error: 'Task not found' }, { status: 404 });
       }
       console.error('Error updating task:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(task);
+    // Update project's updated_at timestamp when task is updated
+    if (projectId) {
+      await supabase
+        .from('projects')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', projectId);
+    }
+
+    // Handle task completion - notify and move department
+    if (body.is_completed && !currentTask.is_completed) {
+      // Fetch tasks that were blocked by this one
+      const { data: unblockedTasks } = await supabase
+        .rpc('get_all_blocked_tasks', { task_uuid: taskId });
+
+      if (unblockedTasks && unblockedTasks.length > 0) {
+        // Trigger Slack notifications (fire-and-forget)
+        setImmediate(async () => {
+          try {
+            // Fetch project name for notification
+            const { data: project } = await supabase
+              .from('projects')
+              .select('name')
+              .eq('id', projectId)
+              .single();
+
+            await sendTaskUnblockedNotifications(unblockedTasks, {
+              id: task.id,
+              title: task.title,
+              project_id: task.project_id || projectId,
+              project: { name: project?.name || 'Unknown Project' }
+            });
+          } catch (error) {
+            console.error('Error sending Slack notifications:', error);
+          }
+        });
+
+        // Auto-move project to first unblocked task's department (if set)
+        const firstUnblockedTask = unblockedTasks[0];
+        if (firstUnblockedTask.department_id) {
+          // Fetch current project department
+          const { data: project } = await supabase
+            .from('projects')
+            .select('current_department_id')
+            .eq('id', projectId)
+            .single();
+
+          if (project && project.current_department_id !== firstUnblockedTask.department_id) {
+            await supabase
+              .from('projects')
+              .update({ current_department_id: firstUnblockedTask.department_id })
+              .eq('id', projectId);
+          }
+        }
+      }
+    }
+
+    // Handle category updates if provided
+    // For /admin/ routes, always use 'internal' category_type
+    if (body.category_ids !== undefined) {
+      console.log('PUT /tasks/[taskId] - Updating categories:', body.category_ids);
+
+      // Delete existing internal category assignments
+      const { error: deleteError } = await supabase
+        .from('project_task_category_assignments')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('category_type', 'internal');
+
+      if (deleteError) {
+        console.error('Error deleting existing task categories:', deleteError);
+      }
+
+      // Insert new category assignments if any
+      if (Array.isArray(body.category_ids) && body.category_ids.length > 0) {
+        const categoryAssignments = body.category_ids.map((categoryId: string) => ({
+          task_id: taskId,
+          category_id: categoryId,
+          category_type: 'internal', // Admin routes always use internal categories
+        }));
+
+        console.log('PUT /tasks/[taskId] - Inserting category assignments:', categoryAssignments);
+
+        const { error: categoryError } = await supabase
+          .from('project_task_category_assignments')
+          .insert(categoryAssignments);
+
+        if (categoryError) {
+          console.error('Error updating task categories:', categoryError);
+          // Don't fail the whole request, just log the error
+        } else {
+          console.log('PUT /tasks/[taskId] - Categories updated successfully');
+        }
+      }
+    }
+
+    // Fetch task with categories
+    const { data: taskWithCategories } = await supabase
+      .from('project_tasks')
+      .select(
+        `
+        *,
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
+        project_task_category_assignments(
+          category_type,
+          category:project_categories(id, name)
+        )
+      `
+      )
+      .eq('id', taskId)
+      .single();
+
+    // Flatten categories with category_type
+    // For /admin/ routes, filter to only include internal categories
+    const categories = taskWithCategories?.project_task_category_assignments
+      ?.filter((assignment: any) => assignment.category_type === 'internal')
+      .map((assignment: any) => ({
+        ...assignment.category,
+        category_type: assignment.category_type,
+      }))
+      .filter((category: any) => category !== null) || [];
+
+    const { project_task_category_assignments, ...taskData } = taskWithCategories || task;
+
+    return NextResponse.json({ ...taskData, categories });
   } catch (error) {
     console.error('Error in PUT /api/admin/projects/[id]/tasks/[taskId]:', error);
     return NextResponse.json(
@@ -191,6 +382,15 @@ export async function PUT(
       { status: 500 }
     );
   }
+}
+
+// PATCH /api/admin/projects/[id]/tasks/[taskId] - Partially update a task
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; taskId: string }> }
+) {
+  // PATCH uses the same logic as PUT for task updates
+  return PUT(request, { params });
 }
 
 // DELETE /api/admin/projects/[id]/tasks/[taskId] - Delete a task

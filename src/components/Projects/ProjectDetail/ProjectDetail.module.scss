@@ -10,6 +10,10 @@
   flex-direction: column;
 }
 
+.cardContentFlushLeft {
+  padding-left: 0;
+}
+
 .actionRow {
   display: flex;
   justify-content: flex-end;
@@ -25,6 +29,18 @@
 
   &:last-child {
     border-bottom: none;
+  }
+}
+
+.notesEditor {
+  :global(.editorContent) {
+    min-height: 120px;
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  :global(.toolbarDropdown) {
+    min-width: 320px;
   }
 }
 
@@ -311,8 +327,6 @@
 
   svg {
     flex-shrink: 0;
-    color: var(--text-secondary, #9ca3af);
-    margin-top: 0.125rem;
   }
 
   > div {
@@ -328,6 +342,29 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.25rem;
+}
+
+.infoHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0.25rem;
+}
+
+.changeLink {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--action-600, #3b82f6);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--action-700, #1d4ed8);
+    text-decoration: underline;
+  }
 }
 
 .infoValue {
@@ -688,6 +725,63 @@
   }
 }
 
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggleText {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+
+  input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+
+    &:checked + .toggleSlider {
+      background-color: var(--action-600, #3b82f6);
+
+      &::before {
+        transform: translateX(20px);
+      }
+    }
+  }
+}
+
+.toggleSlider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--gray-300, #d1d5db);
+  transition: 0.2s;
+  border-radius: 999px;
+
+  &::before {
+    position: absolute;
+    content: '';
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--white, #ffffff);
+    transition: 0.2s;
+    border-radius: 50%;
+  }
+}
+
 .categoryCheckboxes {
   display: flex;
   flex-direction: column;
@@ -711,6 +805,140 @@
   span {
     font-size: 0.875rem;
     font-weight: 500;
+    color: var(--text-primary, #111827);
+  }
+}
+
+.membersList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.memberChip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0;
+  background: transparent;
+}
+
+.memberInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.memberDetails {
+  min-width: 0;
+  flex: 1;
+}
+
+.memberName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberEmail {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.memberTaskCount {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: var(--gray-200, #e5e7eb);
+  color: var(--text-primary, #111827);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0 0.5rem;
+}
+
+.removeMemberButton {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--red-100, #fee2e2);
+    color: var(--red-600, #dc2626);
+  }
+}
+
+.addMemberButton {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 0.5rem;
+
+  &:hover {
+    background: var(--primary-dark, #2563eb);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.addMemberDropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.cancelAddMemberButton {
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--gray-100, #f3f4f6);
     color: var(--text-primary, #111827);
   }
 }

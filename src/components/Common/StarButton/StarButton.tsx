@@ -4,7 +4,7 @@ import styles from './StarButton.module.scss';
 export interface StarButtonProps {
   isStarred: boolean;
   onToggle: () => void;
-  size?: 'small' | 'medium' | 'large';
+  size?: 'small' | 'medium' | 'large' | 'card';
   className?: string;
 }
 

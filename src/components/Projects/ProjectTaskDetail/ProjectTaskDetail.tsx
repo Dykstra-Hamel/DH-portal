@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   X,
   Trash2,
@@ -13,10 +13,12 @@ import {
   Activity as ActivityIcon,
   Flag,
   Pencil,
+  Tag,
+  Lock,
 } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
-import { ProjectTask, taskPriorityOptions } from '@/types/project';
+import { ProjectTask, taskPriorityOptions, ProjectCategory } from '@/types/project';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import styles from './ProjectTaskDetail.module.scss';
 
@@ -32,6 +34,10 @@ interface ProjectTaskDetailProps {
   highlightedCommentId?: string | null;
   onToggleStar?: (taskId: string) => void;
   isStarred?: (taskId: string) => boolean;
+  availableCategories?: ProjectCategory[]; // Available categories for this project
+  projectMembers?: Array<{ user_id: string }>; // Project members
+  projectAssignedTo?: string | null; // Project's assigned_to user
+  availableTasks?: ProjectTask[]; // All tasks in project for dependency selection
 }
 
 export default function ProjectTaskDetail({
@@ -46,10 +52,15 @@ export default function ProjectTaskDetail({
   highlightedCommentId,
   onToggleStar,
   isStarred,
+  availableCategories = [],
+  projectMembers = [],
+  projectAssignedTo = null,
+  availableTasks = [],
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task?.title || '');
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const [priorityDraft, setPriorityDraft] = useState(task?.priority || 'medium');
   const [assignedToDraft, setAssignedToDraft] = useState(task?.assigned_to || '');
   const [dueDateDraft, setDueDateDraft] = useState('');
@@ -59,6 +70,9 @@ export default function ProjectTaskDetail({
   const [isSavingDescription, setIsSavingDescription] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [isUpdatingComplete, setIsUpdatingComplete] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [blocksTaskId, setBlocksTaskId] = useState<string>('');
+  const [blockedByTaskId, setBlockedByTaskId] = useState<string>('');
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -82,22 +96,30 @@ export default function ProjectTaskDetail({
   };
 
   const assignableUsers = useMemo(() => {
-    const shouldFilterByRole = users.some(user => getUserRole(user));
-    const adminUsers = shouldFilterByRole
-      ? users.filter((user) => {
-          const role = getUserRole(user);
-          return role ? isAdminRole(role) : false;
-        })
-      : users;
+    // Get member IDs from project
+    const memberIds = new Set(projectMembers.map(m => m.user_id));
 
-    if (task?.assigned_to && !adminUsers.some(user => user.id === task.assigned_to)) {
-      const assignedUser = users.find(user => user.id === task.assigned_to);
+    // Add project's assigned_to
+    if (projectAssignedTo) {
+      memberIds.add(projectAssignedTo);
+    }
+
+    // Filter users to members only
+    let filteredUsers = users.filter(u => {
+      const userId = u.profiles?.id || u.id;
+      return memberIds.has(userId);
+    });
+
+    // Always include current assignee even if not a member
+    const currentAssignee = task?.assigned_to || assignedToDraft;
+    if (currentAssignee && !filteredUsers.some(u => (u.profiles?.id || u.id) === currentAssignee)) {
+      const assignedUser = users.find(u => (u.profiles?.id || u.id) === currentAssignee);
       if (assignedUser) {
-        return [...adminUsers, assignedUser];
-      }
-      if (task.assigned_to_profile) {
-        return [
-          ...adminUsers,
+        filteredUsers = [...filteredUsers, assignedUser];
+      } else if (task?.assigned_to_profile) {
+        // If assigned user not found in users list but we have the profile, add it
+        filteredUsers = [
+          ...filteredUsers,
           {
             id: task.assigned_to,
             profiles: task.assigned_to_profile,
@@ -107,12 +129,28 @@ export default function ProjectTaskDetail({
       }
     }
 
-    return adminUsers;
-  }, [task?.assigned_to, users]);
+    return filteredUsers;
+  }, [task?.assigned_to, task?.assigned_to_profile, assignedToDraft, projectMembers, projectAssignedTo, users]);
 
   const formatDateInput = (dateString: string | null) => {
     if (!dateString) return '';
     return dateString.split('T')[0];
+  };
+
+  // Format a date-only string (YYYY-MM-DD) to local date without timezone conversion
+  const formatDateOnly = (dateString: string): string => {
+    const datePart = dateString.split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+
+    if (!year || !month || !day) return 'Invalid Date';
+
+    // Create date in local timezone
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   const formatDateTime = (dateString: string | null) => {
@@ -152,7 +190,21 @@ export default function ProjectTaskDetail({
     setStartDateDraft(formatDateInput(task.start_date));
     setDescriptionDraft(task.description || '');
     setIsEditingDescription(false);
+    // Set selected categories from task
+    const categoryIds = task.categories?.map(cat => cat.id) || [];
+    setSelectedCategoryIds(categoryIds.slice(0, 1));
+
+    // Set dependency state
+    setBlocksTaskId(task.blocks_task_id || '');
+    setBlockedByTaskId(task.blocked_by_task_id || '');
   }, [task]);
+
+  useEffect(() => {
+    const textarea = titleInputRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [titleDraft]);
 
   useEffect(() => {
     if (!highlightedCommentId) return;
@@ -182,11 +234,11 @@ export default function ProjectTaskDetail({
         return `changed priority from ${priorityLabel(activity.old_value)} to ${priorityLabel(activity.new_value)}`;
       case 'due_date_changed':
         if (!activity.old_value && activity.new_value) {
-          return `set due date to ${new Date(activity.new_value).toLocaleDateString()}`;
+          return `set due date to ${formatDateOnly(activity.new_value)}`;
         } else if (activity.old_value && !activity.new_value) {
           return 'removed the due date';
         }
-        return `changed due date from ${new Date(activity.old_value).toLocaleDateString()} to ${new Date(activity.new_value).toLocaleDateString()}`;
+        return `changed due date from ${formatDateOnly(activity.old_value)} to ${formatDateOnly(activity.new_value)}`;
       case 'assigned':
       case 'unassigned':
         if (activity.action_type === 'unassigned') {
@@ -240,7 +292,7 @@ export default function ProjectTaskDetail({
     }
   };
 
-  const handleTitleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTitleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       handleTitleSave();
@@ -292,6 +344,26 @@ export default function ProjectTaskDetail({
     }
   };
 
+  const handleBlocksTaskChange = async (taskId: string) => {
+    setBlocksTaskId(taskId);
+    try {
+      await onUpdate(task.id, { blocks_task_id: taskId || null });
+    } catch (error) {
+      console.error('Error updating blocks_task_id:', error);
+      setBlocksTaskId(task.blocks_task_id || '');
+    }
+  };
+
+  const handleBlockedByTaskChange = async (taskId: string) => {
+    setBlockedByTaskId(taskId);
+    try {
+      await onUpdate(task.id, { blocked_by_task_id: taskId || null });
+    } catch (error) {
+      console.error('Error updating blocked_by_task_id:', error);
+      setBlockedByTaskId(task.blocked_by_task_id || '');
+    }
+  };
+
   const handleDescriptionSave = async () => {
     const nextDescription = descriptionDraft.trim();
     setIsSavingDescription(true);
@@ -313,14 +385,45 @@ export default function ProjectTaskDetail({
 
   const handleToggleComplete = async () => {
     if (isUpdatingComplete) return;
+
+    // Check if task is blocked
+    if (!task.is_completed && task.blocked_by_task && !task.blocked_by_task.is_completed) {
+      alert(`Cannot complete task: blocked by "${task.blocked_by_task.title}"`);
+      return;
+    }
+
     setIsUpdatingComplete(true);
     try {
       await onUpdate(task.id, { is_completed: !task.is_completed });
     } catch (error) {
       console.error('Error updating completion:', error);
-      alert('Failed to update task. Please try again.');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update task';
+      alert(errorMsg);
     } finally {
       setIsUpdatingComplete(false);
+    }
+  };
+
+  const handleCategoryChange = async (categoryId: string | null) => {
+    const previousSelectedIds = selectedCategoryIds;
+    const isNoneOption = !categoryId;
+    const isCurrentlySelected = !isNoneOption && selectedCategoryIds.includes(categoryId);
+    const newSelectedIds = isNoneOption ? [] : isCurrentlySelected ? [] : [categoryId];
+
+    if (isNoneOption && previousSelectedIds.length === 0) {
+      return;
+    }
+
+    setSelectedCategoryIds(newSelectedIds);
+
+    try {
+      // Update categories via API
+      await onUpdate(task.id, { category_ids: newSelectedIds } as any);
+    } catch (error) {
+      console.error('Error updating categories:', error);
+      alert('Failed to update categories. Please try again.');
+      // Revert on error
+      setSelectedCategoryIds(previousSelectedIds);
     }
   };
 
@@ -354,15 +457,33 @@ export default function ProjectTaskDetail({
           <div className={styles.titleRow}>
             <button
               type="button"
-              className={`${styles.completeToggle} ${task.is_completed ? styles.completeToggleDone : ''}`}
+              className={`${styles.completeToggle} ${
+                task.is_completed ? styles.completeToggleDone : ''
+              } ${
+                task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.completeToggleBlocked : ''
+              }`}
               onClick={handleToggleComplete}
-              aria-label={task.is_completed ? 'Mark task incomplete' : 'Mark task complete'}
+              aria-label={
+                task.blocked_by_task && !task.blocked_by_task.is_completed
+                  ? 'Task is blocked'
+                  : task.is_completed
+                  ? 'Mark task incomplete'
+                  : 'Mark task complete'
+              }
               disabled={isUpdatingComplete}
+              title={
+                task.blocked_by_task && !task.blocked_by_task.is_completed
+                  ? `Blocked by: ${task.blocked_by_task.title}`
+                  : undefined
+              }
             >
-              {task.is_completed && <Check size={14} />}
+              {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+                <Lock size={14} />
+              ) : task.is_completed ? (
+                <Check size={14} />
+              ) : null}
             </button>
-            <input
-              type="text"
+            <textarea
               className={`${styles.titleInput} ${task.is_completed ? styles.completed : ''}`}
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
@@ -370,6 +491,8 @@ export default function ProjectTaskDetail({
               onKeyDown={handleTitleKeyDown}
               disabled={isSavingTitle}
               placeholder="Task title"
+              rows={1}
+              ref={titleInputRef}
             />
           </div>
         </div>
@@ -517,6 +640,87 @@ export default function ProjectTaskDetail({
                   onChange={(e) => handleDateChange('start_date', e.target.value)}
                 />
               </div>
+
+              {/* Is Blocking Dropdown */}
+              <div className={styles.detailItem}>
+                <div className={styles.detailLabel}>
+                  <CheckSquare size={14} />
+                  Is Blocking
+                </div>
+                <select
+                  className={styles.editSelect}
+                  value={blocksTaskId}
+                  onChange={(e) => handleBlocksTaskChange(e.target.value)}
+                >
+                  <option value="">None</option>
+                  {availableTasks
+                    .filter(t => t.id !== task?.id && t.id !== blockedByTaskId)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Is Blocked By Dropdown */}
+              <div className={styles.detailItem}>
+                <div className={styles.detailLabel}>
+                  <CheckSquare size={14} />
+                  Is Blocked By
+                </div>
+                <select
+                  className={styles.editSelect}
+                  value={blockedByTaskId}
+                  onChange={(e) => handleBlockedByTaskChange(e.target.value)}
+                >
+                  <option value="">None</option>
+                  {availableTasks
+                    .filter(t => t.id !== task?.id && t.id !== blocksTaskId)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} {!t.is_completed && '⏳'}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+
+              {availableCategories.length > 0 && (
+                <div className={`${styles.detailItem} ${styles.detailItemFullWidth}`}>
+                  <div className={styles.detailLabel}>
+                    <Tag size={14} />
+                    Category
+                  </div>
+                  <div className={styles.categorySelector}>
+                    <label className={styles.categoryCheckbox}>
+                      <input
+                        type="radio"
+                        name={`task-category-${task?.id ?? 'task'}`}
+                        checked={selectedCategoryIds.length === 0}
+                        onChange={() => handleCategoryChange(null)}
+                      />
+                      <span className={styles.categoryLabel}>No Category</span>
+                    </label>
+                    {availableCategories.map((category) => (
+                      <label key={category.id} className={styles.categoryCheckbox}>
+                        <input
+                          type="radio"
+                          name={`task-category-${task?.id ?? 'task'}`}
+                          checked={selectedCategoryIds.includes(category.id)}
+                          onChange={() => handleCategoryChange(category.id)}
+                        />
+                        <span className={styles.categoryLabel}>{category.name}</span>
+                      </label>
+                    ))}
+                    {availableCategories.length === 0 && (
+                      <span className={styles.noCategoriesText}>
+                        No categories available for this project
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

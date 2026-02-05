@@ -3,6 +3,7 @@ import { Project, statusOptions } from '@/types/project';
 import { Task } from '@/types/taskManagement';
 import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectsView.module.scss';
 
 type ProjectStatus = Project['status'];
@@ -52,14 +53,22 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
 
         return true;
       })
-      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+      .sort(
+        (a, b) =>
+          (parseDateString(a.due_date)?.getTime() ?? Number.POSITIVE_INFINITY) -
+          (parseDateString(b.due_date)?.getTime() ?? Number.POSITIVE_INFINITY)
+      );
   }, [projects, statusFilter, typeFilter, searchQuery]);
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const date = parseDateString(dateString);
+    if (!date) return 'Not Set';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const isPastDue = (date: Date): boolean => {
+  const isPastDue = (dateString?: string | null): boolean => {
+    const date = parseDateString(dateString);
+    if (!date) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const compareDate = new Date(date);
@@ -191,7 +200,7 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
                     <div className={styles.clientName}>{project.company.name}</div>
                   </div>
                   <div className={styles.cell}>
-                    <ProjectBadge projectName={project.project_type} projectType={project.project_type as any} size="small" />
+                    <ProjectBadge projectName={project.project_type} projectType={project.project_type as any} size="medium" />
                   </div>
                   <div className={styles.cell}>
                     {getStatusBadge(project.status)}
@@ -215,7 +224,7 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
                   <div className={styles.cell}>
                     <div
                       className={`${styles.deadline} ${
-                        project.due_date && isPastDue(new Date(project.due_date))
+                        project.due_date && isPastDue(project.due_date)
                           ? styles.deadlineOverdue
                           : ''
                       }`}

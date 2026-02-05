@@ -5,13 +5,14 @@ import { Plus, Edit2, Trash2, GripVertical } from 'lucide-react';
 import { ProjectCategory } from '@/types/project';
 import CategoryFormModal from './CategoryFormModal';
 import CategoryDeleteModal from './CategoryDeleteModal';
-import CategoryBadge from './CategoryBadge';
+import ProjectTypeSubtypesManager from './ProjectTypeSubtypesManager';
 import styles from './CategorySettings.module.scss';
 
 export default function InternalCategorySettings() {
   const [categories, setCategories] = useState<ProjectCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -127,6 +128,7 @@ export default function InternalCategorySettings() {
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
+    setDraggingIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -136,6 +138,7 @@ export default function InternalCategorySettings() {
 
   const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
+    setDraggingIndex(null);
 
     const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
 
@@ -214,19 +217,21 @@ export default function InternalCategorySettings() {
             {categories.map((category, index) => (
               <div
                 key={category.id}
-                className={styles.categoryCard}
-                draggable
+                className={`${styles.categoryCard} ${draggingIndex === index ? styles.dragging : ''}`}
+                draggable={true}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={() => setDraggingIndex(null)}
               >
-                <div className={styles.dragHandle}>
+                <div
+                  className={styles.dragHandle}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   <GripVertical />
                 </div>
 
                 <div className={styles.categoryInfo}>
-                  <CategoryBadge category={category} showIcon />
-
                   <div className={styles.categoryDetails}>
                     <h3 className={styles.categoryName}>{category.name}</h3>
                     {category.description && (
@@ -278,6 +283,9 @@ export default function InternalCategorySettings() {
         projectsUsingCategory={projectsForCategory}
         isInternal={true}
       />
+
+      {/* Project Type Subtypes Manager */}
+      <ProjectTypeSubtypesManager />
     </div>
   );
 }

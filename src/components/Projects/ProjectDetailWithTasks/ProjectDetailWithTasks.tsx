@@ -1,24 +1,29 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
-import { Check, ChevronDown, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { sanitizeFileName } from '@/lib/storage-utils';
+import { ArrowLeft, Check, ChevronDown, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
-import { Project, ProjectComment, ProjectTask, User as ProjectUser } from '@/types/project';
+import { ImageLightbox } from '@/components/Common/ImageLightbox/ImageLightbox';
+import { Project, ProjectAttachment, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
 import { adminAPI } from '@/lib/api-client';
+import { parseDateString } from '@/lib/date-utils';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import ProjectDetail from '../ProjectDetail/ProjectDetail';
 import ProjectTaskList from '../ProjectTaskList/ProjectTaskList';
 import ProjectTaskForm from '../ProjectTaskForm/ProjectTaskForm';
 import ProjectTaskDetail from '../ProjectTaskDetail/ProjectTaskDetail';
+import ApplyTemplateModal from '../ApplyTemplateModal/ApplyTemplateModal';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './ProjectDetailWithTasks.module.scss';
 
@@ -30,7 +35,9 @@ interface ProjectDetailWithTasksProps {
 
 const formatHeaderDate = (value?: string | null) => {
   if (!value) return 'Not set';
-  return new Date(value).toLocaleDateString('en-US', {
+  const parsed = parseDateString(value);
+  if (!parsed) return 'Not set';
+  return parsed.toLocaleDateString('en-US', {
     month: '2-digit',
     day: '2-digit',
     year: '2-digit',
@@ -43,7 +50,8 @@ const getDaysUntilDue = (dueDate: string | null) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const due = new Date(dueDate);
+  const due = parseDateString(dueDate);
+  if (!due) return '';
   due.setHours(0, 0, 0, 0);
 
   const diffTime = due.getTime() - today.getTime();
@@ -66,7 +74,8 @@ const isDueDateOverdue = (dueDate: string | null) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const due = new Date(dueDate);
+  const due = parseDateString(dueDate);
+  if (!due) return false;
   due.setHours(0, 0, 0, 0);
 
   return due < today;
@@ -78,7 +87,14 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
+  const [isHeaderStatusOpen, setIsHeaderStatusOpen] = useState(false);
+  const [isHeaderDepartmentOpen, setIsHeaderDepartmentOpen] = useState(false);
+  const [isUpdatingHeaderStatus, setIsUpdatingHeaderStatus] = useState(false);
+  const [isUpdatingHeaderDepartment, setIsUpdatingHeaderDepartment] = useState(false);
+  const headerStatusRef = useRef<HTMLDivElement>(null);
+  const headerDepartmentRef = useRef<HTMLDivElement>(null);
   const [users, setUsers] = useState<ProjectUser[]>([]);
+  const [departments, setDepartments] = useState<ProjectDepartment[]>([]);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [comments, setComments] = useState<ProjectComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -89,8 +105,8 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [commentAvatarError, setCommentAvatarError] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
-  const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const dragCounterRef = React.useRef(0);
+  const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
+  const commentComposerDragCounterRef = React.useRef(0);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
@@ -109,6 +125,14 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
   const [highlightedProjectCommentId, setHighlightedProjectCommentId] = useState<string | null>(null);
   const [highlightedTaskCommentId, setHighlightedTaskCommentId] = useState<string | null>(null);
   const highlightTimeoutRef = React.useRef<number | null>(null);
+  const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
+  const [projectAttachments, setProjectAttachments] = useState<ProjectAttachment[]>(project.attachments || []);
+  const [uploadingProjectAttachment, setUploadingProjectAttachment] = useState(false);
+  const [isDraggingProjectFile, setIsDraggingProjectFile] = useState(false);
+  const projectDragCounterRef = React.useRef(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
+  const [currentLightboxImages, setCurrentLightboxImages] = useState<Array<{ id: string; url: string; name: string }>>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const processedCommentRef = React.useRef<string | null>(null);
@@ -149,11 +173,16 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     clearError,
   } = useProjectTasks(project.id);
 
-  // Fetch tasks and users on mount
+  // Fetch tasks, users, and departments on mount
   React.useEffect(() => {
     fetchTasks(project.id);
     // Also fetch users for assignment
     adminAPI.getUsers().then(data => setUsers(data || [])).catch(() => {});
+    // Fetch departments
+    fetch('/api/admin/project-departments')
+      .then(res => res.json())
+      .then(data => setDepartments(data || []))
+      .catch(() => {});
   }, [project.id, fetchTasks]);
 
   React.useEffect(() => {
@@ -165,6 +194,124 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       setProjectDescriptionDraft(project.description || '');
     }
   }, [project.description, project.id, isEditingProjectDescription]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (headerStatusRef.current && !headerStatusRef.current.contains(event.target as Node)) {
+        setIsHeaderStatusOpen(false);
+      }
+      if (headerDepartmentRef.current && !headerDepartmentRef.current.contains(event.target as Node)) {
+        setIsHeaderDepartmentOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const statusLabel = useMemo(() => {
+    return statusOptions.find(option => option.value === project.status)?.label || project.status;
+  }, [project.status]);
+
+  const departmentLabel = useMemo(() => {
+    if (!project.current_department_id) return 'Unassigned';
+    const department = departments.find(d => d.id === project.current_department_id);
+    return department?.name || 'Unassigned';
+  }, [project.current_department_id, departments]);
+
+  const availableTaskCategories = useMemo(() => {
+    return (
+      project.categories
+        ?.map(assignment => assignment.category)
+        .filter((cat): cat is NonNullable<typeof cat> => cat !== null && cat !== undefined) || []
+    );
+  }, [project.categories]);
+
+  const taskGroups = useMemo(() => {
+    if (!tasks || tasks.length === 0) {
+      return { groups: [], otherTasks: [] as ProjectTask[] };
+    }
+
+    const taskById = new Map<string, ProjectTask>();
+    tasks.forEach(task => taskById.set(task.id, task));
+
+    const resolveCategory = (task: ProjectTask) => {
+      let current: ProjectTask | undefined = task;
+      while (current) {
+        const category = current.categories?.[0];
+        if (category) return category;
+        if (!current.parent_task_id) break;
+        current = taskById.get(current.parent_task_id);
+      }
+      return null;
+    };
+
+    const groupsMap = new Map<
+      string,
+      { title: string; tasks: ProjectTask[] }
+    >();
+    const otherTasks: ProjectTask[] = [];
+
+    tasks.forEach(task => {
+      const category = resolveCategory(task);
+      if (!category) {
+        otherTasks.push(task);
+        return;
+      }
+      const key = category.id || category.name;
+      const existing = groupsMap.get(key);
+      if (existing) {
+        existing.tasks.push(task);
+      } else {
+        groupsMap.set(key, { title: category.name, tasks: [task] });
+      }
+    });
+
+    const groups = Array.from(groupsMap.values()).sort((a, b) =>
+      a.title.localeCompare(b.title)
+    );
+
+    return { groups, otherTasks };
+  }, [tasks]);
+
+  const taskSections = useMemo(() => {
+    const sections = taskGroups.groups.map(group => ({
+      key: group.title,
+      title: group.title,
+      tasks: group.tasks,
+    }));
+
+    if (taskGroups.otherTasks.length > 0) {
+      sections.push({
+        key: 'other',
+        title: 'Other Tasks',
+        tasks: taskGroups.otherTasks,
+      });
+    }
+
+    return sections;
+  }, [taskGroups]);
+
+  const availableStatusOptions = useMemo(() => {
+    const hasPrintCategory =
+      project.categories?.some(category =>
+        category.category?.name === 'Print' || (category as any).name === 'Print'
+      ) || false;
+    const isBillable = project.is_billable || false;
+
+    return statusOptions.filter(status => {
+      if (status.value === 'new') {
+        return false;
+      }
+      if (status.requiresCategory === 'Print' && !hasPrintCategory) {
+        return false;
+      }
+      if (status.requiresBillable && !isBillable) {
+        return false;
+      }
+      return true;
+    });
+  }, [project.categories, project.is_billable]);
 
   const fetchComments = useCallback(async () => {
     try {
@@ -208,6 +355,100 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       alert('Failed to delete project. Please try again.');
     }
   }, [project.id, project.name, router]);
+
+  const handleBackToProjects = useCallback(() => {
+    router.push('/admin/project-management');
+  }, [router]);
+
+  const updateProjectFields = useCallback(async (updates: Partial<Project> & { assigned_to?: string | null; requested_by?: string | null; current_department_id?: string | null }) => {
+    const payload: Record<string, any> = {
+      name: updates.name ?? project.name,
+      description: updates.description ?? project.description,
+      project_type: updates.project_type ?? project.project_type,
+      project_subtype: updates.project_subtype ?? project.project_subtype,
+      assigned_to: updates.assigned_to ?? project.assigned_to_profile?.id ?? null,
+      status: updates.status ?? project.status,
+      priority: updates.priority ?? project.priority,
+      due_date: updates.due_date ?? project.due_date,
+      start_date: updates.start_date ?? project.start_date,
+      completion_date: updates.completion_date ?? project.completion_date,
+      is_billable: updates.is_billable ?? project.is_billable,
+      quoted_price: updates.quoted_price ?? project.quoted_price,
+      tags: updates.tags ?? project.tags,
+      notes: updates.notes ?? project.notes,
+      primary_file_path: updates.primary_file_path ?? project.primary_file_path,
+      scope: updates.scope ?? project.scope,
+    };
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'requested_by')) {
+      payload.requested_by = updates.requested_by ?? null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'current_department_id')) {
+      payload.current_department_id = updates.current_department_id ?? null;
+    }
+
+    const response = await fetch(`/api/admin/projects/${project.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update project');
+    }
+  }, [project]);
+
+  const handleHeaderStatusChange = useCallback(async (status: Project['status']) => {
+    if (status === project.status) {
+      setIsHeaderStatusOpen(false);
+      return;
+    }
+    setIsUpdatingHeaderStatus(true);
+    setIsHeaderStatusOpen(false);
+    try {
+      await updateProjectFields({
+        status,
+        completion_date: status === 'complete' ? new Date().toISOString() : null,
+      });
+      setToastMessage('Project status updated.');
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error updating project status:', error);
+      setToastMessage('Failed to update project status.');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsUpdatingHeaderStatus(false);
+    }
+  }, [onProjectUpdate, project.status, updateProjectFields]);
+
+  const handleHeaderDepartmentChange = useCallback(async (departmentId: string | null) => {
+    if (departmentId === project.current_department_id) {
+      setIsHeaderDepartmentOpen(false);
+      return;
+    }
+    setIsUpdatingHeaderDepartment(true);
+    setIsHeaderDepartmentOpen(false);
+    try {
+      await updateProjectFields({ current_department_id: departmentId });
+      setToastMessage('Project department updated.');
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error updating project department:', error);
+      setToastMessage('Failed to update project department.');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsUpdatingHeaderDepartment(false);
+    }
+  }, [onProjectUpdate, project.current_department_id, updateProjectFields]);
 
   const handleCompleteProject = useCallback(async () => {
     if (isCompletingProject) return;
@@ -380,33 +621,121 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
     setPageHeader({
       title: headerTitle,
+      titleLeading: (
+        <button
+          type="button"
+          onClick={handleBackToProjects}
+          className={headerStyles.backButton}
+          aria-label="Back to project management"
+        >
+          <ArrowLeft size={16} />
+        </button>
+      ),
       description: `<span style="margin-right: 12px; color: ${dueDateColor};">Due Date: ${formatHeaderDate(project.due_date)} ${daysText}</span><span class="${headerStyles.updatedText}">Updated: ${formatHeaderDate(project.updated_at)}</span>`,
       customActions: (
         <>
+          <div className={headerStyles.controlGroup} ref={headerStatusRef}>
+            <label className={headerStyles.controlLabel}>Status:</label>
+            <button
+              className={headerStyles.controlDropdown}
+              onClick={() => setIsHeaderStatusOpen(!isHeaderStatusOpen)}
+              type="button"
+              disabled={isUpdatingHeaderStatus}
+            >
+              <span className={headerStyles.controlValue}>{statusLabel}</span>
+              <ChevronDown
+                size={16}
+                className={`${headerStyles.chevron} ${isHeaderStatusOpen ? headerStyles.open : ''}`}
+              />
+            </button>
+            {isHeaderStatusOpen && (
+              <div className={headerStyles.dropdownMenu}>
+                {availableStatusOptions.map(option => (
+                  <button
+                    key={option.value}
+                    className={`${headerStyles.dropdownOption} ${project.status === option.value ? headerStyles.selected : ''}`}
+                    onClick={() => handleHeaderStatusChange(option.value as Project['status'])}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className={headerStyles.controlGroup} ref={headerDepartmentRef}>
+            <label className={headerStyles.controlLabel}>Department:</label>
+            <button
+              className={headerStyles.controlDropdown}
+              onClick={() => setIsHeaderDepartmentOpen(!isHeaderDepartmentOpen)}
+              type="button"
+              disabled={isUpdatingHeaderDepartment}
+            >
+              <span className={headerStyles.controlValue}>{departmentLabel}</span>
+              <ChevronDown
+                size={16}
+                className={`${headerStyles.chevron} ${isHeaderDepartmentOpen ? headerStyles.open : ''}`}
+              />
+            </button>
+            {isHeaderDepartmentOpen && (
+              <div className={headerStyles.dropdownMenu}>
+                <button
+                  className={`${headerStyles.dropdownOption} ${!project.current_department_id ? headerStyles.selected : ''}`}
+                  onClick={() => handleHeaderDepartmentChange(null)}
+                  type="button"
+                >
+                  Unassigned
+                </button>
+                {departments.map(department => (
+                  <button
+                    key={department.id}
+                    className={`${headerStyles.dropdownOption} ${project.current_department_id === department.id ? headerStyles.selected : ''}`}
+                    onClick={() => handleHeaderDepartmentChange(department.id)}
+                    type="button"
+                  >
+                    {department.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {project.status === 'new' && (
+            <button
+              className={styles.templateButton}
+              onClick={() => setIsApplyTemplateOpen(true)}
+              type="button"
+              aria-label="Use Template"
+            >
+              <FileText size={16} />
+              Use Template
+            </button>
+          )}
           <button
-            className={headerStyles.addLeadButton}
-            onClick={handleCreateTask}
-            type="button"
-          >
-            <Plus size={18} />
-            <span>Create Task</span>
-          </button>
-          <button
-            className={`${headerStyles.addLeadButton} ${headerStyles.deleteButton}`}
+            className={`${headerStyles.addLeadButton} ${headerStyles.deleteButton} ${headerStyles.iconOnlyButton}`}
             onClick={handleDeleteProject}
             type="button"
+            aria-label="Delete project"
           >
             <Trash2 size={18} />
-            <span>Delete Project</span>
           </button>
         </>
       ),
     });
   }, [
     project,
-    handleCreateTask,
+    handleBackToProjects,
     handleDeleteProject,
+    availableStatusOptions,
+    handleHeaderStatusChange,
+    handleHeaderDepartmentChange,
+    isHeaderStatusOpen,
+    isHeaderDepartmentOpen,
+    isUpdatingHeaderStatus,
+    isUpdatingHeaderDepartment,
     setPageHeader,
+    statusLabel,
+    departmentLabel,
+    departments,
   ]);
 
   React.useEffect(() => {
@@ -500,12 +829,14 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
   const handleToggleComplete = async (taskId: string, isCompleted: boolean) => {
     await updateTask(project.id, taskId, { is_completed: isCompleted });
+    onProjectUpdate?.();
   };
 
   // Handler for inline task updates (title, due_date, etc.)
   const handleUpdateTaskInline = useCallback(async (taskId: string, updates: Partial<ProjectTask>) => {
     await updateTask(project.id, taskId, updates);
-  }, [project.id, updateTask]);
+    onProjectUpdate?.();
+  }, [project.id, updateTask, onProjectUpdate]);
 
   // Handler for deleting a task from the list
   const handleDeleteTaskFromList = useCallback(async (taskId: string) => {
@@ -532,9 +863,10 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     }
   }, [project.id, updateTask]);
 
-  const handleAddComment = async (comment: string) => {
+  const handleAddComment = async (comment: string, parentCommentId?: string, attachments?: File[]) => {
     if (!selectedTask) return;
 
+    // First create the comment
     const response = await fetch(
       `/api/admin/projects/${project.id}/tasks/${selectedTask.id}/comments`,
       {
@@ -548,12 +880,73 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       throw new Error('Failed to add comment');
     }
 
+    const newComment = await response.json();
+
+    // If there are attachments, upload them directly to storage
+    if (attachments && attachments.length > 0) {
+      const supabase = createClient();
+      const fileMetadata = [];
+
+      for (const file of attachments) {
+        // Validate file size (50MB)
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+          throw new Error(`File "${file.name}" exceeds 50MB limit`);
+        }
+
+        // Upload directly to Supabase Storage
+        const timestamp = Date.now();
+        const sanitizedName = sanitizeFileName(file.name);
+        const filePath = `comment-attachments/${project.id}/tasks/${selectedTask.id}/${newComment.id}/${timestamp}-${sanitizedName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('brand-assets')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+          throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+        }
+
+        fileMetadata.push({
+          file_path: filePath,
+          file_name: file.name,
+          file_size: file.size,
+          mime_type: file.type,
+        });
+      }
+
+      // Save metadata via API
+      const attachmentResponse = await fetch(
+        `/api/admin/projects/${project.id}/tasks/${selectedTask.id}/comments/${newComment.id}/attachments`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ files: fileMetadata }),
+        }
+      );
+
+      if (!attachmentResponse.ok) {
+        // Clean up uploaded files if metadata save fails
+        for (const metadata of fileMetadata) {
+          await supabase.storage.from('brand-assets').remove([metadata.file_path]);
+        }
+        throw new Error('Failed to save attachment metadata');
+      }
+    }
+
     // Refresh task to get new comment
     const updatedTask = await fetch(
       `/api/admin/projects/${project.id}/tasks/${selectedTask.id}`
     ).then(res => res.json());
 
     setSelectedTask(updatedTask);
+    onProjectUpdate?.();
   };
 
   const handleUpdateProgress = async (progress: number) => {
@@ -622,28 +1015,71 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
       const comment = await response.json();
 
-      // If there are attachments, upload them
+      // If there are attachments, upload them directly to storage
       if (pendingAttachments.length > 0) {
-        const formData = new FormData();
-        pendingAttachments.forEach(file => formData.append('files', file));
+        const supabase = createClient();
+        const fileMetadata = [];
 
+        for (const file of pendingAttachments) {
+          // Validate file size (50MB)
+          const MAX_FILE_SIZE = 50 * 1024 * 1024;
+          if (file.size > MAX_FILE_SIZE) {
+            throw new Error(`File "${file.name}" exceeds 50MB limit`);
+          }
+
+          // Upload directly to Supabase Storage
+          const timestamp = Date.now();
+          const sanitizedName = sanitizeFileName(file.name);
+          const filePath = `comment-attachments/${project.id}/${comment.id}/${timestamp}-${sanitizedName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('brand-assets')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error('Storage upload error:', uploadError);
+            throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+          }
+
+          fileMetadata.push({
+            file_path: filePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          });
+        }
+
+        // Save metadata via API
         const attachmentResponse = await fetch(
           `/api/admin/projects/${project.id}/comments/${comment.id}/attachments`,
           {
             method: 'POST',
-            body: formData,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ files: fileMetadata }),
           }
         );
 
         if (attachmentResponse.ok) {
           const uploadedAttachments = await attachmentResponse.json();
           comment.attachments = uploadedAttachments;
+        } else {
+          // Clean up uploaded files if metadata save fails
+          for (const metadata of fileMetadata) {
+            await supabase.storage.from('brand-assets').remove([metadata.file_path]);
+          }
+          throw new Error('Failed to save attachment metadata');
         }
       }
 
       setComments(prev => [...prev, comment]);
       setNewComment('');
       setPendingAttachments([]);
+      onProjectUpdate?.();
     } catch (error) {
       console.error('Error posting comment:', error);
       setToastMessage('Failed to post comment.');
@@ -666,34 +1102,35 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     setPendingAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
+  // Comment composer drag and drop handlers
+  const handleCommentComposerDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    dragCounterRef.current++;
+    commentComposerDragCounterRef.current++;
     if (e.dataTransfer.types.includes('Files')) {
-      setIsDraggingFile(true);
+      setIsDraggingOverCommentComposer(true);
     }
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleCommentComposerDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
-      setIsDraggingFile(false);
+    commentComposerDragCounterRef.current--;
+    if (commentComposerDragCounterRef.current === 0) {
+      setIsDraggingOverCommentComposer(false);
     }
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleCommentComposerDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleCommentComposerDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    dragCounterRef.current = 0;
-    setIsDraggingFile(false);
+    commentComposerDragCounterRef.current = 0;
+    setIsDraggingOverCommentComposer(false);
 
     // Allowed file types for attachments
     const allowedTypes = [
@@ -732,7 +1169,6 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
   // Convert users to mention format for RichTextEditor
   const mentionUsers = useMemo(() => {
-    console.log('Converting users for mentions, raw users:', users);
     const converted = users.map(u => ({
       id: u.profiles?.id || u.id,
       first_name: u.profiles?.first_name || null,
@@ -740,7 +1176,6 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
       email: u.profiles?.email || u.email || null,
       avatar_url: u.profiles?.avatar_url || null,
     }));
-    console.log('Converted mentionUsers:', converted);
     return converted;
   }, [users]);
 
@@ -882,38 +1317,257 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     }
   }, [editingCommentId, project.id]);
 
+  // Project Attachments Handlers
+  const canEditProject = useMemo(() => {
+    const profile = user as any;
+    return (
+      profile?.is_admin ||
+      project.requested_by_profile?.id === user.id ||
+      project.assigned_to_profile?.id === user.id ||
+      project.members?.some((m: { user_id: string }) => m.user_id === user.id)
+    );
+  }, [user, project]);
+
+
+  const handleProjectFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingProjectAttachment(true);
+    try {
+      const supabase = createClient();
+
+      for (const file of files) {
+        // Validate file size (50MB)
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+          throw new Error(`File "${file.name}" exceeds 50MB limit`);
+        }
+
+        // Upload directly to Supabase Storage
+        const sanitizedName = sanitizeFileName(file.name);
+        const timestamp = Date.now();
+        const storagePath = `${project.id}/${timestamp}-${sanitizedName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('project-files')
+          .upload(storagePath, file, {
+            contentType: file.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+          throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+        }
+
+        // Save metadata via API
+        const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            file_path: storagePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          }),
+        });
+
+        if (!response.ok) {
+          // Clean up uploaded file if metadata save fails
+          await supabase.storage.from('project-files').remove([storagePath]);
+
+          let errorMessage = 'Failed to save attachment metadata';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+      }
+
+      // Fetch fresh attachments from server
+      const attachmentsResponse = await fetch(`/api/admin/projects/${project.id}/attachments`);
+      if (attachmentsResponse.ok) {
+        const { attachments } = await attachmentsResponse.json();
+        setProjectAttachments(attachments);
+      }
+
+      setToastMessage(`${files.length} file(s) uploaded successfully.`);
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error uploading attachment:', error);
+      setToastMessage(error instanceof Error ? error.message : 'Failed to upload file(s).');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setUploadingProjectAttachment(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  }, [project.id, onProjectUpdate]);
+
+  const handleDeleteProjectAttachment = useCallback(async (attachmentId: string) => {
+    if (!confirm('Are you sure you want to delete this attachment?')) return;
+
+    try {
+      const response = await fetch(
+        `/api/admin/projects/${project.id}/attachments?id=${attachmentId}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete attachment');
+      }
+
+      setProjectAttachments(prev => prev.filter(a => a.id !== attachmentId));
+      setToastMessage('Attachment deleted.');
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error deleting attachment:', error);
+      setToastMessage('Failed to delete attachment.');
+      setToastType('error');
+      setShowToast(true);
+    }
+  }, [project.id, onProjectUpdate]);
+
+  const handleProjectDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    projectDragCounterRef.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingProjectFile(true);
+    }
+  }, []);
+
+  const handleProjectDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    projectDragCounterRef.current--;
+    if (projectDragCounterRef.current === 0) {
+      setIsDraggingProjectFile(false);
+    }
+  }, []);
+
+  const handleProjectDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleProjectDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    projectDragCounterRef.current = 0;
+    setIsDraggingProjectFile(false);
+
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length === 0) return;
+
+    setUploadingProjectAttachment(true);
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          let errorMessage = 'Failed to upload attachment';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            // If response is not JSON, use status text
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+      }
+
+      // Fetch fresh attachments from server
+      const attachmentsResponse = await fetch(`/api/admin/projects/${project.id}/attachments`);
+      if (attachmentsResponse.ok) {
+        const { attachments } = await attachmentsResponse.json();
+        setProjectAttachments(attachments);
+      }
+
+      setToastMessage(`${files.length} file(s) uploaded successfully.`);
+      setToastType('success');
+      setShowToast(true);
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error uploading attachment:', error);
+      setToastMessage(error instanceof Error ? error.message : 'Failed to upload file(s).');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setUploadingProjectAttachment(false);
+    }
+  }, [project.id, onProjectUpdate]);
+
+  // Lightbox handlers
+  const imageAttachments = useMemo(
+    () => projectAttachments.filter(a => a.mime_type.startsWith('image/')),
+    [projectAttachments]
+  );
+
+  const lightboxImages = useMemo(
+    () => imageAttachments.map(attachment => ({
+      id: attachment.id,
+      url: `/api/admin/projects/${project.id}/attachments/${attachment.id}/url`,
+      name: attachment.file_name
+    })),
+    [imageAttachments, project.id]
+  );
+
+  const handleImageClick = useCallback((attachmentId: string) => {
+    const index = imageAttachments.findIndex(a => a.id === attachmentId);
+    if (index !== -1) {
+      setCurrentLightboxImages(lightboxImages);
+      setLightboxImageIndex(index);
+      setLightboxOpen(true);
+    }
+  }, [imageAttachments, lightboxImages]);
+
+  const handleCloseLightbox = useCallback(() => {
+    setLightboxOpen(false);
+    setCurrentLightboxImages([]);
+  }, []);
+
+  const handleNavigateLightbox = useCallback((index: number) => {
+    setLightboxImageIndex(index);
+  }, []);
+
+  const handleCommentImageClick = useCallback((commentImages: Array<{ id: string; url: string; name: string }>, imageId: string) => {
+    const index = commentImages.findIndex(img => img.id === imageId);
+    if (index !== -1) {
+      setCurrentLightboxImages(commentImages);
+      setLightboxImageIndex(index);
+      setLightboxOpen(true);
+    }
+  }, []);
+
   return (
-    <div
-      className={styles.container}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      {/* File Drop Zone Overlay */}
-      {isDraggingFile && (
-        <div className={styles.dropZoneOverlay}>
-          <div className={styles.dropZoneContent}>
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <path
-                d="M24 32V16M24 16L18 22M24 16L30 22"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M40 32V38C40 39.0609 39.5786 40.0783 38.8284 40.8284C38.0783 41.5786 37.0609 42 36 42H12C10.9391 42 9.92172 41.5786 9.17157 40.8284C8.42143 40.0783 8 39.0609 8 38V32"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className={styles.dropZoneText}>Drop files to attach to comment</span>
-            <span className={styles.dropZoneSubtext}>Images (JPEG, PNG, WebP) and documents (PDF, Word, Excel)</span>
-          </div>
-        </div>
+    <div className={styles.container}>
+      {/* Image Lightbox */}
+      {lightboxOpen && currentLightboxImages.length > 0 && (
+        <ImageLightbox
+          images={currentLightboxImages}
+          currentIndex={lightboxImageIndex}
+          onClose={handleCloseLightbox}
+          onNavigate={handleNavigateLightbox}
+        />
       )}
 
       <Toast
@@ -1048,6 +1702,107 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
               </div>
             )}
 
+            {/* Project Attachments Section */}
+            <div
+              className={styles.projectAttachments}
+              onDragEnter={handleProjectDragEnter}
+              onDragLeave={handleProjectDragLeave}
+              onDragOver={handleProjectDragOver}
+              onDrop={handleProjectDrop}
+            >
+              {canEditProject && (
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleProjectFileSelect}
+                  disabled={uploadingProjectAttachment}
+                  style={{ display: 'none' }}
+                  id="project-file-input"
+                />
+              )}
+
+              {(projectAttachments.length > 0 || canEditProject) && (
+                <div className={styles.attachmentsGrid}>
+                  {projectAttachments.map((attachment) => {
+                    const isImage = attachment.mime_type.startsWith('image/');
+
+                    return (
+                      <div key={attachment.id} className={styles.attachmentItem}>
+                        {isImage ? (
+                          <div
+                            className={styles.imageWrapper}
+                            onClick={() => handleImageClick(attachment.id)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <img
+                              src={`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`}
+                              alt={attachment.file_name}
+                              loading="lazy"
+                            />
+                            {canEditProject && (
+                              <button
+                                className={styles.deleteImageButton}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteProjectAttachment(attachment.id);
+                                }}
+                                aria-label="Delete attachment"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <a
+                            href={`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.documentWrapper}
+                          >
+                            <div className={styles.documentIcon}>
+                              <FileText size={48} />
+                            </div>
+                            {canEditProject && (
+                              <button
+                                className={styles.deleteImageButton}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleDeleteProjectAttachment(attachment.id);
+                                }}
+                                aria-label="Delete attachment"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </a>
+                        )}
+                        <span className={styles.attachmentFileName}>{attachment.file_name}</span>
+                      </div>
+                    );
+                  })}
+
+                  {canEditProject && (
+                    <div
+                      className={`${styles.attachmentItem} ${styles.addNewBox} ${isDraggingProjectFile ? styles.addNewBoxActive : ''}`}
+                      onClick={() => document.getElementById('project-file-input')?.click()}
+                    >
+                      <div className={styles.addNewContent}>
+                        {uploadingProjectAttachment ? (
+                          <span className={styles.addNewText}>Uploading...</span>
+                        ) : (
+                          <>
+                            <span className={styles.addNewPlus}>+</span>
+                            <span className={styles.addNewText}>Add File</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className={styles.sectionHeader}>
               <button
                 type="button"
@@ -1061,23 +1816,51 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                 />
               </button>
               <h2 className={styles.sectionTitle}>
-                Tasks <span className={styles.sectionCount}>({tasks.length})</span>
+                Tasks
               </h2>
             </div>
 
             {!isTasksCollapsed && (
-              <ProjectTaskList
-                tasks={tasks}
-                onTaskClick={handleTaskClick}
-                onToggleComplete={handleToggleComplete}
-                onUpdateTask={handleUpdateTaskInline}
-                onDeleteTask={handleDeleteTaskFromList}
-                onReorderTasks={handleReorderTasks}
-                onToggleStar={(taskId) => toggleStar('task', taskId)}
-                isStarred={(taskId) => isStarred('task', taskId)}
-                isLoading={isLoading}
-                showHeader={false}
-              />
+              <div className={styles.taskCategoryList}>
+                {taskSections.length === 0 ? (
+                  <ProjectTaskList
+                    tasks={[]}
+                    onTaskClick={handleTaskClick}
+                    onToggleComplete={handleToggleComplete}
+                    onUpdateTask={handleUpdateTaskInline}
+                    onDeleteTask={handleDeleteTaskFromList}
+                    onReorderTasks={handleReorderTasks}
+                    onToggleStar={(taskId) => toggleStar('task', taskId)}
+                    isStarred={(taskId) => isStarred('task', taskId)}
+                    isLoading={isLoading}
+                    showHeader={false}
+                    onAddTask={handleCreateTask}
+                  />
+                ) : (
+                  taskSections.map((section, index) => (
+                    <div key={section.key} className={styles.taskCategorySection}>
+                      <div className={styles.taskCategoryHeader}>
+                        <h3 className={styles.taskCategoryTitle}>{section.title}</h3>
+                      </div>
+                      <ProjectTaskList
+                        tasks={section.tasks}
+                        onTaskClick={handleTaskClick}
+                        onToggleComplete={handleToggleComplete}
+                        onUpdateTask={handleUpdateTaskInline}
+                        onDeleteTask={handleDeleteTaskFromList}
+                        onReorderTasks={handleReorderTasks}
+                        onToggleStar={(taskId) => toggleStar('task', taskId)}
+                        isStarred={(taskId) => isStarred('task', taskId)}
+                        isLoading={isLoading}
+                        showHeader={false}
+                        onAddTask={
+                          index === taskSections.length - 1 ? handleCreateTask : undefined
+                        }
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
             )}
 
             <div className={styles.commentsSection}>
@@ -1213,24 +1996,29 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                                       !attachment.mime_type?.startsWith('image/')
                                   );
 
+                                  const commentLightboxImages = imageAttachments.map((attachment: { id: string; url: string; file_name: string }) => ({
+                                    id: attachment.id,
+                                    url: attachment.url,
+                                    name: attachment.file_name
+                                  }));
+
                                   return (
                                     <>
                                       {imageAttachments.length > 0 && (
                                         <div className={styles.commentImageAttachments}>
                                           {imageAttachments.map((attachment: { id: string; url: string; file_name: string }) => (
-                                            <a
+                                            <div
                                               key={attachment.id}
-                                              href={attachment.url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
                                               className={styles.commentImageLink}
+                                              onClick={() => handleCommentImageClick(commentLightboxImages, attachment.id)}
+                                              style={{ cursor: 'pointer' }}
                                             >
                                               <img
                                                 src={attachment.url}
                                                 alt={attachment.file_name}
                                                 className={styles.commentImage}
                                               />
-                                            </a>
+                                            </div>
                                           ))}
                                         </div>
                                       )}
@@ -1279,7 +2067,14 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
                     <div className={styles.commentsEmpty}>No comments yet.</div>
                   )}
 
-                  <form onSubmit={handleSubmitComment} className={styles.commentComposer}>
+                  <form
+                    onSubmit={handleSubmitComment}
+                    className={`${styles.commentComposer} ${isDraggingOverCommentComposer ? styles.commentComposerDragActive : ''}`}
+                    onDragEnter={handleCommentComposerDragEnter}
+                    onDragLeave={handleCommentComposerDragLeave}
+                    onDragOver={handleCommentComposerDragOver}
+                    onDrop={handleCommentComposerDrop}
+                  >
                     {commentAvatarUrl ? (
                       <Image
                         src={commentAvatarUrl}
@@ -1380,6 +2175,9 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
         users={users}
         projectId={project.id}
         parentTasks={parentTasks}
+        projectMembers={project.members}
+        projectAssignedTo={project.assigned_to_profile?.id}
+        availableCategories={availableTaskCategories}
       />
 
       {/* Task Detail Sidebar */}
@@ -1395,6 +2193,7 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
           const response = await fetch(`/api/admin/projects/${project.id}/tasks/${taskId}`);
           const updatedTask = await response.json();
           setSelectedTask(updatedTask);
+          onProjectUpdate?.();
         }}
         onDelete={() => handleDeleteTask()}
         onAddComment={handleAddComment}
@@ -1404,7 +2203,26 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
         highlightedCommentId={highlightedTaskCommentId}
         onToggleStar={(taskId) => toggleStar('task', taskId)}
         isStarred={(taskId) => isStarred('task', taskId)}
+        availableCategories={availableTaskCategories}
+        projectMembers={project.members}
+        projectAssignedTo={project.assigned_to_profile?.id}
+        availableTasks={tasks}
       />
+
+      {/* Apply Template Modal */}
+      {isApplyTemplateOpen && (
+        <ApplyTemplateModal
+          isOpen={isApplyTemplateOpen}
+          onClose={() => setIsApplyTemplateOpen(false)}
+          projectId={project.id}
+          onSuccess={() => {
+            setIsApplyTemplateOpen(false);
+            fetchTasks(project.id);
+            onProjectUpdate?.();
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

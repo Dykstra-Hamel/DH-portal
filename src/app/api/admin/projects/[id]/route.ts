@@ -17,7 +17,10 @@ export async function GET(
         *,
         company:companies(
           id,
-          name
+          name,
+          branding:brands!company_id(
+            icon_logo_url
+          )
         ),
         activity:project_activity(
           *,
@@ -32,6 +35,21 @@ export async function GET(
             description,
             sort_order
           )
+        ),
+        members:project_members(
+          id,
+          user_id,
+          added_via,
+          added_by,
+          created_at,
+          updated_at,
+          user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url)
+        ),
+        current_department:project_departments(
+          id,
+          name,
+          icon,
+          sort_order
         )
       `
       )
@@ -108,6 +126,7 @@ export async function PUT(
       description,
       project_type,
       project_subtype,
+      requested_by,
       assigned_to,
       status,
       priority,
@@ -120,7 +139,9 @@ export async function PUT(
       notes,
       primary_file_path,
       scope,
+      current_department_id,
       category_ids,
+      company_id,
     } = body;
 
     // Validate required fields
@@ -146,27 +167,41 @@ export async function PUT(
       }
     }
 
+    const updateData: Record<string, any> = {
+      name,
+      description,
+      project_type,
+      project_subtype: project_subtype || null,
+      assigned_to: assigned_to || null,
+      status,
+      priority,
+      due_date,
+      start_date: start_date || null,
+      completion_date: completion_date || null,
+      is_billable: is_billable === 'true' || is_billable === true,
+      quoted_price: quoted_price ? parseFloat(quoted_price) : null,
+      tags: parsedTags,
+      notes,
+      primary_file_path: primary_file_path || null,
+      scope: scope || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (requested_by !== undefined) {
+      updateData.requested_by = requested_by || null;
+    }
+
+    if (current_department_id !== undefined) {
+      updateData.current_department_id = current_department_id || null;
+    }
+
+    if (company_id !== undefined) {
+      updateData.company_id = company_id;
+    }
+
     const { data: project, error } = await supabase
       .from('projects')
-      .update({
-        name,
-        description,
-        project_type,
-        project_subtype: project_subtype || null,
-        assigned_to: assigned_to || null,
-        status,
-        priority,
-        due_date,
-        start_date: start_date || null,
-        completion_date: completion_date || null,
-        is_billable: is_billable === 'true' || is_billable === true,
-        quoted_price: quoted_price ? parseFloat(quoted_price) : null,
-        tags: parsedTags,
-        notes,
-        primary_file_path: primary_file_path || null,
-        scope: scope || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select(
         `
@@ -174,6 +209,12 @@ export async function PUT(
         company:companies(
           id,
           name
+        ),
+        current_department:project_departments(
+          id,
+          name,
+          icon,
+          sort_order
         )
       `
       )

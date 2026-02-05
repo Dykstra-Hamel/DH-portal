@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Edit, Trash2, Calendar, User, Tag } from 'lucide-react';
 import { Project, statusOptions, priorityOptions } from '@/types/project';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectsTable.module.scss';
 
 interface ProjectsTableProps {
@@ -34,7 +35,9 @@ const ProjectsTable: React.FC<ProjectsTableProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    const date = parseDateString(dateString);
+    if (!date) return 'Not Set';
+    return date.toLocaleDateString();
   };
 
   const formatCurrency = (amount: number | null) => {

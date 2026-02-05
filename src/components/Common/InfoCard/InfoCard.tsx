@@ -59,7 +59,7 @@ export function InfoCard({
 
   return (
     <div
-      className={`${styles.infoCard} ${isCompact ? styles.compact : ''} ${inSidebar ? styles.inSidebar : ''} ${className}`}
+      className={`${styles.infoCard} ${isExpanded ? styles.expandedCard : ''} ${isCompact ? styles.compact : ''} ${inSidebar ? styles.inSidebar : ''} ${className}`}
     >
       <div
         className={`${styles.header} ${isCollapsible ? styles.clickable : ''} ${!isExpanded ? styles.collapsed : styles.expanded}`}

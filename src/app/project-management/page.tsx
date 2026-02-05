@@ -13,7 +13,7 @@ import { ProjectsView } from '@/components/ProjectManagement/ProjectsView/Projec
 import { TemplateSelectorModal } from '@/components/ProjectTemplates/TemplateSelectorModal/TemplateSelectorModal';
 import { QuickProjectModal } from '@/components/ProjectTemplates/QuickProjectModal/QuickProjectModal';
 import { RecurringFrequency, Task } from '@/types/taskManagement';
-import { Project, User, Company, ProjectFormData, ProjectTemplate, ProjectCategory } from '@/types/project';
+import { Project, User, Company, ProjectFormData, ProjectTemplate, ProjectCategory, ProjectDepartment } from '@/types/project';
 import { QuickProjectData } from '@/components/ProjectTemplates/QuickProjectModal/QuickProjectModal';
 import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
@@ -126,6 +126,9 @@ export default function ProjectManagementDashboard() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
   const [isFetchingCategories, setIsFetchingCategories] = useState(false);
+
+  // Departments state
+  const [departments, setDepartments] = useState<ProjectDepartment[]>([]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -338,6 +341,28 @@ export default function ProjectManagementDashboard() {
     fetchCategories();
     setSelectedCategoryId(null);
   }, [selectedCompany]); // Only depend on selectedCompany
+
+  // Fetch departments
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/admin/project-departments', { headers });
+
+        if (response.ok) {
+          const data = await response.json();
+          setDepartments(data || []);
+        } else {
+          setDepartments([]);
+        }
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+        setDepartments([]);
+      }
+    };
+
+    fetchDepartments();
+  }, []);
 
   // Calculate category counts for tabs
   const categoryCounts = useMemo(() => {
@@ -678,9 +703,9 @@ export default function ProjectManagementDashboard() {
             {currentView === 'kanban' && (
               <ProjectKanbanView
                 projects={filteredProjects}
+                departments={departments}
                 onProjectClick={handleProjectClick}
                 onUpdateProject={handleUpdateProject}
-                onAddTask={() => setShowTaskModal(true)}
               />
             )}
             {currentView === 'list' && (

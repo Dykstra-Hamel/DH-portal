@@ -10,7 +10,7 @@
  */
 export const STORAGE_CONFIG = {
   BUCKET_NAME: 'brand-assets',
-  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB (brand-assets bucket limit)
+  MAX_FILE_SIZE: 50 * 1024 * 1024, // 50MB
   ALLOWED_TYPES: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
 
   // Allowed types for comment attachments (images + documents)

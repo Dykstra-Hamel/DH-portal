@@ -40,7 +40,13 @@ export async function GET(
         `
         *,
         assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
+        project_task_category_assignments(
+          category_type,
+          category:project_categories(id, name)
+        )
       `
       )
       .eq('project_id', projectId)
@@ -68,7 +74,26 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(tasks || []);
+    // Transform tasks to include flattened categories with category_type
+    // For /admin/ routes, filter to only include internal categories
+    const tasksWithCategories = (tasks || []).map((task: any) => {
+      const categories = task.project_task_category_assignments
+        ?.filter((assignment: any) => assignment.category_type === 'internal')
+        .map((assignment: any) => ({
+          ...assignment.category,
+          category_type: assignment.category_type,
+        }))
+        .filter((category: any) => category !== null) || [];
+
+      const { project_task_category_assignments, ...taskWithoutAssignments } = task;
+
+      return {
+        ...taskWithoutAssignments,
+        categories,
+      };
+    });
+
+    return NextResponse.json(tasksWithCategories);
   } catch (error) {
     console.error('Error in GET /api/admin/projects/[id]/tasks:', error);
     return NextResponse.json(
@@ -119,6 +144,9 @@ export async function POST(
       due_date: body.due_date || null,
       start_date: body.start_date || null,
       display_order: body.display_order || 0,
+      blocks_task_id: body.blocks_task_id || null,
+      blocked_by_task_id: body.blocked_by_task_id || null,
+      blocker_reason: body.blocker_reason || null,
       recurring_frequency: body.recurring_frequency || null,
       recurring_end_date: body.recurring_end_date || null,
       is_recurring_template: body.recurring_frequency && body.recurring_frequency !== 'none' ? true : false,
@@ -133,7 +161,9 @@ export async function POST(
         `
         *,
         assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date)
       `
       )
       .single();
@@ -143,7 +173,57 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(task, { status: 201 });
+    // Handle category assignments if provided
+    // For /admin/ routes, always use 'internal' category_type
+    if (body.category_ids && Array.isArray(body.category_ids) && body.category_ids.length > 0) {
+      const categoryAssignments = body.category_ids.map((categoryId: string) => ({
+        task_id: task.id,
+        category_id: categoryId,
+        category_type: 'internal', // Admin routes always use internal categories
+      }));
+
+      const { error: categoryError } = await supabase
+        .from('project_task_category_assignments')
+        .insert(categoryAssignments);
+
+      if (categoryError) {
+        console.error('Error assigning categories to task:', categoryError);
+        // Don't fail the whole request, just log the error
+      }
+    }
+
+    // Fetch task with categories
+    const { data: taskWithCategories } = await supabase
+      .from('project_tasks')
+      .select(
+        `
+        *,
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
+        project_task_category_assignments(
+          category_type,
+          category:project_categories(id, name)
+        )
+      `
+      )
+      .eq('id', task.id)
+      .single();
+
+    // Transform to include flattened categories with category_type
+    // For /admin/ routes, filter to only include internal categories
+    const categories = taskWithCategories?.project_task_category_assignments
+      ?.filter((assignment: any) => assignment.category_type === 'internal')
+      .map((assignment: any) => ({
+        ...assignment.category,
+        category_type: assignment.category_type,
+      }))
+      .filter((category: any) => category !== null) || [];
+
+    const { project_task_category_assignments, ...taskData2 } = taskWithCategories || task;
+
+    return NextResponse.json({ ...taskData2, categories }, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/admin/projects/[id]/tasks:', error);
     return NextResponse.json(

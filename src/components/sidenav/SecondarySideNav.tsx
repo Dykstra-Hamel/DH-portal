@@ -544,6 +544,34 @@ export function SecondarySideNav({
                   </svg>
                 ),
               },
+              {
+                text: 'Templates',
+                href: '/admin/project-management/templates',
+                icon: (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 18 18"
+                    fill="none"
+                  >
+                    <path
+                      d="M10.5 2H3C2.44772 2 2 2.44772 2 3V15C2 15.5523 2.44772 16 3 16H15C15.5523 16 16 15.5523 16 15V7.5M10.5 2L16 7.5M10.5 2V7.5H16"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M5 10H13M5 13H10"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ),
+              },
             ],
           },
         ];
@@ -700,7 +728,8 @@ export function SecondarySideNav({
                     pathname === item.href ||
                     (item.href === '/admin/project-management' &&
                       pathname.startsWith('/admin/project-management/') &&
-                      !pathname.startsWith('/admin/project-management/tasks')) ||
+                      !pathname.startsWith('/admin/project-management/tasks') &&
+                      !pathname.startsWith('/admin/project-management/templates')) ||
                     (item.href === '/customers' &&
                       pathname.startsWith('/customers/')) ||
                     (item.href === '/tickets/new' &&

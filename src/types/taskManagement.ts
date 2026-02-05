@@ -21,6 +21,12 @@ export interface Client {
   company: string;
 }
 
+export interface TaskCategory {
+  id: string;
+  name: string;
+  category_type: 'internal' | 'external'; // Indicates internal or external categorization
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -39,6 +45,14 @@ export interface Task {
   created_at: string;
   updated_at: string;
   is_starred?: boolean; // Whether the current user has starred this task
+  categories?: TaskCategory[]; // Categories assigned to this task
+  blocked_by_task?: {
+    id: string;
+    title: string;
+    is_completed: boolean;
+    assigned_to: string | null;
+    due_date: string | null;
+  } | null; // The task blocking this task
 }
 
 export interface Project {

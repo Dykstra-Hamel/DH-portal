@@ -11,12 +11,13 @@ import {
   LayoutGrid,
   Users,
   Flag,
-  Tag,
   FileText,
   Hash,
   AlertCircle,
   Activity as ActivityIcon,
   CheckSquare,
+  Plus,
+  X,
 } from 'lucide-react';
 import { DetailsCardsSidebar } from '@/components/Common/DetailsCardsSidebar/DetailsCardsSidebar';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
@@ -25,30 +26,16 @@ import {
   Project,
   ProjectActivity,
   ProjectTask,
+  ProjectTypeSubtype,
   User as ProjectUser,
   statusOptions,
   priorityOptions,
   projectTypeOptions,
-  printSubtypes,
-  digitalSubtypes,
 } from '@/types/project';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
+import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
+import { createClient } from '@/lib/supabase/client';
 import styles from './ProjectDetail.module.scss';
-
-const PRESET_PROJECT_TAGS = [
-  'seo', 'social-media', 'content', 'design', 'development',
-  'ppc', 'google-ads', 'facebook-ads', 'email', 'analytics',
-  'branding', 'website', 'blog', 'video', 'photography',
-  'local-seo', 'gmb', 'reviews', 'reporting', 'strategy',
-  'print', 'digital', 'billboard', 'business-cards',
-  'door-hangers', 'vehicle-wrap',
-];
-
-const getSubtypesForType = (projectType: string | null | undefined) => {
-  if (projectType === 'print') return printSubtypes;
-  if (projectType === 'digital') return digitalSubtypes;
-  return [];
-};
 
 interface ProjectDetailProps {
   project: Project;
@@ -76,25 +63,32 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     status: project.status || 'in_progress',
     priority: project.priority || 'medium',
     assigned_to: project.assigned_to_profile?.id || '',
+    requested_by: project.requested_by_profile?.id || '',
     due_date: project.due_date || '',
     start_date: project.start_date || '',
     completion_date: project.completion_date || '',
-    tags: project.tags || [],
     project_type: project.project_type || '',
     project_subtype: project.project_subtype || '',
     is_billable: project.is_billable || false,
     quoted_price: project.quoted_price?.toString() || '',
     scope: project.scope || '',
     category_ids: project.categories?.map(c => c.category_id) || [],
+    company_id: project.company?.id || '',
   }));
-  const [customSubtype, setCustomSubtype] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
   const [pendingExpandCard, setPendingExpandCard] = useState<string | null>(
     null
   );
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [isChangingRequestedBy, setIsChangingRequestedBy] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableSubtypes, setAvailableSubtypes] = useState<ProjectTypeSubtype[]>([]);
+  const [isFetchingSubtypes, setIsFetchingSubtypes] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [isAddingMember, setIsAddingMember] = useState(false);
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
   const hasUserEditedRef = React.useRef(false);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = React.useRef<string>('');
@@ -107,6 +101,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     const isBillable = editFormData.is_billable || project.is_billable || false;
 
     return statusOptions.filter(status => {
+      if (status.value === 'new') {
+        return false;
+      }
       // Using extended statusOptions with requiresCategory and requiresBillable
       if (status.requiresCategory === 'Print' && !hasPrintCategory) {
         return false;
@@ -235,14 +232,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   };
 
   const resetFormData = React.useCallback((source: Project) => {
-    const subtypes = getSubtypesForType(source.project_type);
-    const supportsSubtypeSelect = subtypes.length > 0;
-    const rawSubtype = source.project_subtype || '';
-    const hasCustomSubtype =
-      supportsSubtypeSelect &&
-      rawSubtype &&
-      !subtypes.find(option => option.value === rawSubtype);
-
     const newFormData = {
       name: source.name || '',
       description: source.description || '',
@@ -250,28 +239,24 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       status: source.status || 'in_progress',
       priority: source.priority || 'medium',
       assigned_to: source.assigned_to_profile?.id || '',
+      requested_by: source.requested_by_profile?.id || '',
       due_date: source.due_date || '',
       start_date: source.start_date || '',
       completion_date: source.completion_date || '',
-      tags: source.tags || [],
       project_type: source.project_type || '',
-      project_subtype: supportsSubtypeSelect
-        ? hasCustomSubtype
-          ? 'other'
-          : rawSubtype
-        : rawSubtype,
+      project_subtype: source.project_subtype || '',
       is_billable: source.is_billable || false,
       quoted_price: source.quoted_price?.toString() || '',
       scope: source.scope || '',
       category_ids: source.categories?.map(c => c.category_id) || [],
+      company_id: source.company?.id || '',
     };
 
     // Store the initial state to compare against later
-    lastSavedDataRef.current = JSON.stringify({ formData: newFormData, customSubtype: hasCustomSubtype ? rawSubtype : '' });
+    lastSavedDataRef.current = JSON.stringify(newFormData);
     hasUserEditedRef.current = false;
 
     setEditFormData(newFormData);
-    setCustomSubtype(hasCustomSubtype ? rawSubtype : '');
   }, []);
 
   React.useEffect(() => {
@@ -294,19 +279,62 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     fetchCategories();
   }, []);
 
-  const currentSubtypes = useMemo(
-    () => getSubtypesForType(editFormData.project_type),
-    [editFormData.project_type]
-  );
+  // Fetch available companies
+  React.useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
+        };
+
+        const response = await fetch('/api/admin/companies', { headers });
+        if (response.ok) {
+          const data = await response.json();
+          setCompanies(data);
+        }
+      } catch (error) {
+        console.error('Error fetching companies:', error);
+      }
+    };
+    fetchCompanies();
+  }, []);
+
+  // Fetch available subtypes when project type changes
+  React.useEffect(() => {
+    const fetchSubtypes = async () => {
+      // Get the type_code from the selected project_type
+      const selectedType = projectTypeOptions.find(opt => opt.value === editFormData.project_type);
+      const typeCode = selectedType?.code;
+
+      if (!typeCode) {
+        setAvailableSubtypes([]);
+        return;
+      }
+
+      setIsFetchingSubtypes(true);
+      try {
+        const response = await fetch(`/api/admin/project-types/${typeCode}/subtypes`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSubtypes(data);
+        } else {
+          setAvailableSubtypes([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch subtypes:', error);
+        setAvailableSubtypes([]);
+      } finally {
+        setIsFetchingSubtypes(false);
+      }
+    };
+
+    fetchSubtypes();
+  }, [editFormData.project_type]);
 
   const handleSaveEdit = React.useCallback(async () => {
-    const subtypes = getSubtypesForType(editFormData.project_type);
-    const supportsSubtypeSelect = subtypes.length > 0;
-    const resolvedSubtype = supportsSubtypeSelect
-      ? editFormData.project_subtype === 'other'
-        ? customSubtype.trim()
-        : editFormData.project_subtype
-      : editFormData.project_subtype;
 
     try {
       const response = await fetch(`/api/admin/projects/${project.id}`, {
@@ -321,16 +349,17 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           status: editFormData.status,
           priority: editFormData.priority,
           assigned_to: editFormData.assigned_to || null,
+          requested_by: editFormData.requested_by || null,
           due_date: editFormData.due_date,
           start_date: editFormData.start_date || null,
           completion_date: editFormData.completion_date || null,
-          tags: editFormData.tags,
           project_type: editFormData.project_type,
-          project_subtype: resolvedSubtype || null,
+          project_subtype: editFormData.project_subtype || null,
           is_billable: editFormData.is_billable,
           quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
           scope: editFormData.scope || null,
           category_ids: editFormData.category_ids,
+          company_id: editFormData.company_id,
         }),
       });
 
@@ -351,7 +380,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       setToastType('error');
       setShowToast(true);
     }
-  }, [customSubtype, editFormData, onProjectUpdate, project.id]);
+  }, [editFormData, onProjectUpdate, project.id]);
 
   React.useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -360,7 +389,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     }
 
     // Check if data has actually changed from last saved state
-    const currentData = JSON.stringify({ formData: editFormData, customSubtype });
+    const currentData = JSON.stringify(editFormData);
     if (currentData === lastSavedDataRef.current) {
       return;
     }
@@ -380,17 +409,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [customSubtype, editFormData, handleSaveEdit]);
-
-  const handleToggleTag = (tag: string) => {
-    hasUserEditedRef.current = true;
-    const tags = editFormData.tags || [];
-    if (tags.includes(tag)) {
-      setEditFormData({ ...editFormData, tags: tags.filter(t => t !== tag) });
-    } else {
-      setEditFormData({ ...editFormData, tags: [...tags, tag] });
-    }
-  };
+  }, [editFormData, handleSaveEdit]);
 
   // Helper to mark form as edited when user changes a field
   const handleFieldChange = <K extends keyof typeof editFormData>(
@@ -452,6 +471,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     return adminUsers;
   }, [editFormData.assigned_to, project.assigned_to_profile, users]);
 
+  const requestedByProfile = useMemo(() => {
+    const requestedId = editFormData.requested_by;
+    if (!requestedId) return project.requested_by_profile || null;
+    const match = users.find(user => (user.profiles?.id || user.id) === requestedId);
+    return match?.profiles || project.requested_by_profile || null;
+  }, [editFormData.requested_by, project.requested_by_profile, users]);
+
   const assignedTaskSummaries = useMemo(() => {
     const profilesById = new Map<string, ProjectUser['profiles']>();
     users.forEach(projectUser => {
@@ -507,7 +533,113 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     });
   }, [tasks, users]);
 
+  const memberTaskCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    tasks.forEach(task => {
+      if (task.assigned_to) {
+        counts.set(task.assigned_to, (counts.get(task.assigned_to) || 0) + 1);
+      }
+    });
+
+    return counts;
+  }, [tasks]);
+
+  const availableUsersNotMembers = useMemo(() => {
+    const memberIds = new Set(project.members?.map(m => m.user_id) || []);
+    const companyUserIds = new Set(
+      users
+        .filter(u => u.profiles?.id)
+        .map(u => u.profiles!.id)
+    );
+
+    return users.filter(u => {
+      const userId = u.profiles?.id || u.id;
+      return companyUserIds.has(userId) && !memberIds.has(userId);
+    });
+  }, [project.members, users]);
+
+  const sortedCompanies = useMemo(() => {
+    // Make sure current company is in the list
+    const companiesList = [...companies];
+
+    // If project has a company and it's not in the list, add it
+    if (project.company && !companiesList.some(c => c.id === project.company!.id)) {
+      companiesList.push({
+        id: project.company.id,
+        name: project.company.name,
+      });
+    }
+
+    return companiesList.sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    );
+  }, [companies, project.company]);
+
+  const handleAddMember = async (userId: string) => {
+    if (!userId) return;
+
+    setIsAddingMember(true);
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add member');
+      }
+
+      setToastMessage('Member added successfully');
+      setToastType('success');
+      setShowToast(true);
+      setShowAddMember(false);
+
+      if (onProjectUpdate) {
+        onProjectUpdate();
+      }
+    } catch (error: any) {
+      setToastMessage(error.message || 'Failed to add member');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!confirm('Are you sure you want to remove this member from the project?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}/members/${userId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to remove member');
+      }
+
+      setToastMessage('Member removed successfully');
+      setToastType('success');
+      setShowToast(true);
+
+      if (onProjectUpdate) {
+        onProjectUpdate();
+      }
+    } catch (error: any) {
+      setToastMessage(error.message || 'Failed to remove member');
+      setToastType('error');
+      setShowToast(true);
+    }
+  };
+
   const handleCardExpand = (cardId: string) => {
+    setExpandedCardId(cardId);
     if (!isSidebarExpanded) {
       setPendingExpandCard(cardId);
       setIsSidebarExpanded(true);
@@ -527,6 +659,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   const shouldForceExpand = (cardId: string) =>
     pendingExpandCard === cardId;
 
+  const shouldForceCollapse = (cardId: string) =>
+    !isSidebarExpanded || (!!expandedCardId && expandedCardId !== cardId);
+
   return (
     <>
       <Toast
@@ -544,14 +679,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<LayoutGrid size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('overview')}
-        forceCollapse={!isSidebarExpanded}
+        forceCollapse={shouldForceCollapse('overview')}
         forceExpand={shouldForceExpand('overview')}
         isCompact={!isSidebarExpanded}
         inSidebar={true}
       >
-        <div className={styles.cardContent}>
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           <div className={styles.infoItem}>
-            <FileText size={16} />
             <div>
               <div className={styles.infoLabel}>Project Name</div>
               <input
@@ -564,17 +698,24 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Building size={16} />
             <div>
               <div className={styles.infoLabel}>Company</div>
-              <div className={styles.infoValue}>
-                {project.company?.name || 'Not set'}
-              </div>
+              <select
+                className={styles.editSelect}
+                value={editFormData.company_id}
+                onChange={(e) => handleFieldChange('company_id', e.target.value)}
+              >
+                <option value="">Select Company</option>
+                {sortedCompanies.map(company => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className={styles.infoItem}>
-            <Hash size={16} />
             <div>
               <div className={styles.infoLabel}>Shortcode</div>
               <div className={styles.infoValue}>{project.shortcode || 'Not set'}</div>
@@ -582,7 +723,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <FileText size={16} />
             <div>
               <div className={styles.infoLabel}>Project Type</div>
               <select
@@ -595,7 +735,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     project_type: e.target.value,
                     project_subtype: '',
                   });
-                  setCustomSubtype('');
                 }}
               >
                 <option value="">Select Project Type</option>
@@ -609,65 +748,33 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <FileText size={16} />
             <div>
               <div className={styles.infoLabel}>Project Subtype</div>
-              {currentSubtypes.length > 0 ? (
-                <>
-                  <select
-                    className={styles.editSelect}
-                    value={editFormData.project_subtype}
-                    onChange={(e) => {
-                      hasUserEditedRef.current = true;
-                      setEditFormData({
-                        ...editFormData,
-                        project_subtype: e.target.value,
-                      });
-                      if (e.target.value !== 'other') {
-                        setCustomSubtype('');
-                      }
-                    }}
-                  >
-                    <option value="">Select Subtype</option>
-                    {currentSubtypes.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  {editFormData.project_subtype === 'other' && (
-                    <input
-                      type="text"
-                      className={styles.editInput}
-                      value={customSubtype}
-                      onChange={(e) => {
-                        hasUserEditedRef.current = true;
-                        setCustomSubtype(e.target.value);
-                      }}
-                      placeholder="Enter custom subtype"
-                    />
-                  )}
-                </>
-              ) : (
-                <input
-                  type="text"
-                  className={styles.editInput}
-                  value={editFormData.project_subtype}
-                  onChange={(e) => {
-                    hasUserEditedRef.current = true;
-                    setEditFormData({
-                      ...editFormData,
-                      project_subtype: e.target.value,
-                    });
-                  }}
-                  placeholder="Enter subtype"
-                />
-              )}
+              <select
+                className={styles.editSelect}
+                value={editFormData.project_subtype}
+                onChange={(e) => {
+                  hasUserEditedRef.current = true;
+                  setEditFormData({
+                    ...editFormData,
+                    project_subtype: e.target.value,
+                  });
+                }}
+                disabled={isFetchingSubtypes}
+              >
+                <option value="">
+                  {isFetchingSubtypes ? 'Loading subtypes...' : availableSubtypes.length === 0 ? 'No subtypes available' : 'Select Subtype'}
+                </option>
+                {availableSubtypes.map(subtype => (
+                  <option key={subtype.id} value={subtype.name}>
+                    {subtype.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className={styles.infoItem}>
-            <Flag size={16} />
             <div>
               <div className={styles.infoLabel}>Project Scope</div>
               <select
@@ -684,7 +791,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Tag size={16} />
+            <LayoutGrid size={16} />
             <div>
               <div className={styles.infoLabel}>Project Categories</div>
               <div className={styles.categoryCheckboxes}>
@@ -716,17 +823,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <CheckSquare size={16} />
             <div>
               <div className={styles.infoLabel}>Status</div>
-              <select
-                className={styles.editSelect}
-                value={editFormData.status}
-                onChange={(e) => handleFieldChange('status', e.target.value as typeof editFormData.status)}
-              >
-                {availableStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className={styles.infoValue}>
+                {statusOptions.find(option => option.value === editFormData.status)?.label || editFormData.status}
+              </div>
             </div>
           </div>
 
@@ -752,21 +851,27 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <DollarSign size={16} />
             <div>
               <div className={styles.infoLabel}>Is Billable</div>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={editFormData.is_billable}
-                  onChange={(e) => {
-                    hasUserEditedRef.current = true;
-                    setEditFormData({
-                      ...editFormData,
-                      is_billable: e.target.checked,
-                      quoted_price: e.target.checked ? editFormData.quoted_price : '',
-                    });
-                  }}
-                />
-                <span>Yes</span>
-              </label>
+              <div className={styles.toggleRow}>
+                <label className={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={editFormData.is_billable}
+                    onChange={(e) => {
+                      hasUserEditedRef.current = true;
+                      setEditFormData({
+                        ...editFormData,
+                        is_billable: e.target.checked,
+                        quoted_price: e.target.checked ? editFormData.quoted_price : '',
+                      });
+                    }}
+                    aria-label="Is billable"
+                  />
+                  <span className={styles.toggleSlider}></span>
+                </label>
+                <span className={styles.toggleText}>
+                  {editFormData.is_billable ? 'Yes' : 'No'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -787,36 +892,27 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               </div>
             </div>
           )}
+        </div>
+      </InfoCard>
 
-          <div className={styles.infoItem}>
-            <Tag size={16} />
-            <div>
-              <div className={styles.infoLabel}>Tags</div>
-              <div className={styles.tagCloud}>
-                {PRESET_PROJECT_TAGS.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className={`${styles.tagButton} ${
-                      (editFormData.tags || []).includes(tag) ? styles.tagSelected : ''
-                    }`}
-                    onClick={() => handleToggleTag(tag)}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
+      <InfoCard
+        title="Notes"
+        icon={<FileText size={20} />}
+        startExpanded={false}
+        onExpand={() => handleCardExpand('notes')}
+        forceCollapse={shouldForceCollapse('notes')}
+        forceExpand={shouldForceExpand('notes')}
+        isCompact={!isSidebarExpanded}
+        inSidebar={true}
+      >
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           <div className={styles.textBlock}>
-            <div className={styles.infoLabel}>Notes</div>
-            <textarea
-              className={styles.editTextarea}
+            <RichTextEditor
               value={editFormData.notes}
-              onChange={(e) => handleFieldChange('notes', e.target.value)}
-              rows={4}
+              onChange={(value) => handleFieldChange('notes', value)}
               placeholder="Add notes..."
+              className={styles.notesEditor}
+              compact
             />
           </div>
         </div>
@@ -827,14 +923,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<Calendar size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('timeline')}
-        forceCollapse={!isSidebarExpanded}
+        forceCollapse={shouldForceCollapse('timeline')}
         forceExpand={shouldForceExpand('timeline')}
         isCompact={!isSidebarExpanded}
         inSidebar={true}
       >
-        <div className={styles.cardContent}>
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           <div className={styles.infoItem}>
-            <Calendar size={16} />
             <div>
               <div className={styles.infoLabel}>Due Date</div>
               <input
@@ -847,7 +942,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Calendar size={16} />
             <div>
               <div className={styles.infoLabel}>Start Date</div>
               <input
@@ -860,7 +954,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Calendar size={16} />
             <div>
               <div className={styles.infoLabel}>Completion Date</div>
               <input
@@ -873,7 +966,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Clock size={16} />
             <div>
               <div className={styles.infoLabel}>Created</div>
               <div className={styles.infoValue}>{formatDate(project.created_at)}</div>
@@ -881,7 +973,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Clock size={16} />
             <div>
               <div className={styles.infoLabel}>Last Updated</div>
               <div className={styles.infoValue}>{formatDate(project.updated_at)}</div>
@@ -895,33 +986,56 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<Users size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('people')}
-        forceCollapse={!isSidebarExpanded}
+        forceCollapse={shouldForceCollapse('people')}
         forceExpand={shouldForceExpand('people')}
         isCompact={!isSidebarExpanded}
         inSidebar={true}
       >
-        <div className={styles.cardContent}>
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           <div className={styles.infoItem}>
-            <UserIcon size={16} />
             <div>
-              <div className={styles.infoLabel}>Requested By</div>
-              {project.requested_by_profile ? (
+              <div className={styles.infoHeaderRow}>
+                <div className={styles.infoLabel}>Requested By</div>
+                <button
+                  type="button"
+                  className={styles.changeLink}
+                  onClick={() => setIsChangingRequestedBy(prev => !prev)}
+                >
+                  {isChangingRequestedBy ? 'Done' : 'Change'}
+                </button>
+              </div>
+              {isChangingRequestedBy ? (
+                <select
+                  className={styles.editSelect}
+                  value={editFormData.requested_by || ''}
+                  onChange={(e) => {
+                    handleFieldChange('requested_by', e.target.value);
+                    setIsChangingRequestedBy(false);
+                  }}
+                >
+                  <option value="">Select User</option>
+                  {assignableUsers.map((projectUser) => (
+                    <option key={projectUser.id} value={projectUser.id}>
+                      {getUserDisplayName(projectUser)}
+                    </option>
+                  ))}
+                </select>
+              ) : requestedByProfile ? (
                 <div className={styles.infoPerson}>
                   <MiniAvatar
-                    firstName={project.requested_by_profile.first_name || undefined}
-                    lastName={project.requested_by_profile.last_name || undefined}
-                    email={project.requested_by_profile.email}
-                    avatarUrl={project.requested_by_profile.avatar_url || null}
+                    firstName={requestedByProfile.first_name || undefined}
+                    lastName={requestedByProfile.last_name || undefined}
+                    email={requestedByProfile.email}
+                    avatarUrl={requestedByProfile.avatar_url || null}
                     size="small"
                     showTooltip={true}
                   />
                   <div>
                     <div className={styles.infoValue}>
-                      {project.requested_by_profile.first_name}{' '}
-                      {project.requested_by_profile.last_name}
+                      {requestedByProfile.first_name} {requestedByProfile.last_name}
                     </div>
                     <div className={styles.infoEmail}>
-                      {project.requested_by_profile.email}
+                      {requestedByProfile.email}
                     </div>
                   </div>
                 </div>
@@ -932,7 +1046,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <UserIcon size={16} />
             <div>
               <div className={styles.infoLabel}>Assigned To</div>
               <select
@@ -951,35 +1064,92 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           </div>
 
           <div className={styles.infoItem}>
-            <Users size={16} />
             <div>
-              <div className={styles.infoLabel}>Assigned Tasks</div>
-              {assignedTaskSummaries.length > 0 ? (
-                <div className={styles.assignedTasksList}>
-                  {assignedTaskSummaries.map(summary => (
-                    <div key={summary.id} className={styles.assignedTaskItem}>
-                      <div className={styles.assignedTaskPerson}>
-                        <MiniAvatar
-                          firstName={summary.firstName}
-                          lastName={summary.lastName}
-                          email={summary.email || ''}
-                          avatarUrl={summary.avatarUrl || null}
-                          size="small"
-                          showTooltip={true}
-                        />
-                        <div>
-                          <div className={styles.infoValue}>{summary.name}</div>
-                          {summary.email && summary.email !== summary.name && (
-                            <div className={styles.infoEmail}>{summary.email}</div>
+              <div className={styles.infoLabel}>Project Members</div>
+              {project.members && project.members.length > 0 ? (
+                <div className={styles.membersList}>
+                  {project.members.map(member => {
+                    const taskCount = memberTaskCounts.get(member.user_id) || 0;
+                    return (
+                      <div key={member.id} className={styles.memberChip}>
+                        <div className={styles.memberInfo}>
+                          <MiniAvatar
+                            firstName={member.user_profile?.first_name || undefined}
+                            lastName={member.user_profile?.last_name || undefined}
+                            email={member.user_profile?.email || ''}
+                            avatarUrl={member.user_profile?.avatar_url || null}
+                            size="small"
+                            showTooltip={true}
+                          />
+                          <div className={styles.memberDetails}>
+                            <div className={styles.memberName}>
+                              {member.user_profile?.first_name} {member.user_profile?.last_name}
+                            </div>
+                            {member.user_profile?.email && (
+                              <div className={styles.memberEmail}>
+                                {member.user_profile.email}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className={styles.memberActions}>
+                          {taskCount > 0 && (
+                            <div className={styles.memberTaskCount}>{taskCount}</div>
+                          )}
+                          {member.added_via === 'manual' && (
+                            <button
+                              className={styles.removeMemberButton}
+                              onClick={() => handleRemoveMember(member.user_id)}
+                              title="Remove member"
+                              type="button"
+                            >
+                              <X size={14} />
+                            </button>
                           )}
                         </div>
                       </div>
-                      <div className={styles.assignedTaskCount}>{summary.count}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <div className={styles.infoValue}>None</div>
+                <div className={styles.infoValue}>No members yet</div>
+              )}
+
+              {showAddMember ? (
+                <div className={styles.addMemberDropdown}>
+                  <select
+                    className={styles.editSelect}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddMember(e.target.value);
+                      }
+                    }}
+                    value=""
+                    disabled={isAddingMember}
+                  >
+                    <option value="">Select user...</option>
+                    {availableUsersNotMembers.map((projectUser) => (
+                      <option key={projectUser.id} value={projectUser.profiles?.id || projectUser.id}>
+                        {getUserDisplayName(projectUser)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className={styles.cancelAddMemberButton}
+                    onClick={() => setShowAddMember(false)}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className={styles.addMemberButton}
+                  onClick={() => setShowAddMember(true)}
+                  type="button"
+                >
+                  <Plus size={14} /> Add Member
+                </button>
               )}
             </div>
           </div>
@@ -991,12 +1161,12 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<ActivityIcon size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('activity')}
-        forceCollapse={!isSidebarExpanded}
+        forceCollapse={shouldForceCollapse('activity')}
         forceExpand={shouldForceExpand('activity')}
         isCompact={!isSidebarExpanded}
         inSidebar={true}
       >
-        <div className={styles.cardContent}>
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
           {project.activity && project.activity.length > 0 ? (
             <div className={styles.activityFeed}>
               {project.activity.map(activity => (

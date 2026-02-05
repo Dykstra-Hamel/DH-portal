@@ -8,12 +8,13 @@ import { useStarredItems } from '@/hooks/useStarredItems';
 import ProjectForm from '@/components/Projects/ProjectForm/ProjectForm';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { ProjectKanbanView } from '@/components/ProjectManagement/ProjectKanbanView/ProjectKanbanView';
+import { ProjectCardGrid } from '@/components/ProjectManagement/ProjectCardGrid/ProjectCardGrid';
 import { ProjectCalendarView } from '@/components/ProjectManagement/ProjectCalendarView/ProjectCalendarView';
 import { ProjectsView } from '@/components/ProjectManagement/ProjectsView/ProjectsView';
 import { TemplateSelectorModal } from '@/components/ProjectTemplates/TemplateSelectorModal/TemplateSelectorModal';
 import { QuickProjectModal } from '@/components/ProjectTemplates/QuickProjectModal/QuickProjectModal';
 import { Task } from '@/types/taskManagement';
-import { Project, User, Company, ProjectFormData, ProjectTemplate, ProjectCategory, ProjectTask } from '@/types/project';
+import { Project, User, Company, ProjectFormData, ProjectTemplate, ProjectCategory, ProjectDepartment, ProjectTask, statusOptions } from '@/types/project';
 import { QuickProjectData } from '@/components/ProjectTemplates/QuickProjectModal/QuickProjectModal';
 import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
@@ -21,6 +22,7 @@ import { Search } from 'lucide-react';
 import styles from '../../project-management/projectManagement.module.scss';
 
 type ViewType = 'kanban' | 'list' | 'calendar';
+type ProjectStatusTab = 'current' | 'new' | 'on_hold' | 'completed';
 
 export default function AdminProjectManagementDashboard() {
   const router = useRouter();
@@ -31,14 +33,7 @@ export default function AdminProjectManagementDashboard() {
 
   // View and modal state
   const [currentView, setCurrentView] = useState<ViewType>('kanban');
-  const [kanbanGroupBy, setKanbanGroupBy] = useState<'date' | 'status'>(() => {
-    // Load saved preference from localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('projectManagement.kanbanGroupBy');
-      return (saved === 'status' ? 'status' : 'date') as 'date' | 'status';
-    }
-    return 'date';
-  });
+  const [projectStatusTab, setProjectStatusTab] = useState<ProjectStatusTab>('current');
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showTemplateSelectorModal, setShowTemplateSelectorModal] = useState(false);
@@ -59,7 +54,9 @@ export default function AdminProjectManagementDashboard() {
   // Category filtering state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
-  const [isFetchingCategories, setIsFetchingCategories] = useState(false);
+
+  // Department state
+  const [availableDepartments, setAvailableDepartments] = useState<ProjectDepartment[]>([]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +64,7 @@ export default function AdminProjectManagementDashboard() {
   // Project filter state
   const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
   const [filterAssignedTo, setFilterAssignedTo] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
 
   // Admin-only access check
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -77,13 +75,6 @@ export default function AdminProjectManagementDashboard() {
       router.push('/dashboard');
     }
   }, [profile, isAdmin, router]);
-
-  // Save kanban groupBy preference to localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('projectManagement.kanbanGroupBy', kanbanGroupBy);
-    }
-  }, [kanbanGroupBy]);
 
   // Helper function to get authentication headers
   const getAuthHeaders = async () => {
@@ -257,7 +248,6 @@ export default function AdminProjectManagementDashboard() {
   // Fetch admin categories (always from admin endpoint)
   useEffect(() => {
     const fetchCategories = async () => {
-      setIsFetchingCategories(true);
       try {
         // Always fetch admin/system categories for admin page
         const endpoint = '/api/admin/project-categories';
@@ -273,13 +263,34 @@ export default function AdminProjectManagementDashboard() {
       } catch (error) {
         console.error('Error fetching categories:', error);
         setAvailableCategories([]);
-      } finally {
-        setIsFetchingCategories(false);
       }
     };
 
     fetchCategories();
   }, []); // Fetch categories once on mount
+
+  // Fetch admin departments (always from admin endpoint)
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const endpoint = '/api/admin/project-departments';
+        const headers = await getAuthHeaders();
+        const response = await fetch(endpoint, { headers });
+
+        if (response.ok) {
+          const departments: ProjectDepartment[] = await response.json();
+          setAvailableDepartments(departments);
+        } else {
+          setAvailableDepartments([]);
+        }
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+        setAvailableDepartments([]);
+      }
+    };
+
+    fetchDepartments();
+  }, []); // Fetch departments once on mount
 
   // Calculate category counts for tabs - use allProjectsForCounts to ensure counts are accurate
   // even when a category filter is applied
@@ -320,6 +331,52 @@ export default function AdminProjectManagementDashboard() {
     );
   }, [projectsWithStarred, searchQuery]);
 
+  const statusTabCounts = useMemo(() => {
+    const isCompleteStatus = (status?: string | null) =>
+      status === 'complete' || status === 'completed';
+    const isNewStatus = (status?: string | null) => status === 'new';
+    const isOnHoldStatus = (status?: string | null) => status === 'on_hold';
+
+    return {
+      current: projectsWithStarred.filter(
+        (project) => !isNewStatus(project.status) && !isCompleteStatus(project.status) && !isOnHoldStatus(project.status)
+      ).length,
+      new: projectsWithStarred.filter((project) => isNewStatus(project.status)).length,
+      on_hold: projectsWithStarred.filter((project) => isOnHoldStatus(project.status)).length,
+      completed: projectsWithStarred.filter((project) => isCompleteStatus(project.status)).length,
+    };
+  }, [projectsWithStarred]);
+
+  const visibleProjects = useMemo(() => {
+    const isCompleteStatus = (status?: string | null) =>
+      status === 'complete' || status === 'completed';
+    const isNewStatus = (status?: string | null) => status === 'new';
+    const isOnHoldStatus = (status?: string | null) => status === 'on_hold';
+
+    let projects = filteredProjects;
+
+    // Apply status tab filter
+    if (projectStatusTab === 'new') {
+      projects = projects.filter((project) => isNewStatus(project.status));
+    } else if (projectStatusTab === 'on_hold') {
+      projects = projects.filter((project) => isOnHoldStatus(project.status));
+    } else if (projectStatusTab === 'completed') {
+      projects = projects.filter((project) => isCompleteStatus(project.status));
+    } else {
+      // Current tab: exclude new, on_hold, and completed
+      projects = projects.filter(
+        (project) => !isNewStatus(project.status) && !isOnHoldStatus(project.status) && !isCompleteStatus(project.status)
+      );
+    }
+
+    // Apply status dropdown filter (if selected)
+    if (filterStatus) {
+      projects = projects.filter((project) => project.status === filterStatus);
+    }
+
+    return projects;
+  }, [filteredProjects, projectStatusTab, filterStatus]);
+
   const taskStatsByProject = useMemo(() => {
     const stats: Record<string, { completed: number; total: number }> = {};
 
@@ -335,6 +392,25 @@ export default function AdminProjectManagementDashboard() {
 
     return stats;
   }, [tasks]);
+
+  const userTaskStatsByProject = useMemo(() => {
+    const stats: Record<string, { completed: number; total: number }> = {};
+
+    tasks.forEach((task) => {
+      if (!task.project_id) return;
+      // Only count tasks assigned to the current user
+      if (task.assigned_to !== user?.id) return;
+
+      const current = stats[task.project_id] || { completed: 0, total: 0 };
+      current.total += 1;
+      if (task.is_completed) {
+        current.completed += 1;
+      }
+      stats[task.project_id] = current;
+    });
+
+    return stats;
+  }, [tasks, user?.id]);
 
   // Register page actions
   useEffect(() => {
@@ -385,7 +461,16 @@ export default function AdminProjectManagementDashboard() {
         projectFilterControls: {
           selectedCompanyId: filterCompanyId,
           selectedAssignedTo: filterAssignedTo,
+          selectedCategoryId,
           companies: companies,
+          categories: [
+            ...availableCategories.map(category => ({
+              id: category.id,
+              name: category.name,
+              count: categoryCounts[category.id] || 0,
+            })),
+            { id: 'billing', name: 'Billing', count: categoryCounts['billing'] || 0 },
+          ],
           assignableUsers: assignableUsers,
           currentUser: {
             id: user.id,
@@ -399,12 +484,15 @@ export default function AdminProjectManagementDashboard() {
           onAssignedToChange: (userId: string | null) => {
             setFilterAssignedTo(userId);
           },
+          onCategoryChange: (categoryId: string | null) => {
+            setSelectedCategoryId(categoryId);
+          },
         },
       });
     }
 
     return () => setPageHeader(null);
-  }, [user, profile, users, companies, filterCompanyId, filterAssignedTo, setPageHeader]);
+  }, [user, profile, users, companies, filterCompanyId, filterAssignedTo, selectedCategoryId, availableCategories, categoryCounts, setPageHeader]);
 
   // Fetch companies
   useEffect(() => {
@@ -605,7 +693,10 @@ export default function AdminProjectManagementDashboard() {
       let dueDate = projectData.due_date;
       if (!dueDate && projectData.start_date) {
         const startDate = new Date(projectData.start_date);
-        startDate.setDate(startDate.getDate() + 30);
+        const offset =
+          selectedTemplate?.default_due_date_offset_days ??
+          30;
+        startDate.setDate(startDate.getDate() + offset);
         dueDate = startDate.toISOString().split('T')[0];
       }
 
@@ -635,7 +726,7 @@ export default function AdminProjectManagementDashboard() {
       console.error('Error creating project from template:', error);
       throw error;
     }
-  }, [fetchProjects, user]);
+  }, [fetchProjects, selectedTemplate, user]);
 
   const handleToggleStar = useCallback(async (projectId: string) => {
     await toggleStar('project', projectId);
@@ -649,96 +740,97 @@ export default function AdminProjectManagementDashboard() {
 
   return (
     <div className={styles.pageContainer}>
-      {/* Category Tabs with Search */}
+      {/* Project Status Tabs with Category Filter */}
       <div className={styles.tabsRow}>
-        <div className={styles.tabsSection}>
-          <button
-            className={`${styles.categoryTab} ${selectedCategoryId === null ? styles.active : ''}`}
-            onClick={() => setSelectedCategoryId(null)}
-          >
-            All Projects
-            <span className={styles.tabCount}>{categoryCounts.all}</span>
-          </button>
-          {availableCategories.map((category) => (
+        <div className={styles.tabsLeft}>
+          <div className={`${styles.tabsSection} ${styles.tabsSectionCompact}`}>
             <button
-              key={category.id}
-              className={`${styles.categoryTab} ${selectedCategoryId === category.id ? styles.active : ''}`}
-              onClick={() => setSelectedCategoryId(category.id)}
+              className={`${styles.categoryTab} ${projectStatusTab === 'current' ? styles.active : ''}`}
+              onClick={() => setProjectStatusTab('current')}
             >
-              {category.name}
-              <span className={styles.tabCount}>{categoryCounts[category.id] || 0}</span>
-            </button>
-          ))}
-          <button
-            className={`${styles.categoryTab} ${selectedCategoryId === 'billing' ? styles.active : ''}`}
-            onClick={() => setSelectedCategoryId('billing')}
-          >
-            Billing
-            <span className={styles.tabCount}>{categoryCounts['billing'] || 0}</span>
-          </button>
-        </div>
-        <div className={styles.searchSection}>
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <Search size={18} className={styles.searchIcon} />
-        </div>
-      </div>
-
-      {/* View Controls Row */}
-      <div className={styles.viewControls}>
-        {/* View Tabs (Kanban/List/Calendar) - LEFT SIDE */}
-        <div className={styles.viewTabs}>
-          <button
-            className={`${styles.viewTab} ${currentView === 'kanban' ? styles.active : ''}`}
-            onClick={() => setCurrentView('kanban')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4.55539 3.7778V9.22224M7.6665 3.7778V6.88891M10.7776 3.7778V10.7778M2.22206 0.666687H13.1109C13.9701 0.666687 14.6665 1.36313 14.6665 2.22224V13.1111C14.6665 13.9702 13.9701 14.6667 13.1109 14.6667H2.22206C1.36295 14.6667 0.666504 13.9702 0.666504 13.1111V2.22224C0.666504 1.36313 1.36295 0.666687 2.22206 0.666687Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Kanban
-          </button>
-          <button
-            className={`${styles.viewTab} ${currentView === 'list' ? styles.active : ''}`}
-            onClick={() => setCurrentView('list')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12" fill="none">
-              <path d="M0.666504 0.666687H0.674282M0.666504 5.66669H0.674282M0.666504 10.6667H0.674282M4.55539 0.666687H14.6665M4.55539 5.66669H14.6665M4.55539 10.6667H14.6665" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            List
-          </button>
-          <button
-            className={`${styles.viewTab} ${currentView === 'calendar' ? styles.active : ''}`}
-            onClick={() => setCurrentView('calendar')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="15" viewBox="0 0 14 15" fill="none">
-              <path d="M3.99984 0.666687V3.33335M9.33317 0.666687V3.33335M0.666504 6.00002H12.6665M1.99984 2.00002H11.3332C12.0696 2.00002 12.6665 2.59697 12.6665 3.33335V12.6667C12.6665 13.4031 12.0696 14 11.3332 14H1.99984C1.26346 14 0.666504 13.4031 0.666504 12.6667V3.33335C0.666504 2.59697 1.26346 2.00002 1.99984 2.00002Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Calendar
-          </button>
-        </div>
-
-        {/* Kanban Group By Toggle - RIGHT SIDE */}
-        {currentView === 'kanban' && (
-          <div className={styles.kanbanGroupToggle}>
-            <button
-              className={`${styles.groupToggleButton} ${kanbanGroupBy === 'date' ? styles.active : ''}`}
-              onClick={() => setKanbanGroupBy('date')}
-            >
-              Due Date
+              Current Projects
+              <span className={styles.tabCount}>{statusTabCounts.current}</span>
             </button>
             <button
-              className={`${styles.groupToggleButton} ${kanbanGroupBy === 'status' ? styles.active : ''}`}
-              onClick={() => setKanbanGroupBy('status')}
+              className={`${styles.categoryTab} ${projectStatusTab === 'new' ? styles.active : ''}`}
+              onClick={() => setProjectStatusTab('new')}
             >
-              Status
+              New Project Requests
+              <span className={styles.tabCount}>{statusTabCounts.new}</span>
+            </button>
+            <button
+              className={`${styles.categoryTab} ${projectStatusTab === 'on_hold' ? styles.active : ''}`}
+              onClick={() => setProjectStatusTab('on_hold')}
+            >
+              On Hold
+              <span className={styles.tabCount}>{statusTabCounts.on_hold}</span>
+            </button>
+            <button
+              className={`${styles.categoryTab} ${projectStatusTab === 'completed' ? styles.active : ''}`}
+              onClick={() => setProjectStatusTab('completed')}
+            >
+              Completed Projects
+              <span className={styles.tabCount}>{statusTabCounts.completed}</span>
             </button>
           </div>
-        )}
+          <div className={styles.searchSection}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Search size={18} className={styles.searchIcon} />
+          </div>
+        </div>
+        <div className={styles.tabsRight}>
+          <div className={styles.viewTabs}>
+            <button
+              className={`${styles.viewTab} ${currentView === 'kanban' ? styles.active : ''}`}
+              onClick={() => setCurrentView('kanban')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M4.55539 3.7778V9.22224M7.6665 3.7778V6.88891M10.7776 3.7778V10.7778M2.22206 0.666687H13.1109C13.9701 0.666687 14.6665 1.36313 14.6665 2.22224V13.1111C14.6665 13.9702 13.9701 14.6667 13.1109 14.6667H2.22206C1.36295 14.6667 0.666504 13.9702 0.666504 13.1111V2.22224C0.666504 1.36313 1.36295 0.666687 2.22206 0.666687Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Kanban
+            </button>
+            <button
+              className={`${styles.viewTab} ${currentView === 'list' ? styles.active : ''}`}
+              onClick={() => setCurrentView('list')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12" fill="none">
+                <path d="M0.666504 0.666687H0.674282M0.666504 5.66669H0.674282M0.666504 10.6667H0.674282M4.55539 0.666687H14.6665M4.55539 5.66669H14.6665M4.55539 10.6667H14.6665" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              List
+            </button>
+            <button
+              className={`${styles.viewTab} ${currentView === 'calendar' ? styles.active : ''}`}
+              onClick={() => setCurrentView('calendar')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="15" viewBox="0 0 14 15" fill="none">
+                <path d="M3.99984 0.666687V3.33335M9.33317 0.666687V3.33335M0.666504 6.00002H12.6665M1.99984 2.00002H11.3332C12.0696 2.00002 12.6665 2.59697 12.6665 3.33335V12.6667C12.6665 13.4031 12.0696 14 11.3332 14H1.99984C1.26346 14 0.666504 13.4031 0.666504 12.6667V3.33335C0.666504 2.59697 1.26346 2.00002 1.99984 2.00002Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Calendar
+            </button>
+          </div>
+
+          {/* Status Filter Dropdown */}
+          <select
+            className={styles.statusFilter}
+            value={filterStatus || ''}
+            onChange={(e) => setFilterStatus(e.target.value || null)}
+          >
+            <option value="">All Statuses</option>
+          {statusOptions
+            .filter(status => status.value !== 'new')
+            .map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* View Content */}
@@ -751,19 +843,30 @@ export default function AdminProjectManagementDashboard() {
         ) : (
           <>
             {currentView === 'kanban' && (
-              <ProjectKanbanView
-                projects={filteredProjects}
-                taskStatsByProject={taskStatsByProject}
-                onProjectClick={handleProjectClick}
-                onUpdateProject={handleUpdateProject}
-                onAddTask={() => setShowTaskModal(true)}
-                onToggleStar={handleToggleStar}
-                groupBy={kanbanGroupBy}
-              />
+              projectStatusTab === 'current' ? (
+                <ProjectKanbanView
+                  projects={visibleProjects}
+                  departments={availableDepartments}
+                  taskStatsByProject={taskStatsByProject}
+                  userTaskStatsByProject={userTaskStatsByProject}
+                  onProjectClick={handleProjectClick}
+                  onUpdateProject={handleUpdateProject}
+                  onToggleStar={handleToggleStar}
+                />
+              ) : (
+                <ProjectCardGrid
+                  projects={visibleProjects}
+                  taskStatsByProject={taskStatsByProject}
+                  userTaskStatsByProject={userTaskStatsByProject}
+                  onProjectClick={handleProjectClick}
+                  onToggleStar={handleToggleStar}
+                  onUpdateProject={handleUpdateProject}
+                />
+              )
             )}
             {currentView === 'list' && (
               <ProjectsView
-                projects={filteredProjects}
+                projects={visibleProjects}
                 tasks={tasks.map(convertToTask)}
                 onEditProject={handleEditProject}
                 onDeleteProject={handleDeleteProject}
@@ -772,7 +875,7 @@ export default function AdminProjectManagementDashboard() {
             )}
             {currentView === 'calendar' && (
               <ProjectCalendarView
-                projects={filteredProjects}
+                projects={visibleProjects}
                 onProjectClick={handleProjectClick}
               />
             )}
