@@ -4,6 +4,8 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
+import { sanitizeFileName } from '@/lib/storage-utils';
 import { ArrowLeft, Check, ChevronDown, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
@@ -861,9 +863,10 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
     }
   }, [project.id, updateTask]);
 
-  const handleAddComment = async (comment: string) => {
+  const handleAddComment = async (comment: string, parentCommentId?: string, attachments?: File[]) => {
     if (!selectedTask) return;
 
+    // First create the comment
     const response = await fetch(
       `/api/admin/projects/${project.id}/tasks/${selectedTask.id}/comments`,
       {
@@ -875,6 +878,66 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
     if (!response.ok) {
       throw new Error('Failed to add comment');
+    }
+
+    const newComment = await response.json();
+
+    // If there are attachments, upload them directly to storage
+    if (attachments && attachments.length > 0) {
+      const supabase = createClient();
+      const fileMetadata = [];
+
+      for (const file of attachments) {
+        // Validate file size (50MB)
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+          throw new Error(`File "${file.name}" exceeds 50MB limit`);
+        }
+
+        // Upload directly to Supabase Storage
+        const timestamp = Date.now();
+        const sanitizedName = sanitizeFileName(file.name);
+        const filePath = `comment-attachments/${project.id}/tasks/${selectedTask.id}/${newComment.id}/${timestamp}-${sanitizedName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('brand-assets')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+          throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+        }
+
+        fileMetadata.push({
+          file_path: filePath,
+          file_name: file.name,
+          file_size: file.size,
+          mime_type: file.type,
+        });
+      }
+
+      // Save metadata via API
+      const attachmentResponse = await fetch(
+        `/api/admin/projects/${project.id}/tasks/${selectedTask.id}/comments/${newComment.id}/attachments`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ files: fileMetadata }),
+        }
+      );
+
+      if (!attachmentResponse.ok) {
+        // Clean up uploaded files if metadata save fails
+        for (const metadata of fileMetadata) {
+          await supabase.storage.from('brand-assets').remove([metadata.file_path]);
+        }
+        throw new Error('Failed to save attachment metadata');
+      }
     }
 
     // Refresh task to get new comment
@@ -952,22 +1015,64 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
       const comment = await response.json();
 
-      // If there are attachments, upload them
+      // If there are attachments, upload them directly to storage
       if (pendingAttachments.length > 0) {
-        const formData = new FormData();
-        pendingAttachments.forEach(file => formData.append('files', file));
+        const supabase = createClient();
+        const fileMetadata = [];
 
+        for (const file of pendingAttachments) {
+          // Validate file size (50MB)
+          const MAX_FILE_SIZE = 50 * 1024 * 1024;
+          if (file.size > MAX_FILE_SIZE) {
+            throw new Error(`File "${file.name}" exceeds 50MB limit`);
+          }
+
+          // Upload directly to Supabase Storage
+          const timestamp = Date.now();
+          const sanitizedName = sanitizeFileName(file.name);
+          const filePath = `comment-attachments/${project.id}/${comment.id}/${timestamp}-${sanitizedName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('brand-assets')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error('Storage upload error:', uploadError);
+            throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+          }
+
+          fileMetadata.push({
+            file_path: filePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          });
+        }
+
+        // Save metadata via API
         const attachmentResponse = await fetch(
           `/api/admin/projects/${project.id}/comments/${comment.id}/attachments`,
           {
             method: 'POST',
-            body: formData,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ files: fileMetadata }),
           }
         );
 
         if (attachmentResponse.ok) {
           const uploadedAttachments = await attachmentResponse.json();
           comment.attachments = uploadedAttachments;
+        } else {
+          // Clean up uploaded files if metadata save fails
+          for (const metadata of fileMetadata) {
+            await supabase.storage.from('brand-assets').remove([metadata.file_path]);
+          }
+          throw new Error('Failed to save attachment metadata');
         }
       }
 
@@ -1230,22 +1335,55 @@ export default function ProjectDetailWithTasks({ project, user, onProjectUpdate 
 
     setUploadingProjectAttachment(true);
     try {
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
+      const supabase = createClient();
 
+      for (const file of files) {
+        // Validate file size (50MB)
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+          throw new Error(`File "${file.name}" exceeds 50MB limit`);
+        }
+
+        // Upload directly to Supabase Storage
+        const sanitizedName = sanitizeFileName(file.name);
+        const timestamp = Date.now();
+        const storagePath = `${project.id}/${timestamp}-${sanitizedName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('project-files')
+          .upload(storagePath, file, {
+            contentType: file.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError);
+          throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+        }
+
+        // Save metadata via API
         const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            file_path: storagePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          }),
         });
 
         if (!response.ok) {
-          let errorMessage = 'Failed to upload attachment';
+          // Clean up uploaded file if metadata save fails
+          await supabase.storage.from('project-files').remove([storagePath]);
+
+          let errorMessage = 'Failed to save attachment metadata';
           try {
             const errorData = await response.json();
             errorMessage = errorData.error || errorMessage;
           } catch {
-            // If response is not JSON, use status text
             errorMessage = response.statusText || errorMessage;
           }
           throw new Error(errorMessage);

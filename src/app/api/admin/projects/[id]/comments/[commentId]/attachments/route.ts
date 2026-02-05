@@ -58,7 +58,8 @@ export async function GET(
   }
 }
 
-// POST /api/admin/projects/[id]/comments/[commentId]/attachments - Upload attachments
+// POST /api/admin/projects/[id]/comments/[commentId]/attachments
+// Save attachment metadata after direct client upload to storage
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; commentId: string }> }
@@ -92,8 +93,14 @@ export async function POST(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
-    const formData = await request.formData();
-    const files = formData.getAll('files') as File[];
+    // Parse JSON body with array of file metadata (files already uploaded to storage)
+    const body = await request.json();
+    const files = body.files as Array<{
+      file_path: string;
+      file_name: string;
+      file_size: number;
+      mime_type: string;
+    }>;
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -103,56 +110,44 @@ export async function POST(
     }
 
     const uploadedAttachments = [];
-
     const allowedTypes = STORAGE_CONFIG.ATTACHMENT_ALLOWED_TYPES as readonly string[];
 
     for (const file of files) {
-      // Validate file type
-      if (!allowedTypes.includes(file.type)) {
+      // Validate required fields
+      if (!file.file_path || !file.file_name || !file.file_size || !file.mime_type) {
         return NextResponse.json(
-          { error: `Invalid file type: ${file.type}` },
+          { error: 'Missing required file fields' },
+          { status: 400 }
+        );
+      }
+
+      // Validate file type
+      if (!allowedTypes.includes(file.mime_type)) {
+        return NextResponse.json(
+          { error: `Invalid file type: ${file.mime_type}` },
           { status: 400 }
         );
       }
 
       // Validate file size
-      if (file.size > STORAGE_CONFIG.MAX_FILE_SIZE) {
+      if (file.file_size > STORAGE_CONFIG.MAX_FILE_SIZE) {
         return NextResponse.json(
-          { error: `File too large: ${file.name}` },
+          { error: `File too large: ${file.file_name}` },
           { status: 400 }
         );
       }
 
-      // Generate unique file path
-      const timestamp = Date.now();
-      const sanitizedName = sanitizeFileName(file.name);
-      const filePath = `${STORAGE_CONFIG.CATEGORIES.COMMENT_ATTACHMENTS}/${projectId}/${commentId}/${timestamp}-${sanitizedName}`;
-
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_CONFIG.BUCKET_NAME)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        return NextResponse.json(
-          { error: `Failed to upload ${file.name}` },
-          { status: 500 }
-        );
-      }
+      // File verification skipped - client already uploaded successfully
 
       // Create attachment record
       const { data: attachment, error: insertError } = await supabase
         .from('comment_attachments')
         .insert({
           project_comment_id: commentId,
-          file_path: filePath,
-          file_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
+          file_path: file.file_path,
+          file_name: file.file_name,
+          file_size: file.file_size,
+          mime_type: file.mime_type,
           uploaded_by: user.id,
         })
         .select()
@@ -160,10 +155,6 @@ export async function POST(
 
       if (insertError) {
         console.error('Error creating attachment record:', insertError);
-        // Clean up uploaded file
-        await supabase.storage
-          .from(STORAGE_CONFIG.BUCKET_NAME)
-          .remove([filePath]);
         return NextResponse.json(
           { error: 'Failed to create attachment record' },
           { status: 500 }
@@ -173,7 +164,7 @@ export async function POST(
       // Get public URL
       const { data: urlData } = supabase.storage
         .from(STORAGE_CONFIG.BUCKET_NAME)
-        .getPublicUrl(filePath);
+        .getPublicUrl(file.file_path);
 
       uploadedAttachments.push({
         ...attachment,

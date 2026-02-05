@@ -406,6 +406,18 @@
   border-color: var(--success-600, #04ae6a);
 }
 
+.projectTaskToggleBlocked {
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: white !important;
+  cursor: not-allowed !important;
+
+  &:hover {
+    background-color: #dc2626 !important;
+    border-color: #dc2626 !important;
+  }
+}
+
 .taskTitleRow {
   display: flex;
   align-items: center;

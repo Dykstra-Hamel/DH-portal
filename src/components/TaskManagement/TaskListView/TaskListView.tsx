@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Calendar, Check, ChevronLeft, ChevronRight, FolderKanban, MessageSquare, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, Check, ChevronLeft, ChevronRight, FolderKanban, Lock, MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/taskManagement';
 import { Project, statusOptions as projectStatusOptions } from '@/types/project';
 import { PriorityBadge } from '../shared/PriorityBadge';
@@ -605,12 +605,16 @@ export function TaskListView({
       >
         <button
           type="button"
-          className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''}`}
+          className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.projectTaskToggleBlocked : ''}`}
           onClick={(event) => handleToggleComplete(event, task)}
           aria-label={task.status === 'completed' ? 'Mark task incomplete' : 'Mark task complete'}
-          disabled={!onToggleComplete}
+          disabled={!onToggleComplete || !!(task.blocked_by_task && !task.blocked_by_task.is_completed)}
         >
-          {task.status === 'completed' && <Check size={12} />}
+          {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+            <Lock size={12} />
+          ) : task.status === 'completed' ? (
+            <Check size={12} />
+          ) : null}
         </button>
         <div className={styles.taskTitleRow}>
           {isEditing ? (
@@ -797,12 +801,16 @@ export function TaskListView({
           <div className={styles.cell}>
             <button
               type="button"
-              className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''}`}
+              className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.projectTaskToggleBlocked : ''}`}
               onClick={(event) => handleToggleComplete(event, task)}
               aria-label={task.status === 'completed' ? 'Mark task incomplete' : 'Mark task complete'}
-              disabled={!onToggleComplete}
+              disabled={!onToggleComplete || !!(task.blocked_by_task && !task.blocked_by_task.is_completed)}
             >
-              {task.status === 'completed' && <Check size={12} />}
+              {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+                <Lock size={12} />
+              ) : task.status === 'completed' ? (
+                <Check size={12} />
+              ) : null}
             </button>
           </div>
         )}

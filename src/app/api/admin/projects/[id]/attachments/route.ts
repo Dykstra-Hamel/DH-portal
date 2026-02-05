@@ -102,7 +102,7 @@ export async function GET(
 
 /**
  * POST /api/admin/projects/[id]/attachments
- * Upload a new attachment to a project
+ * Save attachment metadata after direct client upload to storage
  */
 export async function POST(
   request: NextRequest,
@@ -124,72 +124,44 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Parse form data
-    let formData;
-    try {
-      formData = await request.formData();
-    } catch (formError) {
-      console.error('Error parsing form data:', formError);
+    // Parse JSON body (file already uploaded directly to storage)
+    const body = await request.json();
+    const { file_path, file_name, file_size, mime_type } = body;
+
+    if (!file_path || !file_name || !file_size || !mime_type) {
       return NextResponse.json(
-        { error: 'Invalid form data' },
+        { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    const file = formData.get('file') as File;
-
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
     // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!ALLOWED_TYPES.includes(mime_type)) {
       return NextResponse.json(
-        { error: `File type ${file.type} is not allowed` },
+        { error: `File type ${mime_type} is not allowed` },
         { status: 400 }
       );
     }
 
     // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
+    if (file_size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: `File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit` },
         { status: 400 }
       );
     }
 
-    // Sanitize filename
-    const sanitizedName = sanitizeFileName(file.name);
-    const timestamp = Date.now();
-    const storagePath = `${projectId}/${timestamp}-${sanitizedName}`;
-
-    // Upload to storage
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      return NextResponse.json(
-        { error: 'Failed to upload file' },
-        { status: 500 }
-      );
-    }
+    // Verify the file exists in storage (optional - client already uploaded it)
+    // We trust the client upload succeeded if we got this far
 
     // Create attachment metadata
     const attachmentId = crypto.randomUUID();
     const attachment = {
       id: attachmentId,
-      file_path: storagePath,
-      file_name: file.name,
-      file_size: file.size,
-      mime_type: file.type,
+      file_path,
+      file_name,
+      file_size,
+      mime_type,
       uploaded_by: user.id,
       uploaded_at: new Date().toISOString(),
     };
@@ -202,8 +174,6 @@ export async function POST(
       .single();
 
     if (fetchError) {
-      // Clean up uploaded file
-      await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
       return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 });
     }
 
@@ -217,8 +187,6 @@ export async function POST(
       .eq('id', projectId);
 
     if (updateError) {
-      // Clean up uploaded file
-      await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
       return NextResponse.json(
         { error: 'Failed to update project attachments' },
         { status: 500 }
@@ -227,9 +195,9 @@ export async function POST(
 
     return NextResponse.json({ attachment }, { status: 201 });
   } catch (error) {
-    console.error('Error uploading attachment:', error);
+    console.error('Error saving attachment metadata:', error);
     return NextResponse.json(
-      { error: 'Failed to upload attachment' },
+      { error: 'Failed to save attachment' },
       { status: 500 }
     );
   }

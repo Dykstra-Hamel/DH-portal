@@ -25,7 +25,23 @@
   padding: 20px;
   background: var(--slate-50);
   overflow-y: auto;
-  scrollbar-gutter: stable both-edges;
+  min-height: 0;
+}
+
+.projectManagementMainContent {
+  overflow-x: hidden;
+  padding: 20px 0 0;
+}
+
+:global(.pageWrapper).projectManagementPageWrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  align-items: stretch;
+  max-width: none;
+  margin: 0;
+  justify-content: flex-start;
 }
 
 .headerActionButton {

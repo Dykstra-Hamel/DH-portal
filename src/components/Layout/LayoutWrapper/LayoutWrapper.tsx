@@ -36,6 +36,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   const isHomePage = pathname === '/';
   const isQuotePage = pathname.match(/^\/[^\/]+\/quote\/[^\/]+$/);
   const isCampaignLandingPage = pathname.match(/^\/campaign\/[^\/]+\/[^\/]+$/);
+  const isProjectManagementPage =
+    pathname === '/project-management' || pathname === '/admin/project-management';
 
   // Pages that should have the full layout (header + sidebar)
   const shouldShowLayout =
@@ -473,8 +475,19 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               customActions={pageConfig.customActions}
             />
           )}
-          <main className={styles.mainContent} data-scroll-container="main">
-            <section className="pageWrapper">{children}</section>
+          <main
+            className={`${styles.mainContent} ${
+              isProjectManagementPage ? styles.projectManagementMainContent : ''
+            }`.trim()}
+            data-scroll-container="main"
+          >
+            <section
+              className={`pageWrapper ${
+                isProjectManagementPage ? styles.projectManagementPageWrapper : ''
+              }`}
+            >
+              {children}
+            </section>
           </main>
           <BackToTopButton />
         </div>

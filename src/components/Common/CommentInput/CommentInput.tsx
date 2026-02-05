@@ -14,7 +14,7 @@ const ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ];
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 interface CommentInputProps {
   onSubmit: (content: string, attachments?: File[]) => void;
@@ -58,7 +58,7 @@ export function CommentInput({
       return `File type not allowed: ${file.name}`;
     }
     if (file.size > MAX_FILE_SIZE) {
-      return `File too large (max 10MB): ${file.name}`;
+      return `File too large (max 50MB): ${file.name}`;
     }
     return null;
   }, []);
